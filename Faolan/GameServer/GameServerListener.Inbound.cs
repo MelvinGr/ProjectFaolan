@@ -2375,9 +2375,9 @@ namespace Faolan.GameServer
 			// Keyed by the client's own ROLE tag (#647), like the vendor branch above is keyed by template.
 			// This used to match the display name "Trader", which was the wrong key twice over: the string is
 			// a role FOUR templates play, so it pinned none of them, and any other NPC carrying it would have
-			// opened the auction house. See IsAuctioneerTemplate.
+			// opened the auction house. See TradepostService.IsAuctioneerTemplate.
 			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var auctioneerTemplate) &&
-			    await IsAuctioneerTemplate(auctioneerTemplate) && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
+			    await _tradepost.IsAuctioneerTemplate(auctioneerTemplate) && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 			{
 				await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 				return;

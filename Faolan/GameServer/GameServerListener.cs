@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -52,10 +53,6 @@ namespace Faolan.GameServer
 		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
 		private const int SprintEnergyDrainPerTick = 900; // ~necro 9000 -> ~10s of continuous sprint.
-
-		private const uint BankFlagListed = 0x401; // flags value while listed for sale
-		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
-		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
 
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
@@ -247,6 +244,10 @@ namespace Faolan.GameServer
 		// (0x205E) with the captured remoteformat, distinct from the interactive _conversation. See Dialogue/StockConversationService.cs.
 		private readonly StockConversationService _stockConversation;
 
+		// The auction house + the mailbox (listings, buy/sell, mail send/take). Reaches the wallet + item-grant
+		// through IEconomyOutbound, like the shop and the bank. See Economy/TradepostService.cs.
+		private readonly TradepostService _tradepost;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -317,6 +318,7 @@ namespace Faolan.GameServer
 			_equipment = new EquipmentService(database, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
+			_tradepost = new TradepostService(database, logger, this); // auction house + mailbox (#200)
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 			// #495/#504: "the world damaged you" - fall damage and the scripted hazard volumes. Driven from the move
@@ -492,6 +494,14 @@ namespace Faolan.GameServer
 
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};
+		}
+
+		// Tradepost/mail packets are the service's (Economy/TradepostService.cs); the listener keeps only the
+		// unknown-packet tracer, which is connection bookkeeping rather than economy logic.
+		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet, FaolanStream body)
+		{
+			if (!await _tradepost.Handle(client, packet, body))
+				LogUnknownPacket(packet);
 		}
 
 		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every

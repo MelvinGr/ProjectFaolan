@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -12,15 +13,36 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
-using Faolan.GameServer.Economy;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Economy
 {
-	public partial class GameServerListener
+	// The auction house (Tradepost) + the mailbox, decoded from the NecroL80 sell/buy/mail captures
+	// (docs/subsystems/tradepost-protocol.md). Extracted out of GameServerListener as a composed collaborator
+	// (#200): it owns the listing/mail transactions and the auctioneer-template cache, and reaches the two
+	// cross-cutting OUTBOUND ops it needs - the wallet update and the live item grant - through the
+	// IEconomyOutbound port the listener implements, exactly as ShopService/BankService do.
+	//
+	// Everything that is purely a SEND stayed in TradepostResponses (the addressing + framing); this class holds
+	// the transactions. `Handle` returns false for a method it does not own so the LISTENER keeps ownership of the
+	// unknown-packet tracer, which is connection-level bookkeeping rather than economy logic.
+	public sealed class TradepostService
 	{
-		// The NPC TEMPLATES that operate an auction house, cached on the listener (#647). Talking to one opens the
-		// Tradepost - GameServerListener.Inbound's TalkToNpc auctioneer branch.
+		// Bank-slot overlay flag values the client draws a listed / mail-pending cell from (captures F376/F398/F500).
+		private const uint BankFlagListed = 0x401; // flags value while listed for sale
+		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
+		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
+
+		// The backpack's base cell count (mirrors BaseBackpackSlots on the listener) - a read-only query helper is
+		// copied in rather than seamed, per the extraction pattern.
+		private const uint BaseBackpackSlots = 24;
+
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly IEconomyOutbound _outbound;
+
+		// The NPC TEMPLATES that operate an auction house (#647). Talking to one opens the Tradepost -
+		// GameServerListener.Inbound's TalkToNpc auctioneer branch.
 		//
 		// The role comes from the CLIENT's own spawn data (`NpcStats.profession_type` -> `NpcStatCore.ProfessionType`),
 		// not from the display name "Trader" this used to match on. A name was the wrong key twice over: "Trader" is a
@@ -30,16 +52,116 @@ namespace Faolan.GameServer
 		// whichever one a capture saw.
 		private HashSet<uint>? _auctioneerTemplates;
 
-		private async Task<bool> IsAuctioneerTemplate(uint npcTemplateId)
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
-			_auctioneerTemplates ??= [.. await Database.GetNpcTemplatesByProfession(NpcProfession.Auctioneer)];
+			_database = database;
+			_logger = logger;
+			_outbound = outbound;
+		}
+
+		public async Task<bool> IsAuctioneerTemplate(uint npcTemplateId)
+		{
+			_auctioneerTemplates ??= [.. await _database.GetNpcTemplatesByProfession(NpcProfession.Auctioneer)];
 			return _auctioneerTemplates.Contains(npcTemplateId);
+		}
+
+		// Inbound Tradepost (auction house) + mail dispatch, routed here by receiver class (TradepostAgentType) from
+		// the listener's ReceivedPacket. ItemSearch parses + replies via TradepostResponses; the mutating ops are the
+		// methods below. Grammar in docs/subsystems/tradepost-protocol.md.
+		//
+		// Returns false for a method this service does not own, so the caller can log it as unhandled.
+		public async Task<bool> Handle(INetworkClient client, Rpc packet, FaolanStream body)
+		{
+			var method = (TradepostAgentMethods)packet.Method;
+			switch (method)
+			{
+				case TradepostAgentMethods.UpdateItemTimeouts:
+				{
+					// Sent (empty body) AFTER the client received DispatchOpenTradepost (auctioneer / .ah) - the
+					// observed "window opened" signal; nothing to send back, just log.
+					_logger.LogInformation("Tradepost: {Char} opened the auction house.", client.Session.Character.Name);
+					break;
+				}
+
+				case TradepostAgentMethods.ItemSearch:
+				{
+					var query = TradepostItemSearchCodec.Parse(body.ReadRemainingArray());
+					var listings = await _database.GetTradepostListings(query.ItemId, client.Session.Character.RealmId); // #324: realm-local market
+					_logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session.Character!.Name, query.Lang, query.ItemId,
+						query.Page, listings.Length);
+
+					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
+					await TradepostResponses.SendSearchResults(client, packet.Sender.Instance, listings);
+					break;
+				}
+
+				case TradepostAgentMethods.BuyItem:
+				{
+					// BUY -> debit the buyer + deliver the item via a system mail.
+					await HandleBuy(client, packet, body);
+					break;
+				}
+
+				case TradepostAgentMethods.TradepostSellItem:
+				{
+					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
+					await HandleSell(client, body);
+					break;
+				}
+
+				case TradepostAgentMethods.TradepostChangeItemPrice:
+				{
+					await HandleChangePrice(client, body);
+					break;
+				}
+
+				case TradepostAgentMethods.TradepostCancelSellItem:
+				{
+					await HandleCancelSell(client, body);
+					break;
+				}
+
+				case TradepostAgentMethods.SendMail:
+				{
+					await HandleSendMail(client, packet, body);
+					break;
+				}
+
+				case TradepostAgentMethods.CancelMail:
+				{
+					await HandleCancelMail(client, body);
+					break;
+				}
+
+				case TradepostAgentMethods.Close:
+				{
+					_logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session.Character.Name);
+					break;
+				}
+
+				// Mailbox retrieval ops: poll / preview / take the bought item / mark-read / delete.
+				case TradepostAgentMethods.GetAllMails:
+				case TradepostAgentMethods.GetMailByID:
+				case TradepostAgentMethods.GetItemData:
+				case TradepostAgentMethods.GetMailItem:
+				case TradepostAgentMethods.MarkMailRead:
+				case TradepostAgentMethods.DeleteMail:
+				{
+					await HandleMailOp(client, packet, body, method);
+					break;
+				}
+
+				default:
+					return false;
+			}
+
+			return true;
 		}
 
 		// The next wire MailId: a deterministic sequence (max + 1), not a random id + collision retry.
 		private async Task<ulong> AllocateMailId()
 		{
-			return await Database.GetNextMailId();
+			return await _database.GetNextMailId();
 		}
 
 		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
@@ -92,61 +214,61 @@ namespace Faolan.GameServer
 			var character = client.Session.Character;
 			var credited = mail.Money;
 			character.Money += credited;
-			await Database.SetCharacterMoney(character.Id, character.Money);
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
-			await Database.SetMailMoney(mail.MailId, 0);
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
+			await _database.SetMailMoney(mail.MailId, 0);
 			mail.Money = 0;
-			Logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
+			_logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
 		}
 
 		// TradepostBuyItem (0x200E) [saleId:u64][searchResultId:u64]: charge the buyer and deliver the listed item via
 		// a system mail. Refuses on unknown listing or insufficient funds (no money moves until the mail is created).
-		private async Task HandleTradepostBuy(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleBuy(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
 			var saleId = body.ReadUInt64();
 			body.ReadUInt64(); // searchResultId - the row in the client's own search result; the saleId resolves the sale
 
-			var listing = await Database.GetTradepostListingBySaleId(saleId, character.RealmId);
+			var listing = await _database.GetTradepostListingBySaleId(saleId, character.RealmId);
 			if (listing == null)
 			{
-				Logger.LogWarning("Tradepost BUY: {Char} bought unknown listing saleId=0x{Sale:X16} (already sold?).", character.Name, saleId);
+				_logger.LogWarning("Tradepost BUY: {Char} bought unknown listing saleId=0x{Sale:X16} (already sold?).", character.Name, saleId);
 				return;
 			}
 
 			if (character.Money < listing.Price)
 			{
-				Logger.LogInformation("Tradepost BUY: {Char} can't afford listing 0x{Sale:X16} ({Price} tin, has {Balance}).", character.Name, saleId, listing.Price, character.Money);
+				_logger.LogInformation("Tradepost BUY: {Char} can't afford listing 0x{Sale:X16} ({Price} tin, has {Balance}).", character.Name, saleId, listing.Price, character.Money);
 				return;
 			}
 
 			character.Money -= listing.Price;
-			await Database.SetCharacterMoney(character.Id, character.Money);
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			var mail = await BuildPurchaseMail(character.Name!, listing);
 			mail.RealmId = character.RealmId; // #324: no cross-realm mail (recipient = buyer)
-			await Database.CreateMail(mail);
-			await Database.DeleteTradepostListing(saleId, character.RealmId);
+			await _database.CreateMail(mail);
+			await _database.DeleteTradepostListing(saleId, character.RealmId);
 
 			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now - the sale removes it
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
-			var seller = await Database.GetCharacterByName(listing.SellerName, character.RealmId);
+			var seller = await _database.GetCharacterByName(listing.SellerName, character.RealmId);
 			if (seller != null && seller.Id != character.Id)
-				await Database.SetCharacterInventorySlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
+				await _database.SetCharacterInventorySlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
 			await TradepostResponses.SendMailMessage(client, mail, false, packet.Sender.Instance);
 
-			Logger.LogInformation("Tradepost BUY: {Char} bought listing 0x{Sale:X16} (item 0x{Item:X}) for {Price} tin -> mail 0x{Mail:X16} (wallet {Balance}).", character.Name, saleId,
+			_logger.LogInformation("Tradepost BUY: {Char} bought listing 0x{Sale:X16} (item 0x{Item:X}) for {Price} tin -> mail 0x{Mail:X16} (wallet {Balance}).", character.Name, saleId,
 				listing.ItemId, listing.Price, mail.MailId, character.Money);
 		}
 
 		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
 		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
-		private async Task HandleTradepostCancelMail(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleCancelMail(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
@@ -154,62 +276,63 @@ namespace Faolan.GameServer
 
 			// If the sender (this player) attached a bank item, clear its mail-pending overlay (capture F404: flag -> 1)
 			// - the item never left the bank, so cancelling just frees it.
-			var mail = await Database.GetMailByWireId(mailId);
+			var mail = await _database.GetMailByWireId(mailId);
 			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
-				await SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+				await TradepostResponses.SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
 
-			await Database.DeleteMail(mailId);
-			Logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
+			await _database.DeleteMail(mailId);
+			_logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
 		}
 
 		// TradepostCancelSellItem (0x200C) [nBankItemSlot:u32]: pull the seller's own listing (capture F397 = slot 6).
 		// The item never left the bank (it just had the "listed" overlay), so cancelling only deletes the listing -
 		// the client clears the overlay itself.
-		private async Task HandleTradepostCancelSell(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleCancelSell(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
 			var bankSlot = body.ReadUInt32();
 
-			var listing = await Database.GetTradepostListingBySellerSlot(character.Name!, bankSlot, character.RealmId);
+			var listing = await _database.GetTradepostListingBySellerSlot(character.Name!, bankSlot, character.RealmId);
 			if (listing == null)
 			{
-				Logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				_logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
 				return;
 			}
 
-			await Database.DeleteTradepostListing(listing.SaleId, character.RealmId);
+			await _database.DeleteTradepostListing(listing.SaleId, character.RealmId);
 			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
-			Logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.", character.Name, listing.SaleId, bankSlot);
+			await TradepostResponses.SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+			await TradepostResponses.SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
+			_logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.", character.Name, listing.SaleId, bankSlot);
 		}
 
-		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing, 		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
-		private async Task HandleTradepostChangePrice(INetworkClient client, Rpc packet, FaolanStream body)
+		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing,
+		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
+		private async Task HandleChangePrice(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
 			var bankSlot = body.ReadUInt32();
 			var newPrice = body.ReadUInt64();
 
-			var listing = await Database.GetTradepostListingBySellerSlot(character.Name!, bankSlot, character.RealmId);
+			var listing = await _database.GetTradepostListingBySellerSlot(character.Name!, bankSlot, character.RealmId);
 			if (listing == null)
 			{
-				Logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				_logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
 				return;
 			}
 
-			await Database.SetTradepostListingPrice(listing.SaleId, character.RealmId, newPrice);
+			await _database.SetTradepostListingPrice(listing.SaleId, character.RealmId, newPrice);
 			// Update the bank-slot overlay's price stat (capture F364).
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
-			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price,
+			await TradepostResponses.SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
+			_logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price,
 				newPrice);
 		}
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
 		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
-		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentMethods method)
+		private async Task HandleMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentMethods method)
 		{
 			var character = client.Session.Character;
 
@@ -219,17 +342,17 @@ namespace Faolan.GameServer
 			{
 				case TradepostAgentMethods.GetAllMails:
 				{
-					var mails = await Database.GetMailsForRecipient(character.Name!, character.RealmId);
+					var mails = await _database.GetMailsForRecipient(character.Name!, character.RealmId);
 					foreach (var m in mails)
 						await TradepostResponses.SendMailMessage(client, m, false, inst);
 					await TradepostResponses.SendRetrieveMailResult(client, inst);
-					Logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Length);
+					_logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Length);
 					break;
 				}
 
 				case TradepostAgentMethods.GetMailByID:
 				{
-					var mail = await Database.GetMailByWireId(body.ReadUInt64());
+					var mail = await _database.GetMailByWireId(body.ReadUInt64());
 					if (mail != null)
 						await TradepostResponses.SendMailMessage(client, mail, false, inst);
 					break;
@@ -238,7 +361,7 @@ namespace Faolan.GameServer
 				case TradepostAgentMethods.GetItemData:
 				{
 					// Preview: the mail WITH its attachment (the client shows the item in the mail; nothing is granted).
-					var mail = await Database.GetMailByWireId(body.ReadUInt64());
+					var mail = await _database.GetMailByWireId(body.ReadUInt64());
 					if (mail != null)
 						await TradepostResponses.SendMailMessage(client, mail, true, inst);
 					break;
@@ -255,7 +378,7 @@ namespace Faolan.GameServer
 				case TradepostAgentMethods.MarkMailRead:
 				{
 					var mailId = body.ReadUInt64();
-					await Database.SetMailRead(mailId, true);
+					await _database.SetMailRead(mailId, true);
 					await TradepostResponses.SendMailResult(client, true, 0, inst);
 					break;
 				}
@@ -263,100 +386,8 @@ namespace Faolan.GameServer
 				case TradepostAgentMethods.DeleteMail:
 				{
 					var mailId = body.ReadUInt64();
-					await Database.DeleteMail(mailId);
-					Logger.LogInformation("Tradepost mail: {Char} deleted mail 0x{Mail:X16}.", character.Name, mailId);
-					break;
-				}
-			}
-		}
-
-		// Inbound Tradepost (auction house) + mail dispatch, routed here by receiver class (TradepostAgentType) from
-		// ReceivedPacket. Mutating ops are folded onto the listener (GameServerListener.Tradepost.cs); ItemSearch parses + replies via
-		// TradepostResponses. Grammar in docs/subsystems/tradepost-protocol.md.
-		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet, FaolanStream body)
-		{
-			var method = (TradepostAgentMethods)packet.Method;
-			switch (method)
-			{
-				case TradepostAgentMethods.UpdateItemTimeouts:
-				{
-					// Sent (empty body) AFTER the client received DispatchOpenTradepost (auctioneer / .ah) - the
-					// observed "window opened" signal; nothing to send back, just log.
-					Logger.LogInformation("Tradepost: {Char} opened the auction house.", client.Session.Character.Name);
-					break;
-				}
-
-				case TradepostAgentMethods.ItemSearch:
-				{
-					var query = TradepostItemSearchCodec.Parse(body.ReadRemainingArray());
-					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character.RealmId); // #324: realm-local market
-					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session.Character!.Name, query.Lang, query.ItemId,
-						query.Page, listings.Length);
-
-					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no rows).
-					await TradepostResponses.SendSearchResults(client, packet.Sender.Instance, listings);
-					break;
-				}
-
-				case TradepostAgentMethods.BuyItem:
-				{
-					// BUY -> debit the buyer + deliver the item via a system mail.
-					await HandleTradepostBuy(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.TradepostSellItem:
-				{
-					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
-					await HandleTradepostSell(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.TradepostChangeItemPrice:
-				{
-					await HandleTradepostChangePrice(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.TradepostCancelSellItem:
-				{
-					await HandleTradepostCancelSell(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.SendMail:
-				{
-					await HandleTradepostSendMail(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.CancelMail:
-				{
-					await HandleTradepostCancelMail(client, packet, body);
-					break;
-				}
-
-				case TradepostAgentMethods.Close:
-				{
-					Logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session.Character.Name);
-					break;
-				}
-
-				// Mailbox retrieval ops: poll / preview / take the bought item / mark-read / delete.
-				case TradepostAgentMethods.GetAllMails:
-				case TradepostAgentMethods.GetMailByID:
-				case TradepostAgentMethods.GetItemData:
-				case TradepostAgentMethods.GetMailItem:
-				case TradepostAgentMethods.MarkMailRead:
-				case TradepostAgentMethods.DeleteMail:
-				{
-					await HandleTradepostMailOp(client, packet, body, method);
-					break;
-				}
-
-				default:
-				{
-					LogUnknownPacket(packet);
+					await _database.DeleteMail(mailId);
+					_logger.LogInformation("Tradepost mail: {Char} deleted mail 0x{Mail:X16}.", character.Name, mailId);
 					break;
 				}
 			}
@@ -365,28 +396,28 @@ namespace Faolan.GameServer
 		// TradepostSellItem (0x200A) [nBankItemSlot:u32][nPrice:u64]: list one of the player's BANK items (container
 		// 105) for sale. Decoded from the NecroL80 sell_item_on_ah capture (F375 = slot 6 @ 1,000,000 tin). Creates a
 		// TradepostListing from the bank item's identity, escrows the item out of the bank, and refreshes the bank tab.
-		private async Task HandleTradepostSell(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleSell(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
 			var bankSlot = (int)body.ReadUInt32();
 			var price = body.ReadUInt64();
 
-			var row = await Database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
+			var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
 			if (row?.Item == null)
 			{
-				Logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
+				_logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
 				return;
 			}
 
 			// #181: file the listing under the item's AH search CATEGORY (the item-type-search id the client queries
 			// by, e.g. 30030) so a normal item-type search surfaces it, recovered from captured listings. Falls back
 			// to the template when the category is unknown (no regression vs the old template-filing).
-			var searchCategory = await Database.GetItemSearchCategory(row.Item.Id) ?? row.Item.Id;
+			var searchCategory = await _database.GetItemSearchCategory(row.Item.Id) ?? row.Item.Id;
 
 			var listing = new TradepostListing
 			{
-				SaleId = await Database.GetNextTradepostSaleId(character.RealmId),
+				SaleId = await _database.GetNextTradepostSaleId(character.RealmId),
 				Handle = 0,
 				RealmId = character.RealmId, // #324: the AH is realm-local (the seller's realm)
 				SellerName = character.Name!,
@@ -404,22 +435,22 @@ namespace Faolan.GameServer
 				ItemLevel = row.Item.Level,
 				ItemHash = row.Item.Hash
 			};
-			await Database.CreateTradepostListing(listing);
+			await _database.CreateTradepostListing(listing);
 
 			// The listed item STAYS in its bank slot - the client draws a "listed" overlay when the server pushes
 			// these three bank-slot stat updates (decoded from the capture, F376/F377): price, timestamp, and the
-			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleTradepostBuy clears the cell).
-			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatPrice, (uint)price);
-			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
+			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleBuy clears the cell).
+			await TradepostResponses.SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatPrice, (uint)price);
+			await TradepostResponses.SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+			await TradepostResponses.SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
 
 			// Retail pushes a 0x2005 wallet refresh after a listing - but the balance is UNCHANGED: there is NO
 			// listing deposit / postage fee. Verified across the sell / send-mail / change-price / cancel captures
 			// (NecroL80 stays at 1,365,148 tin throughout), #182. Push the current balance (reason 0, as captured) so
 			// the HUD stays in sync; no debit.
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", character.Name, row.Item.Name,
+			_logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", character.Name, row.Item.Name,
 				listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
 		}
 
@@ -428,7 +459,7 @@ namespace Faolan.GameServer
 		// test", slot 5, no COD - its word is 0x7E2 = one attachment; see #378 on why that is read as a count).
 		// Creates a Mail to the recipient with the sender's bank item escrowed, removes it from the sender's bank, and
 		// replies DispatchSendMailResult. Rejects (success=0) an unknown recipient so the client shows "couldn't send".
-		private async Task HandleTradepostSendMail(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleSendMail(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var character = client.Session.Character;
 
@@ -450,7 +481,7 @@ namespace Faolan.GameServer
 				if (!ListFrame.TryCountOf(attachmentWord, out var attachmentCount))
 				{
 					// Not count-framed => not the shape we think. Say so with the bytes rather than guessing.
-					Logger.LogWarning("Tradepost mail: attachment word 0x{Word:X} is not count-framed; ignoring attachments (#378).", attachmentWord);
+					_logger.LogWarning("Tradepost mail: attachment word 0x{Word:X} is not count-framed; ignoring attachments (#378).", attachmentWord);
 					attachmentCount = 0;
 				}
 
@@ -462,13 +493,13 @@ namespace Faolan.GameServer
 				}
 
 				if (attachmentCount > 1)
-					Logger.LogWarning("Tradepost mail: {Char} sent {Count} attachments; only the first is escrowed (#378).", character.Name, attachmentCount);
+					_logger.LogWarning("Tradepost mail: {Char} sent {Count} attachments; only the first is escrowed (#378).", character.Name, attachmentCount);
 			}
 
-			var recipient = await Database.GetCharacterByName(recipientName, character.RealmId);
+			var recipient = await _database.GetCharacterByName(recipientName, character.RealmId);
 			if (recipient == null)
 			{
-				Logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
+				_logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
 				await TradepostResponses.SendMailSendResult(client, false, packet.Sender.Instance);
 				return;
 			}
@@ -493,7 +524,7 @@ namespace Faolan.GameServer
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
 			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
 			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
-			var row = await Database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
+			var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
 			if (row?.Item != null)
 			{
 				mail.SenderBankSlot = (uint)bankSlot;
@@ -515,19 +546,19 @@ namespace Faolan.GameServer
 				});
 			}
 
-			await Database.CreateMail(mail);
+			await _database.CreateMail(mail);
 			await TradepostResponses.SendMailSendResult(client, true, packet.Sender.Instance);
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (row?.Item != null)
-				await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagMailPending);
+				await TradepostResponses.SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagMailPending);
 
 			// Retail pushes a 0x2005 wallet refresh after SendMail too - again with NO postage fee (the captured
 			// balance is unchanged across the send-mail-with-attachment capture), #182. Push the current balance so
 			// the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText,
+			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText,
 				money, row?.Item != null);
 		}
 
@@ -542,51 +573,52 @@ namespace Faolan.GameServer
 		private async Task TakeMailItem(INetworkClient client, ulong mailId, ulong itemInstanceId, uint inst)
 		{
 			var character = client.Session.Character;
-			var mail = await Database.GetMailByWireId(mailId);
+			var mail = await _database.GetMailByWireId(mailId);
 			var attachment = mail?.Attachments?.FirstOrDefault(a => a.ItemInstanceId == itemInstanceId) ?? mail?.Attachments?.FirstOrDefault();
 			if (mail == null || attachment == null)
 			{
-				Logger.LogWarning("Tradepost mail: {Char} tried to take item 0x{Item:X16} from mail 0x{Mail:X16} (no such attachment).", character.Name, itemInstanceId, mailId);
+				_logger.LogWarning("Tradepost mail: {Char} tried to take item 0x{Item:X16} from mail 0x{Mail:X16} (no such attachment).", character.Name, itemInstanceId, mailId);
 				return;
 			}
 
 			var slot = await FindFreeBagSlot(character.Id);
 			if (slot == null)
 			{
-				Logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);
+				_logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);
 				return;
 			}
 
 			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
-			await SendAddItem(client, ContainerKind.Bag, (uint)slot.Value, entry);
+			await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)slot.Value, entry);
 
 			var qty = attachment.Quantity == 0
 				? 1u
 				: attachment.Quantity;
-			var item = await Database.GetItem(attachment.Template);
+			var item = await _database.GetItem(attachment.Template);
 			if (item != null)
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
 				// holds), letting the bought item persist. Hash-0 items the world-entry snapshot drops are
 				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
-				await Database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
+				await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
 			else
-				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
+				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
 			// AH system mail has an empty sender (the listed item already left the seller's bank on buy), so skip it.
 			if (!string.IsNullOrEmpty(mail.SenderName))
 			{
-				var sender = await Database.GetCharacterByName(mail.SenderName, mail.RealmId);
+				var sender = await _database.GetCharacterByName(mail.SenderName, mail.RealmId);
 				if (sender != null)
-					await Database.SetCharacterInventorySlot(sender.Id, ContainerKind.Bank, (int)mail.SenderBankSlot, null);
+					await _database.SetCharacterInventorySlot(sender.Id, ContainerKind.Bank, (int)mail.SenderBankSlot, null);
 			}
 
-			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
+			await _database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
 			mail.Attachments.Remove(attachment);
 			// #213: also bank any attached money on the take so the re-sent mail shows NO remaining attachment - the
 			// client greys out delete while a mail still has unclaimed contents, so leaving the money behind is what
-			// pinned the delete button (and "take all" never credited the tin). Retail captures never carry mail money, 			// so there's no observed take-money op; crediting it with the item take matches the player expectation.
+			// pinned the delete button (and "take all" never credited the tin). Retail captures never carry mail money,
+			// so there's no observed take-money op; crediting it with the item take matches the player expectation.
 			await GrantMailMoney(client, mail);
 			await TradepostResponses.SendMailMessage(client, mail, false, inst);
 			// Complete the take with a result ack, mirroring MarkMailRead (#213): without it the client's mail-op state
@@ -594,7 +626,20 @@ namespace Faolan.GameServer
 			// mailbox is reopened, which resets that state); the ack lets the delete go through on the first try.
 			await TradepostResponses.SendMailResult(client, true, 0, inst);
 
-			Logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
+			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
+		}
+
+		// The first free backpack cell, skipping persisted rows + the legacy starter-bag cell while it renders. The
+		// backpack size is 24 base + the equipped bag's extra slots (#12), so a grown bag can be filled. Null = full.
+		// Read-only DB helper (mirrors GameServerListener.FindFreeBagSlot - copied rather than seamed).
+		private async Task<int?> FindFreeBagSlot(uint characterId)
+		{
+			var equipment = await _database.GetCharacterEquipment(characterId);
+			var taken = (await _database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
+			if (equipment?.FirstPosBag is { Hash: not 0 })
+				taken.Add(1);
+			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
+			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
 		// Builds the live DispatchAddItem entry for a mail attachment via the shared SnapshotItems (the single

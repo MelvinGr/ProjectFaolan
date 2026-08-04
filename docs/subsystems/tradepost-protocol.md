@@ -1,7 +1,7 @@
 # Tradepost (auction house) + mail protocol
 
 The protocol below is decoded byte-exact and the open + search replies are wired + golden-tested
-(`Faolan/GameServer/GameServerListener.Tradepost.cs` + `Faolan.Core.Network/Codecs/Economy/`,
+(`Faolan/GameServer/Economy/TradepostService.cs` + `Faolan.Core.Network/Codecs/Economy/`,
 `TradepostResponseTests`). The `.ah` GM command sends `DispatchOpenTradepost` at the player's position.
 
 Decoded 2026-06-12 from two captures via `TradepostListingCodecTests`:
@@ -173,7 +173,7 @@ attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trai
 Golden tests `MailMessageCodecTests` (Build == captured 629 B and 754 B; `includeAttachments=false` reproduces the
 base from the attachment mail).
 
-**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/GameServerListener.Tradepost.cs`,
+**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/Economy/TradepostService.cs`,
 `TradepostResponses.SendMailMessage/SendMailResult/SendRetrieveMailResult`). `TradepostBuyItem(0x200E)` debits the
 buyer (`DispatchUpdateCash`), creates a **system mail** (recipient = buyer, sender empty) with the listed item
 escrowed as a `MailAttachment`, deletes the listing, and pushes the base `DispatchMailMessage`. The mailbox ops then

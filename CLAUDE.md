@@ -118,8 +118,8 @@ is organizational only.
 folder-namespaced service classes that take their deps by ctor and the client per call:
 `CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` + `PlayerPersistenceService` (World/),
 `EquipmentService` (Inventory/), `ConversationService` (Dialogue/), and
-`ShopService`/`BankService` (Economy/) — tradepost/AH + mail ops are folded onto the listener itself
-(`GameServerListener.Tradepost.cs`) but still reach the wire through the same `IEconomyOutbound` port. The
+`ShopService`/`BankService`/`TradepostService` (Economy/ — the last one owns the AH + mailbox transactions and
+reaches the wire through the same `IEconomyOutbound` port). The
 listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
 OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
 subsystems), reach it through a **narrow port the listener implements** rather than passing the whole

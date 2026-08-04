@@ -90,6 +90,17 @@ namespace Faolan.GameServer.Economy
 			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance));
 		}
 
+		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
+		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
+		// slot registrations (BankHandler), so the client applies it to the live bank cell.
+		//
+		// The AH/mail overlays are its only callers, so it lives here rather than on the listener's Outbound builders.
+		public static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
+		{
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetItemStat,
+				SetItemStatCodec.Build(SetItemStats.BankSlot(client.Session.Character.Id, slot, statId, value))));
+		}
+
 		private static Rpc Build(TradepostInterfaceMethods method, byte[] body, uint interfaceInstance)
 		{
 			var sender = new ProtoEndpoint

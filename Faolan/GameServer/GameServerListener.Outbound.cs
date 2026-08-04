@@ -684,14 +684,6 @@ namespace Faolan.GameServer
 			return SendFeedback(client, new AreaNameBanner(areaNameId));
 		}
 
-		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value], 		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
-		// slot registrations (BankHandler), so the client applies it to the live bank cell.
-		private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
-		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetItemStat,
-				SetItemStatCodec.Build(SetItemStats.BankSlot(client.Session.Character.Id, slot, statId, value))));
-		}
-
 		// Pushes a FormatFeedback message to the client's on-screen feedback, addressed to their GameInterface
 		// instance. The PAYLOAD carries its own typeFlags/footer (#539) - this used to take the child's text plus those
 		// two words, which is how the same message came to be framed differently in two services.
