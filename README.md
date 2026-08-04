@@ -37,26 +37,12 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Connection & session
 
-- ✅ **Log in and play** — the full login handshake (encrypted, single-use challenge per login; any password is
-  accepted until the client is key-patched), character roster and selection, and world entry
-- ✅ **Your own character sheet** — level, vitals, attributes, wallet, kills and deaths all come from your character
-  rather than from the captured one the login snapshot was built out of; its last opaque regions are decoded, and
-  every stat in them is named (#393, #447)
-- ✅ **Create a character** — the appearance editor and the Tortage opening tableau, for every one of the twelve
-  classes: each starts with its own class base pools, starting kit and feats, and walks into the world without a
-  relog. The editor offers the client's full option set per race and sex — heads, hair, colours, tattoos, beards,
-  piercings, face morphs and voices — including the **Khitan** race (#469)
-- ✅ **Appearance renders as chosen** — hair, beard, body size, face markings and tattoos, confirmed in-client
+- ✅ **Log in and play** — the full login handshake (any password is accepted until the client is key-patched)
+- ✅ **Create a character** — hair, beard, body size, face markings and tattoos, confirmed in-client
   (#240, #288, #314)
 - ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines, all
   in-client; the world it drops you into is constructed from the database like any other login, not replayed
-- 🟡 The tutorial tail after it (combat tutorial → approach Casilda) is not wired yet (#234, #261, #262)
-- 🟡 **Your UI comes back with you** — chat tabs, dock bars, hotkeys and per-character preferences are stored
-  server-side and handed back at the next login, the way retail does it: the client uploads them over a second,
-  short-lived login socket it opens mid-session, and gets them plus its character-select preview back before the
-  roster. Byte-exact against the captures; awaiting an in-client check (#611,
-  [docs](docs/subsystems/client-settings.md))
-
+  
 ### Realms & deployment
 
 - 🟡 **Run multiple realms** — one shared login tier fronts any number of independent realm servers, each with its
@@ -80,8 +66,6 @@ we've seen_, and names the gaps). Regenerate with
   resource, across all 141 nodes already in the world; the node empties and disappears, and comes back on zone
   reload. Missing: the per-swing depletion (retail's nodes are shared, so the captures can't show it), a real
   respawn timer, and Elm/Slate, whose resource items aren't in the client data we have (#494)
-- 🟡 **Boss nameplates** — elite and boss NPCs carry the rank that draws the skull marker beside their name (56 of
-  them, King Conan and Keaira among them); pending an in-client confirm (#508)
 - ✅ **Zone-line doors** — a doorway that changes your location teleports you, both within a zone and across a
   loading screen, with destinations learned from captures (a handful of rarer ones still just play the open
   animation, #341)
@@ -112,7 +96,6 @@ we've seen_, and names the gaps). Regenerate with
   The retail trigger (the pick inside the NPC's conversation) is not wired yet, so it runs from a GM command
   (#506, #514)
 - ✅ **Sit on benches** — sitting down, switching seats and standing up, verified in a real client (#355)
-- 🟡 **Fuller simulation** — a continuous AI heartbeat and smoother movement are in progress (#190, #225, #272)
 
 ### Combat
 
@@ -129,9 +112,6 @@ we've seen_, and names the gaps). Regenerate with
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
   it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
-- 🟡 **Discovery uses the client's own volumes** where it ships them — 11 of the points carry a real trigger box
-  (16×20 to 29×33 units, ~10 tall) instead of our 30-unit radius, which discovered from roughly twice the
-  distance retail requires and from any height; the rest keep the radius (#519, needs an in-client check)
 - 🟡 **Outlaw resurrection points** — the client marks 49 of them (one per major playfield) as the criminal
   destination; imported, but the revive path still sends everyone to the normal point (#517, #503)
 - 🟡 **Recalls** — the Path of Asura spell returns you to where you are bound, while the Totem of Origins returns
@@ -196,7 +176,6 @@ we've seen_, and names the gaps). Regenerate with
 ### Items & economy
 
 - ✅ **Inventory** — containers, equipping, moving items, and starting gear
-- ✅ **Item quality** — every item's rarity from Mundane to Legendary, so tooltips and name colours match retail (#397)
 - ✅ **The full economy** — buy and sell at vendors (the shop window opens on use), bank storage, the auction house
   (list and buy), and mail carrying money and item attachments
 - ✅ **Item claims** — the account claim/redeem window (Claim, Claim All), including infinite and multi-charge
@@ -235,28 +214,20 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 Member kick / promote / demote (#104) · trade **cancel** ends the session but does not close the partner's
   window — the s2c side of cancel/decline/remove needs a capture (#427) · team loot rules are accepted but not
   applied (#101)
-- ⬜ Ignore list (opcodes not yet identified) · quest sharing and team quests (#101) · Claude as a virtual friend
-  (#100)
 
 ### Quests & dialogue
 
-- ✅ **Quests** — kill / loot / talk / collect / reach objectives, the journal, and the Casilda Tortage intro chain
-  end to end (kill → loot → free → follow)
+- ✅ **Quests** — kill / loot / talk / collect / reach objectives, the journal
 - ✅ **Gather quests work however you get the item** — a collect objective ticks when the item reaches your bags,
   from a corpse, a pickup node, a vendor or a reward; 62 quests that shipped inert (typed as kills with no target)
   now run (#521)
 - ✅ **The client's quest text is readable** — eleven of its localized-text categories are encrypted, and the key
   turns out to be sent by the server per string; all 168 objective texts, the journal titles and summaries, and
   the NPC dialogue now decrypt (#520)
-- 🟡 **Reach objectives use the client's real trigger volume** where the goal names one, instead of a 40-unit
-  circle around the map pin (#521, needs an in-client check)
 - ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine
 - ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does,
   instead of the quest returning on the next login; the live J-panel refresh that rides along still needs a
   capture (#457, #482)
-- 🟡 Escort completion (#262) · turn-in and reward dialogs (#260) · Lua quest scripting
-- ✅ Day and night Tortage are two ordinary playfields (4020 / 4022), both imported — there is no phasing mechanism
-  to build, and the lighting is the client's own (#149)
 
 ### Mounts & pets
 
