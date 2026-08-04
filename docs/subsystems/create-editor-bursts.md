@@ -165,15 +165,33 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    `0x01000000` here) — added as a pass-through param. It is now framed as the client reads it, a plain `0`/`1`
    word at `[55:59]` (`sceneWord`, see the table above). Locked by `BurstGoldenTests`.
 - **The avatar's FullChar snapshot** — the create editor sends the new character its own `0x737A6DF9`
-   `FullPlayerCharacterIIR` on a `DispatchPassBlob`. It is **carried**, not generated
-   (`CreateEditorAvatarSnapshot.bin`, 8,078 B), but it is not opaque: `FullPlayerCharacterCodec` parses the whole
-   record and re-encodes it byte-exact, giving a typed root (`subscription_flags = 769` + the four EMPTY containers
-   `0x65`/`0x68`/`0x70`/`0x71`) and a fully decoded sub-class (empty quest regions, 86 `PFAccessWindow_` entries,
-   the stat block). `CreateFlowService.EditorAvatarSnapshotFor` re-stamps the instance + every container owner and
-   emits it through the codec; there is no hand-written protobuf on the send path any more (it used to splice the
-   record's tail onto a 77-byte hand-encoded prefix whose sub-message lengths assumed a 4-varint-byte character id).
-   [V3: EditorAvatarSnapshotTests.TheWholeRecord_RoundTripsThroughTheSnapshotCodec] Generating it from the
-   character — the same shape `SnapshotTails.FromScratch` already authors for world entry — is Gitea #651.
+   `FullPlayerCharacterIIR` on a `DispatchPassBlob`. It is **constructed whole from typed data**
+   (`CreateEditorAvatar.Snapshot`), and the 8,078-byte `CreateEditorAvatarSnapshot.bin` that used to be replayed
+   with the character id spliced into it is **deleted**. Byte-exact against the captured record for the first, last
+   and a mid-range character id; pinned by SHA-256 now that the blob is gone.
+   [V3: EditorAvatarSnapshotTests.TheConstructedRecord_IsTheCapturedOne]
+
+   | region | source |
+   |---|---|
+   | root | `subscription_flags = 769` + four EMPTY containers (`0x65` 1028, `0x68` 24, `0x70` 48/12 disabled, `0x71` 48) owned by the live character |
+   | quest regions | all three empty — an unnamed avatar has no journal |
+   | access window | `AccessWindowCatalog`, the same game-static 86 entries every character gets |
+   | stat block | `CreateEditorAvatarSheet` — 17 displayed + 148 sheet pairs, the only captured VALUES left |
+   | spellbook / tails | **absent**, and both trailing tails empty |
+
+   Two things had to be right for the bytes to match. **`has_new_claim_items` and `has_spellbook` must be set
+   explicitly** — both are optional protobuf scalars, so protobuf-net omits a default-valued one and the root comes
+   out four bytes short of retail's (the presence trap). And `has_spellbook = false` is not incidental: it is what
+   tells the client the sub-class carries **no** spellbook list, which is exactly how a create-editor snapshot
+   differs from a login one on the wire (a login snapshot always carries the list, even empty). The flag and the
+   absent list have to agree, which is why this does not just call `SnapshotTails.FromScratch` — that always emits
+   the list, correctly, for world entry.
+
+   ⚠️ `CreateEditorAvatarSheet` is a baseline in its own right and is **not** `SubClassStatBlock.FreshSheet()`: same
+   stat ids in the same order, ~15 different values (the health/stamina/mana pools, `0x113`, `0x3A`/`0x3B`, `0x6A`,
+   the `0x398..0x39D` resist run at −300, `0x25F`). The beach baseline is a level-1 character standing in the world;
+   this one is the editor pedestal avatar. The playfield token in it is the named
+   `CreateEditorCharBuilder.EditorPlayfieldInstance`, not a literal lifted out of a capture.
 - **Record coverage** — the only record left verbatim is the live `Character…` preview
    (`CreateEditorCharBuilder.LivePreview`, intentionally verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built

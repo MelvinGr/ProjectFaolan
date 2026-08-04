@@ -66,34 +66,6 @@ namespace Faolan.GameServer.CreateFlow
 		// mutated from different connection threads (add on one connection, consume on the reconnect). Value unused.
 		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new ConcurrentDictionary<uint, byte>();
 
-		// The create-editor avatar's own FullChar (0x737A6DF9) snapshot, parsed ONCE into the typed model the
-		// world-entry snapshot uses. It is not an opaque blob: `FullPlayerCharacterCodec` reads the whole record and
-		// re-encodes it byte-exact, giving a typed root (subscription_flags + the four empty containers 0x65/0x68/
-		// 0x70/0x71) and a fully decoded sub-class (empty quest regions, 86 PFAccessWindow entries, the stat sheet).
-		//
-		// It is stored with the placeholder instance `EntityHandles.CharacterInstanceBase` and re-stamped per
-		// character by `EditorAvatarSnapshotFor`. This used to be the record's TAIL only, spliced onto a
-		// hand-written protobuf prefix at the send site - which restated the root's wire encoding by hand, with
-		// hardcoded sub-message lengths that silently assumed the character id encodes to exactly four varint bytes
-		// (true, and only because `EntityHandles` constrains the id range for exactly this reason - but nothing
-		// connected the two).
-		//
-		// Generating this record from the character instead of carrying it is Gitea #651.
-		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
-
-		// The avatar snapshot addressed to `id`: the stored record with its instance and every container's owner
-		// re-stamped, built through the codec rather than spliced. Parsed per call rather than once into a shared
-		// model because the model is MUTABLE (protobuf-net types) and two create flows can run concurrently - 8 KB
-		// on the rare create-editor entry is not worth a shared-state hazard.
-		internal static byte[] EditorAvatarSnapshotFor(uint id)
-		{
-			var snapshot = FullPlayerCharacterCodec.Parse(EditorAvatarSnapshot);
-			foreach (var container in snapshot.Root.Inventories)
-				container.InventoryId.Instance = id;
-
-			return FullPlayerCharacterCodec.Build(snapshot with { Instance = id });
-		}
-
 		// The overhead name-COLOUR category retail answers RequestAggroStatus with for each of the five editor scene
 		// characters (0 friendly / 2 neutral - see UpdateAggroStatusCodec). The client polls all five as soon as the
 		// editor scene is streamed, before the character is named, and retail answers every poll: 55/55 in
@@ -1000,9 +972,10 @@ namespace Faolan.GameServer.CreateFlow
 				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1
 			]));
 
-			// The avatar's FullChar snapshot. The carrier's u32 length belongs to the SENDER (#530 rule 2), so it is
-			// written here and the codec emits the record alone.
-			var avatarSnapshot = EditorAvatarSnapshotFor(id);
+			// The avatar's FullChar snapshot, built WHOLE from typed data (#651) - see CreateEditorAvatarSnapshot.
+			// The carrier's u32 length belongs to the SENDER (#530 rule 2), so it is written here and the codec
+			// emits the record alone.
+			var avatarSnapshot = FullPlayerCharacterCodec.Build(CreateEditorAvatar.Snapshot(id));
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteUInt32((uint)avatarSnapshot.Length).WriteArray(avatarSnapshot)));
 

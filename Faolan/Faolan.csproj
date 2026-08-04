@@ -25,9 +25,4 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<EmbeddedResource Include="GameServer\CreateFlow\CreateEditorAvatarSnapshot.bin">
-			<LogicalName>Faolan.CreateEditorAvatarSnapshot.bin</LogicalName>
-		</EmbeddedResource>
-	</ItemGroup>
 </Project>
