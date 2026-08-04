@@ -35,11 +35,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void MillisecondsIsTheMicrosecondCounterDividedByAThousand()
 		{
-			var micros = ServerUptimeClock.Microseconds;
+			var before = ServerUptimeClock.Microseconds;
 			var millis = ServerUptimeClock.Milliseconds;
+			var after = ServerUptimeClock.Microseconds;
 
-			// Read across a boundary they can differ by the elapsed time, never by an origin.
-			Assert.InRange((long)millis - (long)(micros / 1000), 0, 50);
+			// Read across a boundary they can differ by the elapsed time, never by an origin - so bracket the middle
+			// read between the two outer ones rather than allowing a fixed window that machine load can blow through.
+			Assert.InRange(millis, before / 1000, after / 1000);
 		}
 
 		[Fact]
@@ -48,8 +50,9 @@ namespace Faolan.Tests
 			const ulong durationMs = 7_000;
 			var before = ServerUptimeClock.Milliseconds;
 			var stamp = ServerUptimeClock.ExpiryFromNow(durationMs);
+			var after = ServerUptimeClock.Milliseconds;
 
-			Assert.InRange(stamp - durationMs, before, before + 50);
+			Assert.InRange(stamp - durationMs, before, after);
 		}
 
 		// The whole chain, end to end, through the REAL pong handler and the REAL buff factory: take the clock the
@@ -72,16 +75,20 @@ namespace Faolan.Tests
 			// 2. What we send it, through the factory every live cast uses.
 			var payload = MagicBuffDatas.ApplyNow(0x31EB15, durationCs, casterLevel: 80);
 			var stamp = MagicBuffDataCodec.Parse(MagicBuffDataCodec.Build(payload)).ExpiryStamp;
+			// Bracket the second clock read from the outside, so the gap between the two senders' reads is MEASURED
+			// rather than assumed short: a fixed window would depend on machine load, and did fail under a loaded
+			// full-suite run (#624).
+			var gapCs = (long)(ServerUptimeClock.Milliseconds - serverTimeMs) / 10;
 
 			// 3. MagicBuffIIR_c::Activate. Signed, because the client's __alldiv is - a stamp behind the clock has to
 			// come out NEGATIVE and be rejected, not wrap to a huge positive remaining time.
 			var remainingCs = ((long)stamp - (long)serverTimeMs) / 10;
 
 			Assert.True(remainingCs > 0, $"the client would reject a non-positive remaining time ({remainingCs}cs)");
-			// Both readings are of the same monotonic clock a moment apart, so the recovered remaining time is the
-			// duration minus that moment. A whole second of slack is far more than the gap and far less than the 7s
-			// duration, so this fails loudly if the two senders are ever rooted differently.
-			Assert.InRange(remainingCs, durationCs - 100, durationCs);
+			// The pong's read comes FIRST, so the recovered remaining time is the duration plus however long the
+			// factory's read trailed it - never less, and never more than the bracket. Rooted differently, the two
+			// would be apart by however long the two origins started apart, which is unbounded in either direction.
+			Assert.InRange(remainingCs, durationCs, durationCs + gapCs);
 		}
 
 		// A payload built for a buff that is already partly elapsed must produce a SHORTER remaining time than its
@@ -93,11 +100,14 @@ namespace Faolan.Tests
 			const uint fullDurationCs = 8_640_000; // the 24h mount ride buff
 			const uint remainingCs = 8_509_794; // what retail's captured world-entry restore carries (21.7 min in)
 
+			var before = ServerUptimeClock.Milliseconds;
 			var resumed = MagicBuffDatas.ApplyNow(0x31EB15, remainingCs, 80);
 			var serverTimeMs = ServerUptimeClock.Milliseconds;
 			var recovered = ((long)resumed.ExpiryStamp - (long)serverTimeMs) / 10;
 
-			Assert.InRange(recovered, remainingCs - 100, remainingCs);
+			// Here the factory's read comes FIRST, so the recovered time falls SHORT by the gap - bracketed, not a
+			// fixed window (#624).
+			Assert.InRange(recovered, remainingCs - (long)(serverTimeMs - before) / 10, remainingCs);
 			Assert.True(recovered < fullDurationCs, "a resumed buff must come back short of the spell's full duration");
 			Assert.Equal(remainingCs, resumed.Duration);
 		}
