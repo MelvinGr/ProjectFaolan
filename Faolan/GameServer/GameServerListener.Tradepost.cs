@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -18,9 +19,22 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// The AoC auction-house NPC is named "Trader" (capture FA015807 "Trader"); the stable key is the NPC name, as
-		// with shop vendors. Talking to it opens the Tradepost (GameServerListener.Inbound TalkToNpc auctioneer branch).
-		private const string AuctioneerNpcName = "Trader";
+		// The NPC TEMPLATES that operate an auction house, cached on the listener (#647). Talking to one opens the
+		// Tradepost - GameServerListener.Inbound's TalkToNpc auctioneer branch.
+		//
+		// The role comes from the CLIENT's own spawn data (`NpcStats.profession_type` -> `NpcStatCore.ProfessionType`),
+		// not from the display name "Trader" this used to match on. A name was the wrong key twice over: "Trader" is a
+		// ROLE that four distinct templates play, so the name pinned none of them, and any other NPC that happened to
+		// carry the string would have opened the auction house. The profession tag is exclusive - those same four
+		// templates are the only ones in the world carrying it - so this now recognises every auctioneer rather than
+		// whichever one a capture saw.
+		private HashSet<uint>? _auctioneerTemplates;
+
+		private async Task<bool> IsAuctioneerTemplate(uint npcTemplateId)
+		{
+			_auctioneerTemplates ??= [.. await Database.GetNpcTemplatesByProfession(NpcProfession.Auctioneer)];
+			return _auctioneerTemplates.Contains(npcTemplateId);
+		}
 
 		// The next wire MailId: a deterministic sequence (max + 1), not a random id + collision retry.
 		private async Task<ulong> AllocateMailId()

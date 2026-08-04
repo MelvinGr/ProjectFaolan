@@ -36,6 +36,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<uint, uint>> GetQuestGiverMap();
+		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
+		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<int> GraduateSpawnArea(uint areaId);
@@ -320,6 +322,19 @@ namespace Faolan.Core.Database.Repositories
 				.Distinct()
 				.ToListAsync();
 			return grants.GroupBy(g => g.NpcTemplateId).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
+		}
+
+		// #647: which templates carry a ROLE, straight off the client's own `NpcStats.profession_type`. This is what
+		// makes "is the NPC I clicked an auctioneer" answerable for every auctioneer in the world rather than for the
+		// one template a capture happened to see, and without matching on a display name that is a role rather than an
+		// identity ("Trader" is four templates here and would be any NPC that shared the string).
+		public async Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcStatCores.Where(c => c.ProfessionType == (uint)profession)
+				.Select(c => c.NpcTemplateId)
+				.ToArrayAsync();
 		}
 
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)

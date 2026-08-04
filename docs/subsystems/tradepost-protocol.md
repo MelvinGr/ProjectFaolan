@@ -34,6 +34,14 @@ triggered by the NPC interaction (PoC: the `.ah` GM command sends it at the play
 the client's window-open op would be circular and never bootstraps the window. The access-point `maxRadius` (15.0) is a
 client-side proximity check, so the access position must be within 15 units of the player.
 
+**Which NPCs are auctioneers** comes from the client's own role tag, not from a display name (Gitea #647):
+`ProtoCoreCharacterIIR.NpcStats.profession_type` (stored as `NpcStatCore.ProfessionType`, `NpcProfession.Auctioneer`
+= 1). It is exclusive - the four templates carrying it (8554, 8675, 11768, 14712) are exactly the four named
+"Trader" in the world, and nothing else carries it. Matching the NAME was wrong twice over: "Trader" is a role that
+four distinct templates play, so it pinned none of them, and any other NPC that happened to carry the string would
+have opened the auction house.
+[V3: NpcProfessionTests.Auctioneer_IsExactlyTheTradersAndNothingElse]
+
 ## Method map
 
 | dir | method | name | body |

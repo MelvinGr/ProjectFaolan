@@ -2340,18 +2340,17 @@ namespace Faolan.GameServer
 			}
 
 			// Auction-house open (the real trigger for the Tradepost - the `.ah` GM command is only a PoC
-			// bootstrap). Retail opens the AH window when the player interacts with the "Trader" auctioneer
-			// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"); the player is
+			// bootstrap). Retail opens the AH window when the player interacts with an auctioneer NPC
+			// (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"); the player is
 			// standing next to the auctioneer to click it, so their own position trivially satisfies the
 			// 15-unit client proximity check.
 			//
-			// ⚠️ The NAME is still the key here, unlike the vendor branch above, and that is not an oversight
-			// (#646): "Trader" is a ROLE the auction NPC plays on many templates, and the corpus names exactly
-			// one auctioneer without pinning which templates carry it. Keying on the one captured template
-			// would silently break every other auctioneer in the world. Left as a name until a template set is
-			// harvested - Gitea #647.
-			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-			    talkedNpcName == AuctioneerNpcName && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
+			// Keyed by the client's own ROLE tag (#647), like the vendor branch above is keyed by template.
+			// This used to match the display name "Trader", which was the wrong key twice over: the string is
+			// a role FOUR templates play, so it pinned none of them, and any other NPC carrying it would have
+			// opened the auction house. See IsAuctioneerTemplate.
+			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var auctioneerTemplate) &&
+			    await IsAuctioneerTemplate(auctioneerTemplate) && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 			{
 				await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 				return;
