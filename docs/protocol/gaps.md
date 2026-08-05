@@ -52,6 +52,29 @@ avoided the coefficients. They really do need a live dump.
 
 ---
 
+## Minigames / Massive PvP
+
+### The Massive-PvP board's trailing string + tail columns
+`DispatchMassivePvpInfoRequestReturn` (0x20A5) is fully framed and round-trips every captured body
+(`MassivePvpInfoCodec`, `docs/re/minigame-massivepvp-messages.md`), but two of an entry's columns have no meaning
+attached. `otherName` is a second latin1 string after the guild name, non-empty in only 10 of the 1000 captured
+rows (`"Fury (Dead)"`, `"Yellow Lotus (RP)"`), and the `[u32 tail][u8 tailFlag]` pair after it is non-zero in
+exactly those same 10 rows — so the two vary together, and nothing else in the corpus moves with them. Close it
+by capturing a board with more variety, or by finding the client's consumer of the two columns. Tracked in
+Gitea #146.
+`[V0: the Massive-PvP board's otherName / tail columns]`
+
+### `PvPMatchRules_c` column layout
+The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
+`MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its reader is recovered
+(`FUN_0055bdb0` → `FUN_00558b70`, three u32 plus a string group, then `FUN_0053b020`) but the field split is not
+pinned: **no capture contains a single instance**, because no captured session ever queued for a minigame, so
+there is nothing to check a split against. Close it by decompiling the element reader field-by-field the way the
+scalar dispatch bodies were done. Tracked in Gitea #146.
+`[V0: the PvPMatchRules_c element layout]`
+
+---
+
 ## How to close a gap
 
 Decode it, add a golden test, then promote the fact to `[V3: …]` in the relevant layer page and delete its entry
