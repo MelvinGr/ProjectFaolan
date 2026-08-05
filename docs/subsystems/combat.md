@@ -167,15 +167,37 @@ as a too-small radius.
 
 ## Melee cleave (#18)
 
-A swing damages an ARC in retail, not just the selected target. `CombatService.ApplyMeleeCleave` (called
-after the primary hit on both the armed and unarmed paths) splashes the same damage to the hostile, living
-NPCs clustered around the target - `CombatTargeting.CleaveTargets` selects them (target-centered: other
-entities within `DefaultCleaveRadius` of the primary, excluding the primary/players/non-hostile/dead, nearest
-first, capped at `DefaultMaxCleaveTargets`). Each secondary gets its own `DamageResultIIR` + the full
-damage/kill lifecycle. This is the flat "everyone in the cluster takes the swing" half; the directional arc +
-per-direction shield mitigation is the section below. The cleave is
-TARGET-centered rather than a true player-facing cone because the rotation->forward convention isn't decoded;
-radius + cap are provisional, tuned in-client.
+A swing damages an area **in front of the attacker**, not just the selected target and not a ball around it.
+Funcom's own quickstart: *"Your attacks deal damage in a small area **in front of you**. You'll always do more
+damage to your primary target, but you should be mindful of other nearby enemies!"*, and the wiki's *"if you
+can get two or more enemies in front of you, your attacks can hit multiple enemies"*.
+
+`CombatService.ApplyMeleeCleave` (called after the primary hit on both the armed and unarmed paths) splashes
+to the hostile, living NPCs inside that cone — `CombatTargeting.CleaveTargets` selects them: within
+`DefaultCleaveReach` of the **attacker** and inside `DefaultCleaveHalfAngleDegrees` of their facing,
+excluding the primary/players/non-hostile/dead, nearest first, capped at `DefaultMaxCleaveTargets`. Each
+secondary gets its own `DamageResultIIR` + the full damage/kill lifecycle.
+
+⚠️ This was **TARGET-centered** until 2026-08-05 — a sphere around the selected enemy, chosen so it would need
+no rotation convention. Wrong shape, and wrong in a way a player feels: it cleaved into a mob standing behind
+the target and away from you, and missed the one beside you the target happened to be far from. The facing it
+was avoiding has been decoded for a while (`2·atan2(qy, qw)`,
+[`../re/chardcmove-grammar.md`](../re/chardcmove-grammar.md)).
+[V3: CombatTargetingTests.TheConeIsAroundTheATTACKER_NotAroundTheTarget]
+
+**Same damage to the secondaries, deliberately.** The quickstart says the primary takes more, and the only
+shipped number for it is `Combat_{PvE,PvP}DamageReductionMainOnSplash` = **1** — which the client registers and
+never reads (`TweakGlobals`: reads=0 on both, against reads=1 on a control tweak, so they are the server's
+numbers), and whose value is a no-op under any non-absurd reading. Inventing a fraction the balance sheet does
+not carry would be worse than matching it.
+
+Reach and half-angle are **provisional**: no shipped number states either (the tweak table carries no melee
+arc/reach entry — `TWK_Selection_Radius` 10 is targeting, not damage). 8 u and ±60° are sized off
+`WorldState.NpcMeleeRange` and the slack the old radius carried.
+
+This is the flat "everyone in front takes the swing" half; the directional arc + per-direction shield
+mitigation is the section below. The two are independent — the direction picks which of the *defender's*
+guards you meet, the cone picks *who* you meet.
 
 ## Directional combat: the shield rose (#20)
 

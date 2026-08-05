@@ -390,18 +390,27 @@ namespace Faolan.GameServer.Combat
 			return victims.Count;
 		}
 
-		// Melee cleave (#18): an AoC swing hits an arc, not just the selected target. After the primary hit, splash the
-		// same damage to the hostile, living NPCs clustered around the target (CombatTargeting.CleaveTargets - a
-		// target-centered cleave, robust without a decoded player-facing vector; the directional arc + per-direction
-		// mitigation is the separate #20). Each secondary gets its own DamageResultIIR floating number and runs the
-		// full damage/kill lifecycle (vitals push, corpse-loot, XP, kill-quest advance) via ApplyNpcDamage.
+		// Melee cleave (#18): an AoC swing damages "a small area IN FRONT OF YOU" (Funcom's own quickstart), not just
+		// the selected target and not a ball around it. After the primary hit, splash the same damage to the hostile,
+		// living NPCs inside the attacker's frontal cone (CombatTargeting.CleaveTargets). The directional arc a swing
+		// is aimed at and its shield mitigation are the separate #20/#621 - the direction picks which of the
+		// defender's guards you meet, the cone picks who you meet. Each secondary gets its own DamageResultIIR
+		// floating number and runs the full damage/kill lifecycle (vitals push, corpse-loot, XP, kill-quest advance)
+		// via ApplyNpcDamage.
+		//
+		// Same damage as the primary, deliberately: the quickstart says the primary takes more, and the only shipped
+		// number for it is `Combat_{PvE,PvP}DamageReductionMainOnSplash` = 1 - which the client registers and never
+		// reads (TweakGlobals: reads=0, so it is ours to apply), and whose value under any non-absurd reading is a
+		// no-op. Inventing a fraction the balance sheet does not carry would be worse than matching it.
 		private async Task ApplyMeleeCleave(INetworkClient client, uint instance, uint primaryHandle, uint damage)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.TryGetZone(player.MapId, out var zone) || !zone.TryGet(primaryHandle, out var primary))
+			if (player == null || !_sim.World.TryGetZone(player.MapId, out var zone))
 				return;
 
-			foreach (var secondary in CombatTargeting.CleaveTargets(zone, primary, CombatTargeting.DefaultCleaveRadius, CombatTargeting.DefaultMaxCleaveTargets))
+			zone.TryGet(primaryHandle, out var primary);
+			foreach (var secondary in CombatTargeting.CleaveTargets(zone, player, primary, CombatTargeting.DefaultCleaveReach,
+				         CombatTargeting.DefaultCleaveHalfAngleDegrees, CombatTargeting.DefaultMaxCleaveTargets))
 			{
 				await SendDamageNumber(client, secondary.Handle, instance, damage, DamageSchool.Crushing);
 				await ApplyNpcDamage(client, secondary.Handle, (int)damage, $"melee cleave from 0x{instance:X8}");
