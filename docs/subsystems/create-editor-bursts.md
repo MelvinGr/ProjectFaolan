@@ -131,15 +131,21 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
 
 - **`SimpleCharFullUpdate` (editor scene characters)** — `CreateEditorCharBuilder.Reconstruct`
    rebuilds every scene-pedestal `SimpleChar` (the "Stygian Female" avatar + the four example models: Saddur /
-   Male+Female Template / Stygian Slaver) through `SpawnPacketBuilder`: the **transform** from the typed
-   `ProtoVec3`/`ProtoQuat` pose, the **identity/appearance** by decoding + re-encoding the `ProtoCoreCharacterIIR`
-   (a byte-identical round-trip — no protobuf drift), with the **playfield instance** (the `18 <varint>` token)
-   threaded in. The still-un-lifted pre-IIR scaffold block is carried verbatim from the record (DB-sourcing these
-   from the `NpcSpawns` rows is blocked on that lift, #185/#54 — the captured rows are from a different session,
-   so their pre-IIR blocks don't match). Self-reconstruction is byte-exact (`CreateEditorSceneCharTests`); the
-   full burst still equals `InitialBurst.bin` (`BurstGoldenTests`). The live `Character…` preview stays on
-   `IirId` (it carries the live client instance as its handle; also already covered by `SimpleCharFullUpdateCodec`
-   / `SpawnEditorPreview.bin`) — the seam for the eventual live chosen-looks preview.
+   Male+Female Template / Stygian Slaver) through **`SimpleCharFullUpdateCodec`**: the record is PARSED into the
+   typed `SimpleCharFullUpdateIIR` and re-BUILT, with the **playfield instance** set on the model rather than
+   patched into bytes. Nothing inside the record is verbatim (#364) — the pre-IIR is `SpawnPreIir`'s 53 named
+   stat words and the post-IIR is `SpawnPostIir`'s typed stream, both decoded whole by #466/#475/#477 — and the
+   parse+rebuild is byte-exact on all six records (`CreateEditorSceneCharTests`); the full burst still equals
+   `InitialBurst.bin` (`BurstGoldenTests`). The live `Character…` preview takes the same path with the live
+   client instance as its handle (`LivePreview`) — the seam for the eventual live chosen-looks preview.
+
+   ⚠️ **The pedestals' pre-IIR words are the RETAIL server's uninitialised memory, not data.** Resolving the
+   slots they occupy names them `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`,
+   `Onslaught2SpecialsKilled`…, and a create-editor pedestal has no seasonal PvP record: `0x7151E7E0` in a stat
+   slot is a leaked pointer. The live avatar in the same burst carries none of them — only the category word and
+   the 15.0 constant, which is exactly `SpawnPreIirs.Minimal`. So the reading that these were irreducible
+   per-session values blocking a from-data build was wrong. What is still open (#364) is SOURCING the scene from
+   rows rather than from these bytes.
 - **Editor-scene `SimpleDynel` props** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
    `IDatabaseRepository` and SOURCES each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
@@ -192,8 +198,8 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    the `0x398..0x39D` resist run at −300, `0x25F`). The beach baseline is a level-1 character standing in the world;
    this one is the editor pedestal avatar. The playfield token in it is the named
    `CreateEditorCharBuilder.EditorPlayfieldInstance`, not a literal lifted out of a capture.
-- **Record coverage** — the only record left verbatim is the live `Character…` preview
-   (`CreateEditorCharBuilder.LivePreview`, intentionally verbatim — see above). Across `WorldPrepBurst` +
+- **Record coverage** — no record is left verbatim: the live `Character…` preview now takes the same typed
+   parse+rebuild as the pedestals (`CreateEditorCharBuilder.LivePreview`). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
    + wired** (the two dissectors were retired with the burst - they read the retired `WorldPrepBurst` golden,
    deleted in `0683e84d`; builders in

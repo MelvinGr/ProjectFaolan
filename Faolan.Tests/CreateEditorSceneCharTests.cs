@@ -8,16 +8,22 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the create-editor SCENE CHARACTERS (the SimpleCharFullUpdateIIR / FA015807 records the initial burst
-	// streams) are CONSTRUCTED, not replayed: CreateEditorCharBuilder.Reconstruct rebuilds each from its own bytes
-	// (transform from the typed pose + ProtoCoreCharacterIIR round-trip, pre-IIR scaffold carried verbatim, the
-	// session playfield threaded) and reproduces the captured record byte-for-byte (issue #189, "the 5 remaining").
-	// DB-sourcing these like the dynels is blocked on the pre-IIR scaffold (#364): the captured record carries
-	// session-specific runtime values there (heap pointers/handles, e.g. 0x7151E7E0, + a recurring 0x015B6090)
-	// that no DB column holds, so NpcSpawnBuilder's minimal scaffold zeros them (verified 0/5 byte-exact - identical
-	// length + structure, diff only in the scaffold ~offset 71). The #185 lift only covers the clean-appearance
-	// shape; a probe confirmed 5 of 6 post-IIR tables are the larger runtime-state form the appearance codec
-	// refuses, so byte-exact-from-DB is impossible. Retiring this needs a #210-style construct-minimal + in-client
-	// pass; until then, self-reconstruction from each record's own bytes stays the byte-exact path.
+	// streams) are CONSTRUCTED, not replayed: CreateEditorCharBuilder.Reconstruct PARSES each into the typed
+	// SimpleCharFullUpdateIIR and re-BUILDS it, setting the session's playfield on the model, and reproduces the
+	// captured record byte-for-byte (issue #189, "the 5 remaining").
+	//
+	// ⚠️ Nothing inside the record is carried verbatim any more (#364). This gate used to say the pre-IIR held
+	// "session-specific heap pointers/handles that no DB column holds" and that 5 of 6 post-IIR tables were a form
+	// the codecs refuse - both were true when written and neither survived #466/#475/#477: the pre-IIR is
+	// SpawnPreIir's 53 NAMED stat words and the post-IIR is SpawnPostIir's typed stream, so all six records parse
+	// and re-encode whole.
+	//
+	// And the words that looked irreducible are the retail server's own uninitialised memory. Resolving the slots
+	// they sit in names them `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`,
+	// `Onslaught2SpecialsKilled` and the like - a create-editor pedestal has no seasonal PvP record, so
+	// `PvPAnnihilationMatchesWonSeasonal = 0x7151E7E0` is a leaked pointer in a stat slot, not data. The live
+	// avatar in the same burst carries none of them (only the category word + the 15.0 constant), which is exactly
+	// SpawnPreIirs.Minimal. What is still not done is SOURCING the scene from rows rather than from these bytes.
 	public class CreateEditorSceneCharTests
 	{
 		private readonly ITestOutputHelper _o;
