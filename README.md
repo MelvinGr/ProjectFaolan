@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 485 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes · 14 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,058 placements · 4,225 items · 20,848 spells · 265 abilities · 19,777 feats · 515 conversation nodes · 70 shops · 5,048 quests · 2,400 world objects · 853 patrol routes · 14 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -32,232 +32,188 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 74/78 greeted dialogue NPCs imported (94.9%)
 - **Vendor shops** — 48/48 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,408/77,631 decrypted, **5.7% of the total encrypted**. Keys held per category: 4,143 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,448/77,631 decrypted, **5.7% of the total encrypted**. Keys held per category: 4,183 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
 
 - ✅ **Log in and play** — the full login handshake (any password is accepted until the client is key-patched)
-- ✅ **Create a character** — hair, beard, body size, face markings and tattoos, confirmed in-client
-  (#240, #288, #314)
-- ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines, all
-  in-client; the world it drops you into is constructed from the database like any other login, not replayed
-  
+- ✅ **Create a character** — hair, beard, body size, face markings and tattoos (#240, #288, #314)
+- ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines; the
+  world it drops you into is built from the database, not replayed
+
 ### Realms & deployment
 
-- 🟡 **Run multiple realms** — one shared login tier fronts any number of independent realm servers, each with its
-  own world, chat, and guilds, all on a shared database; guilds, the auction house, mail, and character names are
-  realm-scoped, and you're routed to your selected character's realm. Server-side complete and fleet-tested;
-  pending a live two-realm shakedown (#324)
+- 🟡 **Run multiple realms** — one login tier fronts any number of realm servers on a shared database; guilds, the
+  auction house, mail and character names are realm-scoped. Pending a live two-realm shakedown (#324)
 
 ### World & simulation
 
-- ✅ **A living world, built from data** — the world, its objects, and its NPCs are all constructed from the
-  database and streamed to you as you move, never replayed from a recording
-- ✅ **Spawns are fully decoded** — the player and NPC spawn streams are typed end to end with no opaque regions
-  left, and every one of the 11,632 captured spawns re-encodes byte-exact; a buffed humanoid no longer spawns bald
-  (#475, #477)
-- ✅ **NPC AI** — enemies aggro and give chase, leash back and heal when you break away, and walk patrol routes
-  (177 of them, harvested across the whole corpus — #425); friendly and neutral NPCs never attack and show green
-  names, hostiles red
-- ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive tells you so instead of
-  silently doing nothing
-- 🟡 **Resource harvesting** — mining a rock, chopping a tree or picking a shrub yields a stack of the matching
-  resource, across all 141 nodes already in the world; the node empties and disappears, and comes back on zone
-  reload. Missing: the per-swing depletion (retail's nodes are shared, so the captures can't show it), a real
-  respawn timer, and Elm/Slate, whose resource items aren't in the client data we have (#494)
-- ✅ **Zone-line doors** — a doorway that changes your location teleports you, both within a zone and across a
-  loading screen, with destinations learned from captures (a handful of rarer ones still just play the open
-  animation, #341)
-- ✅ **Area-name banners** — crossing into a named district floats its title on screen (Old Tarantia alone has
-  six); coverage grows as more of the map is captured (#377)
-- ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy, verified with two
-  clients side by side
-- 🟡 **Ambient wildlife & spawns** — each zone's spawn groups (roam area + population) are decoded from the client,
-  and a live spawner keeps every group stocked, roaming, and refilling as you hunt them. On by default; because the
-  creature type per group is server-only, ~21% are auto-matched from captures and the rest are hand-confirmed with
-  in-game tools (#332, #363)
-- 🟡 **Line-of-sight & terrain** — NPCs won't aggro over a hill or through a wall, and loot and corpses settle to
-  the ground, driven by baked per-map terrain; the aggro gating is pending an in-client confirm (#284)
-- 🟡 **Damage schools** — every hit carries the element it was dealt with, and the numbering now matches the
-  client's own: a necromancer's spells used to report as *Holy* and *Siege* because Cold sat in the wrong slot.
-  Falls and hazards carry their own marker, distinct from any element (#487)
-- 🟡 **Knockback** — a blow can shove you: the server moves you along a path you did not walk and pins where you
-  land, using the client's own forced-move record. The packets are reproduced exactly from the one captured
-  knockback; the distance, the direction rule and how `KnockbackResistance` scales it rest on that single sample,
-  and no attack triggers it yet, so it runs from a GM command (#496)
-- 🟡 **Environmental damage** — the world can hurt you now, where before every point of damage came from a
-  creature. **Falls** cost health scaled to your own maximum and leave a bruise or a broken bone depending on how
-  far you dropped; **lava** burns and kills, using the client's own 105 lava volumes across 22 playfields rather
-  than a guess at where the flows are. Dying stacks a 30-minute death penalty, and a second death stacks another
-  on top. Pending an in-client confirm (#495, #504)
-- 🟡 **Local travel** — wagoners move you for a fee: pick a destination, pay, confirm, and arrive at its entrance,
-  either across a loading screen or in place within the map. Criminals are refused, as the client's own rules say.
-  The retail trigger (the pick inside the NPC's conversation) is not wired yet, so it runs from a GM command
-  (#506, #514)
-- ✅ **Sit on benches** — sitting down, switching seats and standing up, verified in a real client (#355)
+- ✅ **A living world, built from data** — the world, its objects and its NPCs are constructed from the database
+  and streamed to you as you move, never replayed from a recording
+- ✅ **Spawns are fully decoded** — player and NPC spawn streams typed end to end, no opaque regions; all 11,632
+  captured spawns re-encode byte-exact (#475, #477)
+- ✅ **NPC AI** — aggro and chase, leash and heal on a break, and 177 patrol routes; friendly NPCs never attack and
+  show green names, hostiles red (#425)
+- ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive says so
+- ✅ **Zone-line doors** — a doorway that changes your location teleports you, within a zone and across a loading
+  screen; the costly ones ask you to confirm first. A few rarer ones only play the open animation (#341, #637)
+- ✅ **Area-name banners** — crossing into a named district floats its title on screen; coverage grows with the
+  captures (#377)
+- ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy
+- ✅ **Sit on benches** — sitting down, switching seats and standing up (#355)
+- 🟡 **Resource harvesting** — mining, chopping and picking yield the matching resource across all 141 nodes; the
+  node empties and returns on zone reload. Missing: per-swing depletion, a real respawn timer, and Elm/Slate (#494)
+- 🟡 **Ambient wildlife & spawns** — each zone's spawn groups are decoded from the client and a live spawner keeps
+  them stocked and roaming. The creature type per group is server-only, so ~21% are auto-matched and the rest are
+  hand-confirmed (#332, #363)
+- 🟡 **Line-of-sight & terrain** — NPCs won't aggro through a hill or wall, and loot settles to the ground, off
+  baked per-map terrain. Aggro gating pending an in-client confirm (#284)
+- 🟡 **Damage schools** — every hit carries the element it was dealt with, numbered as the client numbers them;
+  falls and hazards carry their own marker (#487)
+- 🟡 **Knockback** — a blow can shove you along a path you did not walk. Distance, direction and resistance scaling
+  rest on a single captured sample, and no attack triggers it yet — GM command only (#496)
+- 🟡 **Environmental damage** — falls cost health scaled to your maximum and leave a bruise or broken bone; lava
+  burns and kills across the client's 105 lava volumes. Death stacks a 30-minute penalty. Pending an in-client
+  confirm (#495, #504)
+- 🟡 **Local travel** — wagoners move you for a fee: pick, pay, confirm, arrive; criminals are refused. The retail
+  trigger inside the NPC's conversation is not wired, so it runs from a GM command (#506, #514)
 
 ### Combat
 
-- ✅ **Melee & spellcasting** — the full attack/cast cycle: weapon draw, cast bar, hits, damage, and vitals, with a
-  threat/hate list driving who NPCs go after
-- ✅ **Floating damage numbers & combat log** for your hits, matching retail's distinct melee and spell number styles,
-  each tagged with the correct damage school (physical, fire, cold, …) the way retail sends it
-- ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message, exactly like retail (#347)
-- ✅ **Health, mana & stamina regen** — pools refill out of combat on retail's own regen channel and stop the moment
-  a fight starts; the rates come from your attributes and match retail's captured per-second deltas (#442)
-- ✅ **Max health, mana & stamina** — per-class, per-level base curve from the client's own table, plus gear, feats
-  and any buff that raises a pool. Verified against every captured level-up; casters have no stamina bar (#450)
+- ✅ **Melee & spellcasting** — the full attack/cast cycle: weapon draw, cast bar, hits, damage and vitals, with a
+  threat list driving who NPCs go after
+- ✅ **Floating damage numbers & combat log** — retail's distinct melee and spell number styles, each tagged with
+  its damage school
+- ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message (#347)
+- ✅ **Health, mana & stamina regen** — pools refill out of combat and stop when a fight starts, at rates driven by
+  your attributes (#442)
+- ✅ **Max health, mana & stamina** — per-class, per-level base from the client's table plus gear, feats and buffs;
+  casters have no stamina bar (#450)
 - ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
-  and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
-- ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
-  it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
-- 🟡 **Outlaw resurrection points** — the client marks 49 of them (one per major playfield) as the criminal
-  destination; imported, but the revive path still sends everyone to the normal point (#517, #503)
-- 🟡 **Recalls** — the Path of Asura spell returns you to where you are bound, while the Totem of Origins returns
-  you to your race's home city; these are two different destinations and used to be one. Capture-verified for
-  Stygian, the other three races by the same rule (#206, #510)
-- ✅ **Buffs & debuffs** — apply, tick (damage-over-time), expire on a timer, and right-click to cancel; self-buffs
-  and enemy debuffs both verified in-client. Each damage-over-time spell ticks at its own measured rate, 0.5 to 11
-  seconds, instead of one 2-second constant — 53 of the 84 DoT spells in the captures have a measured cadence, and
-  the rest fall back to 2 s, the median of those measured (#274, #370, #437, #524)
-- 🟡 **Damage scale** — NPC swing damage is measured from the captures (it had been ~15x too weak) and caster NPCs
-  land their spells with the right school. Only levels 1-6 are well sampled; above that the curve is extrapolated
-  and wants an in-client pass (#401, #479)
-- ✅ **Shield of the Risen** — the newcomer protection buff, re-applied on login and each zone, dropping the moment
-  you act aggressively (#361)
-- ✅ **NPC death animations** — enemies play a proper death on the killing blow instead of vanishing or teleporting
-  back to spawn; verified in-client per creature type, with more being harvested (#362)
-- 🟡 **Gear-driven combat stats** — weapon damage rolls per swing, worn armour and magical Protection mitigate
-  incoming hits on retail's own mitigation formula and coefficients, and Critical Rating / Critical Damage Rating
-  produce crits. The crit curve and the NPC side of mitigation stay provisional — retail decides both server-side
-  and never tells the client (#395, #401)
-- 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as is
-  equipping and unequipping gear. Pending in-client verification (#400)
-- 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
-  cadence are still approximate (#349)
-- 🟡 **Buff stat effects** — a buff's per-stat bonuses and penalties apply to your live stats and come back off when
-  it expires, is cancelled or you die; flat ones add, percentage ones scale, and one that raises a max pool moves
-  the pool so the bar fills to it. Awaiting an in-client check of the applied values (#367, #435, #436, #450)
-- 🔴 **Spell cooldowns** — spells can be re-cast with no delay. Retail sends no recast on a cast (proven across
-  the whole corpus) and the client's own cast path arms only the shared global cooldown, so the per-spell base
-  must come from client data we have not located yet; no cooldown is enforced server-side either (#271)
-- 🟡 **Spellweaving** (necromancer and demonologist) — built and playable; the toggle turned out to be a different
-  key per class, so demonologists could not weave at all. The energy-bar drain is the last piece, and Priest of
-  Mitra / Tempest of Set are unmapped because no capture shows either weaving (#141, #505)
+  each reviving you at its own strength (#372, #375)
+- ✅ **Discovering resurrection points** — walking near a new point pops retail's banner and adds it to your list,
+  across all 538 imported points (#372)
+- ✅ **Buffs & debuffs** — apply, tick, expire on a timer and right-click to cancel. Each damage-over-time spell
+  ticks at its own measured rate; 53 of the 84 in the captures are measured, the rest use the median (#274, #370,
+  #437, #524)
+- ✅ **Shield of the Risen** — newcomer protection, re-applied on login and each zone, dropping when you act
+  aggressively (#361)
+- ✅ **NPC death animations** — a proper death on the killing blow, per creature type, with more being harvested
+  (#362)
+- 🟡 **Outlaw resurrection points** — the client's 49 criminal destinations are imported, but revive still sends
+  everyone to the normal point (#517, #503)
+- 🟡 **Recalls** — Path of Asura returns you to your bind point, the Totem of Origins to your race's home city.
+  Capture-verified for Stygian, the other three by the same rule (#206, #510)
+- 🟡 **Damage scale** — NPC swing damage is measured from the captures and caster NPCs use the right school. Only
+  levels 1-6 are well sampled; above that the curve is extrapolated (#401, #479)
+- 🟡 **Gear-driven combat stats** — weapon damage rolls per swing, armour and Protection mitigate on retail's own
+  formula, and crit ratings produce crits. The crit curve and the NPC side of mitigation stay provisional (#395,
+  #401)
+- 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as
+  is equipping and unequipping. Pending in-client verification (#400)
+- 🟡 **Ground-targeted AoE** — ticks damage with floating numbers; per-spell radius and cadence are approximate
+  (#349)
+- 🟡 **Buff stat effects** — per-stat bonuses and penalties apply and come back off on expiry, cancel or death;
+  flat ones add, percentage ones scale. Awaiting an in-client check of the values (#367, #435, #436, #450)
+- 🟡 **Spellweaving** (necromancer and demonologist) — built and playable. The energy-bar drain is the last piece,
+  and Priest of Mitra / Tempest of Set are unmapped for want of a capture (#141, #505)
 - 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
-- 🟡 **Fatalities** — the roll (5% at level 1 to 30% at 80), both fatality buffs, the necromancer's Frozen Hatred
-  proc and its pet all work in-client (#140); the finishing-move *animation* never plays and the trigger for it is
-  client-side (#440)
+- 🟡 **Fatalities** — the roll, both fatality buffs and the necromancer's Frozen Hatred proc all work in-client;
+  the finishing-move animation never plays (#140, #440)
+- 🔴 **Spell cooldowns** — nothing gates a re-cast. The per-spell base is not in any client data we have located,
+  and none is enforced server-side either (#271)
 - ⬜ **Real directional combat** with defensive shield arcs (#20)
 
 ### Character progression
 
-- ✅ **Learn spells, abilities & combos** — granted on login and at each level-up, with every rank learned and
-  shown; all twelve classes now get their level-1 kit (four were getting none)
-- ✅ Combos stick across relogs, not just at level-up
-- 🟡 **Feats** — the catalog is imported from the client: **19,777 feats** with trees, ranks and tooltips, 23,321
-  stat effects, a 5,501-edge prerequisite graph, and the wire↔catalog id map that joins a character's trained feats
-  to it. Trained feats grant their stats, training enforces prerequisites and the real point budget (79 at level
-  80), and a character's several named specs are each kept with their own build. Missing: per-feat cost and tier and
-  each class's tree layout (server-side data the client is never sent), and the retail training trigger — so
-  training runs off a GM command for now (#251, #467, #474)
+- ✅ **Learn spells, abilities & combos** — granted on login and at each level-up, every rank learned and shown,
+  for all twelve classes; combos stick across relogs
 - ✅ **Attributes** — Strength/Constitution/Intelligence/Wisdom/Dexterity from the per-class, per-level base plus
-  gear and buffs, so the formulas that read them (regen, mitigation) get real inputs. Retail never sends these; the
-  base was decoded from the client and checked in-client for all twelve classes at all eighty levels (#444)
-- 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
-- 🟡 **Skill points** — the pool is a pure function of level, not an award, so it is stated on login rather than
-  granted. Only five levels have been captured, and the curve has no formula to fill the rest in, so the other
-  levels keep whatever the character already had rather than showing an invented number (#507)
-- 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
-  client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
+  gear and buffs, so regen and mitigation get real inputs. Verified in-client at all eighty levels (#444)
+- 🟡 **Feats** — 19,777 feats imported with trees, ranks and tooltips, 23,321 stat effects and a 5,501-edge
+  prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget, and
+  named specs each keep their own build. Missing: per-feat cost and tier, each class's tree layout, and the retail
+  training trigger — so training runs off a GM command (#251, #467, #474)
+- 🟡 **Skill points** — the pool is a function of level, so it is stated on login rather than awarded. Five levels
+  are captured and there is no formula for the rest, so those keep what the character already had (#507)
+- 🟡 **Spell unlock levels** — 8,460 spells carry one, read from the client's spell and combo records; 592 come
+  only from the retired community scrapes (#650)
+- 🟡 **XP curve** — a provisional ramp; the real thresholds are partly harvested (#297)
+- 🟡 **Class spell / combo / ability catalogs** — still filling in; empty spell and item names are backfilled from
+  the client's own string table (#291, #296, #303, #300)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
 
 ### Items & economy
 
 - ✅ **Inventory** — containers, equipping, moving items, and starting gear
-- ✅ **The full economy** — buy and sell at vendors (the shop window opens on use), bank storage, the auction house
-  (list and buy), and mail carrying money and item attachments
-- ✅ **Item claims** — the account claim/redeem window (Claim, Claim All), including infinite and multi-charge
-  claims like Double XP, delivered straight to your bag (#359)
-- ✅ **Consumables** — right-click a potion, food, or drink to use it and apply its effect
-- ✅ **Creature loot** — killed enemies drop a lootable bag or chest, chosen per creature type (#363), and a looted
-  item lands in the backpack slot you dragged it onto (#462)
-- ✅ **Inventory stays in sync** — a server-side change to your bags (a quest taking the slave manacles off) pushes
-  both containers whole, the way retail does (#380)
-- ✅ **Complete tooltips** — item, spell and ability descriptions are no longer clipped at 512 characters mid-word
-- 🟡 **Gear stat bonuses** — each item's whole tooltip stat list is decoded from its template (4,223 stat rows over
-  1,705 items, matching the client's own values): +HP/+Mana, weapon min–max damage, armour and Protection, the crit
-  ratings, Magic Damage, Combat Rating and the regen stats all feed the fight. The per-hit damage/mitigation/crit
-  formulas are provisional pending in-client tuning (#3, #395, #401, #441)
+- ✅ **The full economy** — vendors (the shop window opens on use), bank storage, the auction house (list and buy),
+  and mail carrying money and item attachments
+- ✅ **Item claims** — the account claim/redeem window, including infinite and multi-charge claims (#359)
+- ✅ **Consumables** — right-click a potion, food or drink to use it and apply its effect
+- ✅ **Creature loot** — killed enemies drop a bag or chest chosen per creature type, and a looted item lands in
+  the slot you dragged it onto (#363, #462)
+- ✅ **Inventory stays in sync** — a server-side change to your bags pushes both containers whole (#380)
+- ✅ **Complete tooltips** — item, spell and ability descriptions are no longer clipped mid-word
+- 🟡 **Gear stat bonuses** — 4,223 stat rows over 1,705 items decoded from their templates: +HP/+Mana, weapon
+  damage, armour and Protection, crit ratings, Magic Damage, Combat Rating and regen all feed the fight. The
+  per-hit formulas are provisional pending in-client tuning (#3, #395, #401, #441)
 - 🟡 Guild bank (#132)
-- ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
+- ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing (#311)
 
 ### Social & guilds
 
 - ✅ **Chat** — say, channels, system messages, and whispers
-- ✅ **Guilds** — create, invite and accept, guild tag, and renown, with the guild window appearing instantly on
-  create (no relog) (#306). A new guild keeps the governing form you picked, and the rank ladder is per form, as the
-  client's own tables have it (#469)
-- ✅ **Groups (teams)** — invite (with the inviter's message, #459), accept, decline, leave, kick, leader promotion
-  on the leader leaving, and the team dissolving at one member; the `~Team` chat channel appears and disappears
-  with it (#101)
-- ✅ **/who and the guild browser** — the character search answers from the players actually online, filtered on
-  level range, class, race, playfield and name and paged as the client asks; guild search filters the realm's
-  guilds. Players are reported at their real level, in search results, team rosters and invites alike (#460)
-- ✅ **Friends list** — add, remove, persistence across a relog, and presence: your entry is pushed to everyone
-  watching when you log in or out, which is what makes the list render at all (the client hides offline friends)
-  (#99)
+- ✅ **Guilds** — create, invite and accept, guild tag and renown, with the window appearing on create. A guild
+  keeps the governing form you picked and the rank ladder is per form (#306, #469)
+- ✅ **Groups (teams)** — invite with a message, accept, decline, leave, kick, leader promotion, and dissolve at
+  one member; the `~Team` channel comes and goes with it (#101, #459)
+- ✅ **/who and the guild browser** — character search answers from the players online, filtered on level, class,
+  race, playfield and name and paged as the client asks; guild search filters the realm's guilds (#460)
+- ✅ **Friends list** — add, remove, persistence across a relog, and presence pushed to everyone watching (#99)
 - ✅ **Player-to-player trade** — request, the window, items and money both ways, rearranging and removing offers,
-  and the exchange committing on the double accept: both inventories and both wallets, with any change to either
-  offer clearing both accepts so nobody can agree to one table and receive another (#101)
-- 🟡 Member kick / promote / demote (#104) · trade **cancel** ends the session but does not close the partner's
-  window — the s2c side of cancel/decline/remove needs a capture (#427) · team loot rules are accepted but not
-  applied (#101)
+  and the exchange committing on the double accept; any change clears both accepts (#101)
+- 🟡 Member kick / promote / demote (#104) · trade **cancel** ends the session but leaves the partner's window
+  open, pending a capture (#427) · team loot rules are accepted but not applied (#101)
 
 ### Quests & dialogue
 
-- ✅ **Quests** — kill / loot / talk / collect / reach objectives, the journal
+- ✅ **Quests** — kill / loot / talk / collect / reach objectives, and the journal
 - ✅ **Gather quests work however you get the item** — a collect objective ticks when the item reaches your bags,
-  from a corpse, a pickup node, a vendor or a reward; 62 quests that shipped inert (typed as kills with no target)
-  now run (#521)
-- ✅ **The client's quest text is readable** — eleven of its localized-text categories are encrypted, and the key
-  turns out to be sent by the server per string; all 168 objective texts, the journal titles and summaries, and
-  the NPC dialogue now decrypt (#520)
-- ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine
-- ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does,
-  instead of the quest returning on the next login; the live J-panel refresh that rides along still needs a
-  capture (#457, #482)
+  from a corpse, a node, a vendor or a reward; 62 quests that were inert now run (#521)
+- ✅ **"Go there" objectives complete on arrival** — typed from the client's own reference, so 11 more quests run;
+  goals the client gives no map marker for stay inert (#641)
+- ✅ **The client's quest text is readable** — eleven localized-text categories are encrypted and the key is sent
+  per string; all 168 objective texts, the journal titles and summaries, and the NPC dialogue decrypt (#520)
+- ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine; every branch any capture
+  walked is reachable in-game (#642, #644)
+- ✅ **NPCs greet you differently the second time** — a full welcome first, a terser line after (#645)
+- ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does;
+  the live J-panel refresh that rides along still needs a capture (#457, #482)
 
 ### Mounts & pets
 
 - ✅ **Necromancer pets** — summon minions by type and have them follow; which spell summons which minion is
-  imported content, not code, so a newly decoded summon is a database row
+  imported content, so a newly decoded summon is a database row (#307, #640)
 - 🟡 **Mounts** — working; importing more from captures
 - ⬜ Mounted combat (#142)
 
 ### Group PvE content (not started)
 
-- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
-  scripting; #309). Two pieces are now **decoded** off the wire, though neither is built: the **difficulty** an
-  instance is entered at (normal vs epic) rides one word we had modelled as a constant (#511), and a group
-  instance really is owned by the **team** — its entry carries the team's own id where a solo one carries nobody
-  (#512). Notably the mode is *not* part of the `(map, instance)` key, so it needs somewhere of its own
-- ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
-  faction companions. The in-game Factions window already populates with standings for imported characters; what's
-  missing is the catalog and the reputation _changes_ from quests and kills (#310, #315)
+- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (#309). Two pieces are decoded but not
+  built: the difficulty an instance is entered at (#511), and group instances being owned by the team (#512)
+- ⬜ Factions & reputation — the Khitai faction ranks, vendors and companions. The Factions window populates for
+  imported characters; the catalog and the reputation changes from quests and kills are missing (#310, #315)
 
 ### Guild base & large-scale (not started)
 
-- ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
-  and gates, rank-gated structures, and hired NPC guards (#147)
-- ⬜ Sieges — massed guild-vs-guild siege warfare (siege weapons, destructible walls) fought over those keeps (#147)
-- 🟡 **Criminal status** — killing a player makes you a criminal for five minutes, and while you are one normal
-  vendors refuse to trade with you **and wagoners refuse to carry you**; smugglers at outlaw camps still will.
-  Both halves come from one sentence of the client's own spell text. Missing the trigger, since player-vs-player
-  combat is not modelled — so it runs off a GM command — plus the murder-point ladder up to Murderer (#503)
-- ⬜ PvP progression — open-world PvP, PvP minigames, and the PvP-resource / consequence layer that feeds base
-  building (#146)
+- ⬜ Guild base — player-built guild cities and battlekeeps: the central keep, walls and gates, rank-gated
+  structures, and hired NPC guards (#147)
+- ⬜ Sieges — massed guild-vs-guild siege warfare fought over those keeps (#147)
+- ⬜ PvP progression — open-world PvP, minigames, and the PvP-resource layer that feeds base building (#146)
+- 🟡 **Criminal status** — killing a player makes you a criminal for five minutes; normal vendors and wagoners
+  refuse you, smugglers still serve you. Missing the trigger (PvP combat is not modelled, so it runs off a GM
+  command) and the murder-point ladder (#503)
 
 ### Tooling
 
@@ -265,27 +221,25 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Client launcher** — drives the game client unattended, straight into the world
 - ✅ **Content-CDN mirror** — serves the client's streamed assets so it loads cleanly offline
 - ✅ **In-process MCP server** — live database + session inspection for tooling
-- ✅ **Client debug channels** — switches on the retail client's OWN logging (`--debug-channels`), so it reports
-  every stat it applies and what caused it, instead of us inferring from screenshots (#443)
+- ✅ **Client debug channels** — switches on the retail client's own logging, so it reports every stat it applies
+  and what caused it (#443)
 - ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
-- ✅ **GM commands** — our own `.commands`, plus the retail client's built-in ones: a GameMaster account flips the
-  stock client into GM mode and its `/teleport`, `/cloak`, `/kill`, `/setname`, … now route into the same server
-  command table, so both spellings work. `.setstat` measures how the client scales a stat for display. Flying is the
-  client's own `/luke` and needs no server support (#449, [docs](docs/subsystems/gm-commands.md))
-- 🟡 What the server should send back for each of the client's 133 GM commands is per-command work; most are not
-  answered yet (#449)
+- ✅ **GM commands** — our own `.commands` plus the retail client's built-in ones: a GameMaster account flips the
+  stock client into GM mode and its `/teleport`, `/cloak`, `/kill`, … route into the same command table (#449,
+  [docs](docs/subsystems/gm-commands.md))
 - 🟡 **Importer** — rebuilds the game database from captures + the client's asset files, plus read-only `--report`
-  diagnostics (NPC damage curve, item stat-region census, behaviour-command census, content coverage)
+  diagnostics
+- 🟡 What the server should answer for each of the client's 133 GM commands is per-command work; most are not
+  answered yet (#449)
 
 ### Wire fidelity
 
 - ✅ **One codec per message** — every byte the server sends is built by a single codec with a uniform
-  `Build`/`Parse` surface; nothing outside `Codecs/` hand-rolls a packet. 16 convention gates enforce it with no
-  exclusions (#530)
-- ✅ **Every codec round-trips its captured bytes** — each one parses and rebuilds real corpus packets byte-exact,
-  with an empty allowlist: no message is excused from the gate (#538, #543, #544, #545)
-- ✅ **Behaviour commands fully decoded** — all 34 of the client's behaviour commands, under its own names, and
-  every per-command trailer: 100% of the 67,299 captured records, zero mismatches (#536, #549)
+  `Build`/`Parse` surface; 16 convention gates enforce it with no exclusions (#530)
+- ✅ **Every codec round-trips its captured bytes** — each parses and rebuilds real corpus packets byte-exact,
+  with an empty allowlist (#538, #543, #544, #545)
+- ✅ **Behaviour commands fully decoded** — all 34 of the client's behaviour commands and every per-command
+  trailer: 100% of the 67,299 captured records (#536, #549)
 
 ## Build
 
