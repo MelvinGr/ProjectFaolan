@@ -19,10 +19,27 @@ namespace Faolan.Core.Network.Constants
 		// is mislabelled "Stagger" with CastTime 0, so this comes from the capture, not the Spell row.)
 		public const int SummonChannelMs = 545;
 
+		// The DISMOUNT channel. Retail acks the press at once and then holds the player MOUNTED for the horse-runs-away
+		// animation: mount capture press frame 1231 (t+19.609) -> server echo-ack frame 1253 (t+19.968) -> end-twin
+		// frame 1449 (t+24.759). Measured from the server's OWN ack rather than the press so it carries no client RTT:
+		// 4.791s. Every player-initiated dismount in the corpus lands 5.0-5.7s after the press, so the constant is one
+		// duration and not per-mount.
+		public const int DismountChannelMs = 4791;
+
 		// The DISMOUNT: the ride buff's end twin (rank 01, empty payload) - removes the mounted state. Pressing the
 		// mount button while mounted toggles it; retail runs the SAME channel (cast bar + horse-runs-away animation)
 		// then applies this end-twin + a StatUpd clearing the mount stat (0xBA=0). Mount-dismount capture frame 1449.
 		public const uint DismountSpell = 0x31EB1501u;
+
+		// ⚠️ PLACEHOLDER (#653). Retail DOES throw a rider off under fire - one server-initiated dismount in the corpus
+		// is a bare end-twin with no preceding client press, landing in the same frame as a hit
+		// (NecroL80_..._gameplay_chat-annotated, frame 598 hit -> frame 599 end-twin). But the corpus cannot pin the RULE:
+		// across 27 mounted windows the rider takes 58 hits and is thrown exactly ONCE, and that single throw defeats
+		// both obvious models - a per-hit threshold (the throwing hit is 10,944, while 24,744 and 200,496 hits elsewhere
+		// leave the rider seated) and a cumulative one (thrown at 157,669 accumulated, seated at 742,185). So it is
+		// modelled as a damage METER with a placeholder ceiling, in WIRE damage (100 display x the /100 display scale),
+		// to be replaced by an in-client measurement. Anything more specific would be invented, not observed.
+		public const int ThrowOffDamage = 10_000;
 
 		// The RIDE buff (#26): after the horse spawns, retail applies a second SELF ApplySpell - spell base 0x31EB15,
 		// apply rank 00 - the mounted/riding state; the dismount is its end twin 0x31EB1501 with an empty payload.

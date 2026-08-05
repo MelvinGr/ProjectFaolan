@@ -488,6 +488,7 @@ namespace Faolan.GameServer
 			var entity = _simulation.PlayerWorldEntity(client);
 			entity?.IsMounted = true;
 			entity?.MountRideStat = mount.CreatureId;
+			entity?.MountDamageTaken = 0; // #142
 
 			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.Spell.Name, character.Name, character.MapId);
 		}

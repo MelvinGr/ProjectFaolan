@@ -65,15 +65,21 @@ dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg
 
 ## The wire sequence
 
-Mounting is a **server-timed channel**; dismounting is **client-driven**. Both directions start with the same
-`SummonMount` press — it toggles.
+Both directions are **server-timed channels** and both start with the same `SummonMount` press — it toggles.
+They differ only in how long the server holds the state.
 
 | | mount | dismount |
 |---|---|---|
-| begin | behavior echo-ack (cast bar + horse runs up) | behavior echo-ack |
-| then | after **545 ms**: complete echo-ack | immediately: complete echo-ack |
+| begin | behavior echo-ack (cast bar + horse runs up) | behavior echo-ack (horse runs away) |
+| then | after **545 ms**: complete echo-ack | after **4,791 ms** |
 | buff | ride buff `0x31EB1500`, 24 h | end twin `0x31EB1501`, empty payload |
 | stats | `Mount` = the creature id, `MountSpeed` = 100 | `Mount` = 0 |
+
+The dismount duration is measured from the server's OWN ack, not from the press, so it carries no client RTT:
+press frame 1231 (t+19.609) → ack frame 1253 (t+19.968) → end twin frame 1449 (t+24.759). Every
+player-initiated dismount in the corpus lands 5.0–5.7 s after the press, so it is one duration and not
+per-mount. (This was once read as "the server responds immediately, frame 1449" — frame 1449 is the response to
+frame 1231, 5.15 s earlier, and clearing `Mount` at once drops the rider to run speed for the whole animation.)
 
 Retail sends **no summon `ApplySpell` and spawns no horse entity** — the client animates the whole run-up and
 mount from the ride buff plus the `Mount` stat. The 545 ms is measured (summon frame 498 → ride buff frame
@@ -88,6 +94,34 @@ The mount is persisted on the character and re-seated on world entry into a moun
 fresh buff apply — retail's entry-restore record is byte-identical to a player-initiated one bar the effect
 id and nonce, so there is no "silent" variant to reconstruct inside the snapshot.
 [V2: NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount.tshark.json]
+
+## What takes a mount off
+
+`SummonMount` is not the only way a mount ends. Sweeping every capture carrying the ride buff — **27 mounted
+windows, ~55 minutes mounted** — and classifying each dismount by whether a c2s `SummonMount` precedes it
+separates the player's toggle from the three the SERVER owns:
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json]
+
+| cause | count | what retail sends |
+|---|---|---|
+| the player's press | 23 | end twin + `StatUpd(Mount=0)`, `DismountChannelMs` after the ack |
+| **death** | 2 | the same two records, within two frames of the player's own `RespawnMe` |
+| **thrown off by damage** | 1 | the same two records, in the same frame as a hit, with no press |
+| a playfield the map does not allow mounts in | 1 | the same two records (frame 10036; no damage near it) |
+
+So a dismount is always those same two records and the only question is what triggered them — which is why
+`SendDismount` is one method every path reaches.
+
+Death unseats you on the **respawn**, not at the moment of death: in both captured cases the end twin follows
+the player's own `RespawnMe` (frames 9103→9108, and 15045→15047 after a lava death).
+
+⚠️ The damage throw-off is **real but unmeasured**. The rider takes 58 hits across those 27 windows and is
+thrown exactly once, and that single sample defeats every threshold: the throwing hit is 10,944 while hits of
+24,744 and 200,496 elsewhere leave the rider seated, and the throw lands at 157,669 accumulated damage while
+742,185 accumulates in a window with no throw at all. Neither the client's tweak table (RDB 1000516) nor the
+`Mounted` spell record (3271445) carries a mount entry, and the throw-off is server-side, so there is nothing to
+reverse out of the client. It ships as a damage METER with a **placeholder** ceiling
+(`MountCatalog.ThrowOffDamage`) — open work tracked in Gitea #653.
 
 ## Mounted combat
 
@@ -141,8 +175,15 @@ the mount, not the class. Widening it is the class-aware ability coverage proble
 `CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action. There is no damage, no knockback, no
 radius on it, none of the mount-ability ids has a spell record at all, and none of the 16 charge spells carries
 a `[2][9]` stat-effect region. So a charge's magnitude is server-GDB-only, exactly like ordinary spell
-magnitudes (`stat-engine.md`), and no capture in the corpus shows a mounted character fighting. Implementing
-trample damage or a charge knockback today would mean inventing both the numbers and the packets.
+magnitudes (`stat-engine.md`). Implementing trample damage or a charge knockback today would mean inventing
+both the numbers and the packets.
+
+**The rider never attacks.** The corpus is not silent about mounted characters in combat — those 27 mounted
+windows carry 168 `DamageResultIIR` and 147 `StatDamageIIR` records, and the mounted player is the TARGET of
+58 of them. They are the ATTACKER in **zero**. That is the client's `GameAction_CanUseIfMounted` gate doing its
+job: the only action it ever asks the question of is `Charge`, and the captured character (a necromancer) has
+none. So there is no "attack from the saddle" packet the server is failing to answer — attacking while mounted
+is refused before anything reaches the wire.
 
 Open work tracked in Gitea #142.
 
@@ -154,6 +195,8 @@ Open work tracked in Gitea #142.
 | lookups | `IDatabaseRepository.GetMount` / `GetMounts` |
 | the protocol constants | `MountCatalog` — channel, ride/dismount spell ids, `MountSpeed`, the buff payload |
 | the summon/dismount handler | `GameServerListener.Inbound.cs`, `BehaviorId.Mount` |
+| the one unseat path | `GameServerListener.Outbound.cs`, `SendDismount` (press, throw-off and death all reach it) |
+| the throw-off meter | `WorldSimulation.ThrowFromMountIfBattered` / `WorldEntity.MountDamageTaken` |
 | the entry re-seat | `GameServerListener.WorldEntry.cs`, `RestoreMount` |
 | the mount creature model | `CaptureMountImporter` lifts it onto an `NpcTemplate` from the captures |
 

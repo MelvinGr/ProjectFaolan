@@ -23,6 +23,11 @@ namespace Faolan.GameServer
 			return CombatService.SendDamageNumber(client, targetHandle, attackerHandle, damage);
 		}
 
+		Task IWorldOutbound.SendDismount(INetworkClient client)
+		{
+			return SendDismount(client);
+		}
+
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

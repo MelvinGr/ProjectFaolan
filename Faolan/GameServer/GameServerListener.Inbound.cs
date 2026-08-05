@@ -1918,14 +1918,16 @@ namespace Faolan.GameServer
 		// Split out of HandleBehaviorControlCenter's action switch (#200) - a pure move; the case is now a one-liner.
 		private async Task HandleBccMount(INetworkClient client, byte[] rawPayload, CommandMessage args, uint from)
 		{
-			// SummonMount TOGGLES (pressing the same button while mounted dismounts) and the two directions time
-			// DIFFERENTLY:
-			//  - MOUNT is a SERVER-timed channel: the client shows the cast bar + horse-runs-up, and retail sends
-			//    the ride buff 545ms later (SummonChannelMs; capture frame 498->520). So we begin-echo-ack, then
-			//    after the channel complete-echo-ack + ride buff 0x31EB1500 + StatUpd(Mount=id, MountSpeed=100).
-			//  - DISMOUNT is CLIENT-driven: the client runs its OWN (longer) dismount channel + horse-runs-away, so
-			//    the server responds IMMEDIATELY with the end-twin 0x31EB1501 (empty payload) + StatUpd(Mount=0)
-			//    (capture frame 1449) rather than holding the mount state on a timer.
+			// SummonMount TOGGLES (pressing the same button while mounted dismounts) and BOTH directions are
+			// SERVER-timed channels - they only differ in how long the server holds the state:
+			//  - MOUNT: the client shows the cast bar + horse-runs-up and retail sends the ride buff 545ms after the
+			//    press (SummonChannelMs; mount capture frame 498 -> 520). So we begin-echo-ack, then after the channel
+			//    complete-echo-ack + ride buff 0x31EB1500 + StatUpd(Mount=id, MountSpeed=100).
+			//  - DISMOUNT: retail acks the press immediately but keeps the player MOUNTED for the horse-runs-away
+			//    animation, sending the end-twin 0x31EB1501 + StatUpd(Mount=0) DismountChannelMs after its own ack
+			//    (same capture, press frame 1231 -> ack 1253 -> end-twin 1449). This used to fire immediately here on
+			//    the reading that frame 1449 was the response to the press; it is 5.15s after it, and clearing the
+			//    mount stat at once drops the player to run speed for the whole animation.
 			// Retail sends NO summon ApplySpell / no horse entity - the client animates it all. IsMounted lives on
 			// the player WorldEntity (without the toggle the press re-mounts and the char sticks).
 			// KNOWN COSMETIC (accepted): during the dismount the char briefly dips into the floor and re-grounds at
@@ -1944,7 +1946,6 @@ namespace Faolan.GameServer
 
 			if (dismounting)
 			{
-				// Immediate: don't hold the mount state during the client's dismount channel.
 				var dismountAck = (byte[])rawPayload.Clone();
 				if (dismountAck.Length > 17)
 				{
@@ -1953,19 +1954,13 @@ namespace Faolan.GameServer
 				}
 
 				await CombatService.SendBehaviorEchoAck(client, dismountAck, 3);
-				await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
-				var dismountStats = new CharacterStatBlock
+				Task.RunAfter(MountCatalog.DismountChannelMs, async () => // horse runs away during the channel, then unseat
 				{
-					[CharacterStatId.Mount] = 0 // clear the mount stat (frame 1449)
-				};
-				await SendStatUpdate(client, dismountStats, self);
-				await _broadcaster.BroadcastStatsToViewers(client, dismountStats); // #428: the horse renders from THIS, so viewers need it too
-				playerEntity?.IsMounted = false;
-				playerEntity?.MountRideStat = 0;
+					if (client.Session.Account == null)
+						return;
 
-				// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
-				client.Session.Character.MountId = null;
-				await Database.SaveCharacterMount(client.Session.Character.Id, null);
+					await SendDismount(client); // end-twin + StatUpd(Mount=0), frame 1449
+				}, Logger);
 				return;
 			}
 
@@ -1992,6 +1987,7 @@ namespace Faolan.GameServer
 				await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
 				playerEntity?.IsMounted = true;
 				playerEntity?.MountRideStat = mount.CreatureId; // so a viewer arriving LATER can be told (#428)
+				playerEntity?.MountDamageTaken = 0; // a fresh mount soaks its own beating before it throws you (#142)
 
 				// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
 				// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.

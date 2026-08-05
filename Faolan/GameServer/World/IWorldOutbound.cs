@@ -88,6 +88,11 @@ namespace Faolan.GameServer.World
 		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
 		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
 
+		// Unseat a mounted player: the ride buff's end-twin + StatUpd(Mount=0), the same two records every retail
+		// dismount ends with. The tick needs it for the two dismounts it owns rather than the client - a hit that
+		// throws the rider, and the respawn after a death (#142).
+		Task SendDismount(INetworkClient client);
+
 		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
 		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
 		// bcc_state=29. Sent at the end of the death sequence (#214).

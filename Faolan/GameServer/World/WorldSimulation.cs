@@ -12,6 +12,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
@@ -374,9 +375,28 @@ namespace Faolan.GameServer.World
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client!, vitals);
+			await ThrowFromMountIfBattered(target, damage);
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}.", character.Name, npc.Name);
+		}
+
+		// Retail throws a rider off their mount under fire (#142): a mounted player who soaks enough damage gets the
+		// ride buff's end-twin with no press of their own. The damage accumulates on the entity rather than testing a
+		// single hit because the corpus rules a per-hit threshold out - a 200,496 hit leaves the rider seated while a
+		// 10,944 one throws them - so the meter is the shape that survives the evidence even though its CEILING is a
+		// placeholder (MountCatalog.ThrowOffDamage, #653).
+		private async Task ThrowFromMountIfBattered(WorldEntity target, int damage)
+		{
+			if (!target.IsMounted || damage <= 0)
+				return;
+
+			target.MountDamageTaken += damage;
+			if (target.MountDamageTaken < MountCatalog.ThrowOffDamage)
+				return;
+
+			_logger.LogInformation("Mount: {Player} was thrown from their mount after {Damage} damage.", target.Client?.Session.Character?.Name, target.MountDamageTaken);
+			await _output.SendDismount(target.Client!);
 		}
 
 		// A caster NPC's tick action (#232): cast a spell at the target player (ApplySpell from the NPC handle) and
@@ -441,6 +461,7 @@ namespace Faolan.GameServer.World
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client!, vitals);
+			await ThrowFromMountIfBattered(target, damage);
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {NpcTemplate}'s spell.", character.Name, npc.Name);
@@ -700,6 +721,13 @@ namespace Faolan.GameServer.World
 			vitals.ReviveTo(target?.RestorationLevel ?? 0f); // no point resolved -> full
 
 			var handle = entity?.Handle ?? character.Id;
+
+			// You do not come back mounted. Retail unseats a rider who died on the RESPAWN, not at the moment of death:
+			// in both captured cases the end-twin + StatUpd(Mount=0) follow the player's own RespawnMe within two frames
+			// (chat-annotated-4 frames 9103->9108 and 15045->15047, the second one a lava death). #142.
+			if (entity?.IsMounted == true || character.MountId != null)
+				await _output.SendDismount(client);
+
 			await _output.SendRevive(client, handle, target?.Id ?? 0);
 			await _output.PushVitals(client, vitals);
 			_logger.LogInformation("Combat: {Player} resurrected (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);

@@ -445,6 +445,12 @@ namespace Faolan.GameServer.World
 		// stats. A late viewer therefore gets that stat block right after the spawn record.
 		public uint MountRideStat { get; set; }
 
+		// Damage this rider has soaked since mounting (#142). Retail throws a rider off under fire, so the damage a
+		// mounted player takes accumulates here and the mount comes off once it passes MountCatalog.ThrowOffDamage;
+		// reset on every mount and every dismount. ⚠️ The CEILING is a placeholder (#653) - see MountCatalog - but the
+		// meter itself is not: nothing else on the entity would let a hit reach the mount.
+		public int MountDamageTaken { get; set; }
+
 		public bool IsPlayer { get; }
 
 		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment
