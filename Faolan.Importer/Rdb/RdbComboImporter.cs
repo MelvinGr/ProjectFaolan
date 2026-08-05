@@ -131,12 +131,55 @@ namespace Faolan.Importer.Rdb
 				spell.RecastCentiseconds = recast;
 			}
 
+			var levelsSet = await FillComboSpellLevels(db, existing.Values);
 			var classCombos = await SyncClassCombos(db, existing.Values, logger);
 
 			logger?.LogInformation(
-				"RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported, {Recasts} combo recasts set on their spell rows ({Cleared} cleared), {ClassCombos} class<->combo rows.",
-				seen, imported, recastsSet, recastsCleared, classCombos);
+				"RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported, {Recasts} combo recasts set on their spell rows ({Cleared} cleared), {Levels} combo spell levels sourced, {ClassCombos} class<->combo rows.",
+				seen, imported, recastsSet, recastsCleared, levelsSet, classCombos);
 			return (seen, imported);
+		}
+
+		// The UNLOCK LEVEL of a combo's spell, from the combo XML - the second re-derivable source for `Spells.Level`
+		// (#650).
+		//
+		// The spell record (RDB 1040005 field 125) carries a level for 7,378 of the shipped 8,221, and the remaining
+		// 843 came from the retired ellatha/wiki scrapes: delete the database and re-import, and those come back at 0,
+		// which matters because `Level` is the gate `GetClassSpellsUnlockedBetween` queries. 251 of the 843 are combo
+		// spells, and the combo XML states their level outright.
+		//
+		// ⚠️ `level="1"` is a SENTINEL, not level one. Every combo the client ships as a generic effect template
+		// (`generic_DOT_fire_10sec`, `generic_stun_3_sec`, ...) sits at 1, and those are exactly the 8 rows where the
+		// combo level contradicts a spell record that DOES state one - so excluding them makes the two RDB sources
+		// disjoint rather than merely mostly-agreeing, and the combo XML can be authoritative for what it covers.
+		//
+		// The column is cross-checked against the client's own combo NAMES, which embed the level
+		// (`BearShaman_15_hitdebuff_Ursine_Brawl_I`, `Herald_24_dot_Burn_to_Death_II`): 431 of 431 names that carry a
+		// number agree with it. That is also what settles the five places where it contradicts a scraped value - the
+		// name backs the XML every time, so the scrape was simply wrong (`Overreach IV` is level 56, not 80).
+		//
+		// MIN across the combos sharing a game action, not MAX: it is the first level at which any variant of the
+		// combo can be used. Only one game action in the shipped data has two (3180972 at 60 and 70).
+		private static async Task<int> FillComboSpellLevels(IDatabaseContext db, IEnumerable<Combo> combos)
+		{
+			var byGameAction = combos
+				.Where(c => c.Level > 1)
+				.GroupBy(c => c.GameActionId)
+				.ToDictionary(g => g.Key, g => (byte)g.Min(c => c.Level));
+
+			var targets = byGameAction.Keys.ToList();
+			var set = 0;
+			foreach (var spell in await db.Spells.Where(s => targets.Contains(s.Id)).ToListAsync())
+			{
+				var level = byGameAction[spell.Id];
+				if (spell.Level == level)
+					continue;
+
+				spell.Level = level;
+				set++;
+			}
+
+			return set;
 		}
 
 		/// <summary>

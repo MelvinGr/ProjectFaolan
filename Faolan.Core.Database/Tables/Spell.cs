@@ -6,16 +6,25 @@ namespace Faolan.Core.Database.Tables
 	public class Spell : BaseEntity
 	{
 		/// <summary>
-		///     The spell's own level requirement — RDB field 125 of its type-1040005 record, which is where the
-		///     overwhelming majority of these come from and which leads over every other source.
+		///     The spell's own level requirement, from TWO client sources — RDB field 125 of its type-1040005 record,
+		///     which is where the overwhelming majority come from and which leads; and, for a spell a COMBO drives, the
+		///     combo XML's own <c>level</c> attribute (RDB 1010206, <c>RdbComboImporter.FillComboSpellLevels</c>).
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ **Not every row is re-derivable.** The RDB carries field 125 on 7,645 of 21,502 records while the
-		///     shipped catalog has 8,221 rows with a level, so roughly 576 of them came from the community scrapes
-		///     retired in #296 (plus captures) and survive only because `faolan.db` is committed — a fresh import
-		///     rebuilds those spells with `Level = 0`. They are deliberately NOT cleared: this is the gate
-		///     `GetClassSpellsUnlockedBetween` queries, so zeroing them would grant those spells at level 0. There is
-		///     no marker saying which rows are which; Gitea #650 tracks closing that.
+		///     ⚠️ **Not every row is re-derivable.** Measured by blanking the column and re-importing from the RDB
+		///     alone: 7,868 of the shipped 8,460 come back (7,378 from the spell record, 490 more from the combo XML).
+		///     The remaining **592** came from the community scrapes retired in #296 (plus captures) and survive only
+		///     because `faolan.db` is committed — a fresh import rebuilds those spells with `Level = 0`. They are
+		///     deliberately NOT cleared: this is the gate `GetClassSpellsUnlockedBetween` queries, so zeroing them
+		///     would grant those spells at level 0. There is still no marker saying which rows are which — the set is
+		///     computable by that same blank-and-re-import diff (Gitea #650).
+		///     <para>
+		///         Where the two client sources both speak they never contradict each other (the 8 places they overlap
+		///         are all <c>generic_*</c> effect templates, whose combo <c>level="1"</c> is a sentinel and is
+		///         excluded). Where the combo XML contradicted a SCRAPED value it won, and the client's own combo names
+		///         — which embed the level, <c>Guardian_56_…_Overreach_IV</c> — back it every time: five scraped levels
+		///         were simply wrong (Overreach IV is 56, not 80).
+		///     </para>
 		///     <para>
 		///         ⚠️ It is also NOT the level a character is actually GRANTED the spell at — retail grants at or
 		///         below this, never above. Where a capture has caught the grant, <see cref="ClassSpell.GrantLevel" />
