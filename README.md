@@ -202,7 +202,7 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Necromancer pets** — summon minions by type and have them follow; which spell summons which minion is
   imported content, so a newly decoded summon is a database row (#307, #640)
 - 🟡 **Mounts** — working; importing more from captures
-- ⬜ Mounted combat (#142)
+- ⬜ Mounted combat — the mount abilities are granted, but a lance charge needs a capture (#667)
 
 ### Group PvE content (not started)
 

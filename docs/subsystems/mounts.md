@@ -188,7 +188,7 @@ job: the only action it ever asks the question of is `Charge`, and the captured 
 none. So there is no "attack from the saddle" packet the server is failing to answer — attacking while mounted
 is refused before anything reaches the wire.
 
-Open work tracked in Gitea #142.
+Open work tracked in Gitea #667 (the capture a charge needs).
 
 ## Where the pieces live
 
