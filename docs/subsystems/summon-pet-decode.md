@@ -118,8 +118,43 @@ pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift)
 
 **Naming gotcha:** "Deathless Acolyte" is the SPELL/UI name; the summoned pet CREATURES are named
 `Arcanist` / `Magus`. The mapping lives in the `SpellEffects` table as `SummonPet` rows keyed by the summon
-spell id (seeded by the importer's `spell-effects` module): `0x5E2F5`→Arcanist, `0x5E2F0`→Magus,
-`0x4105E9`→Pleasurable Company (all `CastSpell` 0x4, spell id in the cast trailer).
+spell id (written by the importer's `spell-effects` module).
+
+## Where the roster comes from (#640)
+
+The twelve pets above were a hand-typed `(spellId, template, combat)` table lifted out of the one necro capture.
+**The client's own catalog states all three facts**, so it is read rather than listed — and the difference is not
+cosmetic: the RDB names **319** summon spells, and three of the misses (`Summon Horde: Corruptor` /
+`Blighted One` / `Mutilator`) are combat pets of the very class that capture was of.
+
+A summon spell performs no stat change. Its `[2][9]` GameAction region carries one
+`StartServerSideScryScriptWithParams` (53261) element whose `ScriptParams` string is the summon, spelled out —
+and there are **two spellings**:
+
+```
+spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781     a COMBAT pet
+Type=Pet;Tag=3681                                             the social COMPANION
+```
+
+| fact | where it comes from |
+|---|---|
+| **which** spells summon | `Spell.SummonSpawnHash != null` — the params, over all 21,502 spell records |
+| **whether it fights** | which spelling the params use (`Spell.SummonIsCompanion`) |
+| **which creature** | the spell's own NAME, after the first `": "` — `Undead Minion: Corruptor`, `Pet: King Cobra`, `Companion: Pleasurable Company` |
+
+53261 is a general "run this server script" action, so the ACTION does not mark a summon — the params do.
+
+⚠️ **`spawnHash` is a 4-character ACG token and resolves to nothing in the client.** It addressed retail's
+server-side content; the client neither reads nor compares it (the same finding that closed #547 for the quest
+tokens). It is carried as *evidence*, not as a lookup — and it is what would make a wrong naming rule visible,
+because spells sharing a pet share a hash (`GGDI` on all three Mutilator summons, `NSAO` on both Corruptor ones).
+
+A summon is only written as a row when its pet name matches an `NpcTemplates` row, which is also the only thing
+the runtime can spawn — **30 of the 319** today. The rest are counted and reported by the module rather than
+silently dropped; they grow with `NpcTemplates`, i.e. with the corpus.
+
+⚠️ `pointCost` (the pet-point budget a pet occupies) and `petBuff` are lifted onto `Spell` and **nothing reads
+them yet** — pet points are not modelled.
 
 ## Follow-up (#307) to make it retail-accurate
 

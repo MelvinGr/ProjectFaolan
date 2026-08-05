@@ -12,21 +12,64 @@ namespace Faolan.Tests
 	// pet summons and Frozen Hatred's fatality proc - now live as rows, so these gate the rows rather than constants.
 	public class SpellEffectSeedTests
 	{
-		// The 12 summonable necro pets, from NecroL80_..._mount-horse_all-necro-summons_dismiss-all (every one summoned
-		// and mass-dismissed in that session). A summon is a cast that resolves to a spawn, so each row is (cast id ->
-		// creature type); "Pleasurable Company" is the one non-combat companion.
+		// The summon roster is DERIVED from the catalog now (#640), so the gate is the derivation, not a list. The
+		// twelve pets one necro capture showed - NecroL80_..._mount-horse_all-necro-summons_dismiss-all, every one
+		// summoned and mass-dismissed - are exactly what the old hand-typed table held, so they are the regression
+		// floor: whatever else the rule finds, it must still find these.
 		[Fact]
-		public void Seed_CarriesTheTwelveCapturedPetSummons()
+		public async Task Summons_StillCarryTheTwelveCapturedPets()
 		{
-			var summons = SpellEffectsModule.BuildRows().Where(r => r is { Trigger: SpellEffectTrigger.OnCast, Kind: SpellEffectKind.SummonPet }).ToList();
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
 
-			Assert.Equal(12, summons.Count);
+			var summons = await db.SpellEffects.AsNoTracking()
+				.Where(e => e.Trigger == SpellEffectTrigger.OnCast && e.Kind == SpellEffectKind.SummonPet)
+				.ToListAsync(ct);
+
 			Assert.Equal("Arcanist", summons.Single(s => s.SpellId == 0x0005E2F5).Template);
 			Assert.Equal("Corruptor", summons.Single(s => s.SpellId == 0x0004F813).Template);
+			Assert.Equal("Life-stealer", summons.Single(s => s.SpellId == 0x0004F817).Template);
 			Assert.Single(summons.Where(s => !s.Combat), s => s.Template == "Pleasurable Company");
 
 			// A cast summon has no lifetime - the necro's pets stand until dismissed. Only a TIMED summon carries one.
 			Assert.All(summons, s => Assert.Null(s.DurationMs));
+
+			// The eleven combat pets of that capture, plus the social companion.
+			uint[] captured = [0x004105E9, 0x0005E2F5, 0x0005E2F0, 0x0005E2F6, 0x0005E321, 0x0005E322, 0x0004F813, 0x0004F814, 0x0004F815, 0x0004F816, 0x0004F817, 0x00127EDD];
+			Assert.Empty(captured.Except(summons.Select(s => s.SpellId)));
+		}
+
+		// The naming rule, stated on retail's own spell names. This is the whole derivation of WHICH creature a summon
+		// spawns, so it is worth pinning separately from the rows it produces.
+		[Theory]
+		[InlineData("Undead Minion: Corruptor", "Corruptor")]
+		[InlineData("Deathless Acolyte: Arcanist", "Arcanist")]
+		[InlineData("Companion: Pleasurable Company", "Pleasurable Company")]
+		[InlineData("Mini-Pet: Serpent Man Oldblood", "Serpent Man Oldblood")]
+		[InlineData("Ancient Soul", "Ancient Soul")] // no prefix: the whole name IS the pet
+		public void PetNameOf_TakesTheNameAfterThePrefix(string spellName, string expected)
+		{
+			Assert.Equal(expected, SpellEffectsModule.PetNameOf(spellName));
+		}
+
+		// The catalog half: the RDB names far more summons than any capture does, and losing that column would take
+		// the roster with it. 319 is what the shipped catalog carries; the gate is that it has not collapsed.
+		[Fact]
+		public async Task Catalog_NamesTheSummonSpells()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var summonSpells = await db.Spells.AsNoTracking().Where(s => s.SummonSpawnHash != null).ToListAsync(ct);
+			Assert.True(summonSpells.Count >= 300, $"only {summonSpells.Count} spells carry summon params - has rdb-spells been run?");
+
+			// Both param spellings are present, and the combat/companion split follows them.
+			Assert.Contains(summonSpells, s => !s.SummonIsCompanion && s.SummonSpawnHash == "YU86"); // Deathless Acolyte: Arcanist
+			Assert.Contains(summonSpells, s => s.SummonIsCompanion && s.Id == 4261353u); // Companion: Pleasurable Company
+
+			// Spells sharing a pet share a hash - the corroboration that makes a wrong naming rule visible.
+			var mutilator = summonSpells.Where(s => s.SummonSpawnHash == "GGDI").ToList();
+			Assert.True(mutilator.Count >= 2, "the Mutilator summons should share one spawnHash");
 		}
 
 		// Frozen Hatred's proc, in the client's own words (spell 4377209's description, LDB 50211): "When you or your
@@ -61,7 +104,16 @@ namespace Faolan.Tests
 			var ct = TestContext.Current.CancellationToken;
 
 			var shipped = await db.SpellEffects.AsNoTracking().OrderBy(e => e.SpellId).ThenBy(e => e.Trigger).ThenBy(e => e.Sequence).ToListAsync(ct);
-			var seed = SpellEffectsModule.BuildRows().OrderBy(e => e.SpellId).ThenBy(e => e.Trigger).ThenBy(e => e.Sequence).ToList();
+
+			// The derived half is rebuilt from the very catalog the shipped rows were built from, so this asserts the
+			// derivation is still the one that produced them - a rule change that silently drops a pet fails here.
+			var summonSpells = await db.Spells.AsNoTracking().Where(s => s.SummonSpawnHash != null).ToListAsync(ct);
+			var templates = (await db.NpcTemplates.AsNoTracking().Select(t => t.Name).Distinct().ToListAsync(ct))
+				.GroupBy(n => n.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First());
+
+			var seed = SpellEffectsModule.BuildSummonRows(summonSpells, templates).Rows
+				.Concat(SpellEffectsModule.BuildRows())
+				.OrderBy(e => e.SpellId).ThenBy(e => e.Trigger).ThenBy(e => e.Sequence).ToList();
 
 			Assert.Equal(seed.Select(Key), shipped.Select(Key));
 			return;

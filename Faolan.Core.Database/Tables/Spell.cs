@@ -197,6 +197,35 @@ namespace Faolan.Core.Database.Tables
 
 		public uint EffectSpell { get; set; }
 
+		// --- Pet summons (#640/#307). A summon spell performs no effect of its own: its GameAction region carries one
+		// StartServerSideScryScript*WithParams* (53261) element whose ScriptParams string is the summon, spelled out:
+		//
+		//   spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781
+		//
+		// so the roster is READ, not listed. This is the whole reason the twelve necro pets stopped being a hand-typed
+		// table: `SummonSpawnHash != null` IS "this spell summons a pet", over the whole catalog rather than over the
+		// spells one capture happened to cast.
+		//
+		// ⚠️ `spawnHash` is a 4-character ACG token ([0-9A-Z_]) and does NOT resolve to a creature anywhere in the
+		// client - it addressed retail's SERVER-side content, and the client neither reads nor compares it (#547 closed
+		// the same question for the quest tokens). So it is carried as EVIDENCE, not as a lookup: it is what makes a
+		// summon spell we have no captured pet NAME for a reportable gap instead of an invisible one. The name itself
+		// comes from the wire (PetSummonExtractor).
+		[MaxLength(16)]
+		public string? SummonSpawnHash { get; set; }
+
+		// Which of the two param spellings the record used, and so whether the pet FIGHTS: the `spawnHash=` form is a
+		// combat pet, the `Type=Pet;Tag=` form the social companion. Every captured summon agrees - all 11 spawnHash
+		// pets bind with PetCodec.CombatKind on the wire and the one Type=Pet pet with SocialKind - which is what
+		// makes this readable off the record instead of needing a capture per pet.
+		public bool SummonIsCompanion { get; set; }
+
+		// The buff the summon applies alongside the pet, and the pet-POINT cost of keeping it out - both straight out
+		// of the same params string. Null on a spell that is not a summon. Nothing consults them yet; they are lifted
+		// because they are free here and a re-harvest is not.
+		public uint? SummonPetBuff { get; set; }
+		public uint? SummonPointCost { get; set; }
+
 		// Backfilled from the RDB spell-data record (type 1040005) by RdbSpellImporter (#236):
 		public ushort CastTime { get; set; } // milliseconds (RDB field 0x126 * 10)
 

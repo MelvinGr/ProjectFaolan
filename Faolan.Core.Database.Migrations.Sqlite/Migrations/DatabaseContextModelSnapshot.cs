@@ -3542,6 +3542,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("SplashRadius")
                         .HasColumnType("REAL");
 
+                    b.Property<bool>("SummonIsCompanion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SummonPetBuff")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SummonPointCost")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SummonSpawnHash")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("Spells");

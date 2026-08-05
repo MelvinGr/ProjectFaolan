@@ -108,6 +108,12 @@ namespace Faolan.Importer.Rdb
 		// mount catalog, lifted into Mounts (#627). See Mount.CreatureId.
 		private const uint MountField = 0x0BA;
 
+		// 53261 StartServerSideScryScriptWithParams - the GameAction a spell performs when its effect is not a stat
+		// change but a server-side SCRIPT. On a pet summon its ScriptParams string is the whole summon (#640,
+		// Spell.SummonSpawnHash). Other spells use the same action for other scripts, which is why the PARAMS decide
+		// whether a record is a summon, not the action id.
+		private const uint StartServerSideScryScriptWithParamsKind = 53261;
+
 		// 499 - the QUALITY/rarity tier, the same field (and the same 0-indexed ItemQuality ladder) an item template
 		// carries; on a mount record it is the ONLY field separating "Swift <horse>" from "<horse>". Read into
 		// Mount.Quality - NOT as a speed, see Mount.Quality's remarks.
@@ -196,6 +202,9 @@ namespace Faolan.Importer.Rdb
 			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
 			// #627: (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
 			var mounts = new Dictionary<uint, (uint CreatureId, ItemQuality? Quality)>();
+			// #640: (spell id -> pet summon params) off the 53261 element's ScriptParams string. Written onto the Spell
+			// row below; this is what makes "which spells summon a pet" a catalog READ instead of a hand-typed list.
+			var summons = new Dictionary<uint, SummonParams>();
 			// #271: the base recast, off the record's GameAction ELEMENT region. Resolved only after the loop, because
 			// deciding which element applies to a spell needs its GuiStackingLine, which this same loop sets.
 			// `recastOwn` is what a record says when IT is cast; the two `assigned` maps are what every record says
@@ -302,6 +311,12 @@ namespace Faolan.Importer.Rdb
 				// modifiers on a base the client already holds (docs/re/spell-recast-source.md).
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
 				{
+					// #640: a PET SUMMON spells itself out in the ScriptParams of its server-side-script element -
+					// `spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781`. Lifted here for the same reason as
+					// the mount above: a column read off a record this loop already has open.
+					if (element.Kind == StartServerSideScryScriptWithParamsKind && SummonParams.TryParse(element.Text(GameActionTypes.KeyEventString), out var petSummon))
+						summons[entry.Id] = petSummon;
+
 					// #349: the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
 					// which is why the field run has none. Largest wins on a record carrying several (a cone plus a
 					// ring): the radius the spell can reach is the outer one.
@@ -353,6 +368,8 @@ namespace Faolan.Importer.Rdb
 					statEffects[entry.Id] = deltas;
 				}
 
+				summons.TryGetValue(entry.Id, out var summon);
+
 				if (!byId.TryGetValue(entry.Id, out var spell))
 				{
 					spell = new Spell
@@ -372,7 +389,11 @@ namespace Faolan.Importer.Rdb
 						GuiStackingLine = stackingLine,
 						ScalingAttribute = scalingAttribute,
 						ManaCost = manaCost,
-						ManaCostIsPercent = manaCostIsPercent
+						ManaCostIsPercent = manaCostIsPercent,
+						SummonSpawnHash = summon?.Token,
+						SummonIsCompanion = summon?.Companion ?? false,
+						SummonPetBuff = summon?.PetBuff,
+						SummonPointCost = summon?.PointCost
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -422,6 +443,13 @@ namespace Faolan.Importer.Rdb
 				spell.ScalingAttribute = scalingAttribute;
 				spell.ManaCost = manaCost;
 				spell.ManaCostIsPercent = manaCostIsPercent;
+
+				// #640: set unconditionally, like the stacking fields - the RDB is the only source, and a record with
+				// no summon element genuinely is not a summon.
+				spell.SummonSpawnHash = summon?.Token;
+				spell.SummonIsCompanion = summon?.Companion ?? false;
+				spell.SummonPetBuff = summon?.PetBuff;
+				spell.SummonPointCost = summon?.PointCost;
 			}
 
 			// #271: apply the recast now that every row's GuiStackingLine is set. The spell's OWN record leads - it

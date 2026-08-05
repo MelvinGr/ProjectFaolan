@@ -22,16 +22,24 @@ namespace Faolan.Importer.Modules
 	// checks that up front and fails naming the ids, rather than writing rows that point at nothing.
 	public sealed class SpellEffectsModule : IImportModule
 	{
-		// The necro's summonable pets (#307, docs/subsystems/summon-pet-decode.md). Spell id = the CastSpell trailer
-		// id; the template = the name of the FA015807 creature that spawned after the channel. The full roster is in
-		// NecroL80_..._mount-horse_all-necro-summons_dismiss-all (all 12 summoned + mass-dismissed). "Pleasurable
-		// Company" is the generic SOCIAL companion (non-combat, not targetable); everything else is a combat pet.
-		private static readonly (uint Spell, string Template, bool Combat)[] PetSummons =
-		[
-			(0x004105E9, "Pleasurable Company", false), (0x0005E2F5, "Arcanist", true), (0x0005E2F0, "Magus", true), (0x0005E2F6, "Reaper", true), (0x0005E321, "Archmagus", true),
-			(0x0005E322, "Blood Arcanist", true), (0x0004F813, "Corruptor", true), (0x0004F814, "Blighted One", true), (0x0004F815, "Necrotic Bomb", true), (0x0004F816, "Harvester", true),
-			(0x0004F817, "Life-stealer", true), (0x00127EDD, "Mutilator", true)
-		];
+		// The pet-summon roster is READ FROM THE CATALOG, not listed here (#640). It used to be twelve hand-typed
+		// (spellId, template, combat) triples lifted out of one necro capture, which is the shape that "fails SILENTLY
+		// for any we don't know about" - and it did: the RDB names **319** summon spells, and three of the misses
+		// (`Summon Horde: Corruptor`/`Blighted One`/`Mutilator`) are combat pets of the very class the capture was of.
+		//
+		// Each of the three facts now comes from the record that states it:
+		//   * WHICH spells summon - `Spell.SummonSpawnHash != null`, off the ScriptParams of the spell's own
+		//     server-side-script GameAction element (SummonParams).
+		//   * WHETHER the pet fights - `Spell.SummonIsCompanion`, off which of the two param spellings that string
+		//     uses. Every captured summon agrees with the wire's own PetIIR kind triple.
+		//   * WHICH creature - the spell's NAME. Retail names a summon after its pet: `Undead Minion: Corruptor`,
+		//     `Companion: Pleasurable Company`, `Pet: King Cobra`. Taken as the part after the first ": " (the whole
+		//     name when there is none) and accepted only when it matches an NpcTemplates row, which is also the only
+		//     thing the runtime can actually spawn.
+		//
+		// ⚠️ The spawnHash CORROBORATES the naming rule but cannot replace it: spells sharing a pet share a hash
+		// (`GGDI` on all three Mutilator spells, `NSAO` on both Corruptor ones), so a hash whose spells disagreed on
+		// the creature would be visible. It resolves to nothing in the client - see Spell.SummonSpawnHash.
 
 		// Frozen Hatred's fatality proc (#140/#434). The trigger is the buff 4377209 - the effect record the castable
 		// 4377207 points at - being live on the killer; retail's own words for it are that spell's description (LDB
@@ -66,7 +74,21 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var rows = BuildRows();
+			// #640: the summon roster comes out of the catalog the `spells` module built (Spell.SummonSpawnHash), so
+			// this module still needs nothing but the database - it reads a column instead of carrying a list.
+			var summonSpells = await ctx.Db.Spells.Where(s => s.SummonSpawnHash != null).ToListAsync();
+			var templateNames = (await ctx.Db.NpcTemplates.Select(t => t.Name).Distinct().ToListAsync())
+				.GroupBy(n => n.ToLowerInvariant())
+				.ToDictionary(g => g.Key, g => g.First());
+			var (summons, unresolved) = BuildSummonRows(summonSpells, templateNames);
+
+			// A catalog with no summon params at all means `spells` has not been run against an RDB that carries them
+			// - which would silently drop every pet summon, the exact failure this ticket replaced a hand-typed list
+			// to avoid. Say so instead.
+			if (summonSpells.Count == 0)
+				throw new InvalidOperationException("spell-effects: no spell in the catalog carries summon params - run `rdb-spells` (with --RdbDir) first, or the pet roster would come out empty.");
+
+			var rows = summons.Concat(BuildRows()).ToList();
 			var mode = ctx.ModeOverrides.GetValueOrDefault(Name, ctx.Mode);
 
 			// Every spell an effect names must be in the catalog - SpellEffect.SpellId is an FK to Spells, and a
@@ -109,7 +131,8 @@ namespace Faolan.Importer.Modules
 			}
 
 			await ctx.Db.SaveChangesAsync();
-			return new ImportResult($"{rows.Count} spell effect(s): {inserted} new, {updated} updated.");
+			return new ImportResult($"{rows.Count} spell effect(s): {inserted} new, {updated} updated; " +
+				$"{summons.Count} of {summonSpells.Count} catalogued summons resolved to a creature we hold ({unresolved} unresolved, #640).");
 		}
 
 		// The summonable pet creature TYPE names, lower-cased for matching. Two importers need them: the pets module
@@ -122,18 +145,61 @@ namespace Faolan.Importer.Modules
 			return names.Select(n => n.ToLowerInvariant()).ToHashSet();
 		}
 
-		// The seed, as a pure function so a test can assert the shipped rows against it.
+		// The pet a summon spell is NAMED after: the part of the spell name after the first ": ", or the whole name
+		// when it carries none. Retail's own convention across all 319 summon spells - `Undead Minion: Corruptor`,
+		// `Pet: King Cobra`, `Mini-Pet: Vistrix`.
+		public static string PetNameOf(string spellName)
+		{
+			var split = spellName.IndexOf(": ", StringComparison.Ordinal);
+			return split < 0
+				? spellName.Trim()
+				: spellName[(split + 2)..].Trim();
+		}
+
+		// The summon rows the catalog yields: every spell carrying summon params whose NAME resolves to a creature we
+		// hold a template for. A summon whose pet we have never seen is skipped and COUNTED - the runtime spawns by
+		// template name, so a row naming a creature no NpcTemplate matches could not summon anything anyway, and the
+		// count is the honest coverage number (~30 of 319) rather than a silence.
+		// `templateNames` maps a lower-cased creature name to the TEMPLATE's own spelling, and the row stores the
+		// latter: the runtime spawns by looking the name up, and retail's spell name is not always capitalised the
+		// way its creature is (`Undead Minion: Life-Stealer` summons `Life-stealer`).
+		public static (List<SpellEffect> Rows, int Unresolved) BuildSummonRows(IEnumerable<Spell> summonSpells, IReadOnlyDictionary<string, string> templateNames)
+		{
+			var rows = new List<SpellEffect>();
+			var unresolved = 0;
+			foreach (var spell in summonSpells)
+			{
+				var pet = PetNameOf(spell.Name ?? "");
+				if (pet.Length == 0 || !templateNames.TryGetValue(pet.ToLowerInvariant(), out var template))
+				{
+					unresolved++;
+					continue;
+				}
+
+				rows.Add(new SpellEffect
+				{
+					SpellId = spell.Id,
+					Trigger = SpellEffectTrigger.OnCast,
+					Sequence = 0,
+					Kind = SpellEffectKind.SummonPet,
+					Template = template,
+					Combat = !spell.SummonIsCompanion
+				});
+			}
+
+			return (rows, unresolved);
+		}
+
+		// The rows that are NOT read from the catalog. One effect, and it is not a summon spell: the Frozen Hatred
+		// fatality proc, whose trigger is a buff being live rather than a cast (#140/#434).
+		//
+		// ⚠️ Its two durations are the only numbers in this module that are not harvested, and they are not
+		// harvestable: they come from retail's own PROSE - the LDB 50211 description quoted above - not from an
+		// observed timer. The corpus catches the proc firing but never times it out. Left as literals deliberately,
+		// and said so here rather than sitting silently beside data that is read (#640).
 		public static IReadOnlyList<SpellEffect> BuildRows()
 		{
-			var rows = PetSummons.Select(p => new SpellEffect
-			{
-				SpellId = p.Spell,
-				Trigger = SpellEffectTrigger.OnCast,
-				Sequence = 0,
-				Kind = SpellEffectKind.SummonPet,
-				Template = p.Template,
-				Combat = p.Combat
-			}).ToList();
+			var rows = new List<SpellEffect>();
 
 			// Both halves of the proc hang off the buff that arms it, in the order the capture shows them: the 6s
 			// self-buff first (it rides the fatality burst's own frame), then the pet.
