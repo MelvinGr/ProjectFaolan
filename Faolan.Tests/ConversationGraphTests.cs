@@ -216,6 +216,56 @@ namespace Faolan.Tests
 			Assert.Equal(graph.Nodes.Single(n => n.ContentKey.StartsWith("50002:100")).Id, edge.FromNodeId); // ...on the gated greeting
 		}
 
+		// The replay gate has to walk each hop under the gate THAT HOP was harvested under, not under the leaf walk's
+		// (#644). Turach is the shape: his 10320-Active greeting offers 2142 both unconditionally and gated on 12407
+		// Completed, leading to two different screens, and the walk hanging under the gated one is itself gated on 10320
+		// Active. Matching the leaf's gate at hop 1 found neither branch, fell through to the unconditional one, and the
+		// rest of the route did not exist there - so the deepest walks of his tree stopped replaying.
+		[Fact]
+		public void ARouteCrossingAGateOtherThanItsOwn_StillReplays()
+		{
+			var root = Gated(Walk("", Line(2833), Options(2142, 0)), 10320, QuestState.Active);
+			var rootKey = "50002:2833,50001:2142,50001:0";
+			var plain = Gated(Under(Walk("0", Line(2820), Options(2144, 0)), rootKey, 2142), 10320, QuestState.Active);
+			var deeper = Gated(Under(Walk("0", Line(2820), Options(2144, 17310, 0)), rootKey, 2142), 12407, QuestState.Completed);
+			var leaf = Gated(Under(Walk("0>0", Line(2822), Options(0)), "50002:2820,50001:2144,50001:17310,50001:0", 2144), 10320, QuestState.Active);
+
+			var graph = ConversationGraph.Fold([root, plain, deeper, leaf]);
+
+			// Both branches of 2142 are in the graph, and the leaf hangs off the 12407-gated one...
+			Assert.Equal(2, graph.Edges.Count(e => e.OptionId == 2142));
+			Assert.Equal(graph.Nodes.Single(n => n.ContentKey.Contains("17310")).Id, graph.Edges.Single(e => e.OptionId == 2144).FromNodeId);
+			// ...and every walk still replays, which is the property that broke.
+			Assert.DoesNotContain(graph.Report, r => r.Contains("unreplayable"));
+		}
+
+		// The answer-path FALLBACK has to shortlist on what each candidate actually offered. A path names several walks -
+		// one per quest-gated variant of that screen - and Casilda's '0>0' includes a variant that carries no answer list
+		// at all, so picking by gate alone landed on a screen with no button for index 0 and the branch was dropped (#644).
+		[Fact]
+		public void ThePathFallbackPrefersAParentThatOfferedTheClickedIndex()
+		{
+			var graph = ConversationGraph.Fold([
+				Walk("", Line(100), Options(7615)),
+				Walk("0", Line(200)), // this capture of the screen never recorded its option list...
+				Gated(Walk("0", Line(200), Options(8149, 0)), 12407, QuestState.Active), // ...this one did
+				Walk("0>0", Line(300), Options(0))
+			]);
+
+			Assert.Equal(8149u, graph.Edges.Single(e => e.ToNodeId == graph.Nodes.Single(n => n.ContentKey.Contains("300")).Id).OptionId);
+			Assert.DoesNotContain(graph.Report, r => r.Contains("option list was never captured"));
+		}
+
+		private static ConversationGraph.Harvested Gated(ConversationGraph.Harvested walk, uint questId, QuestState state)
+		{
+			return walk with { Walk = walk.Walk with { ConditionQuestId = questId, ConditionQuestState = state } };
+		}
+
+		private static ConversationGraph.Harvested Under(ConversationGraph.Harvested walk, string parentContentKey, uint optionId)
+		{
+			return walk with { Walk = walk.Walk with { ParentContentKey = parentContentKey, OptionId = optionId } };
+		}
+
 		private static ConversationGraph.Harvested Walk(string answerPath, params ConversationPacket[] packets)
 		{
 			return WalkGranting(answerPath, 0, packets);

@@ -116,13 +116,23 @@ player was looking at when they picked and the option they clicked, both read of
 pick shallower", and where a screen has quest-gated variants that is several different screens — Casilda's `2`
 sub-tree was harvested under her five-option `12373` greeting but is itself ungated, so a path-derived parent
 attached it to the three-option unconditional greeting and index 2 named *"Goodbye"*. Where the harvested link does
-not resolve (7 branches: the capture that offered the option lost the merge) the path is the fallback, and the
-count is reported rather than assumed.
+not resolve (8 branches: the capture that offered the option lost the merge) the path is the fallback, and the
+count is reported rather than assumed. That fallback shortlists on what each candidate actually **offered** — a
+path names one walk per quest-gated variant of the screen, and a variant whose answer list the capture never
+recorded has no button for the clicked index, so it cannot be the parent whatever its gate says.
 
 **The acceptance gate is a walk replay.** Every harvested walk must still be reachable by starting at the root its
-own capture opened on and clicking the same sequence of option ids: **549 of 553** on the shipped corpus, with the
-4 that are not named in the import log. The fold also reports every screen nothing reaches — a class of defect the
+own capture opened on and clicking the same sequence of option ids: **553 of 553** on the shipped corpus, with any
+that are not named in the import log. The fold also reports every screen nothing reaches — a class of defect the
 answer-path key could not even express, because there the path *was* the route.
+
+⚠️ **A hop is replayed under the gate that hop was harvested under, not the walk's own** (Gitea #644). The route is
+a chain of harvested (parent, child) pairs and the gate is evaluated per pair, so a route can cross an ungated
+screen on its way to a gated one and back. Turach's `10320`-Active greeting offers option `2142` both
+unconditionally and gated on `12407` Completed, leading to two different screens; matching the *leaf* walk's gate
+at that first hop found neither, fell through to the unconditional branch, and the rest of the route did not exist
+there. Laranga is the mirror image — a `10320`-Completed leaf hanging off three ungated hops, whose gate matched a
+*sibling* branch at hop 1.
 
 Two irreducible facts the corpus states, both reported by the import:
 

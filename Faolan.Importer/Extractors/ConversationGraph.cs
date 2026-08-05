@@ -156,6 +156,15 @@ namespace Faolan.Importer.Extractors
 		// looked alike folding into one is exactly the mistake this catches - and the edge dedup can drop a branch when
 		// two routes disagree about where the same option leads.
 		//
+		// ⚠️ A hop carries its OWN gate, not the leaf walk's (#644). The route is a chain of harvested (parent, child)
+		// pairs and `EdgeGate` is evaluated per pair, so the gate on hop 1 is generally a different quest from the gate
+		// on hop 4 - a route can cross an ungated screen on the way to a gated one, and vice versa. Replaying with the
+		// LEAF's gate at every hop was the original bug behind the three unreplayable walks: at Turach's root, option
+		// 2142 offers an unconditional branch and one gated on 12407 Completed, and the walk below it is gated on 10320
+		// Active, so leaf-gate matching fell through to the unconditional branch and the rest of the route did not
+		// exist there. Laranga is the mirror image - a 10320-Completed leaf hanging off three ungated hops, where the
+		// leaf's gate matched a SIBLING branch at hop 1 and sent the replay down the wrong sub-tree.
+		//
 		// Also reports the screens nothing reaches. Under the answer-path key an unreachable screen was not even
 		// expressible (the path WAS the route), so this is a class of defect that only becomes visible here.
 		private static void Verify(Graph graph, List<Harvested> walks, Dictionary<Harvested, string> classOf, Dictionary<string, uint> nodeIdOf,
@@ -168,8 +177,9 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var h in walks)
 			{
-				// Climb to the root the capture opened on, collecting the clicks on the way up.
-				var route = new List<uint>();
+				// Climb to the root the capture opened on, collecting each click AND the gate that click was harvested
+				// under - the same (option, gate) slot the fold keyed the edge by.
+				var route = new List<(uint Option, uint? Quest, QuestState? State)>();
 				var at = h;
 				var broken = false;
 				while (at.Walk.AnswerPath.Length != 0)
@@ -180,7 +190,8 @@ namespace Faolan.Importer.Extractors
 						break;
 					}
 
-					route.Insert(0, link.OptionId);
+					var (quest, state) = EdgeGate(link.Parent.Walk, at.Walk);
+					route.Insert(0, (link.OptionId, quest, state));
 					at = link.Parent;
 				}
 
@@ -189,10 +200,13 @@ namespace Faolan.Importer.Extractors
 
 				var node = nodeIdOf[classOf[at]];
 				var ok = true;
-				foreach (var option in route)
+				foreach (var (option, quest, state) in route)
 				{
 					var branches = out_[node].Where(e => e.OptionId == option).ToList();
-					var next = branches.FirstOrDefault(e => e.ConditionQuestId == h.Walk.ConditionQuestId && e.ConditionQuestState == h.Walk.ConditionQuestState)
+					// The hop's own slot first. The fallbacks below it are the runtime's precedence (ConversationService
+					// .PickConversationEdge): a walk whose exact slot the dedup dropped still counts as replayed if the
+					// branch a player would actually take lands in the same place.
+					var next = branches.FirstOrDefault(e => e.ConditionQuestId == quest && e.ConditionQuestState == state)
 						?? branches.FirstOrDefault(e => e.ConditionQuestId == null)
 						?? branches.FirstOrDefault();
 					if (next == null)
@@ -215,7 +229,7 @@ namespace Faolan.Importer.Extractors
 					// 500 lines of one.
 					lost++;
 					if (lost <= 10)
-						graph.Report.Add($"  unreplayable: {h.Walk.NpcName} '{h.Walk.AnswerPath}' via [{string.Join(">", route)}] reached 0x{node:X8}, not 0x{nodeIdOf[classOf[h]]:X8}");
+						graph.Report.Add($"  unreplayable: {h.Walk.NpcName} '{h.Walk.AnswerPath}' via [{string.Join(">", route.Select(r => r.Option))}] reached 0x{node:X8}, not 0x{nodeIdOf[classOf[h]]:X8}");
 				}
 			}
 
@@ -281,11 +295,22 @@ namespace Faolan.Importer.Extractors
 					if (!uint.TryParse(cut < 0 ? h.Walk.AnswerPath : h.Walk.AnswerPath[(cut + 1)..], out var index))
 						continue;
 
-					parent = Pick(byPath[(h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, parentPath)].ToList(), h, parentPath);
+					// A path names SEVERAL walks (one per quest-gated variant of that screen), and the index has to name a
+					// button on the one we pick - so a candidate that never offered that many options cannot be the
+					// parent, whatever the gate says. Shortlisting on that before the gate preference is what recovers
+					// Casilda's '0>0>0', whose same-path candidates include a close screen with no answer list at all
+					// (#644). If none can, fall back to the whole list so the report still names the real shortfall.
+					var candidates = byPath[(h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, parentPath)].ToList();
+					var offering = candidates.Where(c => OptionIdsOf(c).Count > index).ToList();
+					parent = Pick(offering.Count > 0 ? offering : candidates, h, parentPath);
 					var offered = parent == null ? [] : OptionIdsOf(parent);
 					if (index >= offered.Count)
 					{
+						// Named rather than counted, so the branch that is actually lost can be looked up in the corpus
+						// instead of standing as an anonymous "1" forever (#644).
 						dropped++;
+						report.Add($"  unlinkable: {h.Walk.NpcName} '{h.Walk.AnswerPath}' - parent '{parentPath}' "
+						           + (parent == null ? "was never captured" : $"offers {offered.Count} option(s), so index {index} names none"));
 						continue;
 					}
 
