@@ -48,31 +48,52 @@ Interact, not a pet action and not an emote).
 **Command — `QueuePetCommand` (0x205b)** (opcode already named in `Opcodes.cs`):
 `[u32 type=0xC350][u32 petHandle][u32 command]`.
 
-**The command set is CLOSED at five.** The bar is five buttons — the abilities `Pet Attack` / `Defend` / `Follow`
-/ `Assist` / `Dismiss`, slots 261–265 — and sweeping every capture for `QueuePetCommand` yields exactly five
-distinct codes, `0x1F4`–`0x1F8`, across 18 sends. So nothing further is coming; the only open question is which
-name goes on which code. [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json]
+**The command set is the client's own TWELVE, and it was recovered from the client rather than the corpus.**
 
-What makes the annotations readable is the **lag direction**, and `casting-with-chat-notes` settles it: there the
-player narrates *before* acting, twice, ~3 s apart.
+The client carries the names as one contiguous string block, and that block's order is the enum's order:
+
+```
+Assist  Follow  Defend  AttackTag  CeaseFire
+AllAssist  AllFollow  AllDefend  AllAttackTag
+DismissFollower  Dismiss  AllDismiss
+```
+
+The BASE is pinned by the corpus: require the three capture-attributed codes to land on semantically matching
+names, and **exactly one base in the plausible range does it** — `0x1EF`.
+[V1: docs/re/aoc-client-rpc-methods.json] [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json]
 
 | code | name | evidence |
 |---|---|---|
-| `0x1F4` | **assist** | `chat-annotated-4`: press at 20:11:08, note "set app pets to assist" at 20:11:10. The weakest of the three — a single note, and *after* its press rather than before. |
-| `0x1F5` | attack **or** follow | — |
-| `0x1F6` | **defend** | `casting-with-chat-notes` "net magus to defend" 05:59:38 → press 05:59:41; `chat-annotated-4` "set app pets to defend" 20:11:00 → press 20:11:01, and "defend again" 20:11:18 → press 20:11:19. Three independent notes. |
-| `0x1F7` | the other of attack / follow | — |
-| `0x1F8` | **dismiss** | `casting-with-chat-notes` "dismissing arcanist" 05:59:13 → press 05:59:16, and confirmed by BEHAVIOUR: the server answers with `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D`. |
+| `0x1EF`–`0x1F3` | Assist / Follow / Defend / AttackTag / CeaseFire | per-pet; **never used in any capture** |
+| `0x1F4` | **AllAssist** | `chat-annotated-4`: press 20:11:08, note "set **app** pets to assist" 20:11:10 |
+| `0x1F5` | **AllFollow** | the alignment, plus the ability-slot ladder below |
+| `0x1F6` | **AllDefend** | "net magus to defend" 05:59:38 → press 05:59:41; "set app pets to defend" → press; "defend again" → press. Three independent notes |
+| `0x1F7` | **AllAttackTag** | the alignment, plus the ability-slot ladder below |
+| `0x1F8` | **DismissFollower** | "dismissing arcanist" 05:59:13 → press 05:59:16, confirmed by BEHAVIOUR: `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D` |
+| `0x1F9`, `0x1FA` | Dismiss, AllDismiss | the per-pet and all-pets spellings of the same act |
 
-⚠️ `0x1F5` and `0x1F7` are carried as one named pair (`PetCommand.AttackOrFollowA/B`) rather than as two hopeful
-names. There is no arithmetic shortcut to break the tie — the bar's ability slots have no monotone relation to the
-codes (Assist 264 → `0x1F4` while Defend 262 → `0x1F6`) — and the client sends **no** `PerformSpecialAction`
-alongside a pet command, so the bar press cannot be cross-referenced to the ability it came from either. One
-annotated capture that says "attack" or "follow" settles it.
+The alignment is a derivation, not a fit: no other offset puts an assist-like, a defend-like **and** a dismiss-like
+name on those three codes. The nearest rival (`0x1F4` as `Assist`) matches assist and defend but puts `CeaseFire`
+where a pet was captured being despawned. Executable as
+`PetCommandTests.ExactlyOneBase_SatisfiesAllThreeAnchors`.
 
-(A const-scan of `AgeOfConan.exe` for `0x1F4`–`0x1F8` is a dead end and a trap worth naming: it lands on the
+**A second, independent derivation agrees on exactly the pair that was open.** The bar's ability slots map to the
+all-pets codes in DESCENDING order — Assist 264 → `0x1F4`, Follow 263 → `0x1F5`, Defend 262 → `0x1F6`, Attack 261
+→ `0x1F7`.
+
+### Two earlier conclusions died here
+
+⚠️ **"The command set is CLOSED at five" was wrong.** There are twelve. The corpus carries five because the
+captured character was a necromancer commanding a GROUP, so every press went through the **all-pets** bar — which
+is also why the annotations say "set *app* pets to…". The per-pet codes were simply never pressed on the wire.
+
+⚠️ **"There is no arithmetic relation to the ability slots" was wrong**, and instructive about how: the relation
+DESCENDS, and only an ascending one had been looked for. The original note reads "Assist 264 → `0x1F4` while
+Defend 262 → `0x1F6`" as evidence of no relation; it is the relation, seen backwards.
+
+(A const-scan of `AgeOfConan.exe` for `0x1F4`–`0x1F8` is still a dead end and a trap worth naming: it lands on the
 client's STAT-name registration table, where `0x1F8` is `Stamina` and `0x1FA` is `Mana` — the same numbers in an
-unrelated namespace.)
+unrelated namespace. The string block above is the right artifact.)
 
 **Owner-binding — `PetIIR_c` (0x1F4CB0F7)** (opcode already named; reader in docs/re/iir-readers-conversation-misc.md
 = `[u32 mode], mode∈{0,1}→[u32×2], mode==0→[u32×3]`). This is the packet that tells the client "this creature is
@@ -84,7 +105,7 @@ not client inference and not a spawn field.
 **FULLY DECODED loop** (nothing left to RE on the protocol):
 1. **Summon**: C→S BCC `0x642CD3D6` ability → channel → S→C `FA015807` pet spawn + `StatIIR` + `ApplySpell`
    (pet self-buff) + `StatUpdate` + `MoveTask` + **`PetIIR` 0x1F4CB0F7 mode-0 owner-assign** `[player][pet]`.
-2. **Command**: C→S `QueuePetCommand` 0x205b `[C350][pet][cmd]` — the five bar codes above.
+2. **Command**: C→S `QueuePetCommand` 0x205b `[C350][pet][cmd]` — the twelve codes above (five captured).
 3. **Dismiss**: 0x205b 0x1F8 → S→C `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D` despawn.
 
 The only non-protocol unknown is **which BCC summon-ability id maps to which pet template** (Deathless Acolyte

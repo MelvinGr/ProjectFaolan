@@ -317,14 +317,17 @@ namespace Faolan.GameServer
 		}
 
 		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
-		// [u32 command]. The bar is five buttons and the corpus carries exactly five codes (0x1F4-0x1F8), so the set is
-		// closed - see PetCommand for which three are attributed and why the other two are one named pair (#307,
-		// docs/subsystems/summon-pet-decode.md).
+		// [u32 command]. The command set is the client's own twelve, recovered in #307 - see PetCommand for the
+		// derivation and for the two conclusions it overturned (docs/subsystems/summon-pet-decode.md).
 		//
-		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn, and is the only one that ACTS today: the
+		// DISMISSAL is the only family that ACTS today: retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. The
 		// stance commands need pet-side combat AI (a pet picking and engaging a target), which does not exist - a
 		// summoned minion only follows, via SetNpcFollow. They are logged rather than silently dropped so the bar's
 		// traffic is visible while that is built.
+		//
+		// All three dismissal codes are honoured, not just the captured one: `DismissFollower` (0x1F8) is what the
+		// corpus shows, but `Dismiss` and `AllDismiss` are the same act from the per-pet and all-pets bars, and
+		// answering only the captured spelling would leave the other two bars' buttons dead.
 		private async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // type 0xC350
@@ -333,7 +336,7 @@ namespace Faolan.GameServer
 			var owner = client.Session.Character.Id;
 			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
 
-			if (command == PetCommand.Dismiss)
+			if (command is PetCommand.DismissFollower or PetCommand.Dismiss or PetCommand.AllDismiss)
 			{
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					b => b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Remove(owner, petHandle)))));
