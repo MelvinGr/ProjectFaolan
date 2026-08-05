@@ -423,8 +423,17 @@ namespace Faolan.GameServer.World
 		}
 
 		// An NPC engaged a target: push its aggro to every viewer in range that sees it - a HateListUpdate (the NPC now
-		// hates the target) plus a ThreatLevel, so the threat/aggro is visible the tick combat starts (#216). Additive
-		// to the combat-mode weapon-draw; gated with the rest of the combat sim by the caller.
+		// hates the target), a ThreatLevel, and the NPC's target LOCK, so the threat/aggro is visible the tick combat
+		// starts (#216). Additive to the combat-mode weapon-draw; gated with the rest of the combat sim by the caller.
+		//
+		// The three go out in retail's order: `NecroL80_..._login_combat` shows LockedToChanged arriving right after a
+		// HateListUpdate/ThreatLevel pair. LockedToChanged carries [npc handle] -> [target ref], and every captured
+		// instance is a low NPC handle locking onto a PLAYER, which is the aggro moment (#405).
+		//
+		// ⚠️ It goes to VIEWERS, not just to the target, and that is measured rather than assumed: in
+		// `login_2-clients_group-trade-friend` the same (npc, target) pair is sent on BOTH clients' streams (frames
+		// 3146/3147 and 3394/3395) even though only one of them is the target. A single-client capture cannot tell
+		// those apart, which is why the two-client one is the one that settles it.
 		public async Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
 		{
 			if (target == null)
@@ -432,6 +441,7 @@ namespace Faolan.GameServer.World
 
 			var hate = HateListUpdateCodec.Build(npc.Handle, target.Handle);
 			var threat = ThreatLevelCodec.Build(npc.Handle, 1, 1);
+			var lockedTo = LockedToChangedCodec.Build(npc.Handle, target.Handle);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -439,6 +449,7 @@ namespace Faolan.GameServer.World
 				{
 					await WorldIir.Send(viewer.Client, hate);
 					await WorldIir.Send(viewer.Client, threat);
+					await WorldIir.Send(viewer.Client, lockedTo);
 				}
 			}
 		}

@@ -383,8 +383,21 @@ the target out in the field also sends it home. WORKS in-client (it moves + leas
 
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
-**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListUpdateCodec`/`ThreatLevel` → `BroadcastNpcAggro`,
-#216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled`.
+**aggro** — a `HateListUpdate` + `ThreatLevel` + `LockedToChanged` (`HateListUpdateCodec` / `ThreatLevelCodec` /
+`LockedToChangedCodec` → `BroadcastNpcAggro`, #216/#405) — alongside the combat-mode weapon-draw. All are gated by
+`NpcAutoAttackEnabled`.
+
+The three go out in retail's order: `NecroL80_…_login_combat` shows `LockedToChanged` arriving right after a
+`HateListUpdate`/`ThreatLevel` pair. Its body is `[npc handle] → [target ref]`, and every one of the 250 captured
+instances across 18 dumps is a low NPC handle locking onto a **player**, which is what identifies it as the aggro
+moment rather than (as was once assumed) part of a spell-hit bundle.
+[V2: NecroL80_mage-necromancer_login_combat.tshark.json]
+
+⚠️ It goes to **viewers**, not just to the target, and that is measured rather than assumed: in
+`login_2-clients_group-trade-friend` the same (npc, target) pair is sent on BOTH clients' streams (frames
+3146/3147 and 3394/3395) though only one of them is the target. A single-client capture cannot tell those two
+routings apart — the two-client one is what settles it.
+[V2: login_2-clients_group-trade-friend.tshark.json]
 
 **Walk gait + slight snap.** The 61-byte form has no speed field, so the client uses a default
 interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
