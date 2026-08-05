@@ -43,10 +43,11 @@ namespace Faolan.CSPlayerAgent
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 
-			// `chatServerDispatcher` is not held here: only the guild flow needs it (a membership change moves the
-			// member's ~Guild chat-channel subscription, which lives on their CHAT connection, not this one - #663).
+			// `chatServerDispatcher` is not held here: only the guild and team flows need it, and both take it directly.
+			// A membership change moves that member's ~Guild / ~Team chat-channel subscription, which lives on their
+			// CHAT connection, not this one (#663 / #668).
 			_guild = new GuildService(database, logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
-			_teams = new TeamService(logger, gameServerDispatcher, ClientForCharacter);
+			_teams = new TeamService(logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

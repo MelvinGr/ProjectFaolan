@@ -10,6 +10,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -44,15 +45,17 @@ namespace Faolan.CSPlayerAgent
 		// invitee -> inviter, for the window between TeamInvite and AcceptTeamInvite.
 		private readonly ConcurrentDictionary<uint, uint> _pendingInvites = [];
 		private readonly ConcurrentDictionary<uint, LiveTeam> _teams = [];
+		private readonly IChatServerDispatcher _chatServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly Func<uint, INetworkClient?> _csClientForCharacter;
 		private readonly ILogger _logger;
 		private uint _nextTeamId = FirstTeamId;
 
-		public TeamService(ILogger logger, IGameServerDispatcher gameServerDispatcher, Func<uint, INetworkClient?> clientForCharacter)
+		public TeamService(ILogger logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher, Func<uint, INetworkClient?> clientForCharacter)
 		{
 			_logger = logger;
 			_gameServerDispatcher = gameServerDispatcher;
+			_chatServerDispatcher = chatServerDispatcher;
 			_csClientForCharacter = clientForCharacter;
 		}
 
@@ -134,6 +137,11 @@ namespace Faolan.CSPlayerAgent
 			await BroadcastRoster(team);
 			await Broadcast(team, CSPlayerInterfaceMethods.DispatchTeamJoin, TeamMemberEventCodec.Build(team.Id, MemberOf(accepter)));
 			await PushMembership(team, accepterId, true);
+
+			// The ~Team chat channel, to EVERY member and not just the joiner - retail subscribes both clients when the
+			// team forms (frames 701/702), and the call is idempotent, so a member already on it is a no-op (#668).
+			foreach (var member in team.Members)
+				await _chatServerDispatcher.RefreshTeamChannel(member, team.Id);
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} joined ({Count} member(s), leader {Leader}).", team.Id, accepter.Name, team.Members.Count, inviter.Name);
 		}
 
@@ -188,6 +196,7 @@ namespace Faolan.CSPlayerAgent
 
 			await PushMembership(team, characterId, false);
 			await _gameServerDispatcher.SendGroupMembership(characterId, characterId, team.Id, 0, false);
+			await _chatServerDispatcher.RefreshTeamChannel(characterId, null); // off the ~Team channel with the roster (#668)
 
 			// The leader left: promote whoever is left and say so.
 			if (team.LeaderId == characterId && team.Members.Count > 0)
@@ -214,6 +223,7 @@ namespace Faolan.CSPlayerAgent
 					await Push(last, CSPlayerInterfaceMethods.DispatchTeamLeave, TeamMemberEventCodec.Build(team.Id, MemberOf(member)));
 
 				await _gameServerDispatcher.SendGroupMembership(last, last, team.Id, 0, false);
+				await _chatServerDispatcher.RefreshTeamChannel(last, null); // the dissolve drops everyone's channel (frames 923/926)
 			}
 
 			_teams.TryRemove(team.Id, out _);

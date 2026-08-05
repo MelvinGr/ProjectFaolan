@@ -152,15 +152,9 @@ namespace Faolan.ChatServer
 				return;
 
 			var current = client.Session.PlayfieldChannelId;
-			if (current == mapId)
-				return;
-
-			if (current != 0)
-				await SendChannelUnsubscribe(client, PlayfieldChannelType, current);
-
-			await SendChannelSubscription(client, PlayfieldChannelType, mapId, PlayfieldChannelName, PlayfieldChannelFlag);
-			client.Session.PlayfieldChannelId = mapId;
-			Logger.LogInformation("ChatServer ~Playfield for {Character:X8}: {From} -> {To}", characterId, current, mapId);
+			client.Session.PlayfieldChannelId = await MoveChannel(client, current, mapId, PlayfieldChannelType, PlayfieldChannelName, PlayfieldChannelFlag);
+			if (current != mapId)
+				Logger.LogInformation("ChatServer ~Playfield for {Character:X8}: {From} -> {To}", characterId, current, mapId);
 		}
 
 		// Moves the client's ~Guild channel to the guild they are now in - the membership twin of
@@ -179,18 +173,49 @@ namespace Faolan.ChatServer
 				return;
 
 			var current = client.Session.GuildChannelId;
-			var wanted = guildId ?? 0;
-			if (current == wanted)
+			client.Session.GuildChannelId = await MoveChannel(client, current, guildId ?? 0, GuildChannelType, GuildChannelName, GuildChannelFlag);
+			if (current != (guildId ?? 0))
+				Logger.LogInformation("ChatServer ~Guild for {Character:X8}: {From:X} -> {To:X}", characterId, current, guildId ?? 0);
+		}
+
+		// Moves the client's ~Team channel to the team they are now in - the third instance of the same mechanism, and
+		// the one the corpus pins on BOTH sides (#668): `login_2-clients_group-trade-friend` subscribes every member on
+		// the accept and unsubscribes them all on the dissolve, three teams in a row.
+		//
+		// Like the guild channel, the id IS the team id - the one DispatchYouJoinedTeam carries as an ID32 of type
+		// 0xDEA9 (accept frame 691 -> `0000dea9 0051dd9a` at 693 -> `82 0051dd9a "~Team"` at 701/702).
+		// [V2: login_2-clients_group-trade-friend.tshark.json]
+		public async Task RefreshTeamChannel(uint characterId, uint? teamId)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client?.Session == null)
 				return;
 
+			var current = client.Session.TeamChannelId;
+			client.Session.TeamChannelId = await MoveChannel(client, current, teamId ?? 0, TeamChannelType, TeamChannelName, TeamChannelFlag);
+			if (current != (teamId ?? 0))
+				Logger.LogInformation("ChatServer ~Team for {Character:X8}: {From:X} -> {To:X}", characterId, current, teamId ?? 0);
+		}
+
+		// The move itself, shared by the three channels that follow something the player belongs to (their map, their
+		// guild, their team): drop the old one, subscribe the new one, and return what is now subscribed so the caller
+		// can stamp its session slot. Either side may be 0 for "none", which is what makes it total - a first
+		// subscription, a move, and a plain drop are the same three lines.
+		//
+		// Comparing against the session slot rather than against the character's own state is what makes every caller
+		// idempotent: the slot is what we last TOLD the client, which is a different fact from where the character is.
+		private static async Task<uint> MoveChannel(INetworkClient client, uint current, uint wanted, byte type, string name, uint flag)
+		{
+			if (current == wanted)
+				return current;
+
 			if (current != 0)
-				await SendChannelUnsubscribe(client, GuildChannelType, current);
+				await SendChannelUnsubscribe(client, type, current);
 
 			if (wanted != 0)
-				await SendChannelSubscription(client, GuildChannelType, wanted, GuildChannelName, GuildChannelFlag);
+				await SendChannelSubscription(client, type, wanted, name, flag);
 
-			client.Session.GuildChannelId = wanted;
-			Logger.LogInformation("ChatServer ~Guild for {Character:X8}: {From:X} -> {To:X}", characterId, current, wanted);
+			return wanted;
 		}
 
 		private static Task SendSystemMessage(INetworkClient client, ChatMarkup message)

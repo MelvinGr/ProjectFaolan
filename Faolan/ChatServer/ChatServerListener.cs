@@ -38,6 +38,14 @@ namespace Faolan.ChatServer
 		private const string GuildChannelName = "~Guild";
 		private const uint GuildChannelFlag = 0x00008004;
 
+		// The ~Team channel: the same membership shape one more time, and the id is the TEAM id - the one
+		// DispatchYouJoinedTeam carries as an ID32 of type 0xDEA9 (#668). Both sides are captured: every member is
+		// subscribed on the accept (frames 701/702) and unsubscribed on the dissolve (923/926), three teams in a row.
+		// [V2: login_2-clients_group-trade-friend.tshark.json frame 701]
+		private const byte TeamChannelType = 0x82;
+		private const string TeamChannelName = "~Team";
+		private const uint TeamChannelFlag = 0x00008004;
+
 		// The level + class the virtual Claude friend entry reports (#100). See SendClaudeFriendEntry: both are fields
 		// the client's tooltip shows and neither has a "none" encoding, so they are a choice, not a decode.
 		private const byte ClaudeVirtualFriendLevel = 80;

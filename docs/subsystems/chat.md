@@ -22,8 +22,13 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
   subscription list, a `0x00050000` ready, `0x0014` char-info, and the welcome `SystemMessage`s.
 - **`0x003C` ChannelSubscription** (out, `ChannelSubscriptionCodec`): `[byte type][u32 channelId][u16-str name][u32 flag][u16 0000]`. The list:
   ~Trial(04/0x232A/flag 0x8244), ~Global(04/0x2328), ~LFG(04/0x2329), ~GlobalEnglish(11/0x2335),
-  ~Playfield(90/**id = the character's map id**), ~NewbieHelp(87/0x1E8480); flag 0x8044 except ~Trial. Retail also
-  adds ~Guild(03/<guildId>) once the guild is known — we don't track guilds, so we don't send it.
+  ~Playfield(90/**id = the character's map id**), ~NewbieHelp(87/0x1E8480); flag 0x8044 except ~Trial.
+  Plus the two **membership** channels, whose id is the thing you belong to and whose flag is **0x8004**, not 0x8044:
+  ~Guild(03/**id = the guild id**, #663) and ~Team(82/**id = the team id**, #668). Those three — map, guild, team —
+  are the only channels that MOVE, and all three go through the same `MoveChannel` (drop the old, subscribe the new,
+  stamp the session slot), driven by `RefreshPlayfieldChannel` / `RefreshGuildChannel` / `RefreshTeamChannel`.
+  There is no officer channel and no other `~` channel anywhere in the corpus — see
+  [`create-guild-decode.md`](create-guild-decode.md).
 - **`0x0041` ChannelChat** (out, `ChannelChatCodec`). **in** (client posts): `[byte type][u32 channelId][u16-str message][u16 0000]` — no
   sender. **out** (relay): `[byte type][u32 channelId][u32 senderId][u16-str message][u16 0000]` — sender inserted,
   preceded by a `0x0014` sender-info. Implemented: inbound `0x0041` → `BroadcastChannelChat` relays `0x0014`+`0x0041`
@@ -66,7 +71,7 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 
 - **In-client cross-player verification** (2+ clients): confirm a channel post reaches another player and a say is
   heard only within range.
-- **~Guild** channel (needs a guild/membership system).
+- ~~**~Guild** channel~~ — shipped (#663), along with ~Team (#668).
 
 ## Whispers / tells (0x001E) - decoded + implemented 2026-06-12
 

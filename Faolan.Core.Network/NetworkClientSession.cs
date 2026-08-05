@@ -21,6 +21,10 @@ namespace Faolan.Core.Network
 		// them to listen to, and comparing the two is what makes RefreshGuildChannel idempotent (#663).
 		uint GuildChannelId { get; set; }
 
+		// The team id of the ~Team chat channel this client is currently subscribed to, or 0 for none - the same
+		// per-session slot as PlayfieldChannelId/GuildChannelId, for the third channel that follows a membership (#668).
+		uint TeamChannelId { get; set; }
+
 		Account Account { get; set; }
 
 		Character Character { get; set; }
@@ -243,6 +247,7 @@ namespace Faolan.Core.Network
 	{
 		public uint PlayfieldChannelId { get; set; }
 		public uint GuildChannelId { get; set; }
+		public uint TeamChannelId { get; set; }
 		public Account Account { get; set; } = null!;
 		public Character Character { get; set; } = null!;
 

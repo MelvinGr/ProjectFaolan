@@ -55,6 +55,13 @@ namespace Faolan.Core.Network.Server.ChatServer
 		Task RefreshGuildChannel(uint characterId, uint? guildId);
 
 		/// <summary>
+		///     Brings a character's <c>~Team</c> chat channel in line with the team they are now in, or drops it when
+		///     <paramref name="teamId" /> is null. Same idempotent contract as
+		///     <see cref="RefreshGuildChannel" />; the id is the team id (#668).
+		/// </summary>
+		Task RefreshTeamChannel(uint characterId, uint? teamId);
+
+		/// <summary>
 		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
 		///     character has no connected ChatServer client.
 		/// </summary>

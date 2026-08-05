@@ -57,6 +57,13 @@ namespace Faolan.Core.Network.Server.ChatServer
 				await provider.RefreshGuildChannel(characterId, guildId);
 		}
 
+		public async Task RefreshTeamChannel(uint characterId, uint? teamId)
+		{
+			var provider = Provider;
+			if (provider != null)
+				await provider.RefreshTeamChannel(characterId, teamId);
+		}
+
 		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message)
 		{
 			var provider = Provider;
