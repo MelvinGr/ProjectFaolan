@@ -69,8 +69,9 @@ we've seen_, and names the gaps). Regenerate with
   hand-confirmed (#332, #363)
 - 🟡 **Line-of-sight & terrain** — NPCs won't aggro through a hill or wall, and loot settles to the ground, off
   baked per-map terrain. Aggro gating pending an in-client confirm (#284)
-- 🟡 **Damage schools** — every hit carries the element it was dealt with, numbered as the client numbers them;
-  falls and hazards carry their own marker (#487)
+- 🟡 **Damage schools** — every hit carries the element it was dealt with, numbered as the client numbers them,
+  and falls and hazards carry their own marker. Physical melee is one school for everyone; retail picks it per
+  weapon (#487)
 - 🟡 **Knockback** — a blow can shove you along a path you did not walk. Distance, direction and resistance scaling
   rest on a single captured sample, and no attack triggers it yet — GM command only (#496)
 - 🟡 **Environmental damage** — falls cost health scaled to your maximum and leave a bruise or broken bone; lava
@@ -112,18 +113,20 @@ we've seen_, and names the gaps). Regenerate with
   #401)
 - 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as
   is equipping and unequipping. Pending in-client verification (#400)
-- 🟡 **Ground-targeted AoE** — ticks damage with floating numbers; per-spell radius and cadence are approximate
-  (#349)
+- 🟡 **Ground-targeted AoE** — ticks damage with floating numbers at the blast radius the client states for the
+  spell (1,023 have one), a default otherwise; the per-tick cadence is still approximate (#349)
 - 🟡 **Buff stat effects** — per-stat bonuses and penalties apply and come back off on expiry, cancel or death;
   flat ones add, percentage ones scale. Awaiting an in-client check of the values (#367, #435, #436, #450)
 - 🟡 **Spellweaving** (necromancer and demonologist) — built and playable. The energy-bar drain is the last piece,
   and Priest of Mitra / Tempest of Set are unmapped for want of a capture (#141, #505)
-- 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
+- 🟡 **Directional combat** — an NPC opens its blue shield rose on engaging and shifts a guard between arcs on a
+  timer, broadcast to everyone watching. Missing: an NPC's swing carries no arc, so a player's own rose is inert in
+  PvE, and a viewer who arrives late sees no rose until the next shift (#20, #621, #622)
 - 🟡 **Fatalities** — the roll, both fatality buffs and the necromancer's Frozen Hatred proc all work in-client;
   the finishing-move animation never plays (#140, #440)
-- 🔴 **Spell cooldowns** — nothing gates a re-cast. The per-spell base is not in any client data we have located,
-  and none is enforced server-side either (#271)
-- ⬜ **Real directional combat** with defensive shield arcs (#20)
+- 🟡 **Spell cooldowns** — a cast still on cooldown is refused, line-scoped the way retail's is, so every rank of
+  a spell shares one timer; 3,703 spells carry a base recast read off their own record. Pending in-client
+  verification (#271)
 
 ### Character progression
 
@@ -134,12 +137,14 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Feats** — 19,777 feats imported with trees, ranks and tooltips, 23,321 stat effects and a 5,501-edge
   prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget, and
   named specs each keep their own build. Missing: per-feat cost and tier, each class's tree layout, and the retail
-  training trigger — so training runs off a GM command (#251, #467, #474)
+  training trigger — so training runs off a GM command. The decoded feat modifiers are not imported yet (#251,
+  #474, #593)
 - 🟡 **Skill points** — the pool is a function of level, so it is stated on login rather than awarded. Five levels
   are captured and there is no formula for the rest, so those keep what the character already had (#507)
 - 🟡 **Spell unlock levels** — 8,460 spells carry one, read from the client's spell and combo records; 592 come
   only from the retired community scrapes (#650)
-- 🟡 **XP curve** — a provisional ramp; the real thresholds are partly harvested (#297)
+- 🟡 **XP curve** — anchored on the retail thresholds the captures carry (levels 1-9, 23-25 and 80); the levels
+  between anchors are interpolated (#297)
 - 🟡 **Class spell / combo / ability catalogs** — still filling in; empty spell and item names are backfilled from
   the client's own string table (#291, #296, #303, #300)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
@@ -158,7 +163,8 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Gear stat bonuses** — 4,223 stat rows over 1,705 items decoded from their templates: +HP/+Mana, weapon
   damage, armour and Protection, crit ratings, Magic Damage, Combat Rating and regen all feed the fight. The
   per-hit formulas are provisional pending in-client tuning (#3, #395, #401, #441)
-- 🟡 Guild bank (#132)
+- 🟡 **Guild bank** — a member can withdraw money, rank-gated and balance-checked; the window itself, deposits
+  and item storage are unhandled (#132, #654)
 - ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing (#311)
 
 ### Social & guilds
