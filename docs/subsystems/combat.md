@@ -242,10 +242,31 @@ the 317 captured PLAYER frames carry 0 there, so retail does not seed a viewer's
 
 **Mitigation reads whatever the handle resolves to**, NPC or player, and a player defender switches to the
 `Combat_PvP*` column — the gentler one (−0.15/−0.30 where PvE gives −0.33/−0.66), which is why that column
-exists at all. An NPC's swing at a player still takes no arc: no captured NPC swing carries a direction word
-(the direction ability is the *player's* `Normal Attack`), so there is nothing to aim it with, and the
-geometric reading — "the back is always unshielded" — needs a decoded player-facing vector, which the cleave is
-blocked on too.
+exists at all.
+
+**An NPC's swing carries no direction ability, so its arc is GEOMETRY (#621).** No captured NPC swing carries a
+direction word — the direction ability is the *player's* `Normal Attack`, and its c2s and s2c actor histograms
+match one for one across ~63k NPC-actor records — and nothing needs one: the mitigation is server-side either
+way, since the client registers all eight `Combat_*ShieldBonus` tweaks and reads none of them. So the server
+picks the struck sector from where the attacker stands relative to where the defender faces, which is what the
+live game describes when it says *"attacks from behind leave characters open to more damage, as there aren't
+any shields on the player's backside"*.
+
+`CombatShieldRose.SectorFor` splits the front half into three equal 60° arcs — Mid is ±30° of dead ahead, Left
+and Right take 30–90° on their side — and everything past 90° is `Behind`. `Behind` is deliberately *not* a
+fourth `ShieldArc`: the rose packs three digits, so it resolves to **zero shields covering**, which is the same
++20% `…0ShieldBonus` entry an unguarded front arc earns. The client's whole 294-entry balance sheet carries no
+back/flank tweak, so there is no separate number to miss.
+
+The facing is the decoded one, not a guess: a character's rotation is a yaw-only quaternion and `2·atan2(qy,
+qw)` tracks the direction of travel within 7.5° for 90% of sustained straight runs
+([`../re/chardcmove-grammar.md`](../re/chardcmove-grammar.md)), yaw measured from +Z toward +X. The single
+assumption left is handedness — the client is a left-handed Y-up renderer, so +X of the defender's forward is
+their **right**; if that is mirrored, the fix is one sign in `SectorFor` and nothing else.
+[V3: CombatShieldRoseTests.SectorFor_ReadsTheAttackersBearingAgainstTheDefendersFacing]
+
+Applied on the melee path only (`WorldSimulation.ApplyNpcAttack`, after armour). An NPC **cast** takes no arc,
+for the same reason a player's spell does not: the rose guards swings.
 
 **Server side.** `CombatShieldRose` (roll / shift / cadence / arc mapping / clamp / mitigation) is the policy;
 `WorldEntity.OpenShieldRose` + `TickShieldShift` hold the per-NPC state. `WorldState.Tick` rolls the rose

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
 using Xunit;
@@ -174,6 +175,65 @@ namespace Faolan.Tests
 		{
 			// An NPC that never engaged has no rose; a swing at it is unmitigated in every arc.
 			Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 0, ShieldArc.Mid));
+		}
+
+		// #621: an NPC's swing carries no direction ability, so the sector is geometric. Facing is a yaw-only
+		// quaternion read as 2*atan2(qy, qw) with yaw measured from +Z toward +X (chardcmove-grammar.md), and the
+		// renderer is left-handed Y-up, so +X of the defender's forward is the defender's RIGHT.
+		[Theory]
+		// Defender facing +Z (identity). An attacker due north is head-on; due south is behind.
+		[InlineData(0f, 0f, 10f, CombatShieldRose.StruckSector.Mid)]
+		[InlineData(0f, 0f, -10f, CombatShieldRose.StruckSector.Behind)]
+		[InlineData(0f, 10f, 1f, CombatShieldRose.StruckSector.Right)]
+		[InlineData(0f, -10f, 1f, CombatShieldRose.StruckSector.Left)]
+		// The 30-degree boundary: 20 degrees off dead ahead is still Mid, 45 is not.
+		[InlineData(0f, 3.64f, 10f, CombatShieldRose.StruckSector.Mid)]
+		[InlineData(0f, 10f, 10f, CombatShieldRose.StruckSector.Right)]
+		[InlineData(0f, -10f, 10f, CombatShieldRose.StruckSector.Left)]
+		// Turn the defender 180 degrees and every sector flips with them.
+		[InlineData(180f, 0f, 10f, CombatShieldRose.StruckSector.Behind)]
+		[InlineData(180f, 0f, -10f, CombatShieldRose.StruckSector.Mid)]
+		[InlineData(180f, 10f, -1f, CombatShieldRose.StruckSector.Left)]
+		public void SectorFor_ReadsTheAttackersBearingAgainstTheDefendersFacing(float facingDegrees, float attackerX, float attackerZ,
+			CombatShieldRose.StruckSector expected)
+		{
+			var yaw = float.DegreesToRadians(facingDegrees);
+			var facing = new Quaternion(0f, MathF.Sin(yaw / 2f), 0f, MathF.Cos(yaw / 2f));
+
+			Assert.Equal(expected, CombatShieldRose.SectorFor(new Vector3(attackerX, 0f, attackerZ), Vector3.Zero, facing));
+		}
+
+		// A strike in the back finds no guard, so it takes the zero-shield entry - the +20% the live game describes
+		// as "there aren't any shields on the player's backside". Not a fourth column: the rose packs three digits.
+		[Fact]
+		public void DamageMultiplier_BehindTakesTheUnguardedBonusWhateverTheSpread()
+		{
+			foreach (var spread in new uint[] { 300, 111, 3, 30 })
+				Assert.Equal(120u, CombatShieldRose.ApplyArcMitigation(100, spread, CombatShieldRose.StruckSector.Behind));
+		}
+
+		[Fact]
+		public void DamageMultiplier_AFrontSectorUsesTheSameTableAsADirectedSwing()
+		{
+			// 300 = all three guards on Left: a hit from the defender's left is fully covered, one from the right is not.
+			Assert.Equal(34u, CombatShieldRose.ApplyArcMitigation(100, 300, CombatShieldRose.StruckSector.Left));
+			Assert.Equal(120u, CombatShieldRose.ApplyArcMitigation(100, 300, CombatShieldRose.StruckSector.Right));
+
+			// ...and it agrees with the ability-driven overload arc for arc.
+			foreach (var (sector, arc) in new[]
+			         {
+				         (CombatShieldRose.StruckSector.Left, ShieldArc.Left), (CombatShieldRose.StruckSector.Mid, ShieldArc.Mid),
+				         (CombatShieldRose.StruckSector.Right, ShieldArc.Right)
+			         })
+				Assert.Equal(CombatShieldRose.DamageMultiplier(210, arc), CombatShieldRose.DamageMultiplier(210, sector));
+		}
+
+		[Fact]
+		public void DamageMultiplier_AnUnrolledRoseIsUntouchedFromBehindToo()
+		{
+			// An NPC that never engaged has no rose at all, which is not the same as three bare arcs - so a back
+			// attack on it earns nothing either.
+			Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 0, CombatShieldRose.StruckSector.Behind));
 		}
 
 		private static uint[] Arcs(uint value)

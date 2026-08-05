@@ -362,6 +362,12 @@ namespace Faolan.GameServer.World
 			// display units), so go through AttributeWireScore rather than the display score.
 			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating, character.Level,
 				target.AttributeWireScore(CharacterStatId.Strength));
+			// #621: the player's shield rose finally does something in PvE. An NPC's swing carries no direction
+			// ability, so the struck sector is geometric - where the mob stands relative to where the player faces -
+			// and a hit in the back finds no guard at all. Applied AFTER armour, like the player-swing path in
+			// CombatService.
+			damage = (int)CombatShieldRose.ApplyArcMitigation((uint)damage, target.ShieldDistribution,
+				CombatShieldRose.SectorFor(npc.Position, target.Position, target.Rotation));
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
