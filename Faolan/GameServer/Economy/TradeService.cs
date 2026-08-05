@@ -116,17 +116,23 @@ namespace Faolan.GameServer.Economy
 			await _outbound.SendTradeItem(partnerId, row.Item, destPos, row.Count, false);
 		}
 
-		// c2s RemoveTradeItem (0x2069): take an item back off the table. State only - the two s2c halves
-		// (DispatchTradeRemovedItem / DispatchTradePartnerRemovedItem) are named in the client's catalog but their
-		// OPCODES are not recoverable from it (its s2c numbering is offset against the capture), so the partner's window
-		// is not updated yet. See Gitea #427.
-		public void RemoveItem(uint characterId, uint destPos)
+		// c2s RemoveTradeItem (0x2069): take an item back off the table. The mirror of AddItem - the same two s2c halves
+		// to the same two recipients, DispatchTradeRemovedItem to me and DispatchTradePartnerRemovedItem to them,
+		// carrying the window slot. Without them the partner's window kept rendering an item that was no longer on the
+		// table (#427).
+		public async Task RemoveItem(uint characterId, uint destPos)
 		{
 			if (!TryGetSide(characterId, out var session, out var side))
 				return;
 
-			side.Items.Remove(destPos);
+			if (!side.Items.Remove(destPos))
+				return; // nothing there - say nothing rather than tell the partner to clear a slot that never had an item
+
 			session.ResetAccepts();
+
+			var partnerId = session.Other(characterId).CharacterId;
+			await _outbound.SendTradeItemRemoved(characterId, destPos, true);
+			await _outbound.SendTradeItemRemoved(partnerId, destPos, false);
 		}
 
 		// c2s MoveTradeItemInternal (0x206A): the player drags an offered item to another slot of the trade window. Pure

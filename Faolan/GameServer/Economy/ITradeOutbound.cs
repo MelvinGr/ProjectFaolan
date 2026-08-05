@@ -26,6 +26,13 @@ namespace Faolan.GameServer.Economy
 		/// </summary>
 		Task SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine);
 
+		/// <summary>
+		///     s2c DispatchTradeRemovedItem (0x2074) when <paramref name="mine" />, else DispatchTradePartnerRemovedItem
+		///     (0x2073) - the remove twin of <see cref="SendTradeItem" />, and the same rule: one body (the window slot),
+		///     and which opcode depends only on whose side of the table the item left (#427).
+		/// </summary>
+		Task SendTradeItemRemoved(uint recipientId, uint slot, bool mine);
+
 		/// <summary>s2c 0x206B (empty): acknowledges the recipient's OWN accept.</summary>
 		Task SendAcceptAck(uint recipientId);
 

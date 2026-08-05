@@ -145,6 +145,16 @@ namespace Faolan.GameServer
 				: GameCharInterfaceMethods.DispatchTradePartnerAddedItem, TradeAddedItemCodec.Build(new TradeAddedItem(entry, count)));
 		}
 
+		// The remove twin of SendTradeItem: the same one-body/two-opcodes shape, so only the opcode says whose side of
+		// the table the item left. Recovered from the client's method table rather than a capture - see
+		// TradeRemovedItemCodec for why that is sound here (#427).
+		Task ITradeOutbound.SendTradeItemRemoved(uint recipientId, uint slot, bool mine)
+		{
+			return SendTradeRpc(recipientId, mine
+				? GameCharInterfaceMethods.DispatchTradeRemovedItem
+				: GameCharInterfaceMethods.DispatchTradePartnerRemovedItem, TradeRemovedItemCodec.Build(slot));
+		}
+
 		Task ITradeOutbound.SendAcceptAck(uint recipientId)
 		{
 			// Unnamed in the client's recovered catalog, so it keeps the honest Reserved name; the capture shows its role

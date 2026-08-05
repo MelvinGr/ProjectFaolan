@@ -860,7 +860,7 @@ namespace Faolan.GameServer
 				// 0x2069 RemoveTradeItem([int destPos]) - take an item back off the table.
 				case GameCharAgentMethods.RemoveTradeItem:
 				{
-					_trade.RemoveItem(client.Session.Character.Id, body.ReadUInt32());
+					await _trade.RemoveItem(client.Session.Character.Id, body.ReadUInt32());
 					break;
 				}
 

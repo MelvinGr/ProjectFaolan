@@ -138,9 +138,27 @@ c2s 0x206C AbortTrade()                           CANCEL
 slot, not a quantity.** There is no count in the message at all: the whole stack moves. Read as a count it happened to
 work only because the capture's one add carried destPos 1 for a stack of 1; a destPos of 0 would have moved nothing.
 
-The matching s2c halves are NOT inferable: the client's catalog names `DispatchTradeRemovedItem` /
-`DispatchTradePartnerRemovedItem` but its s2c numbering is offset against the capture (it puts `DispatchRequestTrade`
-at `0x205F` where retail sends `0x2068`), so their opcodes need a capture. Open work in Gitea #427.
+The matching s2c REMOVE halves **are** now buildable, and the reason the earlier reading said otherwise is worth
+keeping: it rested on the old string-catalog numbering, which put `DispatchRequestTrade` at `0x205F` where retail
+demonstrably sends `0x2068`. That offset is gone — since #615 a `*Methods` member IS the wire field, recovered from
+the per-class dispatcher SWITCH rather than the string catalog, and the reconciled table puts `DispatchRequestTrade`
+at exactly the `0x68` the capture shows. So:
+
+```
+s2c 0x2073 DispatchTradePartnerRemovedItem(i_nItemPos)   the OTHER side took an item off
+s2c 0x2074 DispatchTradeRemovedItem(i_nItemPos)          my own removal, echoed back
+```
+
+One scalar each, written bare and big-endian with no header — the same rule that recovered the guild-bank bodies
+(#132) — and the exact mirror of the captured ADD pair: one body, two opcodes, partner-facing one slot below
+own-facing. Built by `TradeRemovedItemCodec`, gated by `TradeRemovedItemCodecTests`.
+[V1: docs/re/aoc-client-rpc-methods.json]
+
+⚠️ Still uncaptured, and NOT built: what closes the partner's window on **cancel** / **decline**, whether an
+internal **move** notifies the partner at all, and whether a partner going offline mid-trade produces anything. The
+client's dispatch table names no method for any of them — the slots around the trade run (`Reserved0x6A`, `0x6B`,
+`0x6D`, `0x71`, `0x72`, `0x75`) are unnamed — so unlike the remove pair there is nothing to recover. Open work in
+Gitea #427.
 
 ## Friend list
 
