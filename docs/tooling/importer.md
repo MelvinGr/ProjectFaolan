@@ -276,7 +276,12 @@ the corpus despawns at 3.5 u while spawning at 1,834 u — then scores candidate
 the same statistic over every position the player walked. ~32 u fits, #529),
 `chain-kill` (every `ChainKillIIR` with the gap to the previous one and to the kill counters `106` / `1000069` /
 `1000070`. Gives the chain's whole grammar — counts 2/3 and never 1, every non-zero closed by a 0 a median 8.97 s
-later — and shows the counters never move with it, #446), … — the report's
+later — and shows the counters never move with it, #446),
+`dot-trains` (the EVIDENCE behind every measured DoT tick interval: each `(spell, target, caster)` tick train, its
+length, and the gaps it contributes — the exact input `DotIntervalEstimator` is handed. Train LENGTH is what the
+pooled gap list hides: a length-2 train contributes one gap that is a re-application phase offset as often as it
+is the period, so a spell whose gaps come mostly from those has no cadence whatever the pooled list looks like.
+`--report-arg <name substring or id>` drills one spell and prints its train lengths and gaps, #524), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

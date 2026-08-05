@@ -213,6 +213,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "dot-trains":
+				{
+					DotTrains(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
@@ -933,6 +939,90 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"TOTAL over {captures.Count} captures: {provenHandles} handle(s) PROVEN recycled (a second template on the same handle), "
 			                  + $"costing {provenLost} spawn observation(s) to DistinctByHandle. {ambiguousHandles} single-template handle(s) were not counted - "
 			                  + "a repeat sighting of one template is a mob that moved, not evidence of reuse.");
+		}
+
+		// --report dot-trains [--report-arg <spell name substring or base id>]
+		//
+		// The EVIDENCE behind every measured DoT tick interval: each `(spell, target, caster)` tick train the corpus
+		// contains, how long it is, and the gaps it contributes - the exact input `DotIntervalEstimator` is handed.
+		//
+		// It exists because #524's open item is a spell whose gaps cluster on a LATTICE (Aura: Fire Weave, 17 gaps at
+		// 0.92 / 1.23 / 1.53 / 1.84, spaced ~0.3s), and there are two very different explanations that the pooled gap
+		// list cannot tell apart:
+		//   * a HARMONIC - one long train of a ~0.3s pulse whose ticks are mostly unobserved, so every surviving gap
+		//     is a multiple of the fundamental (the estimator's documented blind spot);
+		//   * RE-APPLICATION phase - many SHORT trains, each contributing one arbitrary first-gap, in which case the
+		//     lattice is an artefact of when the aura was recast and the spell simply has no measurable interval.
+		// Train LENGTH separates them, and only this report shows it.
+		private static void DotTrains(IReadOnlyList<NamedCapture> captures, string? filter)
+		{
+			var wanted = (filter ?? "").Trim();
+			var trainLengths = new Dictionary<uint, List<int>>();
+			var gapsBySpell = new Dictionary<uint, List<double>>();
+			var names = new Dictionary<uint, string>();
+
+			foreach (var capture in captures)
+			{
+				// Same key as CaptureStatDamageImporter: a train is one spell on one target from one caster, within
+				// ONE capture (handles are session-volatile).
+				var trains = new Dictionary<(uint Spell, uint Target, uint Caster), List<long>>();
+				foreach (var p in capture.Packets)
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: StatDamageCodec.Opcode })
+						continue;
+
+					if (!p.TryParse(StatDamageCodec.Parse, out var dmg) || dmg.SpellBaseId == 0 || dmg.Delta == 0)
+						continue;
+
+					var key = (dmg.SpellBaseId, dmg.Handle, dmg.Caster);
+					trains.TryAdd(key, []);
+					trains[key].Add(p.Ticks);
+				}
+
+				foreach (var (key, times) in trains)
+				{
+					times.Sort();
+					trainLengths.TryAdd(key.Spell, []);
+					trainLengths[key.Spell].Add(times.Count);
+					if (times.Count < 2)
+						continue;
+
+					gapsBySpell.TryAdd(key.Spell, []);
+					for (var i = 1; i < times.Count; i++)
+						gapsBySpell[key.Spell].Add((times[i] - times[i - 1]) / 1e7);
+				}
+			}
+
+			using var db = OpenDb();
+			var ids = trainLengths.Keys.ToList();
+			foreach (var spell in db.Spells.Where(s => ids.Contains(s.Id)))
+				names[spell.Id] = spell.Name;
+
+			Console.WriteLine($"{"spell",-42} {"trains",6} {"ticks",6} {"len1",5} {"len2",5} {"len3+",5} {"gaps",5}  estimate");
+			foreach (var (spellId, lengths) in trainLengths.OrderByDescending(kv => kv.Value.Sum()))
+			{
+				var name = names.GetValueOrDefault(spellId, $"(uncatalogued {spellId})");
+				if (wanted.Length > 0 && !name.Contains(wanted, StringComparison.OrdinalIgnoreCase) && spellId.ToString() != wanted)
+					continue;
+
+				var gaps = gapsBySpell.GetValueOrDefault(spellId, []);
+				var estimate = DotIntervalEstimator.Estimate(gaps);
+				Console.WriteLine($"{name[..Math.Min(42, name.Length)],-42} {lengths.Count,6} {lengths.Sum(),6} "
+				                  + $"{lengths.Count(l => l == 1),5} {lengths.Count(l => l == 2),5} {lengths.Count(l => l >= 3),5} {gaps.Count,5}"
+				                  + $"  {(estimate is { } ms ? $"{ms} ms" : "(none)")}");
+
+				// The whole point when drilling one spell: the gaps WITH the train that produced each.
+				if (wanted.Length == 0)
+					continue;
+
+				Console.WriteLine($"      train lengths: {string.Join(" ", lengths.OrderByDescending(l => l))}");
+				Console.WriteLine($"      gaps: {string.Join(" ", gaps.OrderBy(g => g).Select(g => $"{g:0.00}"))}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("A train of length 2 contributes exactly ONE gap, and that gap is a re-application phase offset as often "
+			                  + "as it is the period. A spell whose gaps come mostly from length-2 trains has no measured cadence, whatever "
+			                  + "the pooled gaps look like (#524).");
 		}
 
 		// --report chain-kill
