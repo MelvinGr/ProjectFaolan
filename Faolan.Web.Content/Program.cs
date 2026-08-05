@@ -26,7 +26,7 @@ using Microsoft.Extensions.Logging;
 // The last path segment IS the md5 of the (compressed) payload, so the store is self-verifying and dedup-free.
 //
 // Faolan.ClientLauncher --mirror redirects those three LocalConfig.xml keys at this server as
-// http://127.0.0.1:<port>/<tag>/upm, so the request path carries the upstream tag. On a miss we fetch the real CDN
+// <mirror>/<tag>/upm, so the request path carries the upstream tag. On a miss we fetch the real CDN
 // once (HTTP identity, raw bytes), store it under store/<tag>/upm/<rest>, and serve it; on a hit we serve straight
 // from disk - no upstream, no timeout. Running the real ConanPatcher through it captures the whole current revision
 // into store/, a server-independent archive.
@@ -59,6 +59,7 @@ namespace Faolan.Web.Content
 
 			var ip = builder.Configuration.CdnMirrorIp;
 			var port = builder.Configuration.CdnMirrorPort;
+			var publicAddress = builder.Configuration.CdnMirrorPublicAddress;
 			var storeDir = Path.GetFullPath(builder.Configuration.CdnMirrorStore);
 			Directory.CreateDirectory(storeDir);
 
@@ -90,7 +91,10 @@ namespace Faolan.Web.Content
 				// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
 				// sticky across a patch run.
 				if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
-					return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream");
+				{
+					var publicBase = PublicBase(publicAddress, ctx.Request.Host, ctx.Request.Scheme, port);
+					return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), publicBase), "application/octet-stream");
+				}
 
 				if (query.Length == 0 && File.Exists(localPath))
 				{
@@ -155,19 +159,38 @@ namespace Faolan.Web.Content
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
-			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store}", ip, port, storeDir);
+			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} patch-addr={PatchAddr}", ip, port, storeDir,
+				publicAddress is { Length: > 0 } ? PublicBase(publicAddress, default, "http", port) : "<per-request Host header>");
 			app.Run();
 			return 0;
 		}
 
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
 		// overwrites its local config from the control server stays pointed at us.
-		private static byte[] RewriteConfig(byte[] body, int port)
+		// Rewrite the three upstream patch addresses to point back at this mirror. `publicBase` is the address the
+		// CLIENT will dial - see PublicBase.
+		internal static byte[] RewriteConfig(byte[] body, string publicBase)
 		{
 			var text = Encoding.UTF8.GetString(body);
 			foreach (var (tag, host) in Upstreams)
-				text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm"); // TODO: External IP (#552)
+				text = text.Replace($"{host}/upm", $"{publicBase}/{tag}/upm");
 			return Encoding.UTF8.GetBytes(text);
+		}
+
+		// The base URL the CLIENT reaches this mirror on. It cannot be derived from the bind address: in a container
+		// CdnMirror:Ip is 0.0.0.0, and a client on the Docker host dials a published port on the host's address. So:
+		// the configured CdnMirror:PublicAddress if there is one, otherwise the Host header of the request that asked
+		// for LocalConfig.xml - which IS, by definition, the address the client just dialled. The old hardcoded
+		// 127.0.0.1:<port> survives only as the last resort for an HTTP/1.0 request with no Host at all (#552).
+		internal static string PublicBase(string? configured, HostString host, string scheme, int port)
+		{
+			if (!string.IsNullOrWhiteSpace(configured))
+			{
+				var value = configured.Trim().TrimEnd('/');
+				return value.Contains("://", StringComparison.Ordinal) ? value : $"http://{value}";
+			}
+
+			return host.HasValue ? $"{scheme}://{host.Value}" : $"http://127.0.0.1:{port}";
 		}
 	}
 }

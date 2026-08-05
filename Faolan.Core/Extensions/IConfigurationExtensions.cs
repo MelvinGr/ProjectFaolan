@@ -55,6 +55,13 @@ namespace Faolan.Core.Extensions
 			// CDN content mirror (Faolan.Web.Content). All optional with the built-in defaults so the mirror runs with no
 			// config at all; override in faolan.json, the environment, or on the command line - all under this one name.
 			public string CdnMirrorStore => config["CdnMirror:Store"] ?? "mirror-store";
+
+			// The address the CLIENT reaches the mirror on, used to rewrite LocalConfig.xml's three patch-addr keys.
+			// It is NOT the bind address: in a container CdnMirror:Ip is 0.0.0.0 by design, and on the Docker host the
+			// client dials a published port. Unset (the default) means "derive it from the inbound request's Host
+			// header", which is by definition what the client dialled; set it only when the mirror sits behind
+			// something that rewrites Host. A bare `host` or `host:port` is fine - the scheme is filled in.
+			public string? CdnMirrorPublicAddress => config["CdnMirror:PublicAddress"];
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 
 			// Log file location. Optional - defaults to faolan.log in the CWD; point it at a mounted volume (container)

@@ -157,9 +157,10 @@ services:
 #    safe to share between runs - and worth persisting: a full patcher run is many GB.
 # ⚠️ `CdnMirror__Ip` MUST be 0.0.0.0 here (the image defaults it): the code's own default is 127.0.0.1, which
 #    inside a container is loopback the published port cannot reach.
-# ⚠️ The LocalConfig.xml the mirror serves back rewrites the patch addresses to `127.0.0.1:<port>`, which is right
-#    only for a client on the DOCKER HOST. A client on another machine needs that to be this host's address -
-#    tracked in Gitea #552.
+# ⚠️ The LocalConfig.xml the mirror serves back rewrites the patch addresses to point at the mirror. That address is
+#    taken from the Host header of the request that asked for the file - i.e. whatever the client dialled - so a
+#    client on another machine gets its own address with no configuration. Set `CdnMirror__PublicAddress` only if
+#    something in front of the mirror rewrites Host.
 # ---------------------------------------------------------------------------------------------------------------
 #  cdn:
 #    build:
@@ -170,6 +171,7 @@ services:
 #      CdnMirror__Ip: "0.0.0.0"       # bind all interfaces IN the container (the code default, 127.0.0.1, is unreachable)
 #      CdnMirror__Port: 7081
 #      CdnMirror__Store: "/app/store"
+#      # CdnMirror__PublicAddress: "gameserver.example.com:7081"   # only when a proxy in front rewrites Host
 #    ports:
 #      - "7081:7081"                  # what --mirror and CdnUrl point at
 #    volumes:
