@@ -215,7 +215,7 @@ namespace Faolan.Importer.Cli
 
 				case "dot-trains":
 				{
-					DotTrains(NamedCapture.LoadAll(capturesDir), arg);
+					DotTrains(NamedCapture.LoadAll(capturesDir), arg, _options.Out);
 					return 0;
 				}
 
@@ -966,7 +966,7 @@ namespace Faolan.Importer.Cli
 		//   * RE-APPLICATION phase - many SHORT trains, each contributing one arbitrary first-gap, in which case the
 		//     lattice is an artefact of when the aura was recast and the spell simply has no measurable interval.
 		// Train LENGTH separates them, and only this report shows it.
-		private static void DotTrains(IReadOnlyList<NamedCapture> captures, string? filter)
+		private static void DotTrains(IReadOnlyList<NamedCapture> captures, string? filter, string? outPath)
 		{
 			var wanted = (filter ?? "").Trim();
 			var trainLengths = new Dictionary<uint, List<int>>();
@@ -1035,6 +1035,20 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("A train of length 2 contributes exactly ONE gap, and that gap is a re-application phase offset as often "
 			                  + "as it is the period. A spell whose gaps come mostly from length-2 trains has no measured cadence, whatever "
 			                  + "the pooled gaps look like (#524).");
+
+			if (outPath == null)
+				return;
+
+			// `--out <file>` writes the SAME input at full precision, one (spell, gap) row per line. The console view
+			// rounds to 2 dp, which is enough to read a cluster and not enough to re-run a candidate acceptance rule
+			// against - and re-running one over every spell at once is the gate #657 asks any new rule to pass.
+			var rows = new List<string> { "spellId\tname\tgapSeconds" };
+			foreach (var (spellId, gaps) in gapsBySpell.OrderBy(kv => kv.Key))
+			foreach (var gap in gaps.OrderBy(g => g))
+				rows.Add($"{spellId}\t{names.GetValueOrDefault(spellId, "")}\t{gap:R}");
+
+			File.WriteAllLines(outPath, rows);
+			Console.WriteLine($"wrote {outPath} ({rows.Count - 1} gaps)");
 		}
 
 		// --report chain-kill

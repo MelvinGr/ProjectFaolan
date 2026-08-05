@@ -20,6 +20,10 @@ namespace Faolan.Importer.Captures
 	// is to accept that shape and REJECT everything else - a spell seen ticking twice tells us nothing, and one whose
 	// gaps are spread across the whole range is not being observed as a periodic tick at all.
 	//
+	// There are TWO acceptance rules, tried in order, and the second exists because the first pivots on the MEDIAN,
+	// which the same one-sidedness defeats once more than half the gaps are stretched (#657 - see
+	// TightClusterTolerance). The second never overrules the first; it only ever answers where the first said no.
+	//
 	// ⚠️ KNOWN LIMIT - the harmonic case. Because the distortion is one-sided, a spell whose ticks are MOSTLY unseen
 	// has no short gaps left to reveal the fundamental, and its gaps concentrate on a MULTIPLE of the true period.
 	// Such a train is indistinguishable from a genuinely slower tick using gaps alone, and this estimator will
@@ -58,6 +62,39 @@ namespace Faolan.Importer.Captures
 		public const double ConcentrationTolerance = 0.25;
 		public const double ConcentrationShare = 0.5;
 
+		// The SECOND CHANCE, tried only where the concentration test above has already said no (#657).
+		//
+		// The median is the wrong pivot once MORE THAN HALF the gaps are stretched: because the distortion is
+		// one-sided, the median itself lands in the tail and the tight cluster at the bottom is measured against a
+		// number it has nothing to do with. Ice Strike (Rank 6) is the worked case - 13 of its 38 gaps sit inside
+		// 3.5% of each other at ~2.15 s, but its median is 4.20 s, so only 6 gaps are "near" it and it is rejected.
+		// The signal is there and the median rule looks past it.
+		//
+		// So this rule does not pivot on anything. It walks candidate intervals UPWARDS and takes the first with a
+		// TIGHT cluster around it, subject to one more condition that is the whole reason it is safe:
+		//
+		//   ⚠️ the cluster must contain the SHORTEST observed gap.
+		//
+		// That is the one-sidedness argument stated as a test. Nothing can shorten a gap below the true interval, so
+		// the true interval is at the BOTTOM of the distribution; a tight cluster with other gaps sitting below it is
+		// therefore a HARMONIC of the period, not the period. Without that condition the rule accepts 4000 ms for a
+		// ragged {2.1 2.2 2.4 | 4.0 4.2 4.4 | 8.5 8.8 9.1 | 12.0} train, which is exactly the shape the estimator
+		// exists to refuse (RaggedGapsAreRejected). It is also why a naive densest-cluster rule is wrong and was not
+		// used: with a ±25% window the densest cluster of Ice Strike's gaps sits at 2.76 s, because that window
+		// swallows the real cluster AND the stragglers above it.
+		//
+		// Measured over the whole corpus (`--report dot-trains --out <file>` writes every gap at full precision):
+		// this changes NO existing measurement - it cannot, it only runs after a rejection - and it rescues exactly
+		// ONE spell, Ice Strike (Rank 6) at 2000 ms. The constants sit on a very wide plateau: every combination of
+		// tolerance 0.03-0.15 and share 0.0-0.33 gives that same single answer.
+		//
+		// ⚠️ 2000 is what Rank 6's OWN gaps say, and not a sibling argument - #657 asserted that "every rank sibling
+		// of this spell is measured at 2000", and the corpus does not support that: `Ice Strike (Rank 1)` is the only
+		// other rank it covers and that one measures 2500. Whether Rank 1's 2500 is itself a median artefact is a
+		// separate question this rule deliberately does not reach, because it never revisits an accepted answer.
+		public const double TightClusterTolerance = 0.05;
+		public const double TightClusterShare = 0.25;
+
 		// The spell's tick interval in ms, or null when the gaps do not establish one. `gapsSeconds` is every
 		// observed gap between consecutive ticks of one spell, pooled across captures (a gap is a duration, so
 		// pooling is safe - unlike the entity handles the gaps were derived from, which are per-session).
@@ -72,10 +109,35 @@ namespace Faolan.Importer.Captures
 				return null;
 
 			var near = gaps.Count(g => Math.Abs(g - median) <= ConcentrationTolerance * median);
-			if (near < gaps.Count * ConcentrationShare)
-				return null;
+			return near < gaps.Count * ConcentrationShare
+				? TightestBottomCluster(gaps)
+				: Snap(median);
+		}
 
-			var snapped = (uint)(Math.Round(median * 1000 / QuantumMs) * QuantumMs);
+		// The second chance described on TightClusterTolerance: the first candidate, walking upwards, whose tight
+		// cluster is big enough AND still holds the shortest gap. Once a candidate's window has climbed past that
+		// shortest gap every larger one has too, so the walk stops there rather than running to the top.
+		private static uint? TightestBottomCluster(IReadOnlyList<double> sorted)
+		{
+			var needed = Math.Max(MinGaps, sorted.Count * TightClusterShare);
+			foreach (var candidate in sorted)
+			{
+				var low = candidate * (1 - TightClusterTolerance);
+				var high = candidate * (1 + TightClusterTolerance);
+				if (sorted[0] < low)
+					return null; // the window has left the bottom of the distribution behind
+
+				var members = sorted.Where(g => g >= low && g <= high).ToList();
+				if (members.Count >= needed)
+					return Snap(members.Average());
+			}
+
+			return null;
+		}
+
+		private static uint? Snap(double seconds)
+		{
+			var snapped = (uint)(Math.Round(seconds * 1000 / QuantumMs) * QuantumMs);
 			return snapped == 0
 				? null
 				: snapped;

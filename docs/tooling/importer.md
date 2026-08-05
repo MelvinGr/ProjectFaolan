@@ -287,7 +287,9 @@ later — and shows the counters never move with it, #446),
 length, and the gaps it contributes — the exact input `DotIntervalEstimator` is handed. Train LENGTH is what the
 pooled gap list hides: a length-2 train contributes one gap that is a re-application phase offset as often as it
 is the period, so a spell whose gaps come mostly from those has no cadence whatever the pooled list looks like.
-`--report-arg <name substring or id>` drills one spell and prints its train lengths and gaps, #524),
+`--report-arg <name substring or id>` drills one spell and prints its train lengths and gaps, #524; `--out <file>`
+writes the same input at full precision as one `(spell, gap)` row per line, which is what makes "re-run a candidate
+acceptance rule over every spell at once" a diff rather than an argument — the gate #657 asks any new rule to pass),
 `buff-durations` (every captured `MagicBuffIIR` apply grouped by spell, with the durations retail stated and the
 `Spells.DurationMs` we build from — the evidence view behind `MagicBuffCorpusTests`' duration gate. It separates
 the two populations a total hides: a SHORTFALL that decreases across a capture is retail re-sending a long buff

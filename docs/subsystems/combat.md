@@ -945,6 +945,12 @@ one target are one tick train and the gap between them *is* that spell's interva
 values are round half-seconds from 500 ms to 11 s, peaking at 1 s (16 spells) and 2 s (14). A spell with no
 measured interval ticks at the 2 s fallback, which is the median of the measured set.
 
+The round-half-second **snap** is corrective, not cosmetic, and that is measured rather than assumed: over the
+measured set the raw estimate sits a mean of **−0.05%** from the value it snaps to — no bias in either direction —
+and the mean absolute distance falls from 5.3% on spells with 3–4 gaps to 3.3% on spells with 20 or more. That is
+the signature of an unbiased estimator of a round interval with sampling noise, so the snap is removing that noise
+rather than inventing a value (#657).
+
 ⚠️ A tick train is scoped to **one capture**: its key includes the target and caster entity handles, and those
 are session-volatile and recycled, so pooling ticks across captures splices unrelated trains. Pooling the
 resulting *gaps* is fine — a gap is a duration. Note also that the distortion is one-sided: a dropped or
@@ -952,6 +958,16 @@ unobserved tick merges two periods into one long gap and can never produce a sho
 DoT cluster at the interval with a long upper tail. That is why `DotIntervalEstimator` accepts on how tightly
 gaps *concentrate* around the median rather than on their spread — a quartile bound rejects good data precisely
 because a quarter of its gaps are doubled periods.
+
+⚠️ The same one-sidedness defeats the **median itself** once more than half a spell's gaps are stretched: the
+median lands in the tail, and the tight cluster at the bottom is then measured against a number it has nothing to
+do with. `Ice Strike (Rank 6)` is the worked case — 13 of its 38 gaps sit inside 3.5% of each other at ~2.15 s
+while its median is 4.20 s. So the estimator has a **second rule**, tried only after the first declines: the first
+tight (±5%) cluster walking upwards, provided that cluster still **contains the shortest observed gap**. That
+proviso is the one-sidedness argument stated as a test — nothing can shorten a gap below the true interval, so a
+tight cluster with other gaps below it is a harmonic, not the period — and without it the rule would read
+4000 ms off a ragged `{2.1 2.2 2.4 | 4.0 4.2 4.4 | 8.5 8.8 9.1 | 12.0}` train. It never revisits an answer the
+first rule accepted; over the whole corpus it changes nothing and measures exactly one further spell (#657).
 
 ⚠️ **The school NUMBERING was wrong until #487, so any pre-#487 census output names the wrong elements.** Cold
 sat at 5 with everything after it one too high, which made a necromancer's unholy nukes read as *Holy* and their

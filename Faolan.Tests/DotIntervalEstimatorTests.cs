@@ -60,12 +60,53 @@ namespace Faolan.Tests
 
 		// Gaps spread across the whole range are not a periodic tick being observed - they are re-applications, a
 		// second caster landing the same spell, or combat pausing. Rejected rather than averaged into a number.
+		//
+		// ⚠️ This shape is exactly what the second rule (#657) must NOT accept, and it would without its
+		// contains-the-shortest-gap condition: {4.0, 4.2, 4.4} is a tight cluster of three, and 4000 ms is wrong.
 		[Fact]
 		public void RaggedGapsAreRejected()
 		{
-			// Ice Strike (Rank 6) as the corpus actually shows it: 2.15 / 4.20 / 8.80 quartiles over 38 gaps.
 			var ragged = new List<double> { 2.1, 2.2, 2.4, 4.0, 4.2, 4.4, 8.5, 8.8, 9.1, 12.0 };
 			Assert.Null(DotIntervalEstimator.Estimate(ragged));
+		}
+
+		// #657: the median is the wrong pivot once MORE than half the gaps are stretched, because it lands in the
+		// tail itself. Ice Strike (Rank 6) as the corpus actually shows it - 38 gaps whose median is 4.20 s while
+		// 13 of them sit inside 3.5% of each other at ~2.15 s, which is what every rank sibling measures at.
+		//
+		// The first rule rejects it (6 gaps near the median, 19 needed). The second reads the cluster at the bottom.
+		[Fact]
+		public void ATightClusterAtTheBottomIsAMeasurementEvenWhenTheMedianIsInTheTail()
+		{
+			var iceStrike = new List<double>
+			{
+				2.07, 2.11, 2.13, 2.13, 2.15, 2.15, 2.15, 2.15, 2.15, 2.15, 2.21, 2.21, 2.22,
+				2.46, 2.76, 2.76, 3.03, 3.38, 3.52,
+				4.88, 4.88, 4.92, 4.92, 5.45, 5.53, 6.11, 6.92, 6.92, 8.80, 8.91, 9.41, 9.52,
+				10.98, 11.09, 11.73, 11.73, 19.82, 22.32
+			};
+			Assert.Equal(2000u, DotIntervalEstimator.Estimate(iceStrike));
+		}
+
+		// The condition that makes the second rule safe, on its own: the same cluster, with a handful of SHORTER
+		// gaps under it, is a harmonic rather than the period - nothing can shorten a gap below the true interval,
+		// so a gap below the cluster says the cluster is not the bottom of the distribution.
+		[Fact]
+		public void ATightClusterWithShorterGapsBelowItIsNotTheInterval()
+		{
+			var harmonic = new List<double> { 1.02, 1.05, 2.05, 2.10, 2.10, 2.12, 5.9, 6.4, 7.1, 9.8, 12.4, 14.0 };
+			Assert.Null(DotIntervalEstimator.Estimate(harmonic));
+		}
+
+		// The second rule never overrules the first: a spell the concentration test accepts keeps that answer, even
+		// where the bottom of its distribution has a tight cluster of its own at a different value. Fires of
+		// Gehenna's real shape, with its doubled-period tail - the median says 2000 and the tail cluster at 4.3 must
+		// not get a vote.
+		[Fact]
+		public void TheSecondRuleOnlyAnswersWhereTheFirstDeclined()
+		{
+			var gaps = new List<double> { 2.15, 2.16, 2.18, 2.20, 2.20, 2.22, 2.25, 4.30, 4.31, 4.35 };
+			Assert.Equal(2000u, DotIntervalEstimator.Estimate(gaps));
 		}
 
 		// Out-of-range gaps are dropped BEFORE the count and spread tests, so a train padded with a long pause is
