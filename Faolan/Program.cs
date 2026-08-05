@@ -157,7 +157,7 @@ namespace Faolan
 				builder.Services.AddSingleton<ICsPlayerAgentDispatcher, CsPlayerAgentDispatcher>();
 				builder.Services.AddHostedService(provider => new CsPlayerAgentListener(hostRealm!.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
 					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>(),
-					provider.GetRequiredService<ICsPlayerAgentDispatcher>()));
+					provider.GetRequiredService<ICsPlayerAgentDispatcher>(), provider.GetRequiredService<IChatServerDispatcher>()));
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools

@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -45,15 +46,18 @@ namespace Faolan.CSPlayerAgent
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
 		private readonly Func<uint, INetworkClient?> _clientForCharacter;
+		private readonly IChatServerDispatcher _chatServerDispatcher;
 		private readonly IDatabaseRepository _database;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly ILogger _logger;
 
-		public GuildService(IDatabaseRepository database, ILogger logger, IGameServerDispatcher gameServerDispatcher, Func<uint, INetworkClient?> clientForCharacter)
+		public GuildService(IDatabaseRepository database, ILogger logger, IGameServerDispatcher gameServerDispatcher, IChatServerDispatcher chatServerDispatcher,
+			Func<uint, INetworkClient?> clientForCharacter)
 		{
 			_database = database;
 			_logger = logger;
 			_gameServerDispatcher = gameServerDispatcher;
+			_chatServerDispatcher = chatServerDispatcher;
 			_clientForCharacter = clientForCharacter;
 		}
 
@@ -104,6 +108,7 @@ namespace Faolan.CSPlayerAgent
 				await SendInviteReplyToInviter(inviterClient, character.Name ?? "", true);
 
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
+			await _chatServerDispatcher.RefreshGuildChannel(character.Id, guild.Id); // the guild chat TAB (#663)
 		}
 
 		// 0x201E ClientRequestGuildInfo([ID32 char]): the client resolves guild banners/tooltips of other
@@ -217,6 +222,11 @@ namespace Faolan.CSPlayerAgent
 			// re-auth 0x203F push), so this only ADDS the no-relog path.
 			await SendGuildCreated(client, ReplySender(packet.Receiver), packet.Sender, guild, character, (byte)form);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
+
+			// The guild chat channel, which is what makes the guild chat TAB appear. Retail sends it right after the
+			// 0x2044 (create capture: 0x2044 at frame 366, the `03 <guildId> "~Guild"` subscription at 369) - so this
+			// is the same order, on the chat connection rather than this one (#663).
+			await _chatServerDispatcher.RefreshGuildChannel(character.Id, guild.Id);
 		}
 
 		// 0x2023 GuildInvite: same as by-name but the target is identified by ID32.
@@ -361,6 +371,7 @@ namespace Faolan.CSPlayerAgent
 
 			_logger.LogInformation("{Character} {Reason} guild {GuildId:X}.", character.Name, reason, guildId);
 			await _gameServerDispatcher.SendGuildTag(character.Id, "");
+			await _chatServerDispatcher.RefreshGuildChannel(character.Id, null); // drop the ~Guild channel with the tag (#663)
 
 			if (guild == null)
 				return;

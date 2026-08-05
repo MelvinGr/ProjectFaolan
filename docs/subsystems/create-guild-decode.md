@@ -39,7 +39,7 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 
 1. C→S `0x2021 CreateGuild` `[name][form]`
 2. S→C `0x2000` (GameServer state) + **`0x2044 DispatchGuildCreated`** (the guild window opens immediately — no relog)
-3. S→C several `0x003c` — guild + officer CHAT-CHANNEL subscriptions (the guild chat tabs)
+3. S→C `0x003c` — the `~Guild` CHAT-CHANNEL subscription (the guild chat tab), then a re-fan of the standing channels
 4. C→S `0x202f` (member-joined ack, len 0) then more `0x003c`
 5. `0x2085`/`0x2082` follow-ups
 
@@ -59,5 +59,38 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
   list (so 225 = 277 − 52), zeroed renown, the feat defaults `List2 = 0x410/0x816/0xBEA`, and create-time constants
   in `Counters64C[0..2]`/`Counters64D`. `GuildHeaders.ForGuildCreate` now carries `GuildRenownBlock.ForGuildCreate()`
   (byte-exact — `GuildRenownBlockCodecTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
-- The `0x003c` guild + officer chat-CHANNEL subs (step 3 above) are never fanned out, so the guild chat tabs do
-  not appear. It does not block the window opening — open work tracked in Gitea #663.
+- **The `0x003c` guild chat-channel subscription (step 3 above) is sent** — `RefreshGuildChannel` on the chat
+  tier, driven from create / invite-accept / leave / kick, plus the login burst for a character already guilded.
+  There is exactly ONE channel and it is `~Guild`; see below.
+
+## The guild chat channel — `~Guild`, and there is no officer one
+
+The subscription is an ordinary `ChannelSubscription` (0x003C) whose **id IS the guild id**, which is what makes
+it constructible: the same word the guild's own header carries.
+
+```
+03 <guildId u32> 0006 "~Guild" 00008004 0000
+```
+
+Two captures state it independently, from the two directions a client can acquire a guild:
+
+| capture | guild | the guild's own header | its `~Guild` channel |
+|---|---|---|---|
+| `DemoL80_…_login_create-guild` fr366/369 | created in-session | `0x2044` … `03 00086c47` | `03 00086c47 "~Guild"` |
+| `Hoxxling_…_login` fr114 | already a member | `0x203F` `03 0007585b` | `03 0007585b "~Guild"` |
+
+The flag is **`0x00008004`**, not the `0x00008044` the standing channels (`~Global` / `~LFG` / `~Playfield` /
+`~NewbieHelp`) carry — the same word the captured `~Team` subscription uses, so the per-membership channels
+share a flag distinct from the standing ones.
+[V2: DemoL80_mage-demonologist_login_create-guild.tshark.json]
+
+**There is no officer channel.** Sweeping all 120 dumps for a 0x003C/0x003D naming a guild, officer or team
+channel returns `~Guild` and `~Team` and nothing else, and the client binary carries no `~`-prefixed channel
+name at all (they are server-supplied). The decisive case is the create capture: DemoL80 is by construction the
+guild LEADER, and retail subscribes them to exactly one channel. So "guild + officer chat channels" was an
+assumption about this build, not an observation of it.
+
+**Leaving is uncaptured.** No session in the corpus ever leaves a guild, so the `0x003D` we send on a
+leave/kick is that message — the one the corpus does show retiring a `~Team` when the group dissolves and a
+`~Playfield` on a zone change — applied to this channel. The guild case itself is inferred.
+[V0: retail's 0x003D on a guild leave/kick]

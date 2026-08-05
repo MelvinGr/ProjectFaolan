@@ -16,6 +16,11 @@ namespace Faolan.Core.Network
 		// RefreshPlayfieldChannel idempotent and tells it which channel to drop (#562).
 		uint PlayfieldChannelId { get; set; }
 
+		// The guild id of the ~Guild chat channel this client is currently subscribed to, or 0 for none. Same reason
+		// as PlayfieldChannelId above: the character's guild is what they ARE in, this is what the chat tier last told
+		// them to listen to, and comparing the two is what makes RefreshGuildChannel idempotent (#663).
+		uint GuildChannelId { get; set; }
+
 		Account Account { get; set; }
 
 		Character Character { get; set; }
@@ -237,6 +242,7 @@ namespace Faolan.Core.Network
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public uint PlayfieldChannelId { get; set; }
+		public uint GuildChannelId { get; set; }
 		public Account Account { get; set; } = null!;
 		public Character Character { get; set; } = null!;
 

@@ -235,6 +235,15 @@ string, `FUN_00cba1b0(dst,1)` one byte). What is NOT settled is who retail sends
 `DispatchGuildInviteReplyToInviter`'s `i_cMessage` - a free string we fill with the invitee's name because that is
 the only thing the inviter's toast can need. A two-client retail guild-management session settles all of it.
 
+### Retail's 0x003D on a guild leave/kick
+**Tracked: Gitea #663.** [V0: retail's 0x003D on a guild leave/kick] The `~Guild` chat-channel SUBSCRIPTION is
+captured twice (a create and a guilded login - see
+[`../subsystems/create-guild-decode.md`](../subsystems/create-guild-decode.md)), but no session in the corpus
+ever leaves or is kicked from a guild, so the drop is not. We send the `ChannelUnsubscribe` (0x003D) on that
+channel: the same message the corpus does show retiring a `~Team` when the group dissolves and a `~Playfield` on
+a zone change, whose body is exactly the `(type, id)` pair the subscription opens with. The MESSAGE is retail's;
+applying it to the guild case is the inference. A two-client guild leave settles it, alongside #104's fan-out.
+
 ### Which guild ranks may kick, promote and demote
 **Tracked: Gitea #104.** [V0: which guild ranks may kick, promote and demote] The same gap the bank withdrawal has,
 one rung along: the client ships a per-rung permission BITMASK in RDB 1000518 (strictly nested, `0` subset `30`

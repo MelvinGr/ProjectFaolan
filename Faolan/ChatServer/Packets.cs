@@ -163,6 +163,36 @@ namespace Faolan.ChatServer
 			Logger.LogInformation("ChatServer ~Playfield for {Character:X8}: {From} -> {To}", characterId, current, mapId);
 		}
 
+		// Moves the client's ~Guild channel to the guild they are now in - the membership twin of
+		// RefreshPlayfieldChannel, and idempotent for the same reason: a guild id is assigned from several places
+		// (create, invite accept, kick, leave) and this is called from all of them.
+		//
+		// ⚠️ The SUBSCRIBE side is captured (create frame 369, and the login burst of a guilded character). The
+		// UNSUBSCRIBE on leaving a guild is not: no capture in the corpus ever leaves one. It is the same 0x003D
+		// (type, id) the corpus does show retiring a ~Team when the group dissolves and a ~Playfield on a zone change,
+		// so it is that message applied to this channel, not a new one - but the guild case itself is inferred.
+		// [V0: retail's 0x003D on a guild leave/kick]
+		public async Task RefreshGuildChannel(uint characterId, uint? guildId)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client?.Session == null)
+				return;
+
+			var current = client.Session.GuildChannelId;
+			var wanted = guildId ?? 0;
+			if (current == wanted)
+				return;
+
+			if (current != 0)
+				await SendChannelUnsubscribe(client, GuildChannelType, current);
+
+			if (wanted != 0)
+				await SendChannelSubscription(client, GuildChannelType, wanted, GuildChannelName, GuildChannelFlag);
+
+			client.Session.GuildChannelId = wanted;
+			Logger.LogInformation("ChatServer ~Guild for {Character:X8}: {From:X} -> {To:X}", characterId, current, wanted);
+		}
+
 		private static Task SendSystemMessage(INetworkClient client, ChatMarkup message)
 		{
 			return client.SendAsync(new ChatServerMessage(ChatSystemMessageCodec.Opcode, ChatSystemMessageCodec.Build(message.Value)));

@@ -43,6 +43,18 @@ namespace Faolan.Core.Network.Server.ChatServer
 		Task RefreshPlayfieldChannel(uint characterId, uint mapId);
 
 		/// <summary>
+		///     Brings a character's <c>~Guild</c> chat channel in line with the guild they are now in: drops the old
+		///     channel (0x003D) and subscribes the new one (0x003C). <paramref name="guildId" /> is null when they are
+		///     guildless, which just drops. IDEMPOTENT, like <see cref="RefreshPlayfieldChannel" />, so the guild tier
+		///     can call it after any membership change without tracking what it sent last.
+		///     <para>
+		///         The subscription is what makes the guild chat TAB appear: without it the window opens but the tab
+		///         never does, because a channel the client holds no subscription for is one it silently drops (#663).
+		///     </para>
+		/// </summary>
+		Task RefreshGuildChannel(uint characterId, uint? guildId);
+
+		/// <summary>
 		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
 		///     character has no connected ChatServer client.
 		/// </summary>

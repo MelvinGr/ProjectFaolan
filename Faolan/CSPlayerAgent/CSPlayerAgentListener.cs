@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -36,11 +37,15 @@ namespace Faolan.CSPlayerAgent
 		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
 		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
-			ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(port, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)))
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher chatServerDispatcher) : base(port, logger, configuration, database,
+			new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
-			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
+
+			// `chatServerDispatcher` is not held here: only the guild flow needs it (a membership change moves the
+			// member's ~Guild chat-channel subscription, which lives on their CHAT connection, not this one - #663).
+			_guild = new GuildService(database, logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
 			_teams = new TeamService(logger, gameServerDispatcher, ClientForCharacter);
 		}
 

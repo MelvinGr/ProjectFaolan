@@ -27,6 +27,17 @@ namespace Faolan.ChatServer
 		private const string PlayfieldChannelName = "~Playfield";
 		private const uint PlayfieldChannelFlag = 0x00008044;
 
+		// The ~Guild channel: type 0x03, and its ID IS the guild id - so it follows the player's MEMBERSHIP the way
+		// ~Playfield follows their map (#663). Captured on both a create and a login already in a guild, and the id is
+		// the same word the create/full-update header carries: DemoL80's create answers 0x2044 with guild 0x00086C47 and
+		// then subscribes `03 00086c47 "~Guild"`, and Hoxxling's login pushes 0x203F for guild 0x0007585B and subscribes
+		// `03 0007585b "~Guild"`. The flag is 0x00008004, NOT the 0x00008044 the global channels use - the same word the
+		// captured ~Team subscription carries, i.e. the per-membership channels share a flag distinct from the standing
+		// ones. [V2: DemoL80_mage-demonologist_login_create-guild.tshark.json frame 369]
+		private const byte GuildChannelType = 0x03;
+		private const string GuildChannelName = "~Guild";
+		private const uint GuildChannelFlag = 0x00008004;
+
 		// The level + class the virtual Claude friend entry reports (#100). See SendClaudeFriendEntry: both are fields
 		// the client's tooltip shows and neither has a "none" encoding, so they are a choice, not a decode.
 		private const byte ClaudeVirtualFriendLevel = 80;
@@ -111,6 +122,15 @@ namespace Faolan.ChatServer
 					}
 
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
+
+					// ...and the character's guild channel, when they are in one - retail carries it in this same login
+					// burst for a guilded character (Hoxxling login, frame 114). A guild JOINED mid-session is subscribed
+					// by RefreshGuildChannel instead, which is why the session slot is stamped here too.
+					if (client.Session.Character?.GuildId is { } guildId)
+					{
+						await SendChannelSubscription(client, GuildChannelType, guildId, GuildChannelName, GuildChannelFlag);
+						client.Session.GuildChannelId = guildId;
+					}
 
 					// The server-defined Claude channel: posts on it are bridged to Claude via the MCP chat tools.
 					// Only offered while the MCP server is hosted - without it nothing reads the log or can reply.
