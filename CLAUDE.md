@@ -359,7 +359,10 @@ suite reads. It has two halves, and the difference decides which one a new gate 
   Conan packets concatenated; a packet self-frames, so no container format), `TestPaths.AssetBytes`/`TestPaths.Asset`
   for inputs, or `Golden.Bytes` for expected outputs. This is what a gate that only ever wanted ONE packet should
   use. They are **hand-carved and cannot be re-derived from the captures**, so a regeneration carries them over
-  untouched; add or replace one with `--report fixture-set --report-arg <key>=<file>`.
+  untouched; add or replace one with `--report fixture-set --report-arg <key>=<file>`, and REMOVE one with an
+  empty source (`<key>=`) - which is how retail bytes leave the archive once a gate's expectation has become a
+  SHA-256 pin (#555; `EditorAvatarSnapshotTests` / `GuildPacketTests` are the pattern). A digest only substitutes
+  for a golden the gate never READS: a parse input or a partial-span compare still needs the bytes.
 - **The corpus slice** (45k packet bodies), read via `CorpusExtract`. Reserved for gates whose assertion IS
   breadth: the snapshot round-trips (#384/#390/#391), the protobuf re-encode oracle (#385), the world-object
   column lift. These would go vacuous on a fixture, which is exactly why they read the corpus. Rebuild it with

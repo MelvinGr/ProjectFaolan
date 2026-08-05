@@ -142,10 +142,21 @@ namespace Faolan.Importer.Cli
 				if (split <= 0)
 				{
 					await Console.Error.WriteLineAsync("usage: --report fixture-set --report-arg <key>=<file>   e.g. golden/InitialBurst.bin=/tmp/burst.bin");
+					await Console.Error.WriteLineAsync("       --report fixture-set --report-arg <key>=        removes it (an empty source, #555)");
 					return 1;
 				}
 
-				FixtureArchiveWriter.SetNamed(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), arg![..split], arg[(split + 1)..]);
+				var archive = Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
+				var source = arg![(split + 1)..];
+
+				// An empty source REMOVES the fixture - the path by which retail bytes leave the archive once a gate's
+				// expectation has become a digest (#555). Spelled as the same flag rather than a second report so the
+				// two halves of "what is in the archive" stay in one place.
+				if (source.Length == 0)
+					FixtureArchiveWriter.RemoveNamed(archive, arg[..split]);
+				else
+					FixtureArchiveWriter.SetNamed(archive, arg[..split], source);
+
 				return 0;
 			}
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Enums;
@@ -16,24 +17,32 @@ namespace Faolan.Tests
 	// codec's output is compared against the record past it.
 	public class MoveTaskBuilderTests
 	{
+		// The two captured MoveTask records, byte-for-byte, past the carrier's [u32 len]. Verified against
+		// Golden/MoveTaskPatrol.bin and Golden/MoveTaskStationary.bin (since deleted, #555) before removal.
+		//
+		// The INPUTS moved into the tests as literals when the blobs went, which is the honest form of what the old
+		// version was doing anyway: it read the handle, positions, waypoints and speed back out of the golden at
+		// fixed offsets and fed them to the builder. Spelling them out says what the capture holds; the digest still
+		// says the builder reproduces it.
+		private const string CapturedPatrolSha256 = "2e659474d4b316fd50b6978ad9f7436540a63957875b09bef45c07b12edd174c";
+		private const string CapturedStationarySha256 = "46654fd27c528366b102b2895147fc97ef4d0964be4820f15e50da46b3602f0a";
+
 		[Fact]
 		public void BuildPatrol_FromCapturedWaypoints_IsByteIdentical()
 		{
 			// Canonical single-segment waypoint patrol (handle 0x17E03, 2 waypoints). Reconstructing it from the
-			// captured current position + waypoint path + speed reproduces the 96-byte body byte-for-byte.
-			var captured = Golden.Bytes("MoveTaskPatrol");
+			// captured current position + waypoint path + speed reproduces the 92-byte record byte-for-byte.
+			var curPos = new Vector3(333.2f, 146.29666f, 706.026f);
+			var waypoints = new List<Vector3>
+			{
+				curPos,
+				new(324.76794f, 145.43733f, 705.13867f)
+			};
 
-			var handle = captured.ReadU32Be(12);
-			var curPos = ReadVec3(captured, 18);
-			int count = captured[40];
-			var waypoints = new List<Vector3>();
-			for (var k = 0; k < count; k++)
-				waypoints.Add(ReadVec3(captured, 41 + 12 * k));
-			var speed = captured.ReadF32Be(41 + 12 * count + 1);
+			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x00017E03u, curPos, MoveTaskNodes.Patrol(waypoints, 8.522063f, curPos)));
 
-			var built = MoveTaskCodec.Build(new MoveTaskIIR(handle, curPos, MoveTaskNodes.Patrol(waypoints, speed, curPos)));
-
-			Assert.Equal(captured[4..], built);
+			Assert.Equal(92, built.Length);
+			Assert.Equal(CapturedPatrolSha256, Sha256(built));
 		}
 
 		[Fact]
@@ -52,15 +61,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildStationary_FromCapturedHandleAndPosition_IsByteIdentical()
 		{
-			var captured = Golden.Bytes("MoveTaskStationary");
+			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x0000AA39u, new Vector3(921.9175f, 171.4333f, 847.75623f), MoveTaskNodes.Stationary()));
 
-			var handle = captured.ReadU32Be(12);
-			var position = new Vector3(captured.ReadF32Be(18), captured.ReadF32Be(22),
-				captured.ReadF32Be(26));
-
-			var built = MoveTaskCodec.Build(new MoveTaskIIR(handle, position, MoveTaskNodes.Stationary()));
-
-			Assert.Equal(captured[4..], built);
+			Assert.Equal(27, built.Length);
+			Assert.Equal(CapturedStationarySha256, Sha256(built));
 		}
 
 		[Fact]
@@ -75,10 +79,9 @@ namespace Faolan.Tests
 			Assert.Equal((byte)0x06, built[26]);
 		}
 
-		private static Vector3 ReadVec3(byte[] b, int off)
+		private static string Sha256(byte[] body)
 		{
-			return new Vector3(b.ReadF32Be(off), b.ReadF32Be(off + 4),
-				b.ReadF32Be(off + 8));
+			return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(body));
 		}
 	}
 }

@@ -53,7 +53,7 @@ namespace Faolan.Tests.Support
 		//
 		// The cache is filled in FULL on first use rather than per key, because tests reach fixtures by directory as
 		// well as by name (`Path.Combine(GetDirectoryName(oneAsset), "another.bin")`) - a lazily-populated directory
-		// makes that work or not depending on which test ran first. 42 entries, ~1.4 MB, once per run.
+		// makes that work or not depending on which test ran first. ~40 entries, ~1.4 MB, once per run.
 		public static string NamedPath(string key)
 		{
 			Materialized.Value.TryGetValue(key, out var path);

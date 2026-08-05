@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -22,6 +23,10 @@ namespace Faolan.Tests
 		private const string CapturedMemberRecord = "030301316e710008486f78786c696e67000100000faa040000002b" + // head..class
 													"0000000000000000" + // unknown0 + lastSeen (online)
 													"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"; // 48-byte counters
+
+		// The DemoL80 create capture's 0x2044 body, byte-for-byte. Verified against Golden/GuildCreated.bin (338
+		// bytes, since deleted) before removal.
+		private const string CapturedGuildCreatedSha256 = "3ca011a4a036200d4a9e1547dc0c3e90ea2604227b66e77f987604a054298a5b";
 
 		// #306: the 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
 		// (DemoL80 creating "Faolan"): [creator member record][guild header (form byte = request's 0x06)][225-byte
@@ -51,7 +56,11 @@ namespace Faolan.Tests
 
 			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, 0x2B20, 0), GuildHeaders.ForGuildCreate(guild, 0x06)));
 
-			Assert.Equal(Convert.ToHexStringLower(Golden.Bytes("GuildCreated")), Convert.ToHexStringLower(body));
+			// The retail body's SHA-256 rather than the retail body: the blob is gone from the repo (#555). Equally
+			// binding and one-way - and this gate never read the bytes, it only compared against them, which is what
+			// makes the substitution lossless here (contrast the goldens that are PARSE inputs; those have to stay).
+			Assert.Equal(338, body.Length);
+			Assert.Equal(CapturedGuildCreatedSha256, Convert.ToHexStringLower(SHA256.HashData(body)));
 		}
 
 		[Fact]

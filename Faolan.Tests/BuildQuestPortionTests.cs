@@ -17,6 +17,10 @@ namespace Faolan.Tests
 	public class BuildQuestPortionTests
 	{
 		private const uint CaptureInstance = 0x021663DD; // Stihetfv's client instance (the goal records carry it)
+
+		// The compeltefirstquest login snapshot's 2,247-byte quest region, byte-for-byte. Verified against
+		// Golden/QuestPortion2QuestGolden.bin (since deleted, #555) before removal.
+		private const string CapturedRegionSha256 = "9c6dc1223caac6630ed3e1baeddf1b47f0df631f0866686a28c5586bc3121422";
 		private static readonly string DbPath = TestPaths.FaolanDb;
 
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
@@ -51,19 +55,12 @@ namespace Faolan.Tests
 			Assert.NotNull(casilda);
 
 			var built = SnapshotTails.QuestPortion([beach, casilda], beach, CaptureInstance);
-			var golden = Golden.Bytes("QuestPortion2QuestGolden");
 
-			var diff = -1;
-			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
-			{
-				if (golden[i] != built[i])
-				{
-					diff = i;
-					break;
-				}
-			}
-
-			Assert.True(golden.SequenceEqual(built), $"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
+			// The captured region's SHA-256 rather than the region: the blob is gone from the repo (#555). This gate
+			// only ever compared against those bytes - both inputs are DB rows - so the digest is the same assertion,
+			// minus the ability to report a first-differing offset. Regenerate the pin only against a capture.
+			Assert.Equal(2247, built.Length);
+			Assert.Equal(CapturedRegionSha256, Sha256(built));
 		}
 
 		// Single-quest path must still equal the multi-quest portion for one held quest (regression guard for the
@@ -85,10 +82,15 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
 		{
-			var golden = Golden.Bytes("QuestPortion2QuestGolden");
+			// The region the test above pins against retail's digest IS the captured region, so searching it for the
+			// 13479 record is still a comparison against a capture - one hop, not a self-check. (If that gate fails
+			// this one is meaningless, but it fails loudly first.)
+			var region = SnapshotTails.QuestPortion([await LoadDefinition(10238), await LoadDefinition(13479)], await LoadDefinition(10238), CaptureInstance);
+			Assert.Equal(CapturedRegionSha256, Sha256(region));
+
 			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
 			var sig = new byte[] { 0, 0, 0x34, 0xA7, 0, 0, 0, 1, 0, 0, 0x34, 0xA7 };
-			var off = IndexOf(golden, sig);
+			var off = IndexOf(region, sig);
 			Assert.True(off >= 0, "13479 record signature present in the golden region");
 
 			var casilda = await LoadDefinition(13479);
@@ -96,7 +98,7 @@ namespace Faolan.Tests
 			var rec = QuestcRecords.ForQuest(casilda, casilda.Level);
 			var built = QuestcRecordCodec.Build(rec);
 
-			var slice = golden.AsSpan(off, built.Length).ToArray();
+			var slice = region.AsSpan(off, built.Length).ToArray();
 			var diff = -1;
 			for (var i = 0; i < built.Length; i++)
 			{
@@ -147,6 +149,11 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(questId);
 			Assert.Equal(expectedHead, def.ChainHeadQuestId);
 			Assert.Equal(expectedHead, QuestcRecords.ForQuest(def, def.Level).Field2c);
+		}
+
+		private static string Sha256(byte[] body)
+		{
+			return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(body));
 		}
 
 		private static int IndexOf(byte[] hay, byte[] needle)

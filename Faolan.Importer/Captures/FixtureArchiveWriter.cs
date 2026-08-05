@@ -158,6 +158,27 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"{key} <- {sourceFile} ({named[key].Length} bytes); archive now {named.Count} named fixtures, {corpus.Count} corpus entries");
 		}
 
+		// Drops ONE named fixture, leaving the corpus untouched - the counterpart of SetNamed, and the only way retail
+		// bytes LEAVE the archive (#555). Used when a gate stops needing the blob because its expectation became a
+		// SHA-256 pin: the digest is equally binding and one-way, so the bytes no longer have to ship.
+		//
+		// ⚠️ A named fixture is hand-carved and cannot be re-derived from the captures, so this is not undoable from
+		// inside the repo. Take the digest FIRST, and confirm the gate passes against it, before removing.
+		public static void RemoveNamed(string archivePath, string key)
+		{
+			ArgumentNullException.ThrowIfNull(key);
+
+			var (counts, corpus, named) = Read(archivePath);
+			if (!named.Remove(key, out var dropped))
+			{
+				Console.WriteLine($"{key}: not in the archive; nothing removed ({named.Count} named fixtures)");
+				return;
+			}
+
+			WriteArchive(archivePath, corpus, counts, named);
+			Console.WriteLine($"{key} REMOVED ({dropped.Length} bytes); archive now {named.Count} named fixtures, {corpus.Count} corpus entries");
+		}
+
 		private static void WriteArchive(string outputPath, List<CorpusEntry> corpus, Dictionary<string, int> counts, SortedDictionary<string, byte[]> named)
 		{
 			// Lay the corpus out by (IIR, length) so same-shaped bodies compress against each other. The reader sorts

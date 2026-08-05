@@ -1,3 +1,5 @@
+using System;
+using System.Security.Cryptography;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Tests.Support;
 using Xunit;
@@ -11,6 +13,10 @@ namespace Faolan.Tests
 	// blob (which had been hand-transcribed 3 bytes short -> 274 not 277, misaligning the roster after it).
 	public class GuildRenownBlockCodecTests
 	{
+		// The create-guild capture's 225-byte 0x2044 tail, byte-for-byte. Verified against
+		// Golden/GuildCreateRenownBlock.bin (since deleted) before removal.
+		private const string CapturedCreateTailSha256 = "890040917505eaf6418b843043290c06ac29e3ec794ffcb3ec9ced43377f4669";
+
 		// The structured factory (no captured blob) reproduces the capture byte-for-byte - so GuildService can
 		// emit a constructed block instead of carrying the verbatim (and previously malformed) template.
 		[Fact]
@@ -75,8 +81,10 @@ namespace Faolan.Tests
 		{
 			var block = GuildRenownBlock.ForGuildCreate();
 
-			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), GuildRenownBlockCodec.Build(block));
+			// The retail tail's SHA-256 rather than the tail: the blob is gone from the repo (#555). This gate only
+			// ever compared against those bytes - it never read them - so the digest is the same assertion.
 			Assert.Equal(225, GuildRenownBlockCodec.Build(block).Length);
+			Assert.Equal(CapturedCreateTailSha256, Convert.ToHexStringLower(SHA256.HashData(GuildRenownBlockCodec.Build(block))));
 			Assert.Equal((byte)0x00, block.Flag);
 			Assert.Empty(block.StatIds);
 		}
