@@ -55,6 +55,9 @@ namespace Faolan.Tests
 
 			// Religion: 0 on 183 of the 184 captured snapshots and 1 on exactly one, so it VARIES - but there is no
 			// deity column to author it from, and which integer is which god is unverified (#553).
+			// Religion is not modelled (#553), and the client cannot help: it WRITES stat 0xA9 into a dedicated slot
+			// and reads it nowhere (docs/re/aoc-client-stat-names.md), so this is a server-side number with no
+			// value->deity mapping to recover and nothing in-client that would show a wrong one.
 			[CharacterStatId.ChosenGod] = "religion not modelled (#553)",
 
 			// Named-unknown slots that vary: undecoded, so there is nothing to derive them FROM yet (#464).

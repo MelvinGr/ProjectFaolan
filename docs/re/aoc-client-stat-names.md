@@ -63,3 +63,36 @@ in the swept range can produce a false pair. Ids **below 768** were dominated by
 gave `8` "Cave", `11` "Carpeted Hallway", `2` "LoadingMusic") and are excluded from the TSV; every retained name is a
 plain identifier. The retained rows have not been individually verified beyond the spot checks above — treat a name
 as strong evidence, not as a citation, until the id is used.
+
+## ⚠️ A name is not a consumer: `ChosenGod` (`0x0A9`) is stored and never read
+
+The table names `0x0A9` `ChosenGod`, which is why #553 asked what its VALUES mean — retail sends `1` for one
+captured character and `0` for the other 183, and Mitra/Set/Ymir is the in-game set. **The client cannot answer
+that, and the reason is worth writing down: it never looks at the value.**
+
+`ConstScan CONST=a9` finds exactly **two** uses of `0xA9` as a stat id in the whole image, and both are WRITES —
+`FUN_007a2ad0` (`SetStat(0xa9, *(obj + 0x14c))`) and the stat-apply run in `FUN_01458d40`, where it is one of a
+block (`0xd7 GmLevel`, `0xed`, `0x42`, `0xa9`) copied out of consecutive fields of a server-fed struct. Every
+other `PUSH 0xa9` in the binary is an assert's line number (`formationdata.cpp`, `DepthPrepassShader.cpp`,
+`fmod_codec_wav.cpp`, …). There is **no** `GetStat(0xa9)` anywhere.
+
+It is not that the stat is ignored, either — one class overrides its stat accessors to give this single id a
+dedicated slot:
+
+```c
+// FUN_00843d10 / FUN_00843d40, adjacent in vtable 0x01fd2640
+if (param_1 != 0xa9) { return FUN_0080ab20(param_1, param_2); }   // everything else: the generic stat bag
+return *(undefined4 *)(in_ECX + 0x244);                            // 0xA9 lives here
+```
+
+…and those two functions are the only ones on that class that touch `+0x244`. So the client caches the value,
+mirrors it, and consumes it nowhere.
+
+**That makes `ChosenGod` a SERVER-side number**, the same tell as the `Combat_{PvE,PvP}*ShieldBonus` tweaks the
+client registers and never reads ([`../rdb/client-tweak-table.md`](../rdb/client-tweak-table.md)). The practical
+consequence for anyone picking up #553: there is no value→deity mapping hidden in the client to recover, and no
+in-client check that could confirm one, because nothing the client draws depends on it. Whatever we emit is
+invisible until religion is modelled server-side.
+
+**The general rule:** the stat-name table tells you what an id IS called, not that the client does anything with
+it. Before treating a named id as decodable from the binary, check that something READS it.
