@@ -283,19 +283,24 @@ defender's facing) was implemented and **reverted**: the *"attacks from behind l
 damage"* line in the same description is a **separate positional rule**, not the arc split, and the client's
 294-entry balance sheet carries no back/flank number to pair with it.
 
-**An NPC's swing carries no direction ability**, so the arc it lands in is the server's to pick. No captured
-NPC swing carries a direction word — the direction ability is the *player's* `Normal Attack`, and its c2s and
-s2c actor histograms match one for one across ~63k NPC-actor records — and none is needed: the mitigation is
-server-side either way, since the client registers all eight `Combat_*ShieldBonus` tweaks and reads none of
-them. ⚠️ `CombatShieldRose.SwingArc` therefore picks **uniformly, and is the one placeholder in the class** —
-`Roll` is uniform because the corpus measured it uniform, this is uniform because nothing observes it. A
-capture that pins a mob's swing direction, or a per-mob attack-animation decode, replaces it.
+**An NPC's swing is the same mechanic as a player's — the same Left/Mid/Right and only that.** Nothing about it
+is visible on the mob: the shields drawn over a defender are a **UI overlay** of the rose, not a model or
+animation state, so there is no left-swing/right-swing pose to look for on either side. That is also why the
+corpus is silent — not one of ~63k NPC-actor BCC records carries a direction word, while the player's own
+swings echo back one for one, because a player's direction rides on an *ability id* and a mob has no ability to
+name. The mitigation is server-side either way (the client registers all eight `Combat_*ShieldBonus` tweaks and
+reads none), so nothing needs to be on the wire.
 
-Without it the rose would do nothing at all in PvE, which contradicts the live game: a player's guards are
-adjustable in PvE, they just rarely need adjusting ("in general, outside of a few battles, you can leave them
-alone for PvE" — and the default `111` spread is the table's neutral entry, so leaving them alone costs
-nothing).
+That leaves the **selector** as the only unknown, and `CombatShieldRose.SwingArc` picks uniformly over the
+three. ⚠️ It is the one placeholder in the class, and what is assumed is the *distribution*, not the mechanic:
+`Roll` is uniform because the corpus measured it uniform, this is uniform because nothing observes it. What
+would replace it is evidence that a mob favours an arc — its own AI tendency, or aiming at the player's weakest
+guard the way a player aims at the mob's.
 [V3: CombatShieldRoseTests.ApplyArcMitigation_AMobsSwingIsMitigatedByTheArcThePlayerStacked]
+
+The player's guards therefore do work in PvE, matching the live game's "in general, outside of a few battles,
+you can leave them alone for PvE" — and the default `111` spread is the table's neutral entry, so leaving them
+alone costs exactly nothing.
 
 Applied on the melee path only (`WorldSimulation.ApplyNpcAttack`, after armour), through the same table as a
 player's directed swing. An NPC **cast** takes no arc, for the same reason a player's spell does not: the rose

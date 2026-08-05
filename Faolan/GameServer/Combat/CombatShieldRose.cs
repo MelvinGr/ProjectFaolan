@@ -124,16 +124,21 @@ namespace Faolan.GameServer.Combat
 		// separate positional rule, not the arc split, and the client's 294-entry balance sheet carries no
 		// back/flank number to go with it.
 		//
-		// An NPC has no direction ability on its swing - of ~63k NPC-actor BCC records not one carries a direction
-		// word, while the player's own swings echo back one-for-one - so the number is not on the wire and does not
-		// need to be: the mitigation is server-side either way (the client registers all eight
-		// `Combat_{PvE,PvP}{0..3}ShieldBonus` tweaks and reads none). That leaves the selector unobservable, so it is
-		// a UNIFORM pick, the same honest placeholder as the NPC rose's own opening roll - and the same shape the
-		// player's guards are meant to meet, which is what makes them do anything at all in PvE.
+		// ⚠️ An NPC's swing is NOT a different kind of thing from a player's - it is the same Left/Mid/Right, and
+		// only that (Melvin, 2026-08-05). Nothing about it is visible on the mob: the shields drawn over a defender
+		// are a UI OVERLAY of the rose, not a model or animation state, so there is no left-swing/right-swing pose to
+		// look for on either side. That is also why the corpus is silent - not one of ~63k NPC-actor BCC records
+		// carries a direction word, while the player's own swings echo back one-for-one, because the player's
+		// direction rides on an ABILITY id and a mob has no ability to name.
 		//
-		// ⚠️ PLACEHOLDER, unlike everything else in this class. `Roll` is uniform because the corpus MEASURED it
-		// uniform (chi-square 2.8); this is uniform because nothing observes it. A capture that pins a mob's swing
-		// direction - or a per-mob attack-animation decode - replaces it.
+		// So the mechanic is symmetric and the SELECTOR is the only unknown. Mitigation is server-side either way
+		// (the client registers all eight `Combat_{PvE,PvP}{0..3}ShieldBonus` tweaks and reads none), so the server
+		// picks, uniformly over the three.
+		//
+		// ⚠️ PLACEHOLDER, unlike everything else in this class - it is the DISTRIBUTION that is assumed, not the
+		// mechanic. `Roll` is uniform because the corpus MEASURED it uniform (chi-square 2.8); this is uniform
+		// because nothing observes it. What would replace it is evidence that a mob favours an arc (its own AI
+		// tendency, or aiming at the player's weakest guard the way a player aims at the mob's).
 		public static ShieldArc SwingArc(Random random)
 		{
 			ArgumentNullException.ThrowIfNull(random);
