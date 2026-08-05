@@ -89,7 +89,7 @@ a second. Both, plus the per-command readers and the attack tail, are in
 
 ## Decode coverage
 The **grammars are decoded**; the dynel is capture-validated 100%. MoveTask's base read has since been pinned in
-full — the recursive grammar round-trips 9468/9468 captured records byte-exact and `PatrolPath`/`PatrolWaypoint`
+full — the recursive grammar round-trips 18,455/18,455 captured records byte-exact and `PatrolPath`/`PatrolWaypoint`
 source the waypoints ([movetask-grammar.md](movetask-grammar.md)), so the caveat this section used to carry
 about the base-class transform is gone. Where a reader here is recovered but nothing emits it from DB rows yet,
 that is Gitea #405. Same column↔offset caveat as

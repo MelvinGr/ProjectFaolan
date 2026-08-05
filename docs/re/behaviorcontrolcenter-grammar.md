@@ -45,12 +45,19 @@ them passes is `0x2F`, and exactly one class is built but never registered — `
 All 34 registered commands are enumerated in `BehaviorId`. The names corroborate the corpus independently: `UseDynel` (0x12) carries
 a 12-byte tail (a class+handle reference), `UseCharacter` (0x16) four (a handle), `PlayAnimation` (0x1D) a
 *variable* 10–39 (an animation name), and `Emote` (0x05), `BccAction` (0x07) and `Limbo/Death` (0x1F) none at
-all — those three alone are 55 699 of the 67 307 captured records.
+all — those three alone are 55,443 of the 65,877 captured records.
 
 ⚠️ Two names this codebase had invented are corrected by it: `0x0F` is **Combat:Melee**, not "NormalAttack", and
 `0x07` is **BccAction**, not "the idle pulse". `0x12` is **UseDynel**, not "an object-hold state".
 
-## Tail census (all 67 307 captured records)
+## Tail census (all 65,877 captured records)
+
+⚠️ **The counts in this section were 67,307/55,699/3,687 when written on 2026-07-31 and are 65,877/55,443/3,313
+today — 1,430 fewer records (2.1%) for no change in the census code.** Running the *same* census from
+2026-07-31 against today's captures also gives 65,877, so the difference is entirely the 2026-08-03 capture
+re-dump, which states it changed no packet content. Whether the old dump over-counted or the new one drops
+records is Gitea #666, and until that is settled every capture-derived figure here should be re-measured with
+`--report bcc-census` rather than quoted. The *grammar* is unaffected — it is proven per-record, not by totals.
 
 Most commands have a FIXED tail length: `Transition` (0x01) 20, `UseCharacter` 4, `UseDynel` 12, `Equip` (0x09)
 88, and the three above 0. What varies is `Magic:Attack` (0x04), `PlayAnimation`, `ObjectInteraction` (0x2A) and
@@ -64,7 +71,7 @@ c2s request : base 28|32  + 8  x count      (counts 0..2 observed)
 s2c ack     : base 40|41|44|81|82|85 + 49 x count
 ```
 
-Subtracting `49 x count` collapses every one of the 3 700 s2c attack tails onto those six bases, and the bases
+Subtracting `49 x count` collapses every one of the s2c attack tails onto those six bases, and the bases
 themselves differ by 41 (81 = 40+41, 82 = 41+41, 85 = 44+41), i.e. one optional 41-byte block on a 40/41/44
 head. `BehaviorAcks.HitResultBlock` builds the single-hit s2c form and is byte-exact against the capture.
 
@@ -108,8 +115,8 @@ factory matches the id its registration pushed.
 | `0x11` | Combat:Unarmed | `AttackCommandUnarmed_c` | `FUN_01151170` | *(same reader)* | varies |
 | `0x10` | Combat:Ranged | `AttackCommandRanged_c` | `FUN_01146af0` | the same + one trailing `0x00` | varies |
 
-Run over the corpus, these account for **all 67 299** captured BCC records with **zero mismatches** — the last
-ten came in with the delay phase below (#549). Re-derive the numbers with
+Run over the corpus, these account for **every** captured BCC record with **zero mismatches** — the last ten
+came in with the delay phase below (#549). Re-derive the numbers with
 `dotnet run --project Faolan.Importer -- --report bcc-census`, which is this census.
 
 ⚠️ `PlayAnimation`'s string is the animation name (`sad`, `approve`, `social_conversation_gesticulate`) and
@@ -120,7 +127,7 @@ variable-length outliers in the census.
 Two results fall straight out of that table:
 
 * **The empty tail is STRUCTURAL, not incidental.** The three commands the census shows with no tail share ONE
-  reader, and it is a 3-byte `return;`. Those three are 55 699 of the 67 307 captured records.
+  reader, and it is a 3-byte `return;`. Those three are 55,443 of the 65,877 captured records.
 * **Melee and Unarmed share a reader**, which is why `BehaviorAcks` measured exactly those two padding an echoed
   tail, and why the attack tail lengths form one family across `0x0F`/`0x10`/`0x11`.
 
@@ -135,8 +142,8 @@ The reader takes a base read, seven u32, then a COUNT and a per-record loop. Dec
 [Combat:Ranged only: u8 0x00]
 ```
 
-so `len = 40 + 8*targets + 41*results` (+1 for Ranged). That accounts for **all 3687** captured s2c attack
-tails. ⚠️ The middle is **8 words usually and 9 sometimes**, selected by its own second word — `1` → eight
+so `len = 40 + 8*targets + 41*results` (+1 for Ranged). That accounts for **every** captured s2c attack tail
+(3,313 today; 3,687 when the split below was measured). ⚠️ The middle is **8 words usually and 9 sometimes**, selected by its own second word — `1` → eight
 (3659 tails), `2` or `3` → nine (28). Missing that selector leaves 11 bodies stubbornly unexplained, because a
 mis-sized middle puts the result count one word out and the length then fits nothing. The 41-byte result is
 `[u32 class][u32 handle][u32 0][u8 0x06][u32 resultType][u32 0][u32 k1][u32 damage][u32 k2][u32 0][u32 0]` —

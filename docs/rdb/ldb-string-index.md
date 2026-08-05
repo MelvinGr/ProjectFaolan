@@ -97,16 +97,22 @@ resource id itself — there is no indirection through a separate "name id":
 **`50200` and `50220` are two halves of one id space, not name vs. polished-name.** They overlap in exactly
 **4** of 96,209 ids, and on all 4 they carry the *same* string (`126183` → "Zealot: HP Regeneration (1)" in
 both). Between them they name **95,895 of the 98,048** item templates. `50220`'s half is the
-training/proficiency items ("Basic Cloth Armor", "Equip: Cloth Armor", "1HB Damage and Combos 40-60"); all
-3,240 of our named catalog items fall in `50200`'s half, and **none** in `50220`'s.
+training/proficiency items ("Basic Cloth Armor", "Equip: Cloth Armor", "1HB Damage and Combos 40-60"); every one
+of our named catalog items fell in `50200`'s half, and **none** in `50220`'s.
 
 So `LDB[50200][item.Id]` on the English page **is** the localized, player-facing name — it is not shadowed by a
 polished name elsewhere. Cross-checking the English page (226593) against the French one (226589): **84 %** of
 the 76,841 entries genuinely differ (translated), and the 16 % that are byte-identical are the dev codenames for
 NPC-only gear (`NPC_Stygia_splintmail_medium_chest_(A0013/A0118)`) — untranslated because retail displayed them
-as-is. Restricted to our 3,240 items the split is 2,176 translated / 1,064 dev codenames.
+as-is. Restricted to our own items the split was 2,176 translated / 1,064 dev codenames.
 
-Where the catalog and the LDB disagree (**9** items) the LDB is the *fuller* string, because the template's
+⚠️ **Every catalog-side figure in this section was measured against a 3,240-name catalog and has NOT been
+re-measured since.** `Items` now holds 4,225 rows, 3,922 of them named — so the 50200/50220 split, the
+translated/codename ratio and the disagreement count below all describe a subset of today's catalog. The LDB
+side (its own entry counts and the two-halves finding) is a property of the client's asset files and does not
+move; what drifts is *our* denominator, every time the item catalog grows.
+
+Where the catalog and the LDB disagreed (**9** items) the LDB is the *fuller* string, because the template's
 embedded `ExtractName` is an internal short name: template `716360` embeds `Hathor-Ka`, the LDB says
 **"Hathor-Ka's Note"** (likewise `Alchemist` → "Alchemist's Offal Creel", `Veteran` → "Veteran's Path"). The
 other 6 are capture-derived names for NPC gear (`Scavenger Lackey Boots` vs the LDB's dev codename). The
@@ -427,9 +433,10 @@ here, since a captured quest carries the keys for its own text along with it.
 - **Descriptions are imported, nothing reads them** — cat `50201` (item id → tooltip text) fills
   `Items.Description` and cat `50211` (spell id → tooltip text) fills `Spells.Description`, but no armory,
   tooltip or MCP path queries either (Gitea #414).
-- **Catalog coverage** — the LDB names **76,546** item templates but the catalog holds **3,245** rows, because an
-  item only enters it when a capture yields its TEA key quad. The 73,339 named-but-uncataloged templates are a
-  name source for whatever fills that gap.
+- **Catalog coverage** — the LDB names **76,546** item templates but `Items` holds **4,225** rows (3,922 named),
+  because an item only enters it when a capture yields its TEA key quad. The ~72k named-but-uncataloged templates
+  are a name source for whatever fills that gap. ⚠️ This ratio moves whenever the catalog grows — re-measure with
+  `sqlite3 faolan.db "SELECT COUNT(*), SUM(Name<>'') FROM Items;"` rather than quoting it. Gitea #415.
 - **Missing catalog rows** — e.g. spell `222682` is absent from `Spells` entirely (an extraction gap, #402), so
   there is no row to name; that is separate from the name *source* this solved.
 - **Appearance (hair) names** (#291's original target) — the hair LDB page holds only ~15 internal art codenames,

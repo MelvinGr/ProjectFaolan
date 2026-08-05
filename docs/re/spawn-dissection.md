@@ -25,7 +25,7 @@
 >   DB-generated; NPC identity lifted to `NpcSpawn` columns; `NpcSpawnBuilder` rebuilds byte-exact. The 227B
 >   pre-IIR block is characterized as a sparse `0x3F1` scaffold (not encrypted; decodable like the post-IIR one).
 > - **`96C46740` MoveTask** — grammar CRACKED, and since superseded by the client-derived recursive grammar in
->   [`movetask-grammar.md`](movetask-grammar.md): `MoveTaskCodec` round-trips **9468/9468 (100%)** byte-exact.
+>   [`movetask-grammar.md`](movetask-grammar.md): `MoveTaskCodec` round-trips **18,455/18,455 (100%)** byte-exact.
 > - **`66AEDD50`/`F096251E`/`33A56FB0` world objects** — message + tail DISSECTED; tail round-trips **1854/1854**;
 >   `WorldObjectCodec` rebuilds byte-exact.
 > - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).
@@ -510,7 +510,7 @@ round-tripped the 4267 records the corpus held then, but it named the forms by w
 (`stationary`, `orient`, `pace`, `follow?`). The client's own reader was recovered two weeks later and gives the
 real shape — a **recursive** composite whose byte @30 is a factory `mode` selecting `Wait`/`Path`/`Rotate`/
 `Jump`/**`List`**/`Ballistic`/`Animated`/`Formation`/approach-target/`SetPos`/`GroundAlign`, a list element
-being another full sub-task. That grammar round-trips **9468/9468** captured records byte-exact through
+being another full sub-task. That grammar round-trips **18,455/18,455** captured records byte-exact through
 `MoveTaskCodec`; there is no residual "not field-named yet" tail.
 
 What is spawn-specific, and still true:
