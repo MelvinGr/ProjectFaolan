@@ -21,31 +21,6 @@ namespace Faolan.ChatServer
 {
 	public partial class ChatServerListener : ChatServerBase, IChatServerProvider
 	{
-		// The ~Playfield channel: type 0x90, and its ID IS the map id - which is what makes it follow the player and
-		// need re-subscribing on a zone change (#562). The flag is the per-channel word every non-~Trial channel uses.
-		private const byte PlayfieldChannelType = 0x90;
-		private const string PlayfieldChannelName = "~Playfield";
-		private const uint PlayfieldChannelFlag = 0x00008044;
-
-		// The ~Guild channel: type 0x03, and its ID IS the guild id - so it follows the player's MEMBERSHIP the way
-		// ~Playfield follows their map (#663). Captured on both a create and a login already in a guild, and the id is
-		// the same word the create/full-update header carries: DemoL80's create answers 0x2044 with guild 0x00086C47 and
-		// then subscribes `03 00086c47 "~Guild"`, and Hoxxling's login pushes 0x203F for guild 0x0007585B and subscribes
-		// `03 0007585b "~Guild"`. The flag is 0x00008004, NOT the 0x00008044 the global channels use - the same word the
-		// captured ~Team subscription carries, i.e. the per-membership channels share a flag distinct from the standing
-		// ones. [V2: DemoL80_mage-demonologist_login_create-guild.tshark.json frame 369]
-		private const byte GuildChannelType = 0x03;
-		private const string GuildChannelName = "~Guild";
-		private const uint GuildChannelFlag = 0x00008004;
-
-		// The ~Team channel: the same membership shape one more time, and the id is the TEAM id - the one
-		// DispatchYouJoinedTeam carries as an ID32 of type 0xDEA9 (#668). Both sides are captured: every member is
-		// subscribed on the accept (frames 701/702) and unsubscribed on the dissolve (923/926), three teams in a row.
-		// [V2: login_2-clients_group-trade-friend.tshark.json frame 701]
-		private const byte TeamChannelType = 0x82;
-		private const string TeamChannelName = "~Team";
-		private const uint TeamChannelFlag = 0x00008004;
-
 		// The level + class the virtual Claude friend entry reports (#100). See SendClaudeFriendEntry: both are fields
 		// the client's tooltip shows and neither has a "none" encoding, so they are a choice, not a decode.
 		private const byte ClaudeVirtualFriendLevel = 80;
@@ -114,36 +89,15 @@ namespace Faolan.ChatServer
 
 					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from
-					// the raw pcap. Channel ids/types are fixed per channel,
-					// except ~Playfield whose id is the character's current map. ~Trial carries 0x00008244, the rest
-					// 0x00008044 (a per-channel flag).
-					await SendChannelSubscription(client, 0x04, 0x0000232A, "~Trial", 0x00008244);
-					await SendChannelSubscription(client, 0x04, 0x00002328, "~Global", 0x00008044);
-					await SendChannelSubscription(client, 0x04, 0x00002329, "~LFG", 0x00008044);
-					await SendChannelSubscription(client, 0x11, 0x00002335, "~GlobalEnglish", 0x00008044);
+					// the raw pcap. Every channel it holds is declared in ChatChannels; the standing ones carry a
+					// constant id, so they are just that list.
+					foreach (var (channel, id) in ChatChannels.StandingAtLogin(Configuration.McpEnabled))
+						await SendChannelSubscription(client, channel, id);
 
-					if (client.Session.Character?.MapId > 0)
-					{
-						await SendChannelSubscription(client, PlayfieldChannelType, client.Session.Character.MapId, PlayfieldChannelName, PlayfieldChannelFlag);
-						// Remember it, or the first RefreshPlayfieldChannel would not know which channel to drop.
-						client.Session.PlayfieldChannelId = client.Session.Character.MapId;
-					}
-
-					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
-
-					// ...and the character's guild channel, when they are in one - retail carries it in this same login
-					// burst for a guilded character (Hoxxling login, frame 114). A guild JOINED mid-session is subscribed
-					// by RefreshGuildChannel instead, which is why the session slot is stamped here too.
-					if (client.Session.Character?.GuildId is { } guildId)
-					{
-						await SendChannelSubscription(client, GuildChannelType, guildId, GuildChannelName, GuildChannelFlag);
-						client.Session.GuildChannelId = guildId;
-					}
-
-					// The server-defined Claude channel: posts on it are bridged to Claude via the MCP chat tools.
-					// Only offered while the MCP server is hosted - without it nothing reads the log or can reply.
-					if (Configuration.McpEnabled)
-						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
+					// ...then the ones that follow something the character belongs to - their map and their guild -
+					// through the SAME calls a mid-session change takes, so the login burst and a later move cannot
+					// drift apart. Each is a no-op when there is nothing to belong to, hence no condition here.
+					await SubscribeMembershipChannels(client);
 
 					// The empty-bodied answer to Hello. Named HelloAck in #532 - from position, since an empty body
 					// gives nothing else to go on, but the position is invariant across all 41 captures.

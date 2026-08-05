@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Server.ChatServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -41,7 +42,7 @@ namespace Faolan.Tests
 		[InlineData(LoginGuildBody, 0x0007585bu)]
 		public void Build_FromTheGuildId_ReproducesTheCapturedBytes(string hex, uint guildId)
 		{
-			Assert.Equal(Convert.FromHexString(hex), ChannelSubscriptionCodec.Build(0x03, guildId, "~Guild", 0x00008004));
+			Assert.Equal(Convert.FromHexString(hex), ChannelSubscriptionCodec.Build(ChatChannels.Guild.Type, guildId, ChatChannels.Guild.Name, ChatChannels.Guild.Flag));
 		}
 
 		// Leaving is the subscription's twin on the same channel - the shape the corpus shows retiring a ~Team and a
@@ -51,7 +52,7 @@ namespace Faolan.Tests
 		public void Unsubscribe_IsTheSubscriptionsLeadingChannelPair()
 		{
 			var subscription = Convert.FromHexString(CreatedGuildBody);
-			var unsubscribe = ChannelUnsubscribeCodec.Build(0x03, 0x00086c47);
+			var unsubscribe = ChannelUnsubscribeCodec.Build(ChatChannels.Guild.Type, 0x00086c47);
 
 			Assert.Equal(unsubscribe, subscription[..unsubscribe.Length]);
 		}

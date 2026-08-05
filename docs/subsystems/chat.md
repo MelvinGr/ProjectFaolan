@@ -29,6 +29,15 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
   stamp the session slot), driven by `RefreshPlayfieldChannel` / `RefreshGuildChannel` / `RefreshTeamChannel`.
   There is no officer channel and no other `~` channel anywhere in the corpus — see
   [`create-guild-decode.md`](create-guild-decode.md).
+
+  **All of them are declared in one place, `ChatChannels`** — a `ChatChannel` is the (type, name, flag) triple, and
+  the id is either a constant (the standing channels, which the login burst iterates) or the thing the player
+  belongs to. `ChatChannelCatalogTests` re-derives every captured subscription body from its descriptor, so the
+  catalog is the wire fact rather than literals re-typed at each call site. Nothing special-cases the assistant
+  channel below either: it is one more descriptor, gated on the MCP host being up.
+  ⚠️ **Subscription ORDER is not significant** — retail varies its own. The Hoxxling login sends the list three
+  times in one burst: `Trial,Global,LFG,Playfield,NewbieHelp`, then `Global,LFG,Trial,Playfield,NewbieHelp`, then
+  the full set with GlobalEnglish. Three orders, one session.
 - **`0x0041` ChannelChat** (out, `ChannelChatCodec`). **in** (client posts): `[byte type][u32 channelId][u16-str message][u16 0000]` — no
   sender. **out** (relay): `[byte type][u32 channelId][u32 senderId][u16-str message][u16 0000]` — sender inserted,
   preceded by a `0x0014` sender-info. Implemented: inbound `0x0041` → `BroadcastChannelChat` relays `0x0014`+`0x0041`

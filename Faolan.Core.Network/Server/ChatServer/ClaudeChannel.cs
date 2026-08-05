@@ -23,14 +23,11 @@ namespace Faolan.Core.Network.Server.ChatServer
 	/// </summary>
 	public sealed class ClaudeChannel
 	{
-		// Channel identity, mirroring the retail subscription tuples (~Global = 04/0x2328/0x8044). The id is far
-		// outside the retail channel-id range (0x2328..0x2335, ~NewbieHelp 0x1E8480) so it can never collide with a
-		// real channel; retail "~"-prefixed names are client-localized, a plain name displays as-is.
-		public const byte ChannelType = 0x04;
+		// The channel's NAME and ID. Its wire identity as a whole (type/name/flag) is declared with every other
+		// channel in ChatChannels.Assistant - this half stays here because it is what the LOG is keyed by, and because
+		// the name doubles as the sender's.
 		public const string ChannelName = "Claude";
-
 		public const string SenderName = "Claude";
-		public const uint ChannelFlag = 0x00008044;
 		public const uint ChannelId = 0x00C1A0DE;
 
 		/// <summary>Synthetic sender for Claude's posts; must never collide with a character id / clientInstance.</summary>

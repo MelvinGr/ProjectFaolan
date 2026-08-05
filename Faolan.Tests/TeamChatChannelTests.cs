@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Server.ChatServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 		[InlineData(OtherSessionBody, 0x000f08dbu)]
 		public void Build_FromTheTeamId_ReproducesTheCapturedBytes(string hex, uint teamId)
 		{
-			Assert.Equal(Convert.FromHexString(hex), ChannelSubscriptionCodec.Build(0x82, teamId, "~Team", 0x00008004));
+			Assert.Equal(Convert.FromHexString(hex), ChannelSubscriptionCodec.Build(ChatChannels.Team.Type, teamId, ChatChannels.Team.Name, ChatChannels.Team.Flag));
 		}
 
 		// The dissolve, captured on the same channel (fr923/926) - unlike the guild leave, this one needs no inference.
@@ -52,7 +53,7 @@ namespace Faolan.Tests
 		public void TheDissolvesUnsubscribe_IsTheSubscriptionsLeadingChannelPair()
 		{
 			var subscription = Convert.FromHexString(FirstTeamBody);
-			var unsubscribe = ChannelUnsubscribeCodec.Build(0x82, 0x0051dd9a);
+			var unsubscribe = ChannelUnsubscribeCodec.Build(ChatChannels.Team.Type, 0x0051dd9a);
 
 			Assert.Equal(unsubscribe, subscription[..unsubscribe.Length]);
 		}

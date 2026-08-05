@@ -52,7 +52,7 @@ namespace Faolan.ChatServer
 				await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(ClaudeChannel.SenderId, ClaudeChannel.SenderName)));
 
 				await client.SendAsync(new ChatServerMessage(ChannelChatCodec.Opcode,
-					ChannelChatCodec.Build(ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.SenderId, message.Value)));
+					ChannelChatCodec.Build(ChatChannels.Assistant.Type, ClaudeChannel.ChannelId, ClaudeChannel.SenderId, message.Value)));
 
 				delivered++;
 			}
@@ -124,18 +124,35 @@ namespace Faolan.ChatServer
 			return new ChatServerMessage(WhisperCodec.Opcode, WhisperCodec.Build(peerCharacterId, message));
 		}
 
-		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on ChatServer connect for each
-		// channel the character joins (~Trial/~Global/~LFG/~GlobalEnglish/~Playfield/~NewbieHelp). Byte layout
-		// verified from the raw login pcap.
-		private static Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
+		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. The channel's (type, name, flag) comes
+		// from its ChatChannels descriptor, so no caller spells one out. Byte layout verified from the raw login pcap.
+		private static Task SendChannelSubscription(INetworkClient client, ChatChannel channel, uint id)
 		{
-			return client.SendAsync(new ChatServerMessage(ChannelSubscriptionCodec.Opcode, ChannelSubscriptionCodec.Build(type, id, name, flag)));
+			return client.SendAsync(new ChatServerMessage(ChannelSubscriptionCodec.Opcode, ChannelSubscriptionCodec.Build(channel.Type, id, channel.Name, channel.Flag)));
 		}
 
-		// The subscription's twin (0x003D): [type][id] - the channel this client is no longer on.
-		private static Task SendChannelUnsubscribe(INetworkClient client, byte type, uint id)
+		// The subscription's twin (0x003D): [type][id] - the channel this client is no longer on. It names no channel
+		// NAME, which is exactly what identifies it as the subscription's leading pair (#532).
+		private static Task SendChannelUnsubscribe(INetworkClient client, ChatChannel channel, uint id)
 		{
-			return client.SendAsync(new ChatServerMessage(ChannelUnsubscribeCodec.Opcode, ChannelUnsubscribeCodec.Build(type, id)));
+			return client.SendAsync(new ChatServerMessage(ChannelUnsubscribeCodec.Opcode, ChannelUnsubscribeCodec.Build(channel.Type, id)));
+		}
+
+		// The channels that follow something the character belongs to, brought in line with what they belong to right
+		// now. This IS the login burst's second half - it calls the same refreshes a mid-session change does, so there
+		// is no second code path that can drift from them. Each is a no-op when there is nothing to belong to.
+		//
+		// ~Team is deliberately NOT here: retail's login burst carries ~Playfield and ~Guild, but every captured ~Team
+		// subscription follows a team FORMING, never a login. A team is live CS-tier state that does not survive the
+		// character's disconnect anyway, so there would be nothing to restore.
+		private async Task SubscribeMembershipChannels(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			await RefreshPlayfieldChannel(character.Id, character.MapId);
+			await RefreshGuildChannel(character.Id, character.GuildId);
 		}
 
 		// Moves the client's ~Playfield channel to the map they are now on. Retail does exactly this on a zone change:
@@ -152,7 +169,7 @@ namespace Faolan.ChatServer
 				return;
 
 			var current = client.Session.PlayfieldChannelId;
-			client.Session.PlayfieldChannelId = await MoveChannel(client, current, mapId, PlayfieldChannelType, PlayfieldChannelName, PlayfieldChannelFlag);
+			client.Session.PlayfieldChannelId = await MoveChannel(client, current, mapId, ChatChannels.Playfield);
 			if (current != mapId)
 				Logger.LogInformation("ChatServer ~Playfield for {Character:X8}: {From} -> {To}", characterId, current, mapId);
 		}
@@ -173,7 +190,7 @@ namespace Faolan.ChatServer
 				return;
 
 			var current = client.Session.GuildChannelId;
-			client.Session.GuildChannelId = await MoveChannel(client, current, guildId ?? 0, GuildChannelType, GuildChannelName, GuildChannelFlag);
+			client.Session.GuildChannelId = await MoveChannel(client, current, guildId ?? 0, ChatChannels.Guild);
 			if (current != (guildId ?? 0))
 				Logger.LogInformation("ChatServer ~Guild for {Character:X8}: {From:X} -> {To:X}", characterId, current, guildId ?? 0);
 		}
@@ -192,7 +209,7 @@ namespace Faolan.ChatServer
 				return;
 
 			var current = client.Session.TeamChannelId;
-			client.Session.TeamChannelId = await MoveChannel(client, current, teamId ?? 0, TeamChannelType, TeamChannelName, TeamChannelFlag);
+			client.Session.TeamChannelId = await MoveChannel(client, current, teamId ?? 0, ChatChannels.Team);
 			if (current != (teamId ?? 0))
 				Logger.LogInformation("ChatServer ~Team for {Character:X8}: {From:X} -> {To:X}", characterId, current, teamId ?? 0);
 		}
@@ -204,16 +221,16 @@ namespace Faolan.ChatServer
 		//
 		// Comparing against the session slot rather than against the character's own state is what makes every caller
 		// idempotent: the slot is what we last TOLD the client, which is a different fact from where the character is.
-		private static async Task<uint> MoveChannel(INetworkClient client, uint current, uint wanted, byte type, string name, uint flag)
+		private static async Task<uint> MoveChannel(INetworkClient client, uint current, uint wanted, ChatChannel channel)
 		{
 			if (current == wanted)
 				return current;
 
 			if (current != 0)
-				await SendChannelUnsubscribe(client, type, current);
+				await SendChannelUnsubscribe(client, channel, current);
 
 			if (wanted != 0)
-				await SendChannelSubscription(client, type, wanted, name, flag);
+				await SendChannelSubscription(client, channel, wanted);
 
 			return wanted;
 		}
