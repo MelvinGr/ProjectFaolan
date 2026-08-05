@@ -188,6 +188,34 @@ constant either: the client computes it from local lighting, which is the whole 
 one to send it, so a value other than 100 is expected somewhere the corpus simply has not walked.
 [V2: Hakotep_hox_login_gameplay_untrain-feats-(causes_loading_screen)_train-feats_delete-quests.tshark.json]
 
+## Who gets them: the corpus is not the roster
+
+An action only appears on the bar if the character was **granted the ability** (`ClassAbilities`), and that map
+is harvested from per-character `0x2052` grants. The corpus has levelled characters for exactly **four** of the
+twelve classes — Assassin 23, Herald of Xotli 24, Necromancer 80, Demonologist 80 — so every ability earned
+above the level-1 create burst naturally lands on those four and nothing else. Left alone, a level-80 Barbarian
+has no **Search**, no **Hide** and no **Path of Asura**: a hole in the captures, served to the client as if it
+were a rule.
+
+`CaptureAbilityImporter.DeriveUniversalLevelledAbilitiesAsync` closes it with a derived rule rather than a hand
+list — an ability is universal when **every class that could have shown it to us did**:
+
+- take the lowest level any holder had the ability at,
+- the classes ELIGIBLE to witness it are those with a character at or above that level,
+- it is universal when the holders are exactly the eligible classes, and there are at least three of them.
+
+Then it is materialised on all twelve at that lowest observed level. The eligibility test is what keeps a
+low-level character from counting as evidence of absence: a level-5 Barbarian is below any level Search is seen
+at, so it cannot un-universalise it. The three-class threshold is what stops the pair of level-80 casters
+standing in for the whole roster — at two, Spellweaving, the pet bar and the mount abilities would all qualify,
+and each is independently known not to be universal (a mount ability comes with the **mount**, see
+[mounts.md](mounts.md)).
+
+Today it yields exactly **Search, Hide and Path of Asura, at level 23**. The level is an upper bound, not the
+unlock level — the assassin was 23 when captured, so all the data says is "by 23", and granting at 23 is the
+conservative direction. Gated by `SeedContentTests.AbilitiesEveryLevelledClassEarns_ReachAllTwelveClasses`,
+which asserts both halves: the three reach twelve classes, and the class kit does not.
+
 ## Code
 
 - `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing. It answers the

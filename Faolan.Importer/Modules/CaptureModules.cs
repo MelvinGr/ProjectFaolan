@@ -363,7 +363,11 @@ namespace Faolan.Importer.Modules
 			// holding rows derived from characters that no longer exist - unreproducible from a clean rebuild (#296).
 			var (createInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesFromCreatesAsync(ctx.Db, ctx.CreateCaptures);
 			var (caInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesAsync(ctx.Db);
-			caInserted += createInserted;
+			// LAST, because it reads what the two passes above wrote: the corpus has a levelled character for only four
+			// of the twelve classes, so an ability every one of them earned (Search, Hide, Path of Asura) would
+			// otherwise be withheld from the other eight - a hole in the CAPTURES served to the client as a rule (#303).
+			var (universalInserted, _) = await CaptureAbilityImporter.DeriveUniversalLevelledAbilitiesAsync(ctx.Db);
+			caInserted += createInserted + universalInserted;
 			// ClassCombo from two sources, mirroring the abilities above. The catalog's capture-validated class-name
 			// prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) give each class its own lines;
 			// the create dumps give the UNIVERSAL kit those prefixes can't express, because it is named by RACE

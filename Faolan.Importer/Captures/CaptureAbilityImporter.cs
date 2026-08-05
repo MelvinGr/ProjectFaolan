@@ -115,6 +115,94 @@ namespace Faolan.Importer.Captures
 			return (inserted, updated);
 		}
 
+		// The number of distinct classes an ability must be held by before "every eligible class holds it" is allowed to
+		// mean UNIVERSAL rather than "the two characters we happen to have are both casters". Two is exactly the pair of
+		// level-80 mages in the corpus, so two would make Spellweaving, the pet bar and the mount abilities universal -
+		// each of which we can independently say is NOT (Spellweaving is caster kit, the pet bar is Necro/Demo, and a
+		// mount ability comes with the MOUNT, docs/subsystems/mounts.md). Three is the first threshold those three fail.
+		private const int UniversalWitnessClasses = 3;
+
+		// Widens the abilities a LEVELLED character earns - Search, Hide, Path of Asura - from the handful of classes we
+		// have a character for onto all twelve (#303).
+		//
+		// The problem this fixes: `DeriveClassAbilitiesAsync` can only see the four classes the corpus has a levelled
+		// character for (Assassin 23, HoX 24, Necro 80, Demo 80). Every ability those four earned above the create burst
+		// therefore lands on those four classes ONLY, so a level-80 Barbarian gets no Search, no Hide and no recall - not
+		// because retail withholds them but because nobody captured a Barbarian past level 1. That is a hole in the
+		// CORPUS being served to the client as if it were a rule.
+		//
+		// The rule, derived rather than hand-listed: an ability is universal when **every class that could have shown it
+		// to us did**. Concretely, for each ability, take the lowest level any holder had it at; the classes ELIGIBLE to
+		// witness it are those with a character at or above that level; and it is universal when the holders are exactly
+		// the eligible classes and there are at least `UniversalWitnessClasses` of them. Then it is materialised on all
+		// twelve at that lowest observed level.
+		//
+		// Why the eligibility test rather than "held by every class we have a character for": a level-5 Barbarian
+		// imported tomorrow must not un-universalise Search - it is below the level Search is ever seen at, so it is not
+		// evidence of absence. It only counts against an ability it is high enough to have earned.
+		//
+		// ⚠️ The level is an UPPER BOUND, not the unlock level: the assassin was 23 when captured, so all we know is
+		// "by 23". Granting at 23 is the conservative direction - never earlier than retail was observed to.
+		public static async Task<(int Inserted, int Abilities)> DeriveUniversalLevelledAbilitiesAsync(IDatabaseContext db, ILogger? logger = null)
+		{
+			var holders = await db
+				.CharacterAbilities.Join(db.Characters, ca => ca.CharacterId, c => c.Id, (ca, c) => new
+				{
+					ca.AbilityId,
+					c.Level,
+					c.Class
+				})
+				.ToListAsync();
+			holders = holders.Where(h => Enum.IsDefined(h.Class)).ToList();
+			if (holders.Count == 0)
+				return (0, 0);
+
+			// The levelled roster: the highest level we have a character at, per class. A class is eligible to witness an
+			// ability if this reaches the level the ability is first seen at.
+			var topLevelByClass = holders.GroupBy(h => h.Class).ToDictionary(g => g.Key, g => g.Max(h => (int)h.Level));
+			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
+
+			var inserted = 0;
+			var universal = new List<uint>();
+			foreach (var ability in holders.Where(h => abilityIds.Contains(h.AbilityId)).GroupBy(h => h.AbilityId))
+			{
+				var minLevel = (byte)Math.Clamp(ability.Min(h => (int)h.Level), 1, 255);
+				var held = ability.Select(h => h.Class).ToHashSet();
+				var eligible = topLevelByClass.Where(x => x.Value >= minLevel).Select(x => x.Key).ToHashSet();
+				if (held.Count < UniversalWitnessClasses || !eligible.SetEquals(held))
+					continue;
+
+				universal.Add(ability.Key);
+				foreach (var cls in Enum.GetValues<ConanClass>())
+				{
+					if (existing.TryGetValue((cls, ability.Key), out var row))
+					{
+						// Never RAISE a level: a class that already earns it earlier keeps its own evidence.
+						if (row is { Level: > 0 } && row.Level > minLevel)
+							row.Level = minLevel;
+
+						continue;
+					}
+
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = cls,
+						AbilityId = ability.Key,
+						Level = minLevel
+					});
+					existing[(cls, ability.Key)] = null!;
+					inserted++;
+				}
+			}
+
+			if (inserted > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: {Abilities} abilities are universal across the levelled roster -> {Inserted} new ClassAbility rows.", universal.Count, inserted);
+			return (inserted, universal.Count);
+		}
+
 		// Seeds the UNIVERSAL level-1 ability kit onto every class (ClassAbility), from the create captures: the
 		// 0x2052 grants that follow a create. Rest needs to be granted to all classes, same with the
 		// directional attacks, etc. - these are basic combat/movement/UI abilities, not class kit (#296).

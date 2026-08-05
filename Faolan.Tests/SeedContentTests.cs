@@ -662,5 +662,44 @@ namespace Faolan.Tests
 			var contested = spawns.GroupBy(s => (s.PositionX, s.PositionZ)).Any(g => g.Select(s => s.NpcTemplateId).Distinct().Count() > 1);
 			Assert.True(contested, "No armory post is held by a different NPC per class - the two class sets are no longer sharing positions, so this gate no longer proves anything.");
 		}
+
+		// #303: the abilities a LEVELLED character earns reach all twelve classes, not just the four the corpus has a
+		// levelled character for.
+		//
+		// This is the gate on a CORPUS hole, which is why a row count cannot stand in for it. Every gameplay ability is
+		// harvested from a per-character grant, and the corpus has exactly four levelled characters (Assassin 23,
+		// HoX 24, Necro 80, Demo 80) - so without the universal pass, Search / Hide / Path of Asura land on those four
+		// classes and a level-80 Barbarian has no search, no hide and no recall. That reads as a design decision in the
+		// data and is really just "nobody captured a Barbarian past level 1".
+		//
+		// The other half matters as much: the pass must not over-generalise. Spellweaving, the pet bar and the mount
+		// abilities are all held by exactly the two level-80 casters, and each is independently known NOT to be
+		// universal - so if they ever appear on all twelve, the witness threshold has been weakened.
+		[Fact]
+		public async Task AbilitiesEveryLevelledClassEarns_ReachAllTwelveClasses()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var byName = await db
+				.ClassAbilities.Join(db.Abilities, ca => ca.AbilityId, a => a.Id, (ca, a) => new
+				{
+					a.Name,
+					ca.Class
+				})
+				.AsNoTracking()
+				.ToListAsync(ct);
+			var classCount = byName.GroupBy(x => x.Name).ToDictionary(g => g.Key, g => g.Select(x => x.Class).Distinct().Count());
+
+			// Universal but NOT part of the level-1 create kit - the three the levelled roster agrees on.
+			foreach (var ability in new[] { "Search", "Hide", "Path of Asura" })
+				Assert.True(classCount.TryGetValue(ability, out var n) && n == 12,
+					$"'{ability}' reaches {(classCount.TryGetValue(ability, out var m) ? m : 0)} of 12 classes - it is earned by every levelled class the corpus has, so withholding it from the rest is a capture artefact.");
+
+			// Class kit, and it must stay class kit.
+			foreach (var ability in new[] { "Spellweaving", "Pet Attack", "Pet Dismiss", "Mount Ability: Trample" })
+				Assert.True(!classCount.TryGetValue(ability, out var n) || n < 12,
+					$"'{ability}' reaches all 12 classes - it is held by exactly the two captured level-80 casters, so the universal-witness threshold has been weakened into treating a caster pair as the whole roster.");
+		}
 	}
 }

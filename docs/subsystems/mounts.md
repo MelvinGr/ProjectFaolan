@@ -169,7 +169,10 @@ them on the same path as every other ability; nothing mounted-specific is needed
 
 ⚠️ They currently sit in `ClassAbilities` under Necromancer and Demonologist at level 80 because those are the
 captured characters. That is a **capture artifact**, not a rule the data states — a mount ability comes with
-the mount, not the class. Widening it is the class-aware ability coverage problem, not mounted combat.
+the mount, not the class. Widening it is the class-aware ability coverage problem, not mounted combat — and the
+universal pass that fixed Search / Hide / Path of Asura ([player-actions.md](player-actions.md)) deliberately
+leaves these alone, because the only witnesses are that one pair of casters and "held by both captured casters"
+is not evidence of universality.
 
 **What is missing is a capture, not a decode.** The `Charge` element carries only `TemplateID`, `TemplateID2`,
 `CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action. There is no damage, no knockback, no
