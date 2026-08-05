@@ -253,29 +253,31 @@ inventing a send to plug it would put a packet on the wire that retail never sen
 `Combat_PvP*` column — the gentler one (−0.15/−0.30 where PvE gives −0.33/−0.66), which is why that column
 exists at all.
 
-**An NPC's swing carries no direction ability, so its arc is GEOMETRY (#621).** No captured NPC swing carries a
-direction word — the direction ability is the *player's* `Normal Attack`, and its c2s and s2c actor histograms
-match one for one across ~63k NPC-actor records — and nothing needs one: the mitigation is server-side either
-way, since the client registers all eight `Combat_*ShieldBonus` tweaks and reads none of them. So the server
-picks the struck sector from where the attacker stands relative to where the defender faces, which is what the
-live game describes when it says *"attacks from behind leave characters open to more damage, as there aren't
-any shields on the player's backside"*.
+**An arc is a direction the attacker SWINGS, not where the attacker stands (#621).** Funcom's own description
+is *"you could instantly stack all of your shielding to your right side if you see an enemy **charging up a
+right-side attack**"* — the arc is a property of the incoming swing, which is exactly what the player's three
+direction abilities are on our side of it. ⚠️ A geometric reading (arc = the attacker's bearing against the
+defender's facing) was implemented and **reverted**: the *"attacks from behind leave characters open to more
+damage"* line in the same description is a **separate positional rule**, not the arc split, and the client's
+294-entry balance sheet carries no back/flank number to pair with it.
 
-`CombatShieldRose.SectorFor` splits the front half into three equal 60° arcs — Mid is ±30° of dead ahead, Left
-and Right take 30–90° on their side — and everything past 90° is `Behind`. `Behind` is deliberately *not* a
-fourth `ShieldArc`: the rose packs three digits, so it resolves to **zero shields covering**, which is the same
-+20% `…0ShieldBonus` entry an unguarded front arc earns. The client's whole 294-entry balance sheet carries no
-back/flank tweak, so there is no separate number to miss.
+**An NPC's swing carries no direction ability**, so the arc it lands in is the server's to pick. No captured
+NPC swing carries a direction word — the direction ability is the *player's* `Normal Attack`, and its c2s and
+s2c actor histograms match one for one across ~63k NPC-actor records — and none is needed: the mitigation is
+server-side either way, since the client registers all eight `Combat_*ShieldBonus` tweaks and reads none of
+them. ⚠️ `CombatShieldRose.SwingArc` therefore picks **uniformly, and is the one placeholder in the class** —
+`Roll` is uniform because the corpus measured it uniform, this is uniform because nothing observes it. A
+capture that pins a mob's swing direction, or a per-mob attack-animation decode, replaces it.
 
-The facing is the decoded one, not a guess: a character's rotation is a yaw-only quaternion and `2·atan2(qy,
-qw)` tracks the direction of travel within 7.5° for 90% of sustained straight runs
-([`../re/chardcmove-grammar.md`](../re/chardcmove-grammar.md)), yaw measured from +Z toward +X. The single
-assumption left is handedness — the client is a left-handed Y-up renderer, so +X of the defender's forward is
-their **right**; if that is mirrored, the fix is one sign in `SectorFor` and nothing else.
-[V3: CombatShieldRoseTests.SectorFor_ReadsTheAttackersBearingAgainstTheDefendersFacing]
+Without it the rose would do nothing at all in PvE, which contradicts the live game: a player's guards are
+adjustable in PvE, they just rarely need adjusting ("in general, outside of a few battles, you can leave them
+alone for PvE" — and the default `111` spread is the table's neutral entry, so leaving them alone costs
+nothing).
+[V3: CombatShieldRoseTests.ApplyArcMitigation_AMobsSwingIsMitigatedByTheArcThePlayerStacked]
 
-Applied on the melee path only (`WorldSimulation.ApplyNpcAttack`, after armour). An NPC **cast** takes no arc,
-for the same reason a player's spell does not: the rose guards swings.
+Applied on the melee path only (`WorldSimulation.ApplyNpcAttack`, after armour), through the same table as a
+player's directed swing. An NPC **cast** takes no arc, for the same reason a player's spell does not: the rose
+guards swings.
 
 **Server side.** `CombatShieldRose` (roll / shift / cadence / arc mapping / clamp / mitigation) is the policy;
 `WorldEntity.OpenShieldRose` + `TickShieldShift` hold the per-NPC state. `WorldState.Tick` rolls the rose

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using Faolan.Core.Network.Codecs.Combat;
 
 namespace Faolan.GameServer.Combat
@@ -115,62 +114,30 @@ namespace Faolan.GameServer.Combat
 			};
 		}
 
-		// The three front arcs plus BEHIND, which is deliberately not a `ShieldArc`: the rose packs exactly three
-		// digits, so "behind" is not a fourth guard slot - it is the case no guard covers (#621).
-		public enum StruckSector
+		// The arc an NPC's swing lands in (#621). An arc is the direction the ATTACKER SWINGS - left, overhead,
+		// right - not where the attacker is standing: the live game's own description is "you could instantly stack
+		// all of your shielding to your right side if you SEE AN ENEMY CHARGING UP A RIGHT-SIDE ATTACK", which is a
+		// property of the swing, and the client's three direction abilities (`Upper Left` / `Overhead` / `Upper
+		// Right Attack`) are exactly that on the player's side.
+		//
+		// A geometric reading was tried and is WRONG - the "attacks from behind" line in the same description is a
+		// separate positional rule, not the arc split, and the client's 294-entry balance sheet carries no
+		// back/flank number to go with it.
+		//
+		// An NPC has no direction ability on its swing - of ~63k NPC-actor BCC records not one carries a direction
+		// word, while the player's own swings echo back one-for-one - so the number is not on the wire and does not
+		// need to be: the mitigation is server-side either way (the client registers all eight
+		// `Combat_{PvE,PvP}{0..3}ShieldBonus` tweaks and reads none). That leaves the selector unobservable, so it is
+		// a UNIFORM pick, the same honest placeholder as the NPC rose's own opening roll - and the same shape the
+		// player's guards are meant to meet, which is what makes them do anything at all in PvE.
+		//
+		// ⚠️ PLACEHOLDER, unlike everything else in this class. `Roll` is uniform because the corpus MEASURED it
+		// uniform (chi-square 2.8); this is uniform because nothing observes it. A capture that pins a mob's swing
+		// direction - or a per-mob attack-animation decode - replaces it.
+		public static ShieldArc SwingArc(Random random)
 		{
-			Left,
-			Mid,
-			Right,
-			Behind
-		}
-
-		// The half-width of the MID sector, and with it the other two: the front half is split into three equal
-		// 60-degree arcs, so Mid is +/-30 degrees of dead ahead, Left and Right take 30..90 on their side, and
-		// anything past 90 is Behind.
-		private const double MidSectorHalfWidthDegrees = 30.0;
-
-		// Which sector of the DEFENDER's rose an undirected swing lands in - i.e. every NPC swing, because an NPC has
-		// no direction ability on it (#621: of ~63k NPC-actor BCC records not one carries a direction word, while the
-		// player's own swings echo back one-for-one).
-		//
-		// Nothing on the wire says where an NPC hits, and nothing needs to: the mitigation is server-side either way -
-		// all eight `Combat_{PvE,PvP}{0..3}ShieldBonus` tweaks are registered by the client and never read
-		// (docs/re/shield-rose-client-upload.md). So this is the server's call, and the live game states the rule it
-		// should follow: *"attacks from behind leave characters open to more damage, as there aren't any shields on
-		// the player's backside"*. That is positional, so the sector is geometry - where the attacker stands relative
-		// to where the defender faces - and Behind resolves to zero shields, which IS the +20% `...0ShieldBonus`
-		// entry rather than a number of its own (the client's balance sheet carries no back/flank tweak; the whole
-		// 294-entry table was searched).
-		//
-		// The facing convention is the DECODED one, not a guess: a character's rotation is a yaw-only quaternion and
-		// `2*atan2(qy, qw)` matches the direction of travel within 7.5 degrees for 90% of sustained straight runs
-		// (docs/re/chardcmove-grammar.md), with yaw measured from +Z toward +X - the same convention
-		// `Vector3.FaceTowards` builds. LEFT vs RIGHT then follows from the client being a left-handed Y-up renderer
-		// (forward +Z, right +X), which is the one assumption here; if it is mirrored, the fix is the sign of
-		// `relative` and nothing else.
-		//
-		// Height is ignored on purpose - the rose's arcs are Left/Mid/Right, a compass split, and a flying or
-		// standing-on-a-rock attacker is still on one side of you.
-		public static StruckSector SectorFor(Vector3 attackerPosition, Vector3 defenderPosition, Quaternion defenderFacing)
-		{
-			var dx = attackerPosition.X - defenderPosition.X;
-			var dz = attackerPosition.Z - defenderPosition.Z;
-			if (dx == 0f && dz == 0f)
-				return StruckSector.Mid; // standing inside the defender: no bearing to read, treat it as head-on
-
-			// The quaternion carries the HALF-angle, hence the factor of two - reading (qy, qw) as a heading pair is
-			// the mistake that made an earlier facing decode scatter by 57 degrees.
-			var facing = 2.0 * Math.Atan2(defenderFacing.Y, defenderFacing.W);
-			var bearing = Math.Atan2(dx, dz);
-			var relative = double.RadiansToDegrees(Math.Atan2(Math.Sin(bearing - facing), Math.Cos(bearing - facing)));
-
-			return Math.Abs(relative) switch
-			{
-				<= MidSectorHalfWidthDegrees => StruckSector.Mid,
-				> 90.0 => StruckSector.Behind,
-				_ => relative > 0 ? StruckSector.Right : StruckSector.Left
-			};
+			ArgumentNullException.ThrowIfNull(random);
+			return (ShieldArc)random.Next(3);
 		}
 
 		// The damage multiplier for a swing into `arc` against `distribution`. 1.0 when the swing carries no direction,
@@ -186,37 +153,10 @@ namespace Faolan.GameServer.Combat
 			return 1.0 + table[shields];
 		}
 
-		// The multiplier for a swing into `sector` (#621). `Behind` is the sector no guard covers, so it takes the
-		// zero-shield entry - the same +20% an unguarded front arc gets, which is what the live game's "no shields on
-		// the backside" describes. An UNROLLED rose (0) still mitigates nothing, exactly as in the arc overload.
-		public static double DamageMultiplier(uint distribution, StruckSector sector, bool playerVersusPlayer = false)
-		{
-			if (distribution == 0)
-				return 1.0;
-
-			var table = playerVersusPlayer ? PvPShieldBonus : PvEShieldBonus;
-			var shields = sector == StruckSector.Behind
-				? 0
-				: (int)Math.Min(CombatShieldDistribution.Count(distribution, (ShieldArc)sector), (uint)table.Length - 1);
-
-			return 1.0 + table[shields];
-		}
-
 		// Applies the arc modifier to a resolved damage number, never dropping a landed hit below 1.
 		public static uint ApplyArcMitigation(uint damage, uint distribution, ShieldArc? arc, bool playerVersusPlayer = false)
 		{
-			return Scale(damage, DamageMultiplier(distribution, arc, playerVersusPlayer));
-		}
-
-		// The geometric twin, for an attacker whose swing carries no direction ability (#621).
-		public static uint ApplyArcMitigation(uint damage, uint distribution, StruckSector sector, bool playerVersusPlayer = false)
-		{
-			return Scale(damage, DamageMultiplier(distribution, sector, playerVersusPlayer));
-		}
-
-		private static uint Scale(uint damage, double multiplier)
-		{
-			var scaled = (int)Math.Round(damage * multiplier);
+			var scaled = (int)Math.Round(damage * DamageMultiplier(distribution, arc, playerVersusPlayer));
 			return (uint)Math.Max(damage == 0 ? 0 : 1, scaled);
 		}
 
