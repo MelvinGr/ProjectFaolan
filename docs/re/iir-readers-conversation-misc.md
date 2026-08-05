@@ -82,7 +82,7 @@ exact reader framing (header + u16-length string).
 These have their readers located but their variable sub-bodies are left for the subsystem that needs
 them (trade UI / spellbook), since capture coverage is thin.
 
-## Status
+## Decode coverage
 
 Decoded + dissected (this doc + `ConversationConstructTests`). The Knubot readers feed the
-dialogue VM (#188); the combat/teleport ones feed combat (#216/#218) and the simulation layer (#190).
+dialogue VM; the combat/teleport ones feed combat and the simulation layer.

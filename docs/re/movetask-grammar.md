@@ -82,7 +82,7 @@ All mode-1/5/6/7 leaves are now field-mapped (`DumpMoveTaskLeafReaders.java` + `
 The PathMoveTask finalizer `FUN_00a3e400` = `[u8 bool][7 u32]` (a fixed 29 B; its sibling `FUN_00a3e510` only
 validates the spline and reads nothing), so both PathMoveTask branches end with it.
 
-## Status (#53)
+## Decode coverage
 
 - **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `MoveTaskCodecTests`
   round-trips **9468/9468 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,

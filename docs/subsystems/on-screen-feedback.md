@@ -56,7 +56,7 @@ The packet body (after the 0x2000 opcode) is the IIR:
 Because the target instance == the world receiver instance (`ClientInstance`), a live send is **fully addressable
 from the session** — not just a verbatim replay.
 
-## Status & follow-ups
+## What is built, and the two traps
 
 - ✅ Decoded + byte-exact builder + golden test (`FormatFeedbackCodecTests`, round-trips the captured area-name
   banner and the LostGraceEffect line).
@@ -71,10 +71,9 @@ from the session** — not just a verbatim replay.
   `0x42000020`, footer `1`) + golden test, sent by `BreakShieldOnAggression` right before the Shield-of-the-Risen
   removal twin when the shield is lost to an aggressive action (see combat.md). The token+key is a fixed constant
   (byte-identical in two independent captures), not a per-send nonce.
-- ⬜ **Arbitrary literal text**: the FIFO templates reference a localized RDB string id (the area-name points at
-  string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
-  The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining
-  decode (compare how the ChatServer system-message remoteformat embeds literal text).
+- ⚠️ **No literal text crosses the wire.** Every FIFO template references a localized RDB string id (the
+  area-name points at string 3474586) and the plain-token lines (`AttributeChanged`, ...) are token-driven, so
+  server-authored custom text has no path here. Open work tracked in Gitea #664.
 - ✅ **Resurrection-point discovered banner** (#372, verified in-client): byte-exact
   `RespawnPointDiscoveredCodec` + goldens, sent by `WorldSimulation.DiscoverNearbyRespawnPoints`
   alongside the spots re-send. Replaces a chat-routed `"Resurrection point discovered: X"` `SendSystemMessage` that

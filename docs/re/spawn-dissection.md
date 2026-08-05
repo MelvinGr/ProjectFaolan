@@ -24,8 +24,8 @@
 > - **`FA015807` entity spawn** (player + NPC) — header/transform/CharacterIIR dissected; player spawn fully
 >   DB-generated; NPC identity lifted to `NpcSpawn` columns; `NpcSpawnBuilder` rebuilds byte-exact. The 227B
 >   pre-IIR block is characterized as a sparse `0x3F1` scaffold (not encrypted; decodable like the post-IIR one).
-> - **`96C46740` MoveTask** — grammar CRACKED; `dissect_movetask.py coverage` round-trips **4267/4267 (100%)**,
->   82.8% fully field-grammared; `MoveTaskCodec.Build{Stationary,Patrol}` build byte-exact.
+> - **`96C46740` MoveTask** — grammar CRACKED, and since superseded by the client-derived recursive grammar in
+>   [`movetask-grammar.md`](movetask-grammar.md): `MoveTaskCodec` round-trips **9468/9468 (100%)** byte-exact.
 > - **`66AEDD50`/`F096251E`/`33A56FB0` world objects** — message + tail DISSECTED; tail round-trips **1854/1854**;
 >   `WorldObjectCodec` rebuilds byte-exact.
 > - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).
@@ -41,46 +41,33 @@
 > blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries. The
 > sections below cover the NPC-spawn, static-world and conversation families and dissection history.
 
-## Status (updated 2026-06-07)
+## The three hard-won gotchas
 
-- **Phase 0 DONE** — workbench (`NpcSpawnAppearanceTests`), `SpawnPacketBuilder`, `SpawnHandleTable`, tests 5/5 pass.
-- **Phase 1 DONE** — player spawn **position** rebuilt from DB in the Strie replay; confirmed in-client (loads +
-  spawns at the edited DB position). Rotation kept verbatim (DB rotation unreliable + stalled loading).
-- **Phase 2 DONE** — any beach character (`Character.MapId == 0xFAA`) uses the replay; the capture's instance is
-  re-addressed to the live one (`RewriteBurstInstance`); SpawnCheck gated on `Session.UsedWorldBurstReplay`.
-  Structurally verified (no-op/byte-identical for Strie); needs in-client confirm for a non-Strie id.
-- **Name field dissected** — `0A <len> <utf8>`; length-change needs a nested-length rebuild (see below).
-- **Three hard-won gotchas**: inject burst packets via the raw `client.SendAsync` path + manual CRC (NOT
-  `PacketStream.SendAsync`, which reshapes TCP segmentation and stalls the client); don't rebuild the rotation
-  yet; and the player handle == the client instance (the client never polls its own handle).
+These cost the most to find and are the ones that still bite anything touching a world burst:
 
-- **Phase 2 confirmed in-client** (id 0x02000005): receivers `85808010`, 50 polls + 641 in-world uploads.
-- **NPC dialogue generalized** — confirmed in-client (opens for a non-Strie char; advancement is coverage-bound).
-- **Per-character name confirmed in-client** — renamed char spawns with its own (different-length) name and loads.
+1. **Inject burst packets via the raw `client.SendAsync` path with a manual CRC**, never `PacketStream.SendAsync`.
+   Byte-identical bytes sent the second way stalled the client on the loading screen — PacketStream's synchronous
+   CRC work changes the TCP segmentation of the tightly-batched burst, and the client does no reassembly on the
+   uncompressed download, so it misframes.
+2. **Rotation was kept verbatim** through this whole dissection: rebuilding it from the DB also stalled loading,
+   and existing characters carry unreliable rotation data.
+3. **The player's entity handle IS the client instance**, and the client never polls its own handle — so no
+   per-instance SpawnCheck logic is needed for the player.
 
-So a non-Strie beach character now: renders the world+NPCs, spawns at its DB position with its DB name, and can
-open NPC dialogue. The appearance/equipment/scaffold — the bulk of the FA015807 body — was
-finished 2026-06-10 (see the banner at the top + docs/re/player-spawn-generation.md).
+## The identity component — CharacterStats
 
-- **Transform now CONSTRUCTED** (2026-06): `SpawnPacketBuilder.BuildSpawnBody` builds the header + transform
-  (position/rotation = typed `ProtoVec3`/`ProtoQuat`, i.e. `ProtoGameCodeDynelIIR`) instead of offset-patching a
-  clone, then appends the undissected tail via `WriteArray`. Byte-identical round-trip kept (`SpawnPacketBuilderTests`).
-- **Phase 3 landmark found — CharacterStats** (2026-06): the identity/stat component (sex/side/race/class/morph
-  scale/life/health/...) is a `0x22` length-delimited field **immediately after the name**, carrying the generated
-  `ProtoCoreCharacterIIR.CharacterStats`. Strie template: `0x22` @315, 67-byte payload (`SpawnPacketBuilder.
-  CharacterStatsTagOffset`). Fields: 1=sex 2=side 3=race 4=monster_scale 5=monster_data 6=life 7=health ...
-  Decoded across all player captures (sex/race vary: Strie 3/1, hoxxling/necrol80/demol80 2/3). The generated type
-  **re-encodes byte-identical** (`CharacterStatsRoundTripTests`), so it can be built from a typed object — the
-  build-side oracle for sourcing it from the DB is in place.
+The identity/stat component (sex/side/race/class/morph scale/life/health/…) is a `0x22` length-delimited field
+**immediately after the name**, carrying `ProtoCoreCharacterIIR.CharacterStats`. In the Strie template it is
+`0x22` @315 with a 67-byte payload (`SpawnPacketBuilder.CharacterStatsTagOffset`), fields
+`1=sex 2=side 3=race 4=monster_scale 5=monster_data 6=life 7=health …`, decoded across every player capture
+(sex/race vary: Strie 3/1, hoxxling/necrol80/demol80 2/3). The generated type re-encodes byte-identical
+(`CharacterStatsRoundTripTests`), so the component is built from a typed object rather than spliced.
 
-- **CharacterStats splice BUILT** (2026-06): `SpawnPacketBuilder.SetCharacterStats(body, stats)` rebuilds the
-  component from a typed `CharacterStats`, length-adjusting @0/@133/@304 like `SetSpawnName`
-  (`CharacterStatsRoundTripTests`: captured-stats splice is a byte-identical no-op; a growing override adjusts all
-  three prefixes).
-- **Field mapping RESOLVED + wired (2026-06-10)**: `race` (field 3) = the `Race` enum; `sex` (field 1) = the
-  `Sex` enum + 2 (Male=2, Female=3); `life`/`health` are ×100 the player-facing `CharacterMaxStats` values.
-  All driven from the DB in `TryRebuildPlayerSpawnFromDb` (Phase 3 DONE — the player spawn is fully DB-driven,
-  see docs/re/player-spawn-generation.md).
+The mapping onto DB columns: `race` (field 3) is the `Race` enum; `sex` (field 1) is the `Sex` enum **+ 2**
+(Male=2, Female=3); `life`/`health` are **×100** the player-facing `CharacterMaxStats` values.
+
+Splicing it at a *different* length adjusts three prefixes — @0 / @133 / @304 — the same nested-length rebuild
+the name field needs (see "Name field" below).
 
 ## Tooling
 
@@ -318,8 +305,10 @@ qty, 0=flags), f3=template tail with f4/f5=fixed32 template id, f8=fixed32 arche
 
 Findings / constraints:
 - Mutating an existing item's **stack count** (prop 26) and **stat values** (tails) is SAFE and works in-client.
-- **Adding/removing an item entry STALLS the client on loading** (open problem; cause unconfirmed - possibly a
-  count/occupancy field not yet found, or client-side state). This is the key blocker for arbitrary inventories.
+- **Adding/removing an item entry STALLS the client on loading.** ⚠️ Read the rest of this phase before acting on
+  that: it looked like a packet-shape blocker for weeks and it is not one. The cause is the item **identity** —
+  a fabricated `Data1..4` quad is rejected — and an entry built from a real row loads fine (see "STEP (b)
+  CONFIRMED IN-CLIENT" below). The count/occupancy theory recorded here at the time was wrong.
 - DB side is a STUB: `Items` table is just (Id, Name), `CharacterEquipment` empty, `Items` empty. There is no
   item-template schema (template id / archetype / stats), so DB-driven inventory needs that built first.
 - Beach login currently sends the captured inventory verbatim from the world burst (instance-substituted), so
@@ -336,8 +325,10 @@ CONCLUSION: the stall is semantic / client-side (the client cross-references the
 state, or its own cache), NOT a packet bug. The safe capability is solid: lossless parse/modify/rebuild +
 confirmed-OK stack-count and stat edits.
 
-ARCHIVE BREAKTHROUGH (2026-06-07): the old C++ server (`Archive/`, extracted to `/tmp/faolan-archive/trunk`)
-explains the add/remove stall and reframes the whole inventory approach. **Snapshot-injection is a dead end.**
+ARCHIVE BREAKTHROUGH (2026-06-07): the old C++ server (`Archive/`, extracted alongside the repo)
+explains the add/remove stall and reframes the whole inventory approach. (It concluded "snapshot-injection is a
+dead end" — ⚠️ that conclusion was overturned the same week: injection works once the identity is real, see
+"STEP (b) CONFIRMED IN-CLIENT" below. What survives is the diagnosis of *why* it was failing.)
 - Items are NOT patched into a captured snapshot. The retail server adds an item via a **dedicated packet**
   (`WorldServer/WorldServerOpcodes.h` op `0x1d`); `WorldServer/CommandHandler.cpp::addItem` builds it as a
   48-byte `item_pack` header followed by `id, id, iLevel, unk(0x4f4f4939), data1, data2, data3, data4` and then
@@ -512,61 +503,33 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   now-isolated per-session object state — see the tail dissection above), so they keep the verbatim burst body.
   The tail's stable part (state string + bbox + scale) is dissected.
 
-96C46740 MoveTask (per-entity movement registration) — GRAMMAR CRACKED 2026-06-11 (workbench
-`MoveTaskCodecTests`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
-registers the entity's movement. It does NOT use the 0x2C transform framing; its floats are BIG-ENDIAN (unlike
-the spawn transform's LE). Body = `[u32 bodyLen][96C46740][ack=0xC350][u32 handle][00 00][curPos vec3 BE][TASK
-TYPE byte @30][payload]`. The byte @30 is a TASK-TYPE discriminator; **all types but 0x04 are FIXED-LENGTH** and
-fully round-trip across the whole captured corpus:
-```
-  0x06 len31  stationary  [06]                                        (BuildStationary)
-  0x00 len32  idle        [00 01]
-  0x02 len61  orient      [02][vec3][0000][f32][0000][f32][00 00]
-  0x07 len55  follow?     [07][00 00 c3 50][00 04][f32][...]
-  0x08 len49  anchor-id   [08][00 00 c3 50][id u32][01][8B][00]
-  0x05 len69  pace        [05][const 12][f32][vec3][vec3][00]
-  0x01 len90  patrol2     fixed 2-waypoint segment variant
-  0x04 VARIABLE  patrol   -> a SEGMENT LIST (the real waypoint patrol path):
-       04 [f1][kind] 01                       segment-list header (kind in {02,03,04})
-       then >=1 MOVE BLOCK, each:
-         01 [mode]
-           mode 01: 00 00 00 00   |   12 <f32> 00 00 00    (optional inline param)
-           mode 00: <f32 a><f32 b> 00 00 00 00             (parametric "approach/face", no waypoints)
-         [count u8][count x waypoint vec3 BE]               the patrol PATH
-         [flag 00/01][speed f32 BE][12x 00]                block trailer
-         [anchor vec3 BE]                                  return/anchor point
-       optional embedded ORIENT (02 [vec3][0000][f32][0000][f32]), mode-00 FINALE (00 00 [f32][f32]),
-       nested 04 headers, or 08/07 record tails, then a 2-byte terminator (00 01 / 03 00 / 03 01).
-```
-The `coverage` mode tokenizes every MoveTask in every capture and rebuilds it byte-exact via `parse_lenient`:
-**byte-exact round-trip is 4267/4267 (100%)** — every MoveTask byte is now accounted for and reproducible. Of
-those, **3533/4267 (82.8%) are FULLY field-grammared** (every token named; the 7 fixed types are 100%, type-04
-patrol 3098/3832); the rest end in a labeled `param_tail` — the mode-00 "approach/face" parametric segments
-whose inner control floats are not field-named yet. Crucially those segments carry NO patrol waypoints, so the
-semantically valuable patrol PATHS + speed are fully extracted for **every** body. This is the world burst's
-largest/most-variable family.
+**96C46740 MoveTask — see [movetask-grammar.md](movetask-grammar.md), which supersedes what stood here.**
+This section carried the 2026-06 *empirical* model, tokenized out of the captures: a task-type byte @30 with
+seven fixed-length forms and one variable "segment list". It was right about where the discriminator sits and it
+round-tripped the 4267 records the corpus held then, but it named the forms by what they looked like
+(`stationary`, `orient`, `pace`, `follow?`). The client's own reader was recovered two weeks later and gives the
+real shape — a **recursive** composite whose byte @30 is a factory `mode` selecting `Wait`/`Path`/`Rotate`/
+`Jump`/**`List`**/`Ballistic`/`Animated`/`Formation`/approach-target/`SetPos`/`GroundAlign`, a list element
+being another full sub-task. That grammar round-trips **9468/9468** captured records byte-exact through
+`MoveTaskCodec`; there is no residual "not field-named yet" tail.
 
-MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling NPC's MoveTask is a constant
-31-byte body (confirmed across 58 captured instances): `[bodyLen=27][96C46740][ack=0xC350][handle][00 00][vec3
-pos BIG-ENDIAN][06]` (the `06` terminator vs `04` = a movement segment follows). `MoveTaskNodes.Stationary
-(handle, position)` constructs it byte-exact (`MoveTaskBuilderTests`). This UNBLOCKS the burst-free NPC path:
-an NPC needs only its position (already in NpcSpawns) to register + render standing still, so the full
-multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker. CONFIRMED IN-CLIENT 2026-06-11 (commit
-a7e6841): a built spawn paired with this built stationary MoveTask is polled by the client and renders standing
-put — see the Phase-4 "BURST-FREE CONSTRUCT VALIDATED IN-CLIENT" entry.
+What is spawn-specific, and still true:
 
-CANONICAL PATROL FORM — BUILT 2026-06-11 (commit pending). The dominant single-segment waypoint patrol
-(`04 01 00 02 01 01 00 00 00 00 [count] [count x WP] 00 [speed f32] [12x00] [anchor=curPos] 00 01`) is
-constructed byte-exact by `MoveTaskNodes.Patrol(waypoints, speed, currentPosition)` — proven
-against the captured golden `golden/MoveTaskPatrol.bin` (in `Faolan.Tests/Assets/fixtures.bin`) (handle 0x17E03, 2 waypoints) in
-`MoveTaskBuilderTests`. So a MOVING NPC's registration can now be constructed from {position, waypoint path,
-speed} — the data a `PatrolPath` schema would hold — complementing `BuildStationary` for non-movers. 165 of the
-captured beach/world patrols match this canonical header byte-for-byte.
+- Each `FA015807` spawn is **paired** with a `96C46740` MoveTask registering that entity's movement, so a rebuilt
+  spawn whose position differs from the burst's is inconsistent with its paired MoveTask's waypoints — see the
+  "MOVETASK CARRIES POSITIONS" note in Phase 4.
+- The MoveTask does **NOT** use the `0x2C` transform framing, and its floats are **BIG-ENDIAN** — the opposite of
+  the spawn transform's LE. Body head is `[u32 bodyLen][96C46740][ack=0xC350][u32 handle][00 00][curPos vec3 BE]`
+  before the mode byte.
+- A non-patrolling NPC's registration is a constant 31-byte body, which is what unblocked the burst-free NPC
+  path: an NPC needs only its position (already in `NpcSpawns`) to register and render standing still, making the
+  multi-segment patrol an enhancement rather than a blocker. Confirmed in-client 2026-06-11 — a built spawn paired
+  with a built stationary MoveTask is polled and renders standing put (see "BURST-FREE CONSTRUCT VALIDATED
+  IN-CLIENT" in Phase 4). A mover is constructed from {position, waypoint path, speed} — the data `PatrolPath`
+  holds.
 
-`BuildStationary`
-+ the spawn position constructs a non-moving NPC's registration (proven in-client); `BuildPatrol` constructs a
-mover when the path is supplied. The burst-free spawn primitives (built spawn + built MoveTask + built world
-objects, fresh handles) are validated.
+So the burst-free spawn primitives — built spawn + built MoveTask + built world objects on fresh handles — are
+validated end to end.
 
 ## Phase 7 — NPC conversations (dialogue)
 
@@ -602,8 +565,8 @@ Current state: a **data-driven conversation replay engine** is implemented.
 
 ## Archive reference (the OLD C++ server) — a data & protocol goldmine
 
-`Archive/` in this repo (extracted to `/tmp/faolan-archive/trunk`) is the **previous-generation Project Faolan
-server written in C++**. It is NOT portable to the C# server (different language/architecture) but it is the
+`Archive/` (extract it to a scratch dir; paths below are relative to its `trunk/`) is the **previous-generation
+Project Faolan server written in C++**. It is NOT portable to the C# server (different language/architecture) but it is the
 best **reference and DATA source** we have — it shipped real world content. What it gives us, project-wide:
 
 - **`trunk/sql/aocdatabase.sql`** — the full retail-shaped schema: `player_items` / `npc_items` (equipment slots,

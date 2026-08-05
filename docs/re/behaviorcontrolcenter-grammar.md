@@ -180,12 +180,12 @@ no third site. Re-split, all ten are `Magic:Attack` (a 22-byte `f == 1` tail) or
 both lengths the corpus already showed on the ordinary phases — the arithmetic closing on grammars decoded
 *before* this was found is what makes the split right rather than merely plausible.
 
-## Status
+## Decode coverage
 
 Grammar SHAPE decoded (type switch + optional delay + commandId + per-command reader); the commandId → COMMAND
 map is enumerated with the client's own names and shown to be complete; and every per-command reader the corpus
-exercises is walked — **100% of captured records, zero mismatches**. What is left is not structure but MEANING:
-the eight middle words of the attack block (one is a charge float, two carry ids).
+exercises is walked — **100% of captured records, zero mismatches**. The one region decoded structurally but not
+semantically is the attack block's eight middle words (open work tracked in Gitea #661).
 
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into

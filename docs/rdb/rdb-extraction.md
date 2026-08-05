@@ -301,7 +301,7 @@ anything; **0 of the 190 contain the known item `Data1` quad value, and 0 contai
 plain ~28% of 1000020 resources are test items ("TESTITEM Spell uploader"), not shippable identity. Conclusion:
 the buildable identity (archetype + `Data1..4` quad) is **absent / intentionally `RDBH`-encrypted** in the RDB
 and **cannot be extracted** without breaking the `RDBH` cipher (a separate major effort). **Buildable items must
-still come from captures** (ArchetypeHarvester on `0x737A6DF9` snapshots) — the RDB does not shortcut this.
+still come from captures** (`ItemHashHarvester` over `0x737A6DF9` snapshots) — the RDB does not shortcut this.
 
 **MONSTERDATA checked 2026-06-08 — it is NOT combat stats, and NOT encrypted.**
 1010201 (3,185 entries) decodes to **plain XML** (12-byte RDB-Id header `type,id,1000002`, then `<?xml …>`;

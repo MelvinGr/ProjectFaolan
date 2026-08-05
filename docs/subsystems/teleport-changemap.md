@@ -100,12 +100,13 @@ do split cleanly by destination. `world-teleports` harvests it into `Map.TravelC
 destination; an empty key means the door teleports straight through. Full grammar in
 [`scry-message-box.md`](scry-message-box.md).
 
-## Status
+## Decode coverage
 
 Both bodies are built by the named `TeleportCodec` (was inline spliced templates in `GMCommands`), now fully
 **reader-structural** — the `begin` / PlayfieldProxy / `dest` readers are decompiled (`tools/ghidra/
 DumpTeleportReaders.java` → `FUN_005bfce0` / `FUN_00a6a600` / `FUN_005d1ae0`; the position-blob reader
 `FUN_00cbf5d0` is dumped in `tools/ghidra/out/helpers.txt`) and every dest byte is accounted for. Sibling lift under #219 — the **guild renown block** — is
 likewise a typed builder (`Faolan.Core.Network/Codecs/Guild/GuildRenownBlockCodec.cs`, `GuildRenownBlockCodecTests`; full reader walk
-documented in `docs/subsystems/guilds.md`). Remaining: in-client verification of the GM teleport path, and the semantic
-meaning of `destDescriptor`.
+documented in `docs/subsystems/guilds.md`). `destDescriptor` is placed and round-trips but nothing names what it
+selects, and the GM teleport path has never been checked against the retail client — open work tracked in
+Gitea #665.

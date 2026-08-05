@@ -84,16 +84,16 @@ saddle — `Charge` and `ChargeSpecialAbility`, both carrying key index 245 → 
 There is no general "usable while mounted" property on any other action, so the client does not gate ordinary
 casts on one.
 
-## Status (#190 / #271)
+## Decode coverage
 
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.
 - The full element grammar is now recovered (positional, type-descriptor-driven; string vs u32 by key).
 - **Type id + key list: RECOVERED for all 260 types** — statically, from the initialiser `FUN_008bdf40`
   ([`gameaction-keylists.tsv`](gameaction-keylists.tsv), 2026-08-03; the 2026-07-11 live Frida dump reached 68 of
-  them and is superseded where the two disagree). Any element is byte-constructible. The grammar is no longer a
-  blocker; #271's base cooldown is SOURCED and gated server-side (the spell record's own `SetSpellRecastTime` /
-  `SetSpellLineRecastTime` element - [spell-recast-source.md](spell-recast-source.md)), and its residue is the
-  in-client check plus an optional low-prio override emit.
+  them and is superseded where the two disagree). Any element is byte-constructible.
+- The spell base cooldown is SOURCED from here and gated server-side: it is the spell record's own
+  `SetSpellRecastTime` / `SetSpellLineRecastTime` element ([spell-recast-source.md](spell-recast-source.md)).
+  Its remaining in-client check and the optional override emit are open work tracked in Gitea #271.
 
 ## RESOLVED 2026-08-03 — the whole descriptor table IS statically recoverable, and it names the RDB modifier record (#591)
 

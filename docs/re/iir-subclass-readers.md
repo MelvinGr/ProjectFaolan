@@ -61,8 +61,8 @@ construct gate is per memory `npc_spawn_movetask_position`, not the grammar.)
 ReadSubClass:  U8 (bool @ +0x3c) ;  U32 @ +0x30 ;  U32 @ +0x34 ;  U32 @ +0x38 ;  then resolve the move-task obj
 ```
 The bulk of MoveTask is the base-class read; `ReadSubClass` only adds a bool + 3 u32. The class holds a
-`ProtoEmptyMessage` vtable — its body is largely protobuf. A `PatrolPath` waypoint source still needs the
-base-read decode (the +0x30/0x34/0x38 trio is the mode-00 "approach/face" params #53 asks for).
+`ProtoEmptyMessage` vtable — its body is largely protobuf. That base read is fully decoded in
+[movetask-grammar.md](movetask-grammar.md); the +0x30/0x34/0x38 trio is the mode-00 "approach/face" params.
 
 ### GameActionListIIR_t (`0xF508F4C1`, #190) — `FUN_008679f0` → `FUN_00870500`
 ```
@@ -70,8 +70,8 @@ U32 framed = (count + 1) * 0x3F1                      # SAME framing as the FA01
 count × { GameActionData blob }                        # log: "Streaming in spell list with N elements"
 then: U8 bool @ +0x3c ;  U32 @ +0x40
 ```
-This is the **spell/action list** (relevant to #73 / #78 spell grants too): a `0x3F1`-framed count then one
-`GameActionData` blob per entry.
+This is the **spell/action list**: a `0x3F1`-framed count then one `GameActionData` blob per entry. The element
+grammar and the full type-id/key catalog are in [gameactionlist-grammar.md](gameactionlist-grammar.md).
 
 ### BehaviorControlCenterIIR_c (`0x642CD3D6`, #190) — `FUN_005e24e0`
 A tagged union — the generic "Interact"/behavior channel:
@@ -83,8 +83,14 @@ switch(kind):
   11,12                 -> U32 @ +0x28
   14                    -> U32 @ +0x24 ; if !=0 -> U32 actionId (resolve)
 ```
+The `actionId` is a key into the client's Command catalog, and kind 14's extra word is a delay in hundredths of
+a second. Both, plus the per-command readers and the attack tail, are in
+[behaviorcontrolcenter-grammar.md](behaviorcontrolcenter-grammar.md).
 
-## Status
-The **grammars are decoded**; the dynel is capture-validated 100%. What remains per issue is the *construct*
-step (emit from DB rows / the recovered protos) and, for MoveTask/PatrolPath, the base-class transform decode.
-Same column↔offset caveat as #185 (`docs/re/fa015807-spawn-reader.md`).
+## Decode coverage
+The **grammars are decoded**; the dynel is capture-validated 100%. MoveTask's base read has since been pinned in
+full — the recursive grammar round-trips 9468/9468 captured records byte-exact and `PatrolPath`/`PatrolWaypoint`
+source the waypoints ([movetask-grammar.md](movetask-grammar.md)), so the caveat this section used to carry
+about the base-class transform is gone. Where a reader here is recovered but nothing emits it from DB rows yet,
+that is Gitea #405. Same column↔offset caveat as
+[fa015807-spawn-reader.md](fa015807-spawn-reader.md).

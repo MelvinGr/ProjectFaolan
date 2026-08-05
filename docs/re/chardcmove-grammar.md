@@ -167,7 +167,7 @@ stops at `(294.12, 145.14, 726.28)` facing `(0.0, -0.497, 0.0, 0.868)` — the `
 yaw-only facing, written out unmasked. Unit length holds for 100% of its 3,540 captured records. Total wire size =
 45 bytes.
 
-## Status
+## Decode coverage
 
 Decoded + dissected (this doc + `CharDCMoveCodec`). **Construct DONE:** `CharDCMoveCodec`,
 `StopCodec` and `SetPosCodec` (one file each under `Faolan.Core.Network/Codecs/World/`) build/parse
@@ -177,5 +177,5 @@ per-tick move still uses `MoveTaskCodec` (swapping it for `CharDCMove` is option
 self-contained records are sent via `WorldIir.Send`, which writes the carrier's `[u32 len]` because that length
 belongs to the sender (#530 rule 2); the codecs emit a bare record. (This used to read "via `SendWorldRecord`,
 NOT `SendWorldIir`, which would double-prefix the codec's own length" — both senders and that hazard are gone:
-#530 moved every self-prefixing codec onto the bare-record shape and left exactly one sender.) Needs in-client
-verification.
+#530 moved every self-prefixing codec onto the bare-record shape and left exactly one sender.) The stop
+broadcast has not been verified against the retail client — open work tracked in Gitea #662.

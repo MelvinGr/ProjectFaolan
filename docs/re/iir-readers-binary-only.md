@@ -167,14 +167,14 @@ generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered 
 `ProtoScryScriptIIR` (+ `Variable`), `ProtoCoreCharacterIIR` (+ `CharacterStats` / `PlayerStats` /
 `NpcStats` / `InventoryEntry` / `InventoryEntry.GemSlot` / `CharacterBcc`).
 
-## Status
+## Decode coverage
 
 Readers recovered (this doc). These are **mostly not implemented or byte-validated** — the retail
-captures never exercise them, so they're low priority for the emulator until a feature needs one
-(groups, feats/skills, master-looter, PvP threat meter, quest rewards). (Exceptions: `NewLevelIIR_t`
-and `MainQuestUpdateIIR_c` has since surfaced in captures and shipped byte-exact —
-see their SHIPPED-annotated rows.) When a feature needs one of the rest, the grammar above is the
-starting point; capture or in-client validation is still required before shipping a builder.
+captures never exercise them (groups, feats/skills, master-looter, PvP threat meter, quest rewards).
+(Exceptions: `NewLevelIIR_t` and `MainQuestUpdateIIR_c` have since surfaced in captures and shipped
+byte-exact — see their SHIPPED-annotated rows.) When a feature needs one of the rest, the grammar
+above is the starting point; capture or in-client validation is still required before shipping a
+builder. Wiring the recovered-but-unused builders to live triggers is tracked in Gitea #405.
 
 **Catalog closeout:** with this batch every one of the 141 IIR classes is accounted for — on-wire
 types byte-exact decoded, binary-only readers recovered, debug/editor readers recovered, and the

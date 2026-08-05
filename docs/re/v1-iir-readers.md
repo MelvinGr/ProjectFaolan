@@ -47,7 +47,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 - **AreaFormulaIIR** reuses the `0x3F1` list framing (same invariant as `GameActionListIIR`,
   `docs/re/gameactionlist-grammar.md`).
 
-## Status
+## Decode coverage
 
 Grammar decoded + a byte-exact codec with a captured round-trip for **all twelve** (`V1IirCodecTests`) — the IIR
 coverage matrix is now **0 V1**. Codecs: `Regen`, `LockedToChanged`, `ChainKill`,

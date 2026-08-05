@@ -135,9 +135,10 @@ before the column was retired and kept as evidence in
   inventory update content is delivered out-of-band (the `ProtoInventory` path), not through this
   IIR reader, so there is no incremental wire grammar here.
 
-## Status
+## Decode coverage
 
 Decoded + dissected (this doc + `BehaviorControlCenterCodec`). Construct/implement (C# codecs +
-golden tests) belongs to the relevant subsystems: combat (#216/#218/`../subsystems/combat.md`) for
-StatDamage/CombatShield/ChainKill/CombatReactive/ThreatLevel/HateList, and the simulation/world
-layer (#190/#187) for SetPos/CharInPlay + the dynel full-updates.
+golden tests) belongs to the relevant subsystems — [`../subsystems/combat.md`](../subsystems/combat.md)
+for StatDamage/CombatShield/ChainKill/CombatReactive/ThreatLevel/HateList, and the simulation/world
+layer for SetPos/CharInPlay + the dynel full-updates. Where a reader here is recovered but nothing
+emits it yet, that is Gitea #405.

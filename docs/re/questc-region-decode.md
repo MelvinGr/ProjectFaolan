@@ -147,23 +147,22 @@ Records are also VARIABLE (rec1 quest 6451 has empty header strings + is itself 
 faithful arbitrary-journal generator needs either a retail server-side spec or a large corpus of progressed
 captures to infer the WTHD/progress fields empirically.
 
-## Status — DONE (#384, 2026-07-20)
+## What the beach template mislabelled
 
-Both items below shipped; nothing here is blocked any more.
+A progressed journal round-trips, and getting there was a naming correction rather than a decode: the structure
+was already fully known, just attributed to the wrong owner.
 
-- The mislabeled fields were renamed (`Zero→Field114`, `N→Field118`, `Marker→N`, `QuestId2→Field2c`) and the
-  two beach-only asserts (`!=0x412`, `questId2!=questId`) dropped. Read/write order is unchanged, so every
-  beach golden stayed byte-exact. `QuestcRegion.Marker` is now `QuestcRecord.Unknown14` — the value the beach
+- The fields the beach capture named for its own values are now `Field114`, `Field118`, `N` and `Field2c`, and
+  the two beach-only asserts (`!=0x412`, `questId2!=questId`) are gone. Read/write order never changed, so every
+  beach golden stayed byte-exact. What was called `Marker` is `QuestcRecord.Unknown14` — the value the beach
   template happens to carry in the goal-count slot, never something to assert against.
-- The per-record objective region is modelled as `QuestcRecord.Objectives` and read/written with the record,
-  so `QuestcRegion` round-trips a progressed journal. `FullCharSnapshotSubClass` lost its now-redundant
-  top-level `QuestObjectives` property (the records own it) and no longer re-parses that region at the
-  boundary.
+- The objective region is **per record** (`QuestcRecord.Objectives`), read and written with the record.
+  `FullCharSnapshotSubClass` therefore holds no top-level `QuestObjectives` and does not re-parse that region at
+  the boundary.
 
-Reading a progressed journal was never blocked by a spec or a corpus — the structure was already fully
-decoded, just attributed to the wrong owner. The lesson is the recurring one: **a grammar pinned only by the
-single-element/degenerate capture is not pinned**, and a "constant" that appears once per record is worth
-checking against a second capture before calling it a magic.
+⚠️ The lesson is the recurring one: **a grammar pinned only by the single-element/degenerate capture is not
+pinned**, and a "constant" that appears once per record is worth checking against a second capture before
+calling it a magic.
 
 ## Static RE pass on the record's unnamed fields (2026-08-01)
 

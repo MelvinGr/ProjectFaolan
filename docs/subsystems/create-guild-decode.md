@@ -43,9 +43,9 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 4. C→S `0x202f` (member-joined ack, len 0) then more `0x003c`
 5. `0x2085`/`0x2082` follow-ups
 
-## Status
+## What we build, and what the golden corrected
 
-- **Implemented (#306, `45905d5d`):** `HandleCreateGuild` now emits `DispatchGuildCreated` (0x2044) — the
+- **Implemented (#306, `45905d5d`):** `HandleCreateGuild` emits `DispatchGuildCreated` (0x2044) — the
   retail no-relog create response — instead of only the `0x203F` full update. Built byte-exact against this
   capture (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`, 338 bytes) by `GuildCreatedCodec`:
   member record + header are CONSTRUCTED; the 225-byte tail is emitted verbatim as a valid create-time block
@@ -59,5 +59,5 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
   list (so 225 = 277 − 52), zeroed renown, the feat defaults `List2 = 0x410/0x816/0xBEA`, and create-time constants
   in `Counters64C[0..2]`/`Counters64D`. `GuildHeaders.ForGuildCreate` now carries `GuildRenownBlock.ForGuildCreate()`
   (byte-exact — `GuildRenownBlockCodecTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
-- **Remaining follow-up:** fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below) so the guild chat
-  tabs appear. Does not block the window opening.
+- The `0x003c` guild + officer chat-CHANNEL subs (step 3 above) are never fanned out, so the guild chat tabs do
+  not appear. It does not block the window opening — open work tracked in Gitea #663.
