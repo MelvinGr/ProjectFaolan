@@ -14,6 +14,11 @@ namespace Faolan.Core.Database.Repositories
 		Task<Ability?> GetAbility(uint id);
 		Task<Ability[]> GetClassAbilities(uint level, ConanClass @class);
 		Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
+
+		// The mount abilities a character has EARNED by owning a mount - empty for a character that owns none. Mount
+		// abilities hang off ownership, not class or level (#303), and owning a mount is knowing its summon spell
+		// (Mount.Id IS the spell id), so this is one join away from the character's spell book.
+		Task<Ability[]> GetMountAbilities(uint characterId);
 		Task<Combo[]> GetClassCombos(uint level, ConanClass @class);
 		Task<Combo[]> GetClassCombosUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Combo[]> GetCombos();
@@ -59,6 +64,21 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassAbilities.Where(ca => ca.Class == @class && ca.Level <= level).Include(ca => ca.Ability).Select(ca => ca.Ability).OrderBy(a => a.Slot).ToArrayAsync();
+		}
+
+		// ⚠️ WHICH mount grants WHICH ability is not modelled, because nothing states it: the two mount owners in the
+		// corpus both own a horse AND a mammoth and both hold all six captured mount abilities, so no capture separates
+		// "Mammoth Charge comes with the mammoth" from "these six come with owning any mount". Granting the observed
+		// set on any ownership is what the evidence supports; per-mount attribution would be invention.
+		// [V0: which mount grants which mount ability]
+		public async Task<Ability[]> GetMountAbilities(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (!await ctx.CharacterSpells.AnyAsync(cs => cs.CharacterId == characterId && ctx.Mounts.Any(m => m.Id == cs.SpellId)))
+				return [];
+
+			var prefix = Ability.MountAbilityNamePrefix;
+			return await ctx.Abilities.Where(a => a.Name.StartsWith(prefix)).OrderBy(a => a.Slot).ThenBy(a => a.Id).ToArrayAsync();
 		}
 
 		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)

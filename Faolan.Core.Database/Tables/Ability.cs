@@ -40,5 +40,23 @@ namespace Faolan.Core.Database.Tables
 		// GRANT, and the keys are random - so an ability no capture ever granted is a name and an id, nothing more.
 		// Granting one would put a null key on the wire, so the grant path skips it instead.
 		public bool IsGrantable => Key.Key1 != 0 || Key.Key2 != 0 || Key.Key3 != 0 || Key.Key4 != 0;
+
+		// True for the abilities that come with a MOUNT rather than with a class or a level (#303). All 14 of them are
+		// named `Mount Ability: <verb>` - Mammoth Charge, Cavalry Charge, Trample, Quick Dismount, ...
+		//
+		// ⚠️ This is a name test, and that is normally the wrong shape (Feats.Tree is a prefix WE invented and is
+		// unreliable for exactly that reason). It is sound here because the prefix is not ours: `Name` is the client's
+		// own LDB category-50210 string, verbatim, so this reads the client's taxonomy rather than imposing one. The
+		// captured half corroborates it - the six with a grant key occupy their own contiguous `Slot` band (269-284),
+		// after the pet commands and before the travel/stance block - but `Slot` only exists for an ability some
+		// capture granted, so it cannot be the catalog-wide test.
+		//
+		// WHY it needs to be a test at all: mount abilities were landing in `ClassAbility` as Necromancer/Demonologist
+		// kit at level 80, because the only two characters in the corpus that hold them are a level-80 Necro and a
+		// level-80 Demo - who are also the ONLY two that own a mount summon spell. That is mount ownership showing
+		// through as if it were class.
+		public bool IsMountAbility => Name.StartsWith(MountAbilityNamePrefix, System.StringComparison.Ordinal);
+
+		public const string MountAbilityNamePrefix = "Mount Ability: ";
 	}
 }

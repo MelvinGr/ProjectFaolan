@@ -34,9 +34,15 @@ namespace Faolan.GameServer
 		// grants) or, for a character that has none yet, the class-starting kit.
 		public static async Task<Ability[]> ResolveAbilities(IDatabaseRepository database, ILogger logger, Character character)
 		{
+			// Mount abilities ride the MOUNT, not the class or the level (#303), so they are unioned in on top of
+			// whichever source below supplies the rest. Before this they sat in ClassAbility under Necromancer and
+			// Demonologist at level 80 - which is only where they landed because the corpus's two mount owners happen
+			// to be a level-80 Necro and a level-80 Demo. A Barbarian with a horse got none; a mountless Necro got six.
+			var fromMounts = await database.GetMountAbilities(character.Id);
+
 			var granted = await database.GetCharacterAbilities(character.Id);
 			if (granted.Length == 0)
-				return await database.GetClassAbilities(character.Level, character.Class);
+				return [.. Merge(await database.GetClassAbilities(character.Level, character.Class), fromMounts)];
 
 			var abilities = new List<Ability>(granted.Length);
 			foreach (var ga in granted)
@@ -57,7 +63,22 @@ namespace Faolan.GameServer
 				abilities.Add(ability);
 			}
 
-			return [.. abilities];
+			return [.. Merge(abilities, fromMounts)];
+		}
+
+		// Union by id, keeping the first source's order. The captured characters' own grants ALREADY contain their
+		// mount abilities (that is where the catalog learned them), so this is a no-op for them - it matters for a
+		// character that acquires a mount later, whose grant list predates the mount.
+		private static IEnumerable<Ability> Merge(IEnumerable<Ability> primary, IEnumerable<Ability> extra)
+		{
+			var seen = new HashSet<uint>();
+			foreach (var ability in primary)
+				if (seen.Add(ability.Id))
+					yield return ability;
+
+			foreach (var ability in extra)
+				if (ability.IsGrantable && seen.Add(ability.Id))
+					yield return ability;
 		}
 
 		// Tells the CLIENT what the character has: the class abilities (0x2052) then its spells (0x200A), on `sender`'s

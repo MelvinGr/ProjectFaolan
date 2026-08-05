@@ -71,7 +71,14 @@ namespace Faolan.Importer.Captures
 				})
 				.ToListAsync();
 
-			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			// Mount abilities are excluded: they come with the MOUNT, not with a class (#303). The two characters that
+			// hold them are a level-80 Necromancer and a level-80 Demonologist - who are also the only two in the
+			// corpus that own a mount summon spell at all, so attributing them to those classes was mount OWNERSHIP
+			// showing through as if it were class kit. A level-80 Barbarian who buys a horse would have got nothing,
+			// and a mountless Necro six abilities for a mount they do not have. CharacterLoadout grants them from
+			// ownership instead.
+			var abilities = await db.Abilities.ToListAsync();
+			var abilityIds = abilities.Where(a => !a.IsMountAbility).Select(a => a.Id).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 
 			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
@@ -160,7 +167,12 @@ namespace Faolan.Importer.Captures
 			// The levelled roster: the highest level we have a character at, per class. A class is eligible to witness an
 			// ability if this reaches the level the ability is first seen at.
 			var topLevelByClass = holders.GroupBy(h => h.Class).ToDictionary(g => g.Key, g => g.Max(h => (int)h.Level));
-			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+
+			// Mount abilities are out of scope here too (see DeriveClassAbilitiesAsync): they are not something a
+			// LEVELLED character earns, so they must never be widened onto all twelve classes either. The three-witness
+			// guard below already rejects them today, but only because the corpus happens to hold exactly two mount
+			// owners - which is a coincidence to depend on, not a rule.
+			var abilityIds = (await db.Abilities.ToListAsync()).Where(a => !a.IsMountAbility).Select(a => a.Id).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 
 			var inserted = 0;

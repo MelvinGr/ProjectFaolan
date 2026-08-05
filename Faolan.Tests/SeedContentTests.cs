@@ -758,9 +758,18 @@ namespace Faolan.Tests
 					$"'{ability}' reaches {(classCount.TryGetValue(ability, out var m) ? m : 0)} of 12 classes - it is earned by every levelled class the corpus has, so withholding it from the rest is a capture artefact.");
 
 			// Class kit, and it must stay class kit.
-			foreach (var ability in new[] { "Spellweaving", "Pet Attack", "Pet Dismiss", "Mount Ability: Trample" })
+			foreach (var ability in new[] { "Spellweaving", "Pet Attack", "Pet Dismiss" })
 				Assert.True(!classCount.TryGetValue(ability, out var n) || n < 12,
 					$"'{ability}' reaches all 12 classes - it is held by exactly the two captured level-80 casters, so the universal-witness threshold has been weakened into treating a caster pair as the whole roster.");
+
+			// A mount ability is not class kit at ALL, not even narrow class kit: it comes with the MOUNT (#303). It
+			// used to sit here under Necromancer and Demonologist at level 80, which is only where it landed because
+			// the corpus's two mount owners happen to be a level-80 Necro and a level-80 Demo - mount OWNERSHIP showing
+			// through as class. So the assertion is zero classes, not "fewer than twelve": one row of it in
+			// ClassAbility means the derivation has started reading ownership as class again.
+			var mountAbilities = byName.Where(x => x.Name.StartsWith(Ability.MountAbilityNamePrefix, StringComparison.Ordinal)).Select(x => x.Name).Distinct().ToList();
+			Assert.True(mountAbilities.Count == 0,
+				$"mount abilities are in ClassAbility ({string.Join(", ", mountAbilities)}) - they hang off owning a mount, not off a class, and CharacterLoadout grants them from the character's mount summon spells.");
 		}
 	}
 }

@@ -207,11 +207,29 @@ list — an ability is universal when **every class that could have shown it to 
 Then it is materialised on all twelve at that lowest observed level. The eligibility test is what keeps a
 low-level character from counting as evidence of absence: a level-5 Barbarian is below any level Search is seen
 at, so it cannot un-universalise it. The three-class threshold is what stops the pair of level-80 casters
-standing in for the whole roster — at two, Spellweaving, the pet bar and the mount abilities would all qualify,
-and each is independently known not to be universal (a mount ability comes with the **mount**, see
-[mounts.md](mounts.md)).
+standing in for the whole roster — at two, Spellweaving and the pet bar would both qualify, and neither is
+universal.
 
-Today it yields exactly **Search, Hide and Path of Asura, at level 23**. The level is an upper bound, not the
+### Mount abilities are not class kit at all
+
+The 14 `Mount Ability: …` rows are excluded from BOTH derivations, because they hang off owning a **mount**, not
+off a class or a level. They used to land in `ClassAbility` under Necromancer and Demonologist at level 80 — and
+that is purely an artefact of who the corpus contains: the only two characters that hold a mount ability are a
+level-80 Necro and a level-80 Demo, who are also the **only two that own a mount summon spell at all**. Mount
+ownership was showing through as class. The visible consequence was both ways round: a level-80 Barbarian who
+bought a horse got nothing, and a mountless Necromancer got six abilities for a mount they did not have.
+
+`CharacterLoadout.ResolveAbilities` unions them in from `GetMountAbilities`, which is one join — owning a mount
+IS knowing its summon spell (`Mount.Id` is the spell id). `SeedContentTests` asserts **zero** mount-ability rows
+in `ClassAbility`, not "fewer than twelve": one row means the derivation has started reading ownership as class
+again.
+
+⚠️ WHICH mount grants WHICH ability is **not** modelled, because nothing states it: both mount owners own a horse
+*and* a mammoth and both hold all six captured mount abilities, so no capture separates "Mammoth Charge comes
+with the mammoth" from "these six come with owning any mount". We grant the observed set on any ownership;
+per-mount attribution would be invention. [V0: which mount grants which mount ability]
+
+Today the universal pass yields exactly **Search, Hide and Path of Asura, at level 23**. The level is an upper bound, not the
 unlock level — the assassin was 23 when captured, so all the data says is "by 23", and granting at 23 is the
 conservative direction. Gated by `SeedContentTests.AbilitiesEveryLevelledClassEarns_ReachAllTwelveClasses`,
 which asserts both halves: the three reach twelve classes, and the class kit does not.

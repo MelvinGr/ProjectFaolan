@@ -223,6 +223,16 @@ whose tick units are not pinned; nothing server-side depends on it, since the cl
 
 ---
 
+### Which mount grants which mount ability
+**Tracked: Gitea #303.** [V0: which mount grants which mount ability] Mount abilities come with the mount, not
+with a class (see [`../subsystems/player-actions.md`](../subsystems/player-actions.md)) — but the corpus cannot
+say which mount brings which ability. Its two mount owners each own a horse **and** a mammoth, and each holds all
+six captured mount abilities, so nothing separates "Mammoth Charge comes with the mammoth" from "these six come
+with owning any mount". The names suggest the first, and that is exactly why it is written down here rather than
+implemented: a name is not a mapping. Neither the mount's spell record (its whole property run is ten fields, none
+of them an ability reference) nor the ability's own name carries the link. A capture of a character who owns ONE
+kind of mount settles it in one sample.
+
 ## Guilds
 
 ### The guild management fan-out
