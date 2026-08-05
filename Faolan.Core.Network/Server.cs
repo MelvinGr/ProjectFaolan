@@ -51,8 +51,18 @@ namespace Faolan.Core.Network
 			}
 			catch (Exception e)
 			{
-				Logger.LogError(e, "Failed to start listener on port {Port}.", LocalEndPoint.Port);
-				return;
+				// FAIL THE HOST. This used to log and `return`, which is a silent fallback of the worst kind: a
+				// BackgroundService that returns early is simply gone, so a port conflict took ONE tier out and left
+				// the process "running" - a server whose world listener never bound, answering nothing, with the
+				// reason four screens up the log. Observed live: five listeners lost their ports to an already-running
+				// instance and the process carried on regardless, surviving only because Kestrel happened to fail too.
+				// A role without Kestrel (`--role login` with the MCP host off) would have sat there serving nobody.
+				//
+				// Rethrowing stops the host: .NET's default BackgroundServiceExceptionBehavior is StopHost, so an
+				// unhandled ExecuteAsync exception brings the process down with this log line as the cause. There is no
+				// useful degraded mode for a listener that cannot bind - see Gitea #409.
+				Logger.LogCritical(e, "Failed to bind port {Port} - stopping the host. Another instance is probably already running.", LocalEndPoint.Port);
+				throw;
 			}
 
 			while (!cancellationToken.IsCancellationRequested)
