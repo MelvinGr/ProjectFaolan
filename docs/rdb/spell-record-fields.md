@@ -289,4 +289,9 @@ dotnet run --project Faolan.Importer -- --report spell-fields --report-arg 40767
 # one field's value distribution, optionally crossed with another
 dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:186 --RdbDir <rdb-dir>
 dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:347x348 --RdbDir <rdb-dir>
+
+# ...and with --out, EVERY carrying record rather than the 14 samples (id / name / value, one TSV per field) -
+# what a histogram cannot answer is "is this the second source for a column we already fill", and that needs the
+# per-record join (#633, field 210).
+dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:210 --RdbDir <rdb-dir> --out <dir>
 ```

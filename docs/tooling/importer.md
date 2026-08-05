@@ -266,7 +266,17 @@ manufactures roughly half its findings; see [retail-server-heap-leak.md](../re/r
 goals with the designers' names in plaintext. No arg prints a summary, a populated-field census and three flat
 TSV sections; `--report-arg <line or quest id>` prints that line as a tree. It also cross-checks `MainQuest.hash`
 against the four `ACGHash` line tokens recovered from captures, which is what establishes that our `QuestLineId`
-IS the client's `MainQuest.template_id`; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)), … — the report's
+IS the client's `MainQuest.template_id`; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
+`shield-rose` (every `CombatShieldIIR` timed against its own defender's spawn — which is what turns "no capture
+covers a catch-up send" into a measurement: of 71 first-roses, none arrives within 2 s of that handle's spawn, so
+retail sends none either, #622),
+`dynel-cycle` (every world-object spawn/despawn BURST with the player's position at the time. Rules a single
+interest RADIUS out one-sidedly — `R` must satisfy every `farthest-spawned ≤ R ≤ every nearest-despawned`, and
+the corpus despawns at 3.5 u while spawning at 1,834 u — then scores candidate CELL sizes against the right null,
+the same statistic over every position the player walked. ~32 u fits, #529),
+`chain-kill` (every `ChainKillIIR` with the gap to the previous one and to the kill counters `106` / `1000069` /
+`1000070`. Gives the chain's whole grammar — counts 2/3 and never 1, every non-zero closed by a 0 a median 8.97 s
+later — and shows the counters never move with it, #446), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions
