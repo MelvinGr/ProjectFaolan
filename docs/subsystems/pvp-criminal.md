@@ -51,6 +51,13 @@ mechanism.
 - `Character.MurderPoints` — the pool, in **wire** units, carried on stat `0x449` in the login snapshot.
 - `Character.CriminalUntil` / `Character.IsCriminal` — a persisted expiry, not a bool and not session state:
   in the capture the debuff outlived a zone change into another instance, so it has to survive both.
+- **Where a criminal revives.** The client's resurrection-point export carries a `shady` attribute
+  (`RespawnPoint.Shady`) — 49 outlaw points, one per major playfield, all always-known. `RespawnResolver.Resolve`
+  splits the map's points on it: a criminal takes the closest shady one and a law-abiding character never gets
+  one, so a release never drops an ordinary player into an outlaw camp. Only 49 of 248 mapped playfields carry a
+  shady point, so a criminal who dies anywhere else falls back to the normal selection. This is the death
+  destination only — whether retail also uses the shady point as a criminal's bind/recall target is not
+  decidable from the RDB, which says WHERE and not WHEN.
 - `ShopService` refuses a criminal at vendor trade-open, and re-checks on buy and sell (the open shop is
   remembered per session, so a player who goes criminal with the window already open would otherwise still
   trade). `CriminalStatus.TradesWithCriminals` carries the smuggler exception.

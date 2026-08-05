@@ -55,13 +55,55 @@ namespace Faolan.Tests
 			Assert.Same(nearDiscovered, target);
 		}
 
-		private static RespawnPoint Point(uint id, float x, float z, bool alwaysKnown = false)
+		// #517: the outlaw split. Every shady point in the RDB is AlwaysKnown, so the only question a resolve
+		// answers is WHICH half of the map's points a character is allowed to land in.
+		[Fact]
+		public void Resolve_CriminalTakesTheShadyPointEvenWhenANormalOneIsCloser()
+		{
+			var beach = Point(1, 0, 0, true);
+			var outlawCamp = Point(2, 100, 0, true, shady: true);
+
+			var target = RespawnResolver.Resolve(new Vector3(5, 0, 0), [beach, outlawCamp], new HashSet<uint>(), criminal: true);
+			Assert.Same(outlawCamp, target);
+		}
+
+		[Fact]
+		public void Resolve_NonCriminalNeverLandsInAnOutlawCamp()
+		{
+			var beach = Point(1, 100, 0, true);
+			var outlawCamp = Point(2, 0, 0, true, shady: true); // closest by far, and always-known
+
+			var target = RespawnResolver.Resolve(new Vector3(5, 0, 0), [beach, outlawCamp], new HashSet<uint>(), criminal: false);
+			Assert.Same(beach, target);
+		}
+
+		[Fact]
+		public void Resolve_CriminalFallsBackToTheNormalPointOnAMapWithNoShadyOne()
+		{
+			// 199 of the 248 mapped playfields carry no shady point, so this is the common case for a criminal.
+			var beach = Point(1, 0, 0, true);
+
+			var target = RespawnResolver.Resolve(new Vector3(5, 0, 0), [beach], new HashSet<uint>(), criminal: true);
+			Assert.Same(beach, target);
+		}
+
+		[Fact]
+		public void Resolve_FallsBackToAKnownPointAndThenToTheMapsFirst()
+		{
+			var unknown = Point(1, 5, 0);
+			// Nothing known -> the map's first point rather than leaving the player with nowhere to go.
+			Assert.Same(unknown, RespawnResolver.Resolve(Vector3.Zero, [unknown], new HashSet<uint>(), criminal: false));
+			Assert.Null(RespawnResolver.Resolve(Vector3.Zero, [], new HashSet<uint>(), criminal: false));
+		}
+
+		private static RespawnPoint Point(uint id, float x, float z, bool alwaysKnown = false, bool shady = false)
 		{
 			return new RespawnPoint
 			{
 				Id = id,
 				MapId = 4010,
 				AlwaysKnown = alwaysKnown,
+				Shady = shady,
 				Position = new Vector3(x, 0, z)
 			};
 		}

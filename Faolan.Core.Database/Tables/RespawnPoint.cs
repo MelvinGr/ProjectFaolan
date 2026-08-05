@@ -23,9 +23,9 @@ namespace Faolan.Core.Database.Tables
 		// "Conarch Village - Shady"), and NO shady="false" point has an outlaw/shady name. 222 older-dialect elements
 		// omit the attribute; absent reads as false, which is safe for the same reason - none of them is outlaw-named.
 		//
-		// Imported but NOT yet consumed: the revive path still picks the closest KNOWN point regardless of criminal
-		// state, so an outlaw currently revives at the normal point. Wiring it up is Gitea #517 (the criminal state
-		// itself is #503).
+		// Consumed by RespawnResolver (#517): a criminal (Character.IsCriminal, #503) revives at the closest shady
+		// point on the map and a law-abiding character never does. Only 49 of 248 mapped playfields carry one, so a
+		// criminal on a map without one falls back to the normal selection.
 		public bool Shady { get; set; }
 
 		// The client's DISCOVERY volume for this point (#519): walk into it and the point becomes known. Null for

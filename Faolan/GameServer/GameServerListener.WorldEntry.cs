@@ -412,7 +412,7 @@ namespace Faolan.GameServer
 				return Map.NewPlayerSpawnSpawnPoint;
 
 			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
-			return RespawnResolver.ClosestKnown(character.Position, points, discovered) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points[0];
+			return RespawnResolver.Resolve(character.Position, points, discovered, character.IsCriminal) ?? points[0];
 		}
 
 		// Re-seat the character's persisted mount (Character.MountId) after world entry, when the map allows mounts.

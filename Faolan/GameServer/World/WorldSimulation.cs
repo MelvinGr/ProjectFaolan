@@ -714,9 +714,7 @@ namespace Faolan.GameServer.World
 			// Resolved BEFORE the vitals restore: the point's RestorationLevel decides how much comes back (#375).
 			var deathPos = entity?.Position ?? character.Position;
 			var points = await GetRespawnPointsCached(character.MapId);
-			var target = points.Length > 0
-				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id)) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault()
-				: null;
+			var target = RespawnResolver.Resolve(deathPos, points, await GetDiscoveredRespawnCached(character.Id), character.IsCriminal);
 
 			vitals.ReviveTo(target?.RestorationLevel ?? 0f); // no point resolved -> full
 
@@ -1001,7 +999,8 @@ namespace Faolan.GameServer.World
 				return;
 
 			var discovered = await GetDiscoveredRespawnCached(character.Id);
-			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points[0];
+			// The release screen offers the point the revive would use - including the outlaw one for a criminal (#517).
+			var spot = RespawnResolver.Resolve(deathPosition, points, discovered, character.IsCriminal) ?? points[0];
 			// #214: replay the retail BEACH player-death sequence (Stihetfv_..._login-die-resurect-beach pkt#1179) in
 			// order: death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death BccIIR.
 			// The death-pose MoveTask drops the avatar into the dead pose; the BccIIR (bcc_state 29) enters the Dead
