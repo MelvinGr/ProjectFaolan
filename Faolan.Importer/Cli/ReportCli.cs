@@ -194,6 +194,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "shield-rose":
+				{
+					ShieldRose(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
@@ -914,6 +920,107 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"TOTAL over {captures.Count} captures: {provenHandles} handle(s) PROVEN recycled (a second template on the same handle), "
 			                  + $"costing {provenLost} spawn observation(s) to DistinctByHandle. {ambiguousHandles} single-template handle(s) were not counted - "
 			                  + "a repeat sighting of one template is a mob that moved, not evidence of reuse.");
+		}
+
+		// --report shield-rose
+		//
+		// Every `CombatShieldIIR` in the corpus as a per-defender timeline: when each rose arrived, what it said, how
+		// long since that handle's previous rose, and how long since that handle's SPAWN (`SimpleCharFullUpdateIIR`)
+		// in the same capture.
+		//
+		// The last column is the whole point (#622). Retail leaves the spawn scaffold's shield word at 0, so a viewer
+		// that arrives after a defender's rose was set has nothing to draw - unless retail sends a CATCH-UP rose when
+		// the entity comes into view. If it does, this report shows it as a rose arriving within a second or two of
+		// that handle's spawn; if the only roses are ones that follow a previous rose by the measured 5-12s shift
+		// cadence, retail has the same hole and inventing a catch-up send would be inventing a message.
+		//
+		// A rose that repeats the PREVIOUS VALUE is called out for the same reason: a shift moves exactly one shield
+		// (34 of 39 captured transitions), so an unchanged re-send is not a shift and wants explaining.
+		private static void ShieldRose(IReadOnlyList<NamedCapture> captures)
+		{
+			var total = 0;
+			var afterSpawn = 0;
+			var unchanged = 0;
+			var noSpawnSeen = 0;
+			foreach (var capture in captures)
+			{
+				var spawnTicks = new Dictionary<uint, long>();
+				var previous = new Dictionary<uint, (long Ticks, uint Value)>();
+				var lines = new List<string>();
+
+				foreach (var p in capture.Packets)
+				{
+					if (p is not { IsIirCarrier: true, IsDownload: true })
+						continue;
+
+					// Both records put the subject handle at the same place - body is [u32 recordLen][u32 type][u32 ...]
+					// [u32 handle] - so the spawn side needs no full parse (most spawn bodies would not survive one).
+					if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode)
+					{
+						if (p.Body.Length >= 16)
+							spawnTicks[p.Body.ReadU32Be(12)] = p.Ticks;
+						continue;
+					}
+
+					if (p.SubOpcode != CombatShieldCodec.Opcode || p.Body.Length < sizeof(uint))
+						continue;
+
+					CombatShieldIIR rose;
+					try
+					{
+						rose = CombatShieldCodec.Parse(p.Body.AsSpan(sizeof(uint)));
+					}
+					catch (Exception)
+					{
+						continue;
+					}
+
+					total++;
+					var sinceSpawn = spawnTicks.TryGetValue(rose.Handle, out var spawned)
+						? TimeSpan.FromTicks(p.Ticks - spawned).TotalSeconds
+						: double.NaN;
+					var sincePrevious = previous.TryGetValue(rose.Handle, out var last)
+						? TimeSpan.FromTicks(p.Ticks - last.Ticks).TotalSeconds
+						: double.NaN;
+
+					var flags = "";
+					if (double.IsNaN(sinceSpawn))
+						noSpawnSeen++;
+					else if (double.IsNaN(sincePrevious) && sinceSpawn <= 2.0)
+					{
+						afterSpawn++;
+						flags += " CATCH-UP?"; // a FIRST rose hard on the heels of the spawn is what a catch-up looks like
+					}
+
+					if (!double.IsNaN(sincePrevious) && last.Value == rose.Value)
+					{
+						unchanged++;
+						flags += " UNCHANGED";
+					}
+
+					lines.Add($"    0x{rose.Handle:X8}  value={rose.Value:000}  +{Fmt(sincePrevious)}s since previous  +{Fmt(sinceSpawn)}s since spawn{flags}");
+					previous[rose.Handle] = (p.Ticks, rose.Value);
+				}
+
+				if (lines.Count == 0)
+					continue;
+
+				Console.WriteLine($"{capture.Name}  ({lines.Count} rose record(s))");
+				foreach (var line in lines)
+					Console.WriteLine(line);
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"TOTAL over {captures.Count} captures: {total} CombatShieldIIR record(s).");
+			Console.WriteLine($"  first rose within 2s of that handle's spawn (a catch-up would look like this): {afterSpawn}");
+			Console.WriteLine($"  re-sends of the PREVIOUS value (not a shift):                                  {unchanged}");
+			Console.WriteLine($"  no spawn for that handle in the same capture:                                  {noSpawnSeen}");
+			return;
+
+			static string Fmt(double seconds)
+			{
+				return double.IsNaN(seconds) ? "  -  " : $"{seconds,5:0.0}";
+			}
 		}
 
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)

@@ -240,6 +240,15 @@ snapshot stat sheet carries (`SubClassStatBlock`, `ShieldAllocation` `0x6F`).
 The spawn scaffold's shield word (`SpawnPreIir.WordStatIds[13]` → stat `0xA5`) is deliberately left at 0: 310 of
 the 317 captured PLAYER frames carry 0 there, so retail does not seed a viewer's rose from the spawn either.
 
+**And it does not catch up afterwards, so neither do we (#622).** A viewer that arrives after a defender's rose
+was set draws nothing over it until the next change — the obvious fix is to re-send the rose when the viewer
+confirms the spawn, and the corpus says retail does not. `--report shield-rose` times all **110**
+`CombatShieldIIR` records against their own defender's `SimpleCharFullUpdateIIR`: of the **71** first-roses,
+**none** arrives within 2 s of that handle's spawn, and the earliest of them is **2.4 s** — an engage, not a
+catch-up. Every other record follows a previous rose at the measured 5–12 s shift cadence, including the four
+that re-send an unchanged value (the closest is +6.1 s, inside the cadence). So the hole is retail's, and
+inventing a send to plug it would put a packet on the wire that retail never sends.
+
 **Mitigation reads whatever the handle resolves to**, NPC or player, and a player defender switches to the
 `Combat_PvP*` column — the gentler one (−0.15/−0.30 where PvE gives −0.33/−0.66), which is why that column
 exists at all.
