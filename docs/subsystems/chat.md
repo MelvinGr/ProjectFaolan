@@ -133,10 +133,22 @@ Together those make a group's whole line set enumerable by sweeping `N`. For the
 finds **54 lines where the DB carries 13** — e.g. `RenownBystanderLovers/conversation1` is an eleven-line
 exchange between Lord Ovidius and his lady, of which captures caught five.
 
-Of the 41 unharvested lines, **16 carry no template slot and can be served as they stand**; the other 25 contain
-a `{Slot}` (`{TopGloryName}`, `{AdGuildName}`, `{DetectedChar.name}`, `{AdvertiseMinutes - AdvertiseCounter}`)
-that needs a matching `<parameter>` element filled from live server state — a separate piece of work from
-harvesting the text.
+Of the 41 unharvested lines, 16 carry no template slot; the other 25 contain a `{Slot}` (`{TopGloryName}`,
+`{AdGuildName}`, `{DetectedChar.name}`, `{AdvertiseMinutes - AdvertiseCounter}`) needing a matching
+`<parameter>` element filled from live server state — separate work from harvesting the text.
+
+`--only npc-chatter` takes **9** of those 16, and the gap between the two numbers is the rule that makes the
+harvest safe. A bark group is often a **two-hander**: `RenownBystanderLovers` is one conversation shared by the
+Nobleman and the Noblewoman, and the client's line set interleaves them (`[2]` is Lord Ovidius on his sons, `[3]`
+is her answering *"That's just dreadful, Lord Ovidius"*). The captures assign 3/8/16/23 to her and 6/19 to him,
+so the split is real — and it is **not** mechanically recoverable: strict alternation from those anchors
+reproduces every line except the last, which is hers and would be given to him. So a group with more than one
+captured speaker is skipped entirely; harvesting it would put her lines in his mouth, which is worse than the
+silence it replaces.
+
+A harvested row is identifiable by its **empty `FormatKey`** — legitimate, since a key is only read for an
+encrypted string. Gated by `SeedContentTests.HarvestedBarks_AreInTheSeed_AndNoTwoHanderGroupWasHarvested`, which
+asserts both halves: the harvested lines are present, and no line of the shared conversation is among them.
 
 ⚠️ **Group DISCOVERY is still open, and the obvious route does not work.** Pulling identifiers out of the client's
 `SCRIPTGROUP2` (1010028) records and hash-testing each was built and thrown away: not one of the five groups the

@@ -663,6 +663,37 @@ namespace Faolan.Tests
 			Assert.True(contested, "No armory post is held by a different NPC per class - the two class sets are no longer sharing positions, so this gate no longer proves anything.");
 		}
 
+		// #331: the ambient barks HARVESTED from the client's LDB are in the seed, and the two-hander rule held.
+		//
+		// A capture only catches the lines an NPC happened to say while someone was recording, so the importer fills in
+		// the rest of each captured group's conversation from category 50015 - which it can do because that category is
+		// plaintext and a line's id is computable from its token. The harvested rows are identifiable by their EMPTY
+		// FormatKey: a key is only read for an encrypted string, so a harvested line legitimately has none.
+		//
+		// The second assertion is the one that matters. `RenownBystanderLovers` is one conversation shared by the
+		// Nobleman and the Noblewoman, and its lines interleave the two speakers - so harvesting it would put her lines
+		// in his mouth. If a keyless Lovers row ever appears, the single-speaker guard has been lost.
+		[Fact]
+		public async Task HarvestedBarks_AreInTheSeed_AndNoTwoHanderGroupWasHarvested()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var barks = await db.NpcChatter.AsNoTracking().ToListAsync(ct);
+			var harvested = barks.Where(b => b.FormatKey.IsEmpty).ToList();
+
+			Assert.True(harvested.Count >= 9, $"The seed carries {harvested.Count} harvested bark(s); the sweep yields 9 across the single-speaker groups.");
+			Assert.True(barks.Count > harvested.Count, "Every bark is keyless - the CAPTURED lines have lost their keys.");
+
+			// The two-hander must never be harvested onto either speaker.
+			var lovers = harvested.Where(b => b.Group == "RenownBystanderLovers").ToList();
+			Assert.True(lovers.Count == 0,
+				$"{lovers.Count} line(s) of the shared Nobleman/Noblewoman conversation were harvested - the single-speaker guard is gone, so one speaker is now saying the other's lines.");
+
+			// A harvested line must never carry a template slot: its wire form would need a <parameter> nobody fills.
+			Assert.All(harvested, b => Assert.DoesNotContain("{", b.Group, StringComparison.Ordinal));
+		}
+
 		// #303: the abilities a LEVELLED character earns reach all twelve classes, not just the four the corpus has a
 		// levelled character for.
 		//

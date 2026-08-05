@@ -95,8 +95,16 @@ namespace Faolan.Importer.Modules
 			// Attach to the exact NpcTemplate type by TemplateId (unique - one NpcTemplate row per template).
 			var npcByTemplate = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n);
 
+			// The client's own line catalog, when an RDB is available. Without one the module runs exactly as before -
+			// captures only - so a corpus-only import is unchanged rather than silently thinner.
+			var catalog = string.IsNullOrWhiteSpace(ctx.RdbDir)
+				? null
+				: BarkCatalog.Load(ctx.RdbDir);
+
 			var lines = 0;
+			var harvested = 0;
 			var npcs = 0;
+			var captured = new List<(uint TemplateId, Dictionary<(string Channel, uint SayInChat), Core.Database.Tables.NpcChatter> Rows)>();
 			foreach (var (template, texts) in byTemplate)
 			{
 				if (!npcByTemplate.TryGetValue(template, out var npc))
@@ -152,11 +160,71 @@ namespace Faolan.Importer.Modules
 				foreach (var row in byKey.Values)
 					ctx.Db.NpcChatter.Add(row);
 
+				captured.Add((npc.TemplateId, byKey));
 				npcs++;
 			}
 
+			// HARVEST the rest of each captured group's conversation from the client's own LDB (#331). A capture only
+			// ever catches the lines an NPC happened to say while someone was recording - five of Lord Ovidius's eleven
+			// - and the client ships the whole set, in PLAINTEXT, at an id computable from the token we already hold.
+			// So this fills in the siblings of every (channel, group) a capture has proved, for the same template.
+			//
+			// ⚠️ ONLY for a group with a SINGLE speaker. A bark group is often a two-hander: `RenownBystanderLovers`
+			// is one conversation shared by the Nobleman and the Noblewoman, and the client's line set interleaves
+			// them (`2` is Lord Ovidius on his sons, `3` is her answering "That's just dreadful, Lord Ovidius"). The
+			// captures assign 3/8/16/23 to her and 6/19 to him, so the split is real - and it is NOT mechanically
+			// recoverable: strict alternation from those anchors reproduces every line except the last, which is hers
+			// and would be given to him. Harvesting a shared group would therefore put her lines in his mouth, which
+			// is worse than the silence it replaces.
+			//
+			// ⚠️ The test is "one captured speaker", which is weaker than "one real speaker" and is the residual
+			// assumption here: `RenownBystanderWomen` is plainly a two-hander too, but both its voices are noblewomen
+			// and only one template was ever captured saying it, so its lines all land on that template. That is the
+			// right call while it holds - a noblewoman saying a noblewoman's line is right either way - and it breaks
+			// the moment a capture shows a second template in the group, which is exactly when this rule stops
+			// harvesting it.
+			//
+			// Slot-free lines only: one carrying `{TopGloryName}` or `{DetectedChar.name}` needs a matching
+			// <parameter> filled from live server state, and adding the row without it would put an unrenderable bark
+			// in an NPC's mouth.
+			//
+			// The row's FormatKey stays EMPTY, and that is correct rather than a gap: the key is only read when a
+			// string is marked encrypted, and this category is not (see BarkCatalog). A harvested line needs no key.
+			if (catalog is { IsPlaintext: true })
+			{
+				var speakers = captured
+					.SelectMany(c => c.Rows.Values.Select(r => (r.Group, r.Channel, r.ChannelCount, c.TemplateId)))
+					.GroupBy(x => (x.Group, x.Channel, x.ChannelCount))
+					.ToDictionary(g => g.Key, g => g.Select(x => x.TemplateId).Distinct().Count());
+
+				foreach (var (templateId, byKey) in captured)
+					foreach (var suffix in byKey.Values.Select(r => (r.Channel, r.ChannelCount, r.Group)).Distinct().ToList())
+					{
+						if (speakers.GetValueOrDefault((suffix.Group, suffix.Channel, suffix.ChannelCount)) != 1)
+							continue; // a two-hander - see above
+
+						foreach (var (sayInChat, text) in catalog.Lines(suffix.Channel, suffix.ChannelCount, suffix.Group))
+						{
+							if (BarkCatalog.HasSlot(text) || byKey.ContainsKey((suffix.Channel, sayInChat)))
+								continue;
+
+							ctx.Db.NpcChatter.Add(new Core.Database.Tables.NpcChatter
+							{
+								NpcTemplateId = templateId,
+								Channel = suffix.Channel,
+								ChannelCount = suffix.ChannelCount,
+								Group = suffix.Group,
+								SayInChat = sayInChat,
+								Category = BarkCatalog.Category,
+								Knubot = 0
+							});
+							harvested++;
+						}
+					}
+			}
+
 			await ctx.Db.SaveChangesAsync();
-			return new ImportResult($"{npcs} NPC templates with chatter, {lines} bark lines.");
+			return new ImportResult($"{npcs} NPC templates with chatter, {lines} captured bark line(s) + {harvested} harvested from the client LDB.");
 		}
 
 		private static byte[]? Body(JsonElement p)
