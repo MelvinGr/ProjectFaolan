@@ -441,7 +441,13 @@ namespace Faolan.GameServer
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
 					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
 					// TradeskillRecipeCodec / docs/subsystems/tradeskill-recipes.md.
-					_ = body.ReadRemainingArray();
+					//
+					// The request carries a handle, an env byte and a version, and NOTHING else - parsed rather than
+					// discarded so a request that ever did carry a recipe id would fail loudly here (#148).
+					var tradeskill = TradeskillRequestCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
+
+					Logger.LogDebug("TradeskillRequestIIR from handle 0x{Handle:X8} (env {Env}) - sending the recipe book.", tradeskill.Handle, tradeskill.Env);
+
 					await SendCraftingRecipeBook(client);
 
 					break;
