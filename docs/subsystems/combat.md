@@ -599,9 +599,25 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
 - **Ground-targeted AoE:** a spell aimed at a reticle POSITION (no locked entity) carries the target Vector3 in
   the trailer (`[u8 kind=0][f32 X/Y/Z BE]…`) and has **no** `SpellTarget`; `CastGroundTarget.TryParse` reads it
   (an entity cast sends `kind=1` and a garbage position). `CombatService.ResolveGroundAoe` then damages every
-  attackable NPC (Disposition ≠ Friendly) within `GroundAoeRadiusUnits` of the reticle — on empty ground it is a
-  no-op like retail. **[V0]** the AoE radius is a single interim constant (no per-spell radius in the RDB spell
-  record) and the channel's per-tick DoT is resolved as one hit on completion.
+  attackable NPC (Disposition ≠ Friendly) within the spell's blast radius of the reticle — on empty ground it is a
+  no-op like retail. A CHANNELED one (`ChannelGroundAoe`) spreads the damage over ticks across the channel and
+  re-checks the blast area each tick, so an NPC that wanders in is picked up; an interrupt stops it.
+
+  **Both numbers are the client's own** (#349), and neither is in the property run — which is why they read as
+  unsourceable for so long:
+  - **Blast radius** = `Spell.AreaRadius`, the `Radius` key (11) of the spell's area-TARGETING GameAction element
+    (`AreaFormula`, `ConeFormula`, `CoreFilteredAreaFormula`, … — `GameActionTypes.AreaTargetKinds`), one region
+    over from the field run. In metres, on 1,023 of the 20,848 spells. ⚠️ NOT the same thing as field 347
+    `SplashRadius`, which is the collateral a single-target hit spills onto bystanders.
+  - **Channel tick interval** = `Spell.ChannelingIntervalMs`, RDB field 447 `ChannelingInterval` (centiseconds
+    ×10), on 516 spells. Corroborated independently: on every spell where a tick interval was also MEASURED off
+    the wire (`Spell.DotIntervalMs`, from captured `StatDamageIIR` gaps) the two agree exactly — Deathly Blizzard
+    2,500 ms, Waves of Flame 1,000, Resting 500 — with no disagreement (`SpellAreaAndChannelTests`).
+
+  **[V0]** the fallbacks remain for a spell the client states neither for. Deathly Blizzard is exactly that case
+  for the radius: it states a channel interval and no area at all, so its blast is server-side and
+  `GroundAoeRadiusUnits` (5 m, where the client's own radius distribution centres) still stands in. A `ConeFormula`
+  spell's arc (keys 212/213) is not modelled — it currently blasts as a ring of the same reach.
 
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `CreateFlowService.SeedStarterEquipment`

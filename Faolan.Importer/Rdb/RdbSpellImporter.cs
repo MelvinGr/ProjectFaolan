@@ -49,7 +49,8 @@ namespace Faolan.Importer.Rdb
 	// families, "War Lord's March", "Mass Ignition", ...).
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=GUI Stacking Order, 125=level, 287=range,
-	// 294=cast, 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=Stacking Order, 79=icon (an id
+	// 294=cast, 347/348/349=the splash triple (radius/damage/max-targets, #626), 447=channel tick interval (#349),
+	// 551=Stacking Order, 79=icon (an id
 	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=GUI Stacking Line
 	// (#590/#634 - see Spell.GuiStackingLine).
 	//
@@ -81,6 +82,11 @@ namespace Faolan.Importer.Rdb
 		private const uint SplashRadiusField = 0x15B;
 		private const uint SplashDamageField = 0x15C;
 		private const uint SplashMaxTargetsField = 0x15D;
+
+		// 447 - how often a CHANNELED spell ticks, in centiseconds (value * 10 = milliseconds), same unit as the cast
+		// time and duration fields. The client names it `ChannelingInterval`; 521 records carry it, one of which is
+		// the developers' "Oysteins Channeltest".
+		private const uint ChannelingIntervalField = 0x1BF;
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
@@ -250,6 +256,10 @@ namespace Faolan.Importer.Rdb
 					? sd / 100f
 					: 0f;
 				var splashMaxTargets = fields.GetValueOrDefault(SplashMaxTargetsField);
+				var channelingIntervalMs = fields.TryGetValue(ChannelingIntervalField, out var ci)
+					? ci * 10
+					: 0u; // centiseconds -> ms
+				var areaRadius = 0u; // metres, filled from the area-targeting elements below (#349)
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
 					: 0u; // centiseconds -> ms
@@ -292,6 +302,12 @@ namespace Faolan.Importer.Rdb
 				// modifiers on a base the client already holds (docs/re/spell-recast-source.md).
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
 				{
+					// #349: the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
+					// which is why the field run has none. Largest wins on a record carrying several (a cone plus a
+					// ring): the radius the spell can reach is the outer one.
+					if (GameActionTypes.AreaTargetKinds.Contains(element.Kind) && element.Value(GameActionTypes.KeyRadius) is { } radius)
+						areaRadius = Math.Max(areaRadius, radius);
+
 					var value = element.Value(GameActionTypes.KeyValue) ?? 0;
 					uint target;
 					if (element.Kind == SetSpellRecastTimeKind)
@@ -348,6 +364,8 @@ namespace Faolan.Importer.Rdb
 						SplashRadius = splashRadius,
 						SplashDamage = splashDamage,
 						SplashMaxTargets = splashMaxTargets,
+						ChannelingIntervalMs = channelingIntervalMs,
+						AreaRadius = areaRadius,
 						DurationMs = durationMs,
 						Level = level,
 						GuiStackingOrder = stackingOrder,
@@ -386,6 +404,8 @@ namespace Faolan.Importer.Rdb
 				spell.SplashRadius = splashRadius;
 				spell.SplashDamage = splashDamage;
 				spell.SplashMaxTargets = splashMaxTargets;
+				spell.ChannelingIntervalMs = channelingIntervalMs;
+				spell.AreaRadius = areaRadius;
 				spell.DurationMs = durationMs;
 
 				// The RDB leads on level, over both the scrapes and the captures (see LevelField).

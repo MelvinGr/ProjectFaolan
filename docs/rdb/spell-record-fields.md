@@ -198,6 +198,38 @@ carries neither.
 ⚠️ **A name is evidence, not a citation.** The id space is shared, so a name is genuinely the client's name for
 that id — but what the property MEANS on a spell still has to be checked against values, and `ManaCost` is the
 worked example: its name is right and reading it as an absolute cost would still be wrong (see above).
+
+## Field 447 `ChannelingInterval` — a name confirmed by a number measured years apart
+
+Imported as `Spell.ChannelingIntervalMs` (centiseconds ×10, like `Duration` and `CastingTimeSeconds`), and it is
+the rare case where a client name can be checked against evidence that never looked at it: `Spell.DotIntervalMs`
+was MEASURED from the gaps between captured `StatDamageIIR` ticks. On every spell where a record carries 447 and
+a same-named record has a measured interval, the two agree **exactly** — Deathly Blizzard 2,500 ms, Waves of
+Flame 1,000 ms, Resting 500 ms — with no disagreement. Gated by `SpellAreaAndChannelTests`.
+
+That also settles the unit: 447's raw `250` on Deathly Blizzard is 2.5 s, not 250 ms.
+
+## The AoE blast radius is NOT in this run — it is a GameAction element key
+
+Three sweeps of the field run looked for a per-spell AoE radius and found none, and that reading was correct
+about *this table*: the answer is one region over. The `[2][9]` element region carries the client's
+area-TARGETING actions, and each states its own `Radius` (key 11 = stat `0x2DD`):
+
+```
+1136242 "Waves of Flame (Rank 1)":  53259 ConeFormula  88=1136241 212=-45 213=90 11=5
+ 144050 "Call of the Bee Hive":     53087 AreaFormula  88=143900 11=5
+```
+
+Key 88 is the sub-spell applied to everyone found inside the radius, so the element IS the AoE: an area, and what
+to do to whatever is in it. Imported as `Spell.AreaRadius` (metres) over
+`GameActionTypes.AreaTargetKinds` — a deliberate subset of the 17 types carrying key 11, because a radius is only
+a blast radius when the element is selecting targets (an `AudioEffect`'s is a sound falloff, an
+`AOERadiusModification`'s adjusts someone else's). 1,023 spells carry one. Dump a record's elements with
+`--report spell-template --report-arg <id>`.
+
+⚠️ Do not read `SplashRadius` (347) as this. Splash is the collateral a SINGLE-target hit spills onto bystanders;
+this is the area the spell targets to begin with. They are different fields, different units (metres vs metres
+×100) and a few spells carry both.
 Some do read straight through (`StaminaCurrent` 7700 on 398 records is a stamina cost;
 `SecondaryMagicRating`'s values 932–937 are themselves the `MagicRatingFire..Poison` stat ids). Others are
 Anarchy-Online inheritance wearing a stat id — `AwardedOmniTekTokens` on 8,505 spell records is a ladder of

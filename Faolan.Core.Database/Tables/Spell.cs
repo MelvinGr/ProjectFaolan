@@ -163,6 +163,30 @@ namespace Faolan.Core.Database.Tables
 		// nobody looked.
 		public uint DotIntervalMs { get; set; }
 
+		// How often a CHANNELED spell ticks while its cast bar runs, in milliseconds. From RDB field 0x1BF (447), which
+		// the client names `ChannelingInterval` and which is in CENTISECONDS like the cast-time and duration fields, so
+		// it is stored ×10 as real ms. 521 of 21,502 records carry it - and one of them is the developers' own
+		// "Oysteins Channeltest", which is about as direct a statement of what the field is for as the data gets.
+		// 0 = not a channeled spell (the overwhelming majority).
+		//
+		// Distinct from DotIntervalMs, which is the tick of a debuff that ticks AFTER the cast lands and is measured
+		// off the wire. This one is stated by the client and governs the cast itself: the channeled ground AoE
+		// (CombatService.ChannelGroundAoe, #349) spreads the spell's damage across `channel / this` ticks.
+		public uint ChannelingIntervalMs { get; set; }
+
+		// The blast radius of an AREA spell, in metres. NOT a property field - it is a GameAction ELEMENT key
+		// (`Radius`, key 11 = stat 0x2DD) on the kinds that select targets in an area, read by key out of the same
+		// [2][9] region as the recast (GameActionTypes.AreaTargetKinds). Which is why the "no per-spell AoE radius
+		// exists" reading held for so long: the property run genuinely has none, and the answer was one region over.
+		//
+		// ⚠️ Distinct from SplashRadius (field 347), which 231 records carry: splash is the collateral a SINGLE-target
+		// hit spills onto bystanders, this is the area the spell targets in the first place. A few spells carry both.
+		// Also distinct in UNIT - a metre here, a metre ×100 there.
+		//
+		// 0 = the spell defines no area (it is single-target, or its area is server-side). Read by
+		// CombatService.ApplyAoeTick as the ground-AoE blast radius, falling back to its interim constant.
+		public float AreaRadius { get; set; }
+
 		// Buff/effect duration in milliseconds. Imported from RDB field 0x008, which is in CENTISECONDS (×10ms - the
 		// same unit as the cast-time field; calibrated in-client: Rend 700->7s, Butcher 400->4s, Exhausted 10000->100s),
 		// so it is stored here ×10 as real ms. 0 = no self-duration on this record (an instant spell, or an ability

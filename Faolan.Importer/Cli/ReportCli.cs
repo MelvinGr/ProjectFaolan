@@ -501,6 +501,20 @@ namespace Faolan.Importer.Cli
 
 						var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
 						Console.WriteLine($"  {id}: mag(551)={mag}  region[{mods.Count}]: {modStr}");
+
+						// The same region read as GAME ACTION ELEMENTS, addressed BY KEY. The pair view above is the
+						// stat-modifier lens; several kinds carry no stat at all and are invisible through it - the
+						// AoE radius (key 11 on the Area* kinds), the recast setters, the particle/script actions. A
+						// spell's mechanics live here, so print every element with its kind name and named keys.
+						foreach (var el in ItemTemplateStatModifiers.ParseElements(b.AsSpan(12)))
+						{
+							var type = GameActionTypes.Get(el.Kind);
+							var keys = type == null
+								? string.Join(" ", el.Values.Select((v, i) => $"[{i}]={v}"))
+								: string.Join(" ", type.Keys.Select((k, i) => $"{k}={(i < el.Values.Length ? el.Values[i].ToString() : "-")}"));
+							var texts = string.Join(" ", el.Texts.Where(t => !string.IsNullOrEmpty(t)).Select(t => $"\"{t}\""));
+							Console.WriteLine($"      {el.Kind} {type?.Name ?? "?"}  {keys} {texts}".TrimEnd());
+						}
 					}
 
 					return 0;

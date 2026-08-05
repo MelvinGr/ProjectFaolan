@@ -3476,7 +3476,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Id")
                         .HasColumnType("INTEGER");
 
+                    b.Property<float>("AreaRadius")
+                        .HasColumnType("REAL");
+
                     b.Property<ushort>("CastTime")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ChannelingIntervalMs")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Description")

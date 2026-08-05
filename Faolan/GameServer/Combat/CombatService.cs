@@ -28,13 +28,15 @@ namespace Faolan.GameServer.Combat
 	// a per-session CombatState backs NPCs not in the model (e.g. the built-NPC test). See protocol_stats_and_combat.
 	public sealed class CombatService
 	{
-		// The blast radius (world units) a ground-targeted AoE damages around its reticle position.
-		// [V0: a single interim radius - the real per-spell AoE radius is not in the RDB spell record or any bulk
-		// source we import (Spell has only Range = cast distance). Source it per spell - see Gitea follow-up.]
+		// The blast radius (world units) a ground-targeted AoE damages around its reticle position, for a spell the
+		// client states none for. The per-spell radius is `Spell.AreaRadius` (#349) - the `Radius` key of the spell's
+		// area-targeting GameAction element - and 1,023 of the 20,848 spells carry one. This is the fallback for the
+		// rest, and Deathly Blizzard is one of them: it has a stated channel interval but no stated area, so its blast
+		// really is server-side. 5 m is where the client's own distribution centres (5 m x201, 6 m x160, 4 m x86).
 		public const float GroundAoeRadiusUnits = 5f;
 
-		// The channel tick interval (ms) for a channeled ground AoE. [V0: a gameplay approximation - the exact retail
-		// cadence is muddied in the mixed casting-combat capture; each tick's DamageResult packet is byte-exact.]
+		// The channel tick interval (ms) for a channeled spell the client states none for. The per-spell value is
+		// `Spell.ChannelingIntervalMs` (RDB field 447 `ChannelingInterval`, 516 spells). Kept as the fallback only.
 		private const int GroundAoeTickIntervalMs = 1500;
 
 		// The stat a spell-damage StatDamageIIR reports against (retail's outgoing spell hits use statId 0x0a in the
@@ -88,14 +90,23 @@ namespace Faolan.GameServer.Combat
 			var casterLevel = client.Session.Character.Level;
 			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamageFor(spellId) ?? 0,
 				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0);
-			var tickCount = Math.Max(1, channelMs / GroundAoeTickIntervalMs);
+
+			// The client STATES the cadence: RDB field 447 `ChannelingInterval` (#349). Corroborated where the two
+			// sources overlap - Deathly Blizzard's 2,500 ms, Waves of Flame's 1,000 and Resting's 500 are each exactly
+			// what the captured StatDamage gaps measured independently (Spell.DotIntervalMs), on all three and with no
+			// disagreement. Only a spell the client states none for falls back to the constant.
+			var spell = await _database.GetSpell(spellId);
+			var intervalMs = spell?.ChannelingIntervalMs > 0
+				? (int)spell.ChannelingIntervalMs
+				: GroundAoeTickIntervalMs;
+			var tickCount = Math.Max(1, channelMs / intervalMs);
 			var perTick = Math.Max(1, total / tickCount);
 
 			try
 			{
 				for (var tick = 0; tick < tickCount; tick++)
 				{
-					await Task.Delay(GroundAoeTickIntervalMs);
+					await Task.Delay(intervalMs);
 					if (client.Session.Account == null)
 						return; // disconnected
 					if (client.Session.ActiveCastToken != castToken)
@@ -347,7 +358,7 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(client, player.ToCurrentsBlock(), client.Session.Character.Id);
 		}
 
-		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
+		// Damages every attackable NPC within the spell's blast radius of `target` for one tick: shows the floating
 		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
 		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
 		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
@@ -357,9 +368,15 @@ namespace Faolan.GameServer.Combat
 			if (player == null)
 				return 0;
 
+			// Per-spell where the client states one (Spell.AreaRadius, #349); GroundAoeRadiusUnits otherwise.
+			var spell = await _database.GetSpell(spellId);
+			var radius = spell?.AreaRadius > 0
+				? spell.AreaRadius
+				: GroundAoeRadiusUnits;
+
 			var victims = _sim
 				.World.ZoneForEntity(player)
-				.EntitiesInRange(target, GroundAoeRadiusUnits, casterHandle)
+				.EntitiesInRange(target, radius, casterHandle)
 				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
 				.Select(e => e.Handle)
 				.ToList();

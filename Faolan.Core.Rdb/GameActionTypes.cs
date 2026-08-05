@@ -54,6 +54,7 @@ namespace Faolan.Core.Rdb
 		public const int KeyValue = 39;
 		public const int KeyAmount = 175;
 		public const int KeySpell = 88;    // the slot SpellStatModifier carries where SpellLineStatModifier has KeyLine
+		public const int KeyRadius = 11;   // stat 0x2DD, client-named `Radius` - metres, carried by 17 of the 260 types
 
 		// The four slots of the INTERPOLATED family (53220 `InterpolatedModify`, 53221 `InterpolatedTempChangeSkill`,
 		// 53068 `InterpolatedModifyAsRating`, all `[Stat, 174, 172, 175, 173]`). The client names 174 `Substate` and
@@ -148,6 +149,32 @@ namespace Faolan.Core.Rdb
 		///     </para>
 		/// </summary>
 		public static readonly HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
+
+		/// <summary>
+		///     The kinds whose <see cref="KeyRadius" /> is a spell's AREA OF EFFECT - the elements that SELECT the
+		///     targets an area spell lands on, and so the one place the client states an AoE's blast radius (Gitea
+		///     #349). Every one of them pairs the radius with the thing to apply inside it: `KeySpell` for the five
+		///     formula kinds (the sub-spell put on everyone found) and `KeyStat` for `AreaHit` (a stat hit directly).
+		/// </summary>
+		/// <remarks>
+		///     17 types carry key 11 and this is deliberately NOT all of them - a radius is only an AoE when the
+		///     element is doing target selection. The excluded ones are an audio falloff (`AudioEffect`), a facility
+		///     range (`SetTradingPostAccess`), the three MODIFIER kinds that adjust someone else's radius rather than
+		///     state one (`AOERadiusModification`, `LineAOERadiusModification`, `GlobalAOERadiusModification`), the
+		///     melee cleave add-targets (`ColumnAddTargets`, `AddCleaveTargets`, `AttackAddTargets`, which extend a
+		///     swing rather than define a blast), `AreaKnockback` (a displacement, not the damage area) and
+		///     `TimedEffect` (a duration kind that happens to carry one).
+		/// </remarks>
+		public static readonly HashSet<uint> AreaTargetKinds =
+		[
+			53018, // AreaRangeFormula        [88 Spell, 2, 11 Radius]
+			53073, // AreaHit                 [0 Stat, 2, 37, 71, 11 Radius]
+			53087, // AreaFormula             [88 Spell, 11 Radius]
+			53088, // FilteredAreaFormula     [88 Spell, 11 Radius, 170, 93, 250]
+			53096, // CoreFilteredAreaFormula [88 Spell, 11 Radius, 170, 93, 250, 66, 67, 138, 212, 2]
+			53159, // CoreRandomPointAreaFormula [88 Spell, 11 Radius, 170, 171]
+			53259  // ConeFormula             [88 Spell, 212 from-angle, 213 to-angle, 11 Radius]
+		];
 
 		/// <summary>
 		///     The id space the client asserts on, straight out of the descriptor lookup `FUN_008c3910`:
