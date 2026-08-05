@@ -7,23 +7,19 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Proves the create-editor SCENE CHARACTERS (the SimpleCharFullUpdateIIR / FA015807 records the initial burst
-	// streams) are CONSTRUCTED, not replayed: CreateEditorCharBuilder.Reconstruct PARSES each into the typed
-	// SimpleCharFullUpdateIIR and re-BUILDS it, setting the session's playfield on the model, and reproduces the
-	// captured record byte-for-byte (issue #189, "the 5 remaining").
+	// The create-editor SCENE CHARACTERS (the SimpleCharFullUpdateIIR / FA015807 records the initial burst streams)
+	// are built from TYPED DATA and reproduce retail byte-for-byte (#189, #364).
 	//
-	// ⚠️ Nothing inside the record is carried verbatim any more (#364). This gate used to say the pre-IIR held
-	// "session-specific heap pointers/handles that no DB column holds" and that 5 of 6 post-IIR tables were a form
-	// the codecs refuse - both were true when written and neither survived #466/#475/#477: the pre-IIR is
-	// SpawnPreIir's 53 NAMED stat words and the post-IIR is SpawnPostIir's typed stream, so all six records parse
-	// and re-encode whole.
+	// The gate used to be that each record reconstructed from ITS OWN BYTES - real construction, but the data was still
+	// the capture. It is now `CreateEditorScene`, generated from the burst and emitted as typed values, so the build
+	// side touches no captured bytes at all. That is the whole of #364's "sourcing the scene from rows rather than from
+	// these bytes", minus a DB table it does not need: the scene is five fixed pedestals, not content anyone edits.
 	//
-	// And the words that looked irreducible are the retail server's own uninitialised memory. Resolving the slots
-	// they sit in names them `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`,
-	// `Onslaught2SpecialsKilled` and the like - a create-editor pedestal has no seasonal PvP record, so
-	// `PvPAnnihilationMatchesWonSeasonal = 0x7151E7E0` is a leaked pointer in a stat slot, not data. The live
-	// avatar in the same burst carries none of them (only the category word + the 15.0 constant), which is exactly
-	// SpawnPreIirs.Minimal. What is still not done is SOURCING the scene from rows rather than from these bytes.
+	// ⚠️ Some pre-IIR words are the retail server's own uninitialised memory. Resolving the slots they sit in names them
+	// `PvPAnnihilationMatchesWonSeasonal`, `PvPCTFMatchesLostSeasonal`, `Onslaught2SpecialsKilled` and the like - a
+	// create-editor pedestal has no seasonal PvP record, so `0x7151E7E0` in that slot is a leaked pointer, not data.
+	// They are reproduced because the gate is byte-exactness against retail; dropping them would be a behavioural
+	// change needing an in-client check. The live avatar carries none of them.
 	public class CreateEditorSceneCharTests
 	{
 		private readonly ITestOutputHelper _o;
@@ -33,38 +29,43 @@ namespace Faolan.Tests
 			_o = o;
 		}
 
+		// THE gate for #364: each pedestal is rebuilt from the generated TYPED DATA - no captured bytes involved on
+		// the build side at all - and must reproduce the captured record exactly. This is what makes CreateEditorScene
+		// a parse of the capture rather than a transcription of it: a wrong emit cannot pass here.
 		[Fact]
-		public void EverySceneChar_ReconstructsFromItself_ByteExact()
+		public void EverySceneChar_BuildsFromTypedData_ByteExact()
 		{
-			var records = ExtractBurstCharRecords();
-			Assert.Equal(6, records.Count); // 5 fixed scene chars + the live "Character..." preview
+			var captured = ExtractBurstCharRecords();
+			var scene = Faolan.Core.Network.Constants.CreateEditorScene.All;
+			Assert.Equal(captured.Count, scene.Count);
 
-			foreach (var (name, record) in records)
+			for (var i = 0; i < captured.Count; i++)
 			{
-				// Reconstruct takes the BODY and returns the whole RECORD (sub-opcode included), so the caller never
-				// names the IIR - #542.
-				var rebuilt = CreateEditorCharBuilder.Reconstruct(record[4..], CreateEditorCharBuilder.EditorPlayfieldInstance);
-				_o.WriteLine($"{name}: {(Convert.ToHexString(record) == Convert.ToHexString(rebuilt!) ? "ok" : "DIFF")}");
-				Assert.Equal(Convert.ToHexString(record), Convert.ToHexString(rebuilt!));
+				var built = SimpleCharFullUpdateCodec.Build(scene[i]());
+				Assert.Equal(Convert.ToHexString(captured[i].Record), Convert.ToHexString(built));
 			}
 		}
 
+		// The session's playfield token is stamped on the MODEL and rides the ordinary codec - it is not patched into
+		// bytes. Everything else in the record must be untouched by that, which is what this pins.
 		[Fact]
-		public void Reconstruct_ThreadsPlayfieldInstance()
+		public void ThePlayfieldToken_IsTheOnlyThingTheSessionChanges()
 		{
-			var record = ExtractBurstCharRecords()[0].Record;
+			var captured = ExtractBurstCharRecords()[0].Record;
 			const uint liveToken = 0x004FE1A8;
 
-			var rebuilt = CreateEditorCharBuilder.Reconstruct(record[4..], liveToken);
+			var scene = Faolan.Core.Network.Constants.CreateEditorScene.Pedestals[0]();
+			scene.Playfield = liveToken;
+			var rebuilt = SimpleCharFullUpdateCodec.Build(scene);
 
 			// only the 4-byte playfield varint changes (transform `18 <varint>` at body offset 53 for a char, i.e. 57
 			// into the record)
-			Assert.Equal(record.Length, rebuilt!.Length);
+			Assert.Equal(captured.Length, rebuilt.Length);
 			const int varintOffset = 4 + 53;
-			for (var i = 0; i < record.Length; i++)
+			for (var i = 0; i < captured.Length; i++)
 			{
 				if (i is < varintOffset or >= varintOffset + 4)
-					Assert.Equal(record[i], rebuilt[i]);
+					Assert.Equal(captured[i], rebuilt[i]);
 			}
 		}
 
