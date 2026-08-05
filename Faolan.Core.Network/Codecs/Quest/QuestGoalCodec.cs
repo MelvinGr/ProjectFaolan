@@ -5,7 +5,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// QuestGoalIIR (0x4E2C93A1, 33 B) - one objective's progress.
+	// QuestGoalIIR (0x0774C8C1, 33 B) - one objective's progress.
 	//   [subop][class][playerHandle][u8 0x01][u32 questId][u32 goalId][u32 w1][u32 w2][u32 w3]
 	//
 	// The three trailing words are ONE value - the update KIND - not a count plus padding. They were modelled as
@@ -79,6 +79,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 	}
 
-	// QuestGoalIIR (0x4E2C93A1).
+	// QuestGoalIIR (0x0774C8C1).
 	public sealed record QuestGoalIIR(uint PlayerHandle, uint QuestId, uint GoalId, QuestGoalUpdate Update);
 }

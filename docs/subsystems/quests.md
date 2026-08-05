@@ -139,6 +139,36 @@ those objectives still cannot complete — **51 of the 74** referenced items are
 but their templates are `RDBH`-encrypted with a per-item key only a capture yields, so this is a catalog-coverage
 gap, not a quest bug.
 
+## A goal update has three shapes, and the QUEST picks which one
+
+What a goal move puts on the wire is decided by the state of the **quest**, not by the goal or by what triggered
+it. There are exactly three shapes across the corpus:
+
+| the goal | what retail sends |
+|---|---|
+| moved, still short of its count | `QuestGoal(Progress)` |
+| met, and the quest still has an unfinished goal | `QuestGoal(Satisfied)`, `QuestGoal(Advanced)` |
+| met, and that was the last one | `QuestGoal(Satisfied)`, `QuestIIR` 2 (active), `QuestIIR` 4 (completed) |
+
+Two things follow that are easy to get wrong in either direction.
+
+**`Advanced` closes the goal being left behind — it does not open the next one.** It rides in the *same frame*
+as that goal's own `Satisfied`; the successor's `Satisfied` lands whenever the successor is actually solved,
+which in the corpus is 34 s to 8 minutes later. All ten sightings are that pair, on four quests:
+12371 g3495→g3497, 10238 g1448→g3490, 12369 g7134→g3492 and 10287 g400→g7363.
+
+**A `QuestIIR` means the quest changed state, so it appears only on the third shape.** The fourteen captured
+`Progress`/`Advanced` frames carry none — an active-refresh after every objective tick is a packet retail does
+not send.
+
+The completing packet names the goal that **just** completed. On a single-goal quest that is also the quest's
+head goal, which is why naming `QuestDefinition.GoalId` looked right for so long; on a multi-goal quest it is
+not (12371 closes on 3497 while its head goal is 3495).
+
+*Sources:* `xxx_mage-necromancer_login_play2_tortage_city_first-quests` fr4247/4815/4872/5488,
+`Hoxxling_mage-heraldofxotli_login_gameplay2` fr4310/4367/4447/5102 and `…_login_gameplay` fr3633/3634/11942,
+`xxx_mage-{demo,necromancer}_login_play*`, `loot-drag-1538` fr2843. Gated by `QuestGoalHandoffTests`.
+
 ## Turn-in: the text goes out first, the state follows it
 
 There is **no separate turn-in or reward node** to look for. Retail's turn-in screen *is* the in-progress

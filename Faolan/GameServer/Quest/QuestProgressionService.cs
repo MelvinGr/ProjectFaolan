@@ -232,7 +232,7 @@ namespace Faolan.GameServer.Quest
 				if (await AllGoalsComplete(character.Id, quest, def, goal, required))
 					await CompleteObjective(client!, character, quest, def!, goal, required);
 				else
-					await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, QuestGoalUpdate.Satisfied); // this goal done, others pending
+					await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, true); // this goal done, others pending -> Satisfied + Advanced
 
 				_logger.LogInformation("Quest {Quest} goal {Goal} solved (reach) for {Char}.", quest.QuestId, goalId, character.Name);
 			}
@@ -369,9 +369,8 @@ namespace Faolan.GameServer.Quest
 
 				// Objective tick (e.g. 2/5 kills, or one of several goals done): refresh the HUD, leave the quest Active.
 				// A tick that REACHES the required count says Satisfied even though the quest as a whole is not done -
-				// that is what retail sends on the third of three stone bricks (#525).
-				await SendGoalUpdate(client!, quest.QuestId, goal.GoalId,
-					progress >= required ? QuestGoalUpdate.Satisfied : QuestGoalUpdate.Progress);
+				// that is what retail sends on the third of three stone bricks (#525), and it closes with Advanced.
+				await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, progress >= required);
 				await _agents.SendSystemMessage(character.Id, $"Objective {progress}/{required}.");
 			}
 
@@ -437,10 +436,10 @@ namespace Faolan.GameServer.Quest
 		// Complete stage N and supersede it with stage N+1: the captured wire sequence + the state flip (mark N
 		// Completed, grant N+1 Active with its goal seeded). The next stage's QuestFullUpdate is what makes the client
 		// swap the displayed quest in place (no QuestLogList - the supersession reuses the existing log slot, fr1356).
-		private async Task CompleteAndSupersede(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def)
+		private async Task CompleteAndSupersede(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, uint goalId)
 		{
 			var required = Math.Max(quest.GoalRequired, 1);
-			await SendStageCompletion(client, quest.QuestId, def.GoalId);
+			await SendStageCompletion(client, quest.QuestId, goalId);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
 
 			// Reached only via CompleteObjective's `NextQuestId is not null` guard, so the successor id is present.
@@ -480,9 +479,9 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// The final stage of a chain (or a chainless loot/talk goal) - complete it outright, no successor to grant.
-		private async Task CompleteFinal(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, uint required)
+		private async Task CompleteFinal(INetworkClient client, Character character, CharacterQuest quest, uint goalId, uint required)
 		{
-			await SendStageCompletion(client, quest.QuestId, def.GoalId);
+			await SendStageCompletion(client, quest.QuestId, goalId);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
 			_logger.LogInformation("Quest {Quest} completed for {Char} (chain end).", quest.QuestId, character.Name);
 			await _agents.SendSystemMessage(character.Id, "Quest complete!");
@@ -493,14 +492,19 @@ namespace Faolan.GameServer.Quest
 		// differs. Supersede to the next stage, hold for turn-in (legacy #47 chainless kill), or complete outright, then
 		// run the goal's completion side-effects. Keyed off the GOAL (its type + target), not the trigger, so both callers
 		// share one code path. Does NOT run RefreshQuestVisibility - the caller does that once after its loop.
+		//
+		// The completion packet names the goal that JUST completed, not `def.GoalId`. On a single-goal quest those are
+		// the same id, which is why the difference went unseen; on a multi-goal quest retail closes 12371 on g3497,
+		// 10238 on g3490 and 10287 on g7363 - the LAST goal - while `def.GoalId` holds the quest's head goal (3495,
+		// 1448, 400). [V2: same four captures as the Advanced pairs above]
 		private async Task CompleteObjective(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal, uint required)
 		{
 			if (def.NextQuestId is not null)
-				await CompleteAndSupersede(client, character, quest, def); // the escort follow / beach wall fire from here when the NEXT stage is an Escort
+				await CompleteAndSupersede(client, character, quest, def, goal.GoalId); // the escort follow / beach wall fire from here when the NEXT stage is an Escort
 			else if (goal.GoalType == QuestGoalType.Kill)
-				await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
+				await ObjectiveCompleteAwaitTurnIn(client, character, quest, goal.GoalId, required); // legacy #47 (chainless kill)
 			else
-				await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
+				await CompleteFinal(client, character, quest, goal.GoalId, required); // chainless loot/talk -> just complete
 		}
 
 		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
@@ -516,10 +520,10 @@ namespace Faolan.GameServer.Quest
 		// marked Completed when the player turns it in at the giver (ConversationService.TryTurnInQuests). The '?' giver
 		// marker then appears. Preserved so a future standalone kill-and-return quest still works; the Casilda chain
 		// (every stage has a successor) never reaches here.
-		private async Task ObjectiveCompleteAwaitTurnIn(INetworkClient client, Character character, CharacterQuest quest, QuestDefinition def, uint required)
+		private async Task ObjectiveCompleteAwaitTurnIn(INetworkClient client, Character character, CharacterQuest quest, uint goalId, uint required)
 		{
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Active, required, quest.GoalRequired, quest.GoalTargetName);
-			await _outbound.SendQuestGoal(client, quest.QuestId, def.GoalId, QuestGoalUpdate.Satisfied);
+			await _outbound.SendQuestGoal(client, quest.QuestId, goalId, QuestGoalUpdate.Satisfied);
 			await _outbound.SendQuestIir(client, quest.QuestId, QuestCodec.StateActive);
 			await _agents.SendSystemMessage(character.Id, $"Objective complete ({required}/{required}). Return to the quest giver.");
 		}
@@ -532,12 +536,29 @@ namespace Faolan.GameServer.Quest
 				await _database.SetCharacterQuestGoal(characterId, quest.QuestId, goal.GoalId, progress);
 		}
 
-		// The HUD update for a goal that moved but did NOT complete the whole quest: the goal update + a journal
-		// active-refresh, leaving the quest Active. (Completion sends the 2->4 sequence via CompleteObjective instead.)
-		private async Task SendGoalUpdate(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
+		// The HUD update for a goal that moved but did NOT finish the whole quest. Retail has exactly two shapes here,
+		// and NEITHER carries a QuestIIR - the journal state flip (Active 2 -> Completed 4) belongs to completion only
+		// (SendStageCompletion):
+		//
+		//   still short of the count  ->  QuestGoal(Progress)
+		//   count reached, quest not done  ->  QuestGoal(Satisfied), QuestGoal(Advanced)
+		//
+		// Advanced (#527) is the hand-off marker on the goal being LEFT BEHIND: it rides in the same frame as that
+		// goal's own Satisfied, and the SUCCESSOR goal's Satisfied follows whenever it is actually solved (up to eight
+		// minutes later in the corpus) - so it is not "the next goal opened", it is "this one closed".
+		//
+		// [V2: all 10 captured Advanced sightings are that pair - 10238 g1448, 12369 g7134, 12371 g3495, 10287 g400
+		// across Hoxxling_mage-heraldofxotli_login_gameplay{,2}, xxx_mage-{demo,necromancer}_login_play*,
+		// loot-drag-1538. The last goal of a quest (10238 g3490, 12369 g3492, 12371 g3497, 10287 g7363) sends
+		// Satisfied then QuestIIR 2/4 and no Advanced. No QuestIIR appears in any Progress/Advanced frame.]
+		private async Task SendGoalUpdate(INetworkClient client, uint questId, uint goalId, bool satisfied)
 		{
-			await _outbound.SendQuestGoal(client, questId, goalId, update);
-			await _outbound.SendQuestIir(client, questId, QuestCodec.StateActive);
+			await _outbound.SendQuestGoal(client, questId, goalId, satisfied
+				? QuestGoalUpdate.Satisfied
+				: QuestGoalUpdate.Progress);
+
+			if (satisfied)
+				await _outbound.SendQuestGoal(client, questId, goalId, QuestGoalUpdate.Advanced);
 		}
 
 		// The shared head of every completion: QuestGoal (the goal is met) then QuestIIR active(2) -> completed(4).
