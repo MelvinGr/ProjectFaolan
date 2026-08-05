@@ -51,19 +51,49 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public QuestState? ConditionQuestState { get; set; }
 
+		// The GREETING-COUNT gate (#645): retail's NPCs open with a full welcome the first time a player opens their
+		// window and a terse line every time after - Elethia's "Hello.{social greet}" becomes "What now?", Sancha's
+		// "Anything for a paying customer." becomes "Hmm? Yes?". NULL is the unconditional root (nearly all of them:
+		// the split is conflict-driven, so only an NPC the corpus caught saying two different things gets one), false
+		// serves only on a first meeting, true only on a repeat.
+		//
+		// ⚠️ NOT SETTLED, and the competing reading is that retail simply picks a greeting at RANDOM. What the corpus
+		// says, over all 21 sequences where one capture opens an NPC's window more than once:
+		//   - a line NEVER recurs once a different one has appeared (0 of ~12 opportunities). Random predicts A>B>A.
+		//   - 8 NPCs greeted 2-4 times give the SAME line every time (Turach four times), so re-greeting does not by
+		//     itself reroll anything.
+		//   - of the four NPCs this gate covers, only two are informative: Sancha and Elethia, both A>B>B. Dathos and
+		//     Ulfheoinn were opened twice, and with two openings and two lines the first ALWAYS differs, so they say
+		//     nothing. Two informative cases is 9:1 for a counter over a uniform draw - suggestive, not decisive.
+		// The text is what tips it: `{social greet}` is on the first line and absent from the second, and "What now?" /
+		// "Hmm? Yes?" are not first-contact lines. This model also reproduces every captured sequence exactly, which a
+		// random pick does not. Nothing in a capture can separate the two outright, so treat it as the best-supported
+		// reading rather than a decoded fact.
+		//
+		// Whether retail's own flag is per SESSION or per character for life is likewise undecidable here - no capture
+		// has one character meet one of these four NPCs across two dumps - so the runtime holds it per session, which
+		// is the reading a single capture supports.
+		public bool? RepeatGreeting { get; set; }
+
 		public uint NodeId { get; set; }
 
 		[ForeignKey(nameof(NodeId))]
 		public virtual ConversationNode Node { get; set; } = null!;
 
-		public static uint ComputeId(uint npcTemplateId, ConversationTrigger trigger, uint? triggerWorldObjectId, uint? conditionQuestId, QuestState? conditionQuestState)
+		public static uint ComputeId(uint npcTemplateId, ConversationTrigger trigger, uint? triggerWorldObjectId, uint? conditionQuestId, QuestState? conditionQuestState,
+			bool? repeatGreeting)
 		{
-			return DerivedKey.From(npcTemplateId, (uint)trigger, triggerWorldObjectId, conditionQuestId, conditionQuestState);
+			return DerivedKey.From(npcTemplateId, (uint)trigger, triggerWorldObjectId, conditionQuestId, conditionQuestState, repeatGreeting switch
+			{
+				null => null,
+				false => (uint?)0,
+				true => 1
+			});
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(NpcTemplateId, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState);
+			return ComputeId(NpcTemplateId, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState, RepeatGreeting);
 		}
 
 		public override string ToString()

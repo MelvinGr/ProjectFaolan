@@ -171,7 +171,16 @@ namespace Faolan.GameServer.Dialogue
 				? []
 				: await _database.GetCharacterQuests(character.Id);
 
-			var opening = PickByLatestQuest(roots, quests) ?? Array.Find(roots, r => r.ConditionQuestId == null);
+			// Retail's greeting is not one line: an NPC opens with a full welcome the first time a player opens his
+			// window and a terse one every time after - Elethia's "Hello.{social greet}" becomes "What now?" (#645). Only
+			// four NPCs in the corpus were captured saying both, so the column is null on nearly every root and this
+			// narrows nothing; where it is set, the roots for the OTHER meeting must not be candidates at all.
+			var repeat = !client.Session.GreetedConversationNpcs.Add(npcTemplateId);
+			var eligible = Array.FindAll(roots, r => r.RepeatGreeting == null || r.RepeatGreeting == repeat);
+			if (eligible.Length == 0)
+				eligible = roots; // the captures only ever caught this NPC on the other meeting - serve what we have
+
+			var opening = PickByLatestQuest(eligible, quests) ?? Array.Find(eligible, r => r.ConditionQuestId == null);
 			if (opening == null)
 				return null;
 

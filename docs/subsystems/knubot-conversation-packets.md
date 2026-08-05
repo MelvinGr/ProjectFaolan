@@ -173,6 +173,46 @@ dropped: adding a capture got nothing, renaming one lost the gate. Deriving it i
 greeting and adds four further chain-stage variants (`12369` / `12373` / `12407`), and turns the old
 `13480 Completed` post-freeing gate into `12407 Active` — the same beat, stated by the data.
 
+### The greeting-count gate — the second condition kind (Gitea #645)
+
+Quest state is not the only thing retail varies a screen on. Six groups it could not split were decrypted, and
+four of them are the same pair: a **full welcome the first time a player opens the window, and a terse line every
+time after** — with an *identical* option list on both.
+
+| NPC | first meeting | repeat |
+|---|---|---|
+| Elethia (`9129`) | `10612` *"{social greet}Hello."* | `10614` *"What now?"* |
+| Sancha (`10992`) | `16899` *"Anything for a paying customer."* | `16900` *"Hmm? Yes?"* |
+| Dathos (`14477`) | `29083` *"We are all travelers."* | `29085` *"Our paths have crossed."* |
+| Ulfheoinn (`21642`) | `58287` *"Well met, warrior."* | `58288` *"There is strength in your eyes, friend."* |
+
+`ConversationEntry.RepeatGreeting` carries it: null on nearly every root (the split is conflict-driven, like the
+quest one), false serves only a first meeting, true only a repeat. The runtime holds the set of greeted NPC
+templates per session (`NetworkClientSession.GreetedConversationNpcs`) and narrows the candidate roots before the
+quest gate runs. `ConversationVariants` only takes the split when the flag separates the group **cleanly** — two
+classes, every capture of one on a first meeting and every capture of the other on a repeat; anything looser is a
+correlation and is left to the packet-count tiebreak with the report saying so.
+
+⚠️ **Best-supported reading, not a decoded fact.** The competing explanation is that retail picks a greeting at
+random. What the corpus says, over all 21 sequences where one capture opens an NPC's window more than once:
+
+- a line **never recurs** once a different one has appeared — 0 of ~12 opportunities. A random draw predicts `A>B>A`.
+- 8 NPCs greeted 2–4 times give the **same** line every time (Turach four times), so re-greeting does not by itself
+  reroll anything.
+- of the four NPCs above only **two are informative**: Sancha and Elethia, both `A>B>B`. Dathos and Ulfheoinn were
+  opened twice, and with two openings and two lines the first *always* differs, so they say nothing. Two informative
+  cases is 9:1 for a counter over a uniform draw — suggestive, not decisive.
+
+The text is what tips it: `{social greet}` is on the first line and absent from the second, and *"What now?"* /
+*"Hmm? Yes?"* are not first-contact lines. This model also reproduces every captured sequence exactly, which a
+random pick does not. Whether retail's flag is per session or per character for life is likewise undecidable — no
+capture has one character meet these NPCs across two dumps — so the runtime holds it per session.
+
+The two groups this does **not** explain stay reported: Casilda's `0>0>0>0>0` farewell (three variants —
+*"Farewell, then."* / *"I'll never forget your help."* / *"Gods go with you."*, plainly chain beats the captured
+state cannot separate) and Cavan's greeting, whose two variants differ in their **option list** too (`6416`
+*[HELPING THE SETTLEMENT]* present on one), so its condition is quest availability rather than a greeting count.
+
 ### Session slots — regenerated, never stored (#417)
 
 A screen carries no dialogue text: `id`+`category` name a string in the CLIENT's LDB and each `<parameter>` fills

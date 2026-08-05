@@ -1212,6 +1212,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool?>("RepeatGreeting")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Trigger")
                         .HasColumnType("INTEGER");
 

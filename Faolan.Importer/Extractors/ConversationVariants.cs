@@ -66,6 +66,25 @@ namespace Faolan.Importer.Extractors
 				}
 
 				var (gates, unsplit) = Discriminate(classes);
+
+				// The quest state is not the only condition retail varies a screen on. When it cannot tell the variants
+				// apart, try the GREETING COUNT: an NPC says a full welcome the first time you open his window and a
+				// terse line every time after ("Hello.{social greet}" -> "What now?"), which is four of the six screens
+				// #645 reported. Only taken when the flag splits the group CLEANLY and UNANIMOUSLY - two classes, one
+				// captured only on a first meeting and one only on a repeat - because a flag that merely correlates
+				// would put a gate on the wire that the captures do not support.
+				if (gates.Count == 0 && SplitsOnGreetingCount(classes))
+				{
+					var first = classes.First(c => !c.First().RepeatGreeting);
+					var repeat = classes.First(c => c.First().RepeatGreeting);
+					report?.Add($"{group.Key.Identity} '{group.Key.AnswerPath}': 2 variants split on GREETING COUNT "
+					            + $"(first meeting {first.Key}, repeat {repeat.Key})");
+
+					result.AddRange(first.Select(e => e with { RequiresRepeatGreeting = false }));
+					result.AddRange(repeat.Select(e => e with { RequiresRepeatGreeting = true }));
+					continue;
+				}
+
 				var shared = unsplit > 0
 					? $"; {unsplit} share a captured state and are left to Merge's packet-count tiebreak"
 					: "";
@@ -96,6 +115,17 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return result;
+		}
+
+		// Whether the greeting count is what tells this group apart: exactly two variants, every capture of one taken on
+		// a FIRST meeting and every capture of the other on a REPEAT. Anything looser - three variants, or a class the
+		// corpus caught both ways - is a correlation rather than the condition, and is left to the packet-count
+		// tiebreak with the report saying so.
+		private static bool SplitsOnGreetingCount(List<IGrouping<string, ConversationWalk>> classes)
+		{
+			return classes.Count == 2
+			       && classes.All(c => c.Select(e => e.RepeatGreeting).Distinct().Count() == 1)
+			       && classes[0].First().RepeatGreeting != classes[1].First().RepeatGreeting;
 		}
 
 		// Picks one (quest, state) gate per signature class, plus how many classes the captured state could NOT tell

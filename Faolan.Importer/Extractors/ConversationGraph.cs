@@ -36,7 +36,8 @@ namespace Faolan.Importer.Extractors
 
 		public sealed record Edge(uint FromNodeId, uint OptionId, uint ToNodeId, uint? ConditionQuestId, QuestState? ConditionQuestState, uint? GrantQuestId);
 
-		public sealed record Entry(string NpcName, uint NpcTemplateId, ConversationTrigger Trigger, uint? TriggerWorldObjectId, uint? ConditionQuestId, QuestState? ConditionQuestState, uint NodeId);
+		public sealed record Entry(string NpcName, uint NpcTemplateId, ConversationTrigger Trigger, uint? TriggerWorldObjectId, uint? ConditionQuestId, QuestState? ConditionQuestState,
+			bool? RequiresRepeatGreeting, uint NodeId);
 
 		public sealed record Graph(List<Node> Nodes, List<Edge> Edges, List<Entry> Entries, List<string> Report);
 
@@ -103,7 +104,7 @@ namespace Faolan.Importer.Extractors
 
 			// --- 4. edges and entries ----------------------------------------------------------------------------
 			var edges = new Dictionary<(uint From, uint Option, uint? Quest, QuestState? State), Edge>();
-			var entries = new Dictionary<(uint, ConversationTrigger, uint?, uint?, QuestState?), Entry>();
+			var entries = new Dictionary<(uint, ConversationTrigger, uint?, uint?, QuestState?, bool?), Entry>();
 
 			foreach (var h in walks)
 			{
@@ -111,8 +112,9 @@ namespace Faolan.Importer.Extractors
 				if (h.Walk.AnswerPath.Length == 0)
 				{
 					var trigger = TriggerOf(h.Walk);
-					var key = (h.Walk.NpcTemplateId!.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState);
-					if (!entries.TryAdd(key, new Entry(h.Walk.NpcName, h.Walk.NpcTemplateId.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState, toId))
+					var key = (h.Walk.NpcTemplateId!.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState, h.Walk.RequiresRepeatGreeting);
+					if (!entries.TryAdd(key, new Entry(h.Walk.NpcName, h.Walk.NpcTemplateId.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState,
+							h.Walk.RequiresRepeatGreeting, toId))
 						&& entries[key].NodeId != toId)
 						report.Add($"{h.Walk.NpcName}: two different screens open the same {trigger} root under the same gate - kept the first");
 
@@ -472,7 +474,7 @@ namespace Faolan.Importer.Extractors
 		private static string WalkKey(Harvested h)
 		{
 			return $"{h.Walk.NpcTemplateId}{h.Walk.TypeId}{h.Walk.ServerInitiated}{h.Walk.TriggerWorldObjectId}"
-			       + $"{h.Walk.AnswerPath.Length:D3}{h.Walk.AnswerPath}{h.Walk.ConditionQuestId}{h.Walk.ConditionQuestState}";
+			       + $"{h.Walk.AnswerPath.Length:D3}{h.Walk.AnswerPath}{h.Walk.ConditionQuestId}{h.Walk.ConditionQuestState}{h.Walk.RequiresRepeatGreeting}";
 		}
 	}
 }

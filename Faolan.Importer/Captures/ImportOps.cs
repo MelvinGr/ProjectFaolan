@@ -563,7 +563,7 @@ namespace Faolan.Importer.Captures
 
 				db.ConversationEntries.Add(new ConversationEntry
 				{
-					Id = ConversationEntry.ComputeId(e.NpcTemplateId, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState),
+					Id = ConversationEntry.ComputeId(e.NpcTemplateId, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState, e.RequiresRepeatGreeting),
 					NpcName = e.NpcName,
 					NpcTemplateId = e.NpcTemplateId,
 					Trigger = e.Trigger,
@@ -572,6 +572,7 @@ namespace Faolan.Importer.Captures
 						: null,
 					ConditionQuestId = e.ConditionQuestId,
 					ConditionQuestState = e.ConditionQuestState,
+					RepeatGreeting = e.RequiresRepeatGreeting,
 					NodeId = e.NodeId
 				});
 				entries++;

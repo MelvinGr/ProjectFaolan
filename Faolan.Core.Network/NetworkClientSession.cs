@@ -181,6 +181,10 @@ namespace Faolan.Core.Network
 		// it re-firing on every step taken near the NPC. Per session, like the rest of the conversation state.
 		HashSet<uint> ApproachedConversationNpcs { get; }
 
+		// Every NPC TEMPLATE whose dialogue window this session has already opened, so the second and later greetings
+		// get retail's terse line rather than the full welcome (#645 - ConversationEntry.RepeatGreeting).
+		HashSet<uint> GreetedConversationNpcs { get; }
+
 		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
 		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
 		// client owns the visual during sprint; the server mirrors the drain/regen silently. EnergyMax 0 = uninitialised.
@@ -293,6 +297,7 @@ namespace Faolan.Core.Network
 		public uint? ConversationEndedNpcHandle { get; set; }
 		public uint? ConversationNpcHandle { get; set; }
 		public HashSet<uint> ApproachedConversationNpcs { get; } = [];
+		public HashSet<uint> GreetedConversationNpcs { get; } = [];
 		public uint Energy { get; set; }
 		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }

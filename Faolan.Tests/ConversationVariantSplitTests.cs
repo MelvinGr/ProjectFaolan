@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -103,20 +104,66 @@ namespace Faolan.Tests
 			Assert.All(split.Where(e => Signature(e).StartsWith("20127")), e => Assert.Equal(12369u, e.ConditionQuestId));
 		}
 
+		// The quest state is not the only condition retail varies a screen on. Elethia says "Hello.{social greet}" the
+		// first time you open her window and "What now?" every time after, with the SAME option list and the same quest
+		// state - so the split falls to the greeting count (#645).
+		[Fact]
+		public void VariantsTheQuestStateCannotSplit_FallBackToTheGreetingCount()
+		{
+			var split = ConversationVariants.SplitConflicts([
+				Entry("", [10612], repeat: false),
+				Entry("", [10614], repeat: true),
+				Entry("", [10614], repeat: true)
+			]);
+
+			Assert.False(Assert.Single(split, e => Signature(e) == "10612").RequiresRepeatGreeting);
+			Assert.All(split.Where(e => Signature(e) == "10614"), e => Assert.True(e.RequiresRepeatGreeting));
+		}
+
+		// ...but only when the flag splits the group CLEANLY. A variant the corpus caught on BOTH a first meeting and a
+		// repeat is a correlation, not the condition, and putting a gate on it would hide the screen from half the
+		// players it belongs to - so that group keeps the old behaviour and says so.
+		[Fact]
+		public void AGreetingCountThatOnlyCorrelates_IsNotTakenAsTheGate()
+		{
+			var report = new List<string>();
+			var split = ConversationVariants.SplitConflicts([
+				Entry("", [10612], repeat: false),
+				Entry("", [10614], repeat: true),
+				Entry("", [10614], repeat: false) // the terse line was also captured on a first meeting
+			], report);
+
+			Assert.All(split, e => Assert.Null(e.RequiresRepeatGreeting));
+			Assert.Contains(report, r => r.Contains("none the captured quest state can tell apart"));
+		}
+
+		// The quest gate still wins where it applies: the greeting count is only consulted once the state has failed.
+		[Fact]
+		public void TheQuestGateIsPreferredOverTheGreetingCount()
+		{
+			var split = ConversationVariants.SplitConflicts([
+				Entry("", [12493], repeat: false),
+				Entry("", [26909], repeat: true, quests: (13480, QuestState.Active))
+			]);
+
+			Assert.All(split, e => Assert.Null(e.RequiresRepeatGreeting));
+			Assert.Equal(13480u, Assert.Single(split, e => Signature(e) == "26909").ConditionQuestId);
+		}
+
 		// The screen ids this entry was built from - the test's own handle on which variant a row is.
 		private static string Signature(ConversationWalk e)
 		{
 			return string.Join(",", e.Packets.Select(p => Regex.Match(Encoding.Latin1.GetString(p), "id=\"(\\d+)\"").Groups[1].Value));
 		}
 
-		private static ConversationWalk Entry(string answerPath, uint[] screenIds, params (uint Quest, QuestState State)[] quests)
+		private static ConversationWalk Entry(string answerPath, uint[] screenIds, bool repeat = false, params (uint Quest, QuestState State)[] quests)
 		{
 			var packets = screenIds
 				.Select(id => Encoding.Latin1.GetBytes($"<remoteformat id=\"{id}\" category=\"50002\" key=\"k\" knubot=\"0\"  ></remoteformat>"))
 				.ToList();
 
 			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, packets, "Casilda",
-				QuestStates: quests.ToDictionary(q => q.Quest, q => q.State));
+				QuestStates: quests.ToDictionary(q => q.Quest, q => q.State), RepeatGreeting: repeat);
 		}
 	}
 }

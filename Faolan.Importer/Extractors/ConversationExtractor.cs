@@ -26,6 +26,9 @@ namespace Faolan.Importer.Extractors
 	// player's quest state AT THE GREETING. Lets a single capture that talks to one NPC at MULTIPLE chain stages (e.g.
 	// Casilda: offer pre-quest, then "free me" once you have the key) be split per-state, since the answer path alone
 	// ("" greeting both times) can't distinguish them (#264). 0 = no quest active at the greeting.
+	// RepeatGreeting: whether this instance RE-opened a window the capture had already opened on that NPC. The gate the
+	// runtime serves on is `RequiresRepeatGreeting`, assigned by ConversationVariants when the flag is what tells two
+	// captures of one screen apart - retail's NPCs say a full welcome the first time and a terse line thereafter (#645).
 	// ParentContentKey/OptionId: the screen the player was looking at when they picked, and the LDB id of the option
 	// they clicked - both read straight off the wire (#642). This is what LINKS the walk to its parent in the folded
 	// graph, and it has to be harvested rather than derived from the answer path: the path only says "one pick
@@ -47,7 +50,9 @@ namespace Faolan.Importer.Extractors
 		uint? TriggerWorldObjectId = null,
 		IReadOnlyDictionary<uint, QuestState>? QuestStates = null,
 		string ParentContentKey = "",
-		uint OptionId = 0);
+		uint OptionId = 0,
+		bool RepeatGreeting = false,
+		bool? RequiresRepeatGreeting = null);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -169,6 +174,15 @@ namespace Faolan.Importer.Extractors
 			var currentQuest = InitialQuestContext(packets);
 			var instanceContext = currentQuest; // currentQuest AT the active instance's greeting - the player's state when they talked
 			var instanceQuests = new Dictionary<uint, QuestState>(); // questStates AT that greeting - the whole picture, not just the last quest
+			// Which NPCs the player has ALREADY talked to here, and whether the active instance is a re-greeting (#645).
+			//
+			// Retail's greeting is not one line: an NPC says a full welcome the first time you open his window and a
+			// terse one every time after ("Hello.{social greet}" -> "What now?"). Four of the six screens the quest-state
+			// split could not tell apart are exactly that pair, and the corpus states it outright - in every capture that
+			// opens one of these windows twice, the first opening is the welcome and every later one the terse form.
+			// Keyed by the clicked HANDLE, which is the specific NPC the player re-approached.
+			var greeted = new HashSet<uint>();
+			var instanceRepeat = false;
 
 			foreach (var p in packets)
 			{
@@ -216,6 +230,7 @@ namespace Faolan.Importer.Extractors
 					optionId = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 					instanceQuests = new Dictionary<uint, QuestState>(questStates);
+					instanceRepeat = !greeted.Add(npc);
 				}
 				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: ConversationScreenDecoder.OpenChatWindow } && !active)
 				{
@@ -250,6 +265,7 @@ namespace Faolan.Importer.Extractors
 					optionId = 0;
 					instanceContext = currentQuest;
 					instanceQuests = new Dictionary<uint, QuestState>(questStates);
+					instanceRepeat = false; // a server-opened window is an EVENT, not a greeting the player repeated
 				}
 				// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 				// follow belong to the child screen reached by that option. Selected by the RECORD's type rather
@@ -377,7 +393,7 @@ namespace Faolan.Importer.Extractors
 						: null,
 					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated,
 					TriggerWorldObjectId: serverTrigger, QuestStates: new Dictionary<uint, QuestState>(instanceQuests),
-					ParentContentKey: parentContentKey, OptionId: optionId));
+					ParentContentKey: parentContentKey, OptionId: optionId, RepeatGreeting: instanceRepeat));
 			}
 		}
 
@@ -487,7 +503,7 @@ namespace Faolan.Importer.Extractors
 
 		public static List<ConversationWalk> Merge(IEnumerable<ConversationWalk> all)
 		{
-			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?), (int score, ConversationWalk entry)>();
+			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?, bool?), (int score, ConversationWalk entry)>();
 			foreach (var e in all)
 			{
 				var identity = WalkIdentity(e);
@@ -497,7 +513,9 @@ namespace Faolan.Importer.Extractors
 				// have SEVERAL server-opened conversations, and they all sit at AnswerPath "". Without it Casilda's two
 				// collapse into one here - before the importer ever computes an id - and the shorter (her city-door
 				// "{hidegoodbye}Friend?" opener) loses to the longer.
-				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState, e.TriggerWorldObjectId);
+				// RequiresRepeatGreeting likewise (#645): a first-meeting welcome and its terse repeat are one screen at one
+				// answer path with the same quest state, so without it the packet-count tiebreak drops one of them.
+				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState, e.TriggerWorldObjectId, e.RequiresRepeatGreeting);
 				var score = e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 				{
