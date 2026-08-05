@@ -68,9 +68,51 @@ the **group finder**, forming a team, and *then* entering the instance that team
 `DispatchGroupFinderSignupFailed` with a localized reason id, and the same `QueueGroupFinder` body succeeds once
 the quest log has room.
 
+## The "Select instance" window — `DispatchInstanceSelectionForCurrentPlayfield`
+
+Clicking **Select instance** sends `GetInstanceListForCurrentPlayfield` (GameCharAgent `0x7B`) with an **empty
+body**, and retail answers `DispatchInstanceSelectionForCurrentPlayfield` (GameCharInterface `0x80`):
+
+```
+[u32 count][PlayfieldProxy x count]
+```
+
+so an instance in the list carries its map, its owner and its difficulty in exactly the slots described above.
+The client's own name for the parameter is `i_cInstanceList`.
+
+⚠️ **The count is a plain u32, not the `(n+1) * 0x3F1` list frame.** That is the client's reader rather than an
+inference: `FUN_00a6d1b0` reads one big-endian word through `FUN_0048f900` and loops it as a countdown, with no
+multiply or divide near it. A one-element list is `00000001`, where a framed one would have been `000007E2` —
+which is exactly the trap this codebase keeps re-finding, so `InstanceSelectionCodecTests` pins it.
+
+The single captured reply is a **one-element list naming the live instance of the map the player is standing in**
+(Ymir's Pass, 1090, pinned to token `0x0050B380`) — i.e. `PlayfieldProxy.ForInstance`, byte for byte.
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json frame 10726]
+
+⚠️ It is sent from GameCharAgent instance **`0x57`**, not the `0x58` that nearly every other GameCharAgent reply
+uses. Copying the neighbours would have been the obvious guess and is wrong.
+
+We host one copy of each playfield, so the server answers with the player's current instance, pinned to the token
+the world-entry burst already gave that client; a player not yet in a zone gets the empty list rather than an
+invented one.
+
+## The dungeon flag — `DispatchInDungeonPlayfield`
+
+`DispatchInDungeonPlayfield` (GameCharInterface `0x07`) is a one-byte s2c flag, and the same capture separates
+what it means. Two **solo** "normal mode" entries (Field of the Dead 20:13:00, Ymir's Pass 20:17:35) produce **no
+`0x0007` at all**; the one **group** dungeon entry produces `01` (20:22:16, five seconds before the
+`entered as private team` annotation).
+
+So it does not mark "this playfield is instanced" — a solo normal-mode instance is instanced and gets nothing. It
+marks a **team-owned dungeon instance**, which is why no column in `Maps` can source it: it is not a property of
+the map but of how the player entered. `Maps.PlayfieldInstanced` is 1 for 529 of 530 rows and `PlayfieldFlags` is
+set on 12, with its `3` shared by four open outdoor zones and a cave — neither is the flag. It therefore falls out
+of team-owned entry (#512) rather than needing data of its own, and is unsent until then. Whether a `00` is sent
+on LEAVING is still open: the corpus's only `00` is in a different capture.
+
 ## What is decoded vs what is built
 
-Decoded and gated by tests: the owner pair, the difficulty word, and the refusal's channel. **Nothing here is
-implemented as behaviour** — resolving an instance from the player's TEAM needs #101 grouping to be solid, and
-the difficulty mode needs somewhere to live beside `(mapId, instanceId)`. Open work is tracked in Gitea #511 and
-#512.
+Decoded and gated by tests: the owner pair, the difficulty word, the refusal's channel, and the instance-list
+reply. **Only the instance list is implemented as behaviour** — resolving an instance from the player's TEAM
+needs #101 grouping to be solid, and the difficulty mode needs somewhere to live beside `(mapId, instanceId)`.
+Open work is tracked in Gitea #309, #511 and #512.

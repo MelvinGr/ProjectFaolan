@@ -1327,8 +1327,21 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 				{
-					LogPacketBodyDebug("GameServer 0x207B body", body.ToArray());
+					// The click asks "which copies of this playfield may I pick between" with an EMPTY body, and retail
+					// answers DispatchInstanceSelectionForCurrentPlayfield: a plain-u32-counted list of PlayfieldProxy
+					// records. Unanswered, the window opens on nothing (#309).
+					//
+					// We host ONE copy of each playfield, so the honest answer is the one the player is standing in -
+					// which is also the only shape a capture pins: retail's single captured reply is a one-element list
+					// naming the live instance of the player's current map, pinned to the token the world-entry burst
+					// already told this client. A player not yet in a zone gets the empty list rather than a made-up one.
+					var here = _simulation.PlayerWorldEntity(client);
+					var selection = here != null
+						? InstanceSelections.Current(here.MapId, _simulation.World.ZoneFor(here.MapId, here.InstanceId).PlayfieldToken)
+						: InstanceSelections.None();
 
+					await client.SendAsync(new Rpc(InstanceSelectionSender, client.Endpoint(Endpoints.GameCharInterfaceType),
+						GameCharInterfaceMethods.DispatchInstanceSelectionForCurrentPlayfield, InstanceSelectionCodec.Build(selection)));
 
 					break;
 				}

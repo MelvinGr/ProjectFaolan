@@ -142,6 +142,12 @@ namespace Faolan.GameServer
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
 
+		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
+		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
+		// 10723 answered from 0xA9ECB95D/0x57 at 10726). Copying the 0x58 of its neighbours would have been the obvious
+		// guess and is wrong.
+		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x57);
+
 		// Phase shift for the world clock, in game seconds (#351). The clock itself runs off the wall clock
 		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
 		private long _gameTimeOffset;
