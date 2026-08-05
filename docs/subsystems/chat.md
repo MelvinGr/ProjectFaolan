@@ -112,3 +112,37 @@ cases), *not* encoded as a `"(whisper) "` text prefix. The bridge surfaces it on
 `mode="whisper|channel"`, and the server instructions tell Claude to answer in kind: whisper back (`whisper_to` =
 `sender_id`) for a whisper, broadcast (omit `whisper_to`) for a channel post. So a private tell stays private and a
 public post stays public, automatically. Covered by `ClaudeChannelTests`.
+
+## Ambient NPC barks — the catalog is HARVESTABLE (#331)
+
+An NPC's ambient line is a local-say `CharacterChat` (0x0022) carrying
+`<remoteformat token="sayinchat(N)|<channel>(K)|<Group>" category="50015" key="…" knubot="0">`, stored per NPC
+TYPE in `NpcChatter` and built by `NpcChatterCodec`. The open half of the ticket was written as "the lines live
+in the RDB scry scripts; a dedicated extraction pass is needed". They do, the pass exists now
+(`--report npc-chatter`), and it rests on two facts that read the other way round at first glance:
+
+- **Category 50015 is PLAINTEXT** (`flags=0`), not one of the encrypted eleven. Every bark line the client ships
+  is readable offline, and the `key=` a captured bark carries is inert — the client's decrypt is guarded on the
+  string's own encrypted flag, so it never reads a key on a `flags=0` page
+  ([`ldb-string-index.md`](../rdb/ldb-string-index.md)). A harvested line therefore needs no captured key.
+- **A bark's string id is computable from its token** — the client's own 28-bit ELF hash
+  (`LdbStringIndex.TokenId`) of `sayinchat(N)|<channel>(K)|<Group>`, all of which are `NpcChatter` columns. All 13
+  captured barks resolve to their text through it, which is the end-to-end proof.
+
+Together those make a group's whole line set enumerable by sweeping `N`. For the five captured groups the sweep
+finds **54 lines where the DB carries 13** — e.g. `RenownBystanderLovers/conversation1` is an eleven-line
+exchange between Lord Ovidius and his lady, of which captures caught five.
+
+Of the 41 unharvested lines, **16 carry no template slot and can be served as they stand**; the other 25 contain
+a `{Slot}` (`{TopGloryName}`, `{AdGuildName}`, `{DetectedChar.name}`, `{AdvertiseMinutes - AdvertiseCounter}`)
+that needs a matching `<parameter>` element filled from live server state — a separate piece of work from
+harvesting the text.
+
+⚠️ **Group DISCOVERY is still open, and the obvious route does not work.** Pulling identifiers out of the client's
+`SCRIPTGROUP2` (1010028) records and hash-testing each was built and thrown away: not one of the five groups the
+corpus already proves appears among those 11,118 identifiers, so it finds no real group — while happily returning
+hash noise that looks like results. The id is 28 bits and the probes are not independent (names differing by a
+digit cluster in ELF-hash space), so even a "3+ hits" threshold let ten confident non-groups through. The 1,277
+strings in the category are reachable only once the group names are found somewhere else.
+
+Open work tracked in Gitea #331.

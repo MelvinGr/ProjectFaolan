@@ -67,6 +67,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB + DB, no corpus: the ambient-bark catalog's readable set (#331).
+			if (report == "npc-chatter")
+			{
+				await NpcChatter(RdbDir());
+				return 0;
+			}
+
 			// RDB (+ DB for the cross-checks), no corpus: the bounded-area trigger-volume survey (#513).
 			if (report == "bounded-areas")
 			{

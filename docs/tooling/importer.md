@@ -221,6 +221,10 @@ stance has to reproduce; see [player-actions.md](../subsystems/player-actions.md
 `combo-swings` (every melee-combo swing in the corpus, resolved against the `Combos` catalog — the census
 [combos.md](../subsystems/combos.md) quotes: which combo, which step, the `bcc_action_id`→direction map and the
 player/NPC split. `--report-arg <file>` also writes the matched packets whole, for `--report fixture-set`),
+`npc-chatter` (the ambient-bark catalog's reach, #331 — the category-50015 page census, every stored `NpcChatter`
+row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
+line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;
+see [chat.md](../subsystems/chat.md)),
 `bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
 bucket and cross-checks it against what we already hold; see
 [bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)),

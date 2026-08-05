@@ -373,6 +373,30 @@ string: the string is a pure base-85 rendering of those four words and `LdbKey.T
 escaping included. That is also why the retail client renders our quest journal correctly — we replay the
 captured keys, so it can decrypt its own LDB.
 
+### ⚠️ A key on a PLAINTEXT category is inert — the client never reads it
+
+`NpcChatter.FormatKey` is in the list above, and that is misleading: the ambient barks it belongs to are
+**category 50015 (`sayinchat`), whose page carries `flags=0`**. Its 1,277 strings are plain UTF-8 and need no key
+at all, yet every captured bark still arrives with a 20-character `key=` attribute. So a key attribute is *not*
+evidence that a category is encrypted, and the eleven above remain eleven.
+
+The client settles what it does with such a key. The decrypt call sits behind a two-condition guard
+(`FUN_00611640`):
+
+```c
+if ((*(char *)(in_EAX + 0x1e) != '\0') && (*(int *)(in_ECX + 0x10) == 0x14)) {
+    FUN_0060d3e0(*in_EAX);              // the keyed TEA decrypt (ldbface.cpp:37)
+    *(undefined1 *)(in_EAX + 0x1e) = 0; // and clear the string's "encrypted" flag
+```
+
+The first condition is the string's own encrypted flag — the page's `flags`, carried onto the string object — and
+the second is the 20-character length check. **A string that is not marked encrypted never reaches the decrypt at
+all**, so on a `flags=0` page the key is dead weight in the payload.
+
+That has a practical consequence for anything harvested rather than captured (#331): a bark line pulled straight
+out of the LDB can be served without a captured key for it, because the client will not look at one. It does
+**not** generalise to the encrypted eleven, where the key is the only thing that makes the text readable.
+
 ### Reading it back: `--report ldb-quest-text`
 
 The join — ciphertext from the client's LDB pages, keys from our own tables — is a committed diagnostic rather
