@@ -73,6 +73,16 @@ there is nothing to check a split against. Close it by decompiling the element r
 scalar dispatch bodies were done. Tracked in Gitea #146.
 `[V0: the PvPMatchRules_c element layout]`
 
+### The battlekeep info record's columns
+`DispatchBattleKeepInfoRequestReturnPhase1And2` / `Phase3And4` (0x20A9 / 0x20AA) are framed exactly — a
+0x3F1-list of a 7-word keep record, with a nested 4-word sub-list in the phase-1/2 form
+(`docs/re/minigame-massivepvp-messages.md`). What the seven words MEAN is open. Unlike the scalar dispatch
+bodies on the same interface, these readers take the words straight into the struct with no per-field bail-out
+string, so the binary does not name them, and **no capture contains a single instance** — no session opened the
+battlekeep UI. Close it by capturing the battlekeep window, or by finding the client's UI consumer of the
+struct. Tracked in Gitea #147.
+`[V0: the battlekeep info record's seven columns]`
+
 ---
 
 ## How to close a gap

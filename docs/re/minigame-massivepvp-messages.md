@@ -1,8 +1,9 @@
-# Minigames + Massive PvP: the message surface (Gitea #146)
+# Minigames + Massive PvP: the message surface (Gitea #146, #147)
 
-AoC's instanced PvP **minigames** and the open-world **Massive PvP** (Border Kingdom battlekeep) scoring layer.
-Neither system is implemented. This page is the wire surface for both: what the 120 capture dumps actually
-contain, and what the client's own code says about everything they do not.
+AoC's instanced PvP **minigames**, the open-world **Massive PvP** (Border Kingdom battlekeep) scoring layer, and
+the **guild city / siege** tier that shares its area-id space. None of them is implemented. This page is the
+wire surface for all three: what the 120 capture dumps actually contain, and what the client's own code says
+about everything they do not.
 
 Two sources, kept apart on purpose:
 
@@ -139,8 +140,47 @@ group, then `FUN_0053b020`). Its column layout is not pinned here: with zero cap
 to check a field split against, and the element reader is shared with the search filter.
 `[V0: the PvPMatchRules_c element layout]`
 
-## What blocks implementing either system
+## Client-recovered: guild cities + battlekeeps (Gitea #147)
 
-Not the wire. Both message sets are fully enumerated and the scalar bodies are exact. What is missing is
-**content**: the minigame playfields and their sensor-volume capture zones, the battlekeep areas behind
-`areaId`, and the scoring rules. Open work tracked in Gitea #146.
+The siege layer sits on the same tier and shares the board's area-id space — `RequestBattleKeepInformation`
+takes a vector of area ids, and the board's `areaId` column is where those ids show up with values
+(11040 / 12070 / 13050). **Not one of these eleven messages appears in any of the 120 dumps**: no captured
+session ever opened the guild-city or battlekeep UI.
+
+| dir | opcode | method | body |
+|---|---|---|---|
+| c2s | CSPlayerAgent `0x42` | `RequestBattleKeepInformation` | `[list of u32 areaId]` |
+| c2s | CSPlayerAgent `0x45` | `RequestGuildCitySpot` | `[ID32 character][ID32 guild][ID32 playfieldModel]` |
+| c2s | GameCharAgent `0x14` | `GuildBookedCity` | `[u32 subgroup][u32 modelInstance][str cityName][u32 cityNameId][list of ID32 members]` |
+| c2s | GameCharAgent `0x15` | `GuildCityOwnershipChange` | `[list of ID32 members][u8 newValue]` |
+| s2c | CSPlayerInterface `0x6B` | `DispatchGuildCityBooked` | `[u32 i_nCitySpotId][u32 i_nCityPlayfieldModelInstance][u32 i_nCitySubgroup]` |
+| s2c | CSPlayerInterface `0x6C` | `DispatchGuildCityBookingFailed` | `[u32 i_nErrorCode]` |
+| s2c | CSPlayerInterface `0x6F` | `DispatchGuildIsMassivePvPCityOwner` | `[u8 i_bNewValue]` |
+| s2c | CSPlayerInterface `0x70` | `DispatchGuildIsMassivePvPCityAttacker` | `[u8 i_bNewValue]` |
+| s2c | CSPlayerInterface `0x72` | `DispatchRequestBattleKeepInformation` | `areaIDVec` |
+| s2c | CSPlayerInterface `0xA9` | `DispatchBattleKeepInfoRequestReturnPhase1And2` | keep list, below |
+| s2c | CSPlayerInterface `0xAA` | `DispatchBattleKeepInfoRequestReturnPhase3And4` | keep list, below |
+
+The two `BattleKeepInfoRequestReturn` replies carry the **same 7-word keep record**, and phases 1+2 add a
+nested per-keep list. Both list frames cap at 30000 elements (`count - 1 < 0x7531`), which is the client's own
+sanity bound rather than a real limit.
+
+```
+Phase3And4:  [u32 (n + 1) * 0x3F1]  { n × [u32 × 7] }              # 28-byte stride, FUN_0134f280
+Phase1And2:  [u32 (n + 1) * 0x3F1]  { n × keep }                   # FUN_0134f1f0 -> FUN_013b1680
+keep      =  [u32]  [u32 (m + 1) * 0x3F1] { m × [u32 × 4] }  [u32 × 6]
+```
+
+The two readers scatter the seven words into the same struct in the same order (slots 0, 1, 2, 5, 6, 4, 3), so
+the record is one type read two ways — a per-phase view of one keep, not two record types. Field meanings are
+not recoverable: these readers take the words straight into the struct with no per-field bail-out string, so
+unlike the scalar dispatch bodies above there is nothing in the binary that names them, and no capture to
+correlate against. `[V0: the battlekeep info record's seven columns]`
+
+## What blocks implementing these
+
+Not the wire. All three message sets are enumerated and the scalar bodies are exact. What is missing is
+**content and systems**: the minigame playfields and their sensor-volume capture zones, the battlekeep areas
+behind `areaId`, the scoring rules, and — for guild cities — a building/object-persistence model and the
+Architect tradeskill that feeds it. Open work tracked in Gitea #146 (minigames / Massive PvP) and #147 (sieges /
+battlekeeps / guild cities); #498 covers the city plots the captures DO carry, as destructibles.
