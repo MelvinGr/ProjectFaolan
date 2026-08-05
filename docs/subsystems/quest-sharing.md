@@ -8,6 +8,10 @@ So every byte here is recovered from `AgeOfConan.exe` instead: each dispatch's f
 own reader, and each RULE the server applies comes from the client code that applies the matching one. Nothing is
 gated against retail bytes, and nothing here claims to be — the tags below are `[V0]` for exactly that reason.
 
+The **one** exception is `RequestTeamQuestList` → `DispatchCancelTeamQuestList`, which that same capture performs
+twice ([below](#the-team-quest-list)) — and it is worth more than one method, because it is the only observation of
+the endpoint pair the whole family is addressed with.
+
 ## The messages
 
 c2s, `GameCharAgentMethods` — all four raised by the journal's Share button or the share window:
@@ -17,7 +21,7 @@ c2s, `GameCharAgentMethods` — all four raised by the journal's Share button or
 0x2050 ShareQuestDeclined(const ID32& i_cRequesterId) [u32 class][u32 characterId]
 0x2051 ShareQuestAccepted(const InstanceID_t& i_cQuestId)  [u32 questId]         - ONE u32, not an ID32
 0x2052 ShareQuestBusy(const ID32& i_cRequesterId)     [u32 class][u32 characterId]
-0x2054 RequestTeamQuestList()                          (empty; still unanswered - see below)
+0x2054 RequestTeamQuestList()                          (empty; answered with 0x204C - see below)
 ```
 
 `InstanceID_t` being one u32 is the client's own proxy saying so: `GameCharAgentProxy_t::ShareQuestAccepted`
@@ -127,9 +131,35 @@ client's reader.
   no field of `QuestDefinition` states a min/max, and inventing one would be a rule of ours wearing retail's message.
   A quest is offered regardless of the target's level until that band is sourced.
 * **`DoesNotHaveExpansion` (code 11).** We model no per-account expansion entitlement.
-* **`DispatchUpdateTeamQuestList` (0x204B) and `DispatchCancelTeamQuestList` (0x204C).** `RequestTeamQuestList`
-  (0x2054) is still consumed with no reply: 0x204B's single field is one opaque object with no capture to shape it,
-  and an empty list is a claim we cannot make byte-exactly. 0x204C's body IS decoded (one u32) but the share CODES it
-  carries are not, so there is nothing to put in it.
+* **`DispatchUpdateTeamQuestList` (0x204B).** The real list. Its single field is one opaque object with no capture to
+  shape it, so it is not built — which costs nothing while we model no shared team quests, because retail does not
+  send it in that state either (see below).
+
+## The team quest list
+
+The journal asks for the team's shared quests with `RequestTeamQuestList` (0x2054, empty body). Retail's answer,
+when the asker has no such list, is **not** the list method — it is `DispatchCancelTeamQuestList` (0x204C) carrying
+one u32 share code of **2**:
+
+```
+1978  c2s 0x2054 RequestTeamQuestList        (empty)          12:32:19.125
+1979  s2c 0x204c DispatchCancelTeamQuestList 00000002         12:32:19.221
+2851  c2s 0x2054 RequestTeamQuestList        (empty)          12:33:25.616
+2853  s2c 0x204c DispatchCancelTeamQuestList 00000002         12:33:25.871
+```
+
+Two requests, two replies, ~100–250 ms apart, and those two are the **only** occurrences of 0x204C in the corpus.
+[V2: login_2-clients_group-trade-friend.tshark.json] `CancelTeamQuestListCodec` builds it and the server answers with
+it, so the client's question is no longer met with silence. [V3: QuestShareCodecTests.CancelTeamQuestList_IsRetailsFourCapturedBytes]
+
+The **endpoints** ride along, and they are why this one capture matters beyond its own method: the reply is sent from
+`GameCharAgent` instance `0x10` to `GameCharInterface` on the asking character — exactly the pair `SendQuestShareRpc`
+addresses every other dispatch in this family with. That pair was `[V0]`, chosen by analogy with the trade set; it is
+now observed for one member of the family.
+
+⚠️ The share CODE itself is still undecoded. The client's handler for this method is a **signal emitter**
+(`FUN_0139cce0` → `FUN_013998c0` → `FUN_0044b1c0`, a generic slot dispatcher), not a jump table like the two feedback
+methods, so there is no per-value branch in the binary to read a name off. `CancelTeamQuestListCodec.RetailNoList`
+ships the observed constant and does not claim to know what 2 means.
 
 Open work tracked in Gitea #101.

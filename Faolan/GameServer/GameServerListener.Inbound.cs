@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
@@ -1060,15 +1061,26 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// 0x2054 RequestTeamQuestList() / 0x208D RequestMassivePvPScoreData(): both take NO arguments (the
-				// captured bodies are empty) and both ask for state we do not model - shared team quests and the
-				// massive-PvP scoreboard. Retail answers with DispatchUpdateTeamQuestList / the MassivePvPScore
-				// dispatches; we have nothing to put in either, and an EMPTY list is a claim ("there are none") we
-				// cannot make byte-exactly without a capture of the reply. Consume so they are not logged as unknown.
+				// 0x2054 RequestTeamQuestList(): no arguments (the captured body is empty). Retail's answer when there
+				// is no list to send is NOT the list method - it is DispatchCancelTeamQuestList (0x204C) carrying
+				// share code 2, twice in `login_2-clients_group-trade-friend` (frames 1978->1979, 2851->2853), the
+				// only two occurrences of 0x204C in the corpus and one per request. We model no shared team quests,
+				// so that is always our answer too - replayed byte-exact rather than left silent.
 				case GameCharAgentMethods.RequestTeamQuestList:
+				{
+					await SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchCancelTeamQuestList,
+						CancelTeamQuestListCodec.Build(CancelTeamQuestListCodec.RetailNoList));
+
+					break;
+				}
+
+				// 0x208D RequestMassivePvPScoreData(): no arguments, and retail answers NOTHING - all six occurrences
+				// across four captures are followed only by the client's other login polls, never by a MassivePvPScore
+				// dispatch. So silence here is retail's own behaviour for a character outside a Massive-PvP battle,
+				// not a gap. Consume so it is not logged as unknown.
 				case GameCharAgentMethods.RequestMassivePvPScoreData:
 				{
-					Logger.LogDebug("{Method}: no data to answer with (not modelled); no reply.", method);
+					Logger.LogDebug("{Method}: retail sends no reply outside a Massive-PvP battle either; no reply.", method);
 
 					break;
 				}

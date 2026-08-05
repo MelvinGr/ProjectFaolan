@@ -78,6 +78,25 @@ namespace Faolan.Tests
 			Assert.Equal("The Scavenger", parsed.QuestName);
 		}
 
+		// The one quest-share message a capture DOES perform: retail's answer to RequestTeamQuestList. Both replies in
+		// `login_2-clients_group-trade-friend` (frames 1979 and 2853, after the requests at 1978 and 2851) carry this
+		// exact body, and they are the only two occurrences of 0x204C in the corpus.
+		// [V2: login_2-clients_group-trade-friend.tshark.json]
+		[Fact]
+		public void CancelTeamQuestList_IsRetailsFourCapturedBytes()
+		{
+			var body = CancelTeamQuestListCodec.Build(CancelTeamQuestListCodec.RetailNoList);
+
+			Assert.Equal("00000002", Hex(body));
+			Assert.Equal(4, body.Length);
+		}
+
+		[Fact]
+		public void CancelTeamQuestList_RoundTrips()
+		{
+			Assert.Equal(2u, CancelTeamQuestListCodec.Parse(Convert.FromHexString("00000002")).QuestShareCode);
+		}
+
 		// Parse is strict: a trailing byte is a body we cannot account for, not something to ignore.
 		[Fact]
 		public void AnOverlongBody_Throws()
