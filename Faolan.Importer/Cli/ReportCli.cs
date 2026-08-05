@@ -433,7 +433,7 @@ namespace Faolan.Importer.Cli
 
 				case "rdb-field-coverage":
 				{
-					RdbFieldCoverage(RdbDir(), arg);
+					RdbFieldCoverage(RdbDir(), arg, _options.Out);
 					return 0;
 				}
 
@@ -2912,7 +2912,12 @@ namespace Faolan.Importer.Cli
 		// ⚠️ It reads the ASCENDING property grammar. That is the established one for SPELL records; for 1000020 the
 		// plaintext half is feats and the run is ascending there too, but an ITEM template's table strictly DESCENDS
 		// (RdbItemImporter.TryReadPropertyField) and is not covered by this - so a 1000020 run measures the feats.
-		private static void RdbFieldCoverage(string rdbDir, string? arg)
+		//
+		// With `--out <dir>` a drill also writes `rdb-<type>-field-<n>.tsv` - EVERY carrying record's id, name and
+		// value, not the 14 samples. A histogram says what values exist; deciding whether an unread field is the
+		// second source for a column we already fill needs the per-record join, and the 14-sample cap cannot do it
+		// (#633).
+		private static void RdbFieldCoverage(string rdbDir, string? arg, string? outDir)
 		{
 			var spec = (arg ?? "").Split(':', 2, StringSplitOptions.TrimEntries);
 			var type = spec.Length > 0 && uint.TryParse(spec[0], out var t) ? t : SpellTemplateType;
@@ -2931,12 +2936,14 @@ namespace Faolan.Importer.Cli
 			// had DRIFTED: it claimed 79 (icon), 129, 321 and 551 were read when nothing reads any of them, which
 			// inflated "read by the importer" from 13 to 17 and hid four gaps behind a green-looking column (#633).
 			// The names on 129 and 551 were wrong too - the client calls them SpellCriticalDamage and StackingOrder.
+			// It drifts the OTHER way too: 447 was imported by #349 and never added here, so the report was calling a
+			// read field unread.
 			var read = type == SpellTemplateType
 				? new Dictionary<uint, string>
 				{
 					[8] = "duration", [123] = "rank", [125] = "level", [128] = "spell line (#590)",
 					[132] = "mana cost, mode from the flags word (#629/#630)", [186] = "mount creature (#627)",
-					[287] = "range", [294] = "cast time",
+					[287] = "range", [294] = "cast time", [447] = "channeling interval (#349)",
 					[347] = "splash radius (#626)", [348] = "splash damage (#626)", [349] = "splash max targets",
 					[499] = "mount quality (#627)", [847] = "scaling attribute (#592)"
 				}
@@ -2951,6 +2958,8 @@ namespace Faolan.Importer.Cli
 			var drilled = drills.ToDictionary(f => f, _ => new Dictionary<uint, int>());
 			var crossed = drills.ToDictionary(f => f, _ => new Dictionary<(uint Against, uint Value), int>());
 			var samples = drills.ToDictionary(f => f, _ => new List<string>());
+			// --out: every carrying record, not just the samples (id, name, value).
+			var rows = outDir != null ? drills.ToDictionary(f => f, _ => new List<(uint Id, string Name, uint Value)>()) : null;
 
 			foreach (var e in rdb.EntriesOfType(type))
 			{
@@ -2995,11 +3004,15 @@ namespace Faolan.Importer.Cli
 						crossed[drill][key] = crossed[drill].GetValueOrDefault(key) + 1;
 					}
 
-					if (samples[drill].Count < 14)
+					if (samples[drill].Count < 14 || rows != null)
 					{
 						var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
-						var cross = against != 0 && fields.TryGetValue(against, out var av) ? $"   [{against}={av}]" : "";
-						samples[drill].Add($"{e.Id} {name} = {value}{cross}");
+						rows?[drill].Add((e.Id, name, value));
+						if (samples[drill].Count < 14)
+						{
+							var cross = against != 0 && fields.TryGetValue(against, out var av) ? $"   [{against}={av}]" : "";
+							samples[drill].Add($"{e.Id} {name} = {value}{cross}");
+						}
 					}
 				}
 			}
@@ -3031,6 +3044,18 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine("samples:");
 					foreach (var line in samples[drill])
 						Console.WriteLine($"  {line}");
+
+					if (rows != null)
+					{
+						Directory.CreateDirectory(outDir!);
+						var path = Path.Combine(outDir!, $"rdb-{type}-field-{drill}.tsv");
+						File.WriteAllLines(path, rows[drill]
+							.OrderBy(r => r.Id)
+							.Select(r => $"{r.Id}\t{r.Name}\t{r.Value}")
+							.Prepend("id\tname\tvalue"));
+						Console.WriteLine($"  -> {path} ({rows[drill].Count} records)");
+					}
+
 					Console.WriteLine();
 				}
 

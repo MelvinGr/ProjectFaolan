@@ -209,6 +209,38 @@ Flame 1,000 ms, Resting 500 ms — with no disagreement. Gated by `SpellAreaAndC
 
 That also settles the unit: 447's raw `250` on Deathly Blizzard is 2.5 s, not 250 ms.
 
+## ⚠️ Field 210 `Recharge Delay` is NOT the spell's recast
+
+It reads like the recast — a time, on 3,567 records, named `Recharge Delay` — and #633 listed it as "⭐ the
+spell COOLDOWN". It is not. `Spell.RecastCentiseconds` comes from the record's own `SetSpellRecastTime` /
+`SetSpellLineRecastTime` GameAction elements (`spell-recast-source.md`), and joining the two per record over the
+whole catalog says they are different numbers:
+
+| | records |
+|---|---:|
+| carry field 210 | 3,567 (2,334 of them `0`) |
+| 210 > 0 **and** a recast > 0 | 768 |
+| …of which the two are **equal** | **98** |
+| 210 > 0, no recast | 465 |
+| 210 = 0, recast > 0 | 178 |
+
+98 of 768 is not a second source; it is what two independent round-number timers (100/1000/1500/2000/6000)
+collide on by accident. Splitting by magnitude does not rescue it either — the ≥1000 bucket, which is almost
+entirely NPC ability records (`Counterstrike III`, `Molten Steel Slash V`), agrees on only 91 of 259. And it is
+not a restatement of any other timing column we already hold: against `CastTime` 6 of 826 agree, against
+`DurationMs` 4 of 453, against `ChannelingIntervalMs` and `DotIntervalMs` 0.
+
+**The unit IS settled**, which is what #633 asked for before importing: stat `0x0D2` sits in the client's
+first percent-divisor set (`StatDisplayScale.Percent1`), so the client draws this field as *value ÷ 100* — the
+same centiseconds every other time field in this run uses. `100` is 1 s, `10` is 0.1 s, `6000` is 60 s, and the
+`500000` / `999999` / `99999999` outliers on 8 records are a "never" sentinel a recast would have no use for.
+
+What it actually times is not settled. The population it sits on is suggestive rather than conclusive: at 0.1 s
+it is `Ignite` / `Burning` / `Poisoned` / `Stunned` / `Ice Barrier` / `Omega Shield`, at 0.5 s the `Druid Heal
+25..80` and `Energy Drain` tiers, at 2 s `Conqueror Evade 20..80`, the regen auras and the `Formation:` /
+`Battle Cry:` band — periodic and *triggered* effects rather than casts, which fits an internal re-fire
+throttle on a proc. That is a hypothesis with no client evidence behind it, so nothing imports the column.
+
 ## The AoE blast radius is NOT in this run — it is a GameAction element key
 
 Three sweeps of the field run looked for a per-spell AoE radius and found none, and that reading was correct
