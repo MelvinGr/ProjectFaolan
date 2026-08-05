@@ -62,7 +62,7 @@ namespace Faolan.Importer.Captures
 		public const double ConcentrationTolerance = 0.25;
 		public const double ConcentrationShare = 0.5;
 
-		// The SECOND CHANCE, tried only where the concentration test above has already said no (#657).
+		// The TIGHT reading, which leads wherever it has one (#657 introduced it as a fallback; #660 promoted it).
 		//
 		// The median is the wrong pivot once MORE THAN HALF the gaps are stretched: because the distortion is
 		// one-sided, the median itself lands in the tail and the tight cluster at the bottom is measured against a
@@ -83,15 +83,22 @@ namespace Faolan.Importer.Captures
 		// used: with a ±25% window the densest cluster of Ice Strike's gaps sits at 2.76 s, because that window
 		// swallows the real cluster AND the stragglers above it.
 		//
-		// Measured over the whole corpus (`--report dot-trains --out <file>` writes every gap at full precision):
-		// this changes NO existing measurement - it cannot, it only runs after a rejection - and it rescues exactly
-		// ONE spell, Ice Strike (Rank 6) at 2000 ms. The constants sit on a very wide plateau: every combination of
-		// tolerance 0.03-0.15 and share 0.0-0.33 gives that same single answer.
+		// Measured over the whole corpus (`--report dot-trains --out <file>` writes every gap at full precision), this
+		// rescues Ice Strike (Rank 6) at 2000 ms and CORRECTS Ice Strike (Rank 1) from 2500 to 2000. The constants sit
+		// on a very wide plateau: every combination of tolerance 0.03-0.15 and share 0.0-0.33 gives the same answers.
 		//
-		// ⚠️ 2000 is what Rank 6's OWN gaps say, and not a sibling argument - #657 asserted that "every rank sibling
-		// of this spell is measured at 2000", and the corpus does not support that: `Ice Strike (Rank 1)` is the only
-		// other rank it covers and that one measures 2500. Whether Rank 1's 2500 is itself a median artefact is a
-		// separate question this rule deliberately does not reach, because it never revisits an accepted answer.
+		// ⚠️ Rank 1 is the case that says this rule must LEAD rather than merely fall back, and it is worth spelling
+		// out because #657 shipped it the other way round. 42 of Rank 1's 93 gaps sit inside ±5% of ~2.15 s - the same
+		// cluster, to two decimals, that Rank 6 shows - while its median is 2.365 s. That median is only 10% above the
+		// cluster, but 2.365 lands the wrong side of the 2.25 s midpoint, so the half-second snap turns a 10% bias
+		// into a 25% error and reports 2500. A tighter concentration test anchored where the one-sidedness argument
+		// says the period lives is simply better evidence than a median over a stretched sample, so where both speak
+		// the cluster wins.
+		//
+		// ⚠️ It does NOT follow that the shortest gap bounds the interval from above, and that reasoning must not be
+		// reintroduced as a shortcut: a re-application's first gap is an arbitrary FRACTION of the period, and 41 of
+		// the 50 accepted spells have an estimate above their own shortest gap. Only a tight CLUSTER is evidence; a
+		// lone short gap is not.
 		public const double TightClusterTolerance = 0.05;
 		public const double TightClusterShare = 0.25;
 
@@ -108,15 +115,29 @@ namespace Faolan.Importer.Captures
 			if (median <= 0)
 				return null;
 
+			// The bottom-cluster reading LEADS wherever it has one, and the concentration test around the median is
+			// what answers when it declines (#660). That ordering is measured, not a preference: over the corpus's 50
+			// median-accepted spells the two agree on 21, the cluster rule declines on 28 - it refuses rather than
+			// guesses, because a re-application gap below the cluster stops its walk - and they disagree on exactly
+			// ONE, `Ice Strike (Rank 1)`, where the median is the one that is wrong.
+			var byCluster = TightestBottomCluster(gaps);
+			if (byCluster != null)
+				return byCluster;
+
 			var near = gaps.Count(g => Math.Abs(g - median) <= ConcentrationTolerance * median);
 			return near < gaps.Count * ConcentrationShare
-				? TightestBottomCluster(gaps)
+				? null
 				: Snap(median);
 		}
 
-		// The second chance described on TightClusterTolerance: the first candidate, walking upwards, whose tight
+		// The tight reading described on TightClusterTolerance: the first candidate, walking upwards, whose tight
 		// cluster is big enough AND still holds the shortest gap. Once a candidate's window has climbed past that
 		// shortest gap every larger one has too, so the walk stops there rather than running to the top.
+		//
+		// ⚠️ That stop is what makes declining the COMMON outcome (28 of 50), and it is the right conservatism: a
+		// re-application starts a fresh train whose first gap is an arbitrary FRACTION of the interval, and such a
+		// gap sits below the real cluster. This rule cannot tell that fragment from a genuine shorter period, so it
+		// says nothing and lets the median rule answer.
 		private static uint? TightestBottomCluster(IReadOnlyList<double> sorted)
 		{
 			var needed = Math.Max(MinGaps, sorted.Count * TightClusterShare);

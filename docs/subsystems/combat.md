@@ -959,15 +959,29 @@ DoT cluster at the interval with a long upper tail. That is why `DotIntervalEsti
 gaps *concentrate* around the median rather than on their spread — a quartile bound rejects good data precisely
 because a quarter of its gaps are doubled periods.
 
-⚠️ The same one-sidedness defeats the **median itself** once more than half a spell's gaps are stretched: the
-median lands in the tail, and the tight cluster at the bottom is then measured against a number it has nothing to
-do with. `Ice Strike (Rank 6)` is the worked case — 13 of its 38 gaps sit inside 3.5% of each other at ~2.15 s
-while its median is 4.20 s. So the estimator has a **second rule**, tried only after the first declines: the first
-tight (±5%) cluster walking upwards, provided that cluster still **contains the shortest observed gap**. That
-proviso is the one-sidedness argument stated as a test — nothing can shorten a gap below the true interval, so a
-tight cluster with other gaps below it is a harmonic, not the period — and without it the rule would read
-4000 ms off a ragged `{2.1 2.2 2.4 | 4.0 4.2 4.4 | 8.5 8.8 9.1 | 12.0}` train. It never revisits an answer the
-first rule accepted; over the whole corpus it changes nothing and measures exactly one further spell (#657).
+⚠️ The same one-sidedness defeats the **median itself** once a spell's gaps are stretched: the median drifts into
+the tail, and the tight cluster at the bottom is then measured against a number it has nothing to do with. So the
+estimator's leading rule is a **tight-cluster** one — the first tight (±5%) cluster walking upwards, provided that
+cluster still **contains the shortest observed gap** — with the concentration-around-the-median test answering only
+where that declines (#657, #660).
+
+The proviso is what makes the cluster rule safe: a tight cluster with other gaps *below* it is a harmonic, not the
+period, so the walk stops once its window leaves the bottom behind. Without it the rule reads 4000 ms off a ragged
+`{2.1 2.2 2.4 | 4.0 4.2 4.4 | 8.5 8.8 9.1 | 12.0}` train. It also makes *declining* the common outcome — over the
+50 median-accepted spells the cluster rule agrees on 21, declines on 28 and disagrees on 1 — which is correct
+conservatism, because a re-application's first gap is an arbitrary fraction of the period and sits below the real
+cluster.
+
+⚠️ **That does not make the shortest gap an upper bound on the interval**, and the shortcut must not be
+reintroduced: 41 of the 50 accepted spells have an estimate *above* their own shortest gap, precisely because
+re-application fragments are common. Only a tight cluster is evidence; a lone short gap is not.
+
+The two Ice Strike ranks are the worked cases and they now agree at 2000 ms. Rank 6 is the *rescue*: 13 of its 38
+gaps inside 3.5% of each other at ~2.15 s while its median is 4.20 s, so the median rule rejected it outright.
+Rank 1 is the *correction*, and the reason the cluster rule leads rather than merely fills in: 42 of its 93 gaps
+sit in that same ~2.15 s cluster, but its median is 2.365 s — only 10% high, yet the wrong side of the 2.25 s
+midpoint, so the half-second snap turned a 10% bias into a reported **2500 ms**. It is the one spell in the corpus
+where the two rules disagree.
 
 ⚠️ **The school NUMBERING was wrong until #487, so any pre-#487 census output names the wrong elements.** Cold
 sat at 5 with everything after it one too high, which made a necromancer's unholy nukes read as *Holy* and their

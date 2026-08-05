@@ -98,14 +98,31 @@ namespace Faolan.Tests
 			Assert.Null(DotIntervalEstimator.Estimate(harmonic));
 		}
 
-		// The second rule never overrules the first: a spell the concentration test accepts keeps that answer, even
-		// where the bottom of its distribution has a tight cluster of its own at a different value. Fires of
-		// Gehenna's real shape, with its doubled-period tail - the median says 2000 and the tail cluster at 4.3 must
-		// not get a vote.
+		// Where both rules speak they normally CORROBORATE - which is what makes letting the cluster lead safe. Fires
+		// of Gehenna's real shape, with its doubled-period tail: the bottom cluster and the median both say 2000, and
+		// the tail cluster at 4.3 gets no vote from either.
 		[Fact]
-		public void TheSecondRuleOnlyAnswersWhereTheFirstDeclined()
+		public void TheTwoRulesCorroborateOnAWellObservedSpell()
 		{
 			var gaps = new List<double> { 2.15, 2.16, 2.18, 2.20, 2.20, 2.22, 2.25, 4.30, 4.31, 4.35 };
+			Assert.Equal(2000u, DotIntervalEstimator.Estimate(gaps));
+		}
+
+		// #660: and where they DISAGREE, the tight cluster is the one to believe. Ice Strike (Rank 1) as the corpus
+		// shows it - 42 of 93 gaps inside 3% of each other at ~2.15 s, the same cluster its rank-6 sibling has, but a
+		// median of 2.365 s. The median is only 10% above the cluster, yet it falls the wrong side of the 2.25 s
+		// midpoint, so the half-second snap converts that 10% into a reported 2500 ms.
+		//
+		// This is the one spell in the corpus where the two rules differ, and it is why the cluster LEADS rather than
+		// merely filling in after a rejection.
+		[Fact]
+		public void ATightClusterBeatsAMedianDraggedUpByAStretchedTail()
+		{
+			var gaps = new List<double>();
+			gaps.AddRange(Enumerable.Repeat(2.15, 40));
+			gaps.AddRange([2.12, 2.16]);
+			gaps.AddRange([2.6, 2.9, 3.2, 3.4, 4.3, 4.4, 4.5, 6.4, 6.5, 8.6, 8.7, 10.8]);
+
 			Assert.Equal(2000u, DotIntervalEstimator.Estimate(gaps));
 		}
 
