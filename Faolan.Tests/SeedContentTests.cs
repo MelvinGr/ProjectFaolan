@@ -30,6 +30,36 @@ namespace Faolan.Tests
 		// capture has walked into (Hakotep as a Herald of Xotli, NecroL80 as a Necromancer).
 		private const uint ConarchArmoryMapId = 5007;
 
+		// A reach objective needs somewhere to walk to. The runtime solves one by proximity to the goal's own map
+		// MARKER, so a ReachArea goal with no marker can never be completed - and a quest that cannot be completed is
+		// strictly worse than one that is visibly inert, because nothing says so.
+		//
+		// This gate exists because the rule that types these got it wrong first (#641). `MapId`/`MarkerX`/`MarkerY` are
+		// NULLABLE, so the guard's `goal.MapId == 0` was false for a null and 23 markerless goals were typed ReachArea
+		// - a silent break the row counts above would never have shown.
+		[Fact]
+		public async Task EveryReachAreaGoal_HasAMarkerToReach()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var goals = await db
+				.QuestGoalDefinitions.AsNoTracking()
+				.Where(g => g.GoalType == QuestGoalType.ReachArea)
+				.Select(g => new { g.QuestDefinitionId, g.GoalId, g.MapId, g.MarkerX, g.MarkerY, g.RegionId })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(goals);
+
+			// A RegionId is the other way to name a place (the client's own bounded-area volume), so either will do.
+			var placeless = goals
+				.Where(g => g.RegionId == null && (g.MapId is null or 0 || (g.MarkerX == null && g.MarkerY == null)))
+				.Select(g => $"quest {g.QuestDefinitionId} goal {g.GoalId}")
+				.ToArray();
+
+			Assert.Equal([], placeless);
+		}
+
 		[Fact]
 		public async Task EveryEssentialTable_CarriesItsContent()
 		{

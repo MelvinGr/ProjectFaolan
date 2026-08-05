@@ -134,7 +134,9 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
   (`Field118/FieldEc/FieldF0/FieldF8`, `IndexMarker/IndexTableField*/IndexTrailerWord/IndexQuestLineQuestIds`) +
   migration; seeded
-  for the beach starter (importer `SeedBeachQuestGoals`). `BuildWholeQuestPortion_ReproducesBeachTails`
+  for the beach starter (importer `SeedBeachQuestGoals`). ⚠️ `IndexMagic`, `IndexTableField1..3` and
+  `IndexQuestLineQuestIds` are no longer seeded — `DeriveQuestIndexFromLine` computes them from `QuestLines.Magic`
+  and the line's steps in `JournalSequence` order (Gitea #641), which reproduces every deleted literal exactly. `BuildWholeQuestPortion_ReproducesBeachTails`
   proves `@0..1292` regenerates byte-exact with NO literals (only the per-character quest state).
 - **Production wiring (live, in-client verified 2026-06-16 — INTERIM, since SUPERSEDED by #210)** — the (now
   removed) `RetailLoginReplay` login-replay path generated the quest portion and spliced it over the captured

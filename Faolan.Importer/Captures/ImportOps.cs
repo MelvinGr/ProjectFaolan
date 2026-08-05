@@ -1499,11 +1499,12 @@ namespace Faolan.Importer.Captures
 		public static async Task WireQuests(DatabaseContext db)
 		{
 			await TypeItemGoalsFromTrailingCategory(db);
+			await TypeLocationGoalsFromTrailingCategory(db);
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
-			await SeedCaptureReachQuests(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
+			await DeriveQuestIndexFromLine(db);
 			await SeedQuestWorldEffects(db);
 		}
 
@@ -1554,6 +1555,136 @@ namespace Faolan.Importer.Captures
 
 			if (typed > 0)
 				await db.SaveChangesAsync();
+		}
+
+		// A goal whose TRAILING REFERENCE is a LOCATION is a reach objective, so type it `ReachArea` (#641). The sibling
+		// of TypeItemGoalsFromTrailingCategory, and the same argument: `TrailingCategory` is a typed reference, 100 is
+		// the client's location category, and the goal already carries the map marker to reach - so this is a RULE over
+		// a column, not a per-quest seed.
+		//
+		// It replaces `SeedCaptureReachQuests`, which hand-listed SEVEN of these with their destination coordinates
+		// sitting in comments. That seed was also the reason the rule looked unnecessary: it ran first and the
+		// bootstrap guard then made every other cat-100 goal invisible. Removing it and typing the column instead
+		// reproduces all seven and reaches 11 more the seed never named.
+		//
+		// ⚠️ The ticket that raised this expected category 51200 (`bounded_areas`, which RdbRegionImporter resolves into
+		// `RegionId`). That is a different, much smaller set - THREE goals corpus-wide, all of which already have a
+		// RegionId. These seven are cat-100, whose reach target is the goal's own map MARKER.
+		//
+		// ⚠️ Requires a marker, and that guard is load-bearing rather than defensive: 23 of the 34 un-wired cat-100
+		// goals carry NO map marker at all. A reach objective with no place to walk to can never be solved, so typing
+		// one would turn a visibly-inert quest into a silently-uncompletable one. Those 23 stay inert and are counted.
+		//
+		// BOOTSTRAP-ONLY, like every wiring step: the eight cat-100 goals already typed TalkToNpc (Kalanthes, Sharak,
+		// Chulainn, ...) and Casilda's Escort are wired, so the rule does not see them.
+		private static async Task TypeLocationGoalsFromTrailingCategory(DatabaseContext db)
+		{
+			const uint locationCategory = 100;
+
+			var goals = await db
+				.QuestGoalDefinitions.Where(g => g.TrailingCategory == locationCategory)
+				.ToListAsync();
+
+			var typed = 0;
+			var noMarker = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal))
+					continue;
+
+				// ⚠️ The marker columns are NULLABLE and null is the common case here, so this must test for a value
+				// rather than for zero: `goal.MapId == 0` on a `uint?` is FALSE when the column is null, which let 23
+				// markerless goals through on the first run of this rule - the exact silently-uncompletable quest the
+				// guard exists to prevent.
+				if (goal.MapId is null or 0 || goal.MarkerX is null && goal.MarkerY is null)
+				{
+					noMarker++;
+					continue;
+				}
+
+				goal.GoalType = QuestGoalType.ReachArea;
+				typed++;
+			}
+
+			if (typed > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Typed {typed} location goal(s) ReachArea from TrailingCategory 100"
+			                  + (noMarker > 0 ? $"; {noMarker} carry no map marker and stay inert" : "") + " (#641).");
+		}
+
+		// The quest INDEX fields, derived from the quest's own LINE instead of hand-typed per quest (#641).
+		//
+		// `QuestIndexRegions.ForQuests` prefers the catalog its caller loads from the database and reads these columns
+		// only as a FALLBACK (the generation tests, which build a region from one definition with no line loaded). That
+		// makes the stored values pure duplication of `QuestLines` + `JournalSequence` - and the beach and Casilda
+		// snapshot seeds were hand-typing them, ~12 quest ids and two ACGHash tokens transcribed from a capture.
+		//
+		// Measured before deleting the literals: `IndexMagic` equals `QuestLines.Magic` on all 16 quests that carry
+		// one, and the two hand-typed catalogs reproduce EXACTLY from the line's quests ordered by JournalSequence
+		// (line 241 = the eight Shipwrecked steps, line 1054 = Casilda's four). So the derivation is not an
+		// improvement on the transcription - it is the same values with a source.
+		//
+		// Scoped to the quests that already carry an index (a non-zero magic, harvested from the QuestJournal's area
+		// header): filling all 5,048 would put a fallback on every quest that nothing reads and churn faolan.sql for it.
+		private static async Task DeriveQuestIndexFromLine(DatabaseContext db)
+		{
+			// A quest is "in the index" if any of its index columns is set: the magic comes off the harvest (the
+			// QuestJournal's area header, #544) and the marker/table pair off the snapshot seeds, and either alone is
+			// enough - scoping on the magic only would drop a snapshot quest whose journal no capture carried.
+			var quests = await db.QuestDefinitions.Where(q => q.IndexMagic != 0 || q.IndexMarker != 0 || q.IndexTableField1 != 0 || q.IndexTableField2 != 0).ToListAsync();
+			if (quests.Count == 0)
+				return;
+
+			var lineIds = quests.Select(q => q.QuestLineId).ToHashSet();
+			var lines = await db.QuestLines.Where(l => lineIds.Contains(l.QuestLineId)).ToDictionaryAsync(l => l.QuestLineId, l => l.Magic);
+
+			// The same catalog the runtime loads (DatabaseRepository.GetQuestDefinitionsByLine): the line's steps that
+			// have journal TEXT REFS, ordered by JournalSequence. The refs filter is load-bearing - the client's own
+			// quest catalog contributed 3,011 quests no capture ever showed, and listing those would put ids on the
+			// wire that no capture supports.
+			var catalog = (await db
+					.QuestDefinitions.Where(q => lineIds.Contains(q.QuestLineId) && q.TextRefs.Any())
+					.Select(q => new { q.QuestLineId, q.QuestId, q.JournalSequence })
+					.ToListAsync())
+				.GroupBy(q => q.QuestLineId)
+				.ToDictionary(g => g.Key, g => g.OrderBy(q => q.JournalSequence).Select(q => q.QuestId).ToList());
+
+			var disagreed = new List<string>();
+			foreach (var quest in quests)
+			{
+				// A magic the line does not carry is a harvest the line table has not caught up with - say so rather
+				// than overwriting the captured value with a zero.
+				if (lines.TryGetValue(quest.QuestLineId, out var magic) && magic != 0)
+				{
+					if (quest.IndexMagic != magic)
+						disagreed.Add($"quest {quest.QuestId} carries magic 0x{quest.IndexMagic:X8} but line {quest.QuestLineId} says 0x{magic:X8}");
+
+					quest.IndexMagic = magic;
+				}
+
+				if (!catalog.TryGetValue(quest.QuestLineId, out var steps) || steps.Count == 0)
+					continue;
+
+				// tf1 is the quest's position in its line and tf2 the number of steps AFTER it; tf3 is 0 in every
+				// captured block. Only the quests the snapshot BUILDS from carry the pair - the other 14 were harvested
+				// with it zero, and inventing one would be a claim no capture makes.
+				if (quest.IndexTableField1 != 0 || quest.IndexTableField2 != 0)
+				{
+					quest.IndexTableField1 = quest.JournalSequence;
+					quest.IndexTableField2 = steps.Count > quest.JournalSequence
+						? (uint)steps.Count - quest.JournalSequence
+						: 0;
+					quest.IndexTableField3 = 0;
+					quest.IndexQuestLineQuestIds = string.Join(",", steps);
+				}
+			}
+
+			await db.SaveChangesAsync();
+			foreach (var line in disagreed)
+				Console.WriteLine($"  ⚠️ quest index: {line}");
+
+			Console.WriteLine($"Quest index derived from the line catalog for {quests.Count} quest(s) (#641).");
 		}
 
 		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
@@ -1736,13 +1867,14 @@ namespace Faolan.Importer.Captures
 			quest.Level = 1;
 			quest.HasSnapshotRecord = true;
 			quest.XpReward = 0;
-			quest.IndexMagic = 0x57365154;
 			quest.IndexMarker = 0x7E2;
-			quest.IndexTableField1 = 1;
-			quest.IndexTableField2 = 7;
-			quest.IndexTableField3 = 0;
 			quest.IndexTrailerWord = 0x000156E7;
-			quest.IndexQuestLineQuestIds = "10238,12369,12373,10320,12371,10286,10287,10915";
+			// The magic, the (sequence, remaining) pair and the line catalog are DERIVED from QuestLines +
+			// JournalSequence by DeriveQuestIndexFromLine (#641) - they were ~10 values transcribed from the capture,
+			// and the line already holds every one of them. tf1/tf2 are stamped non-zero here so that step knows this
+			// quest's index is one the snapshot builds from; it overwrites both with the derived pair.
+			quest.IndexTableField1 = 1;
+			quest.IndexTableField2 = 1;
 
 			// Overlay the two goals' full @609 detail (find-or-create by GoalId): the extractor may have already emitted
 			// goal 1448 as the harvested PRIMARY goal (wire fields only) - this completes it and adds goal 3490 - so the
@@ -1818,24 +1950,6 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Other capture-harvested quests whose single objective is a LOCATION (TrailingCategory 100 + a map marker),
-		// each granted by a SPAWNED NPC's dialogue (ConversationNodes.GrantQuestId). Wire the goal as ReachArea off its
-		// captured marker so it completes on arrival - the most quest data we can source without per-quest capture
-		// correlation (#358). Best-effort ("as much as possible, not 100%"): cat-100 = a location objective (proven for
-		// Shipwrecked III "enter city" / VIII Nadini), but the exact retail purpose (reach vs talk-at-location) isn't
-		// pinned; reaching the marker is a reasonable stand-in. All 7 granting NPCs are spawned and all target maps
-		// exist. Server-trigger field only (not byte-exact); bootstrap-only via SeedGoal.
-		private static async Task SeedCaptureReachQuests(DatabaseContext db)
-		{
-			await SeedGoal(db, 13041, 4833, QuestGoalType.ReachArea); // giver Alyssa        -> reach @4020 (959,723)
-			await SeedGoal(db, 13986, 6459, QuestGoalType.ReachArea); // giver Tanner Chael  -> reach @1000 (283,659)
-			await SeedGoal(db, 14092, 6597, QuestGoalType.ReachArea); // giver Borcha        -> reach @1010 (88,205)
-			await SeedGoal(db, 14617, 7389, QuestGoalType.ReachArea); // giver Cadarn        -> reach @3000 (992,1134)
-			await SeedGoal(db, 14622, 7394, QuestGoalType.ReachArea); // giver Serving Wench -> reach @2000 (826,533)
-			await SeedGoal(db, 14627, 7399, QuestGoalType.ReachArea); // giver Caor          -> reach @1000 (403,445)
-			await SeedGoal(db, 19522, 14328, QuestGoalType.ReachArea); // giver Hadrathus     -> reach @30200 (627,868)
-		}
-
 		// The Tortage intro quest CHAIN (#261): 13479 is a four-stage supersession chain. Idempotent.
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
@@ -1880,11 +1994,10 @@ namespace Faolan.Importer.Captures
 			quest.FieldF0 = 80;
 			quest.FieldF8 = 7;
 			quest.XpReward = 80;
-			quest.IndexMagic = 0x52524C33;
+			// Derived from line 1054 by DeriveQuestIndexFromLine (#641) - magic 0x52524C33 ("RRL3") is QuestLines.Magic
+			// and the catalog is the line's four steps in JournalSequence order. See the beach seed's note.
 			quest.IndexTableField1 = 1;
-			quest.IndexTableField2 = 3;
-			quest.IndexTableField3 = 0;
-			quest.IndexQuestLineQuestIds = "13479,13563,13480,12407";
+			quest.IndexTableField2 = 1;
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
 			if (goal != null)
