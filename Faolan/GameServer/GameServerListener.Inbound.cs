@@ -983,26 +983,38 @@ namespace Faolan.GameServer
 				}
 
 				// 0x203B ScryMessageBoxAnswer(int nAnswer, int nScriptThreadCtxId, uint64 nCtxCookie): the player
-				// answered a scry-script message box. Capture-verified as a pure ECHO pair - in all six captures the
+				// answered a scry-script message box. Capture-verified as a pure ECHO pair - in all nine captures the
 				// answer repeats the DispatchScryShowMessageBox (0x205E) context word-for-word and adds the button
 				// index, e.g. show `...0024f5f7 0000 000000005a4db7a0` -> answer `00000001 0024f5f7 000000005a4db7a0`.
-				// Every captured box is a zone-transition confirm (enter/leave King Conan's castle, changemap) and
-				// every answer is 1.
+				// Every captured answer is 1 (confirm) - no capture declines one.
 				//
-				// We never RAISE one (the script VM is gone - see the lua_vm notes), so there is no thread to resume;
-				// consumed and logged so a stray answer is visible rather than reported as an unknown opcode.
+				// ⚠️ NOT local travel (#514). The captured box that reads "Do you want to travel to Ymir's Pass?"
+				// belongs to the ZONE-LINE DOOR the player selects, not to the wagoneer they rode half a minute
+				// earlier - the wagoner trip teleports straight off the destination pick with no box at all. So the
+				// only box we raise is the zone-line one (#637), and the echo is what resumes its trip: no server-side
+				// script thread is involved, here or in retail.
 				case GameCharAgentMethods.ScryMessageBoxAnswer:
 				{
-					var answer = body.ReadUInt32();
-					var scriptThreadCtxId = body.ReadUInt32();
-					var ctxCookie = body.ReadUInt64();
+					var reply = ScryMessageBoxAnswerCodec.Parse(body.ReadRemainingArray());
+					var pending = client.Session.PendingTravelConfirm;
+					client.Session.PendingTravelConfirm = null;
 
-					// ⚠️ NOT local travel (#514). The captured box that reads "Do you want to travel to Ymir's Pass?"
-					// belongs to the ZONE-LINE DOOR the player selects, not to the wagoneer they rode half a minute
-					// earlier - the wagoner trip teleports straight off the destination pick with no box at all. We
-					// raise none of these ourselves, so there is no thread to resume; consumed and logged so a stray
-					// answer is visible rather than reported as an unknown opcode.
-					Logger.LogInformation("ScryMessageBoxAnswer {Answer} for script thread 0x{Thread:X8} (cookie 0x{Cookie:X16}) - no script thread to resume.", answer, scriptThreadCtxId, ctxCookie);
+					if (pending == null || reply.ThreadCtxId != pending.ThreadCtxId || reply.Cookie != pending.Cookie)
+					{
+						Logger.LogInformation("ScryMessageBoxAnswer {Answer} for script thread 0x{Thread:X8} (cookie 0x{Cookie:X16}) - matches no outstanding box.",
+							reply.Answer, reply.ThreadCtxId, reply.Cookie);
+
+						break;
+					}
+
+					if (reply.Answer != ScryMessageBoxAnswerCodec.Confirm)
+					{
+						Logger.LogInformation("Character {CharacterId} declined the trip to map {MapId}.", client.Session.Character.Id, pending.DestinationMapId);
+
+						break;
+					}
+
+					await DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition);
 
 					break;
 				}
@@ -2286,6 +2298,10 @@ namespace Faolan.GameServer
 					else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
 						// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
 						await _simulation.RelocateSameMap(client, samePos);
+					else if (await Database.GetMap(dest.DestMapId) is { TravelConfirmKey: { IsEmpty: false } } confirming)
+						// #637: retail asks "Do you want to travel to <map>?" before entering this destination. The
+						// trip resumes in HandleScryMessageBoxAnswer when the player confirms; a decline drops it.
+						await SendTravelConfirmation(client, confirming, dest.ArrivalPosition);
 					else
 						await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition); // TODO: Move DoTeleport into _simulation like RelocateSameMap
 

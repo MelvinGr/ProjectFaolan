@@ -216,7 +216,19 @@ namespace Faolan.Core.Network
 		// The token embedded in a pending feat-untrain confirm dialog (DispatchFeatUntrainMessageBox); the client
 		// echoes it in FeatUntrainAnswer, so the reset only fires when the answer matches an outstanding request.
 		uint? PendingFeatUntrainToken { get; set; }
+
+		// #637: the zone-line trip waiting on the player's answer to a travel confirmation box
+		// (DispatchScryShowMessageBox), or null when no box is outstanding. The client echoes the box's
+		// (ThreadCtxId, Cookie) pair back verbatim in ScryMessageBoxAnswer, so this is what a confirm resumes - which
+		// is why retail needs no server-side script thread for it, and neither do we. Cleared on the answer, and
+		// replaced (not queued) if a second box goes out: only the newest box can be the one being answered.
+		PendingTravelConfirm? PendingTravelConfirm { get; set; }
 	}
+
+	// A zone-line trip a client has been asked to confirm: the correlation pair the box carried, plus where the trip
+	// goes. Position is null for a door whose arrival no capture states - the teleport then falls back to the
+	// destination map's default spawn, exactly as it does without a box.
+	public sealed record PendingTravelConfirm(uint ThreadCtxId, ulong Cookie, uint DestinationMapId, Vector3? ArrivalPosition);
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
@@ -297,5 +309,6 @@ namespace Faolan.Core.Network
 
 		// The outstanding feat-untrain confirm token (see the interface); null when no untrain dialog is pending.
 		public uint? PendingFeatUntrainToken { get; set; }
+		public PendingTravelConfirm? PendingTravelConfirm { get; set; }
 	}
 }

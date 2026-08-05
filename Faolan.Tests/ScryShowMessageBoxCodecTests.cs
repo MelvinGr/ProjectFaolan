@@ -1,6 +1,10 @@
 using System;
+using System.Threading.Tasks;
+using Faolan.Core.Crypt;
+using Faolan.Core.Database;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests
@@ -11,13 +15,50 @@ namespace Faolan.Tests
 	// ⚠️ NOT local travel (#514), despite what these gates used to say. The box belongs to the ZONE-LINE DOOR the
 	// player selects: at t=809.8 they click door 0x863 on Field of the Dead, the box follows, and answering it drives
 	// the cross-map redirect. The wagoneer who dropped them at that border half a minute earlier teleported them
-	// straight off the destination pick, with no box at all (docs/subsystems/local-travel.md). Nothing sends these
-	// yet - the door path is `world-teleports`, which has no confirmation step.
+	// straight off the destination pick, with no box at all (docs/subsystems/local-travel.md).
 	//
-	// The point worth gating is that `id` is the DESTINATION MAP ID: all three boxes name the map the player is about
-	// to be moved to, and each is followed by a redirect and a MapChange to exactly that map.
+	// The point worth gating is that `id` is the DESTINATION MAP ID: every travel box names the map the player is
+	// about to be moved to, and each is followed by a redirect and a MapChange to exactly that map. Which maps confirm
+	// is Map.TravelConfirmKey, harvested by `world-teleports` (#637) - gated below against the captured bytes.
 	public class ScryShowMessageBoxCodecTests
 	{
+		// The end-to-end gate for #637: the key the seed carries for a confirming map re-renders to the wire form the
+		// capture holds, so the box we build from a DB row IS the captured box. Without this the harvest could store a
+		// key that decodes but does not re-encode, and the codec gates above would still pass on their literals.
+		[Theory]
+		[InlineData(1090u, "%z&#36;n_zw5ComNiHcqoW4j")]
+		[InlineData(1020u, "rtE^QH#90Dh9&#92;(YR+b,K")]
+		[InlineData(2010u, "_eJgq#Y4?(P_laXxWMD)")]
+		[InlineData(1004u, "&#92;7zs5!)7o%Q%wiF9j9h3")]
+		[InlineData(1092u, "E&#39;#aw8_7tiYB@z4lS&#92;?&#92;")]
+		[InlineData(2090u, "b)qHcZ.FXSLyu5RVjBn*")]
+		[InlineData(2094u, "C]`+v5VppHTGn_xRcPxl")]
+		public async Task ShippedMapKey_RendersTheCapturedWireKey(uint mapId, string capturedKey)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var map = await db.Maps.AsNoTracking().FirstOrDefaultAsync(m => m.Id == mapId, TestContext.Current.CancellationToken);
+
+			Assert.NotNull(map);
+			Assert.False(map!.TravelConfirmKey.IsEmpty, $"map {mapId} carries no travel-confirm key - the harvest lost it");
+			Assert.Equal(capturedKey, LdbKey.ToWire(map.TravelConfirmKey));
+		}
+
+		// ...and the maps a capture walked into WITHOUT a box carry none, which is the half that keeps us from raising
+		// a box retail does not. 4020 (City of Tortage), 2000 (Old Tarantia) and 1010 (Conall's Valley) are all
+		// destinations of captured door walk-throughs with no box in the sequence.
+		[Theory]
+		[InlineData(4020u)]
+		[InlineData(2000u)]
+		[InlineData(1010u)]
+		public async Task MapWalkedIntoWithoutABox_CarriesNoKey(uint mapId)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var map = await db.Maps.AsNoTracking().FirstOrDefaultAsync(m => m.Id == mapId, TestContext.Current.CancellationToken);
+
+			Assert.NotNull(map);
+			Assert.True(map!.TravelConfirmKey.IsEmpty, $"map {mapId} confirms travel, but no capture shows a box on the way in");
+		}
+
 		// t=810.4 - the box for Ymir's Pass (map 1090), which the redirect at t=812.9 and the MapChange at t=814.5
 		// then deliver, after the player selected the border door at t=809.8.
 		[Fact]

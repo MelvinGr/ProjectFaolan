@@ -152,6 +152,10 @@ namespace Faolan.GameServer
 		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
 		private long _gameTimeOffset;
 
+		// #637: hands out the cookie of each travel confirmation box. Retail's is a script-context pointer; ours only
+		// has to be unique among the boxes a client might have outstanding, which a listener-wide counter is.
+		private long _travelConfirmCookie;
+
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;

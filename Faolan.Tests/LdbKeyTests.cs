@@ -117,6 +117,9 @@ namespace Faolan.Tests
 				.Concat(await db.StockPhrases.AsNoTracking().Select(p => p.FormatKey).ToListAsync(ct))
 				.Concat(await db.NpcChatter.AsNoTracking().Select(c => c.FormatKey).ToListAsync(ct))
 				.Concat(await db.WorldObjects.AsNoTracking().Select(o => o.DisplayKey).ToListAsync(ct))
+				// ...and the zone-line travel confirmation box (#637), which is category 520 and so not encrypted at all -
+				// it is here because the round-trip gate is about the KEY ENCODING, which is the same for every category.
+				.Concat(await db.Maps.AsNoTracking().Select(m => m.TravelConfirmKey).ToListAsync(ct))
 				.Where(k => k != null && !k.IsEmpty)
 				.Distinct()
 				.ToList();

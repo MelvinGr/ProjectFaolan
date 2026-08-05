@@ -4804,6 +4804,41 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Mail");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Map", b =>
+                {
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "TravelConfirmKey", b1 =>
+                        {
+                            b1.Property<uint>("MapId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TravelConfirmKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TravelConfirmKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TravelConfirmKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TravelConfirmKey4");
+
+                            b1.HasKey("MapId");
+
+                            b1.ToTable("Maps");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MapId");
+                        });
+
+                    b.Navigation("TravelConfirmKey")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Map", "Map")

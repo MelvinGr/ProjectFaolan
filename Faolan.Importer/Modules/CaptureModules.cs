@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;
@@ -825,6 +827,7 @@ namespace Faolan.Importer.Modules
 			}
 
 			var (named, ambiguous) = await ResolveByNameAsync(ctx, zoneLines);
+			var confirms = await WriteTravelConfirmsAsync(ctx, links);
 
 			await ctx.Db.SaveChangesAsync();
 
@@ -832,7 +835,43 @@ namespace Faolan.Importer.Modules
 				? $"cleared {cleared}; "
 				: "";
 			return new ImportResult($"{prefix}{links.Count} teleport links harvested, {matched} matched to world objects, {misses} unmatched; " +
-				$"{named} more resolved by name against the playfield table, {ambiguous} named but unresolved (#341).");
+				$"{named} more resolved by name against the playfield table, {ambiguous} named but unresolved (#341); " +
+				$"{confirms} destination map(s) carry a travel confirmation box (#637).");
+		}
+
+		// #637: the "Do you want to travel to <map>?" confirmation box, scoped to the DESTINATION map (Map.TravelConfirmKey
+		// says why). A harvested link whose capture showed a box between the use and the teleport marks its destination
+		// map as confirming, and carries the localized key the box named it with.
+		//
+		// A link with NO box does NOT clear a key - "this walk-through showed no box" and "this map never confirms" are
+		// different statements, and only `--mode overwrite` (which clears above) is entitled to the second. A conflict
+		// (two links to one map disagreeing on the key) would be the signal that this is per-DOOR after all; none is
+		// observed, so the first key wins and the disagreement is logged rather than silently resolved.
+		private static async Task<int> WriteTravelConfirmsAsync(ImportContext ctx, IReadOnlyList<TeleportLink> links)
+		{
+			var keys = new Dictionary<uint, ProtoDecryptionKey>();
+			foreach (var link in links)
+			{
+				if (LdbKey.Decode(link.ConfirmKey) is not { } key)
+					continue;
+
+				if (keys.TryGetValue(link.DestMapId, out var existing) && !Equals(LdbKey.Encode(existing), LdbKey.Encode(key)))
+				{
+					Console.WriteLine($"  ⚠️ map {link.DestMapId} has two different travel-confirm keys across captures - keeping the first (#637).");
+					continue;
+				}
+
+				keys.TryAdd(link.DestMapId, key);
+			}
+
+			var written = 0;
+			foreach (var map in await ctx.Db.Maps.Where(m => keys.Keys.Contains(m.Id)).ToListAsync())
+			{
+				map.TravelConfirmKey = keys[map.Id];
+				written++;
+			}
+
+			return written;
 		}
 
 		// #341: the doors no capture walked through. Their NAME is the playfield they lead to, so the client's own

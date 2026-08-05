@@ -4,6 +4,8 @@ using System.Numerics;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
@@ -13,7 +15,12 @@ namespace Faolan.Importer.Extractors
 	// A harvested door->destination link: a zone-line world object (SourceMap + Name + spawn position) that, when
 	// USED, teleported the player to DestMap at the arrival position. Src position keys it back to the WorldObject row
 	// (two doors can share a name across maps); Dest is the truth extracted from the N3Teleport the server sent.
-	public sealed record TeleportLink(uint SourceMapId, string SourceName, float SrcX, float SrcY, float SrcZ, uint DestMapId, float DestX, float DestY, float DestZ);
+	//
+	// `ConfirmKey` is the CONFIRMATION BOX this door raises before travelling, if it raises one (#637): the 20-character
+	// localized-format key of the DispatchScryShowMessageBox the server sent between the use and the teleport. Empty for
+	// a door that teleports straight through - which is most of them. The box's `id` is always the destination map and
+	// its category always 520, so the key is the only per-door datum in it.
+	public sealed record TeleportLink(uint SourceMapId, string SourceName, float SrcX, float SrcY, float SrcZ, uint DestMapId, float DestX, float DestY, float DestZ, string ConfirmKey = "");
 
 	// Harvests zone-line teleport destinations from captured gameplay: a client UseObject (BehaviorControlCenterIIR
 	// actionType 0x12) on a door (DoorFullUpdateIIR 0x33A56FB0 OR SimpleDynelFullUpdateIIR 0x66AEDD50) followed by the
@@ -94,9 +101,32 @@ namespace Faolan.Importer.Extractors
 				// map from the IntendedTeleport and the position from the N3Teleport.
 				uint destMap = 0;
 				var haveDest = false;
+				var confirmKey = "";
+				uint confirmMapId = 0;
 				for (var j = i + 1; j < packets.Count && j <= i + LookaheadPackets; j++)
 				{
 					var q = packets[j];
+
+					// #637: the travel confirmation box, if this door raises one. It is an RPC method body, not an IIR,
+					// so it has to be read before the IIR filter below. Only the localized KEY is kept: the box's `id`
+					// is the destination map and its category is always 520, both of which are re-derivable.
+					//
+					// ⚠️ The category gate is load-bearing, not defensive. The scry message box is a general script
+					// dialog and the corpus carries a NON-travel one (category 10035) inside a door's lookahead window,
+					// which without this gate is harvested as that door's travel key. Every one of the 14 travel boxes
+					// is category 520 with `id` equal to the destination the same sequence then teleports to.
+					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchScryShowMessageBox))
+					{
+						var box = InnerElementCodec.Parse(ScryShowMessageBoxCodec.Parse(q.Body).LocalizedXml);
+						if (box.Category == ScryShowMessageBoxCodec.MapNameCategory)
+						{
+							confirmMapId = box.Id ?? 0;
+							confirmKey = box.Key ?? "";
+						}
+
+						continue;
+					}
+
 					if (!q.IsIirCarrier || !q.IsDownload || !TeleportCodec.HandledTypes.Contains((IirTypes)q.SubOpcode))
 						continue;
 
@@ -127,8 +157,14 @@ namespace Faolan.Importer.Extractors
 
 					// A cross-map record states its arrival in the position blob; a same-map one carries it inline, and
 					// an all-zero inline slot means the record does not name one.
+					// The box only counts as this trip's confirmation when it named the map the trip then went to -
+					// otherwise it belongs to something else that happened in the window.
 					if (destMap != 0 && (arrive.Form == N3TeleportForm.CrossMap || arrive.Position != Vector3.Zero))
-						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrive.Position.X, arrive.Position.Y, arrive.Position.Z));
+					{
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrive.Position.X, arrive.Position.Y, arrive.Position.Z, confirmMapId == destMap
+							? confirmKey
+							: ""));
+					}
 
 					break;
 				}

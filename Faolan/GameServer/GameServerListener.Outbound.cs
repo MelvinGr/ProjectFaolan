@@ -4,13 +4,16 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Apprentice;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Guild;
@@ -746,6 +749,27 @@ namespace Faolan.GameServer
 
 			character.MountId = null;
 			await Database.SaveCharacterMount(self, null);
+		}
+
+		// #637: raises retail's "Do you want to travel to <map>?" box for a zone-line door, and remembers the trip it
+		// is confirming. The (threadCtxId, cookie) pair is retail's script-thread handle; the client only ever echoes
+		// it, so ours are a correlation token rather than a real thread - the character id plus a per-send counter,
+		// which is unique within a session and is all the answer has to match.
+		//
+		// Retail's own sender endpoint instance varies per box across the corpus (0x54/0x56..0x5A - it is the scry
+		// agent that happens to own the script), so 0x58 here is the house default, not a captured constant.
+		private async Task SendTravelConfirmation(INetworkClient client, Map destination, Vector3? arrival)
+		{
+			var threadCtxId = client.Session.Character.Id;
+			var cookie = (ulong)Interlocked.Increment(ref _travelConfirmCookie);
+			client.Session.PendingTravelConfirm = new PendingTravelConfirm(threadCtxId, cookie, destination.Id, arrival);
+
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchScryShowMessageBox,
+				ScryShowMessageBoxCodec.Build(destination.Id, LdbKey.ToWire(destination.TravelConfirmKey), threadCtxId, cookie)));
+
+			Logger.LogInformation("Travel confirm for '{Map}' ({MapId}) sent to character {CharacterId} (cookie 0x{Cookie:X16}).", destination.Name, destination.Id,
+				client.Session.Character.Id, cookie);
 		}
 
 		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.

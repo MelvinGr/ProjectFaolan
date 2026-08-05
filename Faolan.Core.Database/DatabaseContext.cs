@@ -311,6 +311,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<StockPhrase>().OwnsOne(p => p.FormatKey, k => OwnNamedKey(k, "FormatKey"));
 			modelBuilder.Entity<NpcChatter>().OwnsOne(c => c.FormatKey, k => OwnNamedKey(k, "FormatKey"));
 			modelBuilder.Entity<WorldObject>().OwnsOne(o => o.DisplayKey, k => OwnNamedKey(k, "DisplayKey"));
+			modelBuilder.Entity<Map>().OwnsOne(m => m.TravelConfirmKey, k => OwnNamedKey(k, "TravelConfirmKey"));
 
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);

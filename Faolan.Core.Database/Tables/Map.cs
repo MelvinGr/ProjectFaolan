@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Numerics;
 using Faolan.Core.Database.Interfaces;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -71,6 +72,24 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
+
+		// #637: entering this map through a zone-line DOOR raises retail's "Do you want to travel to <map>?"
+		// confirmation box (DispatchScryShowMessageBox) first, and this is the per-string LDB key of the `<localized>`
+		// element that box carries. Empty = the door teleports straight through, which is what half the captured doors
+		// do.
+		//
+		// ⚠️ It is scoped to the DESTINATION MAP rather than to the door, because that is what the corpus groups by:
+		// the 17 harvested door walk-throughs split cleanly by destination with no door disagreeing with another door
+		// to the same map (both doors into Tarantia Noble District confirm and carry the SAME key; both directions of
+		// the Spider Caverns / Old Tarantia / King Conan's Castle lines confirm INBOUND only). The key is a
+		// destination-map-name-string key, which is the same statement from the other side. What the corpus cannot
+		// rule out is a map that confirms from one door and not another - none is observed, and per-door storage would
+		// have cost a column on 141 doors to express it.
+		//
+		// The box's other two fields are re-derivable and so are not columns: its `id` is this map's Id and its
+		// category is always 520, the client's map-name category. 520 is PLAINTEXT, so the client never decrypts with
+		// this key - it is carried to reproduce retail's bytes, not because the text needs it.
+		public virtual ProtoDecryptionKey TravelConfirmKey { get; set; } = new();
 
 		// The per-map PlayfieldFIIR (0x5D85BFC7 MapChange) rule fields (#308). This packet is the playfield the client
 		// enters, and the client keys per-area rules on it (mount permission FIXED via PlayfieldFlags). The values are

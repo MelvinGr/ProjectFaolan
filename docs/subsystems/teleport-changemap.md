@@ -91,6 +91,15 @@ Two guards keep it honest, both from cases the harvest contradicts:
 A door whose name matches no playfield is left alone: from the data, a `Lever` and a zone-line to a playfield
 the client does not ship are indistinguishable.
 
+### The confirmation step
+
+Some destinations ask first: *"Do you want to travel to Ymir's Pass?"* — a `DispatchScryShowMessageBox` sent
+between the use and the teleport, whose answer drives the redirect. It is **per destination map**, not per
+door and not "the door crosses a map": half the captured walk-throughs raise no box at all, and the ones that
+do split cleanly by destination. `world-teleports` harvests it into `Map.TravelConfirmKey` alongside the
+destination; an empty key means the door teleports straight through. Full grammar in
+[`scry-message-box.md`](scry-message-box.md).
+
 ## Status
 
 Both bodies are built by the named `TeleportCodec` (was inline spliced templates in `GMCommands`), now fully
