@@ -49,3 +49,10 @@ The send is gated on a per-entity flag at `+0x378` and rate-limited by the token
   to apply. See `docs/rdb/client-tweak-table.md`.
 * Retail does not seed a viewer's rose from the spawn: 310 of the 317 captured player scaffolds carry 0 in
   word 13, the slot `FUN_011215e0` copies to stat `0xA5`.
+* …and it does not seed one later either. Timing all 110 captured `CombatShieldIIR` against their own
+  defender's spawn (`--report shield-rose`): of the 71 first-roses, **none** arrives within 2 s of that handle's
+  spawn and the earliest is 2.4 s — an engage, not a catch-up. So a viewer who arrives mid-fight sees no rose
+  until the next change, in retail as in ours, and nothing is sent to plug it (#622).
+* The mitigation the server applies with those numbers is keyed on the **direction the attacker SWINGS**, not on
+  where they stand — see [`../subsystems/combat.md`](../subsystems/combat.md). An NPC carries no direction
+  ability, so the server picks one (#621).
