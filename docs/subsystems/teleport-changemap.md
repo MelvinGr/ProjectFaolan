@@ -59,6 +59,38 @@ the golden test / a burst-less map.
 descriptor that does **not** correlate with the map's NPC / world-object / burst-record counts, so its meaning
 is not yet derivable from the data; it stays a parameter with the capture default until another data point pins it.
 
+## Zone-line doors: where a destination comes from
+
+A zone-line door is a `WorldObject` (a `DoorFullUpdateIIR` `0x33A56FB0`, or a `SimpleDynelFullUpdateIIR`
+`0x66AEDD50` where the door backs a building entrance) whose `InteractAction` is `Teleport` (same playfield) or
+`ProxyTeleport` (cross playfield). Using it runs the records above. The destination has **two independent
+sources**, and which one a row has decides what happens on use:
+
+| source | what it yields | what the server does |
+|---|---|---|
+| **The wire.** A captured `UseObject` → `IntendedTeleport` + `n3Teleport` (`WorldTeleportExtractor`) | destination map **and** arrival position | teleports to the exact arrival — same-playfield doors relocate with no loading screen |
+| **The door's own name.** Its name is the playfield behind it, matched against the client's playfield table (`Maps`, RDB 1070003) — `ZoneLineNames`, Gitea #341 | destination map only | change-maps to that map's **default spawn** (`GetDefaultSpawn`), the same fallback `.teleport <map>` takes |
+| neither | nothing | the door reports that it has no known destination |
+
+The name pass runs after the harvest and only over doors the harvest left inert, so a captured destination
+always wins. It is checked against that harvest, which is the only ground truth: of the captured cross-map
+doors whose name matches a playfield, every one names the playfield the capture actually teleported to
+(Conall's Valley 1010, Conarch Village 1000, Field of the Dead 1020, Spider Caverns 1004, Ymir's Pass 1090,
+Tarantia Noble District 2010, Old Tarantia 2000, Thunder River 2090, City of Tortage 4020).
+
+Two guards keep it honest, both from cases the harvest contradicts:
+
+- **A door that names its own playfield is not a zone-line.** The `City of Tortage` doors standing in City of
+  Tortage relocate *within* it; the night twin is a different map id (4022 vs 4020), so the base name — not the
+  id — is what recognises them. Left inert rather than sent to the wrong Tortage.
+- **A playfield that defines no respawn point cannot be a destination while a same-named one does.** The client
+  ships duplicate playfield rows (`Conall's Valley` = 508 *and* 1010, `Old Tarantia` = 2000 *and* 2002); the
+  harvested truth is always the one with respawn points. A genuine tie (`Outflow Tunnels` 2026/2027, `Thirsty
+  Dog Inn` 4533/4534) stays unresolved and reports rather than guessing.
+
+A door whose name matches no playfield is left alone: from the data, a `Lever` and a zone-line to a playfield
+the client does not ship are indistinguishable.
+
 ## Status
 
 Both bodies are built by the named `TeleportCodec` (was inline spliced templates in `GMCommands`), now fully

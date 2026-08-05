@@ -887,8 +887,10 @@ namespace Faolan.GameServer
 			{
 				var obj = live.Row;
 				var oname = WorldObjectDisplay.ToWire(obj) ?? obj.Name ?? "(unnamed object)";
-				var dest = obj.DestinationPosition is { } dp
-					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"
+				// A name-resolved zone-line (#341) knows its destination map but no arrival - report the map either way,
+				// and say which the row is, because "no arrival" is exactly what sends the player to the default spawn.
+				var dest = obj.DestinationMapId is { } destMap
+					? $" · teleports to map {destMap} {(obj.DestinationPosition is { } dp ? $"({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})" : "(no captured arrival - default spawn)")}"
 					: "";
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					ChatMarkup.Lines(ChatMarkup.Raw($"{ChatMarkup.Bold(oname)}  (handle 0x{handle:X8}, world-object)"),

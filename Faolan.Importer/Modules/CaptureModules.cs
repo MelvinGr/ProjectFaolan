@@ -756,8 +756,10 @@ namespace Faolan.Importer.Modules
 
 	// Zone-line teleport destinations: enriches the DoorFullUpdateIIR world objects that are teleporters with their
 	// destination (map + arrival), harvested from captured UseObject->N3Teleport sequences (WorldTeleportExtractor).
-	// Only doors actually walked through in a capture get a destination; the rest keep InteractAction=None and the
-	// server surfaces a message on use. Depends on world-objects (the rows it enriches must exist).
+	// A door actually walked through in a capture gets its destination WHOLE (map + arrival position); the rest are
+	// then resolved by NAME against the client's playfield table (ZoneLineNames, #341), which yields the destination
+	// map but no arrival - the runtime falls back to that map's default spawn. Whatever neither pass can place keeps
+	// InteractAction=None. Depends on world-objects (the rows it enriches must exist).
 	public sealed class WorldTeleportsModule : IImportModule
 	{
 		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
@@ -822,12 +824,69 @@ namespace Faolan.Importer.Modules
 				matched++;
 			}
 
+			var (named, ambiguous) = await ResolveByNameAsync(ctx, zoneLines);
+
 			await ctx.Db.SaveChangesAsync();
 
 			var prefix = cleared > 0
 				? $"cleared {cleared}; "
 				: "";
-			return new ImportResult($"{prefix}{links.Count} teleport links harvested, {matched} matched to world objects, {misses} unmatched.");
+			return new ImportResult($"{prefix}{links.Count} teleport links harvested, {matched} matched to world objects, {misses} unmatched; " +
+				$"{named} more resolved by name against the playfield table, {ambiguous} named but unresolved (#341).");
+		}
+
+		// #341: the doors no capture walked through. Their NAME is the playfield they lead to, so the client's own
+		// playfield table resolves them (ZoneLineNames) - map only, never an arrival position, which stays wire-only
+		// truth. Runs AFTER the capture harvest and only over rows it left inert, so a harvested destination always
+		// wins. Doors whose name matches no playfield are left alone: a "Lever" and a zone-line to a playfield the
+		// client does not ship are indistinguishable from here, and marking them would make every lever complain.
+		private static async Task<(int Named, int Ambiguous)> ResolveByNameAsync(ImportContext ctx, IReadOnlyList<WorldObject> zoneLines)
+		{
+			var maps = await ctx.Db.Maps.Select(m => new
+			{
+				m.Id,
+				m.Name
+			}).ToListAsync();
+			var withSpawn = (await ctx.Db.RespawnPoints.Select(r => r.MapId).Distinct().ToListAsync()).ToHashSet();
+
+			var mapNames = maps.ToDictionary(m => m.Id, m => m.Name);
+			var byName = maps
+				.Where(m => !string.IsNullOrWhiteSpace(m.Name))
+				.GroupBy(m => m.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+				.ToDictionary(g => g.Key, g => (IReadOnlyList<ZoneLineNames.MapCandidate>)g
+					.Select(m => new ZoneLineNames.MapCandidate(m.Id, withSpawn.Contains(m.Id)))
+					.ToList(), StringComparer.OrdinalIgnoreCase);
+
+			int named = 0, ambiguous = 0;
+			foreach (var row in zoneLines)
+			{
+				if (row.InteractAction != InteractAction.None)
+					continue;
+
+				var key = ZoneLineNames.Key(row.Name);
+				if (key == null || !byName.TryGetValue(key, out var candidates))
+					continue;
+
+				if (ZoneLineNames.LeadsBackIntoOwnPlayfield(key, mapNames.GetValueOrDefault(row.MapId)))
+					continue;
+
+				var dest = ZoneLineNames.PickDestination(candidates);
+				if (dest == row.MapId)
+					continue;
+
+				// Cross-playfield by construction - the same-playfield cases are the two `continue`s above. A null
+				// destination is deliberate on a tie: the row is a zone-line (its name IS a playfield), so the server
+				// should say it has no known destination instead of playing the door-open animation at it.
+				row.InteractAction = InteractAction.ProxyTeleport;
+				row.DestinationMapId = dest;
+				row.DestinationX = row.DestinationY = row.DestinationZ = null;
+				if (dest == null)
+					ambiguous++;
+				else
+					named++;
+			}
+
+			return (named, ambiguous);
 		}
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position

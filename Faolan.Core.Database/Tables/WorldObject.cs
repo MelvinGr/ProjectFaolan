@@ -48,6 +48,9 @@ namespace Faolan.Core.Database.Tables
 		// N3Teleport PlayfieldProxy (dest map) + spawn-position blob in the capture where the door was used; the
 		// arrival matches the destination map's reciprocal zone-line. Null when the object isn't a teleporter or its
 		// destination hasn't been captured. Nullable floats mirror Base3DEntity's transform columns.
+		//
+		// The map and the arrival are INDEPENDENTLY sourced (#341): a door no capture walked through gets its map
+		// from its own name against the client's playfield table, and no arrival at all - see DestinationPosition.
 		public uint? DestinationMapId { get; set; }
 
 		// #262: an AFTER-QUEST EFFECT. When the viewing player has EffectQuestId ACTIVE or COMPLETED, this object is
@@ -80,10 +83,14 @@ namespace Faolan.Core.Database.Tables
 		// isn't a teleporter.
 		public InteractAction InteractAction { get; set; }
 
+		// Where on the destination map the player lands. Null is a REAL state, not a missing one (#341): only a door a
+		// capture was walked through carries an arrival, because only the wire ever states one. A name-resolved door
+		// knows its map and nothing else, and the teleport falls back to that map's default spawn - the same fallback
+		// `.teleport <map>` takes. The three coordinates are written together, so a partial one is still a bug.
 		[NotMapped]
-		public Vector3? DestinationPosition => DestinationMapId == null
+		public Vector3? DestinationPosition => DestinationX == null
 			? null
-			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
+			: new Vector3(DestinationX.Value, DestinationY!.Value, DestinationZ!.Value);
 
 		// (proto field 12, "is closed", is NOT a column - it is LIVE door state on LiveWorldObject; see #598 and the
 		// note on WorldObjectColumns.ToMessage.)

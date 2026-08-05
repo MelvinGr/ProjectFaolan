@@ -76,7 +76,7 @@ Capture-sourced (default group, run in dependency order):
 | `shops` | — |
 | `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
 | `world-objects` | — |
-| `world-teleports` (zone-line door destinations, from captured use→teleport sequences) | — |
+| `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
 | `quests` (definitions + the hand-decoded seed steps) | — |
 
