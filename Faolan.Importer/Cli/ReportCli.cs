@@ -19,6 +19,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.GameServer.Combat;
@@ -197,6 +198,12 @@ namespace Faolan.Importer.Cli
 				case "shield-rose":
 				{
 					ShieldRose(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
+				case "dynel-cycle":
+				{
+					DynelCycle(NamedCapture.LoadAll(capturesDir), arg);
 					return 0;
 				}
 
@@ -920,6 +927,186 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"TOTAL over {captures.Count} captures: {provenHandles} handle(s) PROVEN recycled (a second template on the same handle), "
 			                  + $"costing {provenLost} spawn observation(s) to DistinctByHandle. {ambiguousHandles} single-template handle(s) were not counted - "
 			                  + "a repeat sighting of one template is a mob that moved, not evidence of reuse.");
+		}
+
+		// --report dynel-cycle [--report-arg <minimum burst size, default 4>]
+		//
+		// Retail's world-object interest, measured: every BURST of `SimpleDynelFullUpdateIIR` spawns or
+		// `n3ToClientQuitIIR` despawns that arrives in one second, with the burst's centroid, the player's own
+		// position at that moment (from their last uploaded `CharDCMove`) and the distance between the two.
+		//
+		// #529 is the question it answers. Twelve Stone Bricks were seen despawning at 83u, respawning at 144u and
+		// despawning again at 149u - an ordering no radius test can produce, so whatever drives retail's streaming is
+		// not the distance our `InterestManager` uses. One capture cannot say what it IS; a census of every bulk
+		// event in the corpus can, because a RADIUS leaves a tight band of distances and a grid/cell scheme does not.
+		//
+		// Bursts, not individual events, because that is the unit of the phenomenon: an interest pass moves a whole
+		// group at once, and a single spawn is just a mob walking into view.
+		private static void DynelCycle(IReadOnlyList<NamedCapture> captures, string? arg)
+		{
+			var minimumBurst = int.TryParse(arg, out var m) && m > 0 ? m : 4;
+			var spawnDistances = new List<double>();
+			var despawnDistances = new List<double>();
+			var playerAtBurst = new List<Vector3>();
+			var playerEverywhere = new List<Vector3>();
+
+			foreach (var capture in captures)
+			{
+				// A dynel despawn names only a handle, so its position has to come from the spawn that introduced it.
+				var positions = new Dictionary<uint, Vector3>();
+				var player = Vector3.Zero;
+				var seenPlayer = false;
+				var bursts = new List<(long Ticks, bool Spawn, List<uint> Handles, Vector3 Player)>();
+
+				foreach (var p in capture.Packets)
+				{
+					if (!p.IsIirCarrier)
+						continue;
+
+					// The player's own position: their UPLOADED moves, which is the one CharDCMove stream that is
+					// certainly the capturing character (the downloads are every visible mover).
+					if (p is { IsDownload: false, SubOpcode: CharDCMoveCodec.Opcode })
+					{
+						if (p.TryParse(CharDCMoveCodec.Parse, out var move))
+						{
+							player = move.Position;
+							seenPlayer = true;
+							playerEverywhere.Add(player); // the control sample for the cell-boundary fit below
+						}
+
+						continue;
+					}
+
+					if (!p.IsDownload || !seenPlayer)
+						continue;
+
+					uint handle;
+					bool spawn;
+					if (p.SubOpcode == WorldObjectClasses.SimpleDynel)
+					{
+						if (!p.TryParse(WorldObjectCodec.Parse, out var obj))
+							continue;
+
+						handle = obj.Handle;
+						positions[handle] = obj.Transform.FromProtobuf<ProtoGameCodeDynelIIR>().Position;
+						spawn = true;
+					}
+					else if (p.SubOpcode == N3ToClientQuitCodec.Opcode)
+					{
+						if (!p.TryParse(N3ToClientQuitCodec.Parse, out var quit) || !positions.ContainsKey(quit.Handle))
+							continue; // only the dynels we saw spawn - a character quit is a different event
+
+						handle = quit.Handle;
+						spawn = false;
+					}
+					else
+					{
+						continue;
+					}
+
+					var last = bursts.Count > 0 ? bursts[^1] : default;
+					if (bursts.Count > 0 && last.Spawn == spawn && TimeSpan.FromTicks(p.Ticks - last.Ticks).TotalSeconds <= 1.0)
+						last.Handles.Add(handle);
+					else
+						bursts.Add((p.Ticks, spawn, [handle], player));
+				}
+
+				var interesting = bursts.Where(b => b.Handles.Count >= minimumBurst).ToList();
+				if (interesting.Count == 0)
+					continue;
+
+				Console.WriteLine($"{capture.Name}");
+				var start = interesting[0].Ticks;
+				foreach (var burst in interesting)
+				{
+					var known = burst.Handles.Where(positions.ContainsKey).Select(h => Vector3.Distance(positions[h], burst.Player)).ToList();
+					if (known.Count == 0)
+						continue;
+
+					// The RADIUS test is one-sided per kind, and that is the whole trick. A radius R bounds a SPAWN
+					// burst from above (nothing past R may appear) and a DESPAWN burst from below (nothing inside R
+					// may vanish). So the numbers that matter are the FARTHEST thing that spawned and the NEAREST
+					// thing that despawned - if those two ranges overlap, no single R can produce the corpus.
+					var extreme = burst.Spawn ? known.Max() : known.Min();
+					(burst.Spawn ? spawnDistances : despawnDistances).Add(extreme);
+					playerAtBurst.Add(burst.Player);
+
+					Console.WriteLine($"  t+{TimeSpan.FromTicks(burst.Ticks - start).TotalSeconds,7:0.0}s  {(burst.Spawn ? "SPAWN  " : "DESPAWN")}"
+					                  + $" x{burst.Handles.Count,3}  player=({burst.Player.X,8:0.#},{burst.Player.Z,8:0.#})"
+					                  + $"  {(burst.Spawn ? "farthest spawned" : "nearest despawned")}={extreme,7:0.#}"
+					                  + $"  (near={known.Min(),7:0.#} far={known.Max(),7:0.#})");
+				}
+			}
+
+			Console.WriteLine();
+			Report("SPAWN   farthest-spawned", spawnDistances);
+			Report("DESPAWN nearest-despawned", despawnDistances);
+			Console.WriteLine();
+			Console.WriteLine("A single interest RADIUS R would need every 'farthest spawned' <= R <= every 'nearest despawned'.");
+			if (spawnDistances.Count > 0 && despawnDistances.Count > 0)
+			{
+				var floor = despawnDistances.Min();
+				var ceiling = spawnDistances.Max();
+				Console.WriteLine(floor >= ceiling
+					? $"  -> consistent: any R in [{ceiling:0.#}, {floor:0.#}] fits."
+					: $"  -> IMPOSSIBLE: something spawned at {ceiling:0.#} while something else despawned at {floor:0.#}. "
+					  + $"{spawnDistances.Count(d => d > floor)} spawn burst(s) reach past the nearest despawn.");
+			}
+
+			// The grid hypothesis #529 proposes. If interest is per CELL, a burst fires when the player CROSSES a cell
+			// boundary, so the player's position at a burst should sit near a multiple of the cell size on one axis.
+			//
+			// ⚠️ The null model is NOT `cell/6` (the value a uniformly placed player would give). It is the SAME
+			// statistic over every position the player was ever at, because a player does not walk uniformly: they
+			// stand on designer-placed round coordinates, and a burst-only score has no meaning without that control.
+			// A real cell size beats the walk; a spurious one matches it.
+			Console.WriteLine();
+			Console.WriteLine("Cell-boundary fit - player position at each burst, CONTROLLED against every position they walked:");
+			foreach (var cell in new[] { 16f, 32f, 50f, 64f, 100f, 128f, 160f, 200f, 256f, 320f, 512f })
+			{
+				var atBursts = Median(playerAtBurst, cell);
+				var whileWalking = Median(playerEverywhere, cell);
+				if (double.IsNaN(atBursts) || double.IsNaN(whileWalking))
+					continue;
+
+				Console.WriteLine($"  cell {cell,5:0}: median offset at a burst {atBursts,7:0.#}   while walking {whileWalking,7:0.#}"
+				                  + (atBursts < whileWalking * 0.6 ? "   <- FIT" : ""));
+			}
+
+			return;
+
+			// DISTINCT positions on both sides: bursts arrive in clumps at one standing position (a map change fires
+			// several at the same coordinates), and counting that position once per burst would let a single spot
+			// carry the whole statistic.
+			static double Median(List<Vector3> points, float cell)
+			{
+				var offsets = points
+					.Distinct()
+					.Select(p => Math.Min(BoundaryDistance(p.X, cell), BoundaryDistance(p.Z, cell)))
+					.OrderBy(d => d)
+					.ToList();
+				return offsets.Count == 0 ? double.NaN : offsets[offsets.Count / 2];
+			}
+
+			static float BoundaryDistance(float value, float cell)
+			{
+				var offset = value - MathF.Floor(value / cell) * cell;
+				return MathF.Min(offset, cell - offset);
+			}
+
+			static void Report(string kind, List<double> distances)
+			{
+				var usable = distances.Where(d => !double.IsNaN(d)).OrderBy(d => d).ToList();
+				if (usable.Count == 0)
+				{
+					Console.WriteLine($"{kind}: no bursts.");
+					return;
+				}
+
+				Console.WriteLine($"{kind}: {usable.Count} burst(s), min={usable[0]:0.#} "
+				                  + $"p25={usable[usable.Count / 4]:0.#} median={usable[usable.Count / 2]:0.#} "
+				                  + $"p75={usable[usable.Count * 3 / 4]:0.#} max={usable[^1]:0.#}");
+			}
 		}
 
 		// --report shield-rose

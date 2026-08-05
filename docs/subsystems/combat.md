@@ -287,6 +287,47 @@ heartbeat's gating — the rose is drawn on the dynel; the owner is skipped, hav
 `CombatService.SendNormalAttackResponse` reads the swing's arc and scales the damage by the table. An NPC's rose
 closes on disengage and on death, so each fight opens on a fresh one; a player's is theirs for the session.
 
+## Retail's world-object interest is a GRID, not a radius (#529)
+
+Not combat, but it is measured with the same corpus tooling and there is nowhere better to put it yet.
+`--report dynel-cycle` groups every `SimpleDynelFullUpdateIIR` / `n3ToClientQuitIIR` burst in the corpus and
+asks two questions of it.
+
+**A single interest radius is impossible.** A radius `R` bounds a spawn burst from above (nothing past `R` may
+appear) and a despawn burst from below (nothing inside `R` may vanish), so `R` would have to satisfy
+*every* `farthest-spawned ≤ R ≤ every nearest-despawned`. Over 293 spawn and 210 despawn bursts:
+
+| | min | p25 | median | p75 | max |
+|---|---:|---:|---:|---:|---:|
+| farthest thing SPAWNED | 50.2 | 145.5 | 225.4 | 747.6 | **1834.5** |
+| nearest thing DESPAWNED | **3.5** | 61.1 | 79.6 | 116.0 | 501.8 |
+
+Something despawned 3.5 u from the player while things were spawning 1,834 u away. All 293 spawn bursts reach
+past the nearest despawn. No radius produces that, which is why #529's Stone Bricks respawned 62 u *farther*
+away than they had despawned.
+
+**A ~32-unit cell grid does fit.** If interest is per cell, a burst fires when the player crosses a boundary,
+so the player's position at a burst should sit near a multiple of the cell size on one axis. Scored against the
+right null — the same statistic over *every position the player walked*, because a player does not stand
+uniformly — with distinct positions on both sides:
+
+| cell | median offset at a burst | while walking |
+|---:|---:|---:|
+| 16 | 1.1 | 2.4 |
+| **32** | **1.3** | **5.0** |
+| 50 | 6.6 | 7.4 |
+| 64 | 4.6 | 9.9 |
+| 100 | 14.3 | 14.9 |
+| ≥128 | — | no separation |
+
+32 is the strongest and the finest independent one; 16 and 64 fit as its harmonics (every multiple of 32 is a
+multiple of 16, and every other 32-boundary is a 64-boundary). Everything at 100 and above is indistinguishable
+from the walk.
+
+⚠️ This is a correlation between bursts and grid boundaries, not a read of retail's implementation: it says the
+trigger is *positional and quantised at ~32 u*, not how the cells are indexed or how far the interest reaches.
+`InterestManager` is still radius-based — changing it is open work on #529.
+
 ## NPC counter-attack animation ack (decoded 2026-06-15)
 
 When an NPC swings at the player, retail sends a second `BehaviorControlCenterIIR` (0x642CD3D6) whose
