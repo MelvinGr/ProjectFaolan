@@ -44,7 +44,10 @@ namespace Faolan.Tests.Support
 			((uint)IirTypes.MainQuestUpdateIIR, 48),
 			((uint)IirTypes.PlayfieldFIIR, 184),
 			((uint)IirTypes.TradeskillReplyIIR, 1),
-			((uint)IirTypes.SimpleDynelFullUpdateIIR, 8333)
+			((uint)IirTypes.SimpleDynelFullUpdateIIR, 8333),
+			// #617: added 2026-08-05 so the constructed buff payload can be gated against every captured apply
+			// instead of four hand-picked rows. 4,666 bodies = 2,929 applies (80 bytes) + 1,737 ends (26).
+			((uint)IirTypes.MagicBuffIIR, 4666)
 		];
 
 		private static readonly Lazy<List<Entry>> Entries = new(Load);

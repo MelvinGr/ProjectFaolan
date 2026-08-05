@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -64,7 +65,11 @@ namespace Faolan.Importer.Captures
 			(MainQuestUpdateCodec.Opcode, "QuestLogList"),
 			(PlayfieldFCodec.Opcode, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
 			(TradeskillReplyCodec.Opcode, "the one captured recipe catalog"),
-			(WorldObjectClasses.SimpleDynel, "world objects - the identity+geometry column lift, byte-compared")
+			(WorldObjectClasses.SimpleDynel, "world objects - the identity+geometry column lift, byte-compared"),
+			// #617: the 54-byte APPLY payload we CONSTRUCT from Spell rows. Every captured apply is an instance of
+			// the same oracle - this spell id -> the bytes retail actually sent - including spells the capturing
+			// player never cast, since other players' and NPCs' casts are broadcast to them too.
+			(MagicBuffCodec.Opcode, "buff apply/end - the constructed payload's whole-corpus gate")
 		];
 
 		// Reads the tshark JSON DIRECTLY rather than going through TsharkCaptureReader, because the tests consume the
