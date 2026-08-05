@@ -360,7 +360,7 @@ namespace Faolan.GameServer.World
 			// 0.1/point above 10 - so both are passed rather than mitigating on the raw rating alone.
 			// The curve wants the attribute at the ×10 WIRE scale (its `(attribute - 10) / 10` term converts back to
 			// display units), so go through AttributeWireScore rather than the display score.
-			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating, character.Level,
+			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level, character.Level), target.ArmorRating, character.Level,
 				target.AttributeWireScore(CharacterStatId.Strength));
 			// #621: the player's shield rose finally does something in PvE. The arc is the direction the MOB SWINGS -
 			// the same left/overhead/right the player's own direction abilities pick - not where the mob is standing;
@@ -439,7 +439,7 @@ namespace Faolan.GameServer.World
 			npc.AttackSwingCounter++;
 			// #401: an NPC cast is magic damage, so the player's worn-gear Protection mitigates it (the magical mirror
 			// of armor mitigating melee) - same level-normalised curve, against TWK_TargetPerLevelProtection.
-			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.Protection, character.Level,
+			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level, character.Level), target.Protection, character.Level,
 				target.AttributeWireScore(CharacterStatId.Intelligence)); // the curve wants the ×10 wire scale
 			await _output.SendNpcSpellCast(client!, npc.Handle, spell);
 

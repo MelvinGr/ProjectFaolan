@@ -289,8 +289,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void ResolveNpcAttackDamage_ScalesWithLevel()
 		{
-			Assert.True(CombatResolver.ResolveNpcAttackDamage(10) > CombatResolver.ResolveNpcAttackDamage(1));
-			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1), CombatResolver.ResolveNpcAttackDamage(0));
+			Assert.True(CombatResolver.ResolveNpcAttackDamage(10, 10) > CombatResolver.ResolveNpcAttackDamage(1, 1));
+			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1, 1), CombatResolver.ResolveNpcAttackDamage(0, 0));
 		}
 
 		// #572: an NPC's swing must be in the SAME unit as the pool it lands in. It was not - the curve is measured in
@@ -302,17 +302,59 @@ namespace Faolan.Tests
 		[Fact]
 		public void ResolveNpcAttackDamage_IsASmallFractionOfASameLevelPool_NotWireUnits()
 		{
-			Assert.Equal(1u, CombatResolver.ResolveNpcAttackDamage(1)); // display units: 1, not the wire 100
+			Assert.Equal(1u, CombatResolver.ResolveNpcAttackDamage(1, 1)); // display units: 1, not the wire 100
 
 			foreach (var level in new uint[] { 1, 2, 3, 5, 10, 20, 40, 60 })
 			{
-				var swing = CombatResolver.ResolveNpcAttackDamage(level);
+				var swing = CombatResolver.ResolveNpcAttackDamage(level, level);
 				var pool = CombatResolver.NpcMaxHealthForLevel(level);
 
 				// A same-level fight lasts tens of hits, not one. On the wire scale every one of these is >= 100% and
 				// the whole range fails, which is the regression this exists to catch.
 				Assert.InRange(swing * 100.0 / pool, 0.5, 5.0);
 			}
+		}
+
+		// #488: the level-GAP penalty, pinned to the measurement it was built from rather than to its own constants.
+		// Each row is (mob level, player level, the measured `x model` band from `--report npc-damage`'s BY ATTACKER
+		// section) - so if the table is ever retuned, this fails against RETAIL, not against a copy of the code.
+		//
+		// The gap-6 row is the loose one on purpose: it is one template's 11 hits at 0.42, with a single 0.76 sighting
+		// from an above-curve archetype beside it.
+		[Theory]
+		// Same-level and near-level: full damage. 11 beach templates measure 0.77-1.57 at gap 0-1.
+		[InlineData(1u, 1u, 0.9, 1.1)]
+		[InlineData(5u, 6u, 0.9, 1.1)]
+		// Gap 5: three templates at level 75 against a level-80 player measure 0.96 / 0.99 / 1.35 - still full.
+		[InlineData(75u, 80u, 0.9, 1.1)]
+		// Gap 6: the one step. Templates 15441 / 15434 at level 74 measure 0.42 (11 hits) and 0.76 (1 hit).
+		[InlineData(74u, 80u, 0.35, 0.8)]
+		// Gap 7 through 21: the floor. 0.10-0.14 over 39 hits and six templates.
+		[InlineData(73u, 80u, 0.08, 0.16)]
+		[InlineData(70u, 80u, 0.08, 0.16)]
+		[InlineData(59u, 80u, 0.08, 0.16)]
+		// A mob ABOVE the player is deliberately un-penalised (two single-hit rows are not enough to amplify on).
+		[InlineData(42u, 23u, 0.9, 1.1)]
+		public void ResolveNpcAttackDamage_ReproducesTheMeasuredLevelGapCurve(uint npcLevel, uint playerLevel, double low, double high)
+		{
+			// The measured ratio is over `level * 100` in WIRE units; the resolver answers in display units, so the
+			// comparison is against the same curve in display units.
+			var unpenalised = CombatResolver.ResolveNpcAttackDamage(npcLevel, npcLevel);
+			var actual = CombatResolver.ResolveNpcAttackDamage(npcLevel, playerLevel);
+
+			Assert.InRange((double)actual / unpenalised, low, high);
+		}
+
+		// The regression that motivated the ticket, stated in the terms it was reported in: a level-80 player wading
+		// through level-70 mobs used to take TEN TIMES what retail deals. Not a restatement of the table above - this
+		// is the consequence, in the pool the damage actually lands in.
+		[Fact]
+		public void ALevel70Mob_BarelyScratchesALevel80Player()
+		{
+			var swing = CombatResolver.ResolveNpcAttackDamage(70, 80);
+			var pool = CombatResolver.NpcMaxHealthForLevel(80); // a level-80 pool, standing in for the player's
+
+			Assert.InRange(swing * 100.0 / pool, 0.05, 0.5); // fractions of a percent a hit, not ~2%
 		}
 
 		[Fact]

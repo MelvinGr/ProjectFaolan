@@ -355,18 +355,9 @@ namespace Faolan.GameServer.Combat
 		// the client's own combat log for the same fight, so those wire figures are confirmed against what the player
 		// SAW (67-92 displayed, wire x100) rather than inferred.
 		//
-		// ⚠️ BUT the measured figure only matches this line when the mob is within ~5 LEVELS OF THE PLAYER. Sorted by
-		// the gap (player level - mob level) the observed damage collapses, and it is not armour - in one 90-second
-		// fight the same player with the same gear took 7-14 displayed from a level-72 mob and 67-92 from a level-75
-		// one:
-		//
-		//     gap 0-1 (beach)  0.77..1.52      gap 6   0.42       gap 8-10   0.10..0.14
-		//     gap 5            0.96..0.98      gap 7   0.11..0.13 gap 36+    0.01..0.11
-		//
-		// That is a retail SERVER-side rule - the client's tweak table (RDB 1000516) carries no level-difference
-		// constant, only TWK_TargetPerLevelArmor/Protection - and we do not model it. It does not affect THIS line
-		// (a server sends a mob at the player's own level through the un-penalised case), but it does mean the low
-		// `x model` ratios in the report are the penalty, not evidence against the constant. Tracked separately.
+		// ⚠️ This line is the swing against a player AT THE MOB'S OWN LEVEL. Retail scales it down hard once the mob
+		// is well below the player - see LevelGapPercent below, which is where that lives - so the low `x model`
+		// ratios in the report are that penalty, not evidence against this constant.
 		//
 		// A second per-archetype factor is visible and also unmodelled: RANGED mobs sit near 0.2 even at gap 0
 		// (`Poacher Marksman` 0.17, `Bat Pict Archer` 0.21) where same-level melee is ~1.0.
@@ -394,10 +385,76 @@ namespace Faolan.GameServer.Combat
 		// Sanity, in display units: level 1 deals 1 against a level-1 player's ~88 pool = 1.1% a hit, which is the
 		// "~1.5% of a same-level player's health pool" the measurement above states; and the player's own ~6 a swing
 		// against a 63-health critter is the ~10 hits to kill that `WeaponDamageScale` is pinned to.
-		public static uint ResolveNpcAttackDamage(uint npcLevel)
+		//
+		// `targetLevel` is who is being HIT: retail's level-gap penalty is applied here (#488), so pass the defender's
+		// level rather than the mob's. A caller measuring the bare per-level curve passes `npcLevel` for both, which
+		// is the un-penalised case by construction.
+		public static uint ResolveNpcAttackDamage(uint npcLevel, uint targetLevel)
 		{
-			return Math.Max(1u, Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel / CharacterStatId.HealthMax.GetScale());
+			var wire = Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * LevelGapPercent(npcLevel, targetLevel) / 100;
+			return Math.Max(1u, wire / CharacterStatId.HealthMax.GetScale());
 		}
+
+		// Retail's LEVEL-GAP penalty: a mob well below the player barely scratches them, and the drop is a CLIFF, not
+		// a slope - full damage out to a five-level gap, then two steps to a ~0.11 floor that holds all the way down.
+		// Returned as a percent so the arithmetic above stays integral.
+		//
+		// Measured by (attacker TEMPLATE, mob level, player level) - `--report npc-damage`, the BY ATTACKER section.
+		// Keyed by TEMPLATE because one NAME spans several templates and levels (#244), and per-attacker because a
+		// level bucket mixes archetypes. `x model` is the measured median over `level * 100`:
+		//
+		//     gap 0-1   0.77 .. 1.57   11 beach templates, 700+ hits   (a same-level player)
+		//     gap 5     0.96, 0.99, 1.35   43 hits, 3 templates at level 75
+		//     gap 6     0.42 (11 hits, template 15441), 0.76 (1 hit)
+		//     gap 7     0.11, 0.13     14 hits, templates 15437/15441 at level 73
+		//     gap 8-10  0.10 .. 0.14   26 hits, templates 15436/15441 at level 70-72
+		//     gap 20-21 0.11           9 hits, Striped Boar at level 59/60
+		//     gap 27+   0.03 .. 0.11   drifts slightly lower; one floor covers it
+		//
+		// The single strongest piece is template 15441 `Hired Bodyguard` against ONE level-80 player, by its own
+		// level: 729 at 70, 732 at 71, 938 at 73, 3125 at 74, 7402 at 75. A 10x swing over five of the ATTACKER's
+		// levels with the defender, its gear and the attacker's template all held fixed. That is also why it is not
+		// armour - a level-normalised mitigation term cannot differ 8x across three levels of attacker - and the same
+		// fight carries the client's combat log, showing 7-14 displayed from a level-72 mob and 67-92 from a
+		// level-75 one.
+		//
+		// ⚠️ A MEASURED TABLE, NOT A RECOVERED RULE. Retail decides this server-side: the client's tweak table
+		// (RDB 1000516) carries no level-difference constant - only TWK_TargetPerLevelArmor/Protection and
+		// TWK_Consequence_XPGainDecayRate - so there is nothing in the client to read, and it is undocumented
+		// publicly. The two plateaus are well sampled; the STEP between them rests on one template's 12 hits at
+		// gap 6, so that is the number to revisit when a capture at gaps 2-4 or another gap-6 fight arrives.
+		//
+		// ⚠️ The mirror case - a mob ABOVE the player - is deliberately NOT modelled and returns 100. Two rows
+		// measure it (level-42 Nemedians against a level-23 player, 5.15 and 6.99) and they point the right way, but
+		// they are ONE hit each; and a higher-level mob already hits harder through `level * 100`. Amplifying damage
+		// 6x on two hits would be inventing, and the failure mode - a mob a few levels up one-shotting a player -
+		// is the expensive direction to get wrong.
+		//
+		// ⚠️ Elite/boss attackers sit far ABOVE this table (`Black Ring Assassin` 4.94 at gap 17, `Wild Boar` 2.15 at
+		// gap 55) and ranged mobs far below it (`Poacher Marksman` 0.17 at gap 0). Both are per-ARCHETYPE and
+		// independent of the gap; neither is modelled here, and neither is evidence against the gap curve.
+		public static uint LevelGapPercent(uint npcLevel, uint targetLevel)
+		{
+			var gap = (long)targetLevel - Math.Max(1u, npcLevel);
+			return gap switch
+			{
+				<= FullDamageGap => 100,
+				FullDamageGap + 1 => GapStepPercent,
+				_ => FarBelowPercent
+			};
+		}
+
+		// The largest gap that still deals full damage. Measured 0.96/0.99/1.35 at exactly this gap, against 0.42 one
+		// level further down.
+		private const int FullDamageGap = 5;
+
+		// The one step between the plateaus, at gap 6. The 11-hit measurement (0.42) rather than the mean with the
+		// single 0.76 sighting beside it - that one is a `Vibrant Scorpion`, an archetype the same report shows
+		// sitting above the curve at every gap.
+		private const uint GapStepPercent = 42;
+
+		// The floor, from gap 7 down: 0.10-0.14 over 39 hits and six templates from gap 7 to gap 21.
+		private const uint FarBelowPercent = 11;
 
 		// Spell damage: the level-scaled base plus the caster's aggregated Magic Damage rating (#399), added flat like
 		// retail's spell-damage bonus. magicDamage is 0 for NPC casts / callers without gear. Per-spell power isn't

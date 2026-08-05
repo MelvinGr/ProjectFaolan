@@ -1609,7 +1609,7 @@ namespace Faolan.Importer.Cli
 		// What retail's combat actually DEALT, by NPC level (#401/#20). The captures carry every floating number as a
 		// DamageResultIIR [target][attacker][damage][school], and the spawn extractor gives each NPC handle its level
 		// - so joining them measures both directions instead of guessing:
-		//   NPC -> player  : the curve ResolveNpcAttackDamage approximates (today: 5 + 3*level, invented)
+		//   NPC -> player  : the curve ResolveNpcAttackDamage approximates (level * 100, plus the #488 level-gap scale)
 		//   player -> NPC  : what a player's hit lands for on a level-N NPC, i.e. the shape any NPC-armour model has
 		//                    to reproduce
 		// ⚠️ Both sides are POST-mitigation - they are what the client was told to draw - so they are the target
@@ -1862,7 +1862,9 @@ namespace Faolan.Importer.Cli
 			// The model is the SERVER's, called - not a copy of it. This column used to hardcode `5 + level * 3`, a
 			// formula the server had already replaced with `level * 100`, so it spent that time reporting our fit
 			// against a curve nothing ran (#479).
-			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, CombatResolver.ResolveNpcAttackDamage);
+			// `level, level` = a player at the mob's own level, i.e. the un-penalised case - the level-gap penalty
+			// (#488) is a separate factor and the column below is the one that shows it.
+			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => CombatResolver.ResolveNpcAttackDamage(level, level));
 
 			// Per attacker, so the archetype spread is visible instead of averaged away. `x model` is the measured
 			// median over what the server would deal at that level: ~1.0 means the level curve fits this attacker.
@@ -1872,8 +1874,11 @@ namespace Faolan.Importer.Cli
 			{
 				var sorted = hits.Order().ToList();
 				var median = sorted[sorted.Count / 2];
-				var ours = CombatResolver.ResolveNpcAttackDamage(level);
 				var pcLvl = attackerPlayerLevel.GetValueOrDefault((template, level));
+				// Scored against what the server would ACTUALLY deal to that player - the level-gap penalty included
+				// (#488) - so `x model` reads 1.0 when we reproduce the fight rather than only when the gap is 0. Rows
+				// with no resolvable player level fall back to the un-penalised curve.
+				var ours = CombatResolver.ResolveNpcAttackDamage(level, pcLvl > 0 ? pcLvl : level);
 				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 24),-24} {sorted.Count,5} {sorted[0],7} {median,7} {sorted[^1],7} {ours,7} {(ours > 0 ? (double)median / ours : 0),8:F2} {(pcLvl > 0 ? pcLvl.ToString() : "-"),7} {(pcLvl > 0 ? ((int)pcLvl - (int)level).ToString() : "-"),8}");
 			}
 

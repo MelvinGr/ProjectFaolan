@@ -1024,11 +1024,42 @@ longer an extrapolation from the beach.
 whose level sits at very different distances from the player's. Attributed per template, with the capturing
 player's level alongside, two effects separate out that the buckets render as one apparent cliff:
 
-- a **level-GAP penalty** - full damage within ~5 levels of the player, collapsing to ~0.10 by 7, and running
-  the other way when the mob is *above* the player. Retail applies it server-side (the client tweak table
-  carries no level-difference constant), and we model none of it -
-  [#488](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/488).
+- a **level-GAP penalty** - see below; modelled since #488.
 - **ranged mobs deal ~0.2 of same-level melee** even at gap 0 (`Poacher Marksman` 0.17, `Bat Pict Archer` 0.21).
+
+### The level-GAP penalty is a cliff, not a slope (#488)
+
+A mob well below the player barely scratches them, and the drop happens over **two levels**:
+
+| gap (player level − mob level) | measured `x model` | evidence |
+|---|---|---|
+| 0–1 | 0.77 – 1.57 | 11 beach templates, 700+ hits |
+| 5 | 0.96, 0.99, 1.35 | 43 hits, 3 templates at level 75 |
+| **6** | **0.42** (11 hits), 0.76 (1) | template 15441 at level 74 |
+| 7 | 0.11, 0.13 | 14 hits, 15437/15441 at level 73 |
+| 8–10 | 0.10 – 0.14 | 26 hits, 15436/15441 at level 70–72 |
+| 20–21 | 0.11 | 9 hits, Striped Boar at level 59/60 |
+| 27+ | 0.03 – 0.11 | drifts slightly lower; one floor covers it |
+
+`CombatResolver.LevelGapPercent` reproduces that as `100 / 42 / 11` percent at gap `≤5 / 6 / ≥7`, and
+`ResolveNpcAttackDamage` takes the DEFENDER's level for it.
+
+The clincher is one template against one player: `Hired Bodyguard` (15441) versus the same level-80 necromancer
+deals 729 at level 70, 732 at 71, 938 at 73, 3125 at 74 and 7402 at 75. Ten-fold, across five of the attacker's
+own levels, with the defender, its gear and the attacker's template all held fixed. That is also what rules
+**armour** out — a level-normalised mitigation term cannot differ 8× over three levels of attacker — and the
+same fight carries the client's combat log, so the wire numbers are confirmed against 7–14 and 67–92 displayed.
+
+⚠️ **Measured, not recovered.** Retail decides this server-side and the client carries nothing to read: RDB
+1000516 has only `TWK_TargetPerLevelArmor` / `TWK_TargetPerLevelProtection` / `TWK_Consequence_XPGainDecayRate`,
+and it is undocumented publicly. The two plateaus are well sampled; the step between them rests on one
+template's 12 hits.
+
+⚠️ **The mirror case is deliberately NOT modelled.** A mob *above* the player measures 5.15 and 6.99 at gap −19,
+which points the right way but is one hit each — and a higher-level mob already hits harder through `level × 100`.
+
+⚠️ **Elite/boss attackers sit far above this table** (`Black Ring Assassin` 4.94 at gap 17) and ranged mobs far
+below it. Both are per-archetype and independent of the gap, so neither is evidence against the curve.
 
 Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
 [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479).
