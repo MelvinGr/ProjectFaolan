@@ -219,6 +219,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "buff-durations":
+				{
+					BuffDurations(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
@@ -441,6 +447,12 @@ namespace Faolan.Importer.Cli
 				case "spell-recast":
 				{
 					SpellRecast(RdbDir(), arg);
+					return 0;
+				}
+
+				case "spell-refs":
+				{
+					SpellRefs(RdbDir(), arg);
 					return 0;
 				}
 

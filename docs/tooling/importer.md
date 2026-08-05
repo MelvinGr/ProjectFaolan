@@ -51,6 +51,11 @@ the captures/RDB dirs, the raw packet bytes, the chosen `WriteMode`, and the `Dr
 dependencies), topologically sorts by `DependsOn` (registration order is the stable tie-break), and runs them
 in order, printing each `Summary`.
 
+⚠️ `buff-durations` is registered **last of all**, after the RDB group, and that placement is load-bearing:
+`rdb-spells` writes `Spells.DurationMs` unconditionally, so a capture-sourced duration for the rows its property
+run leaves empty has to be applied after it. `RdbSpellsModule.RequiredAfter` names it for the same reason, so
+`--only rdb-spells` pulls it in rather than leaving those rows back at 0/1 ms.
+
 ## Module registry (one row = one `--only`/`--skip` token)
 
 Capture-sourced (default group, run in dependency order):
@@ -79,6 +84,7 @@ Capture-sourced (default group, run in dependency order):
 | `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
 | `quests` (definitions + the hand-decoded seed steps) | — |
+| `buff-durations` (the duration retail STATES, for rows whose RDB record leaves property field 8 empty — #659) | `spells` |
 
 Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `recipes`. ⚠️ `mounts` harvests
 the mount CREATURE models and selects them against the mount CATALOG, which `rdb-spells` imports — so run
@@ -281,7 +287,15 @@ later — and shows the counters never move with it, #446),
 length, and the gaps it contributes — the exact input `DotIntervalEstimator` is handed. Train LENGTH is what the
 pooled gap list hides: a length-2 train contributes one gap that is a re-application phase offset as often as it
 is the period, so a spell whose gaps come mostly from those has no cadence whatever the pooled list looks like.
-`--report-arg <name substring or id>` drills one spell and prints its train lengths and gaps, #524), … — the report's
+`--report-arg <name substring or id>` drills one spell and prints its train lengths and gaps, #524),
+`buff-durations` (every captured `MagicBuffIIR` apply grouped by spell, with the durations retail stated and the
+`Spells.DurationMs` we build from — the evidence view behind `MagicBuffCorpusTests`' duration gate. It separates
+the two populations a total hides: a SHORTFALL that decreases across a capture is retail re-sending a long buff
+with its remaining time (#601), while an EXCESS cannot be a remainder and is therefore a wrong row (#659).
+`--report-arg <name substring or id>` drills one spell and prints each apply with its capture and offset),
+`spell-refs` (`--report-arg <spellId>[,...]`: every spell record whose GameAction element region NAMES the given
+spell, printed by key — the inverse of `spell-template`. A buff whose own record is nearly empty has its mechanics
+stated by whatever APPLIES it, and that applier is only findable by scanning the corpus for the id), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

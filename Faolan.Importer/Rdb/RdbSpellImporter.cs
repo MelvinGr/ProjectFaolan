@@ -157,12 +157,16 @@ namespace Faolan.Importer.Rdb
 		private const uint ScalingAttributeField = 0x34F;
 		private const uint SpellDataType = 1040005;
 
+		// The client's ability/effect catalog (docs/rdb/rdb-type-catalog.md), 146 records. It carries the consumable
+		// potion effects, which have no 1040005 record at all - see FillDurationsFromEffectCatalog.
+		private const uint EffectCatalogType = 1000621;
+
 		// #271: the two GameAction element types that SET a base recast (docs/re/gameaction-keylists.tsv). Their
 		// `Change...` twins (53031 / 53069) are modifiers, not a base, and are deliberately not read here.
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SetSpellLineRecastTimeKind = 53077;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts, int EffectDurations)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
@@ -480,6 +484,8 @@ namespace Faolan.Importer.Rdb
 				recastsSet++;
 			}
 
+			var effectDurations = FillDurationsFromEffectCatalog(rdb, byId, logger);
+
 			if (toAdd.Count > 0)
 				db.Spells.AddRange(toAdd);
 			await db.SaveChangesAsync();
@@ -542,9 +548,9 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows.",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded);
-			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations);
+			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations);
 		}
 
 		/// <summary>
@@ -638,6 +644,90 @@ namespace Faolan.Importer.Rdb
 		// `internal` because --report spell-line-ids needs the SAME parse - a second copy of a grammar this fiddly
 		// (a longest strictly-increasing run, not a fixed offset) is how a report quietly stops agreeing with the
 		// importer, exactly as RdbItemImporter.TryReadPropertyField already learned.
+		/// <summary>
+		///     Fills <see cref="Spell.DurationMs" /> from the client's ABILITY/EFFECT catalog (RDB type 1000621) for
+		///     rows the spell catalog (1040005) does not carry a duration for (#659).
+		/// </summary>
+		/// <remarks>
+		///     A buff can be catalogued as a `Spells` row without having a 1040005 record at all: the captures
+		///     catalogue whatever retail applies (<c>CaptureSpellImporter</c>), and the consumable-potion effects live
+		///     in the 146-record ability/effect catalog instead. `XP Boost (4h)` (5058659) is the worked case - no
+		///     spell record, so nothing ever set its duration, while its own effect record states 1,440,000 cs and its
+		///     description says "for 4 hours".
+		///     <para>
+		///         ⚠️ It only ever FILLS an empty row, never overwrites one: where both catalogs hold a record, the
+		///         spell record is the spell's own statement about itself.
+		///     </para>
+		/// </remarks>
+		private static int FillDurationsFromEffectCatalog(RdbReader rdb, Dictionary<uint, Spell> byId, ILogger? logger)
+		{
+			var filled = 0;
+			foreach (var entry in rdb.EntriesOfType(EffectCatalogType))
+			{
+				if (entry.Size == 0 || !rdb.CanRead(entry) || !byId.TryGetValue(entry.Id, out var spell) || spell.DurationMs > 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(entry);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 12 || !ReadTaggedFields(body.AsSpan(12)).TryGetValue(DurationField, out var centiseconds) || centiseconds == 0)
+					continue;
+
+				logger?.LogInformation("RdbSpellImporter: spell {Spell} '{Name}' has no {SpellType} record; its {EffectType} effect record states {Centiseconds} cs.",
+					spell.Id, spell.Name, SpellDataType, EffectCatalogType, centiseconds);
+				spell.DurationMs = centiseconds * 10;
+				filled++;
+			}
+
+			return filled;
+		}
+
+		/// <summary>
+		///     The ABILITY/EFFECT catalog's field table: the same strictly-increasing field run as
+		///     <see cref="ReadIncreasingFields" />, but its records interleave a TAG byte between each field id and its
+		///     value - <c>[fieldId u32][tag u8][value u32]</c>, a 9-byte stride - and the run does not start on a word
+		///     boundary, so the spell reader cannot see it at all.
+		/// </summary>
+		/// <remarks>
+		///     Pinned on `XP Boost (4h)` (5058659) by three independent readings of the same run: field 8 = 1,440,000 cs
+		///     against a description that says "for 4 hours"; field 54 = 1, as every one of its `(4h)` siblings carries;
+		///     and field 79 = 5,061,875, which lands inside the icon block its four siblings occupy (5,061,874/82/83/84).
+		///     A stride or alignment that were off would break all three, not one.
+		/// </remarks>
+		internal static Dictionary<uint, uint> ReadTaggedFields(ReadOnlySpan<byte> body)
+		{
+			const int stride = 9;
+			var best = new Dictionary<uint, uint>();
+			for (var start = 0; start + stride <= body.Length; start++)
+			{
+				uint last = 0;
+				var haveLast = false;
+				var cur = new Dictionary<uint, uint>();
+				for (var at = start; at + stride <= body.Length; at += stride)
+				{
+					var fid = body.ReadU32Le(at);
+					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
+						break;
+
+					cur[fid] = body.ReadU32Le(at + 5);
+					last = fid;
+					haveLast = true;
+				}
+
+				if (cur.Count > best.Count)
+					best = cur;
+			}
+
+			return best;
+		}
+
 		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;

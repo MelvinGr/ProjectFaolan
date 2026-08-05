@@ -77,7 +77,7 @@ fields (compressed on-disk bytes).
 | 1000521 | Game data/enum table (1000500x) | 1 | 1 | 0 | 704 B |
 | 1000523 | Game data/enum table (1000500x) | 1 | 0 | 1 | 20 B |
 | 1000620 | item-template catalog (RDBH, variant of 1000020) | 271 | 271 | 0 | 94.7 KB |
-| 1000621 | Ability/effect name | 146 | 146 | 0 | 45.6 KB |
+| 1000621 | Ability/effect catalog - name + description + a property run in the SAME field-id namespace as the spell record, but at a **9-byte stride** (`[fieldId u32][tag u8][value u32]`) and off word alignment, so the spell reader cannot see it. Carries the consumable-potion effects, which have no 1040005 record at all (`RdbSpellImporter.ReadTaggedFields`, #659) | 146 | 146 | 0 | 45.6 KB |
 | 1000622 | EFFECTPACKAGE | 9 | 0 | 9 | 6.0 KB |
 | 1000623 | SOUNDENGINE | 1 | 1 | 0 | 84.2 KB |
 | 1000624 | Random name-gen list | 33 | 1 | 32 | 1.1 MB |

@@ -32,6 +32,14 @@ namespace Faolan.Importer.Captures
 		private const uint BehaviorSubOpcode = BehaviorControlCenterCodec.Opcode;
 		private const uint MaxLevel = 80;
 
+		// A `Spells.DurationMs` this low is the RDB record carrying no duration, not a 10 ms buff: property field 8
+		// is centiseconds, so the whole population here is a field-8 of 0 or 1 (#659, ImportBuffDurationsAsync).
+		private const uint EmptyDurationMs = 10;
+
+		// How many DISTINCT captures must state the same duration before it is taken as a spell's base rather than
+		// one restore's remaining time.
+		private const int MinCapturesForADuration = 2;
+
 		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
 		// follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
 		private const uint AddShortcut = (uint)GameCharAgentMethods.AddShortcut;
@@ -137,6 +145,86 @@ namespace Faolan.Importer.Captures
 				await db.SaveChangesAsync();
 
 			return (pairs.Count, linked);
+		}
+
+		// The buff duration retail STATES, for the rows whose RDB record does not carry one (#659).
+		//
+		// `RdbSpellImporter` sources `Spells.DurationMs` from property field 8, and a family of records leaves that
+		// field at 0 or 1 centisecond - the whole 0x003B3C88..0x003B3CAA crowd-control immunity family does, and
+		// `Stagger Immunity` (0x00485DE6) carries no field 8 at all. Retail's own `MagicBuffIIR` apply states a real
+		// duration for them: 40 s for `Root Immunity` and `Knockback immunity`, 15 s for `Stagger Immunity`. A row of
+		// 0 or 1 ms is not cosmetic - such a buff expires on the world tick that applied it.
+		//
+		// ⚠️ The wire value is NOT unconditionally the base duration: retail re-sends a long buff carrying its
+		// REMAINING time (`Contract of Protection`: 1,434,700 -> 1,180,241 cs against a 1,440,000 cs row - #601), and
+		// a single restore looks exactly like a fresh apply. Two gates keep those out:
+		//   * the row must be EMPTY (<= 1 cs) - a row the RDB filled always wins, because the RDB states the base and
+		//     the wire may state a remainder;
+		//   * the adopted value must be the most frequent one AND seen in at least two DISTINCT captures. A remainder
+		//     is a different number every time, so it never repeats across captures; a base duration always does.
+		// Measured over the corpus that is exactly three spells - and it correctly REFUSES `XP Boost (4h)`, whose only
+		// two applies are one restore (1,268,055 cs) duplicated to the two clients of one capture.
+		//
+		// `--report buff-durations` prints the input: every captured apply per spell, with its capture and offset.
+		public static async Task<(int Seen, int Adopted)> ImportBuffDurationsAsync(IDatabaseContext db, IReadOnlyList<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
+		{
+			// spell -> duration in centiseconds -> the distinct captures that stated it.
+			var stated = new Dictionary<uint, Dictionary<uint, HashSet<int>>>();
+			for (var c = 0; c < captures.Count; c++)
+			{
+				foreach (var p in captures[c])
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: ApplySpellSubOpcode })
+						continue;
+
+					MagicBuffIIR buff;
+					try
+					{
+						buff = MagicBuffCodec.Parse(p.Record);
+					}
+					catch (CodecParseException)
+					{
+						continue;
+					}
+
+					if (buff.Form != MagicBuffIds.FormApply || buff.Data.Length != MagicBuffDataCodec.Length)
+						continue;
+
+					var duration = MagicBuffDataCodec.Parse(buff.Data).Duration;
+					if (duration == 0)
+						continue;
+
+					stated.TryAdd(buff.SpellBaseId, []);
+					stated[buff.SpellBaseId].TryAdd(duration, []);
+					stated[buff.SpellBaseId][duration].Add(c);
+				}
+			}
+
+			if (stated.Count == 0)
+				return (0, 0);
+
+			var ids = stated.Keys.ToList();
+			var rows = await db.Spells.Where(s => ids.Contains(s.Id) && s.DurationMs <= EmptyDurationMs).ToListAsync();
+
+			var adopted = 0;
+			foreach (var row in rows)
+			{
+				// Most frequent first (by how many captures stated it), longest as the tie-break so a truncated
+				// re-send never wins a tie against the base it is a remainder of.
+				var best = stated[row.Id].OrderByDescending(kv => kv.Value.Count).ThenByDescending(kv => kv.Key).First();
+				if (best.Value.Count < MinCapturesForADuration || best.Key * 10 <= row.DurationMs)
+					continue;
+
+				logger?.LogInformation("CaptureSpellImporter: spell {Spell} '{Name}' has no RDB duration ({Row} ms); retail states {Wire} cs in {Captures} captures - adopted.",
+					row.Id, row.Name, row.DurationMs, best.Key, best.Value.Count);
+				row.DurationMs = best.Key * 10;
+				adopted++;
+			}
+
+			if (adopted > 0)
+				await db.SaveChangesAsync();
+
+			return (rows.Count, adopted);
 		}
 
 		// Harvests each CLASS's spell ACCESS from the create-flow captures into ClassSpell (#74) - the spell analogue of
