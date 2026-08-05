@@ -317,9 +317,14 @@ namespace Faolan.GameServer
 		}
 
 		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
-		// [u32 command]. Decoded commands (#307, docs/subsystems/summon-pet-decode.md): 0x1F8 = dismiss, 0x1F6 = defend.
-		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn. Other commands are logged for now
-		// (attack/follow/stay AI is a follow-up; a .pet-summoned minion already follows via SetNpcFollow).
+		// [u32 command]. The bar is five buttons and the corpus carries exactly five codes (0x1F4-0x1F8), so the set is
+		// closed - see PetCommand for which three are attributed and why the other two are one named pair (#307,
+		// docs/subsystems/summon-pet-decode.md).
+		//
+		// Dismiss = retail's PetIIR mode-1 remove + the n3ToClientQuit despawn, and is the only one that ACTS today: the
+		// stance commands need pet-side combat AI (a pet picking and engaging a target), which does not exist - a
+		// summoned minion only follows, via SetNpcFollow. They are logged rather than silently dropped so the bar's
+		// traffic is visible while that is built.
 		private async Task HandlePetCommand(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // type 0xC350

@@ -46,10 +46,33 @@ Interact, not a pet action and not an emote).
 (the pet's buff) + `StatUpdate` + `MoveTask`.
 
 **Command — `QueuePetCommand` (0x205b)** (opcode already named in `Opcodes.cs`):
-`[u32 type=0xC350][u32 petHandle][u32 command]`. Confirmed command codes (labelled by the notes):
-- `0x1F6` = **defend** ("net magus to defend")
-- `0x1F8` = **dismiss** → server replies with `ApplySpell` + `n3ToClientQuit 0x04B82B2D` despawn of the pet.
-- (attack/follow/stay/aggressive/passive are the neighbouring `0x1Fx` codes — capture those next.)
+`[u32 type=0xC350][u32 petHandle][u32 command]`.
+
+**The command set is CLOSED at five.** The bar is five buttons — the abilities `Pet Attack` / `Defend` / `Follow`
+/ `Assist` / `Dismiss`, slots 261–265 — and sweeping every capture for `QueuePetCommand` yields exactly five
+distinct codes, `0x1F4`–`0x1F8`, across 18 sends. So nothing further is coming; the only open question is which
+name goes on which code. [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json]
+
+What makes the annotations readable is the **lag direction**, and `casting-with-chat-notes` settles it: there the
+player narrates *before* acting, twice, ~3 s apart.
+
+| code | name | evidence |
+|---|---|---|
+| `0x1F4` | **assist** | `chat-annotated-4`: press at 20:11:08, note "set app pets to assist" at 20:11:10. The weakest of the three — a single note, and *after* its press rather than before. |
+| `0x1F5` | attack **or** follow | — |
+| `0x1F6` | **defend** | `casting-with-chat-notes` "net magus to defend" 05:59:38 → press 05:59:41; `chat-annotated-4` "set app pets to defend" 20:11:00 → press 20:11:01, and "defend again" 20:11:18 → press 20:11:19. Three independent notes. |
+| `0x1F7` | the other of attack / follow | — |
+| `0x1F8` | **dismiss** | `casting-with-chat-notes` "dismissing arcanist" 05:59:13 → press 05:59:16, and confirmed by BEHAVIOUR: the server answers with `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D`. |
+
+⚠️ `0x1F5` and `0x1F7` are carried as one named pair (`PetCommand.AttackOrFollowA/B`) rather than as two hopeful
+names. There is no arithmetic shortcut to break the tie — the bar's ability slots have no monotone relation to the
+codes (Assist 264 → `0x1F4` while Defend 262 → `0x1F6`) — and the client sends **no** `PerformSpecialAction`
+alongside a pet command, so the bar press cannot be cross-referenced to the ability it came from either. One
+annotated capture that says "attack" or "follow" settles it.
+
+(A const-scan of `AgeOfConan.exe` for `0x1F4`–`0x1F8` is a dead end and a trap worth naming: it lands on the
+client's STAT-name registration table, where `0x1F8` is `Stamina` and `0x1FA` is `Mana` — the same numbers in an
+unrelated namespace.)
 
 **Owner-binding — `PetIIR_c` (0x1F4CB0F7)** (opcode already named; reader in docs/re/iir-readers-conversation-misc.md
 = `[u32 mode], mode∈{0,1}→[u32×2], mode==0→[u32×3]`). This is the packet that tells the client "this creature is
@@ -61,8 +84,7 @@ not client inference and not a spawn field.
 **FULLY DECODED loop** (nothing left to RE on the protocol):
 1. **Summon**: C→S BCC `0x642CD3D6` ability → channel → S→C `FA015807` pet spawn + `StatIIR` + `ApplySpell`
    (pet self-buff) + `StatUpdate` + `MoveTask` + **`PetIIR` 0x1F4CB0F7 mode-0 owner-assign** `[player][pet]`.
-2. **Command**: C→S `QueuePetCommand` 0x205b `[C350][pet][cmd]` (0x1F6 defend, 0x1F8 dismiss, neighbours = the
-   rest of the stance/command set).
+2. **Command**: C→S `QueuePetCommand` 0x205b `[C350][pet][cmd]` — the five bar codes above.
 3. **Dismiss**: 0x205b 0x1F8 → S→C `ApplySpell` + `PetIIR` mode-1 + `n3ToClientQuit 0x04B82B2D` despawn.
 
 The only non-protocol unknown is **which BCC summon-ability id maps to which pet template** (Deathless Acolyte
@@ -101,12 +123,15 @@ spell id (seeded by the importer's `spell-effects` module): `0x5E2F5`→Arcanist
 
 ## Follow-up (#307) to make it retail-accurate
 
-The capture DOES contain the flow (frames 1197→1222, above), so the remaining work is:
-1. **Trigger:** wire the necro summon ability — a `BehaviorControlCenterIIR` (0x642CD3D6) channelled activation
-   (frame 1197) — to fire the pet spawn, instead of the GM `.pet` command.
-2. **Spawn:** on channel-complete, spawn the pet as an `FA015807` creature (we already build these) — e.g. the
-   "Tamed Puma" template — next to the caster.
-3. **Owner binding:** pin how the client learns the pet is the caster's (NOT a plain field in the 473-B spawn —
-   check the BCC summon action payload / the follow-up stats, or a dedicated pet-assign packet).
-4. **Command bar + AI:** reuse the 16-byte `[player][target]` RPC for attack/follow/stay; follow AI = `SetNpcFollow`.
-5. Pet persistence + despawn on death/logout.
+Items 1-3 landed with the MVP above: the summon SPELL fires the spawn (`SpellEffects` rows of kind `SummonPet`
+keyed by the summon spell id, shared with `.pet` through `SummonPetForPlayer`), the pet builds from the creature
+TYPE, and owner binding is `PetIIR` mode-0. What is left:
+
+- **Pet-side combat AI.** This is the one real blocker on the command bar. `Dismiss` acts; the four stance
+  commands are decoded, logged and inert, because a pet picking and engaging a target does not exist - the
+  simulation's attack path runs NPC -> player, and a pet is an NPC that must attack another NPC. A summoned minion
+  only follows (`SetNpcFollow`).
+- **The attack/follow tie-break** - see the command table above. One annotated capture settles it.
+- **Persistence + despawn on death/logout.**
+
+Open work tracked in Gitea #307.
