@@ -258,6 +258,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "bcc-attack-tail":
+				{
+					BccAttackTail(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "combo-swings":
 				{
 					await ComboSwings(NamedCapture.LoadAll(capturesDir), arg);

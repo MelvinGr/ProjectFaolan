@@ -217,6 +217,8 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
 `class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
+`bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
+puts each in, with the direction ability resolved — #661) ·
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),

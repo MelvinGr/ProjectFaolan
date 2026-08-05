@@ -141,7 +141,7 @@ The reader takes a base read, seven u32, then a COUNT and a per-record loop. Dec
 
 ```
 [u32 targetCount][targetCount x (u32 class, u32 handle)]   the entities the swing REACHED
-[8 x u32]                                                  one float + two ids on some hits; else zero
+[8 x u32]                                                  the middle block - decoded below
 [u32 resultCount][resultCount x 41-byte result]            one per entity actually affected
 [Combat:Ranged only: u8 0x00]
 ```
@@ -161,6 +161,46 @@ resolved: the arithmetic closes without it.
 
 The AIR SWING is a real captured shape, not just our workaround for #228: 130 tails carry zero targets *and*
 zero results.
+
+### The middle block, word by word (#661)
+
+The client's reader is what places these: `FUN_0084d5f0` reads the target list and then words 0–1 (plus the
+extra word when the selector says so), and `FUN_01151170` — the reader `Combat:Melee` and `:Unarmed` share,
+which `Combat:Ranged` wraps — reads the remaining six and then the result count. Each lands in a named slot on
+the Command object, and `--report bcc-attack-tail` prints what 3,313 captured s2c tails put in it:
+
+| word | Command slot | what the corpus shows |
+|---:|---|---|
+| 0 | `+0x164` | a **float**, 0.02–0.93, 322 distinct values, zero on 2,899 — the swing's charge |
+| 1 | `+0x144` | the **selector**: `1` ×3285, `2` ×19, `3` ×9. `> 1` inserts one extra word → `+0x148` |
+| 2 | bits → `+0x1A0` (b4), `+0x1A1` (b5), `+0x198` (b6) | `0x00` ×2692, `0x20` ×602, `0x30` ×18, `0x70` ×1 — **no other bit is ever set**, which is what confirms the split |
+| 3 | `+0x19C` | zero on 3,312 of 3,313; one sighting of `0x6BE` |
+| 4 | `+0x44` | `0xC9`/`0xCA`/`0xCB` on 292 tails — the alphabet below, but **independent** of both word 5 and the result type (all nine combinations occur) |
+| 5 | `+0xD0` | ⭐ the swing's **DIRECTION**, as an `Abilities` id |
+| 6 / 7 | `+0x188` / `+0x18C` | read back together by one accessor (`FUN_011457f0`), so **one pair**; four sightings of `(0x003C7D4B, 2)` |
+
+The bit split is not inferred from the values: the c2s WRITER (`FUN_01151030`) builds the same word as
+`+0x198 ? 0x40 : 0`, and `FUN_011516a0` (the copy) moves `+0x1A0`/`+0x1A1`/`+0x198` as three **bytes**.
+
+### ⭐ The result's "result type" is the swing's DIRECTION
+
+Word 5's ids resolve in the client's own `Abilities` catalog — 769094 `Upper Left Attack`, 769095
+`Upper Right Attack`, 769099 `Overhead Attack` — and the 41-byte result's own type word, long carried as an
+opaque capture-derived code, is a **perfect function of it**, with zero exceptions:
+
+| direction ability | result type | agreement |
+|---|---|---|
+| 769094 `Upper Left Attack` | `0xC9` | 159 / 159 |
+| 769095 `Upper Right Attack` | `0xCA` | 87 / 87 |
+| 769099 `Overhead Attack` | `0xCB` | 253 / 253 |
+
+The corpus carries `0xCC` and `0xCD` as well, on swings with no direction ability, and the client ships exactly
+two more of these abilities — 769096 `Lower Left Attack` and 769097 `Lower Right Attack` — so the alphabet is the
+five-zone rose. Which of the two lower ones is `0xCC` is **not** established and is not guessed here.
+
+⚠️ Word 5 is zero on an NPC's swing (a mob has no ability to name), but the result type is present on those too,
+so a defender's direction information is on the wire either way. What that means for the shield rose's
+server-side arc pick is #673.
 
 ### The delay phase — behaviorType `0x0E` (#549)
 
@@ -195,8 +235,10 @@ both lengths the corpus already showed on the ordinary phases — the arithmetic
 
 Grammar SHAPE decoded (type switch + optional delay + commandId + per-command reader); the commandId → COMMAND
 map is enumerated with the client's own names and shown to be complete; and every per-command reader the corpus
-exercises is walked — **100% of captured records, zero mismatches**. The one region decoded structurally but not
-semantically is the attack block's eight middle words (open work tracked in Gitea #661).
+exercises is walked — **100% of captured records, zero mismatches**. The attack block's eight middle
+words are decoded too (#661) — each to the Command slot the client stores it in, with word 5 and the result type
+resolving to the client's directional-attack abilities. What is left there is word 4's alphabet and the
+`+0x188`/`+0x18C` pair, both of which are four sightings or fewer.
 
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into

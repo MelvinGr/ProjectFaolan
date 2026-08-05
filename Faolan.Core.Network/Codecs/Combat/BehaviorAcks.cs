@@ -120,17 +120,45 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// the lengths look like a single 49-byte stride - 49 is 8 + 41, not one record. Do not model it as one.
 		//
 		// `Victim` is the entity that plays the hit-react/blood - it was once the ATTACKER's own handle on the player
-		// path, which is #228 ("attack hits myself"). The result codes are capture-derived and not semantically
-		// decoded; 0xCB is the value the captured BccAck result block carries (it was once written as 0xCD).
+		// path, which is #228 ("attack hits myself").
+		//
+		// ⭐ `ResultType` IS THE SWING'S DIRECTION (#661), not an opaque result code. Cross-tabulated over every
+		// captured tail that also names a direction ability in middle word 5, it is a perfect function of it with
+		// ZERO exceptions:
+		//
+		//   Abilities 769094 `Upper Left Attack`  -> 0xC9   (159 of 159)
+		//   Abilities 769095 `Upper Right Attack` -> 0xCA   ( 87 of  87)
+		//   Abilities 769099 `Overhead Attack`    -> 0xCB   (253 of 253)
+		//
+		// The corpus also carries 0xCC and 0xCD on swings with no direction ability, and the client ships exactly two
+		// more such abilities - 769096 `Lower Left Attack` and 769097 `Lower Right Attack` - so the alphabet is the
+		// five-zone rose. WHICH of the two lower ones is 0xCC is not established, and is deliberately not guessed.
+		//
+		// ⚠️ So the 0xCB we default to means "Overhead", and every ack we send says overhead while
+		// `CombatShieldRose.SwingArc` picks a uniform arc for the MITIGATION - the wire and the damage disagree.
+		// Open work: #673.
 		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
 		{
 			return HitResultBlock([], [new HitResult(victimHandle, damage, resultType, resultK1, resultK2)]);
 		}
 
-		// The words between the target list and the result count, in the EIGHT-word form we send. Word 1 is the
-		// selector described above and must stay 1; across the corpus word 0 carries a float (the swing's charge)
-		// and two of the rest carry ids on some hits, so they are undecoded rather than known-zero - which is why
-		// this is a named constant and not silently inlined.
+		// The words between the target list and the result count, in the EIGHT-word form we send. DECODED against
+		// the client's reader (#661) - `FUN_0084d5f0` reads the target list then words 0-1, `FUN_01151170` the rest -
+		// so each one is named for the Command slot it lands in and for what 3,313 captured tails put there:
+		//
+		//   0  Command+0x164   a FLOAT, 0.02..0.93 over 322 distinct values, zero on 2,899 - the swing's charge
+		//   1  Command+0x144   the SELECTOR: 1 (x3285), 2 (x19), 3 (x9); > 1 inserts one extra word (-> +0x148)
+		//   2  a BITFIELD: bit 4 -> +0x1A0, bit 5 -> +0x1A1, bit 6 -> +0x198, and the corpus sets NO other bit
+		//                     (0x00 x2692, 0x20 x602, 0x30 x18, 0x70 x1) - which is what confirms the bit split
+		//   3  Command+0x19C   zero on 3,312 of 3,313; one sighting of 0x6BE
+		//   4  Command+0x44    0xC9/0xCA/0xCB on 292 tails - the same alphabet as the result type below, but
+		//                     INDEPENDENT of it and of word 5 (all nine combinations occur)
+		//   5  Command+0xD0    ⭐ the swing's DIRECTION, as an Abilities id: 769094 Upper Left, 769095 Upper Right,
+		//                     769099 Overhead. Zero on an NPC's swing, which has no ability to name.
+		//   6/7 Command+0x188 / +0x18C   read back together by one accessor, so ONE pair (a class+handle shape);
+		//                     four sightings, (0x003C7D4B, 2)
+		//
+		// Word 1 must stay 1 - it is the selector, and any other value changes the block's own length.
 		private static readonly uint[] MiddleWords = [0, 1, 0, 0, 0, 0, 0, 0];
 
 		internal static byte[] HitResultBlock(IReadOnlyList<uint> targets, IReadOnlyList<HitResult> results)
