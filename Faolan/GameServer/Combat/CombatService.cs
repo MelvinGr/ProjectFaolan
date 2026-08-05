@@ -539,6 +539,7 @@ namespace Faolan.GameServer.Combat
 				await SendWorldPacket(killer, BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, DeathSequence.NpcDeathVariant)));
 
 				await AwardKillXp(killer, npcEntity.Level);
+				await AnnounceKillChain(killer);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
 					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn
@@ -806,6 +807,25 @@ namespace Faolan.GameServer.Combat
 		private static Task SendWorldPacket(INetworkClient client, byte[] record)
 		{
 			return WorldIir.Send(client, record);
+		}
+
+		// #446: the on-screen kill CHAIN. Retail sends `ChainKillIIR` on the player's own handle carrying the running
+		// count, and the whole grammar is measured off the corpus (`--report chain-kill`, 67 records):
+		//   * counts are 2 (x32) and 3 (x3) and NEVER 1 - the first kill starts a chain silently;
+		//   * every non-zero is closed by a 0 (32 of 32) about 9s later - the window, WorldEntity.ChainKillWindowSeconds;
+		//   * escalations (2 -> 3) arrive inside that window, at 1.36-7.83s.
+		// The closing 0 is the world tick's job (WorldSimulation.TickKillChains); this is the kill side.
+		//
+		// ⚠️ #446 paired this with stats 106 / 1000069 / 1000070 ("remaining of 20" and "achieved"). The corpus says
+		// otherwise: **0 of the 67 arrivals coincide with a move of any of the three**. Those are the persisted daily
+		// kill counters the client's stat-name table names; the chain is a live announcement and nothing else.
+		private async Task AnnounceKillChain(INetworkClient killer)
+		{
+			var player = _sim.PlayerWorldEntity(killer);
+			if (player?.RegisterKillInChain(DateTimeOffset.UtcNow) is not { } count)
+				return;
+
+			await SendWorldPacket(killer, ChainKillCodec.Build(player.Handle, count));
 		}
 	}
 }

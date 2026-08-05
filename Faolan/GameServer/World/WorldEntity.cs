@@ -278,6 +278,45 @@ namespace Faolan.GameServer.World
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
 		public EntityVitals Vitals { get; set; } = null!;
 
+		// For a PLAYER: the kill CHAIN (#446) - how many kills this player has strung together inside
+		// ChainKillWindowSeconds of each other, and when the chain lapses. Both are session state; retail's
+		// `ChainKillIIR` is a live announcement, not a persisted score (the DailyPvE/PvPKills counters are the
+		// persisted ones and, measured over the corpus, they never move with it).
+		public uint KillChain { get; set; }
+
+		public DateTimeOffset KillChainExpiresAt { get; set; } = DateTimeOffset.MinValue;
+
+		// How long a chain survives without another kill, MEASURED off the corpus (`--report chain-kill`): 32 captured
+		// resets, median 8.97s, spread 7.90-9.22 - a 9-second timer with capture jitter. Escalations (2 -> 3) all
+		// arrive inside it, at 1.36-7.83s.
+		public const double ChainKillWindowSeconds = 9.0;
+
+		// A chain is only ANNOUNCED from the second kill: retail sends counts 2 (x32) and 3 (x3) and never 1, so the
+		// first kill starts a chain silently.
+		public const uint ChainKillMinimumAnnounced = 2;
+
+		// Records a kill at `now` and returns the count to announce, or null when there is nothing to say (the first
+		// kill of a chain). Extends the window either way.
+		public uint? RegisterKillInChain(DateTimeOffset now)
+		{
+			KillChain = now <= KillChainExpiresAt ? KillChain + 1 : 1;
+			KillChainExpiresAt = now.AddSeconds(ChainKillWindowSeconds);
+			return KillChain >= ChainKillMinimumAnnounced ? KillChain : null;
+		}
+
+		// True when an ANNOUNCED chain has just lapsed, and clears it - the caller then sends the closing count of 0
+		// that retail pairs every non-zero with (32 of 32 captured non-zeros are followed by one).
+		public bool TryLapseKillChain(DateTimeOffset now)
+		{
+			if (KillChain == 0 || now <= KillChainExpiresAt)
+				return false;
+
+			var announced = KillChain >= ChainKillMinimumAnnounced;
+			KillChain = 0;
+			KillChainExpiresAt = DateTimeOffset.MinValue;
+			return announced;
+		}
+
 		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
 		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
 		public HashSet<uint> ActiveQuestIds { get; } = [];

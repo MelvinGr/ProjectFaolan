@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -96,6 +97,11 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
 			return SendRespawnPointDiscoveredBanner(client, pointId, nameKey);
+		}
+
+		Task IWorldOutbound.SendKillChain(INetworkClient client, uint handle, uint count)
+		{
+			return WorldIir.Send(client, ChainKillCodec.Build(handle, count));
 		}
 
 		// The player's resurrection spots. Lives here rather than in the Combat partial because the list is not a

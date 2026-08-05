@@ -935,6 +935,7 @@ namespace Faolan.GameServer.World
 
 						// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
 						await TickPlayerDeaths();
+						await TickKillChains();
 						await TickBuffExpiry();
 						await TickDots();
 
@@ -1093,6 +1094,22 @@ namespace Faolan.GameServer.World
 		// armed at apply time, #274) and tells the client by sending the retail end-twin removal (SendBuffRemoval). The
 		// client does NOT self-expire the icon - the combat captures show retail explicitly removes each timed buff
 		// with the rank-1 empty-payload twin - so without this the icon counts to 0 and sticks.
+		// #446: close a lapsed kill chain. Retail pairs every non-zero ChainKillIIR with a 0 about 9s later - 32 of 32
+		// in the corpus - so the chain has a visible END, and without this the client would keep the last count on
+		// screen forever. The kill side is CombatService.AnnounceKillChain; the window is
+		// WorldEntity.ChainKillWindowSeconds, measured.
+		private async Task TickKillChains()
+		{
+			var now = DateTimeOffset.UtcNow;
+			foreach (var pair in Players)
+			{
+				if (!pair.Value.TryLapseKillChain(now))
+					continue;
+
+				await _output.SendKillChain(pair.Key, pair.Value.Handle, 0);
+			}
+		}
+
 		private async Task TickBuffExpiry()
 		{
 			var now = DateTimeOffset.UtcNow;

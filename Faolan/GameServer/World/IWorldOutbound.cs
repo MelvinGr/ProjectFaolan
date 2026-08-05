@@ -124,6 +124,11 @@ namespace Faolan.GameServer.World
 		// FormatFeedbackCodec.BuildRespawnPointDiscoveredXml.
 		Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey);
 
+		// #446: the kill-chain announcement, `ChainKillIIR` on the player's own handle. `count` is the running chain
+		// (2 or 3 in the corpus, never 1) or 0 to close a lapsed one. Sent to the killer only - all 67 captured
+		// records name the capturing player's own handle.
+		Task SendKillChain(INetworkClient client, uint handle, uint count);
+
 		// The player's resurrection spots: DispatchValidResurrectionSpots (0x2024) with a reference position + every
 		// spot they may resurrect at. Serves BOTH of retail's uses, which is why it is named for the list it carries
 		// and not for the release screen:

@@ -574,6 +574,33 @@ invariant):
   `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
   locked by `CrossPlayerSpellRelayTests` against the captured body.
 
+## The kill CHAIN (#446)
+
+Retail announces a kill streak with `ChainKillIIR` (`0x0EED7068`) on the **player's own handle**. The whole
+grammar is measured off the corpus by `--report chain-kill` over its **67** records:
+
+| | |
+|---|---|
+| counts sent | `2` ×32, `3` ×3 — **never 1** |
+| every non-zero is closed by a `0` | 32 of 32 |
+| that closing delay | median **8.97 s**, spread 7.90–9.22 |
+| escalations (`2` → `3`) | 1.36–7.83 s, i.e. inside the window |
+
+So it is a chain of kills with a **9-second window**: the first kill starts one silently, a second inside the
+window announces `2`, further kills escalate, and the chain closes with an explicit `0` about nine seconds after
+the last kill. `WorldEntity.RegisterKillInChain` / `TryLapseKillChain` hold the state,
+`CombatService.AnnounceKillChain` sends the kill side and `WorldSimulation.TickKillChains` the closing `0`.
+[V3: KillChainTests.AnAnnouncedChainLapsesExactlyOnce_AndAnUnannouncedOneNeverDoes]
+
+⚠️ **It is NOT paired with the kill counters.** #446 read stat `0x6A` (106) as "remaining of 20" and `1000070`
+as "achieved", from a live session where both moved on kills, and expected the IIR to fire with them. Over the
+whole corpus **0 of the 67 arrivals coincide with a move of `106`, `1000069` or `1000070`**. Those three are the
+persisted daily kill counters the client's own stat-name table names (`DailyPvEKills` / `DailyPvPKills`); the
+chain is a live announcement and nothing else. Modelling them is still open.
+
+The body was never the gap either — `ChainKillCodec` has read it byte-exact off the client's own reader
+(`FUN_0079c0b0`) since the V1 IIR sweep. What was missing was only *when to send one*.
+
 ## Fatalities (#140)
 
 A killing blow makes the server apply a **fatality burst** to the KILLER — two self-buffs, plus anything that keys

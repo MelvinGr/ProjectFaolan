@@ -207,6 +207,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "chain-kill":
+				{
+					ChainKill(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
@@ -927,6 +933,140 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"TOTAL over {captures.Count} captures: {provenHandles} handle(s) PROVEN recycled (a second template on the same handle), "
 			                  + $"costing {provenLost} spawn observation(s) to DistinctByHandle. {ambiguousHandles} single-template handle(s) were not counted - "
 			                  + "a repeat sighting of one template is a mob that moved, not evidence of reuse.");
+		}
+
+		// --report chain-kill
+		//
+		// Every `ChainKillIIR` in the corpus in its own timeline, against the kill counters that move with it: stat
+		// `0x6A` (106) and `0xF4256` (1000070), which #446 read as "remaining of 20" and "achieved". Prints each
+		// counter move and each ChainKill, with the seconds since the previous one of each.
+		//
+		// #446's open questions are all TIMING questions - "what exactly triggers the IIR: N kills within a time
+		// window? Both arrivals are ~9-17s apart, so a window is plausible but unmeasured" - and it proposed a fresh
+		// retail session to settle them. The corpus already carries the records; this reads them.
+		//
+		// ⚠️ It does NOT need the IIR body decoded, and the body is not the gap: `ChainKillCodec` already reads it
+		// byte-exact off the client's own reader (handle, env, count). What is missing is when to SEND one.
+		private static void ChainKill(IReadOnlyList<NamedCapture> captures)
+		{
+			const uint chainCounterA = 0x6A; // 106 - "remaining of 20" in #446's reading
+			const uint chainCounterB = 0xF4256; // 1000070 - DailyPvPKills per the client's stat-name table
+			const uint chainCounterC = 0xF4255; // 1000069 - DailyPvEKills, its sibling
+
+			var counts = new List<uint>();
+			var gaps = new List<double>();
+			var resetDelays = new List<double>();   // non-zero -> the 0 that closes it
+			var escalations = new List<double>();   // non-zero -> a HIGHER non-zero
+			var withACounterMove = 0;
+			foreach (var capture in captures)
+			{
+				var lines = new List<string>();
+				long? previousChain = null;
+				var previousCount = 0u;
+				long? previousCounter = null;
+				var counterMovesSinceChain = 0;
+				var recent = new List<(long Ticks, uint Type)>();
+
+				foreach (var p in capture.Packets)
+				{
+					if (p is not { IsIirCarrier: true, IsDownload: true })
+						continue;
+
+					recent.Add((p.Ticks, p.SubOpcode));
+					if (recent.Count > 400)
+						recent.RemoveRange(0, 200);
+
+					if (p.SubOpcode == StatUpdateCodec.Opcode)
+					{
+						if (!p.TryParse(StatUpdateCodec.Parse, out var update))
+							continue;
+
+						var moved = update.Stats.Records
+							.Where(r => (uint)r.StatId is chainCounterA or chainCounterB or chainCounterC)
+							.ToList();
+						if (moved.Count == 0)
+							continue;
+
+						counterMovesSinceChain++;
+						var since = previousCounter is { } pc ? $"{TimeSpan.FromTicks(p.Ticks - pc).TotalSeconds,6:0.0}s" : "     -";
+						previousCounter = p.Ticks;
+						lines.Add($"    counter  {since} since previous   0x{update.EntityHandle:X8}  "
+						          + string.Join("  ", moved.Select(r => $"{(uint)r.StatId}={r.RawValue}")));
+						continue;
+					}
+
+					if (p.SubOpcode != ChainKillCodec.Opcode || !p.TryParse(ChainKillCodec.Parse, out var chain))
+						continue;
+
+					var gap = previousChain is { } pk ? TimeSpan.FromTicks(p.Ticks - pk).TotalSeconds : double.NaN;
+					if (!double.IsNaN(gap))
+					{
+						gaps.Add(gap);
+						if (chain.Count == 0 && previousCount > 0)
+							resetDelays.Add(gap);
+						else if (chain.Count > previousCount && previousCount > 0)
+							escalations.Add(gap);
+					}
+
+					counts.Add(chain.Count);
+					if (counterMovesSinceChain > 0)
+						withACounterMove++;
+
+					// What arrived in the two seconds before it - the trigger names itself if anything does.
+					var before = recent
+						.Where(r => TimeSpan.FromTicks(p.Ticks - r.Ticks).TotalSeconds <= 2.0)
+						.GroupBy(r => r.Type)
+						.OrderByDescending(g => g.Count())
+						.Select(g => $"{IirName(g.Key)}x{g.Count()}")
+						.Take(8);
+
+					lines.Add($"  CHAINKILL {(double.IsNaN(gap) ? "     -" : $"{gap,6:0.0}s")} since previous   0x{chain.Handle:X8}  "
+					          + $"count={chain.Count}  env=0x{chain.Env:X2}  ({counterMovesSinceChain} counter move(s) since the last chain)");
+					lines.Add($"              preceded within 2s by: {string.Join(" ", before)}");
+					previousChain = p.Ticks;
+					previousCount = chain.Count;
+					counterMovesSinceChain = 0;
+				}
+
+				if (!lines.Exists(l => l.Contains("CHAINKILL", StringComparison.Ordinal)))
+					continue;
+
+				Console.WriteLine(capture.Name);
+				foreach (var line in lines)
+					Console.WriteLine(line);
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"TOTAL: {counts.Count} ChainKillIIR record(s) over {captures.Count} captures.");
+			if (counts.Count > 0)
+			{
+				Console.WriteLine("  count values: " + string.Join(", ", counts.GroupBy(c => c).OrderBy(g => g.Key).Select(g => $"{g.Key} x{g.Count()}")));
+				Console.WriteLine($"  arrivals preceded by a kill-counter move: {withACounterMove} of {counts.Count}");
+			}
+
+			if (gaps.Count > 0)
+			{
+				var sorted = gaps.OrderBy(g => g).ToList();
+				Console.WriteLine($"  gap between consecutive chains: min={sorted[0]:0.0}s median={sorted[sorted.Count / 2]:0.0}s max={sorted[^1]:0.0}s");
+			}
+
+			Describe("reset  (non-zero -> 0)", resetDelays);
+			Describe("escalate (n -> n+1)", escalations);
+			return;
+
+			static void Describe(string what, List<double> values)
+			{
+				if (values.Count == 0)
+					return;
+
+				var sorted = values.OrderBy(v => v).ToList();
+				Console.WriteLine($"  {what}: {sorted.Count} sample(s), min={sorted[0]:0.00}s median={sorted[sorted.Count / 2]:0.00}s max={sorted[^1]:0.00}s");
+			}
+
+			static string IirName(uint type)
+			{
+				return Enum.IsDefined(typeof(IirTypes), type) ? ((IirTypes)type).ToString() : $"0x{type:X8}";
+			}
 		}
 
 		// --report dynel-cycle [--report-arg <minimum burst size, default 4>]
