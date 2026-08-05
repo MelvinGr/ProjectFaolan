@@ -52,12 +52,16 @@ all — those three alone are 55,443 of the 65,877 captured records.
 
 ## Tail census (all 65,877 captured records)
 
-⚠️ **The counts in this section were 67,307/55,699/3,687 when written on 2026-07-31 and are 65,877/55,443/3,313
-today — 1,430 fewer records (2.1%) for no change in the census code.** Running the *same* census from
-2026-07-31 against today's captures also gives 65,877, so the difference is entirely the 2026-08-03 capture
-re-dump, which states it changed no packet content. Whether the old dump over-counted or the new one drops
-records is Gitea #666, and until that is settled every capture-derived figure here should be re-measured with
-`--report bcc-census` rather than quoted. The *grammar* is unaffected — it is proven per-record, not by totals.
+⚠️ **This section said 67,307/55,699/3,687 until 2026-08-05. The corpus holds 65,877, and always did** — that
+figure was never reproducible against the committed dumps (#666, resolved). Verified four ways: the same census
+code from 2026-07-31 gives 65,877 against today's captures; the pre-re-dump dumps in the data repo's git history
+give 65,877 too, with all 419,297 packet counts identical per capture; every BCC packet carries **exactly one**
+record, so packet-vs-record counting cannot explain a gap; and no capture has ever been deleted. The likeliest
+source is a pre-reassembly count off the raw pcaps — 1,430 is ~2.2%, a plausible retransmission rate — but the
+original measurement predates `--report bcc-census` and cannot be re-run.
+
+The **grammar is unaffected**: it is proven per-record, not by totals. Re-derive any figure here with
+`--report bcc-census` rather than quoting it.
 
 Most commands have a FIXED tail length: `Transition` (0x01) 20, `UseCharacter` 4, `UseDynel` 12, `Equip` (0x09)
 88, and the three above 0. What varies is `Magic:Attack` (0x04), `PlayAnimation`, `ObjectInteraction` (0x2A) and
