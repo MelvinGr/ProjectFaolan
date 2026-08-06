@@ -85,8 +85,18 @@ namespace Faolan.Core.Database.Tables
 		public float MinZ { get; set; }
 
 		// How many captured banners back this area. 1 = a single sighting, so the bounds are a point and only the
-		// radius does any work; more samples = a real strip (Bridge of Vilerus I has five, spanning z 711..848 -
+		// slack does any work; more samples = a real strip (Bridge of Vilerus I has seven, spanning z 711..848 -
 		// a bridge deck, not scatter).
+		//
+		// DIAGNOSTIC ONLY - nothing branches on it. It is kept because it is the one thing that says how much the
+		// FALLBACK hull is worth, and 10 of the 22 areas are still on that path after #513; a `samples=1` row and a
+		// `samples=18` row are not the same kind of evidence even though the columns look alike.
+		//
+		// ⚠️ **Do not carry it into client-sourced rows** (#679). A row built from the client's own region + the
+		// recovered banner id has no samples, and writing 0 there would read as "no evidence backs this area" when
+		// it means "not capture-derived at all" - a value that looks like data but is really provenance. When those
+		// rows land, this becomes a Source enum (the shape `NpcSpawnArea.ResolvedBy` already uses) and the count
+		// either folds into it or goes. Melvin's call, 2026-08-06: fold it into #679 rather than removing it now.
 		public uint SampleCount { get; set; }
 	}
 }
