@@ -997,7 +997,23 @@ namespace Faolan.GameServer
 			var character = client.Session.Character;
 			var entity = _simulation.PlayerWorldEntity(client);
 
-			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1)));
+			var record = BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1);
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(record));
+
+			// ⚠️ Rest is a CAST, so it has to arm the cast path's cancel state or it can never be cancelled (#505).
+			// The client ends this channel the same way it ends any other: it sends the c2s cancel BCC (seq 0x0002)
+			// when the player moves, and `HandleBccCastSpell` answers it with retail's 0x0007 abort - but ONLY if it
+			// finds the BEGIN's args here. Rest is answered to a `PerformSpecialAction` rather than to a c2s cast, so
+			// nothing ever set them, `beginArgs` came back null, and the cancel fell through to a plain echo instead
+			// of the abort. The client then stayed channeling: the bar hung, and a channeling client sends no further
+			// cast OR melee, so one press of rest silently disabled every combat action the player had.
+			//
+			// Verified against `NecroL80_..._cast-general-abilities` frames 867/921/927 - begin seq 0x0004 (phase 8,
+			// activation 2050) -> c2s cancel seq 0x0002 -> s2c abort seq 0x0007, whose args are these begin args with
+			// the cancel's own command id spliced in. So the record to send back is not a completion at all.
+			client.Session.PendingCastArgs = record.Args;
+			client.Session.PendingCastMode = 0; // no client command id at begin - the cancel brings its own
+
 			if (entity == null)
 				return;
 

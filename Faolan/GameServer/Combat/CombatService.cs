@@ -736,6 +736,14 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.CastInterruptAbort(beginArgs, cancelPayload, instance, phase)));
 		}
 
+		// The abort for a cast the SERVER opened (rest, #505) - see BehaviorAcks.ServerCastInterruptAbort for why it
+		// cannot share the splice above.
+		public static Task SendServerCastInterruptAbort(INetworkClient client, byte[] beginArgs, byte[] cancelPayload, uint clientCommandId)
+		{
+			var instance = client.Session.Character.Id;
+			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.ServerCastInterruptAbort(beginArgs, cancelPayload, instance, clientCommandId)));
+		}
+
 		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
 		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
 		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP

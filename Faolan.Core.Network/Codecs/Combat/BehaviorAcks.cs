@@ -69,6 +69,33 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(instance, AbortSeq, cancel.BehaviorId, InsertBehaviorPhaseField(beginArgs, phase), tail);
 		}
 
+		// The same abort, for a cast the SERVER opened rather than the client - today only REST (#505).
+		//
+		// ⚠️ It needs its own entry point because the splice above assumes the begin came from the CLIENT. A c2s cast's
+		// `beginArgs` already carry field2 (the client's command id), so `InsertBehaviorPhaseField` only has to add
+		// field3. Rest's begin is built HERE, so it has field3 (its phase) and no field2 at all - and the splice then
+		// overwrote the phase with the command id instead of adding a field beside it. On the wire that was
+		// `08c0e80a 18c1843d 2808...` against retail's `08c0e80a 10c5843d 1808 2808...`: the id in the wrong field and
+		// the phase gone, which the client will not pair with the begin, so the bar stayed up.
+		//
+		// Here the begin's own phase is KEPT and the cancel's command id goes to field2, which is exactly retail's
+		// frame 927 (`NecroL80_..._cast-general-abilities`: begin 867 seq 0x0004 -> cancel 921 seq 0x0002 -> this).
+		// Round-tripping through `CommandMessage` is safe for these args specifically because this side BUILT them
+		// from one (`BehaviorAnimations.RestCast`), so there is no captured byte layout to preserve.
+		public static BehaviorControlCenterIIR ServerCastInterruptAbort(byte[] beginArgs, byte[] cancelPayload, uint instance, uint clientCommandId)
+		{
+			var cancel = ParseRequest(cancelPayload);
+
+			var tail = cancel.Tail.ToArray();
+			if (tail.Length > 0)
+				tail[^1] = 0x00;
+
+			var message = beginArgs.FromProtobuf<CommandMessage>();
+			message.CommandqueueClientId = clientCommandId;
+
+			return new BehaviorControlCenterIIR(instance, AbortSeq, cancel.BehaviorId, message.ToProtobuf(), tail);
+		}
+
 		// The echo-ack: echoes the request with field3 (phase) spliced in, and pads the tail only for the behaviours
 		// that take a pad (see above). `tailOverride` replaces the echoed tail wholesale.
 		public static BehaviorControlCenterIIR EchoAck(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null)

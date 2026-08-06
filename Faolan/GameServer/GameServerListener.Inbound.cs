@@ -2073,7 +2073,11 @@ namespace Faolan.GameServer
 				// is what drops the cast bar, cancels the animation and pops the client's "Interrupted" text
 				// (#347, cast-interupt idx1013). The old echo of the cancel payload left the bar running. Needs
 				// the stored BEGIN args; fall back to the plain echo if it's missing.
-				if (beginArgs != null)
+				// A cast the SERVER opened (rest, #505) is aborted differently - see ServerCastInterruptAbort. It is
+				// marked by PendingCastMode 0, which no client cast can carry: the mode IS the client's command id.
+				if (beginArgs != null && client.Session.PendingCastMode == 0)
+					await CombatService.SendServerCastInterruptAbort(client, beginArgs, rawPayload, args.CommandqueueClientId);
+				else if (beginArgs != null)
 					await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
 				else
 					await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
