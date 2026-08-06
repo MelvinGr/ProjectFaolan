@@ -29,7 +29,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var scanned = 0;
 			var hits = new List<(uint Referrer, string Name, uint Target, string Line)>();
 

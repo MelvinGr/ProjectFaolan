@@ -50,7 +50,7 @@ namespace Faolan.Importer.Modules
 
 		public Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			using var rdb = new RdbReader(ctx.RdbDir!);
+			using var rdb = new RdbReader(ctx.RdbDir!, ctx.RdbProxyBase);
 			ctx.Out.WriteLine($"RDB: {rdb.Count} index entries in {ctx.RdbDir}");
 			ctx.Out.WriteLine("  type        count   name");
 			foreach (var (type, count) in rdb.TypeCounts())
@@ -76,7 +76,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var n = await RdbMorphTargetImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var n = await RdbMorphTargetImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult($"{n} morph targets imported.");
 		}
 	}
@@ -98,7 +98,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var n = await RdbAppearanceImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var n = await RdbAppearanceImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult($"{n} appearance choices imported.");
 		}
 	}
@@ -374,11 +374,11 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbQuestTextImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var r = await RdbQuestTextImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			// The target fill runs SECOND on purpose. It claims every remaining bare Kill goal whose trailing reference
 			// is an npc_template, which makes the goal "wired" - so running it first would hide a talk/deliver shape
 			// from the objective-text pass above, which is the only thing that can retype one.
-			var t = await RdbQuestGoalTargetImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var t = await RdbQuestGoalTargetImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 
 			// Every goal it did NOT wire is accounted for by reason - a silent skip here is indistinguishable from a
 			// decode regression.
@@ -420,7 +420,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbDialogueTeleportImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var r = await RdbDialogueTeleportImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 
 			// Every directive it did NOT turn into a trip is accounted for by reason - a silent skip is
 			// indistinguishable from a decode regression.
@@ -475,7 +475,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			var res = r.Resolved;
 			return new ImportResult($"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
 			                        $"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}); linked {res.Linked} captured spawns.");

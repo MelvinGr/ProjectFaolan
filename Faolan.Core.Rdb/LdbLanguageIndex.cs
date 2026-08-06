@@ -38,10 +38,10 @@ namespace Faolan.Core.Rdb
 		// 1103 in the shipped install - stale/duplicate pages), so a caller filtering on a language never picks them up.
 		public static Dictionary<uint, string> LanguageByPage(RdbReader rdb)
 		{
-			var pages = rdb.EntriesOfType(PageType).Where(x => x.IsLocal).Select(x => x.Id).ToHashSet();
+			var pages = rdb.EntriesOfType(PageType).Where(rdb.CanRead).Select(x => x.Id).ToHashSet();
 			var byPage = new Dictionary<uint, string>();
 
-			foreach (var entry in rdb.EntriesOfType(LanguageRecordType).Where(x => x.IsLocal))
+			foreach (var entry in rdb.EntriesOfType(LanguageRecordType).Where(rdb.CanRead))
 			{
 				byte[] body;
 				try
@@ -50,8 +50,11 @@ namespace Faolan.Core.Rdb
 				}
 				catch
 				{
-					continue; // not a readable record
+					continue; // the container is not an IOz1/zlib record
 				}
+
+				if (body.Length == 0)
+					continue; // a CDN record the mirror could not serve (RdbReader returns empty rather than throwing)
 
 				var (name, claimed) = ParseRecord(body, pages);
 				if (name == null)

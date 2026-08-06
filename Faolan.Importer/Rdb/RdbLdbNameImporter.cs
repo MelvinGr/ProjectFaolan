@@ -61,7 +61,7 @@ namespace Faolan.Importer.Rdb
 			var itemPages = new List<Dictionary<uint, string>>();
 			var descriptionPages = new List<Dictionary<uint, string>>();
 			var spellDescriptionPages = new List<Dictionary<uint, string>>();
-			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbType).Where(rdb.CanRead))
 			{
 				// Not English (or claimed by no language record at all) - skip it outright.
 				if (!languageByPage.TryGetValue(e.Id, out var language) || language != LdbLanguageIndex.English)

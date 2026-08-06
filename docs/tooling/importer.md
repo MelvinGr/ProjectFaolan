@@ -164,8 +164,12 @@ Modifiers
   --force              permit overwrite on guarded modules (e.g. characters)
                        (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
   --rdb-proxy <url>    Faolan.Web.Content mirror base for on-demand (le.idx file==0xFF) RDB resources
-                       (default http://127.0.0.1:7081/gameupdate/upm/rdb) — every rdb-* module fetches
-                       CDN-only records through it, and the proxy store-and-forwards so pulls are archived
+                       (default http://127.0.0.1:7081/gameupdate/upm/rdb) — every rdb-* module AND every
+                       --report fetches CDN-only records through it, and the proxy store-and-forwards so
+                       pulls are archived. ⚠️ A reader built WITHOUT it degrades to the local records only,
+                       which for several types is a minority of the game (577 of the 817 NPC spawn layouts,
+                       580 of 653 in-game map tiles, 276 of 520 tilemaps). Gate on `rdb.CanRead(entry)`,
+                       never on `entry.IsLocal`.
   --dump-templates <d> rdb-items: dump decrypted templates (module-specific)
 
 Reports (read-only, bypass the import runner)

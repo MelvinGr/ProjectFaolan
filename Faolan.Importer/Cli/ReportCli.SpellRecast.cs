@@ -36,7 +36,7 @@ namespace Faolan.Importer.Cli
 		private static void SpellRecast(string rdbDir, string? arg)
 		{
 			var only = uint.TryParse(arg, out var wanted) ? wanted : 0u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 
 			var byKind = new SortedDictionary<uint, int>();
 			var perSpell = new List<(uint Id, string Name, uint Kind, uint Target, uint Centiseconds)>();

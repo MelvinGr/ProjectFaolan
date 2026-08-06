@@ -99,7 +99,7 @@ namespace Faolan.Importer.Modules
 			// captures only - so a corpus-only import is unchanged rather than silently thinner.
 			var catalog = string.IsNullOrWhiteSpace(ctx.RdbDir)
 				? null
-				: BarkCatalog.Load(ctx.RdbDir);
+				: BarkCatalog.Load(ctx.RdbDir, ctx.RdbProxyBase);
 
 			var lines = 0;
 			var harvested = 0;

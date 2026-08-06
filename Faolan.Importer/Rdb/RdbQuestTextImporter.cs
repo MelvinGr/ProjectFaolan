@@ -47,9 +47,9 @@ namespace Faolan.Importer.Rdb
 		//   "…to Itsing When You Have Become an Acolyte (Rank 1)"  -> title "Acolyte", rank 1
 		private static readonly Regex RankPrecondition = new(@"When You Have Become (?:an?\s+)?([A-Za-z][\w \-']*?)\s*\(\s*Rank\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
-			var ciphertext = EnglishEncryptedStrings(rdbDir);
+			var ciphertext = EnglishEncryptedStrings(rdbDir, cdnBase);
 			// Every goal, not just the deliveries: the same "who does this name" rule types a talk objective too.
 			var goals = await db.QuestGoalDefinitions.ToListAsync();
 			var npcNames = (await db.NpcTemplates.Select(t => t.Name).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -144,13 +144,13 @@ namespace Faolan.Importer.Rdb
 		// (category, id) -> ciphertext over the ENGLISH pages of the ENCRYPTED categories. The language comes from the
 		// client's own language records rather than from the text (whole pages ship untranslated, so a sniffer unions
 		// languages and yields French), and the encrypted set from the page header's own flags word.
-		private static Dictionary<(uint Category, uint Id), byte[]> EnglishEncryptedStrings(string rdbDir)
+		private static Dictionary<(uint Category, uint Id), byte[]> EnglishEncryptedStrings(string rdbDir, string? cdnBase)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var language = LdbLanguageIndex.LanguageByPage(rdb);
 			var blobs = new Dictionary<(uint, uint), byte[]>();
 
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(rdb.CanRead))
 			{
 				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
 					continue;

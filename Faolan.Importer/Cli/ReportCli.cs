@@ -530,7 +530,7 @@ namespace Faolan.Importer.Cli
 				{
 					var rdbDir = RdbDir();
 					var ids = (arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
-					using var rdb = new RdbReader(rdbDir);
+					using var rdb = OpenRdb(rdbDir);
 					foreach (var idStr in ids)
 					{
 						var id = uint.Parse(idStr.Trim());
@@ -577,10 +577,10 @@ namespace Faolan.Importer.Cli
 				case "spell-stat-coverage":
 				{
 					var rdbDir = RdbDir();
-					using var rdb = new RdbReader(rdbDir);
+					using var rdb = OpenRdb(rdbDir);
 					int total = 0, withMods = 0, records = 0;
 					var byStat = new Dictionary<uint, int>();
-					foreach (var e in rdb.EntriesOfType(1040005).Where(x => x.IsLocal))
+					foreach (var e in rdb.EntriesOfType(1040005).Where(rdb.CanRead))
 					{
 						byte[] dec;
 						try
@@ -616,8 +616,8 @@ namespace Faolan.Importer.Cli
 				{
 					var rdbDir = RdbDir();
 					var needle = (arg ?? "damage").ToLowerInvariant();
-					using var rdb = new RdbReader(rdbDir);
-					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+					using var rdb = OpenRdb(rdbDir);
+					foreach (var e in rdb.EntriesOfType(1030002).Where(rdb.CanRead))
 					{
 						byte[] dec;
 						try
@@ -660,7 +660,7 @@ namespace Faolan.Importer.Cli
 					// #291: walk the LDB's TDC2 pages (LdbStringIndex owns that grammar) and build a global id -> string
 					// map, then print lookups for the pins + any --report-arg ids, to verify offline.
 					var rdbDir = RdbDir();
-					using var rdb = new RdbReader(rdbDir);
+					using var rdb = OpenRdb(rdbDir);
 					var map = new Dictionary<uint, string>();
 					var byCat = new Dictionary<(uint cat, uint id), string>();
 					var perCategory = new Dictionary<uint, int>();
@@ -849,7 +849,7 @@ namespace Faolan.Importer.Cli
 		private static void AbilityNames(string rdbDir)
 		{
 			using var db = OpenDb();
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			foreach (var a in db.Abilities.OrderBy(x => x.Slot).Include(ability => ability.Key).ToList())
 			{
 				var key = new[] { a.Key.Key1, a.Key.Key2, a.Key.Key3, a.Key.Key4 };
@@ -1530,7 +1530,7 @@ namespace Faolan.Importer.Cli
 			{
 				var itemIds = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
 				var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
-				using var reader = new RdbReader(rdb);
+				using var reader = OpenRdb(rdb);
 				var catalog = reader.EntriesOfType(1000020).ToList();
 				int encrypted = 0, plaintext = 0, decrypted = 0, itemsDec = 0, abilitiesDec = 0;
 				foreach (var e in catalog)
@@ -3061,7 +3061,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Key.Key1:X8},{item.Key.Key2:X8},{item.Key.Key3:X8},{item.Key.Key4:X8}");
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
 			byte[]? template = null;
 			foreach (var type in new uint[] { 1000020, 1000620 })
@@ -3183,7 +3183,7 @@ namespace Faolan.Importer.Cli
 		// the page, so a report that merges every page of a category ends up with whichever language sorted last.
 		private static IEnumerable<(uint PageId, uint Category, Dictionary<uint, string> Strings)> LdbPagesOf(RdbReader rdb)
 		{
-			foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(1030002).Where(rdb.CanRead))
 			{
 				byte[] body;
 				try
@@ -3192,8 +3192,11 @@ namespace Faolan.Importer.Cli
 				}
 				catch
 				{
-					continue; // not a readable record (CDN-only / not zlib)
+					continue; // the container is not an IOz1/zlib page
 				}
+
+				if (body.Length == 0)
+					continue; // a CDN page the mirror could not serve (RdbReader returns empty rather than throwing)
 
 				var category = LdbStringIndex.CategoryOf(body);
 				if (category == 0)
@@ -3219,7 +3222,7 @@ namespace Faolan.Importer.Cli
 		// one we named from somewhere else (Ghidra, tooltips) and should stay justified in its comment.
 		private static void LdbStatNames(string rdbDir, string? outDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 
 			// Our own names, normalized to letters+digits, as the crib key set.
 			static string Key(string s)
@@ -3522,7 +3525,7 @@ namespace Faolan.Importer.Cli
 		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob for the Phase 1 spike).
 		private static void RdbAssets(string rdbDir, string? arg, string? outDir, bool dumpMesh)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 
 			// Comma-separated ids => assemble them into one glb (character body + head + equipment).
 			if (arg != null && arg.Contains(','))
@@ -3624,6 +3627,15 @@ namespace Faolan.Importer.Cli
 			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"];
 		}
 
+		// Every report opens the RDB THROUGH the CDN mirror. A reader built without a proxy base silently degrades to
+		// the LOCAL records only, and for several types that is a minority of the game: 577 of the 817 NPC spawn
+		// layouts (1010506), 580 of 653 in-game map tiles (1010013) and 276 of 520 tilemaps (1070003) are CDN-only.
+		// Honours `--rdb-proxy`, which the reports used to ignore in favour of the hardcoded default.
+		private static RdbReader OpenRdb(string? rdbDir = null)
+		{
+			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? ImportContext.DefaultProxyBase);
+		}
+
 		private static string RdbDir()
 		{
 			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"] ??
@@ -3657,7 +3669,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			if (outDir != null)
 				Directory.CreateDirectory(outDir);
 
@@ -3749,7 +3761,7 @@ namespace Faolan.Importer.Cli
 				}
 				: new Dictionary<uint, string> { [74] = "value", [104] = "bag", [499] = "quality", [972] = "primary attribute", [1331] = "resource bag" };
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var records = 0;
 			var counts = new Dictionary<uint, int>();
 			var ranges = new Dictionary<uint, (uint Min, uint Max)>();
@@ -3903,7 +3915,7 @@ namespace Faolan.Importer.Cli
 		private static void SpellManaMode(string rdbDir, string? arg)
 		{
 			var threshold = uint.TryParse(arg, out var t) && t > 0 ? t : 100u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 
 			// perClass[field][value] = (percents, flats) among the records carrying that field at that value.
 			var perField = new Dictionary<uint, Dictionary<uint, (int Percent, int Flat)>>();
@@ -4131,7 +4143,7 @@ namespace Faolan.Importer.Cli
 		private static void SpellLineIds(string rdbDir, string? arg)
 		{
 			var wanted = uint.TryParse(arg, out var w) ? w : 0u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var byLine = new SortedDictionary<uint, List<string>>();
 			var scanned = 0;
 			var carrying = 0;
@@ -4208,7 +4220,7 @@ namespace Faolan.Importer.Cli
 		private static void FeatTable(string rdbDir, string? arg)
 		{
 			var needle = uint.TryParse(arg, out var v) ? v : 0u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var matches = rdb.EntriesOfType(1000042u).Where(e => e.Id == 1).ToList();
 			if (matches.Count == 0)
 			{
@@ -4282,7 +4294,7 @@ namespace Faolan.Importer.Cli
 		private static void FeatSpellModifiers(string rdbDir, string? arg)
 		{
 			var onlyKind = uint.TryParse(arg, out var k) ? k : 0u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var byKind = new Dictionary<uint, int>();
 			var samples = new Dictionary<uint, List<string>>();
 			var refCounts = new Dictionary<uint, int>();
@@ -4394,7 +4406,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var bodies = new Dictionary<uint, byte[]>();
 			foreach (var e in rdb.EntriesOfType(type))
 			{
@@ -4466,7 +4478,7 @@ namespace Faolan.Importer.Cli
 		private static void FeatEffectWidths(string rdbDir, string? arg)
 		{
 			var templateType = uint.TryParse(arg, out var t) && t != 0 ? t : FeatTemplateType;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var widths = new Dictionary<uint, Dictionary<int, int>>();
 			var surplus = new Dictionary<uint, (uint Id, uint[] Words)>();
 			var tiled = new Dictionary<uint, Dictionary<int, (int Count, uint First, uint[] Extra)>>();
@@ -4620,7 +4632,7 @@ namespace Faolan.Importer.Cli
 			var spec = (arg ?? "").Split('/', 2, StringSplitOptions.TrimEntries);
 			var templateType = spec.Length == 2 && uint.TryParse(spec[0], out var t) ? t : FeatTemplateType;
 			var only = uint.TryParse(spec[^1], out var k) ? k : 0u;
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 
 			// Per kind: how many elements carry it, one sample (feat id + name + the whole payload), and whether the
 			// pair view and the key-addressed view agree on that sample.
@@ -4785,7 +4797,7 @@ namespace Faolan.Importer.Cli
 		// --report-arg <substring>  filters the dumped names   --out <dir>  writes feat-catalog.tsv
 		private static void FeatCatalog(string rdbDir, string? filter, string? outDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var plain = new List<(uint Id, string Name, byte[] Body)>();
 			var encrypted = 0;
 			var unreadable = 0;
@@ -4958,7 +4970,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var hits = rdb.Entries.Where(e => e.Id == id).OrderBy(e => e.Type).ToList();
 			Console.WriteLine($"id {id}: {hits.Count} entr(ies)");
 			foreach (var e in hits)
@@ -4970,7 +4982,7 @@ namespace Faolan.Importer.Cli
 		// --report-arg <meshIndexId>  --out <dir>  [--skeleton <id>, default auto-select by bone palette].
 		private static void RdbRig(string rdbDir, string arg, string? outDir, string? skelArg)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			if (!uint.TryParse(arg, out var meshIndexId))
 			{
 				Console.WriteLine($"rdb-rig needs a numeric MESHINDEXFILE id in --report-arg, got '{arg}'");
@@ -5001,7 +5013,7 @@ namespace Faolan.Importer.Cli
 		// substring (case-insensitive). Used to locate race/sex character meshes (head/body/etc.) by name (#275).
 		private static void RdbSearch(string rdbDir, string needle)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			needle = needle.ToLowerInvariant();
 			var hits = 0;
 			foreach (var e in rdb.EntriesOfType(RdbAssetExtractor.MeshIndexFileType))
@@ -5035,7 +5047,7 @@ namespace Faolan.Importer.Cli
 
 		private static void RdbSkeleton(string rdbDir, string arg)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			if (!uint.TryParse(arg, out var id) || !rdb.TryGet(1010002, id, out var e))
 			{
 				Console.WriteLine($"skeleton {arg} not found");
@@ -5073,7 +5085,7 @@ namespace Faolan.Importer.Cli
 		private static void RdbTweaks(string rdbDir, string? filter)
 		{
 			const uint tweakType = 1000516;
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var entries = rdb.EntriesOfType(tweakType).ToList();
 			if (entries.Count == 0)
 			{
@@ -5144,7 +5156,7 @@ namespace Faolan.Importer.Cli
 		// candidate set and their values; the anchor gives the offset.
 		private static void ClassAttributeRuns(string rdbDir, string? outDir)
 		{
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var csv = new StringBuilder("class,block,level,templateId,statId,amount\n");
 			var byClass = ClassAttributeBaseModule.ScanRuns(rdb);
 
@@ -5195,7 +5207,7 @@ namespace Faolan.Importer.Cli
 		private static void RdbClassVitals(string rdbDir, string? filter)
 		{
 			const uint tableType = 1000511;
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			foreach (var entry in rdb.EntriesOfType(tableType))
 			{
 				var blob = rdb.ReadDecompressed(entry);
@@ -5249,7 +5261,7 @@ namespace Faolan.Importer.Cli
 		{
 			using var db = OpenDb();
 			var items = db.Items.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).OrderBy(i => i.Id).ToList();
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 
 			var counts = new Dictionary<uint, (int Items, long Min, long Max)>();
 			var scanned = 0;
@@ -5304,7 +5316,7 @@ namespace Faolan.Importer.Cli
 				.OrderBy(i => i.Id)
 				.ToList();
 
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			uint[] fields = [54, 499, 496, 360, 41, 21, 644, 645, 74];
 			CharacterStatId[] stats = [CharacterStatId.Armor, CharacterStatId.HealthMax, CharacterStatId.ManaMax, CharacterStatId.StaminaMax, CharacterStatId.Constitution];
 
@@ -5387,7 +5399,7 @@ namespace Faolan.Importer.Cli
 		// type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.
 		private static void RdbTypes(string rdbDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			var hist = new Dictionary<uint, (int total, int local)>();
 			foreach (var e in rdb.Entries)
 			{
@@ -5430,10 +5442,12 @@ namespace Faolan.Importer.Cli
 			return best;
 		}
 
-		// The decompressed body of a per-map RDB resource, or empty when the map has no local entry of that type.
+		// The decompressed body of a per-map RDB resource, or empty when the map has no readable entry of that type.
+		// `CanRead` rather than `IsLocal`: the heightmap/collision types are majority CDN-only (1070003 is 276 of 520),
+		// and RdbReader pulls those through the mirror - gating on IsLocal dropped over half the world.
 		private static byte[] ReadResource(RdbReader rdb, uint type, uint mapId)
 		{
-			if (!rdb.TryGet(type, mapId, out var e) || !e.IsLocal)
+			if (!rdb.TryGet(type, mapId, out var e) || !rdb.CanRead(e))
 				return [];
 
 			try
@@ -5496,7 +5510,7 @@ namespace Faolan.Importer.Cli
 		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
 		private static void SpellFields(string rdbDir, string? arg)
 		{
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var counts = new Dictionary<uint, int>();
 			var samples = new Dictionary<uint, List<uint>>();
 			uint? wanted = uint.TryParse(arg, out var w)
@@ -5614,7 +5628,7 @@ namespace Faolan.Importer.Cli
 		private static async Task TerrainExport(string rdbDir, string outDir)
 		{
 			using var db = OpenDb();
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			Directory.CreateDirectory(outDir);
 
 			var mapIds = await db.Maps.Select(m => m.Id).OrderBy(id => id).ToListAsync();
@@ -5656,11 +5670,11 @@ namespace Faolan.Importer.Cli
 		private static async Task ResolveSpawnAreas(string rdbDir)
 		{
 			await using var db = OpenDb();
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
 			foreach (var mapId in await db.Maps.Select(m => m.Id).ToListAsync())
 			{
-				if (!rdb.TryGet(NpcSpawnLayout.ResourceType, mapId, out var e) || !e.IsLocal)
+				if (!rdb.TryGet(NpcSpawnLayout.ResourceType, mapId, out var e) || !rdb.CanRead(e))
 					continue;
 				if (!NpcSpawnLayout.TryParse(rdb.ReadDecompressed(e), out var layout) || layout == null)
 					continue;
@@ -5696,7 +5710,7 @@ namespace Faolan.Importer.Cli
 		// The playfield's world-unit width (1070003 <tilemap Width>), for the heightmap cell size. 0 if unavailable.
 		private static uint TilemapExtent(RdbReader rdb, uint mapId)
 		{
-			if (!rdb.TryGet(1070003, mapId, out var e) || !e.IsLocal)
+			if (!rdb.TryGet(1070003, mapId, out var e) || !rdb.CanRead(e))
 				return 0;
 
 			try

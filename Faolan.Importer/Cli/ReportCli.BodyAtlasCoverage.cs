@@ -35,7 +35,7 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			foreach (var id in ids)
 				One(rdb, id, outDir);
 		}

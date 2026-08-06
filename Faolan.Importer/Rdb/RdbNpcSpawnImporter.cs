@@ -20,9 +20,9 @@ namespace Faolan.Importer.Rdb
 	// fully derived from the fixed client RDB).
 	public static class RdbNpcSpawnImporter
 	{
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 
 			// A hand-verified assignment is a human's answer and must survive a re-harvest. The resolver already
@@ -42,7 +42,7 @@ namespace Faolan.Importer.Rdb
 			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
 
 			int maps = 0, areas = 0, points = 0, emptyMaps = 0, unreadable = 0;
-			foreach (var e in rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(e => e.IsLocal && ourMaps.Contains(e.Id)))
+			foreach (var e in rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(e => rdb.CanRead(e) && ourMaps.Contains(e.Id)))
 			{
 				byte[] dec;
 				try
@@ -52,6 +52,12 @@ namespace Faolan.Importer.Rdb
 				catch
 				{
 					unreadable++;
+					continue;
+				}
+
+				if (dec.Length == 0)
+				{
+					unreadable++; // a CDN layout the mirror could not serve - RdbReader returns empty rather than throwing
 					continue;
 				}
 

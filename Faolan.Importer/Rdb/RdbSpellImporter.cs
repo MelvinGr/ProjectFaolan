@@ -178,7 +178,7 @@ namespace Faolan.Importer.Rdb
 			// (French) check would miss it. A real spell carries the marker in NO language; a dev buff carries it in
 			// at least one. The localized (English) display name is cribbed on later by RdbLdbNameImporter.
 			var ldbSpellNames = new Dictionary<uint, List<string>>();
-			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbType).Where(rdb.CanRead))
 			{
 				byte[] page;
 				try

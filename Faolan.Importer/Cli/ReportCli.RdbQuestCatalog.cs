@@ -218,7 +218,7 @@ namespace Faolan.Importer.Cli
 		// stated once. Returns null when the client's RDB has no such entry.
 		internal static QuestGiverList? ReadQuestCatalog(string rdbDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			if (!rdb.TryGet(QuestCatalogRdbType, 0, out var entry))
 				return null;
 

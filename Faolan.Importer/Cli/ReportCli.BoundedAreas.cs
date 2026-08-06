@@ -51,7 +51,7 @@ namespace Faolan.Importer.Cli
 		// a census that quietly lost a playfield is worse than no census (the importer_silent_skip lesson).
 		private static List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> ReadBoundedAreas(string rdbDir)
 		{
-			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			using var rdb = OpenRdb(rdbDir);
 			var records = new List<(uint, IReadOnlyList<BoundedAreaCollection.BoundedArea>)>();
 			var unreadable = 0;
 

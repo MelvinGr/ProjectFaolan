@@ -26,9 +26,9 @@ namespace Faolan.Importer.Rdb
 		private const uint MonsterDataType = 1010201;
 		private const uint TexScriptType = 1010035;
 
-		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var entry = rdb.EntriesOfType(CreatorType).OrderByDescending(e => e.Size).FirstOrDefault();
 			if (entry.Size == 0)
 			{

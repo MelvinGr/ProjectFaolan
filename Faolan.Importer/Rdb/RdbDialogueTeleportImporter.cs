@@ -53,12 +53,12 @@ namespace Faolan.Importer.Rdb
 		// `{delay <seconds>}` - how long the line stays up before the trip runs. Absent on Sigurd.
 		private static readonly Regex Delay = new(@"\{delay\s+(?<s>[\d.]+)\s*\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
 			ArgumentNullException.ThrowIfNull(db);
 
 			Dictionary<(uint Category, uint Id), byte[]> ciphertext;
-			using (var rdb = new RdbReader(rdbDir))
+			using (var rdb = new RdbReader(rdbDir, cdnBase))
 			{
 				ciphertext = LdbStringIndex.EnglishCiphertext(rdb);
 			}

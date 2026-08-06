@@ -423,13 +423,13 @@ namespace Faolan.Importer.Cli
 		// this is the RDB grammar's own concern, not a report's.
 		internal static Dictionary<(uint Category, uint Id), string> PlaintextLdbStringsFor(string rdbDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			return LdbStringIndex.EnglishPlaintext(rdb);
 		}
 
 		private static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobs(string rdbDir)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = OpenRdb(rdbDir);
 			return LdbStringIndex.EnglishCiphertext(rdb);
 		}
 

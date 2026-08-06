@@ -38,10 +38,10 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint NpcTemplateNameCategory = 51000;
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
 			Dictionary<(uint Category, uint Id), string> plaintext;
-			using (var rdb = new RdbReader(rdbDir))
+			using (var rdb = new RdbReader(rdbDir, cdnBase))
 				plaintext = LdbStringIndex.EnglishPlaintext(rdb);
 
 			var goals = await db

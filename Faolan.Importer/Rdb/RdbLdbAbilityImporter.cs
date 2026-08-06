@@ -43,7 +43,7 @@ namespace Faolan.Importer.Rdb
 
 			var namePages = new List<Dictionary<uint, string>>();
 			var itemNamed = new HashSet<uint>();
-			foreach (var e in rdb.EntriesOfType(RdbLdbNameImporter.LdbType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(RdbLdbNameImporter.LdbType).Where(rdb.CanRead))
 			{
 				byte[] body;
 				try

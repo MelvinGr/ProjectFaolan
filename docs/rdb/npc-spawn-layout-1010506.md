@@ -3,10 +3,17 @@
 The per-playfield **authoritative, capture-independent** open-world NPC spawn source. Where our normal NPC
 placements are lifted from network captures (`NpcSpawnExtractor` → the burst-truth `NpcSpawn` set), this RDB
 type ships the spawn-point layout for every open-world playfield the client renders. Decoded decode-first (probe
-in `Faolan.Core.Rdb/Assets/NpcSpawnLayout.cs`) and **validated byte-exact**: all **238 local** `1010506`
-records parse to EOF (0 failures), **119 carry spawn groups** (2,664 groups / 23,782 primary spawn points) and
-**119 are empty** (`groupCount == 0` — scripted/instanced playfields like the castle and the Tortage interiors,
-whose NPCs are server-scripted and never appear here). The RDB record id **== the playfield id** (== `Map.Id`).
+in `Faolan.Core.Rdb/Assets/NpcSpawnLayout.cs`) and **validated byte-exact**: every `1010506` record parses to
+EOF (0 failures). Over the 425 records whose playfield we hold, **188 carry spawn groups** (3,970 groups /
+34,302 primary spawn points) and **237 are empty** (`groupCount == 0` — scripted/instanced playfields like the
+castle and the Tortage interiors, whose NPCs are server-scripted and never appear here). The RDB record id
+**== the playfield id** (== `Map.Id`).
+
+⚠️ **Most of this type is CDN-only** — 577 of the 817 `1010506` records have `file == 0xFF`, so they are not in
+the local `NN.rdbdata` at all. `RdbReader` pulls those through the mirror proxy transparently, but only when it
+is CONSTRUCTED with one; the importer used to build a bare reader and gate on `Entry.IsLocal`, which silently
+made the local 240 the whole world (120 playfields, 2,669 groups). Read a CDN-backed type with `rdb.CanRead(e)`
+and a reader that has the proxy base, never with `IsLocal`.
 
 Ported to C# as `NpcSpawnLayout` and imported by `RdbNpcSpawnImporter` (the opt-in `rdb-npc-spawns` module) into
 the `NpcSpawnArea` table — one row per group carrying the roam AABB + population count + (once resolved) the
@@ -112,8 +119,8 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
   server-authoritative (sent on the wire at spawn), and is **not** in the client RDB — confirmed via the empty
   spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
   absent from every other resource. So the creature can only be inferred from captures (`SpawnAreaResolver`:
-  name / gated containment / guarded id-propagation), which resolves **188 of the 2,669 areas**; the rest await
-  captures or a manual pass. See #363.
+  name / gated containment / guarded id-propagation), which resolves **506 of the 3,970 areas**; the rest await
+  captures or a manual pass. See #363 and #518.
 
   The containment tier votes on captured spawns standing **on the group's wander path**, not merely inside its
   roam AABB (#491). The box also holds the hand-placed NPCs standing in it — a village overlapping a territory,

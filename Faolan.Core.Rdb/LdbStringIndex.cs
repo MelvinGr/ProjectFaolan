@@ -154,7 +154,7 @@ namespace Faolan.Core.Rdb
 			var language = LdbLanguageIndex.LanguageByPage(rdb);
 			var strings = new Dictionary<(uint, uint), string>();
 
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(rdb.CanRead))
 			{
 				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
 					continue;
@@ -166,8 +166,11 @@ namespace Faolan.Core.Rdb
 				}
 				catch
 				{
-					continue; // not a readable record (CDN-only / not zlib)
+					continue; // the container is not an IOz1/zlib page
 				}
+
+				if (body.Length == 0)
+					continue; // a CDN page the mirror could not serve (RdbReader returns empty rather than throwing)
 
 				if (CategoryOf(body) == 0 || FlagsOf(body) == 1)
 					continue; // not a TDC2 page, or an ENCRYPTED one
@@ -191,7 +194,7 @@ namespace Faolan.Core.Rdb
 			var language = LdbLanguageIndex.LanguageByPage(rdb);
 			var blobs = new Dictionary<(uint, uint), byte[]>();
 
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(rdb.CanRead))
 			{
 				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
 					continue;
@@ -203,8 +206,11 @@ namespace Faolan.Core.Rdb
 				}
 				catch
 				{
-					continue; // not a readable record (CDN-only / not zlib)
+					continue; // the container is not an IOz1/zlib page
 				}
+
+				if (body.Length == 0)
+					continue; // a CDN page the mirror could not serve (RdbReader returns empty rather than throwing)
 
 				if (CategoryOf(body) == 0 || FlagsOf(body) != 1)
 					continue; // not a TDC2 page, or a PLAINTEXT one

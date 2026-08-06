@@ -21,9 +21,9 @@ namespace Faolan.Importer.Rdb
 	{
 		private const uint RegistryType = 1000076;
 
-		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var entry = rdb.EntriesOfType(RegistryType).FirstOrDefault();
 			if (entry.Size == 0)
 			{

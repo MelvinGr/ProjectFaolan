@@ -55,15 +55,15 @@ namespace Faolan.Importer.Extractors
 
 		public int StringCount => _blobs.Count;
 
-		public static BarkCatalog Load(string rdbDir)
+		public static BarkCatalog Load(string rdbDir, string? cdnBase)
 		{
-			using var rdb = new RdbReader(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			var language = LdbLanguageIndex.LanguageByPage(rdb);
 			var blobs = new Dictionary<uint, byte[]>();
 			var flags = new HashSet<uint>();
 			var pages = 0;
 
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(rdb.CanRead))
 			{
 				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
 					continue;
