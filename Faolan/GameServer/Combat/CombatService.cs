@@ -24,8 +24,10 @@ namespace Faolan.GameServer.Combat
 	// builds the combat wire packets (the BehaviorControlCenter ack, DamageResult, Energy, and 0x96B8DC59 vitals).
 	// Extracted out of the GameServer listener as a composed collaborator (like WorldBroadcaster): it reads/writes the
 	// world model via the WorldSimulation, broadcasts world effects via the WorldBroadcaster, and frames its own
-	// packets on the world conversation (WorldSenderEndpoint). Vitals resolve from the world model (the authoritative owner);
-	// a per-session CombatState backs NPCs not in the model (e.g. the built-NPC test). See protocol_stats_and_combat.
+	// packets on the world conversation (WorldSenderEndpoint). Vitals resolve from the world model, which is their ONLY
+	// owner: a handle that does not resolve there is refused and reported, never backed by invented per-session state
+	// (#695 - that fallback silently ate every hit on a target outside the player's zone view). See
+	// protocol_stats_and_combat.
 	public sealed class CombatService
 	{
 		// The blast radius (world units) a ground-targeted AoE damages around its reticle position, for a spell the
@@ -179,7 +181,10 @@ namespace Faolan.GameServer.Combat
 		public Task KillNpc(INetworkClient client, uint targetHandle)
 		{
 			var target = ResolveNpcVitals(client, targetHandle, out _);
-			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
+
+			return target == null
+				? Task.CompletedTask // not a live NPC in the killer's zone - the resolver already said so
+				: ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
 		}
 
 		// Resolves an INSTANT ground-targeted AoE (#236) - a single blast on completion. Empty ground is a no-op like
@@ -435,8 +440,21 @@ namespace Faolan.GameServer.Combat
 		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause, Func<Task>? onDamaged = null)
 		{
 			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
+			if (target == null)
+				return; // unresolvable target - already reported by the resolver (#695)
+
 			if (target.IsDead)
 				return; // already dead this life; ignore overkill until it respawns
+
+			// Being hit puts the mob IN COMBAT with whoever hit it (#695). The world tick reads both: the handle is the
+			// aggro source proximity cannot give it (a caster/archer standing outside NpcAggroRange), and the timestamp
+			// is what stops the anti-whittle full-heal from resetting a mob mid-fight. Without this the mob neither
+			// fought back nor kept its wounds - every hit after the first was erased before the next one landed.
+			if (npcEntity != null)
+			{
+				npcEntity.LastAttackerHandle = _sim.PlayerWorldEntity(client)?.Handle ?? npcEntity.LastAttackerHandle;
+				npcEntity.LastCombatAt = DateTimeOffset.UtcNow;
+			}
 
 			target.ApplyHealthDelta(-damage);
 
@@ -499,20 +517,6 @@ namespace Faolan.GameServer.Combat
 			var block = new CharacterStatBlock().SetExperience(character.Level, character.Experience);
 			await SendStatUpdate(killer!, block, killer!.Session.Character.Id);
 			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
-		}
-
-		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
-		// so its health bar moves relative to the HP the client rendered; falls back to the placeholder for NPCs
-		// not spawned via the burst (e.g. the built-NPC test).
-		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
-		{
-			return _combat.GetOrAdd(targetHandle, () =>
-			{
-				// NPCs spawned via the world burst get their real vitals from the simulation; this fallback only
-				// covers NPCs with no world entity (e.g. the built-NPC test), so a default max is correct.
-				var maxHealth = CombatResolver.DefaultNpcMaxHealth;
-				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
-			});
 		}
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
@@ -674,14 +678,30 @@ namespace Faolan.GameServer.Combat
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
 		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
-		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity? npcEntity)
+		// ⚠️ Returns NULL when the handle does not resolve to a live NPC in the world model, and the caller must treat
+		// that as a REFUSAL. It used to conjure a per-session `EntityVitals` instead, and that silent fallback cost a
+		// whole in-client session (#695): a target that had left the player's zone view - a patroller wandering off,
+		// or a stationary NPC the player walked away from - took its damage on a phantom the world never sees, so the
+		// real NPC's health never moved no matter how many times it was hit. `SendSpellDamageNumber` then read the
+		// phantom's health back for the wire, so the floating NUMBER was wrong too. Reported as "only the first one
+		// does real damage, all following only 1" and "the floating damage numbers are wrong". Nothing logged, nothing
+		// threw, and the damage arithmetic was correct the whole time - it was just being spent on nothing.
+		//
+		// The conjured max was `CombatResolver.DefaultNpcMaxHealth`, i.e. a placeholder health bar for a creature that
+		// already had a real one. That is exactly the shape the no-silent-fallback rule exists to stop: inventing
+		// state to avoid reporting that a lookup failed.
+		private EntityVitals? ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity? npcEntity)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && npcEntity is { IsPlayer: false, Vitals: not null })
 				return npcEntity.Vitals;
 
-			npcEntity = null!;
-			return GetOrAddNpcVitals(client, targetHandle);
+			npcEntity = null;
+			_logger.LogError("Combat: no live NPC for target handle 0x{Handle:X8} in {Player}'s zone - refusing to apply damage. " +
+				"The client is attacking something the server cannot find, which is a targeting/interest bug, not a combat one (#695).",
+				targetHandle, client.Session.Character?.Name ?? "<no character>");
+
+			return null;
 		}
 
 		// The floating number + combat-log line for a SPELL hit on an NPC. Retail carries spell damage on
@@ -693,7 +713,13 @@ namespace Faolan.GameServer.Combat
 		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
 		{
 			var vitals = ResolveNpcVitals(client, npcHandle, out _);
-			return SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
+
+			// Only ever reached from ApplyNpcDamage's onDamaged, which already resolved the same handle - so a null
+			// here means the target vanished between the hit and its number, and a floating number read off nothing
+			// is worse than none.
+			return vitals == null
+				? Task.CompletedTask
+				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
 		}
 
 		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
