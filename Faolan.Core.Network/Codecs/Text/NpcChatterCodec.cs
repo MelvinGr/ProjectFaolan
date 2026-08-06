@@ -142,4 +142,35 @@ namespace Faolan.Core.Network.Codecs.Text
 			return row;
 		}
 	}
+
+	// Live-value policy for a bark that is about to be SENT (#691) - not a codec, the same way `RemoteFormatSession`
+	// beside it is not.
+	public static class NpcChatterBarks
+	{
+		// The bark as this recipient must see it: every SESSION slot filled with THEIR character name.
+		//
+		// ⚠️ **A bark with a session slot cannot be one body broadcast to everyone.** The slot names the player the
+		// NPC is addressing - `DetectedChar.name` on the crier, `Target.Name` on the Damsel - so two players in
+		// earshot must receive two different bodies. The world layer caches each NPC type's barks once, at spawn,
+		// where no recipient exists yet; this is what turns one into a per-recipient copy at the point of send.
+		//
+		// Without it the client renders the macro LITERALLY, and the player reads
+		// "You should consider joining a guild, {DetectedChar.name}!".
+		public static NpcChatterBark Addressed(NpcChatterBark bark, string recipientName)
+		{
+			ArgumentNullException.ThrowIfNull(bark);
+
+			if (!bark.Parameters.Any(p => RemoteFormatSession.IsSessionBarkSlot(p.Name)))
+				return bark; // no session slot - the same body serves every recipient
+
+			return bark with
+			{
+				Parameters = bark.Parameters
+					.Select(p => RemoteFormatSession.IsSessionBarkSlot(p.Name)
+						? new RemoteFormatParameter(p.Name, RemoteFormatSession.Escape(recipientName ?? ""))
+						: p)
+					.ToList()
+			};
+		}
+	}
 }

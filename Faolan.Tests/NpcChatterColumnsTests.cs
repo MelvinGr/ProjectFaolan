@@ -150,5 +150,40 @@ namespace Faolan.Tests
 				Assert.Equal(50015u, row.Category); // the ambient-chatter category, uniform across the corpus
 			}
 		}
+
+		// #691: the SEND-time fill. Everything above already proved the codec renders a name into the session slot
+		// when it is given one - what was missing is that nothing ever gave it one. The world layer caches each NPC
+		// type's barks once, at spawn, where no recipient exists, and the chat tier broadcast that one body to
+		// everybody - so the client rendered the macro literally and the player read
+		// "You should consider joining a guild, {DetectedChar.name}!".
+		[Fact]
+		public void AddressedBark_RendersEachRecipientsOwnName()
+		{
+			var row = NpcChatterColumns.ToRow(NpcChatterCodec.Parse(
+				"<remoteformat token=\"sayinchat(57)|sendtell(3)|RenownCrier\" category=\"50015\" key=\".&#39;eMV&#92;79&quot;!GSlWOqs*sl\" knubot=\"0\"  ><parameter value=\"7;Sonja\" name=\"DetectedChar.name\" /></remoteformat>"));
+
+			// What the world layer caches: the slot is present and EMPTY (no captured name rides along).
+			var cached = NpcChatterColumns.ToBark(row);
+			Assert.DoesNotContain("Sonja", NpcChatterCodec.Build(cached), StringComparison.Ordinal);
+
+			var toNecroL80 = NpcChatterCodec.Build(NpcChatterBarks.Addressed(cached, "NecroL80"));
+			var toValeria = NpcChatterCodec.Build(NpcChatterBarks.Addressed(cached, "Valeria"));
+
+			Assert.Contains("7;NecroL80", toNecroL80, StringComparison.Ordinal);
+			Assert.Contains("7;Valeria", toValeria, StringComparison.Ordinal);
+			Assert.NotEqual(toNecroL80, toValeria); // two listeners, two bodies - it cannot be one broadcast
+			Assert.DoesNotContain("{", toNecroL80, StringComparison.Ordinal); // no macro left for the client to render raw
+		}
+
+		// A bark with no session slot is the SAME body for everyone - the fill must not disturb it (and returns the
+		// identical instance, so the common case costs nothing).
+		[Fact]
+		public void ABarkWithNoSessionSlot_IsUntouchedByTheFill()
+		{
+			var cached = NpcChatterColumns.ToBark(NpcChatterColumns.ToRow(NpcChatterCodec.Parse(CapturedBark)));
+
+			Assert.Same(cached, NpcChatterBarks.Addressed(cached, "NecroL80"));
+			Assert.Equal(NpcChatterCodec.Build(cached), NpcChatterCodec.Build(NpcChatterBarks.Addressed(cached, "Valeria")));
+		}
 	}
 }

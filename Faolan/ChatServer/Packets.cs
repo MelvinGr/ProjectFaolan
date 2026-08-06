@@ -29,15 +29,20 @@ namespace Faolan.ChatServer
 
 		// An NPC bark: the same CharacterChat (0x0022) delivery as a say, with CharacterChatCodec composing the bark's
 		// remoteformat (#539) instead of the world layer pre-rendering it.
+		//
+		// The body is built PER RECIPIENT, because a bark that addresses the player carries their name in a session
+		// slot (#691) - see NpcChatterBarks.Addressed. For a bark without one that is the same body every time, so
+		// the only cost is the composition.
 		public async Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			foreach (var client in NetworkClients)
 			{
-				var recipientId = client.Session.Character?.Id ?? 0;
-				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
+				var character = client.Session.Character;
+				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(character?.Id ?? 0))
 					continue;
 
-				await client.SendAsync(new ChatServerMessage(CharacterChatCodec.Opcode, CharacterChatCodec.Build(npcHandle, bark)));
+				await client.SendAsync(new ChatServerMessage(CharacterChatCodec.Opcode,
+					CharacterChatCodec.Build(npcHandle, NpcChatterBarks.Addressed(bark, character?.Name ?? ""))));
 			}
 		}
 

@@ -944,9 +944,15 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcChatter:
 								{
-									// Ambient bystander bark: the NPC local-says a random RenownBystanderLovers line (chat
-									// server CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the
-									// NPC handle so the client shows the bubble over it.
+									// Ambient bark: the NPC local-says a random line from ITS OWN type's set (chat server
+									// CharacterChat 0x0022) to the players in say-range - purely cosmetic. Sender = the NPC
+									// handle so the client shows the bubble over it.
+									//
+									// The lines are per TEMPLATE, never a shared pool: six types carry any, each with the
+									// client's own group - `RenownCrier` is Tatianus the Crier alone, so his "consider joining
+									// a guild" line cannot come out of anyone else. (A group MAY span types where retail shares
+									// one: the Nobleman and one Noblewoman both bark `RenownBystanderLovers`. That is the
+									// client's grouping, not ours.)
 									var npc = effect.Entity;
 									if (npc.ChatterLines is not { Length: > 0 } lines)
 										break;
