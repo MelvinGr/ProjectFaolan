@@ -1971,6 +1971,7 @@ namespace Faolan.Importer.Cli
 			var word2NonZero = 0;
 			var word2Values = new Dictionary<uint, int>();
 			var word2Prefix = new Dictionary<string, int>();
+			var word2Carriers = new HashSet<(uint Map, float X, float Y, float Z)>();
 
 			foreach (var capture in captures)
 			{
@@ -2011,6 +2012,32 @@ namespace Faolan.Importer.Cli
 					// Neither the player's own spawn nor another player's is an NpcSpawn row.
 					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
 						continue;
+
+					// ⚠️ The Word2 census runs HERE - before the name filter, the position dedup and the DB-row
+					// lookup - because it is a claim about retail's BYTES, not about the spawns we can compare. It
+					// used to sit at the bottom of the loop, past all three gates, and reported "2 of 756 tables"
+					// while the importer's own lift found a THIRD carrying spawn (Valkyrie Skalla) that the dedup had
+					// dropped. A census that silently answers a narrower question than it states is the failure mode
+					// this whole field's history is made of.
+					if (captured.Post?.Slot is NpcEntrySlot census && census.Morphs.Count > 0)
+					{
+						word2Tables++;
+						var nonZero = census.Morphs.FindAll(m => m.Word2 != 0);
+						if (nonZero.Count > 0)
+						{
+							word2NonZero++;
+							word2Carriers.Add((map, captured.Position.X, captured.Position.Y, captured.Position.Z));
+							foreach (var m in nonZero)
+								word2Values[m.Word2] = word2Values.GetValueOrDefault(m.Word2) + 1;
+
+							// "the first N entries and no others" is the shape an ordered appearance field has and
+							// scattered runtime state does not.
+							var prefix = census.Morphs.FindIndex(m => m.Word2 == 0);
+							var contiguous = prefix >= 0 && !census.Morphs.Skip(prefix).Any(m => m.Word2 != 0);
+							var key = contiguous ? $"{prefix} entries" : "scattered";
+							word2Prefix[key] = word2Prefix.GetValueOrDefault(key) + 1;
+						}
+					}
 
 					var name = captured.Character?.Name ?? "";
 					if (!string.IsNullOrEmpty(filter) && !name.Contains(filter, StringComparison.OrdinalIgnoreCase))
@@ -2057,25 +2084,6 @@ namespace Faolan.Importer.Cli
 							+ (fields.Count > 0 ? $" [{string.Join(", ", fields.Take(6))}{(fields.Count > 6 ? ", ..." : "")}]" : ""));
 					}
 
-					if (captured.Post?.Slot is NpcEntrySlot census && census.Morphs.Count > 0)
-					{
-						word2Tables++;
-						var nonZero = census.Morphs.FindAll(m => m.Word2 != 0);
-						if (nonZero.Count > 0)
-						{
-							word2NonZero++;
-							foreach (var m in nonZero)
-								word2Values[m.Word2] = word2Values.GetValueOrDefault(m.Word2) + 1;
-
-							// "the first N entries and no others" is the shape an ordered appearance field has and
-							// scattered runtime state does not.
-							var prefix = census.Morphs.FindIndex(m => m.Word2 == 0);
-							var contiguous = prefix >= 0 && !census.Morphs.Skip(prefix).Any(m => m.Word2 != 0);
-							var key = contiguous ? $"{prefix} entries" : "scattered";
-							word2Prefix[key] = word2Prefix.GetValueOrDefault(key) + 1;
-						}
-					}
-
 					var theirMorphs = Morphs(captured);
 					var ourMorphs = Morphs(ours);
 					if (!theirMorphs.SequenceEqual(ourMorphs))
@@ -2103,10 +2111,38 @@ namespace Faolan.Importer.Cli
 			// bald NPC found so far declines for exactly that. So census the field across every captured table: if
 			// it were runtime noise it would be scattered, and if it is part of the appearance it will have shape.
 			Console.WriteLine();
-			Console.WriteLine("appearance Word2 census (the field that declines a table - #672):");
-			Console.WriteLine($"  tables with a morph list: {word2Tables}, of which {word2NonZero} carry a non-zero Word2 on some entry");
+			Console.WriteLine("appearance Word2 census (the field that USED to decline a table - #672):");
+			Console.WriteLine($"  captured sends with a morph list: {word2Tables}, of which {word2NonZero} carry a non-zero Word2 on some entry"
+			                  + $" ({word2Carriers.Count} distinct placement(s))");
 			Console.WriteLine($"  Word2 values: {string.Join(", ", word2Values.OrderByDescending(kv => kv.Value).Take(10).Select(kv => $"{kv.Key} x{kv.Value}"))}");
 			Console.WriteLine($"  and on a carrying table, the non-zero entries are its FIRST {string.Join("/", word2Prefix.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} ({kv.Value})"))}");
+
+			// ⚠️ Cross-check against what the IMPORTER lifted, because this report can only see the LOGIN BURST and
+			// the importer sees more. That gap is not hypothetical: the burst window shows two carrying placements
+			// (Turach, Kincaid) and the DB holds three - `Valkyrie Skalla` carries one from a send this window never
+			// reaches. Reporting only the burst figure would state a floor as if it were the count, which is exactly
+			// the error #672 was opened about.
+			var carriedInDb = rows.Values.Where(r => r.Morphs.Any(m => m.Word2 != 0)).Select(r => r.NpcTemplate?.Name ?? $"#{r.NpcTemplateId}").Order().ToList();
+			Console.WriteLine($"  the DB (which the importer lifts from a WIDER window than this report sees) holds "
+			                  + $"{carriedInDb.Count} carrying placement(s): {string.Join(", ", carriedInDb)}");
+
+			// ⭐ WHAT it is attached to. The ordinal shape alone says "not runtime state"; this says what it IS.
+			// Resolving each carrying morph id against MorphTargets: every one is a `*texscript_*`, never a face/body
+			// slider or a hair mesh. And no single-texscript table carries it, which is what an ORDER needs two of -
+			// though most multi-texscript tables do not carry it either, so it is not simply "the layer order".
+			var morphNames = db.MorphTargets.AsNoTracking().ToDictionary(t => t.Id, t => t.Name);
+			var carryingKinds = rows.Values
+				.SelectMany(r => r.Morphs.Where(m => m.Word2 != 0))
+				.GroupBy(m => morphNames.GetValueOrDefault(m.MorphId, "?").StartsWith('*') ? morphNames[m.MorphId].Split('_')[0] : "a plain morph slider")
+				.ToDictionary(g => g.Key, g => g.Count());
+			var texscriptRuns = rows.Values
+				.Select(r => r.Morphs.Count(m => morphNames.GetValueOrDefault(m.MorphId, "").StartsWith("*texscript", StringComparison.Ordinal)))
+				.Where(n => n > 0)
+				.GroupBy(n => n)
+				.ToDictionary(g => g.Key, g => g.Count());
+			Console.WriteLine($"  and the carrying ENTRIES are: {string.Join(", ", carryingKinds.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} x{kv.Value}"))}");
+			Console.WriteLine($"  tables by texscript count: {string.Join(", ", texscriptRuns.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}->{kv.Value}"))}"
+			                  + $" (single-texscript tables carrying the ordinal: {rows.Values.Count(r => r.Morphs.Count(m => morphNames.GetValueOrDefault(m.MorphId, "").StartsWith("*texscript", StringComparison.Ordinal)) == 1 && r.Morphs.Any(m => m.Word2 != 0))})");
 			Console.WriteLine();
 
 			Console.WriteLine("spawn-diff: every captured NPC spawn rebuilt from its DB row - CoreCharacter message +");
@@ -2144,9 +2180,11 @@ namespace Faolan.Importer.Cli
 				if (npc.Morphs.Count == 0)
 					return "the table is empty (the minimal no-morph form)";
 
-				var runtime = npc.Morphs.FindIndex(m => m.Word2 != 0 || m.Flag != 0);
-				if (runtime >= 0)
-					return $"entry {runtime} carries runtime state (Word2={npc.Morphs[runtime].Word2}, Flag={npc.Morphs[runtime].Flag})";
+				// Word2 came OFF this veto with #672 - it is an ordinal, not runtime state, and the column now carries
+				// it - so only the never-observed Flag still declines a table.
+				var flagged = npc.Morphs.FindIndex(m => m.Flag != 0);
+				if (flagged >= 0)
+					return $"entry {flagged} sets the never-observed Flag ({npc.Morphs[flagged].Flag})";
 				if (npc.EntryTableX != ListFrame.Empty || npc.EntryTableMarker != ListFrame.Empty)
 					return $"the entry table is not empty (X=0x{npc.EntryTableX:X}, marker=0x{npc.EntryTableMarker:X})";
 				if (post.EndPairs.Count > 0 || post.EndPairs2.Count > 0 || post.EndPairs3.Count > 0)

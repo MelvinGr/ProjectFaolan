@@ -22,6 +22,10 @@ namespace Faolan.Core.Database.Tables
 		public float Value { get; set; }
 		public int Ordinal { get; set; }
 
+		// The entry's third word - see NpcSpawnMorph.Word2 (#672). Carried here too so a type-level table lifted from
+		// the same wire records round-trips byte-exact rather than silently dropping the field.
+		public uint Word2 { get; set; }
+
 		[MaxLength(128)]
 		public string Text { get; set; } = "";
 	}

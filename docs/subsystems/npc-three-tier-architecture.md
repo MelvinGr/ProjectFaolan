@@ -145,6 +145,23 @@ from typed columns.
       SOLE spawn-body path — there is no longer a `Data`-splice fallback in `NpcSpawnBuilder`. The residual
       no-morph-humanoid header words noted above were closed outright by #605: the word is the movement mode the
       message already carries, so there is nothing left to derive separately.
+- [x] **The appearance classifier stopped throwing away real tables (#672).** `NpcSpawnAppearance.TryLiftLenient`
+      declined a whole morph table when any entry carried a non-zero third word, described as "an entry carrying
+      runtime state". Three NPCs lost their whole appearance to it and spawned **bald** — Turach (template 951),
+      Kincaid (7371) and Valkyrie Skalla (22982) — which is #243's symptom on a case #243's fix does not cover.
+      It is not runtime state. Three independent shapes say so:
+      - a dense **ordinal**: the carrying entries are a contiguous prefix and their values a permutation of 1..N.
+        ⚠️ Not *sorted* — Turach's run is 1/2/3 but Kincaid's is 3/1/2/4, so it does not index the table position;
+      - ⭐ every carrying entry is a `*texscript_*` morph — a texture script, never a face/body slider or a hair
+        mesh (9 of 26,930 shipped rows). Runtime state would not confine itself to one kind of entry;
+      - no single-texscript table ever carries it (0 of 719), which is what an ORDER needs two of.
+
+      `NpcSpawnMorph.Word2` / `NpcMorph.Word2` now carry the field and `NpcSpawnBuilder` emits it, so a lifted
+      table still round-trips byte-exact — the condition the widening waited on. Only the never-observed `Flag`
+      still vetoes a table. `--report spawn-diff` goes 487 → **489 match** with the three placements re-lifted, and
+      no captured table is declined any more. What the order *drives* is unresolved, and it is not simply "the
+      layer order": 505 of the 508 multi-texscript tables send zeros.
+      [V3: SpawnBuildsFromColumnsTests.ASpawnCarryingWord2_RoundTripsItOntoTheWire]
 
 ## Class-specific playfields (the city armories)
 

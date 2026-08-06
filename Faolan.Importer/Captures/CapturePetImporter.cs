@@ -100,6 +100,7 @@ namespace Faolan.Importer.Captures
 							Ordinal = i,
 							MorphId = morphs[i].MorphId,
 							Value = morphs[i].Value,
+							Word2 = morphs[i].Word2,
 							Text = morphs[i].Text ?? ""
 						});
 					}

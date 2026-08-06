@@ -73,6 +73,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				{
 					MorphId = m.MorphId,
 					Value = m.Value,
+					Word2 = m.Word2, // #672: carried, or the two tables that use it would round-trip lossily
 					Text = m.Text ?? ""
 				})
 				.ToList();
@@ -102,6 +103,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				{
 					MorphId = m.MorphId,
 					Value = m.Value,
+					Word2 = m.Word2, // #672: carried, or the two tables that use it would round-trip lossily
 					Text = m.Text ?? ""
 				})
 				.ToList();

@@ -1324,6 +1324,7 @@ namespace Faolan.Importer.Captures
 					Ordinal = i,
 					MorphId = e.Morphs[i].MorphId,
 					Value = e.Morphs[i].Value,
+					Word2 = e.Morphs[i].Word2, // #672: two captured tables carry it; dropping it re-declines them
 					Text = e.Morphs[i].Text ?? ""
 				});
 			}

@@ -2262,6 +2262,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("Value")
                         .HasColumnType("REAL");
 
+                    b.Property<uint>("Word2")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("NpcTemplateId", "Ordinal");
 
                     b.ToTable("NpcMorphs");
@@ -2501,6 +2504,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<float>("Value")
                         .HasColumnType("REAL");
+
+                    b.Property<uint>("Word2")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("NpcSpawnId", "Ordinal");
 
