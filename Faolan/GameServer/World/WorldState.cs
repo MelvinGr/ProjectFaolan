@@ -89,6 +89,17 @@ namespace Faolan.GameServer.World
 		// sparse + staggered across NPCs rather than all firing at once. Cosmetic; tune in the in-client pass.
 		private const double ChatterCheckSeconds = 4.0;
 
+		// How close a player must come for a DETECTION bark to fire (#694). Matched to `WorldSimulation.SayRangeUnits`
+		// (50u), which is how far a bark carries: greeting someone who is too far to hear it would be worse than not
+		// greeting them. PROVISIONAL - no shipped number states an NPC's detection radius, and the one annotated
+		// capture times a crier line but does not pin the distance the player crossed to earn it.
+		public const float GreetingRange = 50f;
+
+		// The band a greeted player must leave before the NPC will greet them again - hysteresis, so a player loitering
+		// on the greeting boundary is not greeted, forgotten and greeted again every few ticks. 1.5x the greeting
+		// range; the exact factor is ours, only the fact that it must exceed GreetingRange matters.
+		public const float GreetingForgetRange = GreetingRange * 1.5f;
+
 		// The idle-heartbeat cadence (#225): every live NPC (re-)asserts its short-form BehaviorControlCenterIIR this
 		// often so the client keeps playing its idle animation instead of freezing. Retail streams it faster (~10/s
 		// aggregate in the mount capture; the per-entity rate isn't pinned from captures), so this is a deliberately
@@ -245,11 +256,16 @@ namespace Faolan.GameServer.World
 					if (entity.TickShieldShift(deltaSeconds, Random.Shared))
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcShieldRose));
 
-					// Ambient chatter: NPCs that have captured bark lines (NpcChatter) occasionally speak, staggered by
-					// the per-NPC random roll so they don't all bark at once. The processor picks a random line + sends
-					// it to nearby players (cosmetic). NPCs without a captured group stay silent.
+					// Ambient chatter: NPCs that have captured AMBIENT bark lines occasionally speak, staggered by the
+					// per-NPC random roll so they don't all bark at once. The processor picks a random line + sends it
+					// to nearby players (cosmetic). NPCs without a captured ambient group stay silent.
 					if (chatterDue && entity.ChatterLines is { Length: > 0 } && Random.Shared.NextDouble() < ChatterChancePerCheck)
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcChatter));
+
+					// #694: a DETECTION bark is not on that clock. The crier greets a player he has NOTICED ARRIVE, so
+					// the cue is the arrival itself - one line per player per approach, addressed at them by name.
+					if (entity.GreetingLines is { Length: > 0 })
+						DetectGreetings(zone, entity);
 
 					// #262 companion-follow: a "released" NPC (e.g. Casilda after her rescue) follows its leading player -
 					// step toward them and broadcast a MoveTask each step (UNGATED; not combat), the server-driven
@@ -486,6 +502,33 @@ namespace Faolan.GameServer.World
 				{
 					e.ShieldDistribution = 0;
 				}
+			}
+
+			// Queues a DETECTION bark (#694) for every player who has just walked into `e`'s greeting range, and forgets
+			// the ones who have walked back out of it. This is the whole difference between a greeting and ambient
+			// chatter: the cue is a player ARRIVING, so the line lands as you walk up instead of being said to an empty
+			// street on a clock that runs whether anyone is there or not.
+			//
+			// The forget range is deliberately WIDER than the greeting range: with one radius a player standing right on
+			// the boundary would be greeted, forgotten and greeted again every few ticks. The gap is hysteresis, not a
+			// second concept.
+			void DetectGreetings(Zone z, WorldEntity e)
+			{
+				foreach (var player in z.PlayersInRange(e.Position, GreetingForgetRange, e.Handle))
+				{
+					if (Vector3.Distance(player.Position, e.Position) > GreetingRange)
+						continue; // inside the forget band but not yet close enough to greet - leave the state alone
+
+					if (e.GreetedPlayers.Add(player.Handle))
+						effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcGreeting, player));
+				}
+
+				if (e.GreetedPlayers.Count == 0)
+					return;
+
+				// Forget anyone who has left the band (or the zone entirely), so their next approach greets again.
+				e.GreetedPlayers.RemoveWhere(handle => !z.TryGet(handle, out var p)
+				                                       || Vector3.Distance(p.Position, e.Position) > GreetingForgetRange);
 			}
 
 			// Steps `e` toward (dx,dz) this tick and queues a move broadcast ONLY once it has travelled a retail-sized

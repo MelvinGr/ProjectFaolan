@@ -22,7 +22,8 @@ namespace Faolan.GameServer.World
 		EncounterTrigger, // a player (Target) closed to the LURE's (Entity) trigger radius - swap the lure for its boss (#502)
 		EncounterReset, // a scripted-encounter BOSS (Entity) is gone; put its lure back where it stood (#502)
 		NpcShieldRose, // the NPC's (Entity) directional-combat shield rose changed - it engaged, or the shift timer moved a guard to another arc; broadcast the CombatShieldIIR (#20)
-		NpcChatter // an ambient bystander bark: the NPC (Entity) local-says a random RenownBystanderLovers line to nearby players (chat server), purely cosmetic
+		NpcChatter, // an ambient bystander bark: the NPC (Entity) local-says a random RenownBystanderLovers line to nearby players (chat server), purely cosmetic
+		NpcGreeting // a DETECTION bark (#694): the NPC (Entity) noticed a player (Target) ARRIVE and greets them by name - a `sendtell`, so it goes to that player alone
 	}
 
 	// `Target` is the attacked/chased/aggroed player for NpcAttack/NpcMove/NpcEnterCombat; null otherwise.

@@ -147,6 +147,41 @@ namespace Faolan.Core.Network.Codecs.Text
 	// beside it is not.
 	public static class NpcChatterBarks
 	{
+		// What makes an NPC say a bark (#694). A bark is NOT one thing on a timer - the captured set splits three ways
+		// on the `channel` component the row already stores, and each channel names its own cue:
+		//
+		//   conversation1 / conversation2 -> AMBIENT. Idle bystander chatter (`RenownBystanderLovers`, `*Women`,
+		//       `*Child`). No addressee, no cue - it is overheard, and a clock is the right model for it.
+		//   sendtell                      -> DETECTION. The crier's `RenownCrier` line, and the only channel whose
+		//       name states the delivery: a TELL, i.e. one recipient. Its `DetectedChar.name` slot names the player
+		//       the NPC has DETECTED, so it fires on a player arriving and goes to that player alone. Firing it on a
+		//       clock is what made the crier greet an empty street.
+		//   event                         -> ENCOUNTER SCRIPT. The Damsel's `RnBLadyInDistressBrainScript` cry for
+		//       help, driven by the encounter's own proximity trigger (#502), never by this tier. It was ALSO in the
+		//       ambient pool, so it double-fired on the timer as well as on the trigger.
+		//
+		// The session slot corroborates this, but ONE WAY only, and the difference is why the channel is what gets
+		// switched on. Every bark carrying a slot (`DetectedChar.name`, `Target.Name`) is non-ambient - it names a
+		// player, so something had to pick that player - and no ambient bark carries one. The converse is false: the
+		// crier has TWO `sendtell` lines and only one names anybody (SayInChat 57; SayInChat 10 is an unaddressed
+		// tell). A tell still has exactly one recipient, so it is still said on detection. The channel states the CUE;
+		// the slot only decides whether the body has to be built per-recipient (see Addressed).
+		//
+		// ⚠️ The corpus holds only these four channel values (22 rows / 6 NPC types). An unknown channel falls to
+		// Ambient deliberately: a bark on a clock is a cosmetic line at the wrong moment, while a bark wired to a cue
+		// we have not decoded would be a line that never fires at all.
+		public static BarkTrigger TriggerOf(NpcChatterBark bark)
+		{
+			ArgumentNullException.ThrowIfNull(bark);
+
+			return bark.Channel switch
+			{
+				"sendtell" => BarkTrigger.Detection,
+				"event" => BarkTrigger.EncounterScript,
+				_ => BarkTrigger.Ambient
+			};
+		}
+
 		// The bark as this recipient must see it: every SESSION slot filled with THEIR character name.
 		//
 		// ⚠️ **A bark with a session slot cannot be one body broadcast to everyone.** The slot names the player the
@@ -172,5 +207,13 @@ namespace Faolan.Core.Network.Codecs.Text
 					.ToList()
 			};
 		}
+	}
+
+	// The cue an NPC bark fires on (#694) - see NpcChatterBarks.TriggerOf for how each is read off the row.
+	public enum BarkTrigger
+	{
+		Ambient,
+		Detection,
+		EncounterScript
 	}
 }

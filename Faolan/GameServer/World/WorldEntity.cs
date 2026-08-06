@@ -579,9 +579,28 @@ namespace Faolan.GameServer.World
 		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
 		public string OverheadNameOverride { get; set; } = null!;
 
-		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
-		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
+		// AMBIENT bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
+		// zone load. Null/empty = this NPC has no ambient chatter group and stays silent.
+		//
+		// ⚠️ This is only the `conversation1`/`conversation2` tier. A bark's CUE is a property of the bark, not of the
+		// world tick (#694): the crier's `sendtell` greeting and the Damsel's `event` cry live in GreetingLines and
+		// EncounterLines respectively, because putting all three on one clock made the crier greet an empty street and
+		// double-fired the Damsel alongside her own encounter trigger. `NpcChatterBarks.TriggerOf` is the split.
 		public NpcChatterBark[] ChatterLines { get; set; } = null!;
+
+		// DETECTION barks (`sendtell`): said once TO a player the NPC notices arriving, not on a clock (#694). The
+		// channel names the delivery - a tell has one recipient - and the line's `DetectedChar.name` slot names them.
+		public NpcChatterBark[] GreetingLines { get; set; } = null!;
+
+		// ENCOUNTER-SCRIPT barks (`event`): fired by the scripted encounter's own proximity trigger (#502), never by
+		// the ambient tick. Kept apart from ChatterLines so the lure's cry for help cannot also come out on the clock.
+		public NpcChatterBark[] EncounterLines { get; set; } = null!;
+
+		// The players this NPC has already greeted, so a detection bark is said once per arrival rather than every
+		// tick the player stands in range (#694). A player is forgotten again once they leave `forgetRange` - see
+		// WorldState.GreetingForgetRange - so walking away and coming back is a fresh arrival, which is what a
+		// greeting means, while standing on the boundary cannot re-trigger it.
+		public HashSet<uint> GreetedPlayers { get; } = [];
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the spawning player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever

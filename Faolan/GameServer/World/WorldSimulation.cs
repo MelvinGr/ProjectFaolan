@@ -944,7 +944,7 @@ namespace Faolan.GameServer.World
 									// matters - but it is the tell that the encounter is armed, and it is a real captured
 									// line (its `event(2)` channel is what marks these apart from ambient chatter).
 									var lure = effect.Entity;
-									if (lure.ChatterLines is not { Length: > 0 } barkLines)
+									if (lure.EncounterLines is not { Length: > 0 } barkLines)
 										break;
 
 									var heard = new HashSet<uint>();
@@ -989,6 +989,20 @@ namespace Faolan.GameServer.World
 										recipients.Add(near.Handle);
 									if (recipients.Count > 0)
 										await _agents.NpcBark(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
+									break;
+								}
+
+								case WorldTickEffectType.NpcGreeting:
+								{
+									// #694: the crier noticed a player ARRIVE and greets them. Not the ambient tier - the cue
+									// is the arrival, and the channel is `sendtell`, so it goes to THAT PLAYER ALONE rather
+									// than everyone in earshot. That is also what makes the addressee slot coherent: the line
+									// is "…, {DetectedChar.name}!", and there is exactly one name it can carry.
+									var greeter = effect.Entity;
+									if (effect.Target is not { } greeted || greeter.GreetingLines is not { Length: > 0 } greetings)
+										break;
+
+									await _agents.NpcBark(greeter.Handle, greetings[Random.Shared.Next(greetings.Length)], [greeted.Handle]);
 									break;
 								}
 							}

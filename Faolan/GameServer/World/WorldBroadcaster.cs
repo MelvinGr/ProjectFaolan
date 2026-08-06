@@ -1157,11 +1157,22 @@ namespace Faolan.GameServer.World
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
 				}
 
-				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
-				// The entity caches the bark VALUES; the chat tier renders them (#539), so the world model never holds
-				// pre-built wire text - the same reason wave 6 took OriginalData off the snapshot sub-class.
+				// Bark lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent). The entity
+				// caches the bark VALUES; the chat tier renders them (#539), so the world model never holds pre-built
+				// wire text - the same reason wave 6 took OriginalData off the snapshot sub-class.
+				//
+				// #694: split by CUE, not pooled. A bark's channel says what makes the NPC say it - ambient chatter runs
+				// on the tick's clock, a `sendtell` greeting fires when a player is DETECTED arriving, and an `event`
+				// line belongs to the encounter script's own trigger (#502). Pooling them put the crier's greeting and
+				// the Damsel's cry for help on the ambient clock, which is why the crier greeted an empty street and the
+				// Damsel called for help twice.
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
-					entity.ChatterLines = chatter.Select(c => NpcChatterColumns.ToBark(c)).ToArray();
+				{
+					var barks = chatter.Select(c => NpcChatterColumns.ToBark(c)).ToLookup(NpcChatterBarks.TriggerOf);
+					entity.ChatterLines = barks[BarkTrigger.Ambient].ToArray();
+					entity.GreetingLines = barks[BarkTrigger.Detection].ToArray();
+					entity.EncounterLines = barks[BarkTrigger.EncounterScript].ToArray();
+				}
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
 				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades

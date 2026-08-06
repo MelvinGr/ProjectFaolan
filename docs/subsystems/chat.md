@@ -172,3 +172,36 @@ digit cluster in ELF-hash space), so even a "3+ hits" threshold let ten confiden
 strings in the category are reachable only once the group names are found somewhere else.
 
 Open work tracked in Gitea #331.
+
+### A bark's CUE is in its channel (#694)
+
+A bark is not one thing on a clock. The `channel` component of the token — a column we already store — names what
+makes the NPC say it, and the shipped corpus (22 rows, 6 NPC types) splits three ways with no leftovers:
+
+| channel | cue | groups |
+|---|---|---|
+| `conversation1` / `conversation2` | **ambient** — the tick's clock, said to everyone in say-range | `RenownBystander{Lovers,Women,Child}` |
+| `sendtell` | **detection** — a player walks up; a *tell*, so it goes to that player alone | `RenownCrier` |
+| `event` | **encounter script** — the encounter's own proximity trigger (#502) | `RnBLadyInDistressBrainScript` |
+
+`NpcChatterBarks.TriggerOf` is that split, and `WorldBroadcaster` sorts each NPC type's lines into the three pools
+at spawn (`ChatterLines` / `GreetingLines` / `EncounterLines`) so the world tick never has to ask.
+
+⚠️ Everything used to sit in one pool on the ambient clock, and it was wrong in two visible ways: the crier
+delivered *"You should consider joining a guild, {DetectedChar.name}!"* on a timer — to a player who had been
+standing there for ten minutes, or to nobody at all — and the Damsel's cry for help **double-fired**, once on her
+encounter trigger and again on the clock.
+
+The session slot corroborates the split but runs **one way only**: every bark carrying one (`DetectedChar.name`,
+`Target.Name`) is non-ambient, and no ambient bark carries one — but the converse is false. The crier has *two*
+`sendtell` lines and only `SayInChat` 57 names anybody; `SayInChat` 10 is an unaddressed tell. A tell still has
+exactly one recipient, so it is still said on detection. Hence the channel is the discriminator and the slot only
+decides whether the body must be built per-recipient (`NpcChatterBarks.Addressed`, #691).
+[V3: NpcBarkTriggerTests.TheCrier_HasAnAddressedAndAnUnaddressedTell]
+
+Detection state is per NPC (`WorldEntity.GreetedPlayers`): a player is greeted once on arrival and forgotten again
+only after leaving `WorldState.GreetingForgetRange`, which is deliberately wider than `GreetingRange` so someone
+loitering on the boundary is not greeted, forgotten and greeted again every few ticks. Both numbers are **ours** —
+`GreetingRange` is matched to `SayRangeUnits` (50 u) on the ground that greeting someone too far away to hear it
+would be worse than not greeting them; nothing shipped states an NPC's detection radius, and the one annotated
+capture times a crier line without pinning the distance the player crossed to earn it.
