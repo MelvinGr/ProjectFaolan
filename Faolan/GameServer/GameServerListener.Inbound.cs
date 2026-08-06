@@ -12,6 +12,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Team;
@@ -877,6 +878,19 @@ namespace Faolan.GameServer
 				{
 					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)); // the requester, echoed by the client
 					_trade.Abandon(client.Session.Character.Id);
+					break;
+				}
+
+				// 0x2011 GuildTransferMoney([u64 guildInstance][u64 amount]): a member pays money INTO the guild bank
+				// (#654). It arrives HERE rather than on the CS tier because the wallet lives here; `Guild.Cash` lives
+				// on the CS tier, so the guild is credited across the dispatcher seam.
+				//
+				// The wallet is debited FIRST and refunded if the credit fails, which is the same pessimistic order
+				// the withdrawal uses in the other direction: whoever holds the money moves it first, so a failure
+				// between the two steps loses the transfer rather than duplicating it (#368).
+				case GameCharAgentMethods.GuildTransferMoney:
+				{
+					await HandleGuildDeposit(client, GuildTransferMoneyCodec.Parse(body.ReadRemainingArray()));
 					break;
 				}
 

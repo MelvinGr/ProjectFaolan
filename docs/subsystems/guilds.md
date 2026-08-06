@@ -120,22 +120,49 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 
 ### The guild bank (#132)
 
-One-way by design: **there is no deposit method.** Guild money is fed by the guild TAX (`0x2029`), and
-`GuildWithdrawMoney` (c2s `0x2035`, `[u64 amount]`) pays it back out. The `GuildTransferMoney` /
-`GuildWithdrawMoney` pair on *GameCharAgent* (`0x2011`/`0x2012`) are inter-agent server notifications carrying a
-guild INSTANCE id — not client packets, and a realm-scoped server that mutates `Guild.Cash` directly never needs
-them.
+It has **two** halves, and they are on **different tiers** — which is the client's own arrangement, not ours.
 
-Neither body is captured (no captured session opened the bank UI, across all 215), so both come from the client's
-method table — see the gap register. The transaction **spans two tiers**: the CS tier owns `Guild.Cash` and the
-rank ladder, the game tier owns the wallet and is the only one whose `UpdateCash` the client renders, so
-`GuildService` debits the guild and pays out through `IGameServerDispatcher.CreditCharacterCash`.
+| | method | tier | body |
+|---|---|---|---|
+| withdraw | `CSPlayerAgent.GuildWithdrawMoney` (`0x35`) | CS — where `Guild.Cash` lives | `[u64 amount]` |
+| deposit | `GameCharAgent.GuildTransferMoney` (`0x11`) | game — where the WALLET lives | `[u64 guildInstance][u64 amount]` |
+| refusal | `GameCharInterface.DispatchGuildNotEnoughCash` (`0x03`) | game | `[u64 amount]` |
+
+⚠️ **This section used to say "there is no deposit method"** and that the `GameCharAgent` pair were inter-agent
+server notifications rather than client packets. That was wrong, and the client settles it: `GuildTransferMoney`
+is listed in `GameCharAgent`'s **client_to_server** table with the signature `(uint64 i_nGuildInstance,
+Explicit64_c i_cAmount)`. Guild money is fed by the tax *and* by members paying in (#654).
+
+**None of it is captured** — `--report method-census --report-arg Bank` finds zero guild-bank frames across all
+120 captures, because no captured session ever opened the bank window. So the bodies come from the client's
+method table, and the LAYOUT is the measurable part: a `GameCharAgent` request body is its declared parameters
+concatenated big-endian with no header, at **ID32 = 8, int = 4, uint64 = 8**, which reproduces the captured length
+of every scalar-parameter method on the interface — `RequestBindLocation(ID32)` 8, `SetTradeCash(uint64)` 8,
+`BuyItem(ID32,int)` 12, `AddTradeItem(ID32,int,int)` 16, `SellItem(ID32,ID32,int)` 20,
+`SplitInventoryItem(ID32,int,int,int)` 20, `TryLootItem(ID32,int,ID32,int)` 24. Nine methods, no misses
+(`GuildBankTests`). Two 64-bit parameters therefore make a 16-byte body.
+
+⚠️ **The reply ENDPOINTS are not recovered from anything.** The method table gives the method and its parameters;
+it says nothing about the RpcHeader, whose sender is a server OBJECT id only a capture reveals. And it is
+demonstrably not constant per interface — captured `GameCharInterface` replies arrive from `GameCharAgent{0x58}`
+*and* from `GameCharAgent{0x10}` — so the refusal's `0x10` is the nearest neighbour's, a coin flip. If the refusal
+does not render in-client, suspect the endpoint before the codec; that is the failure #101's team-invite window
+cost a day to.
+
+The transaction **spans two tiers** in both directions: the CS tier owns `Guild.Cash` and the rank ladder, the
+game tier owns the wallet and is the only one whose `UpdateCash` the client renders. So the withdrawal debits the
+guild here and pays out through `IGameServerDispatcher.CreditCharacterCash`, and the deposit debits the wallet on
+the game tier and credits the guild through `ICsPlayerAgentDispatcher.DepositToGuildBank`.
 
 Two deliberate choices, both about not minting money:
 
-- **Debit first, credit second.** If the credit is refused (the member is not on this realm's game host) the guild
-  is refunded. The other order would leave the money in both places on a failure between the steps, and a money
-  handler is exactly where a dupe hides (#368). Losing a withdrawal is recoverable; minting one is not.
+- **Whoever HOLDS the money moves it first.** The withdrawal debits the guild then credits the wallet; the deposit
+  debits the wallet then credits the guild. Either way the second step's failure triggers a refund of the first.
+  The other order would leave the money in both places on a failure between the steps, and a money handler is
+  exactly where a dupe hides (#368). Losing a transfer is recoverable; minting one is not.
+- **A deposit the payer cannot afford gets retail's own refusal**, `DispatchGuildNotEnoughCash`, rather than the
+  silence every other refusal in this subsystem uses. The difference is that the client can legitimately send this
+  one while being wrong — it does not know the wallet moved — and retail has a named message for exactly that.
 - **Leader only.** Retail has per-rank bank permissions and nothing pins which rung they hang off, so the rule is
   the narrowest one that cannot be abused, by that guild's own governing form (`GuildRankLadder.LeaderRank` — the
   top rung is 3, 4 or 5 depending on the form).

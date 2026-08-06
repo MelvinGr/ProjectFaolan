@@ -36,5 +36,19 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		///     who the sharer's team-mates are, and the roster lives here.
 		/// </summary>
 		IReadOnlyList<uint> TeamMembersOf(uint characterId);
+
+		/// <summary>
+		///     Credit <paramref name="amountTin" /> to the guild <paramref name="characterId" /> belongs to - the deposit
+		///     half of the guild bank (#654), and the exact mirror of the withdrawal's
+		///     <c>IGameServerDispatcher.CreditCharacterCash</c>. Returns false when the character is in no guild, or the
+		///     guild is not on this realm's CS tier, so the caller can refund the wallet it has already debited.
+		///     <para>
+		///         The split is the client's own: <c>GuildTransferMoney</c> arrives on the GAME connection because that is
+		///         where the wallet lives, while <c>Guild.Cash</c> lives here. Whoever holds the money does the debit
+		///         first and the other side is credited across this seam - see <c>GuildService.DepositToGuildBank</c> for
+		///         why that order is the safe one for a money handler.
+		///     </para>
+		/// </summary>
+		Task<bool> DepositToGuildBank(uint characterId, ulong amountTin);
 	}
 }

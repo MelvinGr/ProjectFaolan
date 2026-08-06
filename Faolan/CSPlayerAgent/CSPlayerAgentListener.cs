@@ -81,6 +81,12 @@ namespace Faolan.CSPlayerAgent
 				: [];
 		}
 
+		// The guild bank's deposit half (#654) - the world tier has already taken the money out of the wallet.
+		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
+		{
+			return _guild.DepositToGuildBank(characterId, amountTin);
+		}
+
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			var method = (CSPlayerAgentMethods)packet.Method;

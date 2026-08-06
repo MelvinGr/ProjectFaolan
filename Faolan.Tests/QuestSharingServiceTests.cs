@@ -261,6 +261,11 @@ namespace Faolan.Tests
 		{
 			public Task<bool> LeaveTeam(uint characterId) => Task.FromResult(false);
 			public Task<bool> KickFromTeam(uint leaderId, uint targetId) => Task.FromResult(false);
+			public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
+			{
+				return Task.FromResult(false); // no guild tier in these tests
+			}
+
 			public IReadOnlyList<uint> TeamMembersOf(uint characterId) => members;
 		}
 

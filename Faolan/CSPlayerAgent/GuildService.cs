@@ -424,8 +424,50 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
-		// 0x2035 GuildWithdrawMoney(uint64 amount): the guild bank pays out to a member's wallet (#132). There is no
-		// DEPOSIT counterpart - guild money is fed by the guild TAX (0x2029), which is why this is a one-way door.
+		// The DEPOSIT half of the guild bank (#654): the world tier has already debited the payer's wallet, so this
+		// only has to credit the guild and tell everyone. The exact mirror of the withdrawal below, tier for tier -
+		// there the CS side debits first and the world side credits, here the world side debits first and this
+		// credits, and in both cases WHOEVER HOLDS THE MONEY MOVES IT FIRST. That is the rule that matters in a money
+		// handler: a failure between the two steps must lose the transfer, never duplicate it (#368).
+		//
+		// Returns false without crediting when the payer is in no guild or the guild is not on this realm's CS tier,
+		// which is the caller's signal to put the money back in the wallet.
+		public async Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
+		{
+			if (amountTin == 0)
+				return false;
+
+			var character = await _database.GetCharacter(characterId);
+			if (character?.GuildId is not { } guildId)
+				return false;
+
+			var guild = await _database.GetGuild(guildId);
+			if (guild == null)
+				return false;
+
+			guild.Cash += amountTin;
+			await _database.SaveGuild(guild);
+			_logger.LogInformation("Guild \"{Guild}\": {Character} deposited {Amount} tin (bank {Balance}).", guild.Name, character.Name, amountTin, guild.Cash);
+
+			await BroadcastGuildCash(guild);
+			return true;
+		}
+
+		// Everyone who can see the guild window sees the new balance. Shared by both directions of the bank, because
+		// a deposit and a withdrawal are the same event as far as the window is concerned.
+		private async Task BroadcastGuildCash(Core.Database.Tables.Guild guild)
+		{
+			foreach (var member in guild.Members)
+			{
+				if (_clientForCharacter(member.Id) is { } memberClient && memberClient.Session.Character != null)
+					await memberClient.SendAsync(new Rpc(PushSender, PushReceiver, GuildUpdateCashCodec.Method, GuildUpdateCashCodec.Build(guild.Cash)));
+			}
+		}
+
+		// 0x2035 GuildWithdrawMoney(uint64 amount): the guild bank pays out to a member's wallet (#132). Its DEPOSIT
+		// counterpart is DepositToGuildBank above - the client's `GameCharAgent.GuildTransferMoney`, which arrives on
+		// the world tier because that is where the wallet is. (This used to say there was no deposit at all and that
+		// guild money came only from the guild TAX; the client's own method table says otherwise - #654.)
 		//
 		// The transaction spans both tiers: the CS tier owns Guild.Cash and the rank ladder, the GAME tier owns the
 		// wallet and is the only one whose UpdateCash the client renders. So the guild is debited HERE and the payout
@@ -480,12 +522,7 @@ namespace Faolan.CSPlayerAgent
 
 			_logger.LogInformation("Guild \"{Guild}\": {Character} withdrew {Amount} tin (bank {Balance}).", guild.Name, character.Name, request.AmountTin, guild.Cash);
 
-			// Everyone who can see the guild window sees the new balance.
-			foreach (var member in guild.Members)
-			{
-				if (_clientForCharacter(member.Id) is { } memberClient && memberClient.Session.Character != null)
-					await memberClient.SendAsync(new Rpc(PushSender, PushReceiver, GuildUpdateCashCodec.Method, GuildUpdateCashCodec.Build(guild.Cash)));
-			}
+			await BroadcastGuildCash(guild);
 		}
 
 		// Pushes guild state to a freshly authenticated guilded character: retail sends the 0x203F full update

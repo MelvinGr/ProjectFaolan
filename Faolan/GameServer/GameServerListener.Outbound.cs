@@ -86,6 +86,54 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		// The deposit half of the guild bank (#654), the exact inverse of CreditCharacterCash above: there the CS tier
+		// debits the guild and this tier credits the wallet, here this tier debits the wallet and the CS tier credits
+		// the guild. Both do the debit on the side that HOLDS the money, so a failure between the two steps loses the
+		// transfer rather than minting one.
+		//
+		// A payer who cannot afford it gets retail's own named refusal (`DispatchGuildNotEnoughCash`) rather than
+		// silence: unlike the requests this codebase deliberately leaves unanswered, the client CAN legitimately send
+		// this one - it does not know the wallet moved - and the client has a message for exactly this case.
+		private async Task HandleGuildDeposit(INetworkClient client, GuildTransferMoney request)
+		{
+			var character = client.Session.Character;
+			if (character == null || request.AmountTin == 0)
+				return;
+
+			if (request.AmountTin > character.Money)
+			{
+				Logger.LogInformation("GuildTransferMoney refused: {Character} offered {Amount} tin of their {Balance}.", character.Name, request.AmountTin, character.Money);
+				// ⚠️ THE ENDPOINTS ARE THE WEAK PART, and they are not recovered from anything. The client's method
+				// table gives the METHOD and its PARAMETERS; it says nothing about the RpcHeader, whose sender is a
+				// server OBJECT id we only ever learn from a capture - and no capture performs a guild-bank deposit.
+				//
+				// Worse, the instance is demonstrably NOT constant per interface: captured GameCharInterface replies
+				// arrive from GameCharAgent{0x58} (the login/world-handshake family) AND from GameCharAgent{0x10}
+				// (the trade family). Which server object owns the guild bank is unknown, so 0x10 is a COIN FLIP
+				// taken from the nearest neighbour, exactly like the quest-share dispatches below.
+				//
+				// That is the failure mode #101's team-invite window cost a day to: a wrong sender looks like a wrong
+				// body and is not one. If this refusal does not render in-client, suspect this line before the codec.
+				// [V0: the guild-bank reply endpoints]
+				await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+					GuildNotEnoughCashCodec.Method, GuildNotEnoughCashCodec.Build(request.AmountTin)));
+				return;
+			}
+
+			character.Money -= request.AmountTin;
+			await Database.SetCharacterMoney(character.Id, character.Money);
+			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+
+			if (await _csPlayerAgentDispatcher.DepositToGuildBank(character.Id, request.AmountTin))
+				return;
+
+			// Nobody could take it - put it back rather than leave it nowhere (the withdrawal's refund, mirrored).
+			character.Money += request.AmountTin;
+			await Database.SetCharacterMoney(character.Id, character.Money);
+			await SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
+			Logger.LogWarning("GuildTransferMoney rolled back: {Character}'s guild is not on this realm's CS tier.", character.Name);
+		}
+
 		// IGameServerProvider seam: pushes the guild tag onto the character's live world connection, if it is
 		// connected to this listener. Used by the CsPlayerAgent guild flow (accept/create/leave) so the in-world
 		// tag updates without a relog.

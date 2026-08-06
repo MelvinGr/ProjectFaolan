@@ -27,6 +27,12 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 			return provider != null && await provider.KickFromTeam(leaderId, targetId);
 		}
 
+		public async Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
+		{
+			var provider = Provider;
+			return provider != null && await provider.DepositToGuildBank(characterId, amountTin);
+		}
+
 		public IReadOnlyList<uint> TeamMembersOf(uint characterId)
 		{
 			return Provider?.TeamMembersOf(characterId) ?? [];
