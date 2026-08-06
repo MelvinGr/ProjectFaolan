@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using Faolan.Core.Network.Constants;
+using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Xunit;
 
@@ -82,6 +84,44 @@ namespace Faolan.Tests
 			entity.ActiveBuffs[0x0BEEF00] = new ActiveBuff(0x0BEEF00, 1, now.AddSeconds(-7), 7f);
 
 			Assert.Single(entity.TakeExpiredBuffs(now));
+		}
+
+		// The spellweave TRANCE must never be persisted for relog (#690).
+		//
+		// What happened: a weave was cancelled, which sends the client the buff's end twin - and left the live
+		// `ActiveBuffs` entry standing, because `SendBuffRemoval` only wrote packets. The autosave then persisted it
+		// (a self-buff no dedicated re-applier owns), and the next login restored it. The player got the trance's
+		// EFFECTS and sound looping around them with no weave behind it, no pose (nothing re-sends the trance-enter
+		// animation) and no way to stop it - the weave toggle would have opened a new one.
+		//
+		// Two guards, because the fault needed both: the removal now deregisters (covered by the caller), and the
+		// trance is excluded from persistence outright, so logging out mid-weave cannot leave one behind either.
+		[Theory]
+		[InlineData(0x37F29800u)] // Spellweaving (main)
+		[InlineData(0x3969D000u)] // Arcane Drought
+		[InlineData(0x37E5A800u)] // Spellweaving(1), stack 0
+		[InlineData(0x37E5AA00u)] // ... and further up the stack
+		[InlineData(0x000B9000u)] // Exhausted - energy comes back FULL at login, so a restored one is a lie
+		public void TheSpellweaveTrance_IsNeverPersisted(uint wireSpellId)
+		{
+			var entity = Entity();
+			var buff = new ActiveBuff(wireSpellId, entity.Handle, DateTimeOffset.UtcNow, 600f);
+
+			Assert.True(SpellweaveCatalog.IsTranceBuff(wireSpellId));
+			Assert.False(GameServerListener.ShouldPersistBuff(entity, buff));
+		}
+
+		// The exclusion is the trance, not "buffs that look like it" - an ordinary self-buff still survives a relog,
+		// which is the whole point of #274.
+		[Theory]
+		[InlineData(0x0030A200u)] // an ordinary spell
+		[InlineData(0x396AE900u)] // Arcane Renewal - a weave ELEMENT, which is a real spell in its own right
+		public void AnOrdinarySelfBuff_IsStillPersisted(uint wireSpellId)
+		{
+			var entity = Entity();
+
+			Assert.False(SpellweaveCatalog.IsTranceBuff(wireSpellId));
+			Assert.True(GameServerListener.ShouldPersistBuff(entity, new ActiveBuff(wireSpellId, entity.Handle, DateTimeOffset.UtcNow, 600f)));
 		}
 
 		private static WorldEntity Entity()

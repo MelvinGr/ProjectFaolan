@@ -208,9 +208,8 @@ namespace Faolan.GameServer
 			// sent right BEFORE the buff-removal twin (conans-castle-exit rec#508). Without it the icon vanishes with no
 			// notification. Only fired here (the aggression loss), not on a playfield swap (SendShieldOfTheRisen).
 			await SendFeedback(client, new FeedbackLiteral(FeedbackXml.LostGraceEffect, FormatFeedbackCodec.EffectLineTypeFlags));
-			await SendBuffRemoval(client, self, self, appliedId);
+			await SendBuffRemoval(client, self, self, appliedId); // deregisters the live buff too
 
-			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedId, out _);
 			await SyncBuffStats(client);
 			client.Session.ActiveShieldSpellBase = null;
 			Logger.LogInformation("Shield of the Risen broken by aggressive action for {Name}.", client.Session.Character?.Name);
@@ -361,6 +360,18 @@ namespace Faolan.GameServer
 		// docs/subsystems/npc-spell-applyspell.md.
 		private async Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
+			// ⚠️ **DEREGISTER FIRST - "the buff ended" is a state change, not just a packet** (#690). This used to send
+			// the twin and leave the live `ActiveBuffs` entry standing, and each caller was expected to remove it
+			// itself. Two of five did. The spellweave trance is where it surfaced: cancelling a weave told the CLIENT
+			// the trance buff was over, the server kept it, the autosave persisted it (it is a self-buff no dedicated
+			// re-applier owns, so `ShouldPersistBuff` says yes), and the next login restored it - leaving the player
+			// with the trance's effects and sound looping around them, no weave behind it and nothing to cancel.
+			//
+			// Removing it here makes every path agree, and is a no-op for the two that already did it (the tick's
+			// expiry sweep takes the buff out of the dictionary before it sends, `CancelBuff` needs the entry first to
+			// read its caster).
+			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedSpellId, out _);
+
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // form 1 = the "end" twin of the applied buff id
 			var body = MagicBuffCodec.Build(applyTo, applyFrom, endId, []);
 
@@ -604,7 +615,8 @@ namespace Faolan.GameServer
 		// (World layer) calls it without otherwise reaching into the listener.
 		public static bool ShouldPersistBuff(WorldEntity entity, ActiveBuff buff)
 		{
-			return buff.CasterHandle == entity.Handle && !DedicatedRestoreBuffIds.Contains(buff.BuffId);
+			// The spellweave trance is SESSION state and is excluded outright (#690) - see SpellweaveCatalog.IsTranceBuff.
+			return buff.CasterHandle == entity.Handle && !DedicatedRestoreBuffIds.Contains(buff.BuffId) && !SpellweaveCatalog.IsTranceBuff(buff.BuffId);
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops

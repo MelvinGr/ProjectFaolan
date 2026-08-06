@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
 
@@ -48,6 +49,38 @@ namespace Faolan.Core.Network.Constants
 		// it sends `000B9001` - the form-1 END twin, empty payload. So the SERVER owns this debuff on the sprint path
 		// too; the client's own exhausted STATE (it has one, keyed on the same stat) is a separate thing from the icon.
 		public const uint ExhaustedBuff = 0xB90 << 8;
+
+		// How many stack steps of the Spellweaving(1) buff to recognise. The stack is incremented once per picker
+		// reappearance, so it is unbounded in principle; a weave long enough to pass this is not a weave.
+		private const uint StackingBuffWindow = 64;
+
+		// Whether a wire buff id belongs to the TRANCE - the buffs a weave opens with, plus the Spellweaving(1) stack
+		// it walks up, plus the Exhausted twin the energy floor applies.
+		//
+		// ⚠️ **These must never be PERSISTED across a relog** (#690). A weave is session state and only session state:
+		// `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack` and the energy pool all live on the session and
+		// all reset at login. Restoring the buff therefore restores the trance's EFFECTS - its glow and its sound
+		// loop - around a player who is not weaving, cannot cancel (the toggle would open a NEW weave) and never
+		// asked for it. Energy makes the same argument on its own: the pool comes back FULL at login, so a restored
+		// Exhausted contradicts the very stat it was applied for.
+		public static bool IsTranceBuff(uint wireSpellId)
+		{
+			if (wireSpellId == ExhaustedBuff)
+				return true;
+
+			foreach (var profile in Profiles.Values)
+			{
+				if (Array.IndexOf(profile.TranceBuffs, wireSpellId) >= 0)
+					return true;
+
+				var stackBase = profile.StackingBuffBase;
+				var spellBase = wireSpellId >> 8;
+				if (spellBase >= stackBase && spellBase <= stackBase + StackingBuffWindow)
+					return true;
+			}
+
+			return false;
+		}
 
 		// The universal ENERGY (yellow sprint-bar) max by class - the value retail pushes on `DispatchUpdateSprintBar`
 		// (0x200E) when the bar is FULL. Two flat values, and they are flat: the same 14000 reaches a level-24 Herald
