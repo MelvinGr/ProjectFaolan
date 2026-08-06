@@ -22,11 +22,23 @@ namespace Faolan.Importer.Cli
 	// how many unresolved spawn groups name a race, and for how many of those do we already hold a template of that
 	// race to stand in for it.
 	//
-	// Grammar: `[12B RDB-Id header][i32 version][i32 count][count x [i32 nameLength][utf8 name][i32 raceId]]`.
-	// ⚠️ The declared count UNDER-reports: the shipped table says 96 and parses cleanly to 108 records, the extra
-	// twelve being the late races (Chill Crawler, Crowman, Darfari, Groll, Hyrkanian, Lemurian, Mantis Man,
-	// Mountain Man, Vendhyan, Ymirish, ...). Parsing to EOF rather than to the count is what finds them, and it is
-	// the same "a count is not a fact" trap the importer's silent-failure note records.
+	// Grammar: `[i32 type][i32 id][i32 version][i32 count][count x [i32 raceId][i32 nameLength][utf8 name]]`.
+	// The **id PRECEDES its name**, and the header is 16 bytes, not 20.
+	//
+	// ⚠️ This was decoded wrong the first time, in a way that parsed cleanly and printed a plausible table, so it is
+	// worth stating what the failure looked like. Reading the entry as `[nameLength][name][raceId]` from offset 20
+	// pairs every name with the id of the entry AFTER it - an off-by-one that shifts the WHOLE table by one row
+	// (`Crocodile` took Hyperborian's 9, `Dog` took Living Plant's 66) while still yielding 108 sensible-looking
+	// `id -> name` pairs. It also consumed the first entry's raceId (96, Panther's) as the record's COUNT, which is
+	// what produced the claim that "the declared count under-reports by 12" and the recommendation to parse to EOF
+	// rather than to the count.
+	//
+	// Read correctly the count is 109, the record parses to EOF in exactly 109 entries with zero trailing bytes, and
+	// the ids are a dense 1..109 with no gaps - so the count was a fact all along and the anomaly was ours. The real
+	// lesson is the other one: a grammar that parses to EOF is not thereby CORRECT. What settles it is an external
+	// join - the 1010506 spawn groups declare a race id beside a human-readable group name, and under this grammar
+	// `Badger 1` is race 79 = Badger, `Chicken 1` is 61 = Chicken, `Rabbits` is 72 = Rabbit and `Rats` is 56 = Rat,
+	// none of which line up under the old one. The report prints that cross-check on every run (#518).
 	public static partial class ReportCli
 	{
 		private const uint CreatureRaceType = 1000508;
@@ -40,8 +52,9 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			var races = ParseRaces(rdb.ReadDecompressed(entry));
-			Console.WriteLine($"RDB {CreatureRaceType}: {races.Count} creature races");
+			var (races, declared, trailing) = ParseRaces(rdb.ReadDecompressed(entry));
+			Console.WriteLine($"RDB {CreatureRaceType}: {races.Count} creature races " +
+			                  $"(declared {declared}, {trailing} trailing bytes){(races.Count == declared && trailing == 0 ? "  <-- exact" : "  ⚠️  the grammar does not fit")}");
 			Console.WriteLine();
 
 			await using var db = OpenDb();
@@ -60,6 +73,37 @@ namespace Faolan.Importer.Cli
 			// names really are this plain (`Cannibals9`, `Grasslands_Snake06`, `T_Spider_29-1`), which is the point:
 			// nothing cleverer is needed to see how far the vocabulary reaches.
 			var byName = races.ToDictionary(r => r.Value.Replace(" ", "", StringComparison.Ordinal).ToLowerInvariant(), r => r.Key);
+
+			// ---- The grammar's own proof (see the header note) ----
+			// A `Race`-category spawn group carries a numeric race id (`CommunityId`) AND a human-readable name, and
+			// the two come from different places in the 1010506 record. Where the name folds onto a race, the id it
+			// declares should BE that race. That is an external join, so it can falsify the grammar - which is exactly
+			// what it did to the previous one, where the same table shifted every name onto its neighbour's id.
+			var raceGroups = await db
+				.NpcSpawnAreas.Where(a => a.Category == "Race" && a.CommunityId != null)
+				.Select(a => new { a.GroupName, RaceId = a.CommunityId!.Value })
+				.ToListAsync();
+
+			int checkable = 0, agree = 0;
+			var disagreements = new List<string>();
+			foreach (var g in raceGroups)
+			{
+				if (MatchRace(g.GroupName, byName) is not { } namedRace)
+					continue;
+
+				checkable++;
+				if (namedRace == g.RaceId)
+					agree++;
+				else if (disagreements.Count < 12)
+					disagreements.Add($"{g.GroupName} declares {g.RaceId} ({races.GetValueOrDefault(g.RaceId, "?")}) but is named {races[namedRace]}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("--- cross-check: a Race group's declared id vs the race its own NAME folds onto ---");
+			Console.WriteLine($"  {agree}/{checkable} agree ({100.0 * agree / Math.Max(1, checkable):F1}%) over {raceGroups.Count} Race-category groups");
+			foreach (var d in disagreements)
+				Console.WriteLine($"    {d}");
+
 			var unresolved = await db.NpcSpawnAreas.Where(a => a.NpcTemplateId == null).Select(a => new { a.MapId, a.GroupName }).ToListAsync();
 
 			var named = new Dictionary<string, int>();
@@ -101,22 +145,27 @@ namespace Faolan.Importer.Cli
 			return null;
 		}
 
-		private static Dictionary<uint, string> ParseRaces(byte[] body)
+		// `[i32 type][i32 id][i32 version][i32 count]` then `count x [i32 raceId][i32 nameLength][utf8 name]`.
+		// Returns the parsed rows plus what the record CLAIMED and how much was left over, so the caller can print
+		// the agreement instead of the reader silently deciding the count was wrong (see the header note).
+		private static (Dictionary<uint, string> Races, uint DeclaredCount, int TrailingBytes) ParseRaces(byte[] body)
 		{
 			var races = new Dictionary<uint, string>();
-			var offset = 20; // 12-byte RDB-Id header + [i32 version][i32 count]
-			while (offset + 4 <= body.Length)
+			var declared = body.Length >= 16 ? body.ReadU32Le(12) : 0;
+
+			var offset = 16; // [type][id][version][count]
+			while (offset + 8 <= body.Length)
 			{
-				var length = (int)body.ReadU32Le(offset);
-				if (length is <= 0 or > 64 || offset + 4 + length + 4 > body.Length)
+				var raceId = body.ReadU32Le(offset);
+				var length = (int)body.ReadU32Le(offset + 4);
+				if (length is <= 0 or > 64 || offset + 8 + length > body.Length)
 					break;
 
-				var name = Encoding.Latin1.GetString(body, offset + 4, length);
-				races[body.ReadU32Le(offset + 4 + length)] = name;
-				offset += 4 + length + 4;
+				races[raceId] = Encoding.Latin1.GetString(body, offset + 8, length);
+				offset += 8 + length;
 			}
 
-			return races;
+			return (races, declared, body.Length - offset);
 		}
 
 		[GeneratedRegex("[A-Za-z]+")]

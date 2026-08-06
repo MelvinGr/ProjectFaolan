@@ -139,6 +139,48 @@ record 0 the shipped one. Undecided which the client actually uses. [V0]
   the corrected value.
 - **Race `10` is a fourth race we do not model at all** — Khitan, by its class set (Rise of the Godslayer).
 
+## Decoded: 1000508 — the CREATURE RACE table
+
+The 109 names behind `CharacterStats.race`, which every NPC carries as a bare number (`NpcStatCore.Race`,
+`NpcSpawn.Race`). A different domain from the three-value player `Race` enum above. Dump with
+`--report creature-races`.
+
+```
+[u32 type][u32 id][u32 version][u32 count]        count = 109
+count × [u32 raceId][u32 nameLength][utf8 name]   the id PRECEDES its name
+```
+
+Parses to EOF in exactly 109 entries with zero trailing bytes, and the ids are a dense `1..109` with no gaps.
+
+### ⚠️ The first decode of this was wrong, and it parsed cleanly
+
+Worth recording, because the failure is not one a "does it parse?" check can catch. Reading the entry as
+`[nameLength][name][raceId]` from offset 20 also runs to EOF and also yields sensible-looking `id → name` pairs —
+but it pairs every name with the id of the entry **after** it, shifting the whole table by one row (`Crocodile`
+took Hyperborian's 9, `Dog` took Living Plant's 66). It additionally swallowed the first entry's `raceId` (96,
+Panther's) as the record's count, which is where the since-retracted claim that "the declared count under-reports
+by 12, parse to EOF rather than to the count" came from. The count was a fact all along; the anomaly was ours.
+
+**What settled it is an external join, not the parse.** A `Race`-category spawn group in RDB 1010506 carries a
+numeric race id *and* a human-readable group name, from different places in that record, so folding the name onto
+a race name and comparing ids can falsify a grammar:
+
+| grammar | entries | groups whose declared id matches their own name |
+|---|---:|---|
+| `[nameLength][name][raceId]` @20 | 108 | **0 / 872** |
+| `[raceId][nameLength][name]` @16 | 109 | **844 / 872 (96.8%)** |
+
+[V1: Faolan.Importer/Cli/ReportCli.CreatureRaces.cs — `Badger 1` declares 79 = Badger, `Chicken 1` declares
+61 = Chicken, `Rabbits` declares 72 = Rabbit, `Rats` declares 56 = Rat, `Elk 4` declares 74 = Elk. The report
+prints this cross-check and the declared-count/trailing-byte agreement on every run.]
+
+The 28 residual disagreements are genuine content, not decode error — a group named for one creature tagged with
+a neighbouring race (`Deer 1` declares 74 = Elk).
+
+**It is not the creature catalog #518 wants**: a race carries no level, health, faction, name or equipment, so it
+cannot stand a creature up. What it is is the vocabulary the open-world spawn groups are named in — see
+[npc-spawn-layout-1010506.md](npc-spawn-layout-1010506.md).
+
 ## Decoded: the two GUILD tables (1000517 / 1000518)
 
 Both parse callbacks assert `version == 1` and complain through the client's own `Community/Guild` channel on a
@@ -229,7 +271,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000505 | `RDBPlayerClassData_c` | 17 | — | — | does not divide — variable-width |
 | 1000506 | `RDBPlayerClassData_c` | 27 / 16 | 16 B | 8 B | two entries (id 0 and id 1) |
 | 1000507 | `RDBPlayerClassData_c` | 48 / 56 | 16 B | 8 B | two entries |
-| 1000508 | `RDBPlayerClassData_c` | 109 | — | — | does not divide — variable-width |
+| 1000508 | the CREATURE RACE table (not `RDBPlayerClassData_c`) | 109 | 16 B | — | variable-width: `[id][len][name]`, decoded above |
 | 1000509 | `PlayfieldPvPData_c` | 243 | 20 B | 12 B | |
 | 1000510 | `PlayfieldPvPData_c` | 13 | 16 B | 84 B | |
 | 1000511 | `HitsManaAndStamina_c` | 95 | 20 B | 56 B | 5 races × 19 class slots, 14 × i32 each; count is the FIFTH word |
