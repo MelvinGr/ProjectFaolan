@@ -2403,8 +2403,19 @@ namespace Faolan.GameServer.World
 		// harvested AGAIN at 18:43:30 - the same handle, with no `n3ToClientQuit` between them. A state that
 		// destroyed the object could not be re-sent to it fourteen seconds later, so 0x09 is the start of a harvest,
 		// not the end of an object. Melvin confirms the same from play: the bricks are always there, and what comes
-		// and goes is the "can be picked up" glow - which is client-side, shown while the quest is active AND the
-		// player holds fewer than the goal's three.
+		// and goes is the "can be picked up" glow.
+		//
+		// That glow is drawn by the CLIENT off its own quest tracking, and the wire says so rather than it being an
+		// assumption. The dynel's body carries `quest_item_effect` (ProtoSimpleDynelIIR field 6, `QuestItemEffect`)
+		// as a bare flag that names NO quest id - and the twelve bodies are byte-identical on every re-send, so
+		// nothing per-player or per-quest is encoded in them. The client therefore has to supply the quest half
+		// itself, which it can: `QuestFullUpdate` gives it the goal's target and required count, and the
+		// `QuestGoal` Progress/Satisfied stream keeps its progress current. Retail sends no per-dynel packet when
+		// the glow goes out on the third brick - only the QuestGoal pair for the goal itself.
+		//
+		// ⚠️ So do not try to gate the glow server-side. Our job is the flag and an accurate QuestGoal stream; the
+		// client owns the rest. [V0: whether the client's final gate is "goal not yet satisfied" or "held count <
+		// required" - both fit, and the corpus cannot separate them because the two coincide on this quest.]
 		//
 		// The full captured sequence per harvest is six records, of which this is one:
 		//
