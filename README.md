@@ -42,11 +42,6 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines; the
   world it drops you into is built from the database, not replayed
 
-### Realms & deployment
-
-- 🟡 **Run multiple realms** — one login tier fronts any number of realm servers on a shared database; guilds, the
-  auction house, mail and character names are realm-scoped. Pending a live two-realm shakedown (#324)
-
 ### World & simulation
 
 - ✅ **A living world, built from data** — the world, its objects and its NPCs are constructed from the database
