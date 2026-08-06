@@ -46,6 +46,13 @@ namespace Faolan.GameServer.World
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
 		public const float NpcLeashRange = 40f;
 
+		// How long a mob stays engaged with whoever last hit it, with no further hits and nobody in aggro range. It is
+		// the combat MEMORY: below this the mob is still fighting (so it chases, and does not reset its health), above
+		// it the fight is over and the anti-whittle full-heal is allowed. Long enough to cover the gap between two
+		// casts of a slow spell (Smite is a 2 s cast on a 1 s recast) plus the walk into range, so a ranged fight is
+		// one continuous engagement rather than a series of first hits.
+		public const double NpcCombatMemorySeconds = 10.0;
+
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
 
@@ -312,8 +319,16 @@ namespace Faolan.GameServer.World
 					}
 
 					// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
+					//
+					// ⚠️ BEING HIT aggros too, not just proximity (#695). `NearestPlayerInRange` alone means a mob only
+					// ever engages someone who walks inside NpcAggroRange, so a player attacking from further out - any
+					// ranged attack, and any spell, which is most of them - hit a mob that never became engaged. That is
+					// wrong on its own, and it was also load-bearing for something much worse: an unengaged mob takes
+					// the `target == null` branch below and REVIVES TO FULL, every tick. So every hit after the first
+					// was erased before the next one landed ("the first hit is fine, everything following is not"), and
+					// the mob stood there while it happened.
 					var target = entity.Hostile
-						? NearestPlayerInRange(zone, entity, NpcAggroRange)
+						? NearestPlayerInRange(zone, entity, NpcAggroRange) ?? RecentAttackerOf(zone, entity)
 						: null;
 
 					var homeDx = entity.SpawnPosition.X - entity.Position.X;
@@ -363,7 +378,13 @@ namespace Faolan.GameServer.World
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
 						EndMove(entity, true, WorldTickEffectType.NpcMove); // stop if we were mid-chase (#272)
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
-						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
+						//
+						// ⚠️ Only once the fight is genuinely OVER. This used to fire on any tick with no player in
+						// aggro range, which - because damage did not aggro (see the target line above) - meant a mob
+						// shot from range healed to full between every single hit. The anti-whittle intent is right;
+						// the trigger was "nobody stands next to me", which is not the same as "nobody is fighting me".
+						// NpcCombatMemorySeconds after the last hit is, and it is also what keeps the mob chasing.
+						if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcCombatMemorySeconds))
 							entity.Vitals.ReviveToFull();
 						// #266 retail wander (capture-verified): a beach NPC drifts with a SINGLE short 2-point move to a
 						// nearby anchor every ~25-60s - NOT a continuous client-walked route. Server-driven: we move the
@@ -563,6 +584,26 @@ namespace Faolan.GameServer.World
 				if (kvp.Key.MapId == mapId)
 					yield return kvp.Value;
 			}
+		}
+
+		// The player this mob is already FIGHTING - whoever hit it last, while the combat memory holds - or null.
+		//
+		// This is the aggro source proximity cannot supply (#695): a mob attacked from beyond NpcAggroRange has nobody
+		// "in range" to engage, so without this it stays disengaged no matter how hard it is hit. It deliberately
+		// applies NONE of NearestPlayerInRange's gates - not range, not line of sight, not the vertical band - because
+		// they all answer "would this mob NOTICE that player", and a mob that has been hit has already noticed. The
+		// leash below is what bounds the resulting chase, exactly as it bounds a proximity chase.
+		//
+		// Still honours `Invisible`, which is the one gate that is not about noticing: `.invisible` means "draw no
+		// aggro" by GM fiat, and a GM who turns it on mid-fight should stop being chased.
+		private static WorldEntity? RecentAttackerOf(Zone zone, WorldEntity npc)
+		{
+			if (npc.LastAttackerHandle is not { } attacker || !npc.InCombatWithin(NpcCombatMemorySeconds))
+				return null;
+
+			return zone.TryGet(attacker, out var player) && player is { IsPlayer: true, Invisible: false }
+				? player
+				: null;
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.

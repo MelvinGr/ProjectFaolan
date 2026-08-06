@@ -274,6 +274,14 @@ namespace Faolan.GameServer.World
 		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).
 		public DateTimeOffset LastCombatAt { get; set; } = DateTimeOffset.MinValue;
 
+		// Whether this entity has been in combat within the last `seconds`. On a PLAYER this gates regen; on an NPC it
+		// is the combat MEMORY that keeps it engaged with whoever hit it and stops the anti-whittle full-heal from
+		// erasing a fight it is still in (#695).
+		public bool InCombatWithin(double seconds)
+		{
+			return (DateTimeOffset.UtcNow - LastCombatAt).TotalSeconds < seconds;
+		}
+
 		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
 		public EntityVitals Vitals { get; set; } = null!;
