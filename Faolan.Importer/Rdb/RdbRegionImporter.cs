@@ -107,7 +107,7 @@ namespace Faolan.Importer.Rdb
 			// client-sourced row has no hull to match with (its bounds are zero), and a row the name join placed is
 			// already on the region that bears its name, which is an identity rather than an inference.
 			var placed = clientFor.Select(c => c.Area).ToHashSet();
-			var bannerFor = MatchBannerRegions(banners.Where(b => !placed.Contains(b)).ToList(), banners, areasByMap, wanted, notes);
+			var bannerFor = MatchBannerRegions(banners.Where(b => !placed.Contains(b)).ToList(), banners, placed, areasByMap, wanted, notes);
 
 			var hazards = MatchLavaVolumes(areasByMap, wanted, notes);
 
@@ -420,6 +420,7 @@ namespace Faolan.Importer.Rdb
 		private static List<(MapArea Area, (uint Map, string Name) Key)> MatchBannerRegions(
 			List<MapArea> unplaced,
 			List<MapArea> allBanners,
+			HashSet<MapArea> placedByName,
 			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
 			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
 			List<string> notes)
@@ -430,10 +431,19 @@ namespace Faolan.Importer.Rdb
 				if (!areasByMap.TryGetValue(byMap.Key, out var areas))
 					continue;
 
-				// ⚠️ The separation gate is measured against EVERY banner on the playfield, not just the ones still
-				// looking for a region. Scoping it to the unplaced ones let a region that swallows a name-matched
-				// banner's samples through, which is precisely the region that cannot be the trigger for either.
-				var siblings = allBanners.Where(b => b.MapId == byMap.Key && b.Source != AreaBannerSource.ClientName).ToList();
+				// The separation gate is measured against every banner on the playfield that is still ARGUING for a
+				// region - not just the unplaced ones, and not the ones an identity has already settled.
+				//
+				// ⚠️ Both halves of that are load-bearing and each was wrong once. Scoping it to the unplaced banners
+				// let a region that swallows another banner's samples through. Widening it to ALL banners then broke
+				// the opposite way: on map 1010 the region `Fifo-CimmerianSettlement` holds the sample of the banner
+				// the NAME join pinned to `Fifo-PasstoConarchVillage` 600 units away - and since two banners cannot
+				// fire from one spot, that sample is what is wrong, not the region. A banner whose region is already
+				// known by name does not get a veto: its stray sample says the sample is imprecise, which is exactly
+				// what a one-sighting hull is, and never that some other region is ambiguous.
+				var siblings = allBanners
+					.Where(b => b.MapId == byMap.Key && b.Source != AreaBannerSource.ClientName && !placedByName.Contains(b))
+					.ToList();
 				foreach (var banner in byMap)
 				{
 					var cx = (banner.MinX + banner.MaxX) / 2f;

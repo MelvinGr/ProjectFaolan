@@ -55,10 +55,36 @@ namespace Faolan.Tests
 			Assert.Equal(AreaBannerNames.Normalise(text), AreaBannerNames.Normalise(region));
 		}
 
+		// The client's other label conventions, all of them real pairs from the shipped data. Ymir's Pass writes its
+		// designer bookkeeping into the name field and puts the displayed name in brackets beside it, which is why the
+		// join could not see that playfield at all until the parenthetical was read.
+		[Theory]
+		[InlineData("Camp23 Atzels Bandits (Burned Farms)", "Burned Farms")]
+		[InlineData("Camp16 Atzels Bandits (Dolmen)", "The Dolmen")]
+		[InlineData("Camps27-28 Stygian Sorcerers (Ruins of Karutonia)", "Ruins of Karutonia")]
+		[InlineData("POI A - The Last Cimmerian House", "The Last Cimmerian House")]
+		public void ARegionsOtherSpellings_ReachItsBannerText(string region, string text)
+		{
+			Assert.Contains(AreaBannerNames.Normalise(text), AreaBannerNames.RegionForms(region).Select(AreaBannerNames.Normalise));
+		}
+
+		// The POSSESSIVE has to be offered as an alternative rather than normalised away, because the client is
+		// inconsistent about it in BOTH directions: `Ymirs Tongue` keeps the s for "Ymir's Tongue" and `BA_LionMarket`
+		// drops it for "The Lion's Market". Collapsing every possessive would fix one and break the other.
+		[Theory]
+		[InlineData("Ymirs Tongue", "Ymir's Tongue")]
+		[InlineData("BA_LionMarket", "The Lion's Market")]
+		[InlineData("BA_TraitorCommon", "Traitor's Common")]
+		[InlineData("BA_SailorDen", "The Sailor's Den")]
+		[InlineData("BA_ScholarsGarden", "Scholar's Garden")]
+		public void ARegionName_ReachesItsTextThroughOneOfTheTextsSpellings(string region, string text)
+		{
+			Assert.Contains(AreaBannerNames.Normalise(region), AreaBannerNames.TextForms(text).Select(AreaBannerNames.Normalise));
+		}
+
 		// ...and the pairs it must NOT join. Normalisation drops punctuation and a widget prefix, never a word: two
 		// different places staying apart is what stops the join inventing rows.
 		[Theory]
-		[InlineData("BA_EastGate", "The East Gate")]
 		[InlineData("Scout Camp", "Crossroads")]
 		[InlineData("Stream Bridge Camp", "Stream Bridge")]
 		[InlineData("Lower Foothills", "Foothills")]
@@ -141,6 +167,62 @@ namespace Faolan.Tests
 				captured: [(2000u, 3906077u)]);
 
 			Assert.Equal(3906077u, Assert.Single(matches).AreaNameId);
+		}
+
+		// ⚠️ The guard that keeps a playfield's own numbering authoritative (#680). The same places are named on
+		// several playfields - Ymir's Pass's areas exist under 269xxx, 3822xxx AND 3908xxx - so a playfield's regions
+		// can name-match a whole coherent cluster that belongs to a COPY of it. Where the wire has said where this
+		// playfield's ids live, only a block holding a captured id counts. Without this, Ymir's Pass imported eight
+		// regions off another playfield's block.
+		[Fact]
+		public void ACoherentBlockThatTheWireContradicts_IsAnotherPlayfieldsCopy()
+		{
+			var regions = new[] { (1090u, "Wheel of Pain"), (1090u, "Atali Lake"), (1090u, "Frost Gate"), (1090u, "Camp23 Atzels Bandits (Burned Farms)") };
+			var banners = new[]
+			{
+				(3908476u, "Wheel of Pain"), (3908745u, "Atali Lake"), (3908749u, "Frost Gate"), // the copy
+				(269299u, "Burned Farms") // this playfield's own block, where the capture is
+			};
+
+			// With no capture there is nothing to contradict, so the three-anchor cluster stands.
+			Assert.Equal(3, Match(regions, banners, captured: []).Count);
+
+			// With one captured id on this playfield, the far cluster is a copy and only the captured block survives.
+			var pinned = Match(regions, banners, captured: [(1090u, 269294u)]);
+			Assert.Equal("Camp23 Atzels Bandits (Burned Farms)", Assert.Single(pinned).RegionName);
+		}
+
+		// The abbreviation pass - the one rule that is not an exact identity, so it only ever draws from ids already
+		// known to be this playfield's, only for regions that matched nothing, and only where the pairing is unique
+		// both ways. Old Tarantia's three `AV*` regions against its three "Avenue of X" texts are the case it exists
+		// for, and the remainders (Honor/Roses/Lions) are what make each pairing unique.
+		[Fact]
+		public void AnAbbreviatedRegionName_TakesTheOnlyIdItCanAbbreviate()
+		{
+			var matches = Match(
+				[(2000, "BA_TradingPost"), (2000, "BA_MarketWard"), (2000, "BA_AVRoses"), (2000, "BA_AVLions"), (2000, "BA_AVHonor")],
+				[(3373518, "Avenue of Honor"), (3373522, "Trading Post"), (3373523, "Avenue of Roses"), (3373525, "The Market Ward"), (3373530, "Avenue of Lions")],
+				captured: []);
+
+			Assert.Equal(3373523u, matches.Single(m => m.RegionName == "BA_AVRoses").AreaNameId);
+			Assert.Equal(3373530u, matches.Single(m => m.RegionName == "BA_AVLions").AreaNameId);
+			Assert.Equal(3373518u, matches.Single(m => m.RegionName == "BA_AVHonor").AreaNameId);
+		}
+
+		// And it refuses rather than picks when the abbreviation fits more than one leftover. `BA_Bridge` abbreviates
+		// both "Bridge of Vilerus I" and "Stream Bridge"; on the real data it keeps its geometric match instead.
+		[Fact]
+		public void AnAmbiguousAbbreviation_IsRefused()
+		{
+			var notes = new List<string>();
+			var matches = Match(
+				[(2000, "BA_TradingPost"), (2000, "BA_MarketWard"), (2000, "BA_Bridge")],
+				[(3373519, "Bridge of Vilerus I"), (3373522, "Trading Post"), (3373525, "The Market Ward"), (3373526, "Stream Bridge")],
+				captured: [],
+				notes: notes);
+
+			Assert.DoesNotContain(matches, m => m.RegionName == "BA_Bridge");
+			Assert.Contains(notes, n => n.Contains("BA_Bridge") && n.Contains("not unique"));
 		}
 
 		// Only the CROSSING-NOTIFIER volumes are candidates. The same place name is also carried by audio and

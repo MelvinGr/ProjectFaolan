@@ -433,35 +433,74 @@ from the same table of place names, so it looks exactly as plausible as a real o
 ### What makes a hit real: the region name, inside the playfield's id block
 
 The recovery pays off because the client also names its own regions after the same places. So a hit becomes a row
-only when a crossing-notifier region **on some playfield is named exactly that text** — after normalising the
-three ways the client spells one place: a widget prefix (`BA_Bridge`, `Fifo-CascadeFalls`,
-`BA_FIFO_ValleyOfGiants` — FIFO is the client's own name for the banner widget), run-together words
-(`CrawlingDunes` ↔ "Crawling Dunes") and punctuation (`Atzels Approach` ↔ "Atzel's Approach").
+only when a crossing-notifier region **on some playfield is named exactly that text** — after normalising the ways
+the client spells one place. None of these is a fuzzy match; each is a label convention of the client's own, and
+two different strings of words never collapse together under any of them:
+
+| the client writes | the banner renders | rule |
+|---|---|---|
+| `BA_Bridge`, `Fifo-CascadeFalls`, `BA_FIFO_ValleyOfGiants` | Bridge…, Cascade Falls, Valley of Giants | the widget prefix (FIFO is the client's own name for the banner widget) |
+| `CrawlingDunes`, `Zang Xin Camp` | Crawling Dunes | word separation |
+| `Atzels Approach`, `Souleaters Pass` | Atzel's Approach, Souleaters' Pass | punctuation |
+| `BA_EastGate`, `BA_GreatLibrary` | The East Gate, The Great Library | a leading article |
+| `BA_LionMarket`, `BA_TraitorCommon` | The Lion's Market, Traitor's Common | the possessive **s**, which the client keeps on some places (`Ymirs Tongue`) and drops on others — so it is offered as an ALTERNATIVE spelling, never normalised away, or fixing one breaks the other |
+| `Camp23 Atzels Bandits (Burned Farms)` | Burned Farms | the **parenthetical**. Ymir's Pass names every one of its areas this way, so the join could not see that playfield at all until it was read |
+| `POI A - The Last Cimmerian House` | The Last Cimmerian House | the `POI x -` prefix |
 
 That alone is not enough, because the name is ambiguous far more often than not: 41 different ids render "Outlaw
 Camp", one per playfield that has one. The second gate is the **id block**. Real ids arrive in per-playfield runs —
 `358073..358089` on map 1080, `277705..277809` on Field of the Dead, `4186119..4186225` on map 974 — because they
 were handed out a playfield at a time. So a candidate must sit in one of that playfield's own blocks, where a block
 is a cluster of anchors: ids already pinned there either by being the only recovered id in the whole client with
-that text, or by a capture. A one-anchor cluster counts only if that anchor is **captured** — wire truth needs no
-corroboration, a lone name match does, and this is what rejects map 1010's `Fifo-CimmerianSettlement`, whose name
-matches "Cimmerian Settlement" exactly once at 711411 while every other banner on that playfield is 37098xx.
+that text, or by a capture.
+
+Two ways a cluster is **not** a block, and both are the same mistake from different sides — another playfield's
+copy of these places:
+
+- **A one-anchor cluster**, unless that anchor is captured. Wire truth needs no corroboration, a lone name match
+  does. This rejects map 1010's `Fifo-CimmerianSettlement`, whose name matches "Cimmerian Settlement" exactly once
+  in the whole client, at 711411, while every other banner on that playfield is 37098xx.
+- ⚠️ **Any cluster with no captured anchor, once the playfield has captured ids at all.** The wire has then already
+  said where this playfield's numbering lives. Ymir's Pass is the case that proves it: its region names match a
+  perfectly coherent cluster at `3908476..3908749` — eight of them — while the two banners retail was actually
+  captured sending there are `269294` and `269449`. The same places exist under 269xxx, 3822xxx *and* 3908xxx.
+  Without this guard those eight rows import, and every one is another playfield's id.
 
 A run is not gapless (1080 skips 358080, 358085 and 358087) and a playfield can own several blocks: Old Tarantia
-has 3373519..3373530, 3385037..3385038 and its Outlaw Camp at 3906077. Hence a cluster test rather than one range.
+has 3373516..3373530, 3385037..3385038 and its Outlaw Camp at 3906077. Hence a cluster test rather than one range.
 
-### What that produces: 122 areas over 14 playfields, from 22 over 7
+### The last pass: abbreviations, fenced on four sides
+
+The client sometimes abbreviates a word the banner spells out, or writes only the distinctive part of it —
+`BA_AVRoses` for "Avenue of Roses", `SerfDist` for "Kheshatta Serf District", `SouthPlat` for "Southern Plateau",
+`BA_Docks` for "Old Tarantia Docks". This is the one rule here that is **not** an exact identity, so it is fenced:
+
+1. the id must already be in one of the **playfield's blocks** and unclaimed — it is this playfield's own id, the
+   only question is which of its regions it belongs to;
+2. the region must have matched **nothing** by name, so this can never overrule an identity;
+3. every word of the region name must be a **prefix** of a word of the text, in order (`AV` of `Avenue`, `Dist` of
+   `District`); a region word appearing nowhere in the text kills the pair;
+4. the pairing must be **unique in both directions** among what is left.
+
+On Old Tarantia it completes a **bijection** — 17 regions against the 17 ids of its blocks, every one paired — which
+is the real check on it: a wrong pairing would have to be a permutation satisfying the rule everywhere, and there is
+none. It refuses rather than picks where it cannot: `BA_Bridge` abbreviates both "Bridge of Vilerus I" and "Stream
+Bridge", so it is left to the geometric route, which independently lands it on 3373519. Every accepted pair is
+reported by the importer, because a rule this loose should be readable without re-deriving it.
+
+### What that produces: 142 areas over 14 playfields, from 22 over 7
 
 | | banners | playfields | with the client's real trigger volume |
 |---|---|---|---|
 | captured only (before #679) | 22 | 7 | 12 |
-| now | **122** | **14** | **116** |
+| now | **142** | **14** | **140** |
 
-Provenance is on the row (`MapArea.Source`): **13 captured** (the wire saw the id; region matched geometrically or
-not at all), **100 client-name** (recovered from the client, on playfields including several no capture has ever
-visited), and **9 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
+Provenance is on the row (`MapArea.Source`): **7 captured** (the wire saw the id; region matched geometrically or
+not at all), **120 client-name** (recovered from the client, on playfields including several no capture has ever
+visited), and **15 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
 one is a position track against a wire packet and the other a hash inversion against a string table. **Nothing
-produces a disagreement.**
+produces a disagreement**: 14 of the 15 captured hulls sit inside the box of the region their name picked, the
+other two 1.6 and 1.4 units outside it, against a 549-unit counter-example below.
 
 **Imported** by `RdbRegionImporter` (`rdb-regions`). The geometric route still runs, on the banners the name join
 cannot reach, under three gates: the scry filter, containment of the banner's captured hull, and SEPARATION — a
@@ -470,15 +509,24 @@ route left for Old Tarantia, whose volumes are named `BA_Bridge`/`BA_EastGate` r
 I" / "The East Gate" the banner renders. `WorldSimulation` then tests the polygon with no slack where a region is
 linked, and falls back to the hull elsewhere.
 
+⚠️ Its separation gate is measured against the banners still *arguing* for a region — not just the unplaced ones,
+and not the ones an identity has already settled. Both halves were wrong once: scoping it to the unplaced let a
+region that swallows another banner's samples through, and widening it to every banner then rejected
+`Fifo-CimmerianSettlement` on the strength of the misplaced sample described below.
+
 ⚠️ **No tolerance on the geometric containment test, deliberately.** A banner fires ON ENTRY, so its sample sits
 right at the boundary and a near-miss is expected. Padding until they match would be fitting the answer. Those keep
-the captured hull, which is what it is for — **6 rows** still do.
+the captured hull, which is what it is for — **2 rows** still do, both on Ymir's Pass (`269294` "Clan Maugh
+Encampment" and `269449` "Amphitheatre of Karutonia"). That playfield's 1000053 record contains **no notifier volume
+named after either**, and both captured samples land inside the same one, `POI A - The Last Cimmerian House`, so
+nothing separates them. Tracked on the Gitea follow-up; until one of them is identified, `MapArea` cannot collapse
+into a column on this table.
 
 ⚠️ A one-sighting hull is weaker evidence than it looks, and the name join is what showed it. Map 1010's "Pass to
 Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` at x 53..110, while its single captured sample sits
 at (659, 537) — 600 units away, inside `Fifo-CimmerianSettlement`, which is also where the *other* banner captured
 on that playfield was sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there.
-[V3: MapRegionGeometryTests.ACorroboratedBanner_WasCapturedFiringInsideTheRegionItsNameMatched]
+[V3: MapRegionGeometryTests.ACorroboratedBanner_WasCapturedFiringWhereItsNameSaysItShould]
 
 ⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
 unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language

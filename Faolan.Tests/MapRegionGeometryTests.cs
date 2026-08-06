@@ -147,7 +147,10 @@ namespace Faolan.Tests
 			// could never tell which of them the player just walked into.
 			Assert.All(areas.Where(a => a.RegionId != null).GroupBy(a => a.RegionId), g => Assert.Single(g));
 
-			var hulls = areas.Where(a => a.Source != AreaBannerSource.ClientName).ToList();
+			// Only the banners still ARGUING for a region can veto one: a banner whose region is settled by name is not
+			// a second claimant, and its stray sample says the sample is imprecise (see map 1010, where two banners
+			// were sampled inside one volume and the name join pinned one of them 600 units away).
+			var hulls = areas.Where(a => a.Source == AreaBannerSource.Captured).ToList();
 			foreach (var area in areas.Where(a => a.RegionId != null && a.Source == AreaBannerSource.Captured))
 			{
 				var y = (area.Region!.MinY + area.Region.MaxY) / 2f;
@@ -161,37 +164,43 @@ namespace Faolan.Tests
 		}
 
 		// The #679 cross-check, and the reason the name join can be trusted on the playfields no capture has ever
-		// reached: where BOTH routes fire on the same banner they agree. The client's region of that name is the region
-		// retail was captured firing it in - two arguments sharing no evidence at all, one a position track against a
+		// reached: where BOTH routes fire on the same banner they agree. The client's region of that name is where
+		// retail was captured firing it - two arguments sharing no evidence at all, one a position track against a
 		// wire packet and the other a hash inversion against a string table.
 		//
-		// Held to the banners with a REAL hull - more than one sighting, so the bounds are a strip of walked ground
-		// rather than a single point. A one-sighting hull is placed by whichever CharDCMove happened to bracket the
-		// banner, and on map 1010 that demonstrably misplaces one: "Pass to Conarch Village" (3709830) names
-		// `Fifo-PasstoConarchVillage` at x 53..110 while its single sample sits at (659, 537), 600 units away and
-		// inside `Fifo-CimmerianSettlement` - which is also where the OTHER banner captured on that playfield was
-		// sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there, not the name; and
-		// a gate that trusted it would be pinning the capture's weakest evidence against the client's strongest.
+		// Measured against the region's BOUNDING BOX rather than its polygon, because a banner fires ON ENTRY: every
+		// sighting sits on the boundary, so the centre of a hull over several of them lands just outside a concave
+		// ring about as often as just inside. The box is the claim that actually matters here - same place, not some
+		// other part of the playfield - and on the shipped rows it is exact: every one but the documented exception
+		// is INSIDE the box, and the two that are not are 1.6 and 1.4 units out.
+		//
+		// ⚠️ ONE exception, asserted by name and by count so a second one fails rather than joins it. Map 1010's
+		// "Pass to Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` while its single captured sample sits
+		// 549 x 307 units away, inside `Fifo-CimmerianSettlement` - which is also where the OTHER banner captured on
+		// that playfield was sampled. Two banners cannot both fire from one spot, so the SAMPLE is what is wrong
+		// there, and a gate that trusted it would be pinning the capture's weakest evidence against the client's
+		// strongest.
 		[Fact]
-		public async Task ACorroboratedBanner_WasCapturedFiringInsideTheRegionItsNameMatched()
+		public async Task ACorroboratedBanner_WasCapturedFiringWhereItsNameSaysItShould()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var both = await db
-				.MapAreas.Include(a => a.Region!.Vertices)
+				.MapAreas.Include(a => a.Region)
 				.Where(a => a.Source == AreaBannerSource.Corroborated)
 				.ToListAsync(TestContext.Current.CancellationToken);
 
 			Assert.NotEmpty(both);
 			Assert.All(both, a => Assert.NotNull(a.Region));
 
-			var walked = both.Where(a => a.MinX != a.MaxX || a.MinZ != a.MaxZ).ToList();
-			Assert.NotEmpty(walked);
-			foreach (var area in walked)
+			const float near = 2f;
+			var far = both.Where(a =>
 			{
-				var centre = new Vector3((area.MinX + area.MaxX) / 2f, (area.Region!.MinY + area.Region.MaxY) / 2f, (area.MinZ + area.MaxZ) / 2f);
-				Assert.True(EnvironmentService.Contains(area.Region, centre),
-					$"banner {area.AreaNameId} on map {area.MapId} is named after '{area.Region.Name}' but retail fired it outside that volume");
-			}
+				var cx = (a.MinX + a.MaxX) / 2f;
+				var cz = (a.MinZ + a.MaxZ) / 2f;
+				return cx < a.Region!.MinX - near || cx > a.Region.MaxX + near || cz < a.Region.MinZ - near || cz > a.Region.MaxZ + near;
+			}).ToList();
+
+			Assert.Equal([3709830u], far.Select(a => a.AreaNameId).ToArray());
 		}
 
 		// Provenance and geometry have to agree about which half of the row is real, because the runtime branches on
