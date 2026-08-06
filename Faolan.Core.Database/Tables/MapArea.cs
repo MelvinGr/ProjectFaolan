@@ -23,20 +23,37 @@ namespace Faolan.Core.Database.Tables
 	// ⚠️ Two claims that have already been wrong here once each, so they are worth stating carefully:
 	//   - "the fire position lands in no client region except a collision volume" - FALSE. It lands in `BA_Bridge`,
 	//     a 9-vertex polygon named after the bridge the banner announces. The client ships the trigger volumes.
-	//   - "none of the 22 AreaNameIds appears in any of the 1,103 LDB pages" - true as an ID LOOKUP and NOT evidence
-	//     the text is absent. It says our page indexing cannot turn one of these ids into a (page, index) yet, which
-	//     is #291's un-pinned page base. The strings are demonstrably there when searched for by content.
+	//   - "none of the 22 AreaNameIds appears in any of the 1,103 LDB pages" - TRUE, and evidence of nothing. The id
+	//     is a parameter inside the localized token, not an LDB key, so it was never going to appear. See
+	//     AreaNameId below for the hash that does resolve it.
 	//
 	// There is deliberately no NAME column. The wire only ever carries AreaNameId and the CLIENT renders the text,
-	// so a name would be for our logs alone - and filling it needs the client RDB plus a hand-found "pin" per LDB
-	// page (`textId = pageBase + index`, #291; the base is not derivable from the page header yet). One pin covers
-	// Old Tarantia; the other maps' ids sit in pages nobody has pinned, so the column would have been empty for 3 of
-	// 4 maps. The id IS the key. To read a name, decode it via #291 rather than storing a stale copy.
+	// so a name would be for our logs alone - and it would be a stale copy of something the client RDB can answer
+	// exactly, in seven languages, from the id alone (see AreaNameId). Read one with
+	// `--report ldb-strings --report-arg "id:#<elf28 of the token>"` rather than storing it.
 	[PrimaryKey(nameof(MapId), nameof(AreaNameId))]
 	public class MapArea
 	{
-		// The client's localized-string id for this area - the value the banner's XML carries. The stable key: a
-		// playfield's areas are identified by it, and it is what actually goes on the wire.
+		// The area's text id as the banner's XML carries it, and what goes on the wire. Correct as stored - it is a
+		// PARAMETER inside the localized token, not an LDB key:
+		//
+		//   <localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|3474586'>
+		//
+		// The client's LDB id is `elf28(token)` over that WHOLE string, so the number here is never itself an index
+		// into the LDB. Searching the LDB for it therefore always fails, and that failure means nothing.
+		//
+		// ⚠️ It has meant something twice, wrongly. The absence was read as "these ids are per-BUILD and a client
+		// patch renumbered them", which is false - the client has not been patched, and the arithmetic settles it:
+		//
+		//   elf28("DisplayedText(3)|GenericDisplayAreaName|3474586") == 19303910 == cat 50025 "Castle Approach"
+		//
+		// So resolving one is a pure hash, with no per-page "pin" needed (the #291 caveat below does not apply to
+		// these): hash the token, look the result up in category 50025.
+		// `--report ldb-strings --report-arg "id:#<n>"` does the lookup.
+		//
+		// That also CORROBORATES the geometric region match by name, which nothing else could: 3373519 resolves to
+		// "Bridge of Vilerus I" and is linked to `BA_Bridge`, 3385037/3385038 to "The East Gate"/"The West Gate" on
+		// `BA_EastGate`/`BA_WestGate`, and 3147973 to "The Southern Bridge" on the region of that exact name.
 		public uint AreaNameId { get; set; }
 		public uint MapId { get; set; }
 

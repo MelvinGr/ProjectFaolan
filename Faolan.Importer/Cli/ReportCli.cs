@@ -630,6 +630,82 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// `--report ldb-strings --report-arg "id:<text>"` searches the PARSED index and prints each hit's
+				// (category, id) - as opposed to the default raw printable-run scan below, whose bracketed number is
+				// a run ordinal and NOT an id. Confusing the two sent one investigation into page-base arithmetic on
+				// numbers that were never in the id space; this is the form that answers "what id is this text".
+				case "ldb-strings" when (arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase):
+				{
+					// `id:<text>` searches by VALUE; `id:#<number>` searches by the id itself. The second is what tells
+					// a "this id is gone" story from a "this id was never an LDB id" one.
+					var wanted = arg![3..].Trim();
+					uint wantedId = 0;
+					var byNumber = wanted.StartsWith('#') && uint.TryParse(wanted[1..], out wantedId);
+					using var rdb = OpenRdb(RdbDir());
+					var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
+					var hits = 0;
+					// A "not found" is only as strong as the coverage behind it, so the skips are COUNTED and printed.
+					// An id missing from a search that silently skipped 300 encrypted pages is not missing.
+					int searched = 0, unreadable = 0, notTdc2 = 0, encrypted = 0, entries = 0;
+					var encryptedCategories = new SortedSet<uint>();
+					foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType))
+					{
+						if (!rdb.CanRead(e))
+						{
+							unreadable++;
+							continue;
+						}
+
+						byte[] body;
+						try
+						{
+							body = rdb.ReadDecompressed(e);
+						}
+						catch
+						{
+							unreadable++;
+							continue;
+						}
+
+						if (LdbStringIndex.CategoryOf(body) == 0)
+						{
+							notTdc2++;
+							continue;
+						}
+
+						if (LdbStringIndex.FlagsOf(body) == 1)
+						{
+							// The HEADER is plaintext even on an encrypted page, so the category is readable and the
+							// skip can be reported per category - which is what says whether a miss in the category
+							// you care about is conclusive.
+							encrypted++;
+							encryptedCategories.Add(LdbStringIndex.CategoryOf(body));
+							continue;
+						}
+
+						searched++;
+
+						foreach (var entry in LdbStringIndex.Parse(body))
+						{
+							entries++;
+							var match = byNumber
+								? entry.Id == wantedId
+								: string.Equals(entry.Value, wanted, StringComparison.OrdinalIgnoreCase);
+							if (!match)
+								continue;
+
+							hits++;
+							Console.WriteLine($"  cat {entry.Category,-6} id {entry.Id,-12} page {e.Id,-9} lang {(languageByPage.TryGetValue(e.Id, out var lang) ? lang : "?")}  '{entry.Value}'");
+						}
+					}
+
+					Console.WriteLine($"{hits} exact match(es) for '{wanted}'.");
+					Console.WriteLine($"  searched {searched} page(s) / {entries:N0} entries; skipped {encrypted} encrypted, {notTdc2} non-TDC2, {unreadable} unreadable"
+					                  + (encrypted + unreadable == 0 ? "  <-- complete over the plaintext LDB" : ""));
+					if (encryptedCategories.Count > 0)
+						Console.WriteLine($"  the skipped pages are categories {string.Join(", ", encryptedCategories)} - a miss is conclusive for any category NOT listed here");
+					return 0;
+				}
 				case "ldb-strings":
 				{
 					var rdbDir = RdbDir();
