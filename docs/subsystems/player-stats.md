@@ -393,16 +393,25 @@ been checked against each other they have disagreed — reconciling the rest is 
 
 The snapshot emitted a hard `0` here for every character. It varies in retail: 183 of the 184 captured snapshots
 carry `0` and one carries `1`, so a fixed value is a character wearing someone else's number. `Character.ChosenGod`
-now persists it and `SnapshotStatSheet` authors it, with `.religion <n>` as the setter — AoC picks a deity during
-the Tortage storyline, which is not modelled, so a GM command is the standard bootstrap.
+now persists it and `SnapshotStatSheet` authors it, with `.chosengod <n>` as the setter. **That — a per-character
+value being shipped as a constant — is the entire justification.** It is not a claim about what the number means.
 
-⚠️ **The value is carried as an opaque wire number and no deity name is attached to it**, because the mapping
-cannot be recovered. The client *stores* this stat and never reads it back: `ConstScan` finds exactly two uses of
-`0xA9` as a stat id in the whole image and both are WRITES, there is no `GetStat(0xA9)` anywhere, and the one class
-that gives the id a dedicated slot (`FUN_00843d10` / `FUN_00843d40`, field `+0x244`) only mirrors it — see
-[`../re/aoc-client-stat-names.md`](../re/aoc-client-stat-names.md). So it is a **server-side number**: there is no
-integer→Mitra/Set/Ymir table hidden in the client, and no in-client check could confirm one either, because nothing
-the client draws depends on it. `0` = has not chosen is the only value the corpus establishes.
+⚠️ **The value is carried as an opaque wire number, with no deity name anywhere near it**, and there is no religion
+system behind it to model:
+
+- **Age of Conan has no player-choosable religion.** Deities are lore plus the three *priest classes'* patron gods
+  (Priest of Mitra, Tempest of Set, Bear Shaman/Ymir). The AoC wiki has a "Choosing your Class" page and nothing
+  for choosing a god. ⚠️ The "pick a religion, find a priest, become an acolyte" system a web search surfaces is
+  **Conan Exiles — a different game.** #553 was opened on that premise ("AoC's religion is chosen during the
+  Tortage storyline") and it does not hold.
+- **It is not the priest patron either:** the one captured character carrying `1` is a *necromancer*.
+- **And the client cannot be asked.** It *stores* this stat and never reads it back: `ConstScan` finds exactly two
+  uses of `0xA9` as a stat id in the whole image and both are WRITES, there is no `GetStat(0xA9)` anywhere, and the
+  one class that gives the id a dedicated slot (`FUN_00843d10` / `FUN_00843d40`, field `+0x244`) only mirrors it —
+  see [`../re/aoc-client-stat-names.md`](../re/aoc-client-stat-names.md). It is a **server-side number**, so
+  nothing the client draws depends on the value and no in-client check could confirm a meaning either.
+
+Even calling `0` "has not chosen" reads the stat's *name* rather than any evidence.
 
 ## Open follow-ups
 > Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.

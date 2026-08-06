@@ -365,7 +365,7 @@ namespace Faolan.GameServer
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
-				["religion"] = ChosenGodCommand,
+				["chosengod"] = ChosenGodCommand,
 				["travel"] = TravelCommand,
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
@@ -593,21 +593,21 @@ namespace Faolan.GameServer
 		}
 
 		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
-		// .religion <n>  - set the character's CHOSEN DEITY, stat 0x0A9 (#553). The standard test bootstrap: retail's
-		// trigger is the Tortage storyline's religion step, which is not modelled, so without this the column can
-		// never be anything but 0.
+		// .chosengod <n>  - set stat 0x0A9, the one the client's name table calls `ChosenGod` (#553). Named for the
+		// STAT and not for a mechanic, because there is no mechanic: nothing in retail is known to set this, so a GM
+		// command is the only way the column is ever anything but 0.
 		//
-		// ⚠️ The argument is the RAW WIRE NUMBER, not a deity name, and that is not laziness - the integer -> deity
-		// mapping is unrecoverable. The client stores this stat and never reads it back (docs/re/aoc-client-stat-names.md:
-		// two writes of `0xA9`, no `GetStat`), so there is nothing in the client to check a name against and nothing
-		// it draws that a wrong one would show. The corpus pins 0 (has not chosen) and 1, and no more.
+		// ⚠️ The argument is the RAW WIRE NUMBER and there is deliberately no deity name anywhere near it. AoC has no
+		// player-choosable religion (see Character.ChosenGod - the "choose a religion" system is Conan EXILES), the
+		// one captured character carrying 1 is a necromancer rather than a priest, and the client stores this stat
+		// without ever reading it back, so nothing it draws could show a wrong interpretation either way.
 		private async Task ChosenGodCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
 			if (!uint.TryParse((arguments ?? "").Trim(), out var value))
 			{
 				await _agentServerDispatcher.SendSystemMessage(character.Id,
-					$"Usage: .religion <n>  (raw stat 0x0A9 value; 0 = none. Currently {character.ChosenGod}.)");
+					$"Usage: .chosengod <n>  (raw stat 0x0A9 value. Currently {character.ChosenGod}.)");
 				return;
 			}
 

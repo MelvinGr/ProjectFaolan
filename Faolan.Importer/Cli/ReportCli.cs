@@ -2649,6 +2649,8 @@ namespace Faolan.Importer.Cli
 			var names = new List<(string Target, string Name)>();
 			var captureOf = new List<string>();
 			var players = new List<(string MovementMode, string Target)>();
+			// (phase, target value) -> sightings. See the census note in the loop.
+			var byPhase = new Dictionary<(string Phase, string Value), int>();
 			var skipped = 0;
 
 			foreach (var capture in captures)
@@ -2672,7 +2674,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (sawPoll || map == 0 || p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
+					if (map == 0 || p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
 						continue;
 
 					SimpleCharFullUpdateIIR captured;
@@ -2684,6 +2686,22 @@ namespace Faolan.Importer.Cli
 					{
 						continue;
 					}
+
+					// ⭐ The SPAWN PHASE census, and it runs on BOTH phases where the measurement below runs only on
+					// the login burst (#607). That restriction is right for "is this field computed from something
+					// else the spawn carries" - the burst is the set the importer lifts through - but it makes the
+					// most obvious hypothesis about a field like `npc_stats.SpawnAnimation` UNTESTABLE by
+					// construction: "play the spawn-in animation" is a property of the spawn EVENT, i.e. of whether
+					// the NPC is APPEARING or was already standing there, and every row here is the second case.
+					if (captured.Handle < EntityHandles.CharacterInstanceBase && captured.Character?.player_stats == null)
+					{
+						var pv = FieldValues(captured.Character).ToDictionary(v => v.Field, v => v.Value, StringComparer.Ordinal);
+						var phase = sawPoll ? "mid-session" : "login burst";
+						byPhase[(phase, pv.GetValueOrDefault(target, "(absent)"))] = byPhase.GetValueOrDefault((phase, pv.GetValueOrDefault(target, "(absent)"))) + 1;
+					}
+
+					if (sawPoll)
+						continue;
 
 					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
 					{
@@ -2713,7 +2731,22 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
+			// Printed FIRST, because when it separates it answers the question the purity table cannot even ask.
+			if (byPhase.Count > 0)
+			{
+				Console.WriteLine($"`{target}` by SPAWN PHASE - is it a property of the spawn EVENT rather than of the entity? (#607)");
+				foreach (var phase in new[] { "login burst", "mid-session" })
+				{
+					var rowsIn = byPhase.Where(kv => kv.Key.Phase == phase).OrderByDescending(kv => kv.Value).ToList();
+					var n = rowsIn.Sum(kv => kv.Value);
+					Console.WriteLine($"  {phase,-12} {n,6} spawn(s): {(n == 0 ? "-" : string.Join(", ", rowsIn.Select(kv => $"{kv.Key.Value} x{kv.Value} ({100.0 * kv.Value / n:F1}%)")))}");
+				}
+
+				Console.WriteLine();
+			}
+
 			Console.WriteLine($"field-predictors: is `{target}` COMPUTED from something else the same spawn carries?");
+			Console.WriteLine("⚠️ The purity table below is LOGIN-BURST ONLY, which is the set the importer lifts through.");
 			Console.WriteLine("Purity = group the sightings by a candidate's value; within each group, the share that agree on");
 			Console.WriteLine("the target. 100% = the candidate determines the target. Beat the baseline or nothing was learnt.");
 			Console.WriteLine();
