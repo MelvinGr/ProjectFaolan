@@ -349,8 +349,9 @@ simply wins. Typical contents:
 {
   // the client's RDB folder - part of the game INSTALL, so it has no committed default
   "RdbDir": "/path/to/Age of Conan/RDB",
-  // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial
-  "CdnMirror": { "PublicAddress": "192.168.1.5" }
+  // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial.
+  // Write it as a full URL - the derived address is always absolute, because its consumers append a path to it
+  "CdnMirror": { "PublicAddress": "http://192.168.1.5:7081" }
 }
 ```
 

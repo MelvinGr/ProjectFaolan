@@ -68,16 +68,29 @@ namespace Faolan.Core.Extensions
 			// override (`CdnMirror:PublicAddress`) rather than one per consumer. PublicAddress wins because it is by
 			// definition the reachable address; `Ip` is only a fallback, and it is the BIND address (0.0.0.0 in a
 			// container), which is why it is not the first choice.
+			//
+			// ⚠️ ALWAYS an absolute URL - `http(s)://host:port`, nothing else. Its consumers concatenate a path onto it
+			// (`RdbReader` appends the mirror route), so a bare `host` would produce a relative string that fails at the
+			// HTTP call rather than at the config. Write the scheme in the config too; a bare `host` / `host:port` is
+			// still ACCEPTED and completed here, the same contract Faolan.Web.Content's own `PublicBase` honours, so the
+			// two can never disagree about one value.
 			public string CdnMirrorAddress
 			{
 				get
 				{
-					var host = config.CdnMirrorPublicAddress is { Length: > 0 } published ? published : config.CdnMirrorIp;
-					if (!host.Contains("://", StringComparison.Ordinal))
-						host = $"http://{host}";
+					var configured = config.CdnMirrorPublicAddress?.Trim().TrimEnd('/');
+					var value = string.IsNullOrEmpty(configured)
+						? $"http://{config.CdnMirrorIp}:{config.CdnMirrorPort}"
+						: configured.Contains("://", StringComparison.Ordinal)
+							? configured
+							: $"http://{configured}";
 
-					// A published address may already carry its own port (it is allowed to be `host:port`).
-					return host.LastIndexOf(':') > host.IndexOf("://", StringComparison.Ordinal) + 2 ? host : $"{host}:{config.CdnMirrorPort}";
+					// The section's Port fills in only when the address does not carry its own.
+					var builder = new UriBuilder(value);
+					if (!value[(value.IndexOf("://", StringComparison.Ordinal) + 3)..].Contains(':', StringComparison.Ordinal))
+						builder.Port = config.CdnMirrorPort;
+
+					return builder.Uri.GetLeftPart(UriPartial.Authority);
 				}
 			}
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
