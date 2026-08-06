@@ -26,9 +26,16 @@ namespace Faolan.Core.Rdb
 
 		private readonly string _rdbDir;
 
-		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.Web.Content proxy base, e.g.
-		// "http://127.0.0.1:7081/gameupdate/upm/rdb". On-demand resources aren't in the local NN.rdbdata files; their
-		// payload is content-addressed by the entry's 16-byte md5 at <base>/res/<hex[0:2]>/<hex[2:3]>/<hex[3:]>. The
+		// The mirror's own ROUTE for on-demand RDB resources, which is fixed by Faolan.Web.Content
+		// (`/{tag}/upm/{**rest}` with tag `gameupdate`) and mirrors retail's own
+		// `aoc-eu-gameupdate.live.ageofconan.com/upm/rdb/res/<md5>`. It lives here rather than in every caller's
+		// config so a configured base is just the mirror's ADDRESS - `http://127.0.0.1:7081` - and nobody has to
+		// remember the path.
+		private const string MirrorRoute = "/gameupdate/upm/rdb";
+
+		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.Web.Content mirror's base address,
+		// e.g. "http://127.0.0.1:7081". On-demand resources aren't in the local NN.rdbdata files; their payload is
+		// content-addressed by the entry's 16-byte md5 at <base><MirrorRoute>/res/<hex[0:2]>/<hex[2:3]>/<hex[3:]>. The
 		// proxy is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
 		// cold miss). Misses are negative-cached so a dead/absent resource is only attempted once per process.
 		private readonly string? _cdnBaseUrl;
@@ -43,9 +50,13 @@ namespace Faolan.Core.Rdb
 		public RdbReader(string rdbDir, string? cdnBaseUrl = null)
 		{
 			_rdbDir = rdbDir;
-			_cdnBaseUrl = string.IsNullOrWhiteSpace(cdnBaseUrl)
+			// A base that already carries the route is accepted rather than doubled, so a stale config keeps working.
+			var trimmed = cdnBaseUrl?.TrimEnd('/');
+			_cdnBaseUrl = string.IsNullOrWhiteSpace(trimmed)
 				? null
-				: cdnBaseUrl.TrimEnd('/');
+				: trimmed.EndsWith(MirrorRoute, StringComparison.OrdinalIgnoreCase)
+					? trimmed
+					: trimmed + MirrorRoute;
 			ParseIndex(Path.Combine(rdbDir, "le.idx"));
 		}
 

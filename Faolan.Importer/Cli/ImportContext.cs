@@ -10,11 +10,12 @@ namespace Faolan.Importer.Cli
 	// single tracked context the runner wraps in a transaction.
 	public sealed class ImportContext
 	{
-		// The Faolan.Web.Content mirror-proxy base for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
+		// The Faolan.Web.Content mirror's ADDRESS, for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
 		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
 		// Passed to every importer RdbReader so CDN-only records import instead of being skipped. Override with
-		// --rdb-proxy (e.g. to point at a remote mirror); defaults to the local mirror. See [[aoc_content_cdn_mirror]].
-		public const string DefaultProxyBase = "http://127.0.0.1:7081/gameupdate/upm/rdb";
+		// --rdb-proxy (e.g. `--rdb-proxy http://192.168.1.5:7081` for a mirror on another box); defaults to the local
+		// one. The `/gameupdate/upm/rdb` route is RdbReader's, not config's. See [[aoc_content_cdn_mirror]].
+		public const string DefaultProxyBase = "http://127.0.0.1:7081";
 		public required DatabaseContext Db { get; init; }
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();
 

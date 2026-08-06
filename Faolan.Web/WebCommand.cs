@@ -15,7 +15,7 @@ namespace Faolan.Web
 		private static readonly Option<string>[] Options =
 		[
 			FaolanCommandLine.ConfigOption("RdbDir", "The client's RDB folder, for the 3D viewer. Optional - the rest of the site runs without it."),
-			FaolanCommandLine.ConfigOption("CdnUrl", "Base URL for on-demand RDB fetches (the Faolan.Web.Content mirror)."),
+			FaolanCommandLine.ConfigOption("CdnUrl", "Address of the Faolan.Web.Content mirror for on-demand RDB fetches, e.g. http://127.0.0.1:7081."),
 			FaolanCommandLine.ConfigOption("Database:Provider", "Sqlite or Postgres."),
 			FaolanCommandLine.ConfigOption("Database:ConnectionString", "The database to read the roster and GM data from.")
 		];

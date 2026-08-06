@@ -81,7 +81,8 @@ Significant de-risking — the tool and format are identified:
 > (`<resurrectionpoint ...><position x y z>`; record id == playfield/map id; `discoverable="false"` => AlwaysKnown),
 > and upserts `RespawnPoints` keyed on the RDB `Guid` — **557 points across 259 maps** (beach 4010 = 3 real points).
 > The SAME path now unlocks the other v6-gated types (the ~279 v6 maps, TREASUREDATA) — fetch by hash. Like every
-> rdb-* module it goes through the mirror proxy (`--rdb-proxy`, default `http://127.0.0.1:7081/gameupdate/upm/rdb`),
+> rdb-* module it goes through the mirror proxy (`--rdb-proxy`, default `http://127.0.0.1:7081` — just the mirror's
+> address; `RdbReader` appends the fixed `/gameupdate/upm/rdb` route),
 > which store-and-forwards, so pulls are archived for preservation — it does NOT hand-roll its own CDN fetch. NOTE
 > most of our maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the
 > on-demand ones.

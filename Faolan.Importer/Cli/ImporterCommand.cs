@@ -42,7 +42,7 @@ namespace Faolan.Importer.Cli
 		private static readonly Option<string> TerrainOut = new("--terrain-out") { Description = "Output directory for the terrain-export report (default: ./Terrain)." };
 		private static readonly Option<bool> DumpMesh = new("--dump-mesh") { Description = "Dump mesh payloads in the rdb-assets report." };
 		private static readonly Option<string> DumpTemplates = new("--dump-templates") { Description = "Dump decrypted item templates to this directory." };
-		private static readonly Option<string> RdbProxy = new("--rdb-proxy") { Description = "CDN mirror base URL for RDB fetches." };
+		private static readonly Option<string> RdbProxy = new("--rdb-proxy") { Description = "Faolan.Web.Content mirror address for on-demand RDB fetches, e.g. http://127.0.0.1:7081 (the /gameupdate/upm/rdb route is appended)." };
 
 		// Parses argv. Returns null when the parser handled the invocation itself (--help, or a parse error, which it
 		// reports); the exit code is then in `exitCode`.

@@ -163,8 +163,9 @@ Modifiers
                        per-module override: --mode npcs=overwrite,items=insert
   --force              permit overwrite on guarded modules (e.g. characters)
                        (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
-  --rdb-proxy <url>    Faolan.Web.Content mirror base for on-demand (le.idx file==0xFF) RDB resources
-                       (default http://127.0.0.1:7081/gameupdate/upm/rdb) — every rdb-* module AND every
+  --rdb-proxy <url>    Faolan.Web.Content mirror ADDRESS for on-demand (le.idx file==0xFF) RDB resources —
+                       just the host, e.g. http://127.0.0.1:7081 (default) or http://<box>:7081 for a mirror
+                       on another machine; RdbReader owns the /gameupdate/upm/rdb route. Every rdb-* module AND every
                        --report fetches CDN-only records through it, and the proxy store-and-forwards so
                        pulls are archived. ⚠️ A reader built WITHOUT it degrades to the local records only,
                        which for several types is a minority of the game (577 of the 817 NPC spawn layouts,
