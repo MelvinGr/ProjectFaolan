@@ -1066,6 +1066,8 @@ namespace Faolan.GameServer.World
 				// #623: and which `combo_npc_generic_*` its swings perform, off the same rows.
 				entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment);
 				entity.Level = npc.Level;
+				// #675: and the class-family rows it may swing instead, level-gated on the level just stamped.
+				entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level);
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
 				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
 				// #262: an escortee NPC vanishes once its escort quest is COMPLETED (e.g. Casilda after the beach escort);
@@ -1455,6 +1457,7 @@ namespace Faolan.GameServer.World
 			entity.Level = npc.Level;
 			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // #671, as in the zone-load path
 			entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment); // #623, likewise
+			entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level); // #675, likewise
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
@@ -1509,6 +1512,7 @@ namespace Faolan.GameServer.World
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // #671 - from the TYPE's equipment; a pet has no NpcSpawn row
 			entity.MeleeComboId = await _combos.NpcMeleeComboId(npcType.Equipment); // #623, likewise
+			entity.ClassComboIds = await _combos.NpcClassComboIds(npcType.Equipment, level); // #675, likewise
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
 			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
 			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
@@ -166,6 +167,26 @@ namespace Faolan.GameServer.Combat
 			// means the combo import is short - say so rather than silently swinging plain forever.
 			_logger.LogWarning("NPC combo {Name} is not in the catalog - the mob will swing without one", name);
 			return 0;
+		}
+
+		// #675: the CLASS-family rows this NPC may swing beside its generic one, level-gated. Empty when the weapon
+		// does not answer the archetype - which is most of them; `NpcWeapon.ClassComboFamily` is where the two it does
+		// answer, and the three it refuses, are set out.
+		//
+		// The gate is `Combos.Level` verbatim, which IS the family name's trailing number: across the 30 captured
+		// class-family rows no actor ever swings one above its own level, and a level-75 mob still swings the rank-1
+		// row, so this is a ceiling and not a bracket. Resolved ONCE per NPC at zone load, like the generic id.
+		public async Task<uint[]> NpcClassComboIds(IEnumerable<INpcEquipment>? equipment, uint level)
+		{
+			if (NpcWeapon.ClassComboFamily(equipment) is not { } family)
+				return [];
+
+			var catalog = _catalog ??= await LoadCatalog();
+			return catalog.Values
+				.Where(e => e.Combo.Level <= level && e.Combo.Name.StartsWith(family, StringComparison.Ordinal))
+				.Select(e => e.Combo.Id)
+				.Order()
+				.ToArray();
 		}
 
 		// Milliseconds left on this combo's reuse time, 0 when it is ready. Keyed by the COMBO id rather than by a

@@ -344,15 +344,64 @@ combo-ing every time. `Combat:Unarmed` is **0 of 769**, which needs no rule of i
 the lookup returns nothing. The id is resolved once per NPC at zone load (`WorldEntity.MeleeComboId`), beside
 `RangedAttacker` and for the same reason — that is where the equipment rows are already `Include`d.
 
-⚠️ **The class families are NOT shipped.** Retail also swings per-archetype rows on the same mobs, at roughly the
-same rate as the generic ones (`combo_npc_guardian_polearm_1_sweep` ×31 against `generic_polearm` ×29 on the same
-Pillager). Their trailing number is a **minimum level gate** — 1 / 30 / 50 / 70, with no violation across the 30
-captured rows — but the *archetype* is not derivable from anything we hold: it is not the weapon (a two-handed-edge
-mob swings `barbarian_2h` **or** `hox` depending on the creature) and `NpcStatCore.ProfessionType` is null on all
-but one of the actors. Tracked on **Gitea #675**. Ranged is the same gap: there is no `combo_npc_generic_bow`, so
-an archer swings plain until the `combo_npc_ranger_bow_*` family can be picked.
+### The class families (#675)
+
+Retail also swings per-archetype rows on the same mobs, at roughly the same rate as the generic ones
+(`combo_npc_guardian_polearm_1_sweep` ×31 against `generic_polearm` ×29 on the same Pillager). Two things about
+them are settled and one is not.
+
+**`Combos.Criteria` is the WEAPON CLASS the row requires**, in the same numbering `Items.SearchCategory` uses.
+That is what turns the families from names into a lookup, and it holds over all 744 catalog rows — wherever a
+combo's name carries a weapon token, its `Criteria` is that weapon's, with no contradiction:
+
+| `Criteria` | weapon | `SearchCategory` | families at that criteria |
+|---:|---|---:|---|
+| 23 | 1h edge | 30011 | generic, **guardian**_shield |
+| 25 | polearm | 30016 | generic, **guardian**_polearm |
+| 26 | bow | 30017 | **ranger**_bow — *no generic row* |
+| 27 | 1h blunt | 30013 | generic |
+| 28 | 2h (blunt **and** edge) | 30012 | generic, **barbarian**_2h, **conqueror**_2h |
+| 29 | 2h blunt | 30014 | generic |
+| 30 | dagger | 30015 | generic |
+| 32 | crossbow | 30018 | **ranger**_crossbow — *no generic row* |
+| 52 | dual-wield | — | generic, **barbarian**_dual, **conqueror**_dual |
+| 0 | none | — | assassin, bear_shaman, dark_templar, hox, heimdall |
+
+**The trailing number is `Combos.Level`, a CEILING.** Across the 30 captured class-family swings no actor ever
+swings a row above its own level, and a level-75 mob still swings the rank-1 row — so a higher-level NPC's
+eligible set *contains* a lower one's rather than replacing it.
+
+**The archetype itself is a per-NPC property and is not recoverable in general.** Everything we hold cuts across
+the eight observed families — `Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`,
+`CarsGroup`, `Flags`, and `ProfessionType` (null on all but one actor). The client ships **no NPC-template
+catalog** to read it from (RDB 1000020 has no record for the combat actors' template ids), and all 31
+combo-swinging templates have **zero `NpcSpell` rows**, so the two routes #675 named are both dead.
+
+**Two buckets are answered anyway, because they have exactly one class family.** Measured per SPAWN rather than
+per type — one handle in one capture holds one loadout, which is the cut that matters:
+
+| weapon | family | evidence |
+|---|---|---|
+| dagger | `combo_npc_assassin_*` | all 31 assassin-family swings are by dagger-wielders; all **8** dagger-armed templates swing it |
+| polearm | `combo_npc_guardian_polearm_*` | 61 swings; all **5** polearm-armed templates swing it |
+
+Those two are shipped (`NpcWeapon.ClassComboFamily` → `ComboService.NpcClassComboIds`), level-gated, and chosen
+against the generic row at `ClassComboShare` — the corpus splits 92 class / 65 generic over exactly these two
+weapons.
+
+⚠️ **The rest are refused, and the shield case is refuted rather than unsampled.** `combo_npc_guardian_shield_*`
+is swung by only **3 of the 6** captured shield-bearing templates — the three Vanir ones swing generic only — so
+a shield does not make a guardian. Two-handers and dual-wielders carry two or three candidate families
+(`barbarian` / `conqueror` / `hox`) and no template swings two of them.
+
+⚠️ **Ranged is answered but not wired.** `ranger` is the only family at criteria 26/32, there is no
+`combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows — so no archetype is
+needed there at all. What blocks it is the CARRIER: our ranged NPCs send the melee ack (`BehaviorId.CombatMelee`),
+where retail's ranged swings are `CombatRanged` (0x10) with a different tail and a three-phase sequence. Tracked
+on **Gitea #676**.
 
 Gated by `NpcComboTests`, which locks the catalog premise, the mapping, the coverage over the shipped spawn set,
-and that the id reaches the wire in `combo_id` with nothing else about the ack moving.
+the `Criteria` decode, the level ceiling, the two answered buckets and the ones deliberately refused — and that
+the id reaches the wire in `combo_id` with nothing else about the ack moving.
 
 Open work — spellweaving polish — is tracked on **Gitea #141**.

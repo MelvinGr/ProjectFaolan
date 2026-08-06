@@ -426,6 +426,12 @@ namespace Faolan.GameServer.World
 		// Whether a given swing actually carries it is a per-swing roll - see NpcWeapon.MeleeComboShare.
 		public uint MeleeComboId { get; set; }
 
+		// #675: the CLASS-family rows this NPC may swing INSTEAD of its generic one, already level-gated at load.
+		// Empty for every NPC whose archetype the weapon does not answer, which is most of them - see
+		// `NpcWeapon.ClassComboFamily`. A swing that carries a combo at all then picks between this and MeleeComboId
+		// at `NpcWeapon.ClassComboShare`.
+		public uint[] ClassComboIds { get; set; } = [];
+
 		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
 		// The tick flips this and emits an NpcEnterCombat/NpcExitCombat effect on the transition; reset on death/respawn.

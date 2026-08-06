@@ -37,9 +37,9 @@ namespace Faolan.GameServer.Combat
 		// `combo_id`. The rest are plain swings, so a mob that combos every swing reads nothing like retail's.
 		//
 		// `Combat:Unarmed` is 0 of 769 - an animal has no weapon, so it has no combo, which falls out of the weapon
-		// lookup below rather than needing its own rule. `Combat:Ranged` is 57 of 418 (13.6%) and is NOT modelled:
-		// the ranged combos are the `combo_npc_ranger_{bow,crossbow}_*` class family, and there is no
-		// `combo_npc_generic_bow` row to fall back on.
+		// lookup below rather than needing its own rule. `Combat:Ranged` is 57 of 418 (13.6%) and is NOT modelled -
+		// not for want of knowing WHICH combo (that is settled, see ClassComboFamily) but because the ack itself is
+		// the wrong record: #676.
 		public const double MeleeComboShare = 427.0 / 1504.0;
 
 		// The client's weapon SEARCH CATEGORIES that are ranged. Only 30017 appears on an NPC in the corpus; the
@@ -64,11 +64,8 @@ namespace Faolan.GameServer.Combat
 		// two loadouts (Bat Pict Mauler, template 8799 polearm vs 13960 club) swings the two different combos.
 		// The off hand only ever refines the one-handed cases, which is why it is consulted there and nowhere else.
 		//
-		// ⚠️ This is the GENERIC set only. Retail also swings per-class families (`combo_npc_guardian_polearm_1_sweep`,
-		// `combo_npc_assassin_unholy_30_doomstrike`, ...) roughly half the time on the same mobs, and their trailing
-		// number is a minimum LEVEL gate (1/30/50/70, with no violation across the 30 captured rows). What is missing
-		// is the class ARCHETYPE per NPC - it is not the weapon (a 2h-edge mob swings `barbarian_2h` or `hox`
-		// depending on the creature) and `NpcStatCore.ProfessionType` is null on all but one of them. Gitea #675.
+		// ⚠️ This is the GENERIC set only - the CLASS families are `ClassComboFamily` below, which also records which
+		// buckets it deliberately refuses to answer. Gitea #675.
 		public static string? MeleeComboName(IEnumerable<INpcEquipment>? equipment)
 		{
 			var main = CategoryIn(equipment, MainHandPos);
@@ -88,6 +85,53 @@ namespace Faolan.GameServer.Combat
 				_                                   => null
 			};
 		}
+
+		// #675: the CLASS-family `combo_npc_*` rows this NPC may also swing, as the name prefix that selects them, or
+		// null when the weapon does not answer which family it is. Retail swings these alongside the generic set - on
+		// the same Pillager the corpus has `combo_npc_guardian_polearm_1_sweep` x31 against `combo_npc_generic_polearm`
+		// x29 - and their level gate is `Combos.Level` (1/30/50/70), which is why nothing here parses a name.
+		//
+		// **The archetype is a per-NPC property in general and is NOT recoverable**: it is in no column we hold
+		// (`Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`, `CarsGroup` and `Flags` all cut
+		// straight across the eight observed families), the client ships no NPC-template catalog to read it from, and
+		// all 31 combo-swinging templates have zero `NpcSpell` rows. See #675.
+		//
+		// What IS settled is a subset, and the evidence is the per-SPAWN weapon rather than the per-type gear union -
+		// one handle in one capture has one loadout (`--report combo-swings`, the "combo -> the weapon of the actor
+		// that swung it" cut):
+		//
+		//   DAGGER  -> assassin   every one of the 31 captured assassin-family swings is by a dagger-wielder, and all
+		//                         8 dagger-armed templates swing the family
+		//   POLEARM -> guardian   likewise, 61 swings and all 5 polearm-armed templates
+		//
+		// ⚠️ And a subset is all it is - three buckets stay ambiguous and are deliberately absent:
+		//
+		//   SHIELD    the one refuted case. `combo_npc_guardian_shield_*` is swung by 3 of the 6 shield-bearing
+		//             templates; the three Vanir ones swing only generic, so a shield does NOT make a guardian.
+		//   2h        `barbarian_2h` / `conqueror_2h` / `hox` all appear on two-handers, blunt AND edge, and no
+		//             template swings two of them. A per-NPC property with three candidates.
+		//   dual 1h   `barbarian_dual` / `conqueror_dual`, same shape.
+		//
+		// ⚠️ BOW/CROSSBOW is answered but not wired. `combo_npc_ranger_{bow,crossbow}_*` is the only family at those
+		// weapon criteria - there is no `combo_npc_generic_bow` to fall back on - and all 57 captured ranged combos
+		// are ranger rows, so no archetype is needed at all. What stops it is the CARRIER: our ranged NPCs send the
+		// melee ack (`BehaviorId.CombatMelee`), and retail's ranged swings are `CombatRanged` with a different tail
+		// and a three-phase sequence. Putting a bow combo on a melee ack would be wrong in a new way. See #676.
+		public static string? ClassComboFamily(IEnumerable<INpcEquipment>? equipment)
+		{
+			return CategoryIn(equipment, MainHandPos) switch
+			{
+				Dagger  => "combo_npc_assassin_",
+				Polearm => "combo_npc_guardian_polearm_",
+				_       => null
+			};
+		}
+
+		// #675: how often a combo swing by an NPC that HAS a class family uses it rather than its generic row. Over
+		// the two wired buckets the corpus splits 92 class / 65 generic - the dagger actors 31/13 and the polearm ones
+		// 61/52 - so it is a coin flip leaning class, not a preference for either. Applied only after
+		// `MeleeComboShare` has already decided the swing carries a combo at all.
+		public const double ClassComboShare = 92.0 / (92.0 + 65.0);
 
 		// The item class worn in `slot`, or 0 when the slot is empty. `Item` is an FK navigation; a row whose Item is
 		// not Included would throw, so ask the ROW for the slot first and only touch the item on the one that matters.

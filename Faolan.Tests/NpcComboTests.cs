@@ -183,6 +183,98 @@ namespace Faolan.Tests
 		public void TheComboShare_IsTheMeasuredCorpusRate()
 		{
 			Assert.InRange(NpcWeapon.MeleeComboShare, 0.28, 0.29);
+			Assert.True(NpcWeapon.ClassComboShare is > 0.58 and < 0.59, $"{NpcWeapon.ClassComboShare}"); // 92 class / 65 generic over the two wired weapons
+		}
+
+		// #675: `Combos.Criteria` is the WEAPON CLASS a combo requires, and it maps one-to-one onto the item catalog's
+		// own `SearchCategory`. That is what turns the class families from names into a lookup - the polearm rows are
+		// the criteria-25 ones, not "the ones with `polearm` in the name".
+		//
+		// Checked from the CATALOG side over all 744 rows rather than from the nine generic ones: wherever a combo's
+		// name carries a weapon token, its Criteria is that weapon's. Nothing in the shipped catalog contradicts it.
+		[Theory]
+		[InlineData(NpcWeapon.OneHandEdge, 23, "combo_npc_generic_1he")]
+		[InlineData(NpcWeapon.Polearm, 25, "combo_npc_generic_polearm")]
+		[InlineData(30017u, 26, "combo_npc_ranger_bow_1_ripper_volley")] // bow
+		[InlineData(NpcWeapon.OneHandBlunt, 27, "combo_npc_generic_1hb")]
+		[InlineData(NpcWeapon.TwoHandEdge, 28, "combo_npc_generic_2he")]
+		[InlineData(NpcWeapon.TwoHandBlunt, 29, "combo_npc_generic_2hb")]
+		[InlineData(NpcWeapon.Dagger, 30, "combo_npc_generic_dagger")]
+		[InlineData(30018u, 32, "combo_npc_ranger_crossbow_1_ripper_barrage")] // crossbow
+		public void CombosCriteria_IsTheWeaponClassTheRowRequires(uint searchCategory, int criteria, string witness)
+		{
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+
+			var row = db.Combos.Single(c => c.Name == witness);
+			Assert.Equal(criteria, row.Criteria);
+
+			// ...and the item catalog really does hold weapons of that class, so the two numbering spaces are joined
+			// by something we ship rather than by this table alone.
+			Assert.True(db.Items.Any(i => i.SearchCategory == searchCategory), $"no item of class {searchCategory}");
+		}
+
+		// The two buckets the weapon DOES answer, and they are answered because each has exactly one class family.
+		// Corpus, per SPAWN rather than per type (one handle in one capture holds one loadout): all 31 assassin-family
+		// swings are by dagger-wielders and all 8 dagger-armed templates swing the family; likewise 61 swings and 5
+		// templates for the polearm guardians.
+		[Theory]
+		[InlineData(NpcWeapon.Dagger, "combo_npc_assassin_")]
+		[InlineData(NpcWeapon.Polearm, "combo_npc_guardian_polearm_")]
+		public async Task AWeaponThatAnswersTheArchetype_ResolvesItsClassFamily(uint main, string family)
+		{
+			Assert.Equal(family, NpcWeapon.ClassComboFamily(Equip(main, 0)));
+
+			var ids = await Service().NpcClassComboIds(Equip(main, 0), 80);
+			Assert.NotEmpty(ids);
+
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var names = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => c.Name).ToList();
+			Assert.All(names, n => Assert.StartsWith(family, n, System.StringComparison.Ordinal));
+		}
+
+		// ⚠️ The buckets that stay UNANSWERED, pinned so a later "tidy up the rest" pass has to face the evidence
+		// rather than widening the switch:
+		//
+		//   shield    refuted, not merely unsampled - `combo_npc_guardian_shield_*` is swung by 3 of the 6 captured
+		//             shield-bearing templates, the three Vanir ones swinging only generic
+		//   2h/dual   `barbarian` / `conqueror` / `hox` all appear on two-handers (blunt AND edge) and no template
+		//             swings two of them, so it is a per-NPC property with two or three candidates
+		//   bow       ANSWERED (ranger is the only family at those criteria and there is no generic bow row) but not
+		//             wired: the carrier is wrong, our ranged NPCs send the melee ack. See #676.
+		[Theory]
+		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.Shield)]
+		[InlineData(NpcWeapon.TwoHandEdge, 0u)]
+		[InlineData(NpcWeapon.TwoHandBlunt, 0u)]
+		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.OneHandEdge)]
+		[InlineData(NpcWeapon.OneHandBlunt, 0u)]
+		[InlineData(30017u, 0u)] // bow - answered, but the ranged ack is #676
+		[InlineData(0u, 0u)] // unarmed
+		public async Task AWeaponThatDoesNotAnswerTheArchetype_SwingsGenericOnly(uint main, uint off)
+		{
+			Assert.Null(NpcWeapon.ClassComboFamily(Equip(main, off)));
+			Assert.Empty(await Service().NpcClassComboIds(Equip(main, off), 80));
+		}
+
+		// The level gate is `Combos.Level` verbatim - the family name's trailing number. Across the 30 captured
+		// class-family swings no actor ever swings a row above its own level, and a level-75 mob still swings the
+		// rank-1 row, so this is a CEILING and not a bracket: a higher-level NPC's set contains the lower one's.
+		[Fact]
+		public async Task TheClassFamilyIsGatedByLevel_AsACeilingNotABracket()
+		{
+			var service = Service();
+			var dagger = Equip(NpcWeapon.Dagger, 0);
+
+			var atOne = await service.NpcClassComboIds(dagger, 1);
+			var atThirty = await service.NpcClassComboIds(dagger, 30);
+			var atEighty = await service.NpcClassComboIds(dagger, 80);
+
+			Assert.NotEmpty(atOne);
+			Assert.Subset(atThirty.ToHashSet(), atOne.ToHashSet());
+			Assert.Subset(atEighty.ToHashSet(), atThirty.ToHashSet());
+			Assert.True(atEighty.Length > atOne.Length, "the level-80 set should be strictly wider than the level-1 one");
+
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			Assert.All(db.Combos.Where(c => atOne.Contains(c.Id)).ToList(), c => Assert.True(c.Level <= 1, $"{c.Name} is level {c.Level}"));
 		}
 
 		private static IEnumerable<(uint Main, uint Off, string Expected)> Loadouts()

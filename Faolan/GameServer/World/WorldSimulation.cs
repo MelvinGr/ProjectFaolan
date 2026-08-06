@@ -379,9 +379,15 @@ namespace Faolan.GameServer.World
 			// #623: retail puts a combo on 427 of 1,504 captured NPC melee acks, so the mob combos on some swings and
 			// swings plain on the rest. Rolled per swing rather than cycled, because the corpus shows no ordering -
 			// a mob alternates its generic and class combos with plain hits in no pattern. 0 = plain.
+			// #675: and when it does, a mob whose weapon answers its archetype swings a CLASS row about as often as
+			// its generic one (the corpus splits 92/65 over the two wired weapons). Which rank is drawn from the rows
+			// its level allows - retail's level-75 mobs still swing the rank-1 row, so there is no "highest wins".
 			var comboId = npc.MeleeComboId != 0 && Random.Shared.NextDouble() < NpcWeapon.MeleeComboShare
 				? npc.MeleeComboId
 				: 0;
+			if (comboId != 0 && npc.ClassComboIds.Length > 0 && Random.Shared.NextDouble() < NpcWeapon.ClassComboShare)
+				comboId = npc.ClassComboIds[Random.Shared.Next(npc.ClassComboIds.Length)];
+
 			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, direction, comboId);
 
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
