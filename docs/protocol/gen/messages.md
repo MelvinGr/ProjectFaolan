@@ -20,7 +20,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 |-------|----------|--------|-------|--------------------------|
 | V3 | `AddToGroupIIR` | `0x0DF44B73` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `BankIIR` | `0x0BA1C1CB` | `BankCodec` | [V3: BankStorageTests.BankCodec_Matches_CapturedBank] |
-| V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorControlCenterCodec` | [V3: BehaviorAnimationsTests.PlayAnimationRelay_MatchesCapture] |
+| V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorControlCenterCodec` | [V3: BehaviorAcksTests.HitResultAck_StatesTheZoneTheSwingCameFrom] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |

@@ -93,12 +93,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 		//   * the behaviourId is the NormalAttack constant rather than the request's own.
 		// The result block is the SAME 81 bytes `BehaviorAnimations.NpcAttackAck` sends the other way round - it was
 		// written out twice, once here and once there, which is the duplicate-layout pattern #530 keeps finding.
-		public static BehaviorControlCenterIIR HitResultAck(byte[] rawPayload, uint instance, uint phase, uint victimHandle, uint damage)
+		// `direction` is the zone the player swung from, and it is NOT optional in retail: every one of the 515
+		// captured player-actor swings states a direction in its result record, including the 107 that name no
+		// direction ABILITY (a combo step carries its direction in the catalog, not on the wire). Passing it is what
+		// stops this ack saying "Overhead" on every swing - the same defect #673 fixed on the mob path.
+		public static BehaviorControlCenterIIR HitResultAck(byte[] rawPayload, uint instance, uint phase, uint victimHandle, uint damage, SwingDirection direction)
 		{
 			var request = ParseRequest(rawPayload);
 
 			return new BehaviorControlCenterIIR(instance, (ushort)(request.Seq + 1), (uint)BehaviorId.CombatMelee, InsertBehaviorPhaseField(request.Args, phase),
-				HitResultBlock(victimHandle, damage));
+				HitResultBlock(victimHandle, damage, SwingDirectionCode(direction)));
 		}
 
 		// The result block that closes a targeted-hit ack. DECODED (#536) - it used to be written out as one flat run

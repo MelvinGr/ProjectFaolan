@@ -1836,7 +1836,7 @@ namespace Faolan.GameServer
 						// the runtime reads them rather than matching directions. Every step is an ordinary damaging
 						// swing; the finisher adds the combo's own spell (ResolveComboFinisher).
 						var combo = await _combos.TrackSwing(client, args);
-						await _combat.SendNormalAttackResponse(client, rawPayload, targetHandle, args.CommandqueueClientId);
+						await _combat.SendNormalAttackResponse(client, rawPayload, targetHandle, args.CommandqueueClientId, combo);
 						if (combo is { IsFinisher: true })
 							await ResolveComboFinisher(client, combo, targetHandle);
 

@@ -1,4 +1,5 @@
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Combat;
 
 namespace Faolan.GameServer.Combat
 {
@@ -9,7 +10,8 @@ namespace Faolan.GameServer.Combat
 	// reconstruction of it.
 	// [V3: 840 captured records across 26 captures resolve to 60 distinct catalog ids with ZERO unknowns -
 	// ComboWireTests.CapturedComboSwings_AllResolveToTheCatalog]
-	public sealed record ComboSwing(Combo Combo, int Step, int StepCount, uint ActivationCentiseconds, uint TotalCentiseconds)
+	public sealed record ComboSwing(Combo Combo, int Step, int StepCount, uint ActivationCentiseconds, uint TotalCentiseconds,
+		SwingDirection? Direction = null)
 	{
 		// The last step of the sequence - the finisher, which is what carries the combo's effect. The client makes
 		// the same test: `AttackCommandBase_c` compares its step (+0x50) against the combo data's step count minus

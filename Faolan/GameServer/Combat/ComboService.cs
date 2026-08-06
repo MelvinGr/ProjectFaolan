@@ -4,6 +4,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
@@ -99,7 +100,8 @@ namespace Faolan.GameServer.Combat
 			session.ActiveComboCentiseconds += message.ActivationTime;
 			session.ActiveComboStep = step + 1;
 
-			var swing = new ComboSwing(entry.Combo, step, StepCountFor(entry, step), message.ActivationTime, session.ActiveComboCentiseconds);
+			var swing = new ComboSwing(entry.Combo, step, StepCountFor(entry, step), message.ActivationTime, session.ActiveComboCentiseconds,
+				DirectionFor(entry, step));
 			if (swing.IsFinisher)
 			{
 				// The attempt is over - the next combo swing opens a new one.
@@ -128,6 +130,18 @@ namespace Faolan.GameServer.Combat
 			return (uint)(maxStamina * (swing.Combo.Stamina / 100f) * swing.AnimationSeconds / divisor);
 		}
 
+		// The zone this step is swung from, straight off the catalog (#673). A combo step names no direction ABILITY
+		// on the wire - word 5 is absent on 107 of the 515 captured player swings - but the result record still
+		// carries a direction code on every one of them (`--report bcc-attack-tail`: 0xCA x58, 0xCB x22, 0xC9 x8 on
+		// the ability-less player swings). So a swing is ALWAYS directed, and for a combo step the catalog is where
+		// the direction comes from: the client picked the step by pressing that key.
+		//
+		// Null for a combo with no key sequence (the `action` NPC rows, the blank specials, a `Thrust` step).
+		private static SwingDirection? DirectionFor(ComboEntry entry, int step)
+		{
+			return step >= 0 && step < entry.Sequence.Count ? entry.Sequence[step].ToSwingDirection() : null;
+		}
+
 		private static int StepCountFor(ComboEntry entry, int step)
 		{
 			// A combo whose Actions is a marker or blank has no key sequence to count (the 69 `action` rows are the
@@ -141,7 +155,7 @@ namespace Faolan.GameServer.Combat
 			var combos = await _database.GetCombos();
 			var map = new Dictionary<uint, ComboEntry>(combos.Length);
 			foreach (var combo in combos)
-				map[combo.Id] = new ComboEntry(combo, ComboActionParser.TryParse(combo.Actions, out var sequence) ? sequence.Count : 0);
+				map[combo.Id] = new ComboEntry(combo, ComboActionParser.TryParse(combo.Actions, out var sequence) ? sequence : []);
 
 			return map;
 		}
@@ -156,7 +170,11 @@ namespace Faolan.GameServer.Combat
 			return map;
 		}
 
-		// A catalog row plus its step count, so the sequence is parsed once at load rather than per swing.
-		private readonly record struct ComboEntry(Combo Combo, int StepCount);
+		// A catalog row plus its parsed key SEQUENCE, so the sequence is parsed once at load rather than per swing.
+		// Empty for a combo with no directional grammar (a reactive/magic marker, or a blank `Actions`).
+		private readonly record struct ComboEntry(Combo Combo, IReadOnlyList<ComboInput> Sequence)
+		{
+			public int StepCount => Sequence.Count;
+		}
 	}
 }

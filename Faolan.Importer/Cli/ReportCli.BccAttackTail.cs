@@ -86,6 +86,10 @@ namespace Faolan.Importer.Cli
 			// has) rather than of every mob. Keyed by template, never by name (#244).
 			var byTemplate = new Dictionary<uint, Dictionary<uint, int>>();
 			var templateNames = new Dictionary<uint, string>();
+			// A PLAYER swing that names no direction ability is a combo step or a spell. It still carries a result
+			// type, and whether that type is a spread or a constant decides whether our ack may keep writing 0xCB on
+			// the undirected path or has to source the direction some other way (the combo catalog states one).
+			var playerUndirected = new Dictionary<(bool Directed, uint ResultType), int>();
 
 			foreach (var c in captures)
 			{
@@ -144,6 +148,12 @@ namespace Faolan.Importer.Cli
 				foreach (var rt in resultTypes)
 				{
 					Count(playerActor, "result type", rt);
+					if (playerActor)
+					{
+						var pkey = (middle[^3] != 0, rt);
+						playerUndirected[pkey] = playerUndirected.GetValueOrDefault(pkey) + 1;
+					}
+
 					if (!playerActor && actorTemplate != 0 && DirectionCodes.Contains(rt))
 					{
 						var perTemplate = byTemplate.TryGetValue(actorTemplate, out var d2) ? d2 : byTemplate[actorTemplate] = [];
@@ -227,6 +237,11 @@ namespace Faolan.Importer.Cli
 				var named = abilities.TryGetValue(value, out var an) ? an : value == 0 ? "-" : $"0x{value:X}";
 				Console.WriteLine($"      {(player ? "player" : "NPC   "),-7} {field,-16} {named,-20} x{n}");
 			}
+
+			Console.WriteLine();
+			Console.WriteLine("PLAYER swings, split by whether the swing named a direction ABILITY (is an undirected swing directionless?):");
+			foreach (var ((directed, rt), n) in playerUndirected.OrderByDescending(kv => kv.Key.Directed).ThenByDescending(kv => kv.Value))
+				Console.WriteLine($"      {(directed ? "ability named" : "NO ability   "),-14} result type 0x{rt:X2}  x{n}");
 
 			// #673 part 2. The rose has three arcs and the wire has five zones, so the question that decides whether
 			// the swing pick is a placeholder or a measurement is what the five collapse to. The collapse

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.Tests.Support;
@@ -105,6 +106,35 @@ namespace Faolan.Tests
 			Assert.Equal(0, swing.Step);
 			Assert.Equal(1, swing.StepCount);
 			Assert.True(swing.IsFinisher);
+		}
+
+		// #673: a combo step IS a directional swing - the player reached it by pressing that key - and the corpus
+		// agrees: word 5 (the direction ABILITY) is absent on 107 of the 515 captured player swings, yet every one of
+		// those result records still carries a direction code. So the direction has to come from the catalog, which
+		// is the only place a combo step states it. `Assassin_20b_..._Grim_Corruption_II` is `UP,UL` and
+		// `Rogue_19_..._Cunning_Strike_VI_dagger` is `UL,UR,UP`, both read straight off `Combo.Actions`.
+		[Fact]
+		public async Task EachComboStep_CarriesTheZoneItsKeyNames()
+		{
+			var (service, client) = Setup();
+
+			Assert.Equal(SwingDirection.Overhead, (await service.TrackSwing(client, Swing(TwoStep)))!.Direction);
+			Assert.Equal(SwingDirection.UpperLeft, (await service.TrackSwing(client, Swing(TwoStep, 1)))!.Direction);
+
+			Assert.Equal(SwingDirection.UpperLeft, (await service.TrackSwing(client, Swing(ThreeStep)))!.Direction);
+			Assert.Equal(SwingDirection.UpperRight, (await service.TrackSwing(client, Swing(ThreeStep, 1)))!.Direction);
+			Assert.Equal(SwingDirection.Overhead, (await service.TrackSwing(client, Swing(ThreeStep, 2)))!.Direction);
+		}
+
+		// A combo with no directional grammar states no zone rather than a made-up one - the `action` NPC rows, the
+		// blank specials and the reactive markers are not key sequences at all, so the caller falls back explicitly
+		// instead of being handed a fabricated direction.
+		[Fact]
+		public async Task AComboWithNoKeySequence_StatesNoZone()
+		{
+			var (service, client) = Setup();
+
+			Assert.Null((await service.TrackSwing(client, Swing(3363574, ComboService.UnsteppedAttackNum)))!.Direction);
 		}
 
 		// A combo id outside the catalog resolves as a plain swing rather than throwing - the client is free to

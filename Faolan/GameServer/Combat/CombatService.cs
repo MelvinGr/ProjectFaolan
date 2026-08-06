@@ -219,7 +219,7 @@ namespace Faolan.GameServer.Combat
 		// must therefore get the PLAIN echo-ack with no result block, exactly like the unarmed air swing, or the
 		// player visibly bleeds when swinging at nothing (#19). The "no damage" half was already guarded; this also
 		// drops the self hit-react.
-		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0)
+		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0, ComboSwing? combo = null)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
 			if (rawPayload.Length < 26)
@@ -263,15 +263,25 @@ namespace Faolan.GameServer.Combat
 			if (crit)
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
 
-			// #20 directional combat: the swing carries the direction it came from as the LAST word of the request tail
-			// (the Upper Left / Upper Right / Overhead attack ability), and the defender's shield rose says how many of
-			// its three guards cover that arc. An unguarded arc takes 20% MORE, a triple-stacked one 66% less - the
-			// client's own Combat_PvE{0..3}ShieldBonus table. A swing with no direction (a combo step, a spell) is
-			// undirected and passes through unchanged.
+			// #20 directional combat: the swing comes from one of the client's five zones, and the defender's shield rose
+			// says how many of its three guards cover the ARC that zone belongs to. An unguarded arc takes 20% MORE, a
+			// triple-stacked one 66% less - the client's own Combat_PvE{0..3}ShieldBonus table.
 			// The defender's own rose is read off whatever the handle resolves to, NPC or player alike - a player carries
 			// one now (#620), set by the client and relayed by HandlePlayerShieldRose - and a player defender switches
 			// the table to the PvP column, which is the gentler one (-0.15/-0.30 where PvE mitigates -0.33/-0.66).
-			var swingArc = CombatShieldRose.ArcFor(BehaviorTailScan.AbilityId(BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Tail));
+			//
+			// ⚠️ A SWING IS ALWAYS DIRECTED (#673), which this used to have backwards ("a combo step is undirected and
+			// passes through unchanged"). The direction ABILITY in the request tail is only how a PLAIN swing states it:
+			// word 5 is absent on 107 of the 515 captured player swings, and every one of those 88 result records still
+			// carries a direction code (0xCA x58, 0xCB x22, 0xC9 x8). For a combo step the direction is the KEY the
+			// player pressed to reach it, which the catalog states - `ComboSwing.Direction`, off `Combo.Actions`.
+			//
+			// The fallback is only for a combo with no directional grammar at all (a reactive/magic marker, a `Thrust`
+			// step). It is spent on BOTH the mitigation and the ack, so the wire and the damage still agree on every
+			// swing - the invariant #673 established - rather than one of them silently disagreeing on the rare case.
+			var swingDirection = CombatShieldRose.DirectionFor(BehaviorTailScan.AbilityId(BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Tail))
+			                     ?? combo?.Direction ?? SwingDirection.Overhead;
+			var swingArc = CombatShieldRose.ArcOf(swingDirection);
 			WorldEntity? defenderEntity = null;
 			if (attackerEntity != null && _sim.World.TryGetZone(attackerEntity.MapId, out var attackerZone) && attackerZone.TryGet(targetHandle, out var defender))
 				defenderEntity = defender;
@@ -282,7 +292,7 @@ namespace Faolan.GameServer.Combat
 			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 81-byte result
 			// block naming the VICTIM) is BehaviorAcks.HitResultAck's; this path used to write all of it inline, which
 			// made it the sixth hand-rolled copy of a message that has one codec (#530 wave 7).
-			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.HitResultAck(rawPayload, instance, phase, targetHandle, damage)));
+			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.HitResultAck(rawPayload, instance, phase, targetHandle, damage, swingDirection)));
 
 			// 2) DamageResultIIR - the hit / floating number (crits are just a bigger number, same school).
 			await SendDamageNumber(client, targetHandle, instance, damage, school);

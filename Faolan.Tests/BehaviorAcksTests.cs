@@ -131,6 +131,26 @@ namespace Faolan.Tests
 				BehaviorAcks.HitResultBlock(0x2001, 77));
 		}
 
+		// #673, the player half: a swing is ALWAYS directed, so the player's own hit ack has to state the zone they
+		// swung from. It used to write the `0xCB` default on every swing - i.e. tell the client "Overhead" while the
+		// mitigation charged for whatever the request's direction ability said - which is the same defect the mob
+		// path had. The result type is the u32 at +13 of the 41-byte result, which is the last record in the block.
+		[Theory]
+		[InlineData(SwingDirection.UpperLeft, 0xC9u)]
+		[InlineData(SwingDirection.UpperRight, 0xCAu)]
+		[InlineData(SwingDirection.Overhead, 0xCBu)]
+		[InlineData(SwingDirection.LowerLeft, 0xCCu)]
+		[InlineData(SwingDirection.LowerRight, 0xCDu)]
+		public void HitResultAck_StatesTheZoneTheSwingCameFrom(SwingDirection direction, uint expected)
+		{
+			// A minimal Combat:Melee request: [len][subop][c350][instance][seq][behaviorId][argsLen][args][tail].
+			var request = Hex("0000002a642cd3d60000c350021663dd00030000000f00000004089bc80200000000");
+
+			var ack = BehaviorControlCenterCodec.Build(BehaviorAcks.HitResultAck(request, Instance, 1, 0x2001, 77, direction));
+
+			Assert.Equal(expected, ack.ReadU32Be(ack.Length - 41 + 13));
+		}
+
 		private static byte[] Hex(string s)
 		{
 			return Convert.FromHexString(s);

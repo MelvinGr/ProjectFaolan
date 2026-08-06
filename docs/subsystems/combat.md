@@ -209,11 +209,21 @@ across the same arcs, so the swing is worth more into whichever arc is thinnest.
 "Mid" is the overhead arc. The rose is drawn by `CombatRoseView_c` (vtable `0x020a216c`), fed by
 `TargetingModule_t`.
 
-**The attack direction** rides the swing as the LAST word of the `BehaviorControlCenterIIR` request tail — the
-`Normal Attack` ability id, LDB-named: `769094` *Upper Left Attack*, `769095` *Upper Right Attack*, `769099`
-*Overhead Attack*. `769096` / `769097` (*Lower* Left/Right) exist in the ability catalog with slot 0 and appear
-in no capture. `CombatShieldRose.ArcFor` maps them; an ability that is none of the five is undirected and takes
-no arc modifier [V3: CombatShieldRoseTests.ArcFor_MapsTheDirectionAbilitiesToTheirArc].
+**The attack direction** is one of FIVE zones, and the three arcs above are the guards that cover them — a lower
+zone is guarded by the arc on its own side, which is the client's own fold (see "The swing's DIRECTION is on the
+wire" below). A PLAIN swing states its zone as the LAST word of the `BehaviorControlCenterIIR` request tail: the
+`Normal Attack` ability id, LDB-named `769094` *Upper Left*, `769095` *Upper Right*, `769099` *Overhead*, plus
+`769096` / `769097` (*Lower* Left/Right), which carry slot 0 in the catalog because the captured characters were
+below the level that unlocks them. `CombatShieldRose.DirectionFor` maps the id to the zone and `ArcOf` the zone
+to its guard [V3: CombatShieldRoseTests.DirectionFor_MapsTheFiveDirectionAbilities].
+
+⚠️ **A swing is always directed** — a *combo step* simply states its zone somewhere else. It names no ability
+(word 5 is absent on 107 of the 515 captured player swings) yet every one of those results still carries a
+direction code, because the player reached that step by pressing a direction key and the catalog says which:
+`Combo.Actions` is the key sequence (`UL,UR,UP`), so step *n*'s zone is its *n*-th token. `ComboSwing.Direction`
+carries it into both the mitigation and the ack
+[V3: ComboServiceTests.EachComboStep_CarriesTheZoneItsKeyNames]. Only a combo with no directional grammar at all
+(a reactive/magic marker, a `Thrust` step) has no zone to state, and that case alone falls back.
 
 **The defender's guard** is `CombatShieldIIR` (`0xCFFD0519`, `CombatShieldCodec`) — one u32, decimal-packed
 hundreds=Left, tens=Mid, units=Right, stored by the client as stat `0xA5`. All 110 captured records spread
