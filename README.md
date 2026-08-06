@@ -72,8 +72,10 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Environmental damage** — falls cost health scaled to your maximum and leave a bruise or broken bone; lava
   burns and kills across the client's 105 lava volumes. Death stacks a 30-minute penalty. Pending an in-client
   confirm (#495, #504)
-- 🟡 **Local travel** — wagoners move you for a fee: pick, pay, confirm, arrive; criminals are refused. The retail
-  trigger inside the NPC's conversation is not wired, so it runs from a GM command (#506, #514)
+- ✅ **Local travel** — wagoners move you for a fee, triggered from inside the NPC's own conversation: pick, pay,
+  arrive; criminals are refused. The trip goes out on retail's own packets — the move-the-player action and the
+  *Racer* buff — and three travellers who state their destination in dialogue text work too (#506, #514, #635,
+  #636)
 
 ### Combat
 
@@ -97,6 +99,10 @@ we've seen_, and names the gaps). Regenerate with
   aggressively (#361)
 - ✅ **NPC death animations** — a proper death on the killing blow, per creature type, with more being harvested
   (#362)
+- 🟡 **NPCs swing combos** — a mob's weapon picks the combo it performs, at the rate retail does it (28% of melee
+  swings, 14% of shots), and archers shoot on their own record rather than playing a sword swing. Dagger, polearm
+  and bow mobs also swing their class family; two-handers and shields still swing generic, because which archetype
+  those belong to is not in anything the client ships (#623, #675, #676)
 - 🟡 **Outlaw resurrection points** — the client's 49 criminal destinations are imported, but revive still sends
   everyone to the normal point (#517, #503)
 - 🟡 **Recalls** — Path of Asura returns you to your bind point, the Totem of Origins to your race's home city.
@@ -141,7 +147,8 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **XP curve** — anchored on the retail thresholds the captures carry (levels 1-9, 23-25 and 80); the levels
   between anchors are interpolated (#297)
 - 🟡 **Class spell / combo / ability catalogs** — still filling in; empty spell and item names are backfilled from
-  the client's own string table (#291, #296, #303, #300)
+  the client's own string table. The archetype-shared combos and spells now reach all three classes of their
+  archetype rather than being filed under one (#291, #296, #303, #300, #581)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
 
 ### Items & economy

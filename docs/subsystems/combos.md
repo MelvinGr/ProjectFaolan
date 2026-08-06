@@ -25,7 +25,7 @@ resolves the blend + a backlash roll on deactivate.
 
 ## Which class gets which combo
 
-The map (`ClassCombos`) has two sources, and the second was added in #296 because the first refuses to guess:
+The map (`ClassCombos`) has three sources. The second was added in #296 and the third in #581, each because the ones before it refuse to guess:
 
 1. **The combo's NAME prefix**, for the class-named ones (`Guardian_`, `Ranger_`, …) — `CaptureAbilityImporter`,
    plus captured action bars for direct `(class, combo)` evidence.
@@ -94,9 +94,11 @@ Which classes the remaining ambiguous prefixes belong to — open work tracked i
   used to require a `</combo>` and skipped them silently, which is what made #313 read the
   `0x00416541..0x00416549` block as "cataloged nowhere in faolan.db" and hunt for a TEA-encrypted RDB type that was
   never involved. `RdbXml.Carve` handles both forms, for every RDB XML reader (`RdbXmlCarveTests`).
-- **`ClassCombo`** access map — `(Class, ComboId, Level)`, from **two** sources, **436 rows**:
+- **`ClassCombo`** access map — `(Class, ComboId, Level)`, from **three** sources, **668 rows**:
   - the `Combos` name prefix (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes =
     the 8 archetypes that have combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
+  - the **ARCHETYPE** prefixes in the same pass (#581): `Soldier_` / `Rogue_` / `Priest_` name an archetype rather
+    than a class, so each fans out to that archetype's three (`ConanArchetypes`). 51 combos, 153 rows.
   - the **universal kit** (`DeriveUniversalCombosFromCreatesAsync`): the 4 playable races' dance emotes
     (`Cimmerian_`/`Khitan_`/`Stygian_`/`Aquilonian_Dance_combo1..3`), 12 × 12 classes = 144 rows at level 0.
     ⚠️ **Racially NAMED, universally GRANTED** — across the corpus **19 characters spanning every class receive the

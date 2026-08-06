@@ -238,6 +238,11 @@ stance has to reproduce; see [player-actions.md](../subsystems/player-actions.md
 player/NPC split, and — for #623 — each NPC combo swing attributed to its actor's own spawn, so the combo can be
 grouped against the weapon that picked it. `--report-arg <file>` also writes the matched packets whole, for
 `--report fixture-set`),
+`create-classes` (which CLASS each create-flow capture selected, and how many spell/combo grants arrived under
+it — the guard on every create-derived import, all of which attribute a whole capture to its first `ChangeClass`.
+That is only correct while a capture selects ONE class: retail sends a clicked class's book so the editor can
+display it, so a player browsing the list would put several books in one capture. 0 of the 21 today, and #581 is
+where that mattered),
 `method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
 and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
 evidence that decides whether a ticket is "decode it" or "capture it"),

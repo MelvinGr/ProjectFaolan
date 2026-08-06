@@ -43,11 +43,15 @@ namespace Faolan.Importer.Captures
 		// "Herald_..." = HeraldOfXotli). Hakotep's HoX lvl-24 0x2076 combo book validated that a catalog prefix reliably
 		// identifies the class, so these LITERAL class-name prefixes are trusted - and they are exactly the 8 archetypes
 		// that HAVE combos (matching the ellatha combos list), so casters (Necro/Demo/Priest/Tempest) correctly get none.
-		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_"). AMBIGUOUS prefixes are
-		// deliberately EXCLUDED (grant too little, not too much) - they map to multiple or uncertain classes and need a
-		// fan-out / feat-tree taxonomy + validation: archetype-shared (Soldier_/Rogue_ -> 3 classes each), the Tortage
-		// starters (Slave_/Oar_), feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack),
-		// NPC combos (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities.
+		// Matched case-insensitively (the catalog has both "BearShaman_" and "Bearshaman_").
+		//
+		// The ARCHETYPE prefixes are handled beside this list rather than in it (#581): `Soldier_` / `Rogue_` /
+		// `Priest_` name an archetype, so each fans out to its three classes through `ConanArchetypes`.
+		//
+		// Every OTHER ambiguous prefix stays deliberately EXCLUDED (grant too little, not too much) - it maps to
+		// multiple or uncertain classes and needs a taxonomy + validation: the Tortage starters (Slave_/Oar_),
+		// feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack), NPC combos
+		// (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities. #581.
 		private static readonly (string Prefix, ConanClass Class)[] ClassComboPrefixes =
 		[
 			("Guardian_", ConanClass.Guardian), ("Conqueror_", ConanClass.Conqueror), ("DarkTemplar_", ConanClass.DarkTemplar), ("Barbarian_", ConanClass.Barbarian), ("Ranger_", ConanClass.Ranger),
