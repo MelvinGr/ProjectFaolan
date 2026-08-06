@@ -31,8 +31,9 @@ mis-stated the destinations (see below).
 
 ## The trip is one wire string
 
-The `GameActionListIIR` at step 6 carries a single `GameActionData` element of type **`0xD00D`** whose payload
-spells the whole trip out:
+The `GameActionListIIR` at step 6 carries a single `GameActionData` element of type **`0xD00D`** —
+`StartServerSideScryScriptWithParams`, i.e. *the server ran a script*. Its two descriptor values are the client's
+own `ScriptID;ScriptParams` (`docs/re/gameaction-keylists.tsv`), and the params spell the whole trip out:
 
 ```
 xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1
@@ -53,11 +54,54 @@ So `TravelActionCodec` carries the flag as a `(key, value)` pair rather than as 
 collapsing the two would make an instance entry read as a non-local trip *and* re-emit the wrong key.
 [V3: LocalTravelTests.TheHeroicFlagTrip_KeepsItsOwnKeyAndIsNotLocal]
 
-⚠️ **We parse this action; we do not send it.** Building the trip's own `GameActionList` would need the
-element's `Field` word (`0x1A18` on Cordelia's trip, `0x08FA` on Treva's — per-trip and derivable from nothing
-we hold), so the server drives the relocate through the capture-verified revive teleport pair
-(`IntendedTeleport` on the live playfield token + `N3Teleport` carrying the destination) instead. That, and the
-*Racer* buff retail applies, are the two known fidelity gaps. Open work is tracked in Gitea #514.
+Which flag a trip carries is decided by the **destination playfield**: the three trips whose destination is the
+playfield the player is already on carry `Local=1`, and the one that crosses (Wagoner Mycus → Poitain) carries
+`HeroicEnabled=0`. That is the same split `TravelService` already makes to choose between relocating in place and
+running the changemap handoff, so `TravelActions.Local` / `.CrossPlayfield` are picked by it rather than stored.
+
+### The element's `field` is a server counter, not trip data (#636)
+
+The trip's `GameActionList` was un-**buildable** for a long time because the element's `field` word looked
+per-trip and derivable from nothing we hold — `0x1A18` on Cordelia's trip, `0x08FA` on Treva's, `0x0B32` on the
+heroic one. It is **`GameActionData::s_nInstance`**, the sending process's own unique-instance counter, and the
+client names it in the assert that fires when it wraps:
+
+> *"The unique id counter in GameActionData has wrapped and might now collide with existing ids."* —
+> `s_nInstance!=0`, `GameActionData.cpp:75`
+
+The ctor that takes a type id (`FUN_00898780`) fills `+0x10` from its parameter and `+0x14` from the generator
+`FUN_00898ba0`, whose whole body is `++s_nInstance`; the default ctor (`FUN_008985c0`) leaves both at 0, and the
+deserializer then overwrites them. So **0 means "not assigned by that ctor"** — what a template-loaded action
+carries.
+
+The corpus says exactly the same thing. Across all 120 captures, the 187 elements with a non-zero `field` form 40
+`(capture, source port)` series and are **monotonically increasing in every one, with zero violations** — including
+the two wagoner trips in one capture that read as out of order until the port is taken into account, because they
+were issued by two different game servers. A second field agrees: all 1,558 elements with `field == 0` carry
+`0x2f5 == 9`, and all 187 with a counter carry `0x2f5 == 0`.
+
+So the server allocates its own (`GameActionInstanceId`), and the trip is now sent.
+[V3: LocalTravelTests.ACapturedTrip_BuildsFromItsDestinationAndTheInstanceCounter]
+
+## The *Racer* buff
+
+Between the action and the teleport pair retail applies **Racer** (`Spells` row 5029161, wire id `0x4CBD2900`) to
+the travelling player — a `MagicBuffIIR` with **no caster**: a zero entity-class word where the caster reference
+would be. Half a second (`Duration` 50 cs) on all four captured trips; the only thing that moves between them is
+the player's own level (24 on Hakotep's ride, 80 on NecroL80's three) and the expiry stamp.
+
+Its data region is the **casterless apply** form — `Bool2` 0 and `Descriptor[3]` 0, where a cast buff carries 1 and
+the caster's level. That holds on all 11 casterless applies in the corpus, 11 of 11, and the level still rides in
+`CastingLevel`. `TravelCatalog.RacerPayload` builds it.
+[V3: LocalTravelTests.TheRacerBuff_BuildsByteExactFromTheCatalog]
+
+⚠️ **One capture also ends the buff**, eight frames later and *before* the `N3Teleport` — the cross-map Poitain
+trip, and only that one. The other three local relocates send no end twin, and the buff self-expires after its
+half second, so we send the apply alone.
+
+⚠️ **Only the LIST travellers get either record.** The three `{teleportplayer}` dialogue-directive travellers
+below send neither: the corpus holds exactly five `0xD00D` actions in 120 captures and none is in a directive
+traveller's capture.
 
 ## A destination is usually the same map
 

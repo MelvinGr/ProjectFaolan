@@ -1,7 +1,13 @@
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Constants;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.World;
 
@@ -31,14 +37,45 @@ namespace Faolan.GameServer
 		// the revive already uses (IntendedTeleport on the live playfield token, then n3Teleport carrying the
 		// destination), which is exactly what the captured wagoner trip sends at t=781.5, so it is reused rather than
 		// running a changemap the client would answer with a full reload.
-		//
-		// ⚠️ Retail ALSO precedes the pair with a GameActionListIIR carrying "xpos=..;ypos=..;zpos=..;PlayFieldID=..;
-		// Local=1" and a "Racer" buff. We send neither: the n3Teleport already carries the position (the revive path
-		// is in-client verified), and the GameActionList's string form is a movement instruction we have no builder
-		// for. That is a fidelity gap, not a guess - tracked on #514.
 		Task ITravelOutbound.RelocateOnSameMap(INetworkClient client, Vector3 arrival)
 		{
 			return _simulation.RelocateSameMap(client, arrival);
+		}
+
+		// #636 - the two records retail puts between the destination pick and the teleport, in retail's own order:
+		//
+		//   1. the trip's own GameActionListIIR. One GameActionData element of type 0xD00D
+		//      (StartServerSideScryScriptWithParams): the server ran its travel script, and the element's
+		//      `ScriptParams` states the whole trip - "xpos=..;ypos=..;zpos=..;PlayFieldID=..;Local=1".
+		//   2. the casterless *Racer* buff, half a second long, on the travelling player.
+		//
+		// Neither moves the player - the IntendedTeleport/n3Teleport pair behind them does, and that pair is
+		// in-client verified - so this is fidelity: the client is told a trip is happening rather than being silently
+		// relocated. It stayed unsent until the element's `field` was decoded, which read as a per-trip value derived
+		// from nothing we hold; it is retail's own `GameActionData::s_nInstance` counter, so we allocate our own.
+		async Task ITravelOutbound.SendTripDeparture(INetworkClient client, uint destinationMapId, Vector3 arrival, bool sameMap)
+		{
+			var self = client.Session.Character.Id;
+			var trip = sameMap
+				? TravelActions.Local(destinationMapId, arrival.X, arrival.Y, arrival.Z)
+				: TravelActions.CrossPlayfield(destinationMapId, arrival.X, arrival.Y, arrival.Z);
+
+			var action = new GameActionListIIR(self, TravelActionCodec.TypeId, GameActionInstanceId.Next(), TravelActionCodec.Build(trip));
+			await SendWorldRecord(client, GameActionListCodec.Build(action));
+
+			// Casterless: retail writes a zero entity-class word where the caster reference would be, so it does NOT
+			// go through SendMagicBuffIir - that path is for buffs with a caster, and it would also register a
+			// half-second buff in the tracker and send an end twin retail only sends on a cross-map trip.
+			var racer = MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, MagicBuffIds.BaseOf(TravelCatalog.RacerSpell), MagicBuffIds.FormOf(TravelCatalog.RacerSpell), null,
+				MagicBuffDataCodec.Build(TravelCatalog.RacerPayload(CasterLevel(client)))));
+
+			await SendWorldRecord(client, racer);
+		}
+
+		private static Task SendWorldRecord(INetworkClient client, byte[] record)
+		{
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// #635: a `{teleportplayer}` directive may state only X and Z, so the arrival height comes off the baked

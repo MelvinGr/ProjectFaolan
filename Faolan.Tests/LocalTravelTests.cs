@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -53,6 +55,57 @@ namespace Faolan.Tests
 			Assert.Equal(TravelActionCodec.HeroicEnabledFlag, trip.FlagKey);
 			Assert.Equal(0u, trip.FlagValue);
 			Assert.False(trip.IsLocal);
+		}
+
+		// NecroL80_..._chat-annotated-4 frame 9793: the casterless *Racer* buff retail applies between the trip's action
+		// and the teleport pair. Its twin at frame 11539 and Hakotep's at frame 812 differ only in the expiry stamp and
+		// the level, which is exactly what this build takes as arguments.
+		private const string CordeliaRacerBuff =
+			"6b87e3160000c3500802e5d400004cbd29000000000000000000000000000000000000000032000000000001" +
+			"00000000004cbd29000000000000000000000000000000000000005000000000151bb10c";
+
+		// ⚠️ THE gate this issue exists for (#636). The trip's GameActionList used to be un-BUILDABLE: the element's
+		// `field` (0x1A18 here) read as a per-trip value derived from nothing we hold, so the server sent the teleport
+		// pair alone. It is retail's `GameActionData::s_nInstance` - the sending PROCESS's unique-instance counter -
+		// so the only thing a build needs from the capture is that counter reading, and everything else comes from the
+		// destination. Constructing both flag shapes from (map, x, y, z) and landing on the captured bytes is what
+		// says the decode is right.
+		[Theory]
+		[InlineData(CordeliaTrip, 0x0802E5D4u, 0x1A18u, true, 1020u, 1136f, 133f, 223f)]
+		[InlineData(HeroicTrip, 0x0802E5D4u, 0x0B32u, false, 2070u, 1520f, 172f, 1476f)]
+		public void ACapturedTrip_BuildsFromItsDestinationAndTheInstanceCounter(string captured, uint frameHandle, uint instanceId, bool local, uint map, float x, float y, float z)
+		{
+			var trip = local
+				? TravelActions.Local(map, x, y, z)
+				: TravelActions.CrossPlayfield(map, x, y, z);
+
+			var built = GameActionListCodec.Build(new GameActionListIIR(frameHandle, TravelActionCodec.TypeId, instanceId, TravelActionCodec.Build(trip)));
+
+			Assert.Equal(Convert.FromHexString(captured), built);
+		}
+
+		// The counter is an ALLOCATION, so what a test can pin is the invariant the client asserts on: it never hands
+		// out 0 ("not assigned" - the default ctor leaves the field there), and it only ever goes up.
+		[Fact]
+		public void TheGameActionInstanceCounter_NeverHandsOutZeroAndOnlyRises()
+		{
+			var ids = Enumerable.Range(0, 64).Select(_ => GameActionInstanceId.Next()).ToArray();
+
+			Assert.DoesNotContain(0u, ids);
+			Assert.Equal(ids.OrderBy(i => i).ToArray(), ids);
+			Assert.Equal(ids.Length, ids.Distinct().Count());
+		}
+
+		// The Racer buff, byte-exact from the catalog. It is the CASTERLESS apply form - a zero entity-class word where
+		// the caster reference would be, `Bool2` 0 and Descriptor[3] 0 - which is why it does not go through the
+		// generic `Apply`. All 11 casterless applies in the corpus carry those two slots that way.
+		[Fact]
+		public void TheRacerBuff_BuildsByteExactFromTheCatalog()
+		{
+			var built = MagicBuffCodec.Build(new MagicBuffIIR(0x0802E5D4, 0x00, MagicBuffIds.BaseOf(TravelCatalog.RacerSpell), MagicBuffIds.FormOf(TravelCatalog.RacerSpell), null,
+				MagicBuffDataCodec.Build(TravelCatalog.RacerPayload(80, 0x151BB10C))));
+
+			Assert.Equal(Convert.FromHexString(CordeliaRacerBuff), built);
 		}
 
 		[Theory]

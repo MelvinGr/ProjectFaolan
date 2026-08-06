@@ -140,6 +140,25 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel);
 		}
+
+		// The APPLY form of a buff with NO CASTER - the wire writes a zero class word where the entity reference would
+		// be (MagicBuffCodec.Read), and the data region differs from `Apply` in exactly two slots: `Bool2` is 0 rather
+		// than 1, and Descriptor[3] is 0 rather than the level. Both hold on all 11 casterless applies in the corpus,
+		// 11 of 11, and the level still rides in `CastingLevel` - which is what makes this a distinct FORM rather than
+		// `Apply` with a null caster.
+		//
+		// Retail's local-travel "Racer" (#636) is one of these: no caster, 0.5 s, the travelling player's own level.
+		// [V2: NecroL80_..._chat-annotated-4 fr9793/fr11539, NecroL80_..._combat fr6160, Hakotep_..._gameplay0 fr812]
+		public static MagicBuffData ApplyNoCaster(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint level)
+		{
+			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x00, [DescriptorLead, 0, spellBaseId, 0, 0, 0, 0], level, expiryStamp);
+		}
+
+		// The same, starting NOW - the shape a live send wants, with the stamp sourced rather than invented.
+		public static MagicBuffData ApplyNowNoCaster(uint spellBaseId, uint durationCentiseconds, uint level)
+		{
+			return ApplyNoCaster(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), level);
+		}
 	}
 
 	// The MagicBuffData -> `NpcSpell` column mapping (#304). A MAPPER, not a codec: the six columns it feeds are

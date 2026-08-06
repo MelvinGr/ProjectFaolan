@@ -17,8 +17,14 @@ namespace Faolan.Core.Network.Codecs.World
 	// Wire body (the inner 0x2000 IIR record, after the u32 totalLen wrapper), all big-endian:
 	//   [subop 0xF508F4C1][0x0000C350][frameHandle] then the GameActionList payload:
 	//   [u8 0][u32 0x000007E2][u32 dynelHandle][u32 field3][u32 4][u64 1][actionTail...]
-	// frameHandle = the receiving player's instance; dynelHandle = the entity the action list is about; field3 is
-	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
+	// frameHandle = the receiving player's instance; dynelHandle = the entity the action list is about; the 4 / 1 words
+	// are constant across all 570 captures.
+	//
+	// `field3` is the ELEMENT's `field`, and it is retail's own unique-instance counter - `GameActionData::s_nInstance`,
+	// named by the client's wrap assert (`GameActionInstanceId`, #636). 0 means "this element was not constructed by
+	// that ctor", which is what a template-loaded action carries; 1,558 of the 1,745 captured elements are that, and
+	// the 187 that are not form 40 per-(capture, server port) series that are monotonic in every one. Build a
+	// constructed action with `GameActionInstanceId.Next()`, never with 0.
 	//
 	// ⚠️ Those five words are ALSO the first five of the GameActionData element (typeId / field / version=4 /
 	// subCount=0 / 0x2d5=1) - which is why the "tail" starts at GameActionDataCodec.PrefixThrough0x2d5.

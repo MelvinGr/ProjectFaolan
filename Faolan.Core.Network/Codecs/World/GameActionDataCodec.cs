@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// and the GM flymode toggle) and a second hand-rolled copy of a positional grammar is how the two drift apart.
 	// A class-(c) sub-record codec (#530 rule 5c): composed by GameActionListCodec, so it declares no opcode.
 	//
-	//   [u32 typeId][u32 field][u32 version=4][u32 subCount]
+	//   [u32 typeId][u32 field][u32 version=4][u32 subCount]        // field = GameActionInstanceId (see there)
 	//   [u32 v(0x2d5)][u32 v(0x2d6)][u32 v(0x2f2)][u32 v(0x2f5)]     // four ALWAYS-present positional int values
 	//   <descriptor keyList values, in this type's order; u32 unless the key is 0x4d9/0x4da = std::string>
 	//
@@ -30,14 +30,18 @@ namespace Faolan.Core.Network.Codecs.World
 		// five words, so a list body slices the element from here on.
 		public const int PrefixThrough0x2d5 = 5 * sizeof(uint);
 
-		// The GameActionData ctor's seed for the fourth fixed int (0x2f5). ⚠️ EVERY captured element carries 9 here, not
-		// this 0 - see CtorSeed0x2f5 vs CapturedSeed0x2f5. The recast builder documents that its handler ignores the
-		// value; a handler we have NOT read might not, so a type being sent for the first time should prefer the
-		// captured seed.
+		// The GameActionData ctor's seed for the fourth fixed int (0x2f5).
+		//
+		// ⚠️ Which of the two values an element carries is decided by whether it was CONSTRUCTED, and it lines up with
+		// the `field` counter exactly (#636): across all 1,745 captured elements, every one of the 1,558 with
+		// `field == 0` carries 9, and every one of the 187 with a live `GameActionInstanceId` carries 0. So a
+		// server-constructed action wants this 0 - which is what the travel action sends - and a template-loaded one
+		// wants CapturedSeed0x2f5. (This used to read "EVERY captured element carries 9", which was measured on the
+		// four template-loaded bodies the codec's own tests use.)
 		public const uint CtorSeed0x2f5 = 0;
 
-		// What all four captured GameActionList elements carry at 0x2f5 (GameActionListCodecTests' emote, numeric,
-		// template-choice and world-entry bodies).
+		// What a TEMPLATE-LOADED element carries at 0x2f5 - the emote, numeric, template-choice and world-entry bodies
+		// GameActionListCodecTests pins, and all 1,558 corpus elements with no instance counter.
 		public const uint CapturedSeed0x2f5 = 9;
 
 		// The two fixed ints between 0x2d5 and 0x2f5, constant in every element we emit.

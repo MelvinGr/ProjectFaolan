@@ -156,18 +156,27 @@ namespace Faolan.GameServer.World
 		private async Task Depart(INetworkClient client, string npcName, TravelDestination destination, Vector3? arrival)
 		{
 			var character = client.Session.Character;
+			var sameMap = destination.DestinationMapId == character.MapId;
 
 			// Same map = relocate in place (retail's `Local=1`); different map = the full changemap handoff. A same-map
 			// trip with no arrival point would move the player nowhere at all, so it is refused rather than silently
 			// doing nothing.
-			if (destination.DestinationMapId == character.MapId)
+			if (sameMap && arrival == null)
 			{
-				if (arrival == null)
-				{
-					_logger.LogWarning("Travel: \"{Npc}\" -> map {Map} is a SAME-MAP destination with no arrival point; nothing to do.", npcName, destination.DestinationMapId);
-					return;
-				}
+				_logger.LogWarning("Travel: \"{Npc}\" -> map {Map} is a SAME-MAP destination with no arrival point; nothing to do.", npcName, destination.DestinationMapId);
+				return;
+			}
 
+			// #636: retail announces the trip before moving anyone - the 0xD00D travel action and the *Racer* buff.
+			// Only the LIST travellers do; the `{teleportplayer}` directive ones (#635) send neither, and the corpus
+			// has no 0xD00D anywhere near one of their trips. The action states the arrival, so a trip that has none
+			// cannot be announced - it is the changemap's "land at the map's default spawn" case, which retail's own
+			// action has no form for.
+			if (!destination.FromDialogueDirective && arrival is { } announced)
+				await _output.SendTripDeparture(client, destination.DestinationMapId, announced, sameMap);
+
+			if (sameMap)
+			{
 				await _output.RelocateOnSameMap(client, arrival.Value);
 				_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to {Arrival} on map {Map} (in place, no loading screen).", character.Name, npcName, arrival,
 					destination.DestinationMapId);
