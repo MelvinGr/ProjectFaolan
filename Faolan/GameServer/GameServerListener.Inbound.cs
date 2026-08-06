@@ -1851,8 +1851,12 @@ namespace Faolan.GameServer
 						// the runtime reads them rather than matching directions. Every step is an ordinary damaging
 						// swing; the finisher adds the combo's own spell (ResolveComboFinisher).
 						var combo = await _combos.TrackSwing(client, args);
-						await _combat.SendNormalAttackResponse(client, rawPayload, targetHandle, args.CommandqueueClientId, combo);
-						if (combo is { IsFinisher: true })
+						// #696: the finisher only lands if the swing carrying it did. It used to run unconditionally, so a
+						// swing the reach gate refused still delivered the combo's spell - melee stayed unbounded for
+						// anyone finishing a combo. The combo's step tracking above is deliberately still advanced on a
+						// miss: the client counts the step it pressed either way, and desyncing the two ends would be worse.
+						var landed = await _combat.SendNormalAttackResponse(client, rawPayload, targetHandle, args.CommandqueueClientId, combo);
+						if (landed && combo is { IsFinisher: true })
 							await ResolveComboFinisher(client, combo, targetHandle);
 
 						break;

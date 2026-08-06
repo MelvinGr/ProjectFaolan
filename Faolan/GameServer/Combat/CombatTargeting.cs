@@ -71,6 +71,32 @@ namespace Faolan.GameServer.Combat
 				.ToList();
 		}
 
+		// Whether a swing by `attacker` can physically REACH the target the client named (#696), and why not when it
+		// cannot. The target handle is the CLIENT's, so this is the only thing bounding a melee swing - the client
+		// checks a SPELL's range itself and never sends an out-of-range cast, but it always sends the swing.
+		//
+		// ⚠️ It resolves the target through `WorldState.ZoneForEntity`, i.e. the attacker's (MapId, InstanceId), and
+		// that is the whole reason this is a pure function with a test rather than three lines inside CombatService.
+		// The first cut of the check used `TryGetZone(MapId)`, which resolves the DEFAULT instance only; the map it
+		// was tested on - Tortage Island (4010) - is `MapInstanceMode.Solo`, so the lookup missed, the guard fell
+		// open, and the gate shipped doing nothing at all. `MeleeReachTests` now pins exactly that case.
+		//
+		// A target the attacker's zone cannot place is `TargetNotInZone`, NOT reachable: you cannot hit what the world
+		// cannot put next to you, and letting it through only bought a hit-react and a floating damage number for a
+		// hit `ApplyNpcDamage` then refuses anyway (#695). The caller distinguishes the two because the causes differ -
+		// too far is the player's doing, not-in-zone is a targeting/interest bug on our side.
+		public static MeleeReach ResolveSwingReach(WorldState world, WorldEntity attacker, uint targetHandle, out float distance)
+		{
+			distance = 0f;
+			if (world == null || attacker == null || !world.ZoneForEntity(attacker).TryGet(targetHandle, out var target))
+				return MeleeReach.TargetNotInZone;
+
+			distance = Vector3.Distance(attacker.Position, target.Position);
+			return distance <= SwingReach
+				? MeleeReach.InReach
+				: MeleeReach.TooFar;
+		}
+
 		// An entity's facing as a yaw in radians, measured from +Z toward +X - the convention `Vector3.FaceTowards`
 		// builds and the one the move records were decoded in. The quaternion carries the HALF-angle, hence the
 		// factor of two; reading (qy, qw) as a heading pair is the mistake that made an earlier decode scatter by 57
@@ -93,5 +119,15 @@ namespace Faolan.GameServer.Combat
 			var relative = Math.Atan2(Math.Sin(bearing - facing), Math.Cos(bearing - facing));
 			return Math.Abs(double.RadiansToDegrees(relative)) <= halfAngleDegrees;
 		}
+	}
+
+	// Why a melee swing can or cannot land on the target the client named (#696). Only `InReach` lets the swing
+	// resolve; both refusals are answered as an AIR SWING (the plain echo-ack), never dropped - a silently refused
+	// action leaves the client waiting on a reply it will never get, which is the #271 lesson.
+	public enum MeleeReach
+	{
+		InReach,
+		TooFar,
+		TargetNotInZone
 	}
 }

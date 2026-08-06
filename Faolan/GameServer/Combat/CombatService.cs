@@ -224,11 +224,16 @@ namespace Faolan.GameServer.Combat
 		// must therefore get the PLAIN echo-ack with no result block, exactly like the unarmed air swing, or the
 		// player visibly bleeds when swinging at nothing (#19). The "no damage" half was already guarded; this also
 		// drops the self hit-react.
-		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0, ComboSwing? combo = null)
+		//
+		// Returns whether the swing LANDED, so the caller can gate what rides on it - the combo finisher is the one
+		// that matters (#696). The finisher is a separate op in the inbound handler, and it used to run whatever this
+		// method decided, so a refused swing still delivered the combo's spell: melee stayed unbounded for anyone
+		// finishing a combo even once the plain swing was gated.
+		public async Task<bool> SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0, ComboSwing? combo = null)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
 			if (rawPayload.Length < 26)
-				return;
+				return false;
 
 			var instance = client.Session.Character.Id;
 
@@ -248,7 +253,7 @@ namespace Faolan.GameServer.Combat
 			if (!hasEnemyTarget || !WithinMeleeReach(client, targetHandle))
 			{
 				await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, phase)));
-				return;
+				return false;
 			}
 
 			var level = client.Session.Character.Level;
@@ -312,6 +317,8 @@ namespace Faolan.GameServer.Combat
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, EnergyCodec.Build(instance, player.Stamina));
+
+			return true;
 		}
 
 		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
@@ -326,8 +333,13 @@ namespace Faolan.GameServer.Combat
 			var instance = client.Session.Character.Id;
 			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, mode)));
 
+			// #696: an unarmed swing reaches no further than an armed one. This path had NO reach check at all - it is
+			// the one place `SendSwingDamage` is called from, so a bare-handed player could kill anything selectable at
+			// any distance even after the armed swing was bounded. Unlike the armed path the echo-ack has already gone
+			// out above (retail's whole reply to an unarmed air swing IS that ack), so an out-of-reach swing needs
+			// nothing further sent - it is already indistinguishable from the air swing it now is.
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
-			if (!hasEnemyTarget)
+			if (!hasEnemyTarget || !WithinMeleeReach(client, targetHandle))
 				return;
 
 			// The unarmed swing's ability id is the LAST word of the request's behaviour TAIL - an opaque region at the
@@ -423,25 +435,44 @@ namespace Faolan.GameServer.Combat
 		// reminder that silently refusing an action the client thinks it made leaves it waiting on a reply.
 		//
 		// ⚠️ The reach is `CombatTargeting.SwingReach`, which is PROVISIONAL - see it for why there is no shipped
-		// number to use instead. An unresolvable target passes: whether it is reachable is not this method's question,
-		// and ApplyNpcDamage refuses it separately (#695).
+		// number to use instead.
+		//
+		// The GEOMETRY (and the zone resolution that got it wrong the first time) lives in
+		// `CombatTargeting.ResolveSwingReach`, which is pure and tested; this is only the session half - find the
+		// attacker, and SAY what happened. The refusal is logged at INFORMATION on purpose: the file logger a play
+		// session is read back from is where the evidence for this ticket has to appear, and the first cut's Debug
+		// line is a large part of why "the gate does not bite" was diagnosed as a stale-position problem when the
+		// gate had simply never resolved the (instanced) zone it was asked about.
 		private bool WithinMeleeReach(INetworkClient client, uint targetHandle)
 		{
-			// ⚠️ `ZoneForEntity`, NOT `TryGetZone(MapId)`: the latter looks up the DEFAULT instance only, so in any
-			// instanced playfield it misses, and this guard then passes everything - which is exactly how the first
-			// cut of this check shipped doing nothing at all (#696, #268).
 			var attacker = _sim.PlayerWorldEntity(client);
-			if (attacker == null || !_sim.World.ZoneForEntity(attacker).TryGet(targetHandle, out var target))
-				return true;
+			var name = client.Session.Character?.Name ?? "<no character>";
+			if (attacker == null)
+			{
+				// Not in the world model at all (create-editor connection, or a swing racing world entry). Nothing to
+				// measure from, and nothing downstream could apply the hit either.
+				_logger.LogWarning("Combat: {Player} swung at 0x{Target:X8} with no live world entity - refusing the swing (#696).", name, targetHandle);
 
-			var distance = Vector3.Distance(attacker.Position, target.Position);
-			if (distance <= CombatTargeting.SwingReach)
-				return true;
+				return false;
+			}
 
-			_logger.LogDebug("Combat: {Player}'s swing at 0x{Target:X8} misses - {Distance:F1}u away, reach is {Reach}u (#696).",
-				client.Session.Character?.Name ?? "<no character>", targetHandle, distance, CombatTargeting.SwingReach);
+			switch (CombatTargeting.ResolveSwingReach(_sim.World, attacker, targetHandle, out var distance))
+			{
+				case MeleeReach.InReach:
+					return true;
 
-			return false;
+				case MeleeReach.TooFar:
+					_logger.LogInformation("Combat: {Player}'s swing at 0x{Target:X8} misses - {Distance:F1}u away, reach is {Reach}u (#696).",
+						name, targetHandle, distance, CombatTargeting.SwingReach);
+
+					return false;
+
+				default:
+					_logger.LogWarning("Combat: {Player} swung at 0x{Target:X8}, which is not in their zone - refusing the swing. " +
+						"The client is attacking something the server cannot place, which is a targeting/interest bug, not a combat one (#695/#696).", name, targetHandle);
+
+					return false;
+			}
 		}
 
 		// Melee cleave (#18): an AoC swing damages "a small area IN FRONT OF YOU" (Funcom's own quickstart), not just

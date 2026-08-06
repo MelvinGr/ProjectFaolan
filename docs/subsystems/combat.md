@@ -199,6 +199,48 @@ This is the flat "everyone in front takes the swing" half; the directional arc +
 mitigation is the section below. The two are independent — the direction picks which of the *defender's*
 guards you meet, the cone picks *who* you meet.
 
+## The swing's own reach (#696)
+
+The target handle a swing carries is the **client's**, so the server is the only thing that can bound a melee
+swing. The division of labour is not symmetric with spells: the client range-checks a *cast* itself and simply
+never sends an out-of-range one, but it always sends the swing (in-client, 2026-08-07: *"spells are checked
+client side, but melee you can always do"*). Same shape as #271 — the client enforces what its own data tells
+it, the server has to own what the client does not.
+
+`CombatTargeting.ResolveSwingReach(world, attacker, targetHandle, out distance)` is that bound, and it is the
+one number the cleave uses (`SwingReach` **is** `DefaultCleaveReach`): two constants would let a swing land on
+a primary the splash could not have touched. It returns `InReach`, `TooFar`, or `TargetNotInZone`; the caller
+answers both refusals as an **air swing** — the plain echo-ack a targetless swing already gets — rather than
+dropping the request, because a silently refused action leaves the client waiting (the #271 lesson).
+
+`TargetNotInZone` refuses too. You cannot hit what the attacker's zone cannot place, and passing it only bought
+a hit-react and a floating damage number for a hit `ApplyNpcDamage` then refuses anyway (#695). The two
+refusals are logged differently on purpose: too far is the player's doing, not-in-zone is a targeting/interest
+bug on our side.
+
+⚠️ **Every melee path has to go through it**, which is the part that took two attempts:
+
+- the armed swing (`SendNormalAttackResponse`),
+- the **unarmed** swing (`SendUnarmedAttackResponse`) — this had no check at all, and it is the only caller of
+  `SendSwingDamage`, so a bare-handed player could kill anything selectable at any distance,
+- the **combo finisher**, which is a separate op in the inbound handler and used to run whatever the swing
+  decided — so a refused swing still delivered the combo's spell. `SendNormalAttackResponse` now returns
+  whether the swing landed and the finisher rides that. (The combo's *step* tracking still advances on a miss:
+  the client counts the step it pressed either way, and desyncing the two ends would be worse.)
+
+⚠️ **The first cut of this gate shipped doing nothing**, and it is worth knowing why. It resolved the target
+through `TryGetZone(MapId)`, which only ever finds the **default** instance — and it was tested on Tortage
+Island (map 4010), which is `MapInstanceMode.Solo`. The lookup missed, the unresolvable branch fell open, and
+every swing passed. The session log then read as *"the check runs and measures a small distance"*, which was
+diagnosed as a stale-position problem; the log actually shows a swing landing for 40 on a mob standing
+untouched at its own spawn **21.3 u** away, with its first move broadcast arriving only afterwards (the hit is
+what aggroed it, #695) — the signature of a guard that never resolved its target at all.
+`MeleeReachTests` now pins the instanced case directly, including that map 4010 really is Solo.
+
+Reach remains **provisional** for the reason above; it is also where a weapon-dependent reach would go if one
+is ever recovered — a polearm and a dagger plainly do not share it, and nothing shipped tells us what either
+should be. [V3: MeleeReachTests.OutOfReach_InAPrivateInstance_IsRefused]
+
 ## Directional combat: the shield rose (#20)
 
 AoC's signature melee is DIRECTIONAL — the attacker picks an arc, and the defender spreads a finite guard
