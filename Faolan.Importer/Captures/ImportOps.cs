@@ -95,7 +95,7 @@ namespace Faolan.Importer.Captures
 		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
 		// the capture was played on and elected only against captures of that same class.
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols, List<NpcSpawnEntry> ObservedTypes) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
-			IReadOnlySet<uint> classSpecificMaps)
+			IReadOnlySet<uint> classSpecificMaps, IReadOnlySet<uint> ambusherTemplates)
 		{
 			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
 			// exclusion has to be, too - and doing it here rather than at the placement step keeps a summon out of the
@@ -242,7 +242,16 @@ namespace Faolan.Importer.Captures
 			//   * name roster only:    Mutilator x10                                 (no PetIIR ever captured for it)
 			// So dropping either one regresses. If a capture ever observes the Mutilator's owner-binding, this net
 			// becomes redundant and can go.
-			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
+			//
+			// #528 AMBUSHERS go the same way, for the same reason one level over: a `NpcAmbush` creature is put in the
+			// world by a quest goal advancing, so a capture that caught one is evidence of a SPRUNG AMBUSH, not of a
+			// placement. Harvesting it as one left a Bat Demon standing in the Tortage quarry permanently, for every
+			// player, regardless of quest state - the summoned-pet failure exactly. By TEMPLATE rather than by name,
+			// because unlike the pet roster this set is a real table with real ids.
+			var placements = spawns
+				.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant()))
+				.Where(e => !ambusherTemplates.Contains(e.TemplateId))
+				.ToList();
 
 			// The placements are position-deduped; the TYPES are not. A creature that loses the position dedup is
 			// still a creature we observed, and its type must survive even though its placement does not - the

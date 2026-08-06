@@ -495,7 +495,11 @@ namespace Faolan.Importer.Modules
 			// The maps whose population is per class (the city armories). Read from the DB, not hardcoded, so flagging
 			// another map is a data change - and so a run against an empty DB simply harvests everything class-agnostic.
 			var classSpecificMaps = await ctx.Db.Maps.Where(m => m.ClassSpecific).Select(m => m.Id).ToHashSetAsync();
-			var (spawns, patrols, observedTypes) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps);
+			// #528: the quest-ambush creatures. Read from the DB for the same reason the pet roster is - a capture that
+			// caught one caught a SPRUNG AMBUSH, not a placement, so it must not become a permanent world spawn. Its
+			// TYPE still survives (via observedTypes), which is what the ambush spawns from.
+			var ambusherTemplates = await ctx.Db.NpcAmbushes.Select(a => a.NpcTemplateId).ToHashSetAsync();
+			var (spawns, patrols, observedTypes) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps, ambusherTemplates);
 
 			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
 			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the

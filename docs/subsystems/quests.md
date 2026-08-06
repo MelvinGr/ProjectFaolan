@@ -289,10 +289,12 @@ NPC spawn in that capture; everything else arrives in the world-entry stream.
 
 - **Fires on the goal's FIRST advance only.** That session picks up all three bricks and gets exactly one Bat
   Demon. Because the gate reads *persisted* progress, a relog does not re-arm it.
-- **The captured placement is SKIPPED.** `NpcSpawns` holds one Bat Demon row on map 4020 — a harvest of that
-  sprung ambush, 10.2 u from where retail actually spawned it — and rendering it left a Bat Demon standing in the
-  quarry permanently, for every player, regardless of quest state. `WorldBroadcaster.EnsureZoneNpcs` skips any
-  placement whose type is an ambusher on that map, which is also what keeps it skipped across a re-import.
+- **An ambusher gets no placement row at all.** `NpcSpawns` used to hold one Bat Demon on map 4020 — a harvest of
+  that sprung ambush, 10.2 u from where retail spawned it — which left a Bat Demon standing in the quarry
+  permanently, for every player, regardless of quest state. `ImportOps.BuildBurstTruthSpawns` now drops ambushers
+  from the burst-truth set exactly as it drops summoned pets, and for the same reason: *a trigger spawn is not a
+  world placement*. The **type** still survives via `observedTypes`, which is what the ambush is built from.
+  `WorldBroadcaster.EnsureZoneNpcs` skips them too, as the second net for a database built before that rule.
 - **Anchored on the player**, not the interacted object: retail measures from the brick, we measure from the
   player standing at it, which is the same spot to within the interaction range and needs no object identity to
   reach the progression engine.

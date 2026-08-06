@@ -998,9 +998,10 @@ namespace Faolan.GameServer.World
 			var encounters = (await _database.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
 
 			// #528: the map's quest AMBUSHERS. An ambusher does not stand in the world - it appears when a goal
-			// advances - so its captured placements are skipped below. The single Bat Demon row on map 4020 is a
-			// harvest of one sprung ambush, 10.2 u from where retail actually spawned it, and rendering it left a
-			// Bat Demon standing permanently in the quarry for every player regardless of quest state.
+			// advances - so a captured "placement" of one is a harvest of a SPRUNG AMBUSH, and it is skipped below.
+			// The importer already excludes them from the burst-truth set (ImportOps.BuildBurstTruthSpawns, alongside
+			// the summoned pets), so on a current database this finds nothing; it is the second net, for a database
+			// built before that rule or hand-edited since.
 			var ambushers = (await _database.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId).ToHashSet();
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
@@ -1035,9 +1036,8 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate == null)
 					continue;
 
-				// #528: this type only exists inside a triggered ambush, so its captured placement is not a creature
-				// standing in the world. Same standing as an encounter BOSS having no placement at all (#501) - the
-				// difference is only that this one WAS captured, because the capture caught the ambush already sprung.
+				// #528: this type only exists inside a triggered ambush, so a row for it is not a creature standing in
+				// the world. Same standing as an encounter BOSS having no placement at all (#501).
 				if (ambushers.Contains(npc.NpcTemplateId))
 					continue;
 
