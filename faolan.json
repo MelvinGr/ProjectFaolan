@@ -35,7 +35,8 @@
 	"CdnMirror": {
 		"Store": "mirror-store",
 		"Ip": "127.0.0.1",
-		"Port": 7081
+		"Port": 7081,
+		"PublicAddress": "http://127.0.0.1:7081"
 	},
 
 	// Chat-bridge (defaults shown)
