@@ -79,6 +79,7 @@ namespace Faolan.Core.Database
 		DbSet<Mount> Mounts { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcChatterParameter> NpcChatterParameter { get; }
+		DbSet<NpcAmbush> NpcAmbushes { get; }
 		DbSet<NpcEncounter> NpcEncounters { get; }
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcMorph> NpcMorphs { get; }
@@ -183,6 +184,7 @@ namespace Faolan.Core.Database
 		public DbSet<Mount> Mounts { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcChatterParameter> NpcChatterParameter { get; set; }
+		public DbSet<NpcAmbush> NpcAmbushes { get; set; }
 		public DbSet<NpcEncounter> NpcEncounters { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcMorph> NpcMorphs { get; set; }

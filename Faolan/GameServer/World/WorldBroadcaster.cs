@@ -996,6 +996,12 @@ namespace Faolan.GameServer.World
 
 			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
 			var encounters = (await _database.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
+
+			// #528: the map's quest AMBUSHERS. An ambusher does not stand in the world - it appears when a goal
+			// advances - so its captured placements are skipped below. The single Bat Demon row on map 4020 is a
+			// harvest of one sprung ambush, 10.2 u from where retail actually spawned it, and rendering it left a
+			// Bat Demon standing permanently in the quarry for every player regardless of quest state.
+			var ambushers = (await _database.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId).ToHashSet();
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
 			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
@@ -1027,6 +1033,12 @@ namespace Faolan.GameServer.World
 				// The type identity (name/community) lives on the NpcTemplate type now (#244); a spawn with no type is a phantom
 				// capture artifact (no real creature) - skip it.
 				if (npc.NpcTemplate == null)
+					continue;
+
+				// #528: this type only exists inside a triggered ambush, so its captured placement is not a creature
+				// standing in the world. Same standing as an encounter BOSS having no placement at all (#501) - the
+				// difference is only that this one WAS captured, because the capture caught the ambush already sprung.
+				if (ambushers.Contains(npc.NpcTemplateId))
 					continue;
 
 				var npcName = npc.NpcTemplate.Name;
@@ -2195,6 +2207,73 @@ namespace Faolan.GameServer.World
 			zone.Add(entity);
 			_logger.LogInformation("Encounter: {Lure} on map {Map} sprang into {Boss} (level {Level}) at ({X:F1}, {Z:F1}).", lure.Name, lure.MapId, boss.Name, entity.Level, position.X, position.Z);
 			return entity;
+		}
+
+		// #528 quest ambush: a goal just advanced for the first time and it springs an NPC on the player. Spawned FROM
+		// ITS TYPE beside them, hostile, with no placement anywhere - the same shape as an encounter boss, triggered by
+		// quest progress instead of proximity.
+		//
+		// The delay is real, not cosmetic: in the capture the trigger EFFECTS (item grant, goal progress, feedback) all
+		// land at t=315.6 and the body arrives at t=318.6 - two distinct steps. It is scheduled rather than awaited so
+		// the pickup's own reply chain is not held up behind it.
+		//
+		// Retail anchors the spawn on the interacted OBJECT (3.6 u from the brick); this anchors on the PLAYER standing
+		// at it, which is the same spot to within the interaction range and needs no object identity to reach the
+		// progression engine. The offset direction is the player's own facing, so it lands in front of them.
+		public void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush)
+		{
+			ArgumentNullException.ThrowIfNull(client);
+			ArgumentNullException.ThrowIfNull(ambush);
+
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(player);
+			var facing = player.Rotation;
+			var forward = Vector3.Transform(new Vector3(0, 0, 1), facing);
+			var position = player.Position + forward * ambush.AnchorDistance;
+
+			var delayMs = (int)MathF.Max(0, ambush.DelaySeconds * 1000);
+			Task.RunAfter(delayMs, async () =>
+			{
+				// The player may have logged out, zoned or died in the delay - an ambush with nobody to ambush is
+				// dropped rather than left standing in an empty quarry.
+				if (client.Session.Account == null || _sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
+					return;
+
+				await SpawnAmbusher(zone, ambush, position, facing);
+			}, _logger);
+		}
+
+		private async Task SpawnAmbusher(Zone zone, NpcAmbush ambush, Vector3 position, Quaternion rotation)
+		{
+			var type = await _database.GetNpcByTemplateId(ambush.NpcTemplateId);
+			if (type?.StatCore?.Health is not { } health || type.StatCore.Level is not { } level)
+			{
+				// Loudly, not silently: an ambush whose type never got harvested would spring nothing at all, and the
+				// quest would look exactly the same as one with no ambush wired.
+				_logger.LogWarning("Ambush: goal {Goal} on map {Map} names type {Type}, which has no usable stat core - nothing sprung.", ambush.GoalId, zone.MapId, ambush.NpcTemplateId);
+				return;
+			}
+
+			var handle = NextRuntimeHandle();
+			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, type.Name, EntityVitals.FromMax(health, 0, health), type.TemplateId);
+			entity.InstanceId = zone.InstanceId;
+			entity.Level = level;
+			entity.Disposition = WorldEntity.DispositionHostile; // it is an ambush - it attacks on arrival
+			entity.Hostile = true;
+			entity.LootContainer = type.LootContainerTemplateId;
+			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken);
+			entity.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
+			foreach (var sp in type.Spells)
+				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
+
+			// Zone-only, as the encounter swap and the ambient pools are: the interest pass streams it to everyone in
+			// range on its next tick, and the sim's own aggro pass puts the player on its hate list - which is what the
+			// capture shows arriving with it, rather than a hate list we would have to author.
+			zone.Add(entity);
+			_logger.LogInformation("Ambush: goal {Goal} sprang {Name} (level {Level}) on map {Map} at ({X:F1}, {Z:F1}).", ambush.GoalId, type.Name, level, zone.MapId, position.X, position.Z);
 		}
 
 		// #502: the boss is gone - put her lure back where she stood, so the encounter can fire again. Spawned from the

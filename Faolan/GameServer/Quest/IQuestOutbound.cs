@@ -28,6 +28,10 @@ namespace Faolan.GameServer.Quest
 		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.
 		Task RefreshQuestMarkerByName(INetworkClient client, string npcName);
 
+		// #528: a goal that springs an AMBUSH just advanced for the first time - put the ambusher in the world beside
+		// the player after the definition's delay. No-op when the player is no longer there to ambush.
+		void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush);
+
 		// #261: the player's quest state changed, so re-evaluate quest-gated NPC visibility - reload their active quest
 		// set and run an interest pass so newly-qualified gated NPCs (e.g. Scavenger Tuut) spawn and no-longer-qualified
 		// ones despawn in-place, without waiting for the player or NPC to move.

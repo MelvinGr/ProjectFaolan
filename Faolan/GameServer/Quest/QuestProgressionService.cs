@@ -360,6 +360,13 @@ namespace Faolan.GameServer.Quest
 				changed = true;
 				await PersistGoalProgress(character.Id, quest, def, goal, progress);
 
+				// #528: the goal's FIRST advance can spring an ambush - the Quarry Bat Demon on the first of three
+				// stone bricks. First only: the captured session picks up all three and gets exactly one Bat Demon, so
+				// the gate is `current == 0` and not "every tick". Persisted progress is what makes it survive a relog
+				// (a player who already holds a brick does not get ambushed again).
+				if (current == 0 && await _database.GetNpcAmbushForGoal(def.QuestId, goal.GoalId) is { } ambush)
+					_outbound.ScheduleQuestAmbush(client!, ambush);
+
 				// The whole quest is done only when THIS goal hit its count AND every other goal is already complete.
 				if (progress >= required && await AllGoalsComplete(character.Id, quest, def, goal, progress))
 				{

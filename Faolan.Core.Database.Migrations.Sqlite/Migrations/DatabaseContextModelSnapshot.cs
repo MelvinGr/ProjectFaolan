@@ -2137,6 +2137,37 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
+                {
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("AnchorDistance")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("DelaySeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<uint>("GoalId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("QuestDefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("MapId", "NpcTemplateId");
+
+                    b.HasIndex("GoalId");
+
+                    b.HasIndex("NpcTemplateId");
+
+                    b.HasIndex("QuestDefinitionId");
+
+                    b.ToTable("NpcAmbushes");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
                 {
                     b.Property<uint>("NpcTemplateId")
@@ -4939,6 +4970,41 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Spell");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.QuestGoalDefinition", "Goal")
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "QuestDefinition")
+                        .WithMany()
+                        .HasForeignKey("QuestDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
+
+                    b.Navigation("Map");
+
+                    b.Navigation("NpcTemplate");
+
+                    b.Navigation("QuestDefinition");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>

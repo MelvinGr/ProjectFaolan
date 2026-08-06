@@ -30,6 +30,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
 		Task<NpcEncounter?> GetNpcEncounter(uint mapId, uint lureTemplateId);
 		Task<NpcEncounter[]> GetNpcEncounters(uint mapId);
+
+		// #528: the quest-triggered ambushes on `mapId` - the NPCs that appear only when a goal advances. Read once
+		// per zone load, both to arm the trigger and to SKIP the captured placements of those types.
+		Task<NpcAmbush[]> GetNpcAmbushes(uint mapId);
+
+		// The ambush a goal springs, or null. Keyed by the goal because that is what the progression engine holds.
+		Task<NpcAmbush?> GetNpcAmbushForGoal(uint questDefinitionId, uint goalId);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
@@ -168,6 +175,18 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.NpcEncounters.Where(e => e.MapId == mapId).ToArrayAsync();
+		}
+
+		public async Task<NpcAmbush[]> GetNpcAmbushes(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcAmbushes.Where(a => a.MapId == mapId).ToArrayAsync();
+		}
+
+		public async Task<NpcAmbush?> GetNpcAmbushForGoal(uint questDefinitionId, uint goalId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcAmbushes.FirstOrDefaultAsync(a => a.QuestDefinitionId == questDefinitionId && a.GoalId == goalId);
 		}
 
 		public async Task<NpcTemplate?> GetNpcByName(string name)

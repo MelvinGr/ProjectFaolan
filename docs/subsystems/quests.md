@@ -275,6 +275,33 @@ Whether a target is a unique story NPC or a population mob is not stated anywher
 so it is a column and not a rule. `SeedContentTests.GatedKillTargets_HaveEnoughSpawnsToFinishTheGoal` asserts the
 property that makes setting one safe, rather than the current membership.
 
+### A goal can spring an AMBUSH
+
+`NpcAmbush` is the third trigger shape, after quest-gated **visibility** above (the NPC is there, only some players
+see it) and the proximity **lure** (`NpcEncounter` — the NPC is there and turns into something else). An ambusher
+is not in the world at all: it appears when a goal advances, beside the player, and attacks.
+
+Decoded from `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: picking up the first Quarry Stonebrick
+for quest 12371 (*Get 3 stone bricks*) grants the item at t=315.6, and a **Bat Demon** arrives at t=318.6 — 3.6 u
+from the brick, with the player already on its hate list. The trigger *effects* are immediate and the *body*
+follows ~3 s later, which is why `DelaySeconds` is a column and not a detail. It is the only genuine mid-session
+NPC spawn in that capture; everything else arrives in the world-entry stream.
+
+- **Fires on the goal's FIRST advance only.** That session picks up all three bricks and gets exactly one Bat
+  Demon. Because the gate reads *persisted* progress, a relog does not re-arm it.
+- **The captured placement is SKIPPED.** `NpcSpawns` holds one Bat Demon row on map 4020 — a harvest of that
+  sprung ambush, 10.2 u from where retail actually spawned it — and rendering it left a Bat Demon standing in the
+  quarry permanently, for every player, regardless of quest state. `WorldBroadcaster.EnsureZoneNpcs` skips any
+  placement whose type is an ambusher on that map, which is also what keeps it skipped across a re-import.
+- **Anchored on the player**, not the interacted object: retail measures from the brick, we measure from the
+  player standing at it, which is the same spot to within the interaction range and needs no object identity to
+  reach the progression engine.
+- **No authored hate list.** The capture shows the Bat Demon arriving with `HateListUpdateIIR` already naming the
+  player; ours spawns hostile and the simulation's own aggro pass picks the player up on the next tick.
+
+Like `NpcEncounter`, the rows are **hand-authored** — nothing on the wire states a trigger or a delay — and gated
+by `QuestAmbushTests`.
+
 ### A delivery checks that the player is carrying the goods
 
 A hand-in advances on the **talk**, so without a precondition it completes by walking up to the recipient

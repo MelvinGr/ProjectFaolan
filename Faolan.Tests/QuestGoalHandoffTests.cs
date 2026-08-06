@@ -163,6 +163,15 @@ namespace Faolan.Tests
 			public void InvalidateReachGoals(INetworkClient client) { }
 			public Task RefreshQuestMarkerByName(INetworkClient client, string npcName) => Task.CompletedTask;
 			public Task RefreshQuestVisibility(INetworkClient client) => Task.CompletedTask;
+
+			// #528: the ambusher TYPES the engine sprang, so a gate can assert one fired without a live zone.
+			public List<uint> Ambushes { get; } = [];
+
+			public void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush)
+			{
+				Ambushes.Add(ambush.NpcTemplateId);
+			}
+
 			public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null) => Task.CompletedTask;
 			public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds) => Task.CompletedTask;
 			public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow) => false;
