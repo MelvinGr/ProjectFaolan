@@ -28,7 +28,17 @@ namespace Faolan.GameServer.Combat
 		// tweak table carries no melee arc/reach entry; `TWK_Selection_Radius` 10 is targeting, not damage). Sized as
 		// the NPC melee range (3u, WorldState.NpcMeleeRange) plus the slack the old target-centered radius had, so a
 		// swing at a target in contact still catches the pack immediately around it.
-		public const float DefaultCleaveReach = 8f;
+		//
+		// ONE number, deliberately: it bounds the swing itself (#696 - whether the selected target is reachable at
+		// all) as well as the cleave splash, because they are the same physical reach. Two constants would let a
+		// swing legitimately land on a primary the splash could not have touched, which is not a thing a sword does.
+		// ⚠️ It is also where a WEAPON-dependent reach would go if one is ever recovered - a polearm and a dagger
+		// plainly do not share this, and nothing shipped tells us what either should be.
+		public const float SwingReach = 8f;
+
+		// The cleave's reach IS the swing's reach - see SwingReach. Kept as its own name because the cleave call site
+		// reads better for it, not because the two can differ.
+		public const float DefaultCleaveReach = SwingReach;
 
 		// The half-angle of the swing's cone, in degrees. PROVISIONAL for the same reason: 60 each side is a
 		// 120-degree frontal arc - "a small area in front of you" that takes in the enemies flanking your target

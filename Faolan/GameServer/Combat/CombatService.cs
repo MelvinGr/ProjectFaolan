@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Combat
 			// echo-ack (no result block) so the client plays no hit-react on the player (#19), matching the unarmed
 			// air-swing path - then we're done (retail's air swing is the bare ack).
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
-			if (!hasEnemyTarget)
+			if (!hasEnemyTarget || !WithinMeleeReach(client, targetHandle))
 			{
 				await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, phase)));
 				return;
@@ -405,6 +405,45 @@ namespace Faolan.GameServer.Combat
 			return victims.Count;
 		}
 
+		// Whether the swing can actually REACH its named target (#696). The target handle is the client's, and until
+		// this existed nothing bounded it: melee landed at any distance, because the only reach in the attack path
+		// belonged to the CLEAVE set and `CombatTargeting` exempts the primary from the geometric test on purpose -
+		// "it takes the swing by being selected, whatever angle it is at". That exemption is right about the ANGLE (you
+		// face what you selected, so cone-testing the primary would reject a legitimate swing) and it silently took the
+		// DISTANCE with it.
+		//
+		// ⚠️ Melee is the only one of these the server has to own. The client checks a SPELL's range itself and simply
+		// never sends an out-of-range cast (confirmed in-client 2026-08-07: "spells are checked client side, but melee
+		// you can always do"), so a server-side spell gate would guard a door the client already holds shut. The swing
+		// it always sends. Same division of labour as #271, where the client owns the recast it can read and the server
+		// owns what the client cannot.
+		//
+		// An out-of-reach swing is answered as an AIR SWING - the same plain echo-ack a swing with no target gets -
+		// rather than dropped. That shape is captured and the client already handles it, and #271 is the standing
+		// reminder that silently refusing an action the client thinks it made leaves it waiting on a reply.
+		//
+		// ⚠️ The reach is `CombatTargeting.SwingReach`, which is PROVISIONAL - see it for why there is no shipped
+		// number to use instead. An unresolvable target passes: whether it is reachable is not this method's question,
+		// and ApplyNpcDamage refuses it separately (#695).
+		private bool WithinMeleeReach(INetworkClient client, uint targetHandle)
+		{
+			// ⚠️ `ZoneForEntity`, NOT `TryGetZone(MapId)`: the latter looks up the DEFAULT instance only, so in any
+			// instanced playfield it misses, and this guard then passes everything - which is exactly how the first
+			// cut of this check shipped doing nothing at all (#696, #268).
+			var attacker = _sim.PlayerWorldEntity(client);
+			if (attacker == null || !_sim.World.ZoneForEntity(attacker).TryGet(targetHandle, out var target))
+				return true;
+
+			var distance = Vector3.Distance(attacker.Position, target.Position);
+			if (distance <= CombatTargeting.SwingReach)
+				return true;
+
+			_logger.LogDebug("Combat: {Player}'s swing at 0x{Target:X8} misses - {Distance:F1}u away, reach is {Reach}u (#696).",
+				client.Session.Character?.Name ?? "<no character>", targetHandle, distance, CombatTargeting.SwingReach);
+
+			return false;
+		}
+
 		// Melee cleave (#18): an AoC swing damages "a small area IN FRONT OF YOU" (Funcom's own quickstart), not just
 		// the selected target and not a ball around it. After the primary hit, splash the same damage to the hostile,
 		// living NPCs inside the attacker's frontal cone (CombatTargeting.CleaveTargets). The directional arc a swing
@@ -419,10 +458,13 @@ namespace Faolan.GameServer.Combat
 		// no-op. Inventing a fraction the balance sheet does not carry would be worse than matching it.
 		private async Task ApplyMeleeCleave(INetworkClient client, uint instance, uint primaryHandle, uint damage)
 		{
+			// Same instance trap as WithinMeleeReach: TryGetZone(MapId) resolves the DEFAULT instance only, so cleave
+			// silently did nothing in an instanced playfield (#268).
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.TryGetZone(player.MapId, out var zone))
+			if (player == null)
 				return;
 
+			var zone = _sim.World.ZoneForEntity(player);
 			zone.TryGet(primaryHandle, out var primary);
 			foreach (var secondary in CombatTargeting.CleaveTargets(zone, player, primary, CombatTargeting.DefaultCleaveReach,
 				         CombatTargeting.DefaultCleaveHalfAngleDegrees, CombatTargeting.DefaultMaxCleaveTargets))
