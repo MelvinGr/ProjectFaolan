@@ -44,15 +44,26 @@ namespace Faolan.Importer.Rdb
 		// The id space above this is a VARIANT playfield numbering (0x40000000 | <playfield>) that is not a Map.Id.
 		private const uint VariantIdBase = 0x40000000;
 
-		// A RESURRECTION-POINT discovery volume. `Rez` is load-bearing and is the client's own discriminator: it
-		// separates `BA_MountainGlade_RezDiscovery` (a respawn pad, 16x20 to 29x33 units) from `FrostFields_Discovery`
-		// and `FotD_Discovery`, which are AREA discovery - the zone-codex mechanic, 157x185 and 114x74.
+		// A RESURRECTION-POINT discovery volume - the ground you walk into to discover the point (#519/#682).
 		//
-		// ⚠️ The looser `_discovery` spelling matches BOTH, and the two area regions each contain a respawn point of
-		// the SAME NAME ("Frost Fields", "Field of the Dead"), so a containment test alone happily links them and
-		// widens those points' discovery from a 30-unit radius to a 157x185 box. That is a different mechanic wearing
-		// a matching name, not a tighter volume - so anchor on `Rez` and leave area discovery to whoever implements it.
-		private static readonly Regex DiscoveryName = new(@"rezdiscov", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		// The client spells the family several ways and only two of them contain "discovery":
+		// `BA_MountainGlade_RezDiscovery`, `skammestein_res`, `graveyard_res`, `Pin Pin Respad`,
+		// `Resurrection POI F`, `RezBA`. Anchored on `(?<![a-z])` rather than `\b` throughout, because `_` is a WORD
+		// character - `\brez` matches neither `zang_xin_camp_rezpad` nor `BA_MountainGlade_RezDiscovery`, which is
+		// how the survey came to file the whole discovery family under quest-goal.
+		//
+		// ⚠️ The NAME is only the first of three gates, and on its own it is actively dangerous: `FrostFields_Discovery`
+		// and `FotD_Discovery` are AREA discovery - the zone-codex mechanic, 157x185 and 114x74 - and each CONTAINS a
+		// respawn point of the same name ("Frost Fields", "Field of the Dead"). A containment test alone happily links
+		// them and widens those points' discovery from a 30-unit radius to a box 25x the size. That is a different
+		// mechanic wearing a matching name, so the size gate below is what keeps it out, not the vocabulary.
+		private static readonly Regex DiscoveryName =
+			new(@"resurrect|rezz|re[zs]pad|(?<![a-z])rez|(?<![a-z])res$|_res(?![a-z])|(?<![a-z])res(pawn|point|spot)",
+				RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// The footprint above which a resurrection-named volume is AREA discovery rather than a respawn pad. The pads
+		// are 10x11 to 56x50; the two area regions are 157x185 and 114x74, so nothing sits near this line.
+		private const double DiscoveryPadFootprint = 3000;
 
 		// Lava by name. Anchored on the word so `LavaDamage-3` / `BA_lava_dmg1` / `LavaArea2` / `HazardLava` all match.
 		private static readonly Regex LavaName = new(@"lava", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -92,7 +103,7 @@ namespace Faolan.Importer.Rdb
 			var wanted = new Dictionary<(uint Map, string Name), BoundedAreaCollection.BoundedArea>();
 
 			var points = await db.RespawnPoints.ToListAsync();
-			var discoveryFor = MatchDiscoveryVolumes(points, areasByMap, wanted);
+			var discoveryFor = MatchDiscoveryVolumes(points, areasByMap, wanted, notes);
 
 			var goals = await db
 				.QuestGoalDefinitions.Where(g => g.TrailingCategory == BoundedAreaNameCategory && g.TrailingRefId > 0)
@@ -371,13 +382,32 @@ namespace Faolan.Importer.Rdb
 			return names;
 		}
 
-		// A respawn point's discovery volume: the SMALLEST discovery-named region containing it. Smallest because the
-		// pads nest inside larger audio/collision volumes that happen to share the naming, and the tightest match is
-		// the one the designer drew around the point.
+		// A respawn point's discovery volume: the SMALLEST region containing it that passes all three gates.
+		//
+		//   1. NAME - the resurrection family's own vocabulary (see DiscoveryName).
+		//   2. SIZE - a respawn PAD, not the zone-codex area that happens to contain the same point.
+		//   3. SCRYID 0 - server-owned behaviour, which is what discovery is. All 11 volumes the narrower `rezdiscov`
+		//      rule found carry it; the 7 pad-sized ones that do not are running a CLIENT script, and the same
+		//      principle that keeps `BA_Lava_music` out of the hazard import keeps them out of this one.
+		//
+		// Smallest because the pads nest inside larger audio/collision volumes that happen to share the naming, and
+		// the tightest match is the one the designer drew around the point.
+		//
+		// ⚠️ Widened from `rezdiscov` alone (#682), which reached 11 of 538 points. The value it replaces is a FEEL
+		// CALL and known to be wrong in a specific direction: `RespawnDiscoveryRange` is a 60x60 box with no vertical
+		// bound, against real volumes of 16x20 to 29x33 and ~10 units tall, so we discover a point from roughly twice
+		// retail's distance and from any height. The RDB carries no radius at all, so these volumes are the only
+		// source there is.
+		//
+		// ⚠️ It is an inference from name + shape + scryid + containment, not from a name that SAYS discovery -
+		// `Pin Pin Respad` may be the shrine's footprint rather than its trigger. Three signals agreeing is decent
+		// evidence and the failure mode is bounded: a slightly wrong discovery radius, against a value already known
+		// to be too generous.
 		private static List<(RespawnPoint Point, (uint Map, string Name) Key)> MatchDiscoveryVolumes(
 			List<RespawnPoint> points,
 			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
-			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted)
+			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
+			List<string> notes)
 		{
 			var matched = new List<(RespawnPoint, (uint, string))>();
 			foreach (var p in points)
@@ -389,11 +419,11 @@ namespace Faolan.Importer.Rdb
 				var bestArea = double.MaxValue;
 				foreach (var a in areas)
 				{
-					if (!DiscoveryName.IsMatch(a.Name) || !a.Contains(p.PositionX, p.PositionZ))
+					if (a.ScryId != 0 || !DiscoveryName.IsMatch(a.Name) || !a.Contains(p.PositionX, p.PositionZ))
 						continue;
 
 					var box = (a.Vertices.Max(v => v.X) - a.Vertices.Min(v => v.X)) * (double)(a.Vertices.Max(v => v.Y) - a.Vertices.Min(v => v.Y));
-					if (box >= bestArea)
+					if (box > DiscoveryPadFootprint || box >= bestArea)
 						continue;
 
 					best = a;
@@ -406,6 +436,11 @@ namespace Faolan.Importer.Rdb
 				wanted[(p.MapId, best.Name)] = best;
 				matched.Add((p, (p.MapId, best.Name)));
 			}
+
+			// A pad that discovers TWO points is either one pad serving both or the wrong pad for one of them, and
+			// nothing here can tell which - so it is reported rather than quietly shipped.
+			foreach (var shared in matched.GroupBy(m => m.Item2).Where(g => g.Count() > 1))
+				notes.Add($"discovery volume '{shared.Key.Item2}' on map {shared.Key.Item1} is the tightest match for {shared.Count()} respawn points ({string.Join(", ", shared.Select(m => m.Item1.Name))})");
 
 			return matched;
 		}

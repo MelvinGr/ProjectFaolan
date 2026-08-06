@@ -40,12 +40,18 @@ namespace Faolan.Importer.Rdb
 			// same distinction RdbHazardImporter's NotAVolume guard draws for lava.
 			(BoundedAreaBucket.Audio, Rx(@"sfx|_music|music_|\bmusic\b|reverb|reveb|\beax\b|ambien(ce|t)|soundscape")),
 
-			// Resurrection pads. The corpus spells them five ways and only two of them contain the word: `BA_Resurrection_*`,
-			// `RezBA`/`RezzBaishan`, `Pin Pin Respad`, and a bare `-res` SUFFIX (`graveyard_res`, `LoggingCampRes`,
+			// Resurrection pads. The corpus spells them several ways and only two of them contain the word:
+			// `BA_Resurrection_*`, `RezBA`/`RezzBaishan`, `Pin Pin Respad`, `BA_MountainGlade_RezDiscovery`,
+			// `BA_BottomFloor_RezPointDiscover`, and a bare `-res` SUFFIX (`graveyard_res`, `LoggingCampRes`,
 			// `Throneroomres`). The suffix is anchored at the end precisely because a loose `res` is a substring of half
 			// the place names in the game.
-			// ⚠️ `_` is a WORD character, so `\brez` does NOT match `zang_xin_camp_rezpad` - hence the explicit `re[zs]pad`.
-			(BoundedAreaBucket.Resurrection, Rx(@"resurrect|rezz|\brez|re[zs]pad|res$|_res\b|\bres(pawn|point|prison|spot|zone)")),
+			//
+			// ⚠️ `_` is a WORD character, so `\brez` does NOT match `zang_xin_camp_rezpad` OR
+			// `BA_MountainGlade_RezDiscovery`. It used to be written `\brez` plus an explicit `re[zs]pad` to paper over
+			// the first case, which left the second: every `*_RezDiscovery` fell through to the QuestGoal rule's
+			// `discovery` and the whole discovery family - the one this bucket is most about - was filed as quest
+			// regions. Anchor on `(?<![a-z])` and the underscore stops mattering.
+			(BoundedAreaBucket.Resurrection, Rx(@"resurrect|rezz|(?<![a-z])rez|re[zs]pad|res$|_res(?![a-z])|(?<![a-z])res(pawn|point|prison|spot|zone)")),
 
 			(BoundedAreaBucket.Teleport, Rx(@"teleport|\bport(al)?\b|zoneline|zone_line|\bwarp\b|traveltrigger")),
 

@@ -138,13 +138,18 @@ space, which are not `Map.Id`s. 544 of the regions carry fewer than 3 vertices a
 | `spawn-camp` | 198 | 55 | ambient spawns (#332/#363) — **checked, see below** |
 | `hazard-fire-death` | 147 | 31 | #504 |
 | **`hazard-lava`** | **111** | **24** | **#504 — imported** |
-| `resurrection` | 96 | 46 | resurrection spots (#372) — **checked, see below** |
+| `resurrection` | 108 | 51 | resurrection spots (#372) — **checked, see below**; 68 imported as discovery volumes |
 | `hazard-trap` | 79 | 8 | #504 |
-| `quest-goal` | 57 | 30 | `ReachArea` goals (#262) |
+| `quest-goal` | 51 | 29 | `ReachArea` goals (#262) |
 | `teleport` | 43 | 24 | local travel + zone lines (#506) |
-| `dismount` | 14 | 4 | mounts (#27) |
+| **`dismount`** | **14** | **4** | **#681 — imported** |
 | `hazard-drown` | 7 | 5 | #504 |
-| `uncategorised` | 4,735 | 326 | — |
+| `uncategorised` | 4,729 | 326 | — |
+
+⚠️ **First match wins, so a rule that cannot match hands its family to a later rule.** The resurrection rule was
+anchored `\brez`, and `_` is a word character — so every `*_RezDiscovery` fell through to `quest-goal`'s
+`discovery`, and the discovery family this bucket is most about was counted as quest regions (#682). Anchored on
+`(?<![a-z])` since; that is the 96 → 108 / 57 → 51 in the table above, and no region changed, only its label.
 
 ⚠️ The buckets are a **naming heuristic**, and the ordering is load-bearing: rules are applied in the order above
 and first match wins, so an audio twin (`Vanir_camp_music`, `BA_Lava_music`) is audio rather than the thing it is
@@ -594,14 +599,18 @@ nothing reads stays out.
 `RdbRegionImporter` (the opt-in `rdb-regions` module) imports **235 regions / 6,899 vertices** into `MapRegion` +
 `MapRegionVertex` and links each to its consumer:
 
-- **11 resurrection-point discovery volumes** (#519) → `RespawnPoint.DiscoveryRegionId`, matched by containment:
-  the smallest `*RezDiscovery* `region containing the point. `WorldSimulation` then tests the polygon instead of
-  its 30-unit radius, which was a 60 × 60 box with no vertical bound against volumes of 16 × 20 to 29 × 33 and
-  ~10 units tall.
-  ⚠️ `Rez` is load-bearing and is the client's own discriminator. The looser `_Discovery` spelling also matches
-  `FrostFields_Discovery` and `FotD_Discovery` — **area** discovery, 157 × 185 and 114 × 74 — and each of those
-  contains a respawn point of the *same name*, so a containment test alone happily links them and widens two
-  points' discovery to a box 25× the size. Different mechanic, matching name.
+- **68 resurrection-point discovery volumes** (#519/#682) → `RespawnPoint.DiscoveryRegionId`, the smallest region
+  containing the point that passes three gates: the resurrection family's own **vocabulary**, a pad **footprint**
+  (≤ 3000 u² — the shipped ones are 147 to 1,658), and **`scryid 0`**, i.e. server-owned behaviour, which is what
+  discovery is. `WorldSimulation` then tests the polygon instead of its 30-unit radius, which is a 60 × 60 box with
+  no vertical bound against volumes of 16 × 20 to 29 × 33 and ~10 units tall — so the radius discovers a point from
+  roughly twice retail's distance and from any height. The RDB carries **no radius at all**, so these volumes are
+  the only source there is.
+  ⚠️ The name gate is the weakest of the three and is dangerous alone: `FrostFields_Discovery` and `FotD_Discovery`
+  are **area** discovery — the zone-codex mechanic, 157 × 185 and 114 × 74 — and each contains a respawn point of
+  the *same name*, so containment plus a loose `_Discovery` happily links them and widens two points' discovery to
+  a box 25× the size. The **size** gate is what keeps them out, not the vocabulary.
+  ⚠️ It widened from 11 to 68 only once the `\brez` anchor was fixed — see the classifier note below.
 - **3 quest goal regions** (#521) → `QuestGoalDefinition.RegionId`, resolved through the goal's typed LDB
   reference (see below). `BossRoom` resolves even though goal 14073 carries no `MapId`, because the name occurs on
   exactly one hosted playfield; ambiguity is reported rather than guessed.

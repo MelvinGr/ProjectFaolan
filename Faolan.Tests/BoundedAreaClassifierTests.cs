@@ -24,6 +24,14 @@ namespace Faolan.Tests
 			(BoundedAreaBucket.Resurrection, "BA_Resurrection_TheOutcastCamp"),
 			(BoundedAreaBucket.Teleport, "TeleportToArena"),
 			(BoundedAreaBucket.Dismount, "DismountArea1"),
+			// ⚠️ The discovery family, and the reason the resurrection rule anchors on `(?<![a-z])` rather than `\b`:
+			// `_` is a word character, so a `\brez` anchor lets every one of these fall through to the QuestGoal
+			// rule's `discovery` and files the family as quest regions (#682).
+			(BoundedAreaBucket.Resurrection, "BA_MountainGlade_RezDiscovery"),
+			(BoundedAreaBucket.Resurrection, "BA_BottomFloor_RezPointDiscover"),
+			(BoundedAreaBucket.Resurrection, "zang_xin_camp_rezpad"),
+			// ...while AREA discovery, which contains a respawn point of the same name, is NOT this family.
+			(BoundedAreaBucket.QuestGoal, "FrostFields_Discovery"),
 			(BoundedAreaBucket.HazardLava, "BA_Lava7"),
 			(BoundedAreaBucket.HazardTrap, "BA_SpikeTrap"),
 			(BoundedAreaBucket.HazardDrown, "PlayerDrowns_Dies"),

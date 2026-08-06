@@ -180,7 +180,7 @@ namespace Faolan.Tests
 			var banners = await db.MapRegions.CountAsync(r => r.AreaNameId != null, ct);
 			var hazards = await db.MapHazards.CountAsync(ct);
 			var noMount = await db.MapRegions.CountAsync(r => r.NoMount, ct);
-			Assert.True(discovery >= 11, $"{discovery} respawn points carry a discovery volume; the import resolves 11.");
+			Assert.True(discovery >= 68, $"{discovery} respawn points carry a discovery volume; the import resolves 68 (#519/#682).");
 			Assert.True(goals >= 3, $"{goals} quest goals carry a region; the import resolves 3.");
 			Assert.True(banners >= 140, $"{banners} volumes carry an area banner; the import resolves 140+ (#513/#679/#680).");
 			Assert.True(hazards >= 100, $"{hazards} hazard volumes carry behaviour; the lava import resolves 100+ (#504).");
