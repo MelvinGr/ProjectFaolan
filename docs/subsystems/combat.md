@@ -416,13 +416,28 @@ semantically decoded - capture-typical defaults for the live send.
 
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
-A hostile NPC with a player inside `NpcAggroRange` (20u) chases it: `WorldState.Tick` steps the NPC toward
+A hostile NPC aggros a player two ways: proximity — a player inside `NpcAggroRange` (20u) — or **being hit**,
+which engages it with its attacker for `NpcCombatMemorySeconds` (10s) regardless of distance
+(`WorldState.RecentAttackerOf`, off the attacker + timestamp `CombatService.ApplyNpcDamage` stamps on the NPC).
+The damage half applies none of the proximity gates (range, line of sight, the vertical band): those answer
+"would this mob notice you", and a mob that has been hit already has. The leash below still bounds the chase.
+
+⚠️ Both halves matter for HEALTH, not just movement. A disengaged NPC full-heals (the anti-whittle rule below),
+so while damage did not aggro, any mob attacked from outside 20u reset to full on the next tick and only ever
+took the most recent hit — in-client that reads as "the first hit is fine, everything following is not" (#695).
+
+Once engaged, `WorldState.Tick` steps the NPC toward
 the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
 sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
 origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
 (`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (40u) from
 spawn it disengages, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival; losing
 the target out in the field also sends it home. WORKS in-client (it moves + leashes + stops on de-aggro).
+
+**Anti-whittle:** a disengaged NPC with its health down restores to full, so it cannot be worn down from
+outside its aggro range across separate approaches. The trigger is the combat memory lapsing — 10s since the
+last hit — **not** "no player currently in aggro range", which is a different question and, while damage did
+not aggro, fired between every pair of ranged hits.
 
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
@@ -994,6 +1009,15 @@ level 1. `StatDamageIIR` (0xE9F24184) is spell hits and DoT TICKS - small and re
 a real cast. ⚠️ The word after `delta` in StatDamage is the damage **school**, not a stat id; censusing it as a
 stat finds nothing and reads as "retail has no caster NPCs", which is how the magical branch went missing on a
 first pass. Filtering by school instead shows magical casters at levels 1-6.
+
+⚠️ **`Spell.DotDelta` is a captured `StatDamageIIR` delta, so it is stored in WIRE units and must be converted
+before it is spent.** Everything it meets in the simulation is display: `EntityVitals.Health` is the ÷100 vitals
+value, and the melee curve is converted at its point of use for the same reason (#572). `WorldSimulation.DotEffect`
+does the conversion once, where a spell row becomes a live effect, so the health application and the wire cannot
+disagree; the stored column stays wire so its captured provenance stays readable. Unconverted, a DoT hit 100×
+too hard — and harder than the melee bug did, because melee is a per-level CURVE (bounded by the mob's level)
+while a DoT is a flat constant that ignores both level and pool: `Rend` at −54/1.5s emptied a level-1 player's
+88-point pool in three ticks, and the corpus reaches −258,352 (`Chill (Rank 5)`) (#693).
 
 **A DoT's cadence is measured, not read.** The record carries no period, so consecutive ticks of one spell on
 one target are one tick train and the gap between them *is* that spell's interval — harvested by the
