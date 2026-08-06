@@ -239,6 +239,12 @@ namespace Faolan.Importer.Captures
 		public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			// spellId -> the distinct classes whose create capture granted it (null class = unattributed capture).
+			//
+			// One class per capture is CORRECT here, and it was worth checking rather than assuming: retail sends a
+			// clicked class's book so the editor can display it, so a player browsing the class list would put several
+			// books in one capture and this would merge them onto the first. `--report create-classes` (#581) says
+			// 0 of the 21 create captures select more than one class, so no capture in the corpus can be wrong this
+			// way. Re-run that report before trusting this on a new corpus.
 			var idToClasses = new Dictionary<uint, HashSet<uint>>();
 			foreach (var capture in createCaptures)
 			{
@@ -621,6 +627,15 @@ namespace Faolan.Importer.Captures
 			{
 				// not a parseable DispatchLearnSpell grant
 			}
+		}
+
+		// How many LEARN grants one packet carries - the `create-classes` report's counter, reading the same reader
+		// the import does.
+		internal static int CountLearnGrants(byte[] packet)
+		{
+			var ids = new HashSet<uint>();
+			TryReadLearnSpellId(packet, ids);
+			return ids.Count;
 		}
 
 		private static void TryReadLearnSpellId(byte[] packetBytes, ISet<uint> ids)

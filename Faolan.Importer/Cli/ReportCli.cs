@@ -520,6 +520,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "create-classes":
+				{
+					CreateClasses(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "rdb-types":
 				{
 					RdbTypes(RdbDir());

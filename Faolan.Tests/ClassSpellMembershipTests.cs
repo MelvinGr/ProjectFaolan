@@ -25,6 +25,9 @@ namespace Faolan.Tests
 		// here instead of being rounded away, and a SECOND such row should fail this test rather than join it.
 		private const uint KnownDisagreement = 146281;
 
+		// How far into a leading number the shared archetype block runs - the same 8 `RdbSpellImporter` uses.
+		private const uint ArchetypeBlockWidth = 8;
+
 		[Fact]
 		public async Task NoClassSpellRow_ContradictsItsSpellsStackingLine()
 		{
@@ -44,8 +47,15 @@ namespace Faolan.Tests
 
 			// A line whose high part is not a class says nothing about membership (50000 and 440061 are real lines
 			// with no class in them - see Spell.GuiStackingLine), so only the class-encoded ones can contradict.
+			//
+			// ...and neither can the ARCHETYPE-SHARED block, 20000-20008, where the leading number is a block rather
+			// than Guardian: three archetypes' combos sit under it, so its spells go to their archetype's three
+			// classes and two of those three necessarily "contradict" the line. That is the whole correction of #581 -
+			// it is exactly what this comparison must NOT reinstate. `ArchetypeSpells_GoToTheirArchetypesThreeClasses`
+			// gates the block instead.
 			var real = contradictions
-				.Where(x => System.Enum.IsDefined((ConanClass)(x.GuiStackingLine / 1000)) && x.SpellId != KnownDisagreement)
+				.Where(x => System.Enum.IsDefined((ConanClass)(x.GuiStackingLine / 1000)) && x.SpellId != KnownDisagreement
+				            && x.GuiStackingLine % 1000 > ArchetypeBlockWidth)
 				.ToList();
 
 			Assert.True(real.Count == 0,

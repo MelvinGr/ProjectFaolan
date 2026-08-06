@@ -334,10 +334,16 @@ namespace Faolan.Importer.Captures
 				if (combo.Name == null)
 					continue;
 
-				foreach (var (prefix, cls) in ClassComboPrefixes)
+				// #581: an ARCHETYPE-shared combo (`Soldier_`, `Rogue_`, `Priest_`) belongs to all THREE classes of
+				// that archetype, so it fans out where a class-named prefix names one. It is the half no class prefix
+				// could ever match, and the half the stacking-line route (#296) refuses too, because those combos sit
+				// in the shared `20000`-`20008` block that reads as class 20 and is not one.
+				var classes = ConanArchetypes.FromNamePrefix(combo.Name) is { } archetype
+					? ConanArchetypes.ClassesOf(archetype)
+					: ClassComboPrefixes.Where(p => combo.Name.StartsWith(p.Prefix, StringComparison.OrdinalIgnoreCase)).Select(p => p.Class).ToArray();
+
+				foreach (var cls in classes)
 				{
-					if (!combo.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-						continue;
 
 					if (existing.TryGetValue((cls, combo.Id), out var row))
 					{
@@ -562,6 +568,56 @@ namespace Faolan.Importer.Captures
 		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
 		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
 		// the capture carries no ChangeClass (e.g. a login capture) so its grants stay generic by default.
+		// Every packet of a create capture paired with the class that was SELECTED when it arrived (#581).
+		//
+		// ⚠️ `DetectClass` returns the FIRST `ChangeClass` in the capture and every caller filed the whole capture's
+		// grants under it. That is wrong whenever the player browsed the editor's class list, because retail sends the
+		// clicked class's spell/combo book each time so the UI can show it - so one capture legitimately carries
+		// several classes' books. The damage is visible in the shipped data: `ClassSpells` gives GUARDIAN all four
+		// archetype combo lines - Soldier 20002-20005 AND Rogue 20006-20007 AND Priest 20008, 22 rows a Guardian
+		// cannot have - and no other class has a single archetype-line spell. One capture, one attribution.
+		//
+		// Walking in ORDER fixes it without needing to know how many classes were browsed: the class is whatever the
+		// last callback selected, and packets before the first one have none.
+		internal static IEnumerable<(uint? Class, byte[] Packet)> PacketsWithSelectedClass(IReadOnlyList<byte[]> capture)
+		{
+			uint? current = null;
+			foreach (var packetBytes in capture)
+			{
+				try
+				{
+					if (TryReadChangeClass(packetBytes, out var classId, out _))
+						current = classId;
+				}
+				catch
+				{
+					// not a parseable editor callback
+				}
+
+				yield return (current, packetBytes);
+			}
+		}
+
+		// The distinct classes a create capture SELECTED, in order of first appearance. More than one means the player
+		// browsed the editor, and that a per-capture attribution would have merged their books.
+		internal static IReadOnlyList<uint> SelectedClasses(IReadOnlyList<byte[]> capture)
+		{
+			var seen = new List<uint>();
+			foreach (var (cls, _) in PacketsWithSelectedClass(capture))
+				if (cls is { } c && (seen.Count == 0 || seen[^1] != c) && !seen.Contains(c))
+					seen.Add(c);
+
+			return seen;
+		}
+
+		// How many COMBO grants one packet carries - the report's counter, so it reads the same reader the import does.
+		internal static int CountComboGrants(byte[] packet)
+		{
+			var one = new Dictionary<uint, HashSet<uint>>();
+			TryReadCharacterGrant(packet, one, true);
+			return one.Values.Sum(x => x.Count);
+		}
+
 		internal static uint? DetectClass(IReadOnlyList<byte[]> capture)
 		{
 			foreach (var packetBytes in capture)

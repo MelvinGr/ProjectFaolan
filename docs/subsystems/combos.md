@@ -48,9 +48,39 @@ value files every Rogue and Priest archetype combo under Guardian. The split is 
 prefixes in the catalog: every class-specific and feat-tree combo is at 401+ (Barbarian 18401–18409,
 Guardian 20401–20406, Halberdier 20407–20410, Ranger 39401–39412, …) and every archetype-shared one is at ≤ 8.
 
-Which classes each ARCHETYPE combo belongs to still needs the captured action bars — open work tracked in
-Gitea #581. Gated by `Faolan.Tests/ClassComboMembershipTests.cs`, which pins both halves: the rule never
-contradicts source 1, and the low-block combos are not mapped from it.
+### 3. The ARCHETYPE, for the shared block (#581)
+
+An archetype-shared combo belongs to **all three classes of its archetype**, so `Soldier_` / `Rogue_` / `Priest_`
+fan out where a class-named prefix names one. The membership is `ConanArchetypes`:
+
+| archetype | classes |
+|---|---|
+| Soldier | Guardian, Dark Templar, Conqueror |
+| Priest | Priest of Mitra, Tempest of Set, Bear Shaman |
+| Rogue | Barbarian, Assassin, Ranger |
+| Mage | Demonologist, Herald of Xotli, Necromancer |
+
+The client ships the archetype **ids** (RDB 1000505 `RDBPlayerClassData_c`, tier 1) but no membership table — not
+in the class registry, not in the race × class table (1000507), and not in the CHARACTERCREATOR XML (1010700),
+which is appearance only. So the membership is taken from the game's published documentation
+([aoc.fandom.com/wiki/Class](https://aoc.fandom.com/wiki/Class), which lists it twice), and it is **corroborated
+by the corpus on one arm**: the captured Assassin's action bar carries `Rogue_15_dotdetaunt_Vicious_Strike_II_2h`
+and `Rogue_19_damagedetaunt_Cunning_Strike_VI_2h` — two `Rogue_` combos on an Assassin, who is a Rogue. Nothing
+in the corpus contradicts any of the twelve placements.
+
+⚠️ **The same block was wrong on the SPELL side, and that is where it was doing damage.** `RdbSpellImporter`'s
+class map read `line / 1000` with no guard at all, so `ClassSpells` gave **Guardian** all 22 of the Rogue and
+Priest archetype spells — Cunning Strike I–VI, Vicious Strike I–II, Censuring Strike I–III — while no other class
+held a single archetype spell. It now resolves the archetype **per stacking LINE**, from the combos that drive
+that line's spells (per line, not per spell: a line's spells are one combo family's weapon variants and only some
+have a catalogued combo). Lines 20000 and 20001 carry no combo at all, so they are left **unattributed** rather
+than handed to Guardian.
+
+Gated by `Faolan.Tests/ClassComboMembershipTests.cs`, which pins all of it: the stacking-line rule never
+contradicts source 1, each archetype combo is mapped to exactly its archetype's three classes, and the archetype
+spells go to those three or to nobody.
+
+Which classes the remaining ambiguous prefixes belong to — open work tracked in Gitea #581.
 
 
 ## Data model (DONE)

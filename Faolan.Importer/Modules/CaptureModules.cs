@@ -400,9 +400,10 @@ namespace Faolan.Importer.Modules
 			var (universalInserted, _) = await CaptureAbilityImporter.DeriveUniversalLevelledAbilitiesAsync(ctx.Db);
 			caInserted += createInserted + universalInserted;
 			// ClassCombo from two sources, mirroring the abilities above. The catalog's capture-validated class-name
-			// prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) give each class its own lines;
-			// the create dumps give the UNIVERSAL kit those prefixes can't express, because it is named by RACE
-			// (Cimmerian_/Khitan_/Stygian_/Aquilonian_Dance) yet granted to every class alike (#416).
+			// prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) give each class its own lines -
+			// plus, since #581, the ARCHETYPE-shared ones (`Soldier_`/`Rogue_`/`Priest_`) fanned out to that
+			// archetype's three classes; the create dumps give the UNIVERSAL kit those prefixes can't express, because
+			// it is named by RACE (Cimmerian_/Khitan_/Stygian_/Aquilonian_Dance) yet granted to every class alike (#416).
 			var (ccInserted, _) = await CaptureAbilityImporter.DeriveClassCombosAsync(ctx.Db);
 			var (ucInserted, _) = await CaptureAbilityImporter.DeriveUniversalCombosFromCreatesAsync(ctx.Db, ctx.CreateCaptures);
 			ccInserted += ucInserted;

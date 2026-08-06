@@ -89,6 +89,12 @@ namespace Faolan.Importer.Rdb
 		private const uint ChannelingIntervalField = 0x1BF;
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
+		// How far into a leading number the shared ARCHETYPE block runs (#581/#296). The archetype combo lines are
+		// 20000-20008 - `Soldier_` 20002-20005, `Rogue_` 20006-20007, `Priest_` 20008 - so three archetypes sit under
+		// the one leading `20`, which is a BLOCK there rather than the Guardian class. Every class's OWN lines are far
+		// above it: Guardian 20401-20406, Halberdier 20407-20410, Barbarian 18401-18409, Ranger 39401-39412.
+		private const uint ArchetypeBlockWidth = 8;
+
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
 		// 132 - the mana cost, carried RAW because the client reads it in two modes: a PERCENTAGE of the caster's
@@ -578,34 +584,96 @@ namespace Faolan.Importer.Rdb
 				.GroupBy(c => c.SpellId)
 				.ToDictionary(g => g.Key, g => g.Select(c => c.Class).ToList());
 
+			// #581: which stacking LINE belongs to which archetype, from the combos that drive its spells. Per line
+			// rather than per spell, because a line's spells are the weapon variants of one combo family and only some
+			// of them have a catalogued combo - reading it per spell left the un-named variants of line 20008 (three
+			// `Censuring Strike` rows) attributed to Guardian while their siblings went to the Priest classes.
+			var lineOf = await db.Spells.Where(s => s.GuiStackingLine > 0).Select(s => new
+			{
+				s.Id,
+				s.GuiStackingLine
+			}).ToDictionaryAsync(s => s.Id, s => s.GuiStackingLine);
+
+			var archetypeOfLine = (await db.Combos.Where(c => c.Name != null).Select(c => new
+				{
+					c.Name,
+					c.GameActionId
+				}).ToListAsync())
+				.Select(c => (Line: lineOf.GetValueOrDefault(c.GameActionId), Archetype: ConanArchetypes.FromNamePrefix(c.Name!)))
+				.Where(x => x is { Line: > 0, Archetype: not null })
+				.GroupBy(x => x.Line)
+				.Where(g => g.Select(x => x.Archetype).Distinct().Count() == 1) // a line naming two archetypes is not evidence
+				.ToDictionary(g => g.Key, g => g.First().Archetype!.Value);
+
+			// The leading numbers that hold at least one archetype line. Every OTHER line under such a number is in the
+			// same shared block, so it is not that number's class either - we simply cannot say whose it is.
+			var sharedBlocks = archetypeOfLine.Keys.Select(l => l / 1000).ToHashSet();
+
 			var added = 0;
 			var conflicts = 0;
+			var shared = 0;
+			var skipped = 0;
 			foreach (var spell in spells)
 			{
 				if (spell.GuiStackingLine == 0 || !Enum.IsDefined((ConanClass)(spell.GuiStackingLine / 1000)))
 					continue; // no line, or a line whose high part is not a class (50000 and 440061 - see Spell.GuiStackingLine)
 
-				var @class = (ConanClass)(spell.GuiStackingLine / 1000);
-				if (known.TryGetValue(spell.Id, out var already))
+				// ⚠️ `line / 1000` is NOT always a class, and this is exactly the trap #296 called out on the COMBO side
+				// and this side never got. The archetype-shared combos sit in the `20000`-`20008` block - `Soldier_`
+				// 20002-20005, `Rogue_` 20006-20007, `Priest_` 20008 - so THREE different archetypes share the leading
+				// `20`, which is a BLOCK there and not Guardian. Reading it as a class shipped Guardian all 22 of the
+				// Rogue and Priest archetype spells (Cunning Strike I-VI, Vicious Strike I-II, Censuring Strike I-III),
+				// while no other class held a single archetype spell.
+				//
+				// Recognised from the DATA rather than by hardcoding the range: a LINE whose combos are named for an
+				// archetype is that archetype's, and its spells go to all three of the archetype's classes. Another
+				// line under the same leading number is in the same shared block, so it is left UNATTRIBUTED rather
+				// than handed to the class that number would name - "grant too little rather than guess wrong", as the
+				// combo prefixes put it. That is lines 20000 and 20001 (one spell each, `Redoubt` among them): the
+				// block is shared, and nothing says which archetype they are for.
+				var archetypeLine = archetypeOfLine.TryGetValue(spell.GuiStackingLine, out var archetype);
+				if (!archetypeLine && sharedBlocks.Contains(spell.GuiStackingLine / 1000) && spell.GuiStackingLine % 1000 <= ArchetypeBlockWidth)
 				{
-					if (already.Contains(@class))
-						continue;
-
-					conflicts++;
-					logger?.LogWarning("RdbSpellImporter: spell {Spell} '{Name}' is on line {Line} ({Class}) but is already mapped to {Other} - adding the RDB's reading alongside it.",
-						spell.Id, spell.Name, spell.GuiStackingLine, @class, string.Join('/', already));
+					skipped++;
+					continue;
 				}
 
-				db.ClassSpells.Add(new ClassSpell
+				var classes = archetypeLine
+					? ConanArchetypes.ClassesOf(archetype)
+					: [(ConanClass)(spell.GuiStackingLine / 1000)];
+
+				if (archetypeLine)
+					shared++;
+
+				foreach (var @class in classes)
 				{
-					SpellId = spell.Id,
-					Class = @class
-				});
-				added++;
+					if (known.TryGetValue(spell.Id, out var already))
+					{
+						if (already.Contains(@class))
+							continue;
+
+						// Only a LINE-derived reading can disagree - an archetype fan-out is three classes by design.
+						if (!archetypeLine)
+						{
+							conflicts++;
+							logger?.LogWarning("RdbSpellImporter: spell {Spell} '{Name}' is on line {Line} ({Class}) but is already mapped to {Other} - adding the RDB's reading alongside it.",
+								spell.Id, spell.Name, spell.GuiStackingLine, @class, string.Join('/', already));
+						}
+					}
+
+					db.ClassSpells.Add(new ClassSpell
+					{
+						SpellId = spell.Id,
+						Class = @class
+					});
+					added++;
+				}
 			}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("RdbSpellImporter: {Added} class<->spell rows from the class-encoded stacking line ({Conflicts} disagreed with an existing mapping).", added, conflicts);
+			logger?.LogInformation(
+				"RdbSpellImporter: {Added} class<->spell rows from the class-encoded stacking line ({Shared} archetype-shared spells fanned out to three classes each, {Skipped} left unattributed in a shared block, {Conflicts} disagreed with an existing mapping).",
+				added, shared, skipped, conflicts);
 			return added;
 		}
 
