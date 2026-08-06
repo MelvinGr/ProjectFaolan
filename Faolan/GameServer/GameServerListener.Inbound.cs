@@ -2129,6 +2129,10 @@ namespace Faolan.GameServer
 			// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
 			var castToken = ++client.Session.ActiveCastToken;
 
+			// When this cast STARTED. The recast is measured from here, not from when the spell goes off - see the
+			// arming site in Resolve() below (#271).
+			var castBeganAt = Environment.TickCount64;
+
 			Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X}{(isGroundCast ? $" ground={groundTarget}" : "")} {args}");
 
 			// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
@@ -2190,11 +2194,24 @@ namespace Faolan.GameServer
 
 				client.Session.PendingCastArgs = null!; // cast completed; no abort needed
 
-				// #271: the recast starts when the spell actually GOES OFF, not when the cast begins - an
-				// interrupted cast costs no cooldown, which is why this arms here rather than beside the refusal
-				// check above.
+				// #271: an interrupted cast costs no cooldown, which is why the recast is ARMED here, in the branch
+				// that only runs when the spell actually goes off - but it is MEASURED from when the cast BEGAN.
+				//
+				// ⚠️ Those are two different questions and answering both with "now" made every spell lock out for
+				// castTime + recast instead of max(castTime, recast). The CLIENT disagrees, and the client is the
+				// authority here - it reads the recast out of its own RDB. Smite (Rank 1) is a 2.0 s cast with a
+				// 1.0 s recast, and the client re-requested it 2.43 s after the begin: valid if the recast ran from
+				// the begin (ready at 2.0 s), 0.57 s early if it ran from the completion (ready at 3.0 s). We refused
+				// it - and because a refusal is answered with SILENCE, the client then sat waiting on a reply that
+				// never came, which is what "i cant smite more than once" and "the second one goes off way later, by
+				// itself" actually were.
+				//
+				// Corroborated in capture: `Ice Strike (Rank 6)` is a 2.0 s cast with recast 0, and its captured
+				// begin->begin gap is 2.11 s - i.e. retail's client re-casts the instant the channel ends. There is
+				// no captured repeat of a spell that HAS a recast (both repeat-cast spells in the corpus carry 0), so
+				// the begin-relative reading rests on the client's own behaviour rather than on a measured gap.
 				if (recastGroup != 0)
-					client.Session.SpellReadyAt[recastGroup] = Environment.TickCount64 + spell!.RecastCentiseconds * 10;
+					client.Session.SpellReadyAt[recastGroup] = castBeganAt + spell!.RecastCentiseconds * 10;
 
 				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 				// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
