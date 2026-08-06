@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
@@ -141,7 +142,7 @@ namespace Faolan.Tests
 			// A real CloseChatWindow record wrapped in a packet whose rpcHeader carries the chosen GameAgent sender:
 			// [8 len+crc][u32 headerLen][0x0a][byteLen][sender endpoint][record].
 			var record = Convert.FromHexString(KnubotCodecTestData.CloseChatWindowBody);
-			var sender = Endpoints.EndpointBytes(Endpoints.GameAgentType, instance);
+			var sender = Endpoints.EndpointBytes(RpcInterfaces.GameAgentType, instance);
 			var header = new byte[2 + sender.Length];
 			header[0] = 0x0a;
 			header[1] = (byte)sender.Length;

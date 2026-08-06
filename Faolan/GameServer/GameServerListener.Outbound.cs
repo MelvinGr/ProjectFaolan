@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -115,7 +116,7 @@ namespace Faolan.GameServer
 				// That is the failure mode #101's team-invite window cost a day to: a wrong sender looks like a wrong
 				// body and is not one. If this refusal does not render in-client, suspect this line before the codec.
 				// [V0: the guild-bank reply endpoints]
-				await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+				await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GuildNotEnoughCashCodec.Method, GuildNotEnoughCashCodec.Build(request.AmountTin)));
 				return;
 			}
@@ -294,7 +295,7 @@ namespace Faolan.GameServer
 		// third), which looks like a wrong body and is not one. [V0]
 		private static Task SendQuestShareRpc(INetworkClient client, GameCharInterfaceMethods method, byte[] body)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), method, body));
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType), method, body));
 		}
 
 		// One place the trade replies are addressed from, so the endpoints cannot drift between them. Silently no-ops for
@@ -303,7 +304,7 @@ namespace Faolan.GameServer
 		private Task SendTradeRpc(uint characterId, GameCharInterfaceMethods opcode, byte[] body)
 		{
 			return ClientForCharacter(characterId) is { } client
-				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), opcode, body))
+				? client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType), opcode, body))
 				: Task.CompletedTask;
 		}
 
@@ -452,7 +453,7 @@ namespace Faolan.GameServer
 				Serializer.Serialize(ms, container);
 				var payload = ms.ToArray();
 
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(UpdateInventoryCodec.Build(new UpdateInventoryIIR(characterId, 0x00, payload)))));
 			}
 
@@ -538,7 +539,7 @@ namespace Faolan.GameServer
 			var rows = await Database.GetRecipes();
 			var records = rows.Select(RecipeRecords.FromRow).ToList();
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
@@ -566,7 +567,7 @@ namespace Faolan.GameServer
 		// record stream (the retail money updates ride that conversation).
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchUpdateCash,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchUpdateCash,
 				UpdateCashCodec.Build(new UpdateCash(balanceTin, reason))));
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
@@ -589,7 +590,7 @@ namespace Faolan.GameServer
 
 		internal static Rpc BuildGameTime(INetworkClient client, float dayTimeSeconds, DateTimeOffset now)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now)));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now)));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildUpdateCodec) on the world conversation: [RpcHeader][DispatchPassBlob]
@@ -597,7 +598,7 @@ namespace Faolan.GameServer
 		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildUpdateCodec.
 		internal static Rpc BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(GuildUpdateCodec.Build(characterId, guildName)));
 		}
 
@@ -627,7 +628,7 @@ namespace Faolan.GameServer
 			var fieldA = map?.PlayfieldFieldA ?? 0u;
 			var fieldC = map?.PlayfieldFieldC ?? 7u;
 
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(PlayfieldFCodec.Build(new Vector3(character.PositionX, character.PositionY, character.PositionZ), character.MapId,
 					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, fieldB, fieldA, fieldC)));
 		}
@@ -696,7 +697,7 @@ namespace Faolan.GameServer
 		internal static Rpc BuildWorldEntrySpawn(INetworkClient client, byte[] spawnRecord)
 		{
 			ArgumentNullException.ThrowIfNull(spawnRecord);
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(spawnRecord));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(spawnRecord));
 		}
 
 		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a
@@ -705,7 +706,7 @@ namespace Faolan.GameServer
 		// from-scratch record body reach the wire without a captured packet header.
 		internal static Rpc FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, bodyWithLenPrefix.ToArray());
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, bodyWithLenPrefix.ToArray());
 		}
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
@@ -714,7 +715,7 @@ namespace Faolan.GameServer
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddItem,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddItem,
 				AddItemCodec.Build(new AddItem(containerType, charId, itemPos, entry, feedback))));
 		}
 
@@ -728,7 +729,7 @@ namespace Faolan.GameServer
 		// (`mining iron`). The item id is repeated in the first two words in every observed record.
 		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint count)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
 				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(count).WriteArray(new byte[48])));
 		}
 
@@ -760,7 +761,7 @@ namespace Faolan.GameServer
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchRemoveItem,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchRemoveItem,
 				RemoveItemCodec.Build(new RemoveItem(containerType, charId, itemPos, amountToRemove))));
 		}
 
@@ -822,7 +823,7 @@ namespace Faolan.GameServer
 			var cookie = (ulong)Interlocked.Increment(ref _travelConfirmCookie);
 			client.Session.PendingTravelConfirm = new PendingTravelConfirm(threadCtxId, cookie, destination.Id, arrival);
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchScryShowMessageBox,
 				ScryShowMessageBoxCodec.Build(destination.Id, LdbKey.ToWire(destination.TravelConfirmKey), threadCtxId, cookie)));
 
@@ -833,7 +834,7 @@ namespace Faolan.GameServer
 		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, spots))));
 		}
 
@@ -894,7 +895,7 @@ namespace Faolan.GameServer
 			// The mode flag is on GameCharInterface, not GameCharInterfaceProject - a different interface, so a
 			// different endpoint pair, which is exactly the distinction `WireOpcode` cannot express.
 			return ClientForCharacter(recipientId) is { } client
-				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+				? client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 					GameCharInterfaceMethods.DispatchApprenticeModeOnOff, ApprenticeModeCodec.Build(on)))
 				: Task.CompletedTask;
 		}
@@ -1006,7 +1007,7 @@ namespace Faolan.GameServer
 
 		private static Task SendApprenticeRpc(INetworkClient client, GameCharInterfaceProjectMethods method, byte[] body)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType), method, body));
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x54), client.Endpoint(RpcInterfaces.GameCharInterfaceProjectType), method, body));
 		}
 	}
 }

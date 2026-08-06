@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
@@ -26,21 +27,21 @@ namespace Faolan.Core.Network.Protocol
 		private static readonly IReadOnlyDictionary<uint, Type> MethodEnumsByReceiverType = new Dictionary<uint, Type>
 		{
 			// c2s: the client addresses the server's *Agent endpoint (the inbound UL trace).
-			[Endpoints.UniverseAgentType] = typeof(UniverseAgentMethods),
-			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentMethods),
-			[Endpoints.GameAgentType] = typeof(GameAgentMethods),
-			[Endpoints.GameCharAgentType] = typeof(GameCharAgentMethods),
-			[Endpoints.GameCharAgentProjectType] = typeof(GameCharAgentProjectMethods),
-			[Endpoints.TradepostAgentType] = typeof(TradepostAgentMethods),
-			[Endpoints.PlayerAgentType] = typeof(PlayerAgentMethods),
+			[RpcInterfaces.UniverseAgentType] = typeof(UniverseAgentMethods),
+			[RpcInterfaces.CSPlayerAgentType] = typeof(CSPlayerAgentMethods),
+			[RpcInterfaces.GameAgentType] = typeof(GameAgentMethods),
+			[RpcInterfaces.GameCharAgentType] = typeof(GameCharAgentMethods),
+			[RpcInterfaces.GameCharAgentProjectType] = typeof(GameCharAgentProjectMethods),
+			[RpcInterfaces.TradepostAgentType] = typeof(TradepostAgentMethods),
+			[RpcInterfaces.PlayerAgentType] = typeof(PlayerAgentMethods),
 
 			// s2c: the server addresses the client's *Interface endpoint (the outbound DL trace).
-			[Endpoints.GameInterfaceType] = typeof(GameInterfaceMethods),
-			[Endpoints.GameCharInterfaceType] = typeof(GameCharInterfaceMethods),
-			[Endpoints.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectMethods),
-			[Endpoints.TradepostInterfaceType] = typeof(TradepostInterfaceMethods),
-			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceMethods),
-			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
+			[RpcInterfaces.GameInterfaceType] = typeof(GameInterfaceMethods),
+			[RpcInterfaces.GameCharInterfaceType] = typeof(GameCharInterfaceMethods),
+			[RpcInterfaces.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectMethods),
+			[RpcInterfaces.TradepostInterfaceType] = typeof(TradepostInterfaceMethods),
+			[RpcInterfaces.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceMethods),
+			[RpcInterfaces.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
 		};
 
 		// The method enum for a given receiver-type hash, but only when that enum actually DEFINES the method; else null

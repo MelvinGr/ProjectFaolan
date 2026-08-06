@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,7 @@ namespace Faolan.Tests
 
 			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
 			// into the Rpc the receive path now dispatches on (Gitea #407).
-			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceMethods.DispatchPong,
+			var incoming = Rpc.Parse(BuildFrame(RpcInterfaces.GameCharAgentType, 0x08, RpcInterfaces.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceMethods.DispatchPong,
 				[0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
@@ -36,8 +37,8 @@ namespace Faolan.Tests
 			// parser's independent crc recompute accepts the frame.
 			var pong = Rpc.Parse(client.Sent!);
 			Assert.True(Rpc.IsCrcValid(client.Sent!));
-			Assert.Equal(Endpoints.GameCharAgentType, pong.Sender.Type);
-			Assert.Equal(Endpoints.GameCharInterfaceType, pong.Receiver.Type);
+			Assert.Equal(RpcInterfaces.GameCharAgentType, pong.Sender.Type);
+			Assert.Equal(RpcInterfaces.GameCharInterfaceType, pong.Receiver.Type);
 			Assert.Equal(Instance, pong.Receiver.Instance);
 			// The method is 0x82 = 130, so its varint needs a second group - the byte that used to be hand-passed as a
 			// "headerData" tail and is now simply part of the method field (#610).
@@ -79,8 +80,8 @@ namespace Faolan.Tests
 			// trailing words stay 0 - retail's are 0 in all 4243 captured GameServerStats.
 			var stats = Rpc.Parse(client.Sent!);
 			Assert.True(Rpc.IsCrcValid(client.Sent!));
-			Assert.Equal(Endpoints.GameAgentType, stats.Sender.Type);
-			Assert.Equal(Endpoints.GameInterfaceType, stats.Receiver.Type);
+			Assert.Equal(RpcInterfaces.GameAgentType, stats.Sender.Type);
+			Assert.Equal(RpcInterfaces.GameInterfaceType, stats.Receiver.Type);
 			Assert.Equal(Instance, stats.Receiver.Instance);
 			Assert.Equal((uint)GameInterfaceMethods.DispatchGameServerStats, stats.Method);
 

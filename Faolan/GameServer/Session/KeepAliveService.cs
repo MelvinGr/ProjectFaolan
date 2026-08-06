@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
@@ -22,8 +23,8 @@ namespace Faolan.GameServer.Session
 	public sealed class KeepAliveService
 	{
 		// LatencyCheck rides the GameCharAgent conversation (sub-id 0x08); Ping rides GameAgent (sub-id 0x08).
-		private static readonly ProtoEndpoint LatencySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08);
-		private static readonly ProtoEndpoint PingSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x08);
+		private static readonly ProtoEndpoint LatencySender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x08);
+		private static readonly ProtoEndpoint PingSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x08);
 
 		// The simulation loop's live health readout - the source of the frame rate the Ping reply reports. Taken as the
 		// narrow metric object rather than the WorldSimulation so this stays a keep-alive service that reads a gauge.
@@ -56,7 +57,7 @@ namespace Faolan.GameServer.Session
 			var counter = body.ReadUInt32();
 			var uptime = ServerUptimeClock.Microseconds;
 
-			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchPong,
+			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchPong,
 				b => b.WriteUInt32(counter)
 					.WriteUInt32((uint)(uptime >> 32))
 					.WriteUInt32((uint)uptime)));
@@ -80,7 +81,7 @@ namespace Faolan.GameServer.Session
 		{
 			var frameRate = (float)_metrics.Current.TicksPerSecond;
 
-			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchGameServerStats,
+			return client.SendAsync(new Rpc(PingSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchGameServerStats,
 				b => b.WriteFloat(frameRate).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}

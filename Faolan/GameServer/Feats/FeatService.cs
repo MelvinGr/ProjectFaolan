@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -147,7 +148,7 @@ namespace Faolan.GameServer.Feats
 
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(FeatCodec.Build(handle, FeatCodec.StateAck, featIds))));
 
 			_logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));
@@ -195,7 +196,7 @@ namespace Faolan.GameServer.Feats
 			var token = character.Id; // a per-request token the client echoes back in the answer (player handle == id)
 			client.Session.PendingFeatUntrainToken = token;
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchFeatUntrainMessageBox, FeatUntrainMessageBoxCodec.Build(1, 0, token))); // kind 1 = untrain-all; value 0 = free (no cost model yet)
 
 			_logger.LogInformation("Sent feat untrain-all confirm to character {CharacterId} ({Count} feats).", character.Id, feats.Length);

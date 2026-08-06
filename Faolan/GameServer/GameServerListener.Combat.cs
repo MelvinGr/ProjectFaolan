@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
@@ -30,19 +31,19 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Bcc(dyingHandle)))));
 		}
 
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(MoveTaskCodec.Build(DeathSequence.Pose(dyingHandle, deathPosition)))));
 		}
 
 		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(SimpleCharKilledByUpdateCodec.Build(dyingHandle, killerEndpoint))));
 		}
 
@@ -64,7 +65,7 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendRevive(INetworkClient client, uint handle, uint respawnPointId)
 		{
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Revive(handle, respawnPointId)))));
 		}
 
@@ -72,7 +73,7 @@ namespace Faolan.GameServer
 		{
 			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, facingX, facingZ))));
 		}
 
@@ -80,7 +81,7 @@ namespace Faolan.GameServer
 		{
 			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, playfieldToken))));
 		}
 
@@ -93,7 +94,7 @@ namespace Faolan.GameServer
 		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
 		Task IEnvironmentOutbound.SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)
 		{
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(StatDamageCodec.Build(StatDamages.Environmental(targetHandle, amount, statId, school)))));
 		}
 

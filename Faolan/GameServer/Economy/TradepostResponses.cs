@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -97,7 +98,7 @@ namespace Faolan.GameServer.Economy
 		// The AH/mail overlays are its only callers, so it lives here rather than on the listener's Outbound builders.
 		public static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetItemStat,
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetItemStat,
 				SetItemStatCodec.Build(SetItemStats.BankSlot(client.Session.Character.Id, slot, statId, value))));
 		}
 
@@ -105,12 +106,12 @@ namespace Faolan.GameServer.Economy
 		{
 			var sender = new ProtoEndpoint
 			{
-				Type = Endpoints.GameCharAgentType,
+				Type = RpcInterfaces.GameCharAgentType,
 				Instance = GameCharAgentInstance
 			};
 			var receiver = new ProtoEndpoint
 			{
-				Type = Endpoints.TradepostInterfaceType,
+				Type = RpcInterfaces.TradepostInterfaceType,
 				Instance = interfaceInstance
 			};
 

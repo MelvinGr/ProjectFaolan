@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -102,7 +103,7 @@ namespace Faolan.GameServer
 		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
 		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
-		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
+		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
 		// (Tortage Beach, Map.TortageBeachId, is the universal fallback world - its burst is always seeded, so a
 		// character whose own map has no usable burst still enters a real rendered world. The world-entry path reads
@@ -131,22 +132,22 @@ namespace Faolan.GameServer
 
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict = null!;
 
-		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x58);
+		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
+		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
 
 		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
+		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59);
 
 		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
 		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
 		// 10723 answered from 0xA9ECB95D/0x57 at 10726). Copying the 0x58 of its neighbours would have been the obvious
 		// guess and is wrong.
-		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x57);
+		private static readonly ProtoEndpoint InstanceSelectionSender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x57);
 
 		// Phase shift for the world clock, in game seconds (#351). The clock itself runs off the wall clock
 		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
@@ -482,7 +483,7 @@ namespace Faolan.GameServer
 			return packet.Receiver.Type switch
 			{
 				// Tradepost (auction house + mail): inbound packets address the TradepostAgent endpoint.
-				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet, body),
+				RpcInterfaces.TradepostAgentType => HandleTradepostPacket(client, packet, body),
 
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
 				// screen (without the reply the client retries forever + never opens chat).
@@ -493,14 +494,14 @@ namespace Faolan.GameServer
 				// gate actually dropped was the poll the client fires at the five editor scene characters as soon as
 				// they are streamed (before the name is committed). Retail answers those - 55/55 in
 				// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create - so we do too.
-				Endpoints.GameCharAgentProjectType => HandleGameCharAgentProject(client, packet, body),
+				RpcInterfaces.GameCharAgentProjectType => HandleGameCharAgentProject(client, packet, body),
 
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.
-				Endpoints.GameCharAgentType => HandleGameCharAgentPacket(client, packet, body),
+				RpcInterfaces.GameCharAgentType => HandleGameCharAgentPacket(client, packet, body),
 
 				// GameAgent (the connection class): auth / chat / ping / server-stats (+ VanityToggle, GCAProject-ish).
-				Endpoints.GameAgentType => HandleGameAgentPacket(client, packet, body),
+				RpcInterfaces.GameAgentType => HandleGameAgentPacket(client, packet, body),
 
 				_ => throw new Exception($"Unhandled packet receiver type: {packet.Receiver.Type:X8}")
 			};

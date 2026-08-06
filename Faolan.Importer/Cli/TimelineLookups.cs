@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -41,8 +42,8 @@ namespace Faolan.Importer.Cli
 			// The ENDPOINT is what actually says which interface a packet is on (CLAUDE.md: every 0x2000 packet in the
 			// corpus is GameAgent <-> GameInterface), so that is the test. The length check is a second, structural
 			// one: a real IIR record opens with its own length.
-			var onIirEndpoint = packet.SenderClass is Endpoints.GameAgentType or Endpoints.GameInterfaceType
-			                    && packet.ReceiverClass is Endpoints.GameAgentType or Endpoints.GameInterfaceType;
+			var onIirEndpoint = packet.SenderClass is RpcInterfaces.GameAgentType or RpcInterfaces.GameInterfaceType
+			                    && packet.ReceiverClass is RpcInterfaces.GameAgentType or RpcInterfaces.GameInterfaceType;
 			Iir = onIirEndpoint && packet.IsIirCarrier && Raw.Length >= 8 && Raw.ReadU32Be(0) == Raw.Length - 4
 				? packet.SubOpcode
 				: 0;
@@ -150,18 +151,18 @@ namespace Faolan.Importer.Cli
 		// capture (their "bodies" are the first bytes of an RpcHeader).
 		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new()
 		{
-			[Endpoints.UniverseAgentType] = typeof(UniverseAgentMethods),
-			[Endpoints.UniverseInterfaceType] = typeof(UniverseInterfaceMethods),
-			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentMethods),
-			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceMethods),
-			[Endpoints.GameAgentType] = typeof(GameAgentMethods),
-			[Endpoints.GameInterfaceType] = typeof(GameInterfaceMethods),
-			[Endpoints.GameCharAgentType] = typeof(GameCharAgentMethods),
-			[Endpoints.GameCharInterfaceType] = typeof(GameCharInterfaceMethods),
-			[Endpoints.GameCharAgentProjectType] = typeof(GameCharAgentProjectMethods),
-			[Endpoints.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectMethods),
-			[Endpoints.TradepostAgentType] = typeof(TradepostAgentMethods),
-			[Endpoints.TradepostInterfaceType] = typeof(TradepostInterfaceMethods)
+			[RpcInterfaces.UniverseAgentType] = typeof(UniverseAgentMethods),
+			[RpcInterfaces.UniverseInterfaceType] = typeof(UniverseInterfaceMethods),
+			[RpcInterfaces.CSPlayerAgentType] = typeof(CSPlayerAgentMethods),
+			[RpcInterfaces.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceMethods),
+			[RpcInterfaces.GameAgentType] = typeof(GameAgentMethods),
+			[RpcInterfaces.GameInterfaceType] = typeof(GameInterfaceMethods),
+			[RpcInterfaces.GameCharAgentType] = typeof(GameCharAgentMethods),
+			[RpcInterfaces.GameCharInterfaceType] = typeof(GameCharInterfaceMethods),
+			[RpcInterfaces.GameCharAgentProjectType] = typeof(GameCharAgentProjectMethods),
+			[RpcInterfaces.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectMethods),
+			[RpcInterfaces.TradepostAgentType] = typeof(TradepostAgentMethods),
+			[RpcInterfaces.TradepostInterfaceType] = typeof(TradepostInterfaceMethods)
 		};
 
 		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its INTERFACE, and the
@@ -182,8 +183,8 @@ namespace Faolan.Importer.Cli
 		// from an opcode that cannot tell two of them apart (#608/#613).
 		private static readonly Dictionary<uint, Type> MethodsByReceiver = new()
 		{
-			[Endpoints.PlayerAgentType] = typeof(PlayerAgentMethods),
-			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
+			[RpcInterfaces.PlayerAgentType] = typeof(PlayerAgentMethods),
+			[RpcInterfaces.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
 		};
 
 		// Re-reads the frame for its `method_instance`. The catch is deliberate and narrow: this is a REPORT over

@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,7 +52,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (packet.Receiver.Type != Endpoints.GameCharInterfaceType)
+				if (packet.Receiver.Type != RpcInterfaces.GameCharInterfaceType)
 					continue;
 
 				var character = packet.Receiver.Instance;

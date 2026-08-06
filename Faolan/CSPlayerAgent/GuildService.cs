@@ -35,8 +35,8 @@ namespace Faolan.CSPlayerAgent
 		// handle, not session data). We stamp a constant so our s2c headers match retail's shape instead of echoing the
 		// client's instance-0 endpoint back as the sender.
 		private const uint GuildServerInstance = 0x04;
-		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(Endpoints.CSPlayerAgentType, GuildServerInstance);
-		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(Endpoints.CSPlayerInterfaceType, 0);
+		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, GuildServerInstance);
+		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(RpcInterfaces.CSPlayerInterfaceType, 0);
 
 		// The s2c endpoints for an unsolicited CsPlayerAgent PUSH (a guild event to a player who didn't just send a
 		// request, so there is no incoming packet to echo). Retail addresses every reply the same way, and every

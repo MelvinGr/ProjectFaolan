@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -11,7 +12,7 @@ namespace Faolan.UniverseAgent
 	partial class UniverseAgentListener
 	{
 		private static readonly ProtoEndpoint AuthChallengeReceiver = Endpoints.EndpointFromBytes(0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42);
-		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.UniverseAgentType, 0x01);
+		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(RpcInterfaces.UniverseAgentType, 0x01);
 
 		// receiver = the request's caller endpoint (packet.Sender), passed through by the handler - the reply echoes it,
 		// which is client-specific and can't be generated (see ce487719).

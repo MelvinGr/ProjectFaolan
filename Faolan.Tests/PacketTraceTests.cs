@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
@@ -21,8 +22,8 @@ namespace Faolan.Tests
 	// tracer, the one tier that renders the extra IIR sub-opcode on top of that shared line.
 	public class PacketTraceTests
 	{
-		private static readonly ProtoEndpoint Receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, 0x0012D687);
-		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
+		private static readonly ProtoEndpoint Receiver = Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, 0x0012D687);
+		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
 		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of method 0: on every other
 		// RPC class method 0 is a different method whose body would be misread as an [payloadLength][iir] header.
@@ -32,7 +33,7 @@ namespace Faolan.Tests
 			var capture = new CapturingLogger();
 			var tracer = Tracer(capture);
 
-			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateAggroStatus,
+			var rpc = new Rpc(Sender, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateAggroStatus,
 				(byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
 
 			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
@@ -50,7 +51,7 @@ namespace Faolan.Tests
 			var capture = new CapturingLogger();
 			var tracer = Tracer(capture);
 
-			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentMethods.PassBlob,
+			var rpc = new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x0012D687), GameAgentMethods.PassBlob,
 				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Received(Rpc.Parse(rpc.Serialize()));
@@ -145,7 +146,7 @@ namespace Faolan.Tests
 			// A non-PassBlob carrier with a plain byte body (no sub-opcode branch).
 			yield return
 			[
-				new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateCash,
+				new Rpc(Sender, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateCash,
 					(byte[])[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00, 0x00, 0x01])
 			];
 
@@ -153,7 +154,7 @@ namespace Faolan.Tests
 			// partly - the line has to come off the METHOD there, not the opcode (#608/#610).
 			yield return
 			[
-				new Rpc(Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02), Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01), PlayerInterfaceMethods.AuthenticateAck,
+				new Rpc(Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02), Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01), PlayerInterfaceMethods.AuthenticateAck,
 					(byte[])[0x00, 0x00, 0x00, 0x01])
 			];
 

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -204,7 +205,7 @@ namespace Faolan.GameServer
 						echoBody.WriteF32Be(22, acceptedPosition.Z);
 					}
 
-					await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+					await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 						s => s.WriteArrayUInt32Length(echoBody)));
 
 					// Interest-managed broadcast: spawn this player to newly-near players and forward the move to those
@@ -673,11 +674,11 @@ namespace Faolan.GameServer
 					if (!isCreateWorldEntry)
 					{
 						var authSender = isNewCharacter
-							? Endpoints.Endpoint(Endpoints.GameAgentType, 0x59)
+							? Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59)
 							: WorldSenderEndpoint;
 						var authReceiver = isNewCharacter
 							? CreateFlowService.Receiver(client)
-							: client.Endpoint(Endpoints.GameInterfaceType);
+							: client.Endpoint(RpcInterfaces.GameInterfaceType);
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
@@ -927,7 +928,7 @@ namespace Faolan.GameServer
 						// invite dispatches carry none, and the client DISCARDS the reply without it: it accepted our
 						// invite record, echoed it back in RequestTeamInvite, and then never raised the window - and
 						// still did not when fed retail's own captured bytes, because the bytes were never the problem.
-						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+						await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 							GameCharInterfaceMethods.DispatchReplyTeamInvite,
 							ReplyTeamInviteCodec.Build(TeamMemberRecord.FromCharacter(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
 
@@ -989,7 +990,7 @@ namespace Faolan.GameServer
 					var subjectId = body.ReadUInt32();
 
 					if (await Database.GetCharacter(subjectId) is { Name: { } name })
-						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchCharacterNameReply,
+						await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchCharacterNameReply,
 							CharacterNameReplyCodec.Build(new CharacterNameReply(subjectId, name))));
 					else
 						Logger.LogWarning("RequestCharName for unknown character {CharacterId:X8}; no reply.", subjectId);
@@ -1384,7 +1385,7 @@ namespace Faolan.GameServer
 						? InstanceSelections.Current(here.MapId, _simulation.World.ZoneFor(here.MapId, here.InstanceId).PlayfieldToken)
 						: InstanceSelections.None();
 
-					await client.SendAsync(new Rpc(InstanceSelectionSender, client.Endpoint(Endpoints.GameCharInterfaceType),
+					await client.SendAsync(new Rpc(InstanceSelectionSender, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 						GameCharInterfaceMethods.DispatchInstanceSelectionForCurrentPlayfield, InstanceSelectionCodec.Build(selection)));
 
 					break;
@@ -1684,7 +1685,7 @@ namespace Faolan.GameServer
 				// zone to resolve - their retail categories are carried with the burst instead (#564).
 				category = editorCategory;
 
-			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
+			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				UpdateAggroStatusCodec.Method, UpdateAggroStatusCodec.Build(new UpdateAggroStatus(request.Target, category))));
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
@@ -2512,7 +2513,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 					// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
+					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					break;
@@ -2534,7 +2535,7 @@ namespace Faolan.GameServer
 					// Retail's reply: the behavior ack with null identity + a 0x201C entry
 					// (prefix 0x68, state 0). Capture frames 320-321.
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
+					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000068, 0,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 					break;

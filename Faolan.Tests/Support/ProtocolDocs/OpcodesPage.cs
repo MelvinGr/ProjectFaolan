@@ -24,9 +24,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// restate them, which is two copies of a table that only stays in step by hand. What stays HERE is the
 		// ASSERTION - recomputing every id from its class name below - because verifying the table is this
 		// generator's job, and owning it is not.
+		// Kept as a name the two doc generators already call; the hash itself is Faolan.Core.Crypt.Bkdr31.
 		public static uint Bkdr31(string name)
 		{
-			return RpcInterfaces.Bkdr31(name);
+			return Faolan.Core.Crypt.Bkdr31.Of(name);
 		}
 
 		public static string Render()

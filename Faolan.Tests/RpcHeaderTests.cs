@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -25,8 +26,8 @@ namespace Faolan.Tests
 	// and fail an independent CRC recompute under every alignment (#609).
 	public class RpcHeaderTests
 	{
-		private static readonly ProtoEndpoint Agent = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08);
-		private static readonly ProtoEndpoint Character = Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x3BC035EC);
+		private static readonly ProtoEndpoint Agent = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x08);
+		private static readonly ProtoEndpoint Character = Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceType, 0x3BC035EC);
 
 		// What the code used to split into `[u16 opcode][headerData]` is ONE protobuf field: tag 0x20 (field 4, varint)
 		// whose value is the method's registration constant, whole. This is the gate that says the two readings are
@@ -109,7 +110,7 @@ namespace Faolan.Tests
 		 InlineData(PlayerAgentMethods.VerifyLanguageSetting, 0x20D6), InlineData(PlayerAgentMethods.UpdateCharacterPreview, 0x20D6)]
 		public void OneOpcode_CanNameTwoMethods(PlayerAgentMethods method, int opcode)
 		{
-			var frame = new Rpc(Agent, Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02), method, ReadOnlyMemory<byte>.Empty).Serialize();
+			var frame = new Rpc(Agent, Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02), method, ReadOnlyMemory<byte>.Empty).Serialize();
 			var parsed = Rpc.Parse(frame);
 
 			// Both members of a pair READ the same in a dump...
@@ -128,9 +129,9 @@ namespace Faolan.Tests
 		 InlineData(PlayerInterfaceMethods.LoginConnectReady, "1a070d3857157d100120f9d8d9c50d"), InlineData(PlayerInterfaceMethods.OverrideGameTweaks, "1a070d3857157d100120e3ee9fe207")]
 		public void TheLoginHandoffs_ReproduceTheCapturedHeaders(PlayerInterfaceMethods method, string expected)
 		{
-			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01), method, ReadOnlyMemory<byte>.Empty)
+			var rpc = new Rpc(Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01), method, ReadOnlyMemory<byte>.Empty)
 			{
-				RoutingContext = Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01)
+				RoutingContext = Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01)
 			};
 
 			Assert.EndsWith(expected, Convert.ToHexString(rpc.Serialize()).ToLowerInvariant());
@@ -138,7 +139,7 @@ namespace Faolan.Tests
 			// …and it survives the round trip as the same method plus the same routing context, rather than as bytes.
 			var parsed = Rpc.Parse(rpc.Serialize());
 			Assert.Equal(method, (PlayerInterfaceMethods)parsed.Method);
-			Assert.Equal(Endpoints.PlayerInterfaceType, parsed.RoutingContext!.Type);
+			Assert.Equal(RpcInterfaces.PlayerInterfaceType, parsed.RoutingContext!.Type);
 			Assert.Equal(1u, parsed.RoutingContext.Instance);
 		}
 

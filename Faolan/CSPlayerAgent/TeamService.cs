@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -38,7 +39,7 @@ namespace Faolan.CSPlayerAgent
 		// The SENDER of every CsPlayerAgent s2c packet: the guild/team server object. Instance 0x04 is what retail
 		// stamps (0x04 on the two-client capture and the Hoxxling login, 0x52 on one create session - an arbitrary
 		// server handle, not session data).
-		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(Endpoints.CSPlayerAgentType, 0x04);
+		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, 0x04);
 
 		private readonly ConcurrentDictionary<uint, uint> _teamByCharacter = [];
 
@@ -317,7 +318,7 @@ namespace Faolan.CSPlayerAgent
 		// still showed no invite window.
 		private static Task Send(INetworkClient client, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
-			return client.SendAsync(new Rpc(PushSender, client.Endpoint(Endpoints.CSPlayerInterfaceType), (ushort)opcode, body));
+			return client.SendAsync(new Rpc(PushSender, client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), (ushort)opcode, body));
 		}
 
 		// One live team. Members is a snapshot-on-write list so a broadcast can iterate it while another connection

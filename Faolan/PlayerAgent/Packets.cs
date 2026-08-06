@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -17,13 +18,13 @@ namespace Faolan.PlayerAgent
 {
 	partial class PlayerAgentListener
 	{
-		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02);
-		private static readonly ProtoEndpoint ServiceConnectionSender = Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08);
+		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02);
+		private static readonly ProtoEndpoint ServiceConnectionSender = Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08);
 
 		// `full_routing_context` (RpcHeader field 3) for the four login handoffs: they are addressed to the
 		// ServiceConnection, so they restate the PlayerInterface object the method actually fires on. Constant across
 		// all 472 captured frames - instance 1, never the character or account id (#610).
-		private static readonly ProtoEndpoint PlayerInterfaceRoutingContext = Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01);
+		private static readonly ProtoEndpoint PlayerInterfaceRoutingContext = Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01);
 
 		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
 		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's

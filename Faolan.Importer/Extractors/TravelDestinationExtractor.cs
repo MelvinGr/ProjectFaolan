@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -163,7 +164,7 @@ namespace Faolan.Importer.Extractors
 				return null;
 			}
 
-			if (packet.Receiver.Type != Endpoints.GameCharInterfaceType || packet.Method != (uint)GameCharInterfaceMethods.DispatchUpdateCash || packet.Body.Length != 12)
+			if (packet.Receiver.Type != RpcInterfaces.GameCharInterfaceType || packet.Method != (uint)GameCharInterfaceMethods.DispatchUpdateCash || packet.Body.Length != 12)
 				return null;
 
 			return packet.BodyReader().ReadUInt64();

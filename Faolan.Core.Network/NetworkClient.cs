@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.IO;
 using System.Net;
@@ -286,7 +287,7 @@ namespace Faolan.Core.Network
 	public static class ClientEndpointExtensions
 	{
 		// The client's server->client INTERFACE endpoint (ProtoEndpoint) for `endpointType`, addressed to the logged-in
-		// character (e.g. client.Endpoint(Endpoints.GameCharInterfaceType)) — the receiver every Rpc send frames against.
+		// character (e.g. client.Endpoint(RpcInterfaces.GameCharInterfaceType)) — the receiver every Rpc send frames against.
 		// Pass `instance` to override with a non-character id — the create flow has no committed Character yet, so it
 		// passes Account.ClientInstance (the temporary create-editor instance).
 		public static ProtoEndpoint Endpoint(this INetworkClient client, uint endpointType, uint? instance = null)

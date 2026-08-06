@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -40,7 +41,7 @@ namespace Faolan.Core.Network.Logging
 			if (rpc.Method != (uint)GameAgentMethods.PassBlob)
 				return false;
 
-			if (rpc.Receiver.Type != Endpoints.GameAgentType && rpc.Receiver.Type != Endpoints.GameInterfaceType)
+			if (rpc.Receiver.Type != RpcInterfaces.GameAgentType && rpc.Receiver.Type != RpcInterfaces.GameInterfaceType)
 				return false;
 
 			var body = rpc.Body.Span;
@@ -57,7 +58,7 @@ namespace Faolan.Core.Network.Logging
 			// a length or an opcode - the same trap as the 0x3F1 list-count word.
 			//
 			// ⚠️ The ENDPOINT cannot tell them apart, so do not try to narrow the receiver check instead. The two
-			// senders are otherwise identical - same sender endpoint, same `Endpoints.GameInterfaceType` receiver, same
+			// senders are otherwise identical - same sender endpoint, same `RpcInterfaces.GameInterfaceType` receiver, same
 			// DispatchPassBlob opcode; compare CombatService.SendWorldPacket with SendWorldFeedback. The ONLY structural
 			// difference is that a carrier's body goes through `WriteArrayUInt32Length` and a feedback body does not.
 			//

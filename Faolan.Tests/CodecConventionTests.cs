@@ -85,8 +85,9 @@ namespace Faolan.Tests
 		// re-declared two of them locally.
 		//
 		// The registry is `Faolan.Core.Constants.RpcInterfaces` (it also carries each class's NAME and its `*Methods`
-		// enum); `Endpoints` forwards to it and stays exempt because its named constants are how callers reach one.
-		// ProtocolDocsTests recomputes every id from its class name, which is what proves the table right.
+		// enum) and is the ONLY file allowed to spell an id. `Endpoints` used to re-declare them as forwarders - a
+		// second name for one thing - and now only builds the wire ProtoEndpoint. ProtocolDocsTests recomputes every
+		// id from its class name through Bkdr31, which is what proves the table right.
 		[Fact]
 		public void EndpointClassIdsComeFromEndpoints_NotAHandRolledHash()
 		{
@@ -98,15 +99,15 @@ namespace Faolan.Tests
 				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
 				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
 			{
-				if (Path.GetFileName(file) is "RpcInterfaces.cs" or "Endpoints.cs") // the registry, and the forwarding names
+				if (Path.GetFileName(file) is "RpcInterfaces.cs") // the registry itself
 					continue;
 
 				var lines = File.ReadAllLines(file);
 				for (var i = 0; i < lines.Length; i++)
 				{
 					var code = StringLiteral.Replace(LineComment.Replace(BlockComment.Replace(lines[i], ""), ""), "");
-					if (code.Contains("Endpoints.", StringComparison.Ordinal))
-						continue; // it comes from Endpoints on this line - that IS the convention
+					if (code.Contains("RpcInterfaces.", StringComparison.Ordinal))
+						continue; // it comes from the registry on this line - that IS the convention
 
 					if (EndpointClassLiteral.IsMatch(code))
 						offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {code.Trim()}");

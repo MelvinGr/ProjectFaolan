@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
@@ -17,20 +18,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void MethodEnumFor_ResolvesInterfaceEnum_ElseNull()
 		{
-			Assert.Equal(typeof(GameInterfaceMethods), ProtocolCatalog.MethodEnumFor(Endpoints.GameInterfaceType, (uint)GameInterfaceMethods.DispatchGameServerStats));
-			Assert.Null(ProtocolCatalog.MethodEnumFor(Endpoints.GameInterfaceType, 0xFF));
+			Assert.Equal(typeof(GameInterfaceMethods), ProtocolCatalog.MethodEnumFor(RpcInterfaces.GameInterfaceType, (uint)GameInterfaceMethods.DispatchGameServerStats));
+			Assert.Null(ProtocolCatalog.MethodEnumFor(RpcInterfaces.GameInterfaceType, 0xFF));
 			Assert.Null(ProtocolCatalog.MethodEnumFor(0xDEADBEEF, 0x00));
 		}
 
 		// Same method, different receiver class -> different recovered name, formatted "Name (0xHEX)". Method 0 spans
 		// four distinct classes (three agents + is a valid method on others); 0x02/0x03 are the multiplex collisions.
-		[Theory, InlineData(Endpoints.UniverseAgentType, (uint)UniverseAgentMethods.InitiateAuthentication, "InitiateAuthentication (0x00000000)"),
-		 InlineData(Endpoints.CSPlayerAgentType, (uint)CSPlayerAgentMethods.Authenticate, "Authenticate (0x00000000)"),
-		 InlineData(Endpoints.GameAgentType, (uint)GameAgentMethods.Authenticate2, "Authenticate2 (0x00000003)"),
-		 InlineData(Endpoints.GameAgentType, (uint)GameAgentMethods.ChatVicinity, "ChatVicinity (0x00000002)"),
-		 InlineData(Endpoints.GameCharAgentType, (uint)GameCharAgentMethods.RequestBindLocation, "RequestBindLocation (0x00000002)"),
-		 InlineData(Endpoints.GameCharAgentProjectType, (uint)GameCharAgentProjectMethods.AcceptApprenticeTeacher, "AcceptApprenticeTeacher (0x00000002)"),
-		 InlineData(Endpoints.TradepostAgentType, (uint)TradepostAgentMethods.ItemSearch, "ItemSearch (0x0000000D)")]
+		[Theory, InlineData(RpcInterfaces.UniverseAgentType, (uint)UniverseAgentMethods.InitiateAuthentication, "InitiateAuthentication (0x00000000)"),
+		 InlineData(RpcInterfaces.CSPlayerAgentType, (uint)CSPlayerAgentMethods.Authenticate, "Authenticate (0x00000000)"),
+		 InlineData(RpcInterfaces.GameAgentType, (uint)GameAgentMethods.Authenticate2, "Authenticate2 (0x00000003)"),
+		 InlineData(RpcInterfaces.GameAgentType, (uint)GameAgentMethods.ChatVicinity, "ChatVicinity (0x00000002)"),
+		 InlineData(RpcInterfaces.GameCharAgentType, (uint)GameCharAgentMethods.RequestBindLocation, "RequestBindLocation (0x00000002)"),
+		 InlineData(RpcInterfaces.GameCharAgentProjectType, (uint)GameCharAgentProjectMethods.AcceptApprenticeTeacher, "AcceptApprenticeTeacher (0x00000002)"),
+		 InlineData(RpcInterfaces.TradepostAgentType, (uint)TradepostAgentMethods.ItemSearch, "ItemSearch (0x0000000D)")]
 		public void ResolveName_NamesTheMethodPerClass(uint receiverType, uint method, string expected)
 		{
 			Assert.Equal(expected, ProtocolCatalog.ResolveName(receiverType, method));
@@ -43,14 +44,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void ResolveName_NamesTheHashRegisteredPair_FromItsMethod()
 		{
-			var agent = Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02);
-			var player = Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01);
+			var agent = Endpoints.Endpoint(RpcInterfaces.PlayerAgentType, 0x02);
+			var player = Endpoints.Endpoint(RpcInterfaces.PlayerInterfaceType, 0x01);
 
 			Assert.Equal("AuthenticateAck (0x5DC18991)", ProtocolCatalog.ResolveName(new Rpc(agent, player, PlayerInterfaceMethods.AuthenticateAck, ReadOnlyMemory<byte>.Empty)));
 
 			// A login handoff addresses the ServiceConnection, which no receiver-keyed map covers - only the listener's
 			// fall-back method enum can name it. Before #613 this path reached Rpc.Opcode, which #615 deleted.
-			var handoff = new Rpc(Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x01),
+			var handoff = new Rpc(Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(RpcInterfaces.PlayerAgentServiceConnectionType, 0x01),
 				PlayerInterfaceMethods.LoginConnectReady, ReadOnlyMemory<byte>.Empty);
 			Assert.Equal("LoginConnectReady (0xD8B66C79)", ProtocolCatalog.ResolveName(in handoff, typeof(PlayerInterfaceMethods)));
 
@@ -58,7 +59,7 @@ namespace Faolan.Tests
 		}
 
 		// A method the mapped class doesn't carry, or a receiver type not in the catalog, both render "Unknown (0xHEX)".
-		[Theory, InlineData(Endpoints.GameCharAgentType, 0xFFFu, "Unknown (0x00000FFF)"), InlineData(0xDEADBEEF, 0x00u, "Unknown (0x00000000)")]
+		[Theory, InlineData(RpcInterfaces.GameCharAgentType, 0xFFFu, "Unknown (0x00000FFF)"), InlineData(0xDEADBEEF, 0x00u, "Unknown (0x00000000)")]
 		public void ResolveName_UnknownPairs_RenderUnknown(uint receiverType, uint method, string expected)
 		{
 			Assert.Equal(expected, ProtocolCatalog.ResolveName(receiverType, method));

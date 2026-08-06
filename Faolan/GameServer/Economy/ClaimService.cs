@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -216,7 +217,7 @@ namespace Faolan.GameServer.Economy
 			// as "Claim All" deletes rows one by one (which would otherwise shift every later index).
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
@@ -235,7 +236,7 @@ namespace Faolan.GameServer.Economy
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(new CoreClaimNewClaimsIIR(client.Session.Character.Id)))));
 		}
 
@@ -310,7 +311,7 @@ namespace Faolan.GameServer.Economy
 				: claim.Code;
 			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(new CoreClaimRedeemAckIIR(client.Session.Character.Id, entry)))));
 		}
 	}

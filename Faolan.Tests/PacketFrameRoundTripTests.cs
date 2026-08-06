@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -30,11 +31,11 @@ namespace Faolan.Tests
 		// The two keepalive replies from KeepAliveService are the seed cases (GameServerStats, a one-group method;
 		// Pong, whose method needs a second varint group - what used to be read as a 1-byte "headerData"), plus a
 		// 32-bit hashed method and a login handoff, which is the only shape that carries a full_routing_context.
-		[Theory, InlineData(Endpoints.GameAgentType, 0x08u, Endpoints.GameInterfaceType, 0x3BC035ECu, (uint)GameInterfaceMethods.DispatchGameServerStats, 0u,
+		[Theory, InlineData(RpcInterfaces.GameAgentType, 0x08u, RpcInterfaces.GameInterfaceType, 0x3BC035ECu, (uint)GameInterfaceMethods.DispatchGameServerStats, 0u,
 			 "42B32A07000000000000000000000000"),
-		 InlineData(Endpoints.GameCharAgentType, 0x08u, Endpoints.GameCharInterfaceType, 0x3BC035ECu, (uint)GameCharInterfaceMethods.DispatchPong, 0u, "0000000700000012AF50A848"),
-		 InlineData(Endpoints.PlayerAgentType, 0x02u, Endpoints.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.AuthenticateAck, 0u, "00000001"),
-		 InlineData(Endpoints.PlayerAgentServiceConnectionType, 0x08u, Endpoints.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.LoginConnectReady, Endpoints.PlayerInterfaceType, "DEADBEEF")]
+		 InlineData(RpcInterfaces.GameCharAgentType, 0x08u, RpcInterfaces.GameCharInterfaceType, 0x3BC035ECu, (uint)GameCharInterfaceMethods.DispatchPong, 0u, "0000000700000012AF50A848"),
+		 InlineData(RpcInterfaces.PlayerAgentType, 0x02u, RpcInterfaces.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.AuthenticateAck, 0u, "00000001"),
+		 InlineData(RpcInterfaces.PlayerAgentServiceConnectionType, 0x08u, RpcInterfaces.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.LoginConnectReady, RpcInterfaces.PlayerInterfaceType, "DEADBEEF")]
 		public void Frame_Builder_And_Parser_AreMutualInverses(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, uint method, uint routingContextType, string bodyHex)
 		{
 			var body = Convert.FromHexString(bodyHex);

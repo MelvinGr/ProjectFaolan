@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -600,7 +601,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Method != LearnSpell || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
+				if (packet.Method != LearnSpell || packet.Sender.Type != RpcInterfaces.GameCharAgentType || packet.Receiver.Type != RpcInterfaces.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -627,7 +628,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Method != LearnSpell || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
+				if (packet.Method != LearnSpell || packet.Sender.Type != RpcInterfaces.GameCharAgentType || packet.Receiver.Type != RpcInterfaces.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();

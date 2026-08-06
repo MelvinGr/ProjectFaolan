@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -574,7 +575,7 @@ namespace Faolan.GameServer.Dialogue
 		// The carrier's [u32 len] is written HERE (#530 rule 2) - KnubotCodec emits the record alone.
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, senderInstance), Endpoints.Endpoint(Endpoints.GameInterfaceType, liveInstance),
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameAgentType, senderInstance), Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, liveInstance),
 				GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
@@ -583,7 +584,7 @@ namespace Faolan.GameServer.Dialogue
 		// Byte-identical to the captured packet re-addressed (gated by the construct test).
 		internal static Rpc BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, CameraArgs camera)
 		{
-			return new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
+			return new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, agentInstance), Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceType, liveInstance),
 				SetDialogueCameraCodec.Method, SetDialogueCameraCodec.Build(npcHandle, liveInstance, camera));
 		}
 

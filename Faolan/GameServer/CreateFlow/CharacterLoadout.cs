@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -101,7 +102,7 @@ namespace Faolan.GameServer
 			var spells = await database.GetStartingSpells(character.Level, character.Class);
 			foreach (var spellId in spells)
 			{
-				await client.SendAsync(new Rpc(sender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchLearnSpell, s => s.WriteUInt32(spellId)));
+				await client.SendAsync(new Rpc(sender, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchLearnSpell, s => s.WriteUInt32(spellId)));
 			}
 
 			logger.LogInformation("Loadout: granted '{Name}' (class={Class}) {A} ability(s) + {S} spell(s) for its bar.", character.Name, character.Class, abilities.Length, spells.Length);

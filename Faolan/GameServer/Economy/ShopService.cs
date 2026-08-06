@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -239,7 +240,7 @@ namespace Faolan.GameServer.Economy
 			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchShopData, body));
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchShopData, body));
 
 			_logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.", shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
 		}
@@ -278,7 +279,7 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
 

@@ -996,7 +996,7 @@ namespace Faolan.Core.Enums
 	// TradepostAgent client->server methods (the AH + mail selector after the endpoints) - the complete
 	// recovered TradepostAgent.client_to_server table (the method IS the table position; alignment verified on
 	// ItemSearch/BuyItem/Close). The method ids COLLIDE with ordinary GameServer opcodes, so tradepost packets
-	// route by RPC class id (Endpoints.TradepostAgentType), never by opcode alone. Behaviour that differs
+	// route by RPC class id (RpcInterfaces.TradepostAgentType), never by opcode alone. Behaviour that differs
 	// from the name is noted per line (docs/subsystems/tradepost-protocol.md).
 	public enum TradepostAgentMethods : uint
 	{

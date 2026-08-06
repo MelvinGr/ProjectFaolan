@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -22,7 +23,7 @@ namespace Faolan.GameServer.Inventory
 	// which routes to HandleAddShortcut only for the in-game case.
 	public sealed class ShortcutBarService
 	{
-		private static readonly ProtoEndpoint ReplySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
+		private static readonly ProtoEndpoint ReplySender = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
 		private readonly ICharacterRepository _database;
 		private readonly ILogger _logger;
 
@@ -83,7 +84,7 @@ namespace Faolan.GameServer.Inventory
 		public async Task SendRestoredBar(INetworkClient client)
 		{
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
-			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchShortcutBarReply, ShortcutBarReplyCodec.Build(client.Session.Character.Id, shortcuts)));
+			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchShortcutBarReply, ShortcutBarReplyCodec.Build(client.Session.Character.Id, shortcuts)));
 			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}
 	}

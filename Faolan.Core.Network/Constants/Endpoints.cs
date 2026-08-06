@@ -4,59 +4,26 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Constants
 {
-	// ⚠️ The class IDS are not defined here any more - they belong to `Faolan.Core.Constants.RpcInterfaces`, which
-	// also carries each class's NAME and its `*Methods` enum, and these forward to it. This type's own job is the
-	// WIRE form: turning (type, instance) into the `[0x0D <type LE32> 0x10 <instance varint>]` a header carries.
-	// The named constants stay because a caller wants one BY NAME, not by a lookup.
+	// ⚠️ The class IDS live in `Faolan.Core.Constants.RpcInterfaces`, which also carries each class's NAME and its
+	// `*Methods` enum. They were duplicated here as forwarding constants for a while; that is still a second name for
+	// one thing, so callers name the owner directly (`RpcInterfaces.GameCharAgentType`). What is left here is this
+	// type's actual job: the WIRE FORM - turning (type, instance) into the bytes a header carries.
 	//
 	// A Conan packet header is the client's RpcHeader (recovered from AgeOfConan.exe). Its caller_id (field 1,
 	// our "sender") and endpoint_id (field 2, our "receiver") are each a ProtoEndpoint:
 	//
 	//   message ProtoEndpoint { fixed32 type = 1; uint32 instance = 2; uint32 token = 3; }
 	//
-	//   - type     = the object-CLASS id (a per-subsystem constant, listed below)
+	//   - type     = the object-CLASS id (`RpcInterfaces`)
 	//   - instance = the specific object: the character id for the player, the zone id for the world
 	//   - token    = never present on the wire in any capture
 	//
 	// On the wire a serialized endpoint is exactly [0x0D <type LE32> 0x10 <instance varint>] - the same bytes the
 	// codebase used to hand-roll as byte[] literals. Building them through ProtoEndpoint makes a wrong type/instance
-	// (the create-editor receiver-mismatch bug) impossible by construction. The type ids below were recovered from
-	// the client schema and verified against 109k captured endpoints.
+	// (the create-editor receiver-mismatch bug) impossible by construction. The type ids were recovered from the
+	// client schema and verified against 109k captured endpoints.
 	public static class Endpoints
 	{
-		public const uint CSPlayerAgentType = RpcInterfaces.CSPlayerAgentType; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
-		public const uint CSPlayerInterfaceType = RpcInterfaces.CSPlayerInterfaceType; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)
-		public const uint GameAgentType = RpcInterfaces.GameAgentType; // = hash("GameAgent")
-		public const uint GameCharAgentProjectType = RpcInterfaces.GameCharAgentProjectType; // = hash("GameCharAgentProject")     (post-ready family)
-		public const uint GameCharAgentType = RpcInterfaces.GameCharAgentType; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
-		public const uint GameCharInterfaceProjectType = RpcInterfaces.GameCharInterfaceProjectType; // = hash("GameCharInterfaceProject")  (report-server-id family)
-
-		public const uint GameCharInterfaceType = RpcInterfaces.GameCharInterfaceType; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
-
-		// GameServer object-class type ids (ProtoEndpoint.type, fixed32). Each id = BKDR-31 hash of the client's
-		// interface/agent class name (h = h*31 + c; == Java String.hashCode), cracked by RE'ing AgeOfConan.exe -
-		// see docs/re/aoc-opcode-ids.md. The C# constant names are kept for compatibility, but
-		// the REAL client class name is noted per line (our originals were guesses). "Agent" = client->server proxy
-		// side, "Interface" = server->client dispatch side.
-		public const uint GameInterfaceType = RpcInterfaces.GameInterfaceType; // = hash("GameInterface")
-		public const uint PlayerAgentServiceConnectionType = RpcInterfaces.PlayerAgentServiceConnectionType;
-
-		// The login-tier endpoint classes. These were hand-encoded as raw ProtoEndpoint bytes in the agents'
-		// Packets.cs (e.g. [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01] = {type, instance}); named here so the senders
-		// go through EndpointBytes like every other endpoint.
-		public const uint PlayerAgentType = RpcInterfaces.PlayerAgentType;
-
-		// The two s2c login-tier classes. Both were already recovered in docs/re/aoc-opcode-ids.md; only the constants
-		// were missing here, because nothing SENT on them - our login tier replies on the connection it was called on.
-		// `--report timeline` needs them to map a receiver class to its interface (#558).
-		public const uint PlayerInterfaceType = RpcInterfaces.PlayerInterfaceType; // = hash("PlayerInterface")
-		public const uint UniverseInterfaceType = RpcInterfaces.UniverseInterfaceType; // = hash("UniverseInterface")
-
-		// Tradepost (auction house + mail) rides the GameServer RPC layer. TradepostAgent is the SERVER object the
-		// client calls (client->server); TradepostInterface is the CLIENT object the server dispatches to (s2c).
-		public const uint TradepostAgentType = RpcInterfaces.TradepostAgentType; // = hash("TradepostAgent")     (client -> server endpoint)
-		public const uint TradepostInterfaceType = RpcInterfaces.TradepostInterfaceType; // = hash("TradepostInterface") (server -> client endpoint)
-		public const uint UniverseAgentType = RpcInterfaces.UniverseAgentType;
 
 		public static ProtoEndpoint Endpoint(uint type, uint instance)
 		{
@@ -74,9 +41,6 @@ namespace Faolan.Core.Network.Constants
 			return Endpoint(type, instance).ToProtobuf();
 		}
 
-		// Parse those [0x0D <type LE32> 0x10 <instance varint>] sub-message bytes back into a ProtoEndpoint - for the
-		// few hand-rolled capture-literal endpoints (e.g. the UniverseAgent InitAuth receiver) that live as byte[] in
-		// source, not as type+instance. Round-trips: EndpointFromBytes(x).ToProtobuf() == x.
 		public static ProtoEndpoint EndpointFromBytes(params byte[] subMessage)
 		{
 			using var stream = new FaolanStream(subMessage);
