@@ -165,6 +165,35 @@ The completing packet names the goal that **just** completed. On a single-goal q
 head goal, which is why naming `QuestDefinition.GoalId` looked right for so long; on a multi-goal quest it is
 not (12371 closes on 3497 while its head goal is 3495).
 
+### The verb decides the trigger — obtaining an item is not always doing the objective
+
+A goal's `Separator` is its VERB (`QuestGoalKind`), and its trailing reference is often an ITEM. Typing every
+item-referencing goal `CollectItem` is wrong for five of those verbs, because the objective is not satisfied by
+the item arriving in the backpack:
+
+| kind | goals | why a collect is wrong |
+|---|---:|---|
+| `20` `Deliver` | 13 | the item is handed OVER — obtaining it starts the objective |
+| `5` `Craft` | 9 | *"Make Visionwine"* — a bought Visionwine is not a made one |
+| `25` `DestroyObject` | 9 | destroying an object does not put it in your bag, so it can only ever be wrong |
+| `10` `Use` | 1 | *"Use the Vial to Capture Gas"* |
+| `24` `Investigate` | 1 | typed `ReachArea` instead, below |
+
+⚠️ These twenty were recorded on Gitea #522 as *"inert — nothing advances them"*. **They were not.** Each carried
+a real `TrailingRefId` and was typed `CollectItem`, so each would advance the moment its item reached the
+backpack. Most were harmless only because the item is absent from our catalog — coverage, not design — but
+`Use the Vial to Capture Gas` was live: its vial (4349109) IS in the catalog, so picking it up completed the
+objective without using it. `TypeItemGoalsFromTrailingCategory` now refuses those verbs *and* resets a row a
+previous run mistyped, so they read as un-wired (visibly stuck) rather than silently completing.
+
+**`Investigate` is the one of the four that could be typed.** Goal 8278 *"Investigate the Ancient Gateway"*
+(quest 15051) carries a real map marker (2090 @ 928/1011), so it is a reach. ⚠️ Retail may want an *interaction*
+with the gateway rather than proximity; we hold no world object at that marker to interact with — map 2090's
+`WorldObject` rows are all worn NPC gear — so a reach is the only trigger the data supports, and it errs toward
+completing on something a player cannot do without going there. `Craft`, `Use` and `DestroyObject` still have no
+trigger: `DestroyObject`'s nine goals sit on maps 3034/3044/3045/6130, for which we hold **no world objects at
+all**, so it is blocked on coverage rather than on the trigger.
+
 ### Goals recovered from a second full-update record, and what makes one PARTIAL
 
 `QuestGoalDefinition.Partial` marks a goal recovered from the second 50304 record of its `QuestFullUpdate` -

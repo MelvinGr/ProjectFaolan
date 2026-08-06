@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -1517,6 +1518,7 @@ namespace Faolan.Importer.Captures
 		{
 			await TypeItemGoalsFromTrailingCategory(db);
 			await TypeLocationGoalsFromTrailingCategory(db);
+			await TypeInvestigateGoalsAsReach(db);
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
 			await SeedCasildaChain(db);
@@ -1552,26 +1554,57 @@ namespace Faolan.Importer.Captures
 				.QuestGoalDefinitions.Where(g => g.TrailingCategory == itemNameCategory && g.TrailingRefId > 0)
 				.ToListAsync();
 
-			var typed = 0;
+			int typed = 0, untyped = 0;
 			foreach (var goal in goals)
 			{
+				// ⚠️ CORRECTIVE, and it has to run BEFORE the bootstrap guard: nineteen rows were already typed
+				// CollectItem by the older version of this rule, which only excluded `Deliver`. A goal typed
+				// CollectItem IS wired, so the guard below would skip it forever and the mistyping would outlive the
+				// fix. Reset to the un-wired shape (`Kill` with no target - what `IsWired` reads as not wired) so the
+				// quest is VISIBLY stuck rather than silently completing on a pickup.
+				//
+				// Narrow on purpose: only a row this rule itself could have produced (CollectItem with no TargetName
+				// and no QuestItemId). A hand-seeded or Quest-editor row carries one of those and is left alone.
+				if (UntypedByArrival.Contains(goal.Separator ?? 0) && goal is { GoalType: QuestGoalType.CollectItem, TargetName: null, QuestItemId: null })
+				{
+					goal.GoalType = QuestGoalType.Kill;
+					untyped++;
+					continue;
+				}
+
 				if (IsWired(goal))
 					continue;
 
 				// ⚠️ NOT every item goal is a collect - the goal's own `Separator` is the VERB (see QuestGoalKind), and
-				// `Deliver` (20) hands the item OVER rather than acquiring it. Typing a hand-in as a collect would
-				// complete the quest the moment the player obtains the item, skipping the delivery entirely - a silent
-				// chain-progression bug, where leaving it unwired is at least visibly stuck. Those need the target NPC,
-				// which the goal does not carry, so they stay for a capture or #520's objective text.
-				if (goal.Separator == (uint)QuestGoalKind.Deliver)
+				// for five of them OBTAINING the item is not DOING the objective. Typing one of those as a collect
+				// completes the quest the moment the item reaches the backpack, skipping the objective entirely - a
+				// silent chain-progression bug, where leaving it unwired is at least visibly stuck.
+				//
+				// `Deliver` was the first one found; #522 named three more and this is where they stop being typed:
+				//
+				//   Deliver (20)       hands the item OVER - obtaining it is the START of the objective, not the end
+				//   Craft (5)          "Make Visionwine" - a BOUGHT Visionwine is not a made one
+				//   Use (10)           "Use the Vial to Capture Gas" - and the vial (4349109) IS in our catalog, so
+				//                      this one was live: picking the vial up completed the objective
+				//   DestroyObject (25) "Destroy Bowl of Set" - destroying an object does not put it in your bag, so
+				//                      this can only ever be wrong, in whichever direction
+				//   Investigate (24)   "Investigate the Ancient Gateway" - typed ReachArea instead, below
+				//
+				// ⚠️ #522 recorded these as "inert - nothing advances them". They were not: all twenty carried a real
+				// TrailingRefId and were typed CollectItem, so each would advance on ARRIVAL of its item. Most are
+				// harmless today only because the item is absent from our catalog, which is coverage, not a design.
+				if (UntypedByArrival.Contains(goal.Separator ?? 0))
 					continue;
 
 				goal.GoalType = QuestGoalType.CollectItem;
 				typed++;
 			}
 
-			if (typed > 0)
+			if (typed > 0 || untyped > 0)
 				await db.SaveChangesAsync();
+
+			if (untyped > 0)
+				Console.WriteLine($"Un-typed {untyped} item goal(s) whose verb is not satisfied by the item ARRIVING (craft/use/destroy/deliver/investigate) - they read as un-wired now rather than completing on a pickup (#522).");
 		}
 
 		// A goal whose TRAILING REFERENCE is a LOCATION is a reach objective, so type it `ReachArea` (#641). The sibling
@@ -1594,6 +1627,52 @@ namespace Faolan.Importer.Captures
 		//
 		// BOOTSTRAP-ONLY, like every wiring step: the eight cat-100 goals already typed TalkToNpc (Kalanthes, Sharak,
 		// Chulainn, ...) and Casilda's Escort are wired, so the rule does not see them.
+		// The verbs whose objective is NOT satisfied by the item arriving in the backpack - see the note in
+		// TypeItemGoalsFromTrailingCategory, which is the only place this is consulted.
+		private static readonly FrozenSet<uint> UntypedByArrival = new[]
+		{
+			(uint)QuestGoalKind.Deliver, (uint)QuestGoalKind.Craft, (uint)QuestGoalKind.Use, (uint)QuestGoalKind.DestroyObject, (uint)QuestGoalKind.Investigate
+		}.ToFrozenSet();
+
+		// #522: an INVESTIGATE goal is a place you go and look at, so it is a reach - the same shape
+		// TypeLocationGoalsFromTrailingCategory types, reached from the VERB rather than from a location reference.
+		//
+		// One goal corpus-wide, "Investigate the Ancient Gateway" (8278, quest 15051), and it carries a real map
+		// marker (2090 @ 928/1011). Its trailing reference is an ITEM (category 50200), which is why it was being
+		// swept up as a collect; the item is not in our catalog, so the practical effect was an objective that could
+		// never complete.
+		//
+		// ⚠️ ASSUMPTION, and the honest one to state: retail may want an INTERACTION with the gateway rather than
+		// proximity to it. We hold no world object at that marker to interact with - map 2090's WorldObject rows are
+		// all worn NPC gear - so a reach is the only trigger the data supports, and #522 proposed exactly this. It
+		// errs toward completing the objective by walking to the gateway, which is a thing a player cannot do without
+		// going there; the alternative is a goal that never completes at all.
+		//
+		// Marker-guarded like its sibling, and for the same load-bearing reason: a reach with nowhere to walk turns a
+		// visibly-inert quest into a silently-uncompletable one.
+		private static async Task TypeInvestigateGoalsAsReach(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Separator == (uint)QuestGoalKind.Investigate).ToListAsync();
+
+			var typed = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal) && goal.GoalType != QuestGoalType.CollectItem)
+					continue; // hand-reviewed or already given a better type
+				if (goal.MapId is null or 0 || (goal.MarkerX is null && goal.MarkerY is null))
+					continue;
+
+				goal.GoalType = QuestGoalType.ReachArea;
+				typed++;
+			}
+
+			if (typed > 0)
+			{
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Typed {typed} investigate goal(s) ReachArea from their own marker (#522).");
+			}
+		}
+
 		private static async Task TypeLocationGoalsFromTrailingCategory(DatabaseContext db)
 		{
 			const uint locationCategory = 100;
