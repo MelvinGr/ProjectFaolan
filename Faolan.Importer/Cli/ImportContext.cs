@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
+using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
 {
@@ -12,10 +14,16 @@ namespace Faolan.Importer.Cli
 	{
 		// The Faolan.Web.Content mirror's ADDRESS, for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
 		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
-		// Passed to every importer RdbReader so CDN-only records import instead of being skipped. Override with
-		// --rdb-proxy (e.g. `--rdb-proxy http://192.168.1.5:7081` for a mirror on another box); defaults to the local
-		// one. The `/gameupdate/upm/rdb` route is RdbReader's, not config's. See [[aoc_content_cdn_mirror]].
-		public const string DefaultProxyBase = "http://127.0.0.1:7081";
+		// Passed to every importer RdbReader so CDN-only records import instead of being skipped.
+		//
+		// Config-derived (`IConfiguration.CdnMirrorAddress`, the same `CdnMirror` section the mirror itself reads), so
+		// a mirror on another box is ONE setting in faolan.user.json rather than a flag on every command; `--rdb-proxy`
+		// still overrides per run. The `/gameupdate/upm/rdb` route is RdbReader's, not config's.
+		// See [[aoc_content_cdn_mirror]].
+		public static string DefaultProxyBase(IConfiguration config)
+		{
+			return config.CdnMirrorAddress;
+		}
 		public required DatabaseContext Db { get; init; }
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();
 
@@ -42,7 +50,7 @@ namespace Faolan.Importer.Cli
 		public bool Force { get; init; }
 		// The corpus directory the run loaded, or EMPTY when no module in the plan needed it (a Db-source-only run).
 		public required string CapturesDir { get; init; }
-		public string RdbProxyBase { get; init; } = DefaultProxyBase;
+		public required string RdbProxyBase { get; init; }
 		public string? DumpTemplatesDir { get; init; }
 
 		// rdb-* module sub-options (from --rdb / --dump-templates). Out-of-DB write paths (dump) must be suppressed

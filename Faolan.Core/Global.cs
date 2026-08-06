@@ -21,6 +21,13 @@ namespace Faolan.Core
 		// plain relative name resolves in both cases; FAOLAN_CONFIG overrides it (container / one-off run).
 		public static string ConfigPath => Environment.GetEnvironmentVariable("FAOLAN_CONFIG") ?? FindUpwards("faolan.json");
 
+		// The developer's own overrides, found the same way and layered ON TOP of faolan.json. GITIGNORED, and that is
+		// the point: faolan.json is committed deployment config that must stay machine-agnostic (CLAUDE.md's
+		// no-local-paths rule), so anything true only of this box - an RDB folder, a CDN mirror on another machine,
+		// a scratch database - goes here instead of being edited into the committed file and accidentally committed.
+		// Optional; absent is the normal case.
+		public static string UserConfigPath => Environment.GetEnvironmentVariable("FAOLAN_USER_CONFIG") ?? FindUpwards("faolan.user.json");
+
 		// The directory ConfigPath resolves to. A RELATIVE path inside the config - the SQLite `Data Source` above
 		// all - means "beside faolan.json", not "in whatever directory this process happened to be started from".
 		// Reading it against the CWD is the trap CLAUDE.md documents for `dotnet ef database update` and the one that

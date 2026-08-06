@@ -32,7 +32,7 @@ namespace Faolan.Importer.Cli
 	{
 		private static async Task NpcChatter(string rdbDir)
 		{
-			var catalog = BarkCatalog.Load(rdbDir, _options.RdbProxy ?? ImportContext.DefaultProxyBase);
+			var catalog = BarkCatalog.Load(rdbDir, _options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(_options.ConfigOverrides)));
 			if (catalog.Pages == 0)
 			{
 				Console.WriteLine($"npc-chatter: no ENGLISH category-{BarkCatalog.Category} pages found - is RdbDir pointing at the client's RDB folder?");

@@ -422,6 +422,10 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
     `tempfile.gettempdir()`, `Path.GetTempPath()`.
   - **Docs / prose:** use a placeholder — `<data-repo>/Captures`, `<rdb-dir>`, `$PWD/faolan.db`. Concrete local
     paths belong in agent memory only (under `~/.claude`), not the repo. See the `no_local_paths_in_repo` memory.
+  - **This checkout's own values:** `faolan.user.json` at the repo root — **gitignored**, layered on top of
+    `faolan.json` by the shared config builder (`Global.UserConfigPath`; `FAOLAN_USER_CONFIG` overrides). Same keys,
+    same shapes, it simply wins. It is where `RdbDir` and a LAN `CdnMirror:PublicAddress` live, so no importer
+    command needs `--RdbDir` / `--rdb-proxy` and the committed `faolan.json` stays machine-agnostic.
   - `run.sh` is the one deliberate exception (personal dev launcher, kept local); its Windows twin `run.bat`
     takes `FAOLAN_CDN_STORE` / `AOC_EXE2` instead.
 - **Docs carry CONFIRMED info only — progress/TODOs live in Gitea, not `docs/`.** No "Remaining / Next steps /

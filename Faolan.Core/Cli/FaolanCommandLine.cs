@@ -51,11 +51,14 @@ namespace Faolan.Core.Cli
 				.ToDictionary(o => o.Name.TrimStart('-'), o => (string?)result.GetValue(o));
 		}
 
-		// faolan.json (optional) < command line < environment. The one place that order is written down.
+		// faolan.json (optional) < faolan.user.json (optional, gitignored) < command line < environment. The one place
+		// that order is written down. The user file sits directly above the committed one so a per-machine override
+		// needs no edit to a tracked file - see Global.UserConfigPath.
 		public static IConfiguration Build(IEnumerable<KeyValuePair<string, string?>>? commandLine = null)
 		{
 			return new ConfigurationBuilder()
 				.AddJsonFile(Global.ConfigPath, true)
+				.AddJsonFile(Global.UserConfigPath, true)
 				.AddInMemoryCollection(commandLine ?? [])
 				.AddEnvironmentVariables()
 				.Build();

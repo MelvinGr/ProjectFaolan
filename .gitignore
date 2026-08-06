@@ -270,6 +270,11 @@ Faolan.ClientHook/*.lib
 # (a CI runner registration token, a Postgres password) - never commit
 .env
 
+# Per-machine config, layered on top of the committed faolan.json (Global.UserConfigPath). This is where a local
+# RDB folder, a CDN mirror on another box, or a scratch database goes - faolan.json is committed and must stay
+# machine-agnostic, so anything true only of this checkout belongs here instead.
+/faolan.user.json
+
 /faolan.db-shm
 /faolan.db-wal
 /faolan.log

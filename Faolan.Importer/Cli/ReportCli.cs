@@ -3633,7 +3633,7 @@ namespace Faolan.Importer.Cli
 		// Honours `--rdb-proxy`, which the reports used to ignore in favour of the hardcoded default.
 		private static RdbReader OpenRdb(string? rdbDir = null)
 		{
-			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? ImportContext.DefaultProxyBase);
+			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(_options.ConfigOverrides)));
 		}
 
 		private static string RdbDir()

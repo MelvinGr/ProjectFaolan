@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
@@ -113,7 +114,7 @@ namespace Faolan.Web.Services
 				: throw new InvalidOperationException("RdbDir not configured - set it to the client's RDB folder in appsettings.Development.json or the RdbDir env var");
 			// Optional ContentMirror proxy base for on-demand (CDN-only) resources, e.g. the CDN race bodies that aren't
 			// in the local RDB. Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
-			_cdnUrl = config["CdnUrl"];
+			_cdnUrl = config["CdnUrl"] is { Length: > 0 } explicitUrl ? explicitUrl : config.CdnMirrorAddress;
 		}
 
 		// The wearable armour-set catalogue (built once from the RDB, then cached). Optionally filtered to a sex.

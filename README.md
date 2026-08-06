@@ -335,9 +335,24 @@ Two are worth knowing up front:
 
 Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,
 and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment variables > command line >
-`faolan.json`**, with `faolan.json` **optional** (a container can be configured entirely by env vars, with no
-file baked into the image). It lives at the repo root, and is found by searching up from the working directory —
-so a tool started from its own project directory still uses the repo's file (`FAOLAN_CONFIG` overrides).
+`faolan.user.json` > `faolan.json`**, with both files **optional** (a container can be configured entirely by env
+vars, with no file baked into the image). They live at the repo root, and are found by searching up from the
+working directory — so a tool started from its own project directory still uses the repo's files (`FAOLAN_CONFIG`
+/ `FAOLAN_USER_CONFIG` override).
+
+**`faolan.user.json` is gitignored, and that is its whole point.** `faolan.json` is committed and has to stay
+machine-agnostic (no `/home/<user>/…` paths, no LAN addresses), so anything true only of *your* checkout goes in
+the user file instead of being edited into the tracked one and accidentally committed. Same keys, same shapes; it
+simply wins. Typical contents:
+
+```jsonc
+{
+  // the client's RDB folder - part of the game INSTALL, so it has no committed default
+  "RdbDir": "/path/to/Age of Conan/RDB",
+  // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial
+  "CdnMirror": { "PublicAddress": "192.168.1.5" }
+}
+```
 
 Related keys are grouped into sections; the remaining shared keys stay flat:
 
@@ -349,7 +364,7 @@ Related keys are grouped into sections; the remaining shared keys stay flat:
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
 | `Login` `{ PrivateKey, PublicKey, RetailPublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
-| `CdnMirror` `{ Store, Ip, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + bind address; `PublicAddress` is the address written into the patch config it serves back (default: the request's `Host`) |
+| `CdnMirror` `{ Store, Ip, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + bind address; `PublicAddress` is the address written into the patch config it serves back (default: the request's `Host`) **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
@@ -359,7 +374,7 @@ environment and on the command line — only the separator differs:
 
 | method | how |
 | --- | --- |
-| `faolan.json` | nested: `"Database": { "ConnectionString": … }` |
+| `faolan.json` / `faolan.user.json` | nested: `"Database": { "ConnectionString": … }` |
 | environment | `__` between the parts: `Database__ConnectionString=…`, `Mcp__Port=7098`, `CdnMirror__Store=/data` |
 | command line | the config path itself: `--Database:ConnectionString "…"`, `--CdnMirror:Store /data` |
 

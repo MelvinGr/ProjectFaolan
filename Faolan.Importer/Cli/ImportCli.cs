@@ -147,7 +147,7 @@ namespace Faolan.Importer.Cli
 				RdbDir = rdbDir,
 				RawPackets = rawPackets,
 				CreateCaptures = createCaptures,
-				RdbProxyBase = options.RdbProxy ?? ImportContext.DefaultProxyBase,
+				RdbProxyBase = options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(options.ConfigOverrides)),
 				DumpTemplatesDir = options.DumpTemplates,
 				Mode = mode,
 				ModeOverrides = overrides,

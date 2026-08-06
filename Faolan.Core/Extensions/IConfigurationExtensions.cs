@@ -62,6 +62,24 @@ namespace Faolan.Core.Extensions
 			// header", which is by definition what the client dialled; set it only when the mirror sits behind
 			// something that rewrites Host. A bare `host` or `host:port` is fine - the scheme is filled in.
 			public string? CdnMirrorPublicAddress => config["CdnMirror:PublicAddress"];
+
+			// Where a CLIENT of the mirror dials it: the importer's RDB proxy and Faolan.Web's viewer. Derived from the
+			// same `CdnMirror` section the mirror itself reads, so pointing everything at a mirror on another box is one
+			// override (`CdnMirror:PublicAddress`) rather than one per consumer. PublicAddress wins because it is by
+			// definition the reachable address; `Ip` is only a fallback, and it is the BIND address (0.0.0.0 in a
+			// container), which is why it is not the first choice.
+			public string CdnMirrorAddress
+			{
+				get
+				{
+					var host = config.CdnMirrorPublicAddress is { Length: > 0 } published ? published : config.CdnMirrorIp;
+					if (!host.Contains("://", StringComparison.Ordinal))
+						host = $"http://{host}";
+
+					// A published address may already carry its own port (it is allowed to be `host:port`).
+					return host.LastIndexOf(':') > host.IndexOf("://", StringComparison.Ordinal) + 2 ? host : $"{host}:{config.CdnMirrorPort}";
+				}
+			}
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 
 			// Log file location. Optional - defaults to faolan.log in the CWD; point it at a mounted volume (container)
