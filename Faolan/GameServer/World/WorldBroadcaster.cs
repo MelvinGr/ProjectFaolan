@@ -2394,10 +2394,34 @@ namespace Faolan.GameServer.World
 			return bag;
 		}
 
-		// #262: remove a picked-up quest dynel from the player's view (SimpleDynel visual change, state 0x09 = the
-		// GenericSimpleDynelPickup vanish retail sends, Hoxxling gameplay2 @4310) so the brick disappears when taken.
-		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
-		public static Task HidePickupObject(INetworkClient client, uint handle)
+		// #262: the visual response to harvesting a quest dynel (a quarry Stone Brick) - the FIRST state of retail's
+		// harvest sequence, `SimpleDynelVisualChange` 0x09.
+		//
+		// ⚠️ **0x09 is not "vanish", and this used to be called `HidePickupObject` on the belief that it was.**
+		// Retail never removes a harvested brick: in
+		// `xxx_mage-necromancer_login_play2_tortage_city_first-quests` handle 0x6AF3 is harvested at 18:43:16 and
+		// harvested AGAIN at 18:43:30 - the same handle, with no `n3ToClientQuit` between them. A state that
+		// destroyed the object could not be re-sent to it fourteen seconds later, so 0x09 is the start of a harvest,
+		// not the end of an object. Melvin confirms the same from play: the bricks are always there, and what comes
+		// and goes is the "can be picked up" glow - which is client-side, shown while the quest is active AND the
+		// player holds fewer than the goal's three.
+		//
+		// The full captured sequence per harvest is six records, of which this is one:
+		//
+		//   0x09 40000000                       <- this (harvest begins)
+		//   0x02 0037f518 <transform>           first harvest of that node only
+		//   0x04 00000000 000f696e
+		//   0x08 40000000
+		//   0x03 00000000                       first harvest of that node only
+		//   StatIIR 0x1A = 5
+		//   0x05 00000000                       (harvest ends - the node is available again)
+		//
+		// Sending only the opening state is incomplete rather than wrong; the rest carries undecoded words and a
+		// transform, so it is not built here yet - tracked separately. What matters is that nothing in this path may
+		// treat the node as consumed: the server side already agrees (`ResolveCollectPickupItem` keeps answering
+		// while the collect goal is short, so the same brick can be taken again), and it is only the naming and the
+		// comment here that claimed otherwise.
+		public static Task MarkPickupHarvested(INetworkClient client, uint handle)
 		{
 			return WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(handle, 0x09));
 		}
