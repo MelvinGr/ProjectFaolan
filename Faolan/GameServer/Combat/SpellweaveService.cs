@@ -142,6 +142,13 @@ namespace Faolan.GameServer.Combat
 
 		// Deactivate: fire the accumulated weave and close the trance. Emits the s2c fire burst (0xF98E10B3); the
 		// componentIndex -> effect table + backlash roll await the weave-element contribution table.
+		//
+		// ⚠️ **The "fire burst" is four COMBAT-RATING stat sets, and replaying it is almost certainly wrong** (#678).
+		// The four ids are `AttackRating` / `MagicRating` / `DefenseRating` / `ResistRating` and the value is the
+		// captured character's own rating (31700 for that level-80 necromancer), not a burst constant - so what this
+		// sends any caster is "your four combat ratings are now 31700". It is left byte-identical to what it sent
+		// before the decode rather than silently changed, because what retail's weave SHOULD push is its own
+		// question - tracked in Gitea #685.
 		private async Task FireAsync(INetworkClient client)
 		{
 			var session = client.Session;
@@ -156,7 +163,7 @@ namespace Faolan.GameServer.Combat
 			if (profile != null)
 			{
 				foreach (var stage in profile.FireStages)
-					await WorldIir.Send(client, StatCodec.Build(caster, stage));
+					await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(caster, stage, SpellweaveCatalog.CapturedFireRating)));
 			}
 
 			// The trance-EXIT animation: take the character out of the weave pose (without it it stays stuck kneeling).

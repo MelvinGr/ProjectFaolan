@@ -85,6 +85,20 @@ struct. Tracked in Gitea #147.
 
 ---
 
+## World objects
+
+### What selects a harvest node's regrowth step
+A node's health climbs back on `StatIIR` `HealthCurrent` in a fixed step on a fixed cadence, and the corpus
+measures four of them across 406 node series — `+25 / 15 s`, `+16 / 60 s`, `+26 / 60 s`, `+33 / 60 s`
+(`docs/subsystems/resource-harvesting.md`). What is NOT known is what picks a node's step: it is not the node's
+name (two Oak Trees in one capture regrow at different steps is not something the corpus shows either way, and no
+column we hold distinguishes them), not the max health (every node caps at 1000), and no RDB field has been tied
+to it. Close it by finding the client-side or RDB source of the rate, or by measuring enough named nodes to prove
+it is per name after all. Tracked in Gitea #494.
+`[V0: what selects a node's regrowth step]`
+
+---
+
 ## How to close a gap
 
 Decode it, add a golden test, then promote the fact to `[V3: …]` in the relevant layer page and delete its entry

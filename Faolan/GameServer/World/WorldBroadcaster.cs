@@ -162,8 +162,20 @@ namespace Faolan.GameServer.World
 
 			foreach (var obj in _sim.World.ZoneForEntity(player).WorldObjects)
 			{
-				if (obj.Row.EffectQuestId is { } eq && held.Contains(eq))
-					await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(obj.Handle, obj.Row.EffectDynelState));
+				if (obj.Row.EffectQuestId is not { } eq || !held.Contains(eq))
+					continue;
+
+				// The column stores the visual-change KIND, and the one value any row ships is SetKdTree - the chain
+				// decor dropping its collision. Now that a kind selects a typed payload (#678) an unknown one cannot
+				// be built blind, so it is reported rather than guessed at.
+				if ((DynelVisualChange)obj.Row.EffectDynelState != DynelVisualChange.SetKdTree)
+				{
+					_logger.LogWarning("Quest world effect: '{Obj}' 0x{Handle:X8} asks for visual-change kind {Kind}, which carries a payload we have no source for - skipped.",
+						obj.Row.Name, obj.Handle, obj.Row.EffectDynelState);
+					continue;
+				}
+
+				await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetKdTree(WorldObjectColumns.TypeTagForClass(obj.SubOpcode), obj.Handle, 0)));
 			}
 		}
 
@@ -1247,11 +1259,15 @@ namespace Faolan.GameServer.World
 		}
 
 		// A player used a STATIC world object (Interact UseObject) that isn't a loot bag - a DOOR/GATE (e.g. the
-		// "King Conan's Throne Room" gate). Reply with the SimpleDynelVisualChange so the client plays the open
-		// animation + drops the collision: numeric state 5 then the "object_open" state string, matching the
-		// conans-castle capture (rec 1697 -> 1698). The object is resolved through the ZONE - the handle it was streamed
-		// with is the zone's, not a column. Returns false if no such object exists, so the caller can fall through to
-		// the loot-bag path.
+		// "King Conan's Throne Room" gate). Reply with the SimpleDynelVisualChange so the client drops the door's
+		// collision and plays its open animation, matching the conans-castle capture (rec 1697 -> 1698).
+		//
+		// Both halves are now named rather than numbered (#678): `SetKdTree 0` is what removes the collision, and
+		// "object_open" is a BASE ANIMATION name, not a state string. Retail's own close is the mirror image -
+		// "object_closed" plus `SetKdTree` back to the object's `Kdtree` - which is why the collision id is the
+		// object's own and not a constant. The object is resolved through the ZONE - the handle it was streamed with
+		// is the zone's, not a column. Returns false if no such object exists, so the caller can fall through to the
+		// loot-bag path.
 		public async Task<bool> OpenWorldObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
@@ -1259,9 +1275,10 @@ namespace Faolan.GameServer.World
 				return false;
 
 			var obj = live.Row;
+			var typeTag = WorldObjectColumns.TypeTagForClass(live.SubOpcode);
 
-			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(handle, 0x05));
-			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(EntityClass.SimpleDynel, handle, "object_open"));
+			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetKdTree(typeTag, handle, 0)));
+			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(typeTag, handle, "object_open")));
 			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.ToWire(obj) ?? "object", handle);
 			return true;
 		}
@@ -2394,47 +2411,115 @@ namespace Faolan.GameServer.World
 			return bag;
 		}
 
-		// #262: the visual response to harvesting a quest dynel (a quarry Stone Brick) - the FIRST state of retail's
-		// harvest sequence, `SimpleDynelVisualChange` 0x09.
+		// #262/#678: the visual response to harvesting a quest dynel (a quarry Stone Brick). Opens retail's sequence
+		// with the fade-out and schedules the rest of it on the zone - see [[DynelVisualSequence]] for the steps and
+		// their measured timings, and PlayDynelVisualStep for what each one puts on the wire.
 		//
-		// ⚠️ **0x09 is not "vanish", and this used to be called `HidePickupObject` on the belief that it was.**
-		// Retail never removes a harvested brick: in
-		// `xxx_mage-necromancer_login_play2_tortage_city_first-quests` handle 0x6AF3 is harvested at 18:43:16 and
-		// harvested AGAIN at 18:43:30 - the same handle, with no `n3ToClientQuit` between them. A state that
-		// destroyed the object could not be re-sent to it fourteen seconds later, so 0x09 is the start of a harvest,
-		// not the end of an object. Melvin confirms the same from play: the bricks are always there, and what comes
-		// and goes is the "can be picked up" glow.
+		// ⚠️ **The node DOES go away, and it comes back ~14 s later; it is not permanent and it is not destroyed.**
+		// Both halves of that were misread before. The first reading was that the opening state means "vanish", so
+		// the method was called `HidePickupObject`; the second (#529) was that a harvested brick is never removed at
+		// all, because the same handle gets a second sequence 14 s later with no `n3ToClientQuit` between them. The
+		// second sequence is the REGROWTH: no client interaction precedes it, and it is the run that SETS the brick's
+		// mesh and collision rather than clearing them. What is true in both readings is that the object is never
+		// destroyed - the handle survives - which is why nothing in this path may treat the node as consumed.
 		//
-		// That glow is drawn by the CLIENT off its own quest tracking, and the wire says so rather than it being an
-		// assumption. The dynel's body carries `quest_item_effect` (ProtoSimpleDynelIIR field 6, `QuestItemEffect`)
-		// as a bare flag that names NO quest id - and the twelve bodies are byte-identical on every re-send, so
-		// nothing per-player or per-quest is encoded in them. The client therefore has to supply the quest half
-		// itself, which it can: `QuestFullUpdate` gives it the goal's target and required count, and the
-		// `QuestGoal` Progress/Satisfied stream keeps its progress current. Retail sends no per-dynel packet when
-		// the glow goes out on the third brick - only the QuestGoal pair for the goal itself.
+		// The glow that marks a brick as takeable is drawn by the CLIENT off its own quest tracking, and the wire
+		// says so rather than it being an assumption. The dynel's body carries `quest_item_effect`
+		// (ProtoSimpleDynelIIR field 6, `QuestItemEffect`) as a bare flag that names NO quest id - and the twelve
+		// bodies are byte-identical on every re-send, so nothing per-player or per-quest is encoded in them. The
+		// client therefore has to supply the quest half itself, which it can: `QuestFullUpdate` gives it the goal's
+		// target and required count, and the `QuestGoal` Progress/Satisfied stream keeps its progress current. Retail
+		// sends no per-dynel packet when the glow goes out on the third brick - only the QuestGoal pair for the goal.
 		//
 		// ⚠️ So do not try to gate the glow server-side. Our job is the flag and an accurate QuestGoal stream; the
 		// client owns the rest. [V0: whether the client's final gate is "goal not yet satisfied" or "held count <
 		// required" - both fit, and the corpus cannot separate them because the two coincide on this quest.]
 		//
-		// The full captured sequence per harvest is six records, of which this is one:
-		//
-		//   0x09 40000000                       <- this (harvest begins)
-		//   0x02 0037f518 <transform>           first harvest of that node only
-		//   0x04 00000000 000f696e
-		//   0x08 40000000
-		//   0x03 00000000                       first harvest of that node only
-		//   StatIIR 0x1A = 5
-		//   0x05 00000000                       (harvest ends - the node is available again)
-		//
-		// Sending only the opening state is incomplete rather than wrong; the rest carries undecoded words and a
-		// transform, so it is not built here yet - tracked separately. What matters is that nothing in this path may
-		// treat the node as consumed: the server side already agrees (`ResolveCollectPickupItem` keeps answering
-		// while the collect goal is short, so the same brick can be taken again), and it is only the naming and the
-		// comment here that claimed otherwise.
-		public static Task MarkPickupHarvested(INetworkClient client, uint handle)
+		// NOT built: the particle puff retail plays over the brick (`StartParticleEffect` 1010207:3667224 at the
+		// node's position, stopped a second later). The effect id is per-object CONTENT and no column holds one, so
+		// building it would mean hardcoding one capture's dust cloud onto every pickup in the world - Gitea #686
+		// covers harvesting it out of the corpus.
+		public async Task MarkPickupHarvested(INetworkClient client, uint handle)
 		{
-			return WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(handle, 0x09));
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(player);
+			if (!zone.TryGetWorldObject(handle, out var node))
+				return;
+
+			await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeOut(WorldObjectColumns.TypeTagForClass(node.SubOpcode), handle, DynelVisualSequence.FadeSeconds));
+			zone.StartVisualSequence(node);
+
+			_logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} fades out; it grows back in {Seconds}s.", node.Row.Name, handle,
+				(2 * DynelVisualSequence.FadeSeconds) + DynelVisualSequence.RespawnDelaySeconds);
+		}
+
+		// #678: one due step of a harvested object's staged visual sequence, put on the wire for everyone who can see
+		// it. Each step is exactly what retail sends at that moment:
+		//
+		//   HarvestClearMesh       ChangeMesh(0, the object's asset TYPE) + FadeIn      - draw nothing, fade back in
+		//   HarvestClearCollision  StatIIR CarsGroup + SetKdTree(0)                     - and it stops blocking
+		//   RespawnFadeOut         FadeOut                                              - the regrowth begins
+		//   RespawnMesh            ChangeMesh(the row's asset) + FadeIn                 - the node is drawn again
+		//   RespawnCollision       StatIIR CarsGroup + SetKdTree(the row's Kdtree)      - and blocks again
+		//
+		// Every value comes from the object's own row: `GeometryAssetId`/`GeometryAssetType` are the pair its spawn
+		// already carries, `Kdtree` is the collision mesh (the client's mesh manifest names the very same record -
+		// 1010030:23748 `quest_quarry_stonebrick01` lists `<CollisionMesh2 file="168444"/>`, and 168444 is what
+		// retail restores AND what the column holds), and `CarsGroup` is the same value the spawn's proto field 5
+		// states. Nothing here is a constant lifted from a capture.
+		public async Task PlayDynelVisualStep(DueDynelVisualStep due)
+		{
+			var (zone, node, step) = due;
+			var row = node.Row;
+			var typeTag = WorldObjectColumns.TypeTagForClass(node.SubOpcode);
+			var carsGroup = StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.CarsGroup, row.CarsGroup));
+
+			switch (step)
+			{
+				case DynelVisualStep.HarvestClearMesh:
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.ChangeMesh(typeTag, node.Handle, 0, row.GeometryAssetType));
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeIn(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
+					break;
+
+				case DynelVisualStep.HarvestClearCollision:
+					await BroadcastToViewers(zone, node, carsGroup);
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.SetKdTree(typeTag, node.Handle, 0));
+					break;
+
+				case DynelVisualStep.RespawnFadeOut:
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeOut(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
+					break;
+
+				case DynelVisualStep.RespawnMesh:
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.ChangeMesh(typeTag, node.Handle, row.GeometryAssetId, row.GeometryAssetType));
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeIn(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
+					break;
+
+				case DynelVisualStep.RespawnCollision:
+					await BroadcastToViewers(zone, node, carsGroup);
+					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.SetKdTree(typeTag, node.Handle, row.Kdtree));
+					_logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} has grown back.", row.Name, node.Handle);
+					break;
+			}
+		}
+
+		private Task BroadcastDynelVisual(Zone zone, LiveWorldObject node, SimpleDynelVisualChangeIIR change)
+		{
+			return BroadcastToViewers(zone, node, SimpleDynelVisualChangeCodec.Build(change));
+		}
+
+		// Every player near enough to see the object gets it - a world object's state is the world's, not the
+		// harvester's. Gated on WorldEntered like the despawn path: a still-loading client has no dynel to change.
+		private static async Task BroadcastToViewers(Zone zone, LiveWorldObject node, byte[] body)
+		{
+			foreach (var viewer in zone.PlayersInRange(node.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client?.Session.WorldEntered == true)
+					await WorldIir.Send(viewer.Client, body);
+			}
 		}
 
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken

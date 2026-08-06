@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -7,14 +8,10 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// SimpleDynelVisualChangeIIR (0xE7F4F8F8) - flips a SimpleDynel's visual/collision STATE.
+	// SimpleDynelVisualChangeIIR (0xE7F4F8F8) - changes ONE aspect of a world object's presentation: its mesh, its
+	// collision, an animation, a particle effect, a fade, a name, its bounds.
 	//
 	//   [subop][u32 typeTag][u32 handle][u8 0][u32 kind][ kind-specific payload ]
-	//
-	// Retail sends it to the Casilda chain decor the instant she's freed on the beach, switching it to kind 5 - which
-	// drops the chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the
-	// dynel reads as an invisible barrier). It is also what opens a loot/container WINDOW on an object (the bag stays
-	// in the world; this just opens its UI).
 	//
 	// ⚠️ THE TAIL IS DISCRIMINATED BY `Kind`, and the record's own field split was off by one byte (#535). This used
 	// to read `[u32 word0][u8 state]` and carry everything after as an opaque `Trailer`, on the reasoning that "the
@@ -25,18 +22,12 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// The switch is the client's own (`SimpleDynelVisualChangeIIR_c::ReadSubClass` = FUN_007a6910, reached through
 	// the vtable's ReadSubClass slot 8), so the payload sizes are stated rather than inferred from what happened to
-	// be captured:
-	//
-	//   kind 0/1/6/7  [u16 len][ascii]   a state NAME - "Open", "object_open", "object_closed"
-	//   kind 2        6 x u32            3 read inline, then 3 more through FUN_004e0300 (a shared 3-word reader;
-	//                                    zero in every capture). FUN_007a6e10 beside it reads NOTHING - it appends
-	//                                    to a 0x20-stride container.
-	//   kind 3/5      1 x u32
-	//   kind 4        2 x u32
-	//   kind 8/9      1 x u32            carries a float on the wire (0x3E4CCCCD = 0.2 in every capture)
-	//   kind 10       1 x u32
-	//   kind 11       12 x u32           (FUN_00c9b900)
-	//   kind 12       16 x u32
+	// be captured. Each kind's MEANING is the client's too (#678): the applier beside the reader (FUN_007a6480)
+	// switches on the same word and logs the enum's own name into `GameCode/simpledynel` before it acts - which is
+	// where every `e_*` name in `DynelVisualChange` comes from, and why none of them is a guess. See that enum for
+	// the per-kind payloads; the ones that name an RDB resource were then checked against the client's index (the
+	// mesh a `ChangeMesh` names really is a MESHINDEXFILE, and the `SetKdTree` that follows it really is that
+	// manifest's own `<CollisionMesh2 file>`).
 	//
 	// All 2633 captured bodies parse and re-encode byte-exact, with nothing left over
 	// (SimpleDynelVisualChangeCodecTests). The corpus exercises kinds 0, 2, 3, 4, 5, 8 and 9; the rest come from the
@@ -48,17 +39,23 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const uint Opcode = (uint)IirTypes.SimpleDynelVisualChangeIIR;
 
-		// The kind that carries a state NAME rather than words - what a window open sends.
-		public const uint NamedKind = 0;
-
 		// The byte between the handle and the kind. Consumed by the BASE record's read rather than by ReadSubClass,
-		// and zero in all 2633 captured bodies - so it is expected, not carried.
+		// and zero in all 2633 captured bodies - so it is expected, not carried. (The same slot `StatCodec` calls
+		// `Env`, which is where it is non-zero.)
 		private const byte BaseTail = 0x00;
 
 		// How many u32 each non-named kind's payload carries, straight off the client's switch.
 		private static readonly Dictionary<uint, int> PayloadWords = new()
 		{
-			[2] = 6, [3] = 1, [4] = 2, [5] = 1, [8] = 1, [9] = 1, [10] = 1, [11] = 12, [12] = 16
+			[(uint)DynelVisualChange.StartParticleEffect] = 6,
+			[(uint)DynelVisualChange.StopParticleEffect] = 1,
+			[(uint)DynelVisualChange.ChangeMesh] = 2,
+			[(uint)DynelVisualChange.SetKdTree] = 1,
+			[(uint)DynelVisualChange.FadeIn] = 1,
+			[(uint)DynelVisualChange.FadeOut] = 1,
+			[(uint)DynelVisualChange.ChangeDecal] = 1,
+			[(uint)DynelVisualChange.SetBounds] = 12,
+			[(uint)DynelVisualChange.SetInverseObbMatrix] = 16
 		};
 
 		// CANONICAL - the only method here that writes bytes.
@@ -68,19 +65,6 @@ namespace Faolan.Core.Network.Codecs.World
 			using var s = new FaolanStream();
 			Write(s, value);
 			return s.ToArray();
-		}
-
-		// The state flip - e.g. the Casilda chain decor going to kind 5. Its single payload word is 0 in every
-		// captured flip of the kind we send.
-		public static byte[] Build(uint handle, byte state)
-		{
-			return Build(new SimpleDynelVisualChangeIIR(EntityClass.SimpleDynel, handle, state, null, [0]));
-		}
-
-		// The window open, carrying the state NAME ("Open" / "object_open") - kind 0.
-		public static byte[] Build(uint typeTag, uint handle, string state)
-		{
-			return Build(new SimpleDynelVisualChangeIIR(typeTag, handle, NamedKind, state, []));
 		}
 
 		public static SimpleDynelVisualChangeIIR Parse(in ReadOnlySpan<byte> data)
@@ -139,11 +123,76 @@ namespace Faolan.Core.Network.Codecs.World
 		// across `case 0/6/7` and `case 1` only because the decompiler kept the duplicated tails apart.
 		private static bool IsNamed(uint kind)
 		{
-			return kind is 0 or 1 or 6 or 7;
+			return kind is (uint)DynelVisualChange.SetBaseAnim or (uint)DynelVisualChange.PlayActionAnim
+				or (uint)DynelVisualChange.SetName or (uint)DynelVisualChange.SetDisplayName;
 		}
 	}
 
 	// SimpleDynelVisualChangeIIR (0xE7F4F8F8). Exactly one of `Name` / `Words` carries the payload, selected by
-	// `Kind` - see the codec for the client's switch.
+	// `Kind` - see the codec for the client's switch, and `SimpleDynelVisualChanges` for the named forms.
 	public sealed record SimpleDynelVisualChangeIIR(uint TypeTag, uint Handle, uint Kind, string? Name, IReadOnlyList<uint> Words);
+
+	// The semantic forms of a visual change, named rather than told apart by their argument list (#530 rule 8). Each
+	// is one `DynelVisualChange` case with its payload spelled out, so a caller says what it wants to happen.
+	public static class SimpleDynelVisualChanges
+	{
+		// The RDB type the client hardcodes for a particle effect - it reads only the record id off the wire and
+		// pairs it with 1010207 itself ("StartParticleEffect() Invalid particle resource id", FUN_0080a130).
+		public const uint ParticleEffectResourceType = 1010207;
+
+		// Play a base animation by NAME - the loot/container window's "Open", a door's "object_open" /
+		// "object_closed".
+		public static SimpleDynelVisualChangeIIR SetBaseAnim(uint typeTag, uint handle, string animation)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.SetBaseAnim, animation, []);
+		}
+
+		// Swap the object's GEOMETRY to an RDB resource - the (id, type) pair its spawn record already carries
+		// (`WorldObject.GeometryAssetId` / `GeometryAssetType`). Id 0 clears it: the object stays, with nothing drawn.
+		public static SimpleDynelVisualChangeIIR ChangeMesh(uint typeTag, uint handle, uint assetId, uint assetType)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.ChangeMesh, null, [assetId, assetType]);
+		}
+
+		// Swap the object's COLLISION to a kd-tree resource - the mesh manifest's own `<CollisionMesh2 file>`, which
+		// is what `WorldObject.Kdtree` holds. Id 0 drops collision entirely: that is the Casilda chain's "invisible
+		// wall" going away (#267), and it is what a door sends when it opens.
+		public static SimpleDynelVisualChangeIIR SetKdTree(uint typeTag, uint handle, uint kdTreeId)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.SetKdTree, null, [kdTreeId]);
+		}
+
+		// Fade the object IN / OUT over `seconds` (a big-endian float on the wire; 2.0 on a harvest, 0.2 and 0.5
+		// elsewhere). The client runs the ramp itself, so the state change belongs at the END of it - retail's mesh
+		// swap lands 2.05 s after a 2.0 s fade-out.
+		public static SimpleDynelVisualChangeIIR FadeIn(uint typeTag, uint handle, float seconds)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.FadeIn, null, [BitConverter.SingleToUInt32Bits(seconds)]);
+		}
+
+		public static SimpleDynelVisualChangeIIR FadeOut(uint typeTag, uint handle, float seconds)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.FadeOut, null, [BitConverter.SingleToUInt32Bits(seconds)]);
+		}
+
+		// Start an RDB particle effect (type 1010207) on the object. `attractor` is the attachment point on its
+		// skeleton - 0 places the effect free-standing at `position` instead (the client's `if (attractor < 1)`
+		// branch), which is what retail's quarry-brick harvest does. `rotationDegrees` is converted to radians by the
+		// client.
+		public static SimpleDynelVisualChangeIIR StartParticleEffect(uint typeTag, uint handle, uint effectResourceId, uint attractor, float rotationDegrees, Vector3 position)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.StartParticleEffect, null,
+			[
+				effectResourceId, attractor, BitConverter.SingleToUInt32Bits(rotationDegrees),
+				BitConverter.SingleToUInt32Bits(position.X), BitConverter.SingleToUInt32Bits(position.Y), BitConverter.SingleToUInt32Bits(position.Z)
+			]);
+		}
+
+		// Stop a particle effect. Its one word is 0 in all 19 captured records, so which effect it names (or whether
+		// 0 means "all of them") is not evidenced. [V0: the StopParticleEffect payload word.]
+		public static SimpleDynelVisualChangeIIR StopParticleEffect(uint typeTag, uint handle, uint effectResourceId = 0)
+		{
+			return new SimpleDynelVisualChangeIIR(typeTag, handle, (uint)DynelVisualChange.StopParticleEffect, null, [effectResourceId]);
+		}
+	}
 }

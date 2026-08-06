@@ -510,6 +510,21 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// Advances the staged VISUAL sequences running on static world objects (#678) and returns the steps that came
+		// due - a harvested node's mesh swap, its collision drop, its regrowth.
+		//
+		// A separate pass from `Tick` because its subjects are separate: a `WorldTickEffect` is about a `WorldEntity`,
+		// and a world object deliberately is not one (see Zone.WorldObjects). Squeezing an object into that record
+		// would mean making its entity nullable for every existing effect.
+		public IReadOnlyList<DueDynelVisualStep> TickVisualSequences(double deltaSeconds)
+		{
+			List<DueDynelVisualStep> steps = [];
+			foreach (var zone in _zones.Values)
+				steps.AddRange(zone.TickVisualSequences(deltaSeconds));
+
+			return steps;
+		}
+
 		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
 		public bool TryGetZone(uint mapId, [MaybeNullWhen(false)] out Zone zone)
 		{

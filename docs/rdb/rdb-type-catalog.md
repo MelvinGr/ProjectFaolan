@@ -112,7 +112,7 @@ fields (compressed on-disk bytes).
 | 1010203 | BCTMESH | 29 | 29 | 0 | 63.5 KB |
 | 1010205 | MOVEMENTSET | 55 | 55 | 0 | 13.5 KB |
 | 1010206 | Combo animation defs (XML) | 744 | 744 | 0 | 386.2 KB |
-| 1010207 | Compressed blob (zlib) | 8,163 | 1,824 | 6,339 | 20.2 MB |
+| 1010207 | Particle effect (zlib blob; #678) | 8,163 | 1,824 | 6,339 | 20.2 MB |
 | 1010209 | * Map top-down image (PNG, by playfield; #284) | 172 | 172 | 0 | 87.4 MB |
 | 1010210 | PNG4 | 344 | 344 | 0 | 20.7 MB |
 | 1010211 | PNG5 | 344 | 344 | 0 | 29.0 MB |
@@ -202,6 +202,14 @@ fields (compressed on-disk bytes).
 | 9398815 | PNG image (CDN) | 7,025 | 0 | 7,025 | 99.6 MB |
 | 9398825 | PNG image (CDN) | 137 | 0 | 137 | 1.8 MB |
 | 4294967295 | Combo/ability tech defs | 12 | 0 | 12 | 8.2 KB |
+
+**1010207 is the PARTICLE-EFFECT type**, not an unlabelled compressed blob (#678). Its record id is what a
+`SimpleDynelVisualChangeIIR` `e_StartParticleEffect` carries - the client reads only the id off the wire and
+pairs it with `1010207` itself, then errors as *"StartParticleEffect() Invalid particle resource id"* when it
+does not resolve. The client's own combat log names the same pairing: *"Starting 7 visual effect [ResourceID
+1010207:3667002] on attractor 10"*. The payload is still an undecoded zlib blob (a binary effect graph, no
+strings) - what is decoded is what the id MEANS. See
+[`../re/iir-readers-combat-world.md`](../re/iir-readers-combat-world.md).
 
 **Totals:** 873,588 entries · 410,382 local · 463,206 CDN · 84.6 GB indexed.
  192/195 types named (21 decoded by us).

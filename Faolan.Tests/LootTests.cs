@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		public void BuildOpenWindowBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: SimpleDynelVisualChange "Open" on bag 0x000021FE opens the loot window.
-			var body = SimpleDynelVisualChangeCodec.Build(EntityClass.LootBag, 0x000021FE, "Open");
+			var body = SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(EntityClass.LootBag, 0x000021FE, "Open"));
 			Assert.Equal("e7f4f8f80000c87a000021fe000000000000044f70656e", Convert.ToHexString(body).ToLowerInvariant());
 		}
 

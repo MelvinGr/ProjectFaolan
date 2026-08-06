@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		// frame#1846
 		public void BuildFireStage_Necro_MatchesCapture(uint fireId, string expected)
 		{
-			var bytes = StatCodec.Build(0x0802E5D4, fireId);
+			var bytes = StatCodec.Build(StatIirs.ForCharacter(0x0802E5D4, fireId, SpellweaveCatalog.CapturedFireRating));
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 

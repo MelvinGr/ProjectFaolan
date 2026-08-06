@@ -62,6 +62,10 @@ namespace Faolan.GameServer.World
 		// Called on a slow cadence from the sim tick; no-op unless the ambient spawner is enabled.
 		Task MaintainAmbientPools();
 
+		// #678: play one due step of a harvested world object's staged visual sequence (mesh swap, collision drop,
+		// regrowth) to everyone who can see it. The tick owns the TIMING; this is the wire side.
+		Task PlayDynelVisualStep(DueDynelVisualStep step);
+
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
 

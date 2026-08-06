@@ -131,14 +131,14 @@ namespace Faolan.Tests
 		public void StatIir_FlagOne_MatchesCapturedBytes()
 		{
 			// A env=1 record from the same stream: statId 0x000F4285, value 0.
-			Assert.Equal("f98e10b30000c350021662c801000f428500000000", Hex(StatCodec.Build(new StatIIR(0x021662C8, 0x01, 0x000F4285, 0))));
+			Assert.Equal("f98e10b30000c350021662c801000f428500000000", Hex(StatCodec.Build(StatIirs.ForCharacter(0x021662C8, 0x000F4285, 0))));
 		}
 
 		[Fact]
 		public void StatIir_MatchesCapturedBytes()
 		{
 			// First StatIIR of the editor stream: type=C350 handle=021662C8 env=00 statId=0x000F4266 value=0.
-			Assert.Equal("f98e10b30000c350021662c800000f426600000000", Hex(StatCodec.Build(new StatIIR(0x021662C8, 0x00, 0x000F4266, 0))));
+			Assert.Equal("f98e10b30000c350021662c800000f426600000000", Hex(StatCodec.Build(StatIirs.ForCharacter(0x021662C8, 0x000F4266, 0, env: 0x00))));
 		}
 
 		[Fact]

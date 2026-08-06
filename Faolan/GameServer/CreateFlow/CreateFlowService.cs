@@ -871,10 +871,10 @@ namespace Faolan.GameServer.CreateFlow
 			await Record(GameTimeCodec.Build(new GameTimeIIR(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds)));
 
 			// #189: constructed via StatCodec (was verbatim). env=0 for 0x0F4266, then an env=1 / value=0 run 0x0F4285..0x0F428C.
-			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0F4266, 0x00)));
+			await Record(StatCodec.Build(StatIirs.ForCharacter(id, 0x0F4266, 0x00, env: 0x00)));
 
 			for (uint statId = 0x0F4285; statId <= 0x0F428C; statId++)
-				await Record(StatCodec.Build(new StatIIR(id, 0x01, statId, 0x00)));
+				await Record(StatCodec.Build(StatIirs.ForCharacter(id, statId, 0x00)));
 
 			return;
 
@@ -930,7 +930,7 @@ namespace Faolan.GameServer.CreateFlow
 			await Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x0009FF96u, 7, 41413, 1, 24, 0)));
 			await Record(StatUpdateCodec.Build(0x0009FF96u, EditorVitals()));
 
-			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0360, 0x02)));
+			await Record(StatCodec.Build(StatIirs.ForCharacter(id, 0x0360, 0x02, env: 0x00)));
 
 			// MagicBuff carries the instance twice (applyTo + applyFrom); the 54-byte APPLY payload rides verbatim.
 			await Record(MagicBuffCodec.Build(new MagicBuffIIR(id, 0x00, 0x00000B90, 0x00, id,
@@ -943,9 +943,9 @@ namespace Faolan.GameServer.CreateFlow
 
 			// Stat run (env=1, value=0): entity stat ids 0x0566..0x0573, then 0x0575 and 0x0580.
 			foreach (var statId in (uint[])[0x0566, 0x0567, 0x0568, 0x0569, 0x056A, 0x056B, 0x056C, 0x056D, 0x056E, 0x056F, 0x0570, 0x0571, 0x0572, 0x0573, 0x0575, 0x0580])
-				await Record(StatCodec.Build(new StatIIR(id, 0x01, statId, 0x00)));
+				await Record(StatCodec.Build(StatIirs.ForCharacter(id, statId, 0x00)));
 
-			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0F428F, 0x00)));
+			await Record(StatCodec.Build(StatIirs.ForCharacter(id, 0x0F428F, 0x00, env: 0x00)));
 
 			await Record(StatUpdateCodec.Build(id, EditorAvatarStats()));
 
@@ -1185,7 +1185,7 @@ namespace Faolan.GameServer.CreateFlow
 			var instance = client.Session.Account.ClientInstance;
 			var character = client.Session.Character;
 
-			await SendCreateEditor2000Record(client, StatCodec.Build(new StatIIR(instance, 0x01, 0x0578, 0x00)));
+			await SendCreateEditor2000Record(client, StatCodec.Build(StatIirs.ForCharacter(instance, 0x0578, 0x00)));
 			await SendCreateEditor2000Record(client, ScryScriptCodec.Build(instance, 35820)); // StartScriptGroupOnClient (#223)
 
 			// The editor's class-base push: stat 0x0001 / 0x01F9 / 0x01FB for the class the player just chose. Retail

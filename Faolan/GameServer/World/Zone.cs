@@ -47,9 +47,34 @@ namespace Faolan.GameServer.World
 		// the state that earns entity-hood.
 		public IReadOnlyList<LiveWorldObject> WorldObjects { get; set; } = [];
 
+		// The staged visual sequences currently running on this zone's objects (#678) - a harvested node fading out,
+		// swapping its mesh, and growing back. Keyed by handle so a second harvest of the same node REPLACES its
+		// sequence instead of interleaving two of them.
+		private readonly ConcurrentDictionary<uint, DynelVisualSequence> _visualSequences = new ConcurrentDictionary<uint, DynelVisualSequence>();
+
 		public Zone(uint mapId)
 		{
 			MapId = mapId;
+		}
+
+		// Starts (or restarts) an object's harvest visual sequence. The caller has already sent its opening fade-out;
+		// this schedules everything that follows it.
+		public void StartVisualSequence(LiveWorldObject obj)
+		{
+			_visualSequences[obj.Handle] = new DynelVisualSequence(obj);
+		}
+
+		// Advances every running sequence by `deltaSeconds` and yields the steps that came due.
+		public IEnumerable<DueDynelVisualStep> TickVisualSequences(double deltaSeconds)
+		{
+			foreach (var sequence in _visualSequences.Values)
+			{
+				foreach (var step in sequence.Advance(deltaSeconds))
+					yield return new DueDynelVisualStep(this, sequence.Object, step);
+
+				if (sequence.IsFinished)
+					_visualSequences.TryRemove(sequence.Object.Handle, out _);
+			}
 		}
 
 		// The static world objects within `range` of `position` - the interest query for streaming props as a player

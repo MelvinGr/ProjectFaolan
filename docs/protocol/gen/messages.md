@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **63 V3** (63 with an auto-cited golden). The
+**80** IIR carrier types · **64 V3** (64 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -73,6 +73,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: SimpleDynelVisualChangeCodecTests.CapturedBody_ParsesToItsKind_AndReEncodesByteExact] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `StatDamageCodec` | [V3: CombatDamageCodecTests.EnvironmentalDamage_IsByteIdentical] |
+| V3 | `StatIIR` | `0xF98E10B3` | `StatCodec` | [V3: SimpleDynelVisualChangeCodecTests.TheHarvestSequence_MatchesTheCapturedBrick] |
 | V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame] |
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
@@ -96,7 +97,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `SetMorphValueCodec` |  |
 | V2 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverageCodec` |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
-| V2 | `StatIIR` | `0xF98E10B3` | `StatCodec` |  |
 | V2 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see

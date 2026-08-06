@@ -75,6 +75,11 @@ namespace Faolan.GameServer
 			return _broadcaster.MaintainAmbientPools();
 		}
 
+		Task IWorldOutbound.PlayDynelVisualStep(DueDynelVisualStep step)
+		{
+			return _broadcaster.PlayDynelVisualStep(step);
+		}
+
 		// #367: the tick's seam onto the buff stat engine (expiry / death clear), same body as the listener's own calls.
 		Task IWorldOutbound.SyncBuffStats(INetworkClient client)
 		{

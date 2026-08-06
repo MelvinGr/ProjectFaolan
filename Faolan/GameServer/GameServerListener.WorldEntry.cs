@@ -129,7 +129,7 @@ namespace Faolan.GameServer
 		private async Task SendWorldReadyBurst(INetworkClient client)
 		{
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(StatCodec.Build(new StatIIR(client.Session.Character.Id, 0x01, 0x00000013, 0x00000000)))));
+				b => b.WriteArrayUInt32Length(StatCodec.Build(StatIirs.ForCharacter(client.Session.Character.Id, 0x00000013, 0x00000000)))));
 			Logger.LogInformation("Sent deferred StatIIR prompt.");
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58), client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,

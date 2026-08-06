@@ -2350,7 +2350,7 @@ namespace Faolan.GameServer
 						if (await _questProgression.ResolveCollectPickupItem(client) is { } pickedItem)
 						{
 							await GrantItemToBackpack(client, pickedItem);
-							await WorldBroadcaster.MarkPickupHarvested(client, target);
+							await _broadcaster.MarkPickupHarvested(client, target);
 						}
 
 						break; // inert (no active collect quest) still swallows the use - don't open a window on a brick

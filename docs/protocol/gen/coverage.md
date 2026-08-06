@@ -8,8 +8,8 @@
 ## Headline
 
 - **860** RPC methods — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **63 V3** (byte-exact builder), **17 V2** (built, no golden), **0 V1** (no builder found).
-- **68** codec classes, **51** with a byte-exact test.
+- **80** IIR carrier types: **64 V3** (byte-exact builder), **16 V2** (built, no golden), **0 V1** (no builder found).
+- **68** codec classes, **52** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -95,6 +95,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `SimpleDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelVisualChangeCodec` |
 | V3 | `StatDamageIIR` | `StatDamageCodec` |
+| V3 | `StatIIR` | `StatCodec` |
 | V3 | `StatUpdateIIR` | `StatUpdateCodec` |
 | V3 | `StopIIR` | `StopCodec` |
 | V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
@@ -118,5 +119,4 @@ the margins, but never invents a golden that isn't there.
 | V2 | `SetMorphValueIIR` | `SetMorphValueCodec` |
 | V2 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
-| V2 | `StatIIR` | `StatCodec` |
 | V2 | `TemplateActionIIR` | `TemplateActionCodec` |

@@ -1,5 +1,8 @@
 using System;
+using System.Numerics;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Xunit;
@@ -59,19 +62,67 @@ namespace Faolan.Tests
 			Assert.Equal([0x000300B3u], flip.Words);
 		}
 
-		// The two convenience forms production sends, still byte-identical to what they built before the decode: the
-		// collision flip (#267's Casilda chain) and the loot-window open.
+		// The two forms production sends, still byte-identical to what they built before the kinds were named: the
+		// collision drop (#267's Casilda chain) and the loot-window open.
 		[Fact]
 		public void TheProductionForms_BuildTheirCapturedShapes()
 		{
-			var flip = SimpleDynelVisualChangeCodec.Parse(SimpleDynelVisualChangeCodec.Build(0x00013966, 5));
+			var flip = SimpleDynelVisualChangeCodec.Parse(SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetKdTree(EntityClass.SimpleDynel, 0x00013966, 0)));
 			Assert.Equal(EntityClass.SimpleDynel, flip.TypeTag);
-			Assert.Equal(5u, flip.Kind);
+			Assert.Equal((uint)DynelVisualChange.SetKdTree, flip.Kind);
 			Assert.Equal([0u], flip.Words);
 
-			var open = SimpleDynelVisualChangeCodec.Parse(SimpleDynelVisualChangeCodec.Build(EntityClass.LootBag, 0x00000190, "Open"));
-			Assert.Equal(SimpleDynelVisualChangeCodec.NamedKind, open.Kind);
+			var open = SimpleDynelVisualChangeCodec.Parse(SimpleDynelVisualChangeCodec.Build(SimpleDynelVisualChanges.SetBaseAnim(EntityClass.LootBag, 0x00000190, "Open")));
+			Assert.Equal((uint)DynelVisualChange.SetBaseAnim, open.Kind);
 			Assert.Equal("Open", open.Name);
+		}
+
+		// #678: the HARVEST sequence, byte-exact against the capture it was decoded from -
+		// `xxx_mage-necromancer_login_play2_tortage_city_first-quests`, the quarry Stone Brick 0x6AF3. Every record
+		// of it, in the order retail sends them, built from what the object's DB row holds: the mesh pair
+		// (GeometryAssetId 23748 / GeometryAssetType 1010030), the collision (Kdtree 168444 - which is that mesh
+		// manifest's own `<CollisionMesh2 file>`), and CarsGroup 5.
+		//
+		// The two runs are the harvest and the REGROWTH, and the difference between them is the whole point: the
+		// first clears the mesh and the collision, the second sets them back to the brick's own.
+		[Fact]
+		public void TheHarvestSequence_MatchesTheCapturedBrick()
+		{
+			const uint Dynel = EntityClass.SimpleDynel;
+			const uint Brick = 0x00006AF3;
+
+			// f4247 18:43:16.131 - the harvest opens with a 2.0 s fade-out.
+			Assert.Equal("e7f4f8f80000c87800006af3000000000940000000", Hex(SimpleDynelVisualChanges.FadeOut(Dynel, Brick, 2.0f)));
+
+			// f4276 18:43:18.181 - the fade has run: draw nothing (id 0, still the MESHINDEXFILE type), fade back in.
+			Assert.Equal("e7f4f8f80000c87800006af3000000000400000000000f696e", Hex(SimpleDynelVisualChanges.ChangeMesh(Dynel, Brick, 0, 1010030)));
+			Assert.Equal("e7f4f8f80000c87800006af3000000000840000000", Hex(SimpleDynelVisualChanges.FadeIn(Dynel, Brick, 2.0f)));
+
+			// f4360 18:43:20.229 - the brick is invisible, so its collision goes, alongside its CarsGroup.
+			Assert.Equal("f98e10b30000c87800006af3000000041a00000005", Convert.ToHexStringLower(StatCodec.Build(StatIirs.ForWorldObject(Dynel, Brick, CharacterStatId.CarsGroup, 5))));
+			Assert.Equal("e7f4f8f80000c87800006af3000000000500000000", Hex(SimpleDynelVisualChanges.SetKdTree(Dynel, Brick, 0)));
+
+			// f4495 18:43:30.468 - ten seconds later the same sequence runs the other way and the brick grows back.
+			Assert.Equal("e7f4f8f80000c87800006af3000000000940000000", Hex(SimpleDynelVisualChanges.FadeOut(Dynel, Brick, 2.0f)));
+			Assert.Equal("e7f4f8f80000c87800006af3000000000400005cc4000f696e", Hex(SimpleDynelVisualChanges.ChangeMesh(Dynel, Brick, 23748, 1010030)));
+			Assert.Equal("e7f4f8f80000c87800006af30000000005000291fc", Hex(SimpleDynelVisualChanges.SetKdTree(Dynel, Brick, 168444)));
+		}
+
+		// The particle puff over the harvested brick (f4249). Not built by the server - the effect id is per-object
+		// content no column holds (Gitea #685) - but the FORM is decoded, so the codec can state it: attractor 0
+		// means "not attached to a bone", which is why this one carries a position, and that position is the brick's
+		// own (its spawn puts it at 915.92 / 171.04 / 844.66).
+		[Fact]
+		public void TheHarvestParticleEffect_MatchesTheCapturedRecord()
+		{
+			var effect = SimpleDynelVisualChanges.StartParticleEffect(EntityClass.SimpleDynel, 0x00006AF3, 3667224, 0, 0f, new Vector3(912.4328f, 171.06451f, 844.13379f));
+
+			Assert.Equal("e7f4f8f80000c87800006af300000000020037f518000000000000000044641bb3432b108444530890", Hex(effect));
+		}
+
+		private static string Hex(SimpleDynelVisualChangeIIR value)
+		{
+			return Convert.ToHexStringLower(SimpleDynelVisualChangeCodec.Build(value));
 		}
 
 		// Strict (#530 rule 4): a kind outside the client's switch is a decode failure, and so is a body whose

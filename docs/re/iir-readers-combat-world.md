@@ -129,6 +129,54 @@ spawns with a clean empty scaffold and the loot system fills it). What the captu
 before the column was retired and kept as evidence in
 [`container-loot-observed.json`](container-loot-observed.json) - 15 containers, 45 items, 12 distinct.
 
+## SimpleDynelVisualChangeIIR (`0xE7F4F8F8`, reader `FUN_007a6910`, applier `FUN_007a6480`)
+
+Changes ONE aspect of a world object's presentation. The reader is a `switch` on a u32 `kind` that selects the
+payload; the **applier beside it** is the same switch again, and every case logs its own enum name into the
+`GameCode/simpledynel` debug channel before acting - so the meanings below are the client's words, not an
+inference from what a payload looked like [V3: SimpleDynelVisualChangeCodecTests.TheHarvestSequence_MatchesTheCapturedBrick].
+
+```
+[u32 typeTag][u32 handle][u8 0][u32 kind][ payload ]
+```
+
+| kind | client name | payload | what it does |
+|---|---|---|---|
+| 0 | `e_SetBaseAnim` | `[u16 len][ascii]` | the resting animation - `"Open"`, `"object_open"`, `"object_closed"` |
+| 1 | `e_PlayActionAnim` | `[u16 len][ascii]` | a one-shot animation |
+| 2 | `e_StartParticleEffect` | `[effect][attractor][rot°][x][y][z]` | see below |
+| 3 | `e_StopParticleEffect` | `[u32]` | 0 in all 19 captured records |
+| 4 | `e_ChangeMesh` | `[rdb id][rdb type]` | swaps the geometry; id 0 draws nothing |
+| 5 | `e_SetKDTree` | `[rdb id]` | swaps the COLLISION; id 0 drops it |
+| 6 | `e_SetName` | `[u16 len][ascii]` | |
+| 7 | `e_SetDisplayName` | `[u16 len][ascii]` | |
+| 8 | `e_FadeIn` | `[f32 seconds]` | 2.0 on a harvest, 0.2 / 0.5 elsewhere |
+| 9 | `e_FadeOut` | `[f32 seconds]` | |
+| 10 | `e_ChangeDecal` | `[u32]` | |
+| 11 | `e_SetBounds` | `12 x u32` | |
+| 12 | `e_SetInverseOBBMatrix` | `16 x u32` | a 4x4 matrix |
+
+The three that name a resource were each checked against the client's own RDB index rather than taken on the
+name:
+
+- **`e_ChangeMesh`'s pair is the same `(id, type)` the object's spawn already carries** (the bounds struct above,
+  `WorldObject.GeometryAssetId`/`GeometryAssetType`). The applier stores them at dynel+0x1D0/+0x1D4 and rebuilds.
+- **`e_SetKDTree`'s id is the mesh manifest's own `<CollisionMesh2 file>`.** `1010030:23748` is
+  `quest_quarry_stonebrick01` and names `168444`; that is exactly what retail sends after a `ChangeMesh` to
+  23748, and it is what `WorldObject.Kdtree` holds. Same for both harvest-node meshes (`3113740` → `3113743`,
+  `3113735` → `3113739`).
+- **`e_StartParticleEffect`'s first word is an RDB **1010207** record** - the client reads only the id and pairs
+  it with `0xF6A1F` itself, and errors as "StartParticleEffect() Invalid particle resource id". The second word
+  is the ATTRACTOR (attachment point): `if (attractor < 1)` the effect is placed free-standing at the trailing
+  position instead, which is the branch retail's quarry harvest takes - its three floats are the dynel's own
+  world position to two centimetres. The third word is degrees (the client multiplies by π/180).
+
+⚠️ **The single six-word "node" in the bounds struct above is the same thing.** Its id co-varies with the asset,
+matches nothing in the database, and carries a constant `34` - and 34/35 is precisely the attractor word, while
+every one of those ids (`4998690`, `3198555`, `3198574`, `3139195`, …) is a type-1010207 record. So a signpost's
+"second client-side resource reference" is a standing PARTICLE EFFECT plus the bone it hangs on, not geometry.
+Re-decoding that region as an effect list is Gitea #687.
+
 ## No-op / out-of-band readers
 
 - `UpdateInventoryIIR_t` (`0xA74D2814`, `FUN_005b9230`) — `ReadSubClass` just `return 0`. The

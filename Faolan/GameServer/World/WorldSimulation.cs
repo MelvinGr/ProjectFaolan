@@ -961,6 +961,12 @@ namespace Faolan.GameServer.World
 							}
 						}
 
+						// #678: the staged visual sequence a harvested world object plays - fade, mesh swap, collision
+						// drop, and the regrowth ten seconds later. Retail paces these against the CLIENT's own fade,
+						// so they are timed steps rather than one burst.
+						foreach (var step in World.TickVisualSequences(dt))
+							await _output.PlayDynelVisualStep(step);
+
 						// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
 						await TickPlayerDeaths();
 						await TickKillChains();
