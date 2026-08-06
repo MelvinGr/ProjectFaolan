@@ -1,6 +1,6 @@
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 		[InlineData("Trainer", 193463442u)]
 		public async Task ProfessionName_IsTheElfHashOfTheProfessionName(string name, uint hash)
 		{
-			Assert.Equal(hash, ElfHash(name));
+			Assert.Equal(hash, Elf28.Of(name));
 
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var carriers = await db.NpcStatCores.AsNoTracking().CountAsync(c => c.ProfessionName == hash, TestContext.Current.CancellationToken);
@@ -137,22 +137,5 @@ namespace Faolan.Tests
 
 		private const string AuctioneerName = "Trader";
 
-		// The classic ELF/PJW hash: 4-bit shift, and the top nibble folded back in and cleared, so the result is 28
-		// bits wide.
-		private static uint ElfHash(string s)
-		{
-			var h = 0u;
-			foreach (var b in Encoding.Latin1.GetBytes(s))
-			{
-				h = (h << 4) + b;
-				var high = h & 0xF0000000;
-				if (high != 0)
-					h ^= high >> 24;
-
-				h &= ~high;
-			}
-
-			return h;
-		}
 	}
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Faolan.Core.Crypt;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 
@@ -94,11 +95,11 @@ namespace Faolan.Importer.Rdb
 					byId[entry.Id] = entry.Value;
 			}
 
-			var prefix = Elf28(TokenPrefix, 0);
+			var prefix = Elf28.Of(TokenPrefix, 0);
 			var hits = new List<Banner>();
 			for (uint n = 0; n <= SweepMax; n++)
 			{
-				if (byId.TryGetValue(Elf28Digits(n, prefix), out var text))
+				if (byId.TryGetValue(Elf28.OfDigits(n, prefix), out var text))
 					hits.Add(new Banner(n, text));
 			}
 
@@ -239,36 +240,5 @@ namespace Faolan.Importer.Rdb
 			}
 		}
 
-		// The classic UNIX ELF/PJW hash masked to 28 bits, resumable so a constant prefix is paid once.
-		internal static uint Elf28(string s, uint h)
-		{
-			foreach (var c in s)
-			{
-				h = (h << 4) + c;
-				h = (h ^ ((h & 0xF0000000) >> 24)) & 0x0FFFFFFF;
-			}
-
-			return h;
-		}
-
-		// `Elf28(n.ToString(), state)` without allocating the string - the sweep runs this tens of millions of times.
-		internal static uint Elf28Digits(uint n, uint h)
-		{
-			Span<char> digits = stackalloc char[10];
-			var at = digits.Length;
-			do
-			{
-				digits[--at] = (char)('0' + (int)(n % 10));
-				n /= 10;
-			} while (n > 0);
-
-			for (var i = at; i < digits.Length; i++)
-			{
-				h = (h << 4) + digits[i];
-				h = (h ^ ((h & 0xF0000000) >> 24)) & 0x0FFFFFFF;
-			}
-
-			return h;
-		}
 	}
 }

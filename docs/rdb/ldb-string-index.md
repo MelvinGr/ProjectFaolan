@@ -450,6 +450,12 @@ string up by. The exe is full of `FUN_0061f640(<category>, "<Token>")` calls who
 token name, so **any of them can be resolved to its actual string with no live client** - hash the token, look
 the id up in the category.
 
+⚠️ And where the token carries a NUMBER, the hash **inverts**: sweep the parameter, hash each candidate, keep the
+ones landing on a real id. That is what recovered the area-banner ids
+([bounded-areas-1000053.md](bounded-areas-1000053.md#both-blockers-are-gone-the-scry-script-and-the-banner-id-itself)),
+and it works because 28 bits is small enough to sweep and the varying part is the tail, so the prefix is hashed
+once. It also means a hit is only a candidate: 2^28 buckets against a few thousand ids collide by chance.
+
 ```python
 def elf(s):                      # the classic UNIX ELF/PJW hash, masked to 28 bits
     h = 0
@@ -459,7 +465,9 @@ def elf(s):                      # the classic UNIX ELF/PJW hash, masked to 28 b
     return h
 ```
 
-It ships as `LdbStringIndex.TokenId`, and `--report ldb-resolve` takes token names (or raw ids) directly —
+It ships as `Elf28` (in `Faolan.Core/Crypt`, beside `Bkdr31` — the client's two string hashes, one file each so
+neither can be re-implemented into disagreeing with itself; `LdbStringIndex.TokenId` is a name for it in LDB
+terms). `--report ldb-resolve` takes token names (or raw ids) directly —
 resolved **per page**, English first, because every category is shipped once per language and an unqualified
 lookup answers in whichever language happened to be parsed last:
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Crypt;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Rdb;
 using Xunit;
@@ -23,7 +24,7 @@ namespace Faolan.Tests
 		[InlineData(3474586u, 19303910u)]
 		public void ABannerIdsToken_HashesToItsLdbKey(uint bannerId, uint ldbId)
 		{
-			Assert.Equal(ldbId, AreaBannerNames.Elf28(AreaBannerNames.TokenPrefix + bannerId, 0));
+			Assert.Equal(ldbId, Elf28.Of(AreaBannerNames.TokenPrefix + bannerId));
 		}
 
 		// The sweep hashes each candidate's digits onto the prefix's state instead of building the string - tens of
@@ -35,8 +36,8 @@ namespace Faolan.Tests
 		[InlineData(40_000_000u)]
 		public void TheDigitOnlyHash_IsTheSameAsHashingTheWholeToken(uint candidate)
 		{
-			var whole = AreaBannerNames.Elf28(AreaBannerNames.TokenPrefix + candidate, 0);
-			Assert.Equal(whole, AreaBannerNames.Elf28Digits(candidate, AreaBannerNames.Elf28(AreaBannerNames.TokenPrefix, 0)));
+			var whole = Elf28.Of(AreaBannerNames.TokenPrefix + candidate);
+			Assert.Equal(whole, Elf28.OfDigits(candidate, Elf28.Of(AreaBannerNames.TokenPrefix)));
 		}
 
 		// The three ways the client spells the same place - a widget prefix, run-together words, an apostrophe - all

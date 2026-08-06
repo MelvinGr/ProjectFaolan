@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
@@ -49,14 +50,7 @@ namespace Faolan.Core.Rdb
 		// See docs/rdb/ldb-string-index.md.
 		public static uint TokenId(string token)
 		{
-			var h = 0u;
-			foreach (var c in token)
-			{
-				h = (h << 4) + c;
-				h = (h ^ ((h & 0xF0000000) >> 24)) & 0x0FFFFFFF;
-			}
-
-			return h;
+			return Elf28.Of(token);
 		}
 
 		// The page's category, or 0 if the body is not a TDC2 page (too short / wrong magic).
