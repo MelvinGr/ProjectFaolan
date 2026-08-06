@@ -95,7 +95,7 @@ namespace Faolan.Importer.Captures
 		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
 		// the capture was played on and elected only against captures of that same class.
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols, List<NpcSpawnEntry> ObservedTypes) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
-			IReadOnlySet<uint> classSpecificMaps, IReadOnlySet<uint> ambusherTemplates)
+			IReadOnlySet<uint> classSpecificMaps, IReadOnlySet<uint> triggerSpawnedTypes)
 		{
 			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
 			// exclusion has to be, too - and doing it here rather than at the placement step keeps a summon out of the
@@ -243,14 +243,21 @@ namespace Faolan.Importer.Captures
 			// So dropping either one regresses. If a capture ever observes the Mutilator's owner-binding, this net
 			// becomes redundant and can go.
 			//
-			// #528 AMBUSHERS go the same way, for the same reason one level over: a `NpcAmbush` creature is put in the
-			// world by a quest goal advancing, so a capture that caught one is evidence of a SPRUNG AMBUSH, not of a
-			// placement. Harvesting it as one left a Bat Demon standing in the Tortage quarry permanently, for every
-			// player, regardless of quest state - the summoned-pet failure exactly. By TEMPLATE rather than by name,
-			// because unlike the pet roster this set is a real table with real ids.
+			// TRIGGER-SPAWNED types go the same way, for the same reason one level over (#528). `triggerSpawnedTypes`
+			// is every creature the world puts in play through a SCRIPT rather than a placement:
+			//   * a `NpcAmbush` ambusher  - a quest goal advancing spawns it (the Quarry Bat Demon)
+			//   * a `NpcEncounter` BOSS   - a proximity lure swaps into it (Eerika of the Maidens / Boros)
+			// A capture that caught one caught the trigger FIRING, so harvesting it as a placement is the summoned-pet
+			// failure exactly: it left a Bat Demon standing in the Tortage quarry permanently, for every player,
+			// regardless of quest state. By TEMPLATE rather than by name, because unlike the pet roster these are real
+			// tables with real ids.
+			//
+			// ⚠️ The encounter boss half is a RULE now, where it used to be an accident. She got no placement only
+			// because she spawns on the exact spot her lure vacated and the position dedup below dropped her (#501) -
+			// which would have stopped protecting her the moment a capture caught the swap a few units off.
 			var placements = spawns
 				.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant()))
-				.Where(e => !ambusherTemplates.Contains(e.TemplateId))
+				.Where(e => !triggerSpawnedTypes.Contains(e.TemplateId))
 				.ToList();
 
 			// The placements are position-deduped; the TYPES are not. A creature that loses the position dedup is

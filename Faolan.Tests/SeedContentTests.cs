@@ -332,6 +332,36 @@ namespace Faolan.Tests
 			}
 		}
 
+		// A TRIGGER-SPAWNED type is never a world placement (#528/#501). Two kinds today: a `NpcAmbush` ambusher (a
+		// quest goal advancing spawns it) and a `NpcEncounter` BOSS (a proximity lure swaps into it). Neither stands
+		// anywhere, so a `NpcSpawns` row for one is a harvest of the trigger FIRING, and rendering it puts a creature
+		// in the world permanently that retail only ever shows to a player who triggered it.
+		//
+		// ⚠️ This is a gate on something that used to be an ACCIDENT. The Bat Demon really did stand in the Tortage
+		// quarry for every player; the encounter boss escaped only because she spawns on the exact spot her lure
+		// vacated and the position dedup dropped her (#501) - which would have stopped protecting her the moment a
+		// capture caught the swap a few units off. `ImportOps.BuildBurstTruthSpawns` now excludes both by rule.
+		[Fact]
+		public async Task NoTriggerSpawnedType_HasAWorldPlacement()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var ambushers = await db.NpcAmbushes.Select(a => a.NpcTemplateId).ToListAsync(ct);
+			var bosses = await db.NpcEncounters.Select(e => e.BossNpcTemplateId).ToListAsync(ct);
+			var triggerSpawned = ambushers.Concat(bosses).ToHashSet();
+			Assert.NotEmpty(triggerSpawned); // an empty set would mean the tables were lost, not that the rule is unused
+
+			var placed = await db
+				.NpcSpawns.Where(s => triggerSpawned.Contains(s.NpcTemplateId))
+				.Select(s => new { s.NpcTemplateId, s.NpcTemplate.Name, s.MapId })
+				.ToListAsync(ct);
+
+			Assert.True(placed.Count == 0,
+				"trigger-spawned types with a world placement: " +
+				string.Join(", ", placed.Select(p => $"{p.Name} ({p.NpcTemplateId}) on map {p.MapId}")));
+		}
+
 		// ⚠️ NO SHIPPED GOAL CARRIES KIND 0, because the wire never sends one (#548). `QuestGoalKind` used to declare
 		// `Untargeted = 0` on the strength of 11 rows holding it - which were not a kind at all but the importer's
 		// un-harvested default: the full-update path set `Separator` nowhere, so every goal the corpus only ever

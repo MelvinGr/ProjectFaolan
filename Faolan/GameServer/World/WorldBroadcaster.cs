@@ -997,12 +997,14 @@ namespace Faolan.GameServer.World
 			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
 			var encounters = (await _database.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
 
-			// #528: the map's quest AMBUSHERS. An ambusher does not stand in the world - it appears when a goal
-			// advances - so a captured "placement" of one is a harvest of a SPRUNG AMBUSH, and it is skipped below.
-			// The importer already excludes them from the burst-truth set (ImportOps.BuildBurstTruthSpawns, alongside
-			// the summoned pets), so on a current database this finds nothing; it is the second net, for a database
-			// built before that rule or hand-edited since.
-			var ambushers = (await _database.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId).ToHashSet();
+			// #528: the map's TRIGGER-SPAWNED types - a quest ambusher and an encounter BOSS alike. Neither stands in
+			// the world (one appears when a goal advances, the other when a lure swaps), so a captured "placement" of
+			// one is a harvest of the trigger FIRING, and it is skipped below. The importer already excludes them from
+			// the burst-truth set (ImportOps.BuildBurstTruthSpawns, alongside the summoned pets), so on a current
+			// database this finds nothing; it is the second net, for a database built before that rule.
+			var triggerSpawned = (await _database.GetNpcAmbushes(mapId)).Select(a => a.NpcTemplateId)
+				.Concat(encounters.Values.Select(e => e.BossNpcTemplateId))
+				.ToHashSet();
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
 			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
@@ -1036,9 +1038,9 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate == null)
 					continue;
 
-				// #528: this type only exists inside a triggered ambush, so a row for it is not a creature standing in
-				// the world. Same standing as an encounter BOSS having no placement at all (#501).
-				if (ambushers.Contains(npc.NpcTemplateId))
+				// #528/#501: this type only exists inside a triggered spawn, so a row for it is not a creature standing
+				// in the world.
+				if (triggerSpawned.Contains(npc.NpcTemplateId))
 					continue;
 
 				var npcName = npc.NpcTemplate.Name;

@@ -291,10 +291,28 @@ NPC spawn in that capture; everything else arrives in the world-entry stream.
   Demon. Because the gate reads *persisted* progress, a relog does not re-arm it.
 - **An ambusher gets no placement row at all.** `NpcSpawns` used to hold one Bat Demon on map 4020 — a harvest of
   that sprung ambush, 10.2 u from where retail spawned it — which left a Bat Demon standing in the quarry
-  permanently, for every player, regardless of quest state. `ImportOps.BuildBurstTruthSpawns` now drops ambushers
-  from the burst-truth set exactly as it drops summoned pets, and for the same reason: *a trigger spawn is not a
-  world placement*. The **type** still survives via `observedTypes`, which is what the ambush is built from.
-  `WorldBroadcaster.EnsureZoneNpcs` skips them too, as the second net for a database built before that rule.
+  permanently, for every player, regardless of quest state. See the rule below.
+
+### A trigger-spawned type is never a world placement
+
+Two kinds of creature are put in play by a *script* rather than by a placement, and they share one rule:
+
+| kind | trigger | table |
+|---|---|---|
+| ambusher | a quest goal advances | `NpcAmbush` |
+| encounter **boss** | a proximity lure swaps into it | `NpcEncounter.BossNpcTemplateId` |
+
+A capture that caught either one caught the **trigger firing**, so harvesting it as a placement is the summoned-pet
+failure one level over. `ImportOps.BuildBurstTruthSpawns` excludes both from the burst-truth set exactly as it
+excludes summoned pets, and for the reason already written beside that exclusion: *a trigger spawn is not a world
+placement, and a type with no `NpcSpawn` row is an established shape.* The **type** still survives via
+`observedTypes` — that is what the trigger spawns from. `WorldBroadcaster.EnsureZoneNpcs` skips them too, as the
+second net for a database built before the rule.
+
+⚠️ This was an **accident** before it was a rule. The Bat Demon really did stand in the quarry; the encounter boss
+escaped only because she spawns on the exact spot her lure vacated and the position dedup dropped her (#501) —
+which would have stopped protecting her the moment a capture caught the swap a few units off.
+`SeedContentTests.NoTriggerSpawnedType_HasAWorldPlacement` is the gate.
 - **Anchored on the player**, not the interacted object: retail measures from the brick, we measure from the
   player standing at it, which is the same spot to within the interaction range and needs no object identity to
   reach the progression engine.
