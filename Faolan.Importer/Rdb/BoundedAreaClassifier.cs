@@ -76,6 +76,22 @@ namespace Faolan.Importer.Rdb
 			// nothing and printed a zero row that reads as "the client ships none", which is the opposite of the truth.
 		];
 
+		// The client-side scry script a region runs to tell the SERVER the player crossed its boundary. 479 regions
+		// over 60 playfields share it, and what the server does on that notification is the region's own business:
+		// it is the mechanism behind the area-name banners (#348) and it also appears on dismount volumes, a couple
+		// of fire hazards and a respawn-discovery area.
+		//
+		// ⚠️ So it is NOT "the banner script" - it is "this volume talks to the server", which is a strictly weaker
+		// and more useful claim. It is a FILTER, not an identification: a region without it cannot be what fires a
+		// server-sent banner, so it excludes the audio regions, building interiors and playfield borders that a
+		// containment test alone happily returns. Pairing it with a captured banner is what identifies one.
+		//
+		// Found by grouping every 1000053 region by ScryId: on Old Tarantia it selects exactly the `BA_*` sub-areas
+		// (BA_Bridge, BA_MarketWard, BA_EastGate, BA_WestGate, BA_Docks, BA_GreatLibrary, ...), on Tarantia Noble
+		// District the named quarters (Noble Quarters, The Market, Castle Approach, The Southern Bridge) and on Field
+		// of the Dead the Clan burial mounds - three playfields whose sub-area names are the banner texts.
+		public const uint CrossingNotifierScryId = 220656;
+
 		private static Regex Rx(string pattern)
 		{
 			return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);

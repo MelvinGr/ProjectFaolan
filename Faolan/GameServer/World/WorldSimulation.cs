@@ -1100,7 +1100,12 @@ namespace Faolan.GameServer.World
 					if (!Contains(area, entity.Position))
 						continue;
 
-					var volume = (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
+					// Smallest wins, measured on whichever shape actually decided the hit - a captured hull is a
+					// fraction of the real region's size, so mixing the two would always rank a hull-backed area above
+					// a region-backed one regardless of which is the tighter fit.
+					var volume = area.Region is { } r
+						? (double)(r.MaxX - r.MinX + 1) * (r.MaxZ - r.MinZ + 1)
+						: (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
 					if (volume >= bestVolume)
 						continue;
 
@@ -1291,8 +1296,18 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// #513: the CLIENT'S OWN trigger volume where we have one, and only then the captured hull.
+		//
+		// The two are not the same kind of thing and must not be treated alike. A `MapArea` is a hull over the
+		// positions retail was seen firing the banner at, so it under-covers by construction and needs
+		// `AreaBannerSlack` to fire at all. A `MapRegion` is the polygon the client ships - exact, concave, and
+		// vertically bounded - so it gets NO slack, exactly as the lava volumes do: padding an exact volume is how
+		// a banner starts firing on the road outside the ward it names.
 		private static bool Contains(MapArea area, Vector3 p)
 		{
+			if (area.Region is { } region)
+				return EnvironmentService.Contains(region, p);
+
 			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack && p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
 			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
 		}

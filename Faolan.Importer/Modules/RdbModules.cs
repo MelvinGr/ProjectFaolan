@@ -442,7 +442,7 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Rdb;
 
-		public string Description => "Consumed bounded-area trigger volumes -> MapRegion (1000053, #519/#521).";
+		public string Description => "Consumed bounded-area trigger volumes -> MapRegion (1000053, #519/#521/#513).";
 		public string Name => "rdb-regions";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
@@ -452,8 +452,8 @@ namespace Faolan.Importer.Modules
 			foreach (var note in r.Notes)
 				ctx.Out.WriteLine($"  rdb-regions unresolved: {note}");
 
-			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s) " +
-			                        $"and {r.GoalLinks} quest goal region(s).");
+			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s), " +
+			                        $"{r.GoalLinks} quest goal region(s) and {r.BannerLinks} area-banner volume(s).");
 		}
 	}
 

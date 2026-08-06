@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
+using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -96,6 +97,87 @@ namespace Faolan.Tests
 			// Every corner of the bounding box lies outside the polygon - which is exactly what a bbox test would get wrong.
 			Assert.False(EnvironmentService.Contains(region, new Vector3(region.MinX, y, region.MinZ)));
 			Assert.False(EnvironmentService.Contains(region, new Vector3(region.MaxX, y, region.MaxZ)));
+		}
+
+		// --- #513: the AREA BANNER volumes ---------------------------------------------------------------------
+		// A banner is an LDB string id and a region is a place name, so the link between them is GEOMETRIC and has
+		// no name to check it against. These gate the property that makes the match trustworthy instead.
+
+		// Every linked banner's captured firing hull has to sit in the region it was matched to. This is the whole
+		// basis of the match, and it is the thing a rule change would break silently - the link would still be there,
+		// just pointing at the wrong polygon.
+		[Fact]
+		public async Task EveryLinkedBanner_SitsInsideItsOwnClientRegion()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var linked = await db
+				.MapAreas.Include(a => a.Region!.Vertices)
+				.Where(a => a.RegionId != null)
+				.ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.NotEmpty(linked);
+			foreach (var area in linked)
+			{
+				var centre = new Vector3((area.MinX + area.MaxX) / 2f, (area.Region!.MinY + area.Region.MaxY) / 2f, (area.MinZ + area.MaxZ) / 2f);
+				Assert.True(EnvironmentService.Contains(area.Region, centre),
+					$"banner {area.AreaNameId} on map {area.MapId} is linked to '{area.Region.Name}' but its captured hull centre is outside it");
+			}
+		}
+
+		// The SEPARATION guard: a region holding two banners cannot be what distinguishes them, so no region may be
+		// linked to more than one banner, and no banner's region may swallow a sibling banner on the same map.
+		// Without this the test above passes happily with every banner on a map pointing at one big region.
+		[Fact]
+		public async Task ALinkedRegion_DoesNotContainAnotherBannerOnTheSameMap()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var areas = await db.MapAreas.Include(a => a.Region!.Vertices).ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.All(areas.Where(a => a.RegionId != null).GroupBy(a => a.RegionId), g => Assert.Single(g));
+
+			foreach (var area in areas.Where(a => a.RegionId != null))
+			{
+				var y = (area.Region!.MinY + area.Region.MaxY) / 2f;
+				foreach (var other in areas.Where(o => o.MapId == area.MapId && o.AreaNameId != area.AreaNameId))
+				{
+					var centre = new Vector3((other.MinX + other.MaxX) / 2f, y, (other.MinZ + other.MaxZ) / 2f);
+					Assert.False(EnvironmentService.Contains(area.Region, centre),
+						$"'{area.Region.Name}' (banner {area.AreaNameId}) also contains banner {other.AreaNameId} - it cannot be what tells them apart");
+				}
+			}
+		}
+
+		// The FILTER that made the match unambiguous. Every banner volume runs the client's crossing-notifier scry
+		// script; without it Old Tarantia's banners returned up to four containing regions, the tightest being
+		// `City_sounds` at 142,490 u² - an audio region. A region that never tells the server the player entered it
+		// cannot be what fires a server-sent banner.
+		[Fact]
+		public async Task EveryBannerVolume_RunsTheCrossingNotifierScript()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var linked = await db.MapAreas.Include(a => a.Region).Where(a => a.RegionId != null).ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.All(linked, a => Assert.Equal(BoundedAreaClassifier.CrossingNotifierScryId, a.Region!.ScryId));
+		}
+
+		// Old Tarantia is the map where the answer can be read by eye, so it is worth pinning by name: the client's
+		// own region names for the four banners we hold several samples of say bridge, trading post, market ward and
+		// the two gates - which is what `MapArea`'s comment lists as Old Tarantia's banner texts, arrived at from a
+		// completely different direction (a hull over captured walk positions).
+		[Fact]
+		public async Task OldTarantiasBanners_LandOnTheRegionsNamedAfterThem()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var byBanner = (await db
+					.MapAreas.Include(a => a.Region)
+					.Where(a => a.MapId == 2000 && a.RegionId != null)
+					.ToListAsync(TestContext.Current.CancellationToken))
+				.ToDictionary(a => a.AreaNameId, a => a.Region!.Name);
+
+			Assert.Equal("BA_Bridge", byBanner[3373519]); // "Bridge of Vilerus I"
+			Assert.Equal("BA_MarketWard", byBanner[3373525]);
+			Assert.Equal("BA_EastGate", byBanner[3385037]); // "The East Gate"
+			Assert.Equal("BA_WestGate", byBanner[3385038]); // "The West Gate"
 		}
 	}
 }

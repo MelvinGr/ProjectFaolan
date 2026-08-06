@@ -1947,10 +1947,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("MinZ")
                         .HasColumnType("REAL");
 
+                    b.Property<uint?>("RegionId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("SampleCount")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("MapId", "AreaNameId");
+
+                    b.HasIndex("RegionId");
 
                     b.ToTable("MapAreas");
                 });
@@ -4909,7 +4914,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "Region")
+                        .WithMany()
+                        .HasForeignKey("RegionId");
+
                     b.Navigation("Map");
+
+                    b.Navigation("Region");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>

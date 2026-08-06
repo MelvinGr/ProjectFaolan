@@ -37,14 +37,110 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
+			// Not a bucket: the "zone / area names" family has no naming rule (see BoundedAreaClassifier), so the only
+			// way to ask whether the client ships our area-banner regions is GEOMETRICALLY - which needs no names at
+			// all. `--report-arg area-banners` runs that test.
+			if (bucketSlug.Trim().Equals("area-banners", StringComparison.OrdinalIgnoreCase))
+			{
+				await AreaBannerCrossCheck(real);
+				return;
+			}
+
 			var bucket = BoundedAreaClassifier.FromSlug(bucketSlug.Trim());
 			if (bucket == null)
 			{
-				Console.WriteLine($"bounded-areas: unknown bucket '{bucketSlug}'. Known: {string.Join(", ", BoundedAreaClassifier.Order.Select(BoundedAreaClassifier.Slug))}");
+				Console.WriteLine($"bounded-areas: unknown bucket '{bucketSlug}'. Known: {string.Join(", ", BoundedAreaClassifier.Order.Select(BoundedAreaClassifier.Slug))}, area-banners");
 				return;
 			}
 
 			await BoundedAreaDetail(real, bucket.Value);
+		}
+
+		// #513/#348: does the client's trigger-volume table contain the AREA BANNER regions?
+		//
+		// `MapArea` is capture-sourced - a hull over the positions retail actually fired each banner at - and it
+		// under-covers by construction, so #513 lists "area banners" as one of the safe, high-value buckets to import
+		// if the real region is in 1000053. This is the test for that, and it deliberately uses **no names**: a
+		// banner's identity is an LDB string id and a region's is a place name, so matching them by text needs the
+		// place-name catalog. Containment needs neither.
+		//
+		// The bar is not "some region contains the banner" - on any playfield the border region contains everything.
+		// A sub-area trigger has to SEPARATE the sub-areas, so a region only counts as a candidate if it contains
+		// this area's captured footprint AND does not swallow another area's on the same map. That is the property
+		// that would make it the thing that fires the banner.
+		private static async Task AreaBannerCrossCheck(List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> records)
+		{
+			await using var db = OpenDb();
+			var mapNames = await db.Maps.ToDictionaryAsync(m => m.Id, m => m.Name ?? "");
+			var byMap = records.ToDictionary(r => r.MapId, r => r.Areas);
+			var banners = (await db.MapAreas.ToListAsync()).GroupBy(a => a.MapId).ToDictionary(g => g.Key, g => g.ToList());
+
+			Console.WriteLine("=== area-banner cross-check: is a MapArea's region in RDB 1000053? ===");
+			Console.WriteLine("A candidate must CONTAIN this banner's captured footprint and EXCLUDE every other banner on the map.");
+			Console.WriteLine();
+
+			int total = 0, anyContainer = 0, separating = 0;
+			foreach (var (mapId, areas) in banners.OrderBy(b => b.Key))
+			{
+				Console.WriteLine($"-- map {mapId} {mapNames.GetValueOrDefault(mapId, "(no Map row)")}"
+				                  + (byMap.TryGetValue(mapId, out var regions) ? $"  ({regions.Count} client regions)" : "  ⚠️ NO 1000053 record"));
+				if (regions == null)
+				{
+					total += areas.Count;
+					continue;
+				}
+
+				foreach (var a in areas.OrderBy(a => a.AreaNameId))
+				{
+					total++;
+					var cx = (a.MinX + a.MaxX) / 2f;
+					var cz = (a.MinZ + a.MaxZ) / 2f;
+
+					// Every polygon holding this banner's centre, tightest first - the tightest is the only one with a
+					// claim to being a sub-area rather than the playfield. Restricted to the CROSSING-NOTIFIER scry
+					// script: a region that does not tell the server the player entered it cannot be what fires a
+					// server-sent banner, and that is the client's own statement rather than a guess about the name.
+					var holding = regions
+						.Where(r => r.IsPolygon && r.ScryId == BoundedAreaClassifier.CrossingNotifierScryId && r.Contains(cx, cz))
+						.Select(r => (Region: r, Footprint: Footprint(r)))
+						.OrderBy(r => r.Footprint)
+						.ToList();
+
+					if (holding.Count == 0)
+					{
+						Console.WriteLine($"   banner {a.AreaNameId,-10} samples={a.SampleCount,-3} -> NO client region contains it");
+						continue;
+					}
+
+					anyContainer++;
+
+					// The separation test. Another banner's centre inside the same region means it cannot be what
+					// distinguishes them.
+					var others = areas.Where(o => o.AreaNameId != a.AreaNameId).ToList();
+					var clean = holding
+						.Where(h => !others.Any(o => h.Region.Contains((o.MinX + o.MaxX) / 2f, (o.MinZ + o.MaxZ) / 2f)))
+						.ToList();
+					if (clean.Count > 0)
+						separating++;
+
+					var best = holding[0];
+					Console.WriteLine($"   banner {a.AreaNameId,-10} samples={a.SampleCount,-3} -> {holding.Count} containing region(s); "
+					                  + $"tightest '{best.Region.Name}' {best.Footprint:N0} u², bucket {BoundedAreaClassifier.Slug(BoundedAreaClassifier.Classify(best.Region.Name))}"
+					                  + (clean.Count > 0 ? $"; {clean.Count} SEPARATE the banners -> '{clean[0].Region.Name}'" : "; none separate the banners"));
+				}
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"{total} banner region(s): {anyContainer} sit inside some client region, {separating} inside one that separates them from the map's other banners.");
+			Console.WriteLine(separating == 0
+				? "  -> the client does NOT ship the banner trigger volumes. MapArea's captured hull stays the only source (#348)."
+				: "  -> candidates exist; check the named regions before importing (#513).");
+			return;
+
+			static double Footprint(BoundedAreaCollection.BoundedArea r)
+			{
+				return (r.Vertices.Max(v => v.X) - r.Vertices.Min(v => v.X)) * (double)(r.Vertices.Max(v => v.Y) - r.Vertices.Min(v => v.Y));
+			}
 		}
 
 		// Every readable 1000053 record, parsed. A record that will not parse is REPORTED rather than dropped silently -

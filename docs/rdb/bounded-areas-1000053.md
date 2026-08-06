@@ -7,10 +7,14 @@ the variant `0x40000000`-based numbering). The RDB record id **== the playfield 
 convention [type 1010506](npc-spawn-layout-1010506.md) uses.
 
 This matters because the project had assumed regions like these were server-side and therefore only
-reconstructible from captures. For **area banners** that is true and stays true (`MapArea` documents the evidence:
-scanning all 410,433 local RDB records for a banner's text id found only chance collisions). For **bounded areas
-it is false** — the client needs them to draw the lava, block the camera and start its own scripts, so it ships
-them exactly.
+reconstructible from captures. That is **false** — the client needs them to draw the lava, block the camera and
+start its own scripts, so it ships them exactly.
+
+⚠️ For **area banners** the assumption survives only for the banner TEXT. Scanning all 410,433 local RDB records
+for a banner's text id found nothing but chance collisions, and none of the 22 `AreaNameId`s appears in any LDB
+page — so the text really is server-side. **The geometry is not**: the client ships the trigger volumes, and 12
+of them are now imported and driving the banners. See
+[the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name) below.
 
 ## Format
 
@@ -373,22 +377,43 @@ Those read exactly like the banners the client shows on entry, which is the subs
 regions do ship with the client**, and #348's note that they are "server-side and only reconstructible from
 captures" is true only of the banner TEXT, not of the geometry.
 
-### But the pairing is still a judgement call
+### The ambiguity is resolved by the region's SCRY SCRIPT, and 12 are now imported
 
-Two things stop this being a mechanical import:
+One of the two blockers below is gone. The other stands.
 
-- **No id link *for the banner*.** The banner's `AreaNameId` is not the ELF-28 hash of the region name (13
-  spellings of all 5,308 distinct region names against all 22 ids — zero hits), and it is not an LDB string id at
-  all: **none of the 22 ids appears in any of the 1,103 LDB pages**. That independently confirms this issue's
-  original finding. The banner text is genuinely not in the client.
-- **Containment is ambiguous.** Every hull also sits inside larger audio and collision regions, and for the
-  bigger hulls the smallest place-named region does **not** contain both hull corners — `3373522` is the
-  best-sampled banner we have (18 sightings) and its hull spills outside both `Building_1_auction_house` and
-  `BA_TradingPost`. So the hull and the region disagree at the edges, and picking the right region per banner is
-  a human decision. 4 of the 22 have no place-named container at all.
+- **No id link *for the banner* — still true.** The banner's `AreaNameId` is not the ELF-28 hash of the region
+  name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits), and it is not an LDB
+  string id at all: **none of the 22 ids appears in any of the 1,103 LDB pages**. The banner text is genuinely
+  not in the client, so the match can only ever be geometric.
+- **~~Containment is ambiguous~~ — SOLVED.** The ambiguity was entirely the audio and collision regions, and the
+  client separates those itself: a region's `<scryid>` says which client script it runs, and **220656 is the
+  crossing NOTIFIER** — the script that tells the server the player entered. A region that never notifies the
+  server cannot be what fires a server-sent banner, so filtering on it is not a heuristic but a statement of
+  mechanism.
 
-The prize is real all the same: 11 of `MapArea`'s 22 rows rest on a **single sample**, i.e. a zero-area point that
-only works with a runtime slack, and the client ships true polygons for the same places.
+[V1: Faolan.Importer/Rdb/BoundedAreaClassifier.cs — 479 regions over 60 playfields carry `scryid 220656`. On Old
+Tarantia it selects exactly the `BA_*` sub-areas, on Tarantia Noble District the named quarters (Noble Quarters,
+The Market, Castle Approach) and on Field of the Dead the Clan burial mounds. Applied to the banner test it takes
+Old Tarantia's `3373519` from *four* containing regions (tightest `City_sounds`, an audio region at 142,490 u²) to
+**exactly one**, `BA_Bridge` at 4,615 u². `--report bounded-areas --report-arg area-banners` prints the whole
+test.]
+
+⚠️ It is **not** "the banner script". 4 dismount volumes, 5 fire hazards, a respawn-discovery area and 3 encounter
+triggers carry it too — it means *this volume talks to the server*, which is a weaker and more useful claim than
+identification. It is a FILTER; pairing it with a captured banner is what identifies one.
+
+**Imported** by `RdbRegionImporter` (`rdb-regions`) under three gates: the scry filter, containment of the
+banner's captured hull, and SEPARATION — a region holding two banners' samples cannot be what distinguishes them,
+so it is rejected for both. That resolves **12 of the 22**; `WorldSimulation` then tests the polygon with no slack
+where one is linked and falls back to the hull elsewhere.
+
+⚠️ **No tolerance on the containment test, deliberately.** A banner fires ON ENTRY, so its sample sits right at the
+boundary and a near-miss is expected — 10 of 22 land outside every notifier region (including `3373522`, the
+best-sampled at 18 sightings, whose hull spills outside `BA_TradingPost` at the edges). Padding until they match
+would be fitting the answer. Those keep the captured hull, which is what it is for.
+
+The prize was real: 11 of `MapArea`'s 22 rows rest on a **single sample**, i.e. a zero-area point that only works
+with a runtime slack, and the client ships true polygons for the same places.
 
 ⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
 unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language

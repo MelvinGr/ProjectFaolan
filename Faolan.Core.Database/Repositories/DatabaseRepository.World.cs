@@ -57,7 +57,13 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<MapArea[]> GetMapAreas(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
+			// The client's real trigger volume rides along where we have one (#513): the banner test prefers its
+			// polygon over the captured hull, so its vertices have to be loaded here - lazy loading is off.
+			return await ctx
+				.MapAreas.Where(a => a.MapId == mapId)
+				.Include(a => a.Region!)
+				.ThenInclude(r => r.Vertices)
+				.ToArrayAsync();
 		}
 
 		// The destinations offered from one dialogue SCREEN - the list screen, which is where retail charges the fare

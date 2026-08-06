@@ -177,11 +177,14 @@ namespace Faolan.Tests
 
 			var discovery = await db.RespawnPoints.CountAsync(p => p.DiscoveryRegionId != null, ct);
 			var goals = await db.QuestGoalDefinitions.CountAsync(g => g.RegionId != null, ct);
+			var banners = await db.MapAreas.CountAsync(a => a.RegionId != null, ct);
 			Assert.True(discovery >= 11, $"{discovery} respawn points carry a discovery volume; the import resolves 11.");
 			Assert.True(goals >= 3, $"{goals} quest goals carry a region; the import resolves 3.");
+			Assert.True(banners >= 12, $"{banners} area banners carry a trigger volume; the import resolves 12 (#513).");
 
 			var linked = (await db.RespawnPoints.Where(p => p.DiscoveryRegionId != null).Select(p => p.DiscoveryRegionId!.Value).ToListAsync(ct))
 				.Concat(await db.QuestGoalDefinitions.Where(g => g.RegionId != null).Select(g => g.RegionId!.Value).ToListAsync(ct))
+				.Concat(await db.MapAreas.Where(a => a.RegionId != null).Select(a => a.RegionId!.Value).ToListAsync(ct))
 				.ToHashSet();
 			var orphans = regions.Where(r => !linked.Contains(r.Id)).Select(r => $"{r.MapId}/{r.Name}").ToList();
 			Assert.True(orphans.Count == 0, $"MapRegions nothing links to: {string.Join(", ", orphans)}");
