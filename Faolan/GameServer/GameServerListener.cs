@@ -299,7 +299,8 @@ namespace Faolan.GameServer
 			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call
 			// into it (Casilda's captive pose) without a construction cycle.
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
+			_combos = new ComboService(database, logger);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos);
 			// `this` as IEconomyOutbound: a Deliver goal's hand-in takes the goods out of the inventory, which is an
 			// economy op the listener owns - the same seam ShopService/BankService reach the wallet and grants through.
 			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, logger);
@@ -312,7 +313,6 @@ namespace Faolan.GameServer
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
-			_combos = new ComboService(database, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			// #506/#514: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs), and is
 			// built BEFORE the dialogue runtime because the travel TRIGGER is a conversation node (a wagoneer's

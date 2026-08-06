@@ -420,6 +420,12 @@ namespace Faolan.GameServer.World
 		// unarmed.
 		public bool RangedAttacker { get; set; }
 
+		// #623: the `combo_npc_generic_*` catalog id this NPC's melee swings carry, 0 when it has no melee weapon
+		// (unarmed, an animal, an archer). Picked from the WEAPON (NpcWeapon.MeleeComboName) and stamped at load
+		// beside RangedAttacker, for the same reason: that is where the equipment rows are already Included.
+		// Whether a given swing actually carries it is a per-swing roll - see NpcWeapon.MeleeComboShare.
+		public uint MeleeComboId { get; set; }
+
 		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
 		// The tick flips this and emits an NpcEnterCombat/NpcExitCombat effect on the transition; reset on death/respawn.

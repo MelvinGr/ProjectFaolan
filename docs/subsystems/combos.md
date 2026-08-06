@@ -306,5 +306,53 @@ ranks are ever held at once to need a shared timer. `Combo.ParentId` chains the 
 Gated by `ComboServiceTests` (the runtime) and `ComboWireTests` (the wire claims, against the captured swings in
 the `combo-swings.bin` fixture).
 
-Open work — the combo-completed on-screen feedback and NPC combos on the server's own AI — is tracked on
-**Gitea #623**; spellweaving polish on **Gitea #141**.
+## NPC combos — the WEAPON picks the row
+
+Retail's mobs combo too, and constantly: **484 of the corpus's 840 combo swings are `combo_npc_*` rows**, from 150
+distinct NPC actors. They arrive only as a server-to-client `Combat:Melee` ack — the AI drives them, so there is no
+request behind one — and they ride the same `combo_id` field a player's own swing uses.
+
+**Which combo is decided by the weapon, not by the creature.** Resolving each captured swing's actor handle against
+that capture's own `FA015807` spawns (`--report combo-swings`) puts a name and a worn-item list behind all 484, and
+the grouping separates with no crossover: every `combo_npc_generic_polearm` actor holds a polearm, every `_2hb` one
+a two-handed blunt, every `_dualdaggers` one a dagger in **both** hands. One NPC *type* with two loadouts settles
+it outright — Bat Pict Mauler template 8799 (polearm) swings `generic_polearm` while template 13960 (club) swings
+`generic_1hb`.
+
+The weapon class comes from **`Items.SearchCategory`**, the client's own catalog value, and the shipped catalog
+separates the classes perfectly (every 30011 row's name carries the `1hEdge` token and no other, and so on):
+
+| slot 6 (main hand) | slot 8 (off hand) | combo |
+|---|---|---|
+| 30011 1h edge | 30005 shield | `combo_npc_generic_1he_shield` |
+| 30011 1h edge | 30011 1h edge | `combo_npc_generic_dual_1h` |
+| 30011 1h edge | — | `combo_npc_generic_1he` |
+| 30013 1h blunt | (any) | `combo_npc_generic_1hb` |
+| 30012 2h edge | — | `combo_npc_generic_2he` |
+| 30014 2h blunt | — | `combo_npc_generic_2hb` |
+| 30015 dagger | 30015 dagger | `combo_npc_generic_dualdaggers` |
+| 30015 dagger | — | `combo_npc_generic_dagger` |
+| 30016 polearm | — | `combo_npc_generic_polearm` |
+
+That is the whole `combo_npc_generic_*` set — nine rows — and the off hand only ever refines the one-handed cases,
+which is why it is consulted there and nowhere else. Slot 6/8 are the weapon slots: across the shipped spawn set no
+weapon-class item appears in any other slot (slot 7 is the belt).
+
+**Not every swing combos.** 427 of the 1,504 captured s2c `Combat:Melee` acks whose actor is a named NPC carry a
+combo — 28.4% — so `WorldSimulation.ApplyNpcAttack` rolls per swing (`NpcWeapon.MeleeComboShare`) rather than
+combo-ing every time. `Combat:Unarmed` is **0 of 769**, which needs no rule of its own: an animal has no weapon, so
+the lookup returns nothing. The id is resolved once per NPC at zone load (`WorldEntity.MeleeComboId`), beside
+`RangedAttacker` and for the same reason — that is where the equipment rows are already `Include`d.
+
+⚠️ **The class families are NOT shipped.** Retail also swings per-archetype rows on the same mobs, at roughly the
+same rate as the generic ones (`combo_npc_guardian_polearm_1_sweep` ×31 against `generic_polearm` ×29 on the same
+Pillager). Their trailing number is a **minimum level gate** — 1 / 30 / 50 / 70, with no violation across the 30
+captured rows — but the *archetype* is not derivable from anything we hold: it is not the weapon (a two-handed-edge
+mob swings `barbarian_2h` **or** `hox` depending on the creature) and `NpcStatCore.ProfessionType` is null on all
+but one of the actors. Tracked on **Gitea #675**. Ranged is the same gap: there is no `combo_npc_generic_bow`, so
+an archer swings plain until the `combo_npc_ranger_bow_*` family can be picked.
+
+Gated by `NpcComboTests`, which locks the catalog premise, the mapping, the coverage over the shipped spawn set,
+and that the id reaches the wire in `combo_id` with nothing else about the ack moving.
+
+Open work — spellweaving polish — is tracked on **Gitea #141**.

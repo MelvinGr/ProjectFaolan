@@ -205,14 +205,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// Decoded in tools/capture/decode_combat_npc_ack.py (98/98 frames); byte-exact against frame 6472 of the strickenbla
 		// capture. The animation params (typeId/swingCounter/f5/f11/f12) + the result codes (resultType/resultK1/resultK2)
 		// are not semantically decoded - capture-typical defaults for the live send, the exact captured values for the golden.
+		//
+		// `comboId` (#623) is the `Combos` row this swing performs, 0 for a plain one. Retail puts it in the SAME
+		// `combo_id` field a player's own combo swing uses - 427 of the 1,504 captured NPC melee acks carry one -
+		// and never a `combo_attack_num` beyond the implicit 0, because an NPC combo is a single `action` marker
+		// with no key sequence to step through (`--report combo-swings`).
 		public static BehaviorControlCenterIIR NpcAttackAck(uint npcHandle, uint playerHandle, uint damage, uint typeId, uint swingCounter, uint f5 = 24, uint f11 = 64, uint f12 = 56,
-			byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
+			byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, uint comboId = 0)
 		{
-			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f10=Target{f1=0xC350, f2=player}, f11, f12}.
+			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f7=combo, f10=Target{f1=0xC350, f2=player}, f11, f12}.
 			// NO f2/Mode - that field is present only on player-initiated actions and is the NPC-vs-player tell.
 			// CommandMessage field 10 is the TARGET - a ProtoID32 { type, instance }, not the "spell target" the old
 			// hand-reconstructed schema called it: its first word is an entity class (Gitea #387).
-			var args = new CommandMessage
+			var message = new CommandMessage
 			{
 				BccActionId = typeId,
 				CommandqueueServerId = swingCounter,
@@ -221,7 +226,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 				Target = Target(EntityClass.Character, playerHandle),
 				RechargeTime = f11,
 				ActivationTime = f12
-			}.ToProtobuf();
+			};
+			if (comboId != 0)
+				message.ComboId = comboId;
+
+			var args = message.ToProtobuf();
 
 			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 81 bytes with the roles
 			// swapped, and it was written out in both files until #530 wave 7.

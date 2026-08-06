@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -143,6 +144,28 @@ namespace Faolan.GameServer.Combat
 			}
 
 			return swing;
+		}
+
+		// #623: the catalog id of the `combo_npc_generic_*` row this NPC's melee swings carry, or 0 when it has no
+		// melee weapon. The WEAPON picks the row (NpcWeapon.MeleeComboName); this only resolves the name against the
+		// catalog, which is where the ids live - hardcoding nine ids would be a second copy of imported RDB content.
+		//
+		// Resolved ONCE per NPC at zone load rather than per swing, like `RangedAttacker`: the equipment rows are
+		// Included there and the answer cannot change while the entity lives.
+		public async Task<uint> NpcMeleeComboId(IEnumerable<INpcEquipment>? equipment)
+		{
+			if (NpcWeapon.MeleeComboName(equipment) is not { } name)
+				return 0;
+
+			var catalog = _catalog ??= await LoadCatalog();
+			foreach (var entry in catalog.Values)
+				if (entry.Combo.Name == name)
+					return entry.Combo.Id;
+
+			// The nine generic rows come from RDB 1010206 and every one of them is in the shipped catalog, so a miss
+			// means the combo import is short - say so rather than silently swinging plain forever.
+			_logger.LogWarning("NPC combo {Name} is not in the catalog - the mob will swing without one", name);
+			return 0;
 		}
 
 		// Milliseconds left on this combo's reuse time, 0 when it is ready. Keyed by the COMBO id rather than by a

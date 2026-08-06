@@ -376,7 +376,13 @@ namespace Faolan.GameServer.World
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
-			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, direction);
+			// #623: retail puts a combo on 427 of 1,504 captured NPC melee acks, so the mob combos on some swings and
+			// swings plain on the rest. Rolled per swing rather than cycled, because the corpus shows no ordering -
+			// a mob alternates its generic and class combos with plain hits in no pattern. 0 = plain.
+			var comboId = npc.MeleeComboId != 0 && Random.Shared.NextDouble() < NpcWeapon.MeleeComboShare
+				? npc.MeleeComboId
+				: 0;
+			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, direction, comboId);
 
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
 				return;

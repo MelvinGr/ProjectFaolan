@@ -770,14 +770,19 @@ namespace Faolan.GameServer.Combat
 		// damage told the client "overhead" on every swing regardless of what the player actually took. It is the
 		// five-zone `SwingDirection` rather than the three-arc `ShieldArc` because retail's mobs use all five and the
 		// arc is only the guard that covers it.
-		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, SwingDirection direction)
+		//
+		// `comboId` (#623) is the `combo_npc_generic_*` row this swing performs, 0 for a plain one. It rides the same
+		// `combo_id` field a player's combo swing uses, which is what makes the client play the combo's animation and
+		// name it in the combat log rather than showing a generic hit.
+		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, SwingDirection direction, uint comboId = 0)
 		{
 			var playerHandle = client.Session.Character.Id;
 			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
 			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, BehaviorAcks.SwingDirectionCode(direction)));
+			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, BehaviorAcks.SwingDirectionCode(direction),
+				comboId: comboId));
 			return SendWorldPacket(client, body);
 		}
 

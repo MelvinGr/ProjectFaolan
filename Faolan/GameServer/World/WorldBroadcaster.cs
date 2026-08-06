@@ -110,6 +110,7 @@ namespace Faolan.GameServer.World
 
 		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
 		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
+		private readonly ComboService _combos;
 		private readonly QuestHandlerService _questHandler;
 
 		private readonly WorldSimulation _sim;
@@ -133,12 +134,13 @@ namespace Faolan.GameServer.World
 		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
 		private int _nextRuntimeHandle = 0x00090000;
 
-		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler)
+		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler, ComboService combos)
 		{
 			_sim = sim;
 			_database = database;
 			_logger = logger;
 			_questHandler = questHandler;
+			_combos = combos;
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
@@ -1060,6 +1062,8 @@ namespace Faolan.GameServer.World
 				// #671: a mob that SHOOTS deals about a fifth of what one that swings does. Decided here, off the
 				// equipment rows this query already Includes, so the combat tick reads a flag rather than a join.
 				entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment);
+				// #623: and which `combo_npc_generic_*` its swings perform, off the same rows.
+				entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment);
 				entity.Level = npc.Level;
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
 				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
@@ -1449,6 +1453,7 @@ namespace Faolan.GameServer.World
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
 			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // #671, as in the zone-load path
+			entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment); // #623, likewise
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
@@ -1502,6 +1507,7 @@ namespace Faolan.GameServer.World
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // #671 - from the TYPE's equipment; a pet has no NpcSpawn row
+			entity.MeleeComboId = await _combos.NpcMeleeComboId(npcType.Equipment); // #623, likewise
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
 			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
 			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
