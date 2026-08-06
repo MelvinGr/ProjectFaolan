@@ -10,11 +10,20 @@ This matters because the project had assumed regions like these were server-side
 reconstructible from captures. That is **false** — the client needs them to draw the lava, block the camera and
 start its own scripts, so it ships them exactly.
 
-⚠️ For **area banners** the assumption survives only for the banner TEXT. Scanning all 410,433 local RDB records
-for a banner's text id found nothing but chance collisions, and none of the 22 `AreaNameId`s appears in any LDB
-page — so the text really is server-side. **The geometry is not**: the client ships the trigger volumes, and 12
-of them are now imported and driving the banners. See
-[the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name) below.
+⚠️ For **area banners** the assumption does not survive at all, and it is worth being exact about what is whose,
+because this has been stated wrongly twice:
+
+- **The TEXT is the client's.** The server sends an `AreaNameId` and nothing else; the client renders the string.
+  "The West Gate" is in English LDB page 974162.
+- **The GEOMETRY is the client's too** — it ships the trigger volumes, and 12 are now imported and driving the
+  banners. See [the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name).
+- **What is ours** is only the LINK between them: which region carries which `AreaNameId`. The client's
+  bounded-area record does not name a banner id, which is why the pairing had to be reconstructed geometrically.
+
+The old evidence for "the text is server-side" does not support it. Scanning all 410,433 local RDB records for a
+banner's text id found chance collisions, and none of the 22 `AreaNameId`s resolves through our LDB page index —
+but that is a statement about our **id → (page, index) lookup**, which is #291's un-pinned page base, not about
+the strings being absent. Searched by content they are plainly there.
 
 ## Format
 
@@ -374,17 +383,19 @@ region contains a banner we have already observed. `MapArea` (#348) is exactly t
 | 269294 | Ymir's Pass 1090 | `POI A - The Last Cimmerian House` — the client's own "point of interest" prefix |
 
 Those read exactly like the banners the client shows on entry, which is the substantive result: **the area-banner
-regions do ship with the client**, and #348's note that they are "server-side and only reconstructible from
-captures" is true only of the banner TEXT, not of the geometry.
+regions do ship with the client**, so #348's note that they are "server-side and only reconstructible from
+captures" is wrong about the geometry. It is not right about the text either — the client renders that from its
+own LDB. What is genuinely ours is the LINK from a region to its `AreaNameId`, and nothing else.
 
 ### The ambiguity is resolved by the region's SCRY SCRIPT, and 12 are now imported
 
 One of the two blockers below is gone. The other stands.
 
 - **No id link *for the banner* — still true.** The banner's `AreaNameId` is not the ELF-28 hash of the region
-  name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits), and it is not an LDB
-  string id at all: **none of the 22 ids appears in any of the 1,103 LDB pages**. The banner text is genuinely
-  not in the client, so the match can only ever be geometric.
+  name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits), and **none of the 22 ids
+  resolves through our LDB page index**. So there is nothing to join a region to a banner id by, and the match can
+  only ever be geometric. ⚠️ That is a missing *link*, not a missing *string*: the client renders these banners
+  from its own LDB, and searching by content finds them (`The West Gate` → page 974162). The id lookup is #291.
 - **~~Containment is ambiguous~~ — SOLVED.** The ambiguity was entirely the audio and collision regions, and the
   client separates those itself: a region's `<scryid>` says which client script it runs, and **220656 is the
   crossing NOTIFIER** — the script that tells the server the player entered. A region that never notifies the

@@ -7,17 +7,25 @@ namespace Faolan.Core.Database.Tables
 	// into it (#348). A map has MANY - Old Tarantia alone fires six (Bridge of Vilerus I, The East Gate, The West
 	// Gate, ...) - which is why this is a child table and not the single `Map.AreaNameId` scalar it replaces.
 	//
-	// CAPTURE-SOURCED, because the client does not name these: scanning all 410,433 local RDB records for a banner's
-	// text id found only chance 4-byte collisions in multi-MB textures, and none of the 22 AreaNameIds appears in any
-	// of the 1,103 LDB pages. So the banner TEXT really is server-side, and the sighting hull below is reconstructed
-	// from where retail ACTUALLY sent each banner - `AreaNameExtractor` pairs every captured FormatFeedbackIIR with
-	// the player's position at that moment.
+	// ⚠️ **The TEXT is the CLIENT'S.** We put `AreaNameId` on the wire and nothing else (`SendAreaNameBanner` ->
+	// `AreaNameBanner`), and the client renders the string - "The West Gate" sits in English LDB page 974162. An
+	// earlier version of this comment said the banner text was "server-side"; that is wrong, and so is the reading of
+	// the evidence it cited. Neither this table nor `MapRegion` carries display text and neither should.
 	//
-	// ⚠️ **The GEOMETRY is a different question, and this comment used to get it wrong.** It said the fire position
-	// "lands in no client region except a collision volume", which is false: it lands in `BA_Bridge`, a 9-vertex
-	// polygon named after the bridge the banner announces. The client ships the trigger volumes; only the text is
-	// ours to supply. 12 of the 22 are now linked through `RegionId` below (#513) - see
-	// docs/rdb/bounded-areas-1000053.md for how the client's own scry script disambiguated them.
+	// What IS ours is the pair of things the client cannot answer: WHICH area the player is in, and hence which id to
+	// send. The client's bounded-area record does not name a banner id, so the region -> AreaNameId link had to be
+	// reconstructed, and it was reconstructed GEOMETRICALLY (see RegionId below, #513).
+	//
+	// The hull below is CAPTURE-SOURCED for the same reason - `AreaNameExtractor` pairs every captured
+	// FormatFeedbackIIR with the player's position at that moment - and it stays the fallback for the 10 banners the
+	// geometric match could not corroborate.
+	//
+	// ⚠️ Two claims that have already been wrong here once each, so they are worth stating carefully:
+	//   - "the fire position lands in no client region except a collision volume" - FALSE. It lands in `BA_Bridge`,
+	//     a 9-vertex polygon named after the bridge the banner announces. The client ships the trigger volumes.
+	//   - "none of the 22 AreaNameIds appears in any of the 1,103 LDB pages" - true as an ID LOOKUP and NOT evidence
+	//     the text is absent. It says our page indexing cannot turn one of these ids into a (page, index) yet, which
+	//     is #291's un-pinned page base. The strings are demonstrably there when searched for by content.
 	//
 	// There is deliberately no NAME column. The wire only ever carries AreaNameId and the CLIENT renders the text,
 	// so a name would be for our logs alone - and filling it needs the client RDB plus a hand-found "pin" per LDB
