@@ -238,6 +238,9 @@ stance has to reproduce; see [player-actions.md](../subsystems/player-actions.md
 player/NPC split, and — for #623 — each NPC combo swing attributed to its actor's own spawn, so the combo can be
 grouped against the weapon that picked it. `--report-arg <file>` also writes the matched packets whole, for
 `--report fixture-set`),
+`method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
+and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
+evidence that decides whether a ticket is "decode it" or "capture it"),
 `creature-races` (RDB 1000508, the client's creature RACE table — the names behind `CharacterStats.race`, which
 every NPC carries as a bare number; plus how far that vocabulary reaches into the unresolved open-world spawn
 groups, which is the #518 question),

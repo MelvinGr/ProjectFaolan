@@ -35,7 +35,7 @@ namespace Faolan.Importer.Cli
 						: ""));
 				}
 
-				Console.WriteLine("\nReports (read-only): --report coverage | conversation-states | anim | bcc-census | bcc-attack-tail | combo-swings | creature-races | worldobj | rdb-tweaks | rdb-class-vitals | item-stat-scaling  [--report-arg <name>]");
+				Console.WriteLine("\nReports (read-only): --report coverage | conversation-states | anim | bcc-census | bcc-attack-tail | combo-swings | creature-races | method-census | worldobj | rdb-tweaks | rdb-class-vitals | item-stat-scaling  [--report-arg <name>]");
 				return 0;
 			}
 

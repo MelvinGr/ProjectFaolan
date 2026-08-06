@@ -508,6 +508,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "method-census":
+				{
+					MethodCensus(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "creature-races":
 				{
 					await CreatureRaces();
