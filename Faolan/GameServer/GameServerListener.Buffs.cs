@@ -249,10 +249,19 @@ namespace Faolan.GameServer
 				}
 
 				var spellBase = buff.BuffId >> 8;
-				// Duration stays the REMAINING time (not the spell's full duration) and the stamp is sourced from it, so
-				// this restores correctly whether or not the client has learned our clock yet: it only learns it from a
-				// DispatchPong, and world entry can precede the first LatencyCheck. With ServerTime still 0 the client
-				// rejects the stamp as longer than Duration and counts down Duration - the same remaining time.
+				// Duration is the REMAINING time, not the spell's full duration, because THAT IS WHAT RETAIL SENDS
+				// (#601). Measured over the corpus with `--report buff-durations`, which prints each spell's catalogue
+				// duration beside every duration retail actually put on the wire: 51 of 256 spells carry at least one
+				// below-full value, and they are exactly the long ones a session can span - `Contract of Protection`
+				// (full 1,440,000 cs) appears as 1,180,241 / 1,195,185 / 1,213,465 / ... / 1,440,000, `XP Boost (4h)`
+				// as 1,268,055, `Critical Rating Boost (4h)` as 431,043. Short buffs (Wrath 1000, Chill 600) only ever
+				// send full, because they are never alive across a restore.
+				//
+				// ⚠️ So do NOT "improve" this into sending the full duration plus an absolute expiry and letting the
+				// client shorten it. That shape is not on the wire anywhere in the corpus, and #601 was closed on this
+				// measurement rather than implemented. The stamp is still sourced from the same remaining time, which
+				// also keeps it correct before the client has learned our clock at all - it learns that only from a
+				// DispatchPong, and world entry can precede the first LatencyCheck.
 				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDatas.ApplyNow(spellBase, remainingCs, CasterLevel(client)));
 				restored++;
 			}

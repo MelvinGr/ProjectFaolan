@@ -104,14 +104,27 @@ agree to 92 seconds on when the mount buff was applied (see the `NpcSpellCastCod
 [V1: tools/ghidra/DumpServerTimeClock.java] [V1: Faolan.Tests/MagicBuffExpiryStampTests.cs]
 
 **What we send now.** `ServerUptimeClock` owns the one origin both senders read — the pong in microseconds, the
-stamp in milliseconds — and `MagicBuffDatas.ApplyNow` sources it. The buff RESTORE path still puts the
-**remaining** time in `Duration` (rather than retail's full duration plus a true expiry) because world entry can
-precede the client's first `LatencyCheck`: with `ServerTime` still 0 the client rejects the stamp and counts down
-`Duration`, so the remaining-time shape is correct either way. Sending the retail shape needs a
-"has this session answered a pong yet" gate — Gitea #601.
+stamp in milliseconds — and `MagicBuffDatas.ApplyNow` sources it. The buff RESTORE path puts the **remaining**
+time in `Duration`, and that is not an interim: **it is the shape retail sends.**
 
-⚠️ Retail's captured world-entry mount restore proves the remaining-time shape is what retail uses too: its
-`Duration` is 8,509,794 cs (23.638 h) against a fresh cast's 8,640,000 (24 h) — 21.7 minutes had elapsed.
+[V1: Faolan.Importer/Cli/ReportCli.cs — `--report buff-durations` prints each spell's catalogue duration beside
+every duration retail actually put on the wire. **51 of 256 spells carry at least one below-full value**, and they
+are exactly the long ones a session can span: `Contract of Protection (Rank 1)` (full 1,440,000 cs) appears as
+1,180,241 / 1,195,185 / 1,213,465 / … / 1,440,000; `XP Boost (4h)` as 1,268,055; `Critical Rating Boost (4h)` as
+431,043; `Aura of Dread Fury (Rank 5)` as 910,653. Short buffs (`Wrath` 1000, `Chill` 600) only ever send full,
+because they are never alive across a restore. The captured world-entry mount restore is the same story on one
+spell: 8,509,794 cs against a fresh cast's 8,640,000, i.e. 21.7 minutes elapsed.]
+
+⚠️ **So do not "finish" this by sending the full duration plus a true expiry and letting the client shorten it.**
+That shape appears nowhere in the corpus. Gitea #601 proposed exactly that, gated on a "has this session answered
+a pong yet" flag, and was **closed on this measurement rather than implemented** — building it would have put a
+packet on the wire retail never sends. The stamp is still sourced from the same remaining time, which as a
+side-effect keeps the restore correct before the client has learned our clock at all: it learns that only from a
+`DispatchPong`, and world entry can precede the first `LatencyCheck`.
+
+What retail's absolute stamp is genuinely *for* is a different case we do not cover yet — a buffed entity
+STREAMING INTO VIEW mid-buff, where the observer has no apply event to count from. Nothing emits another entity's
+active buffs at spawn today; tracked separately.
 
 **`@26` stays open [V0].** It sits in the descriptor beside the spell id and tracks `CastingLevel` closely but not
 exactly across the captures (1563 equal, 283 below, 92 above), so a second input exists. What the read DOES settle
