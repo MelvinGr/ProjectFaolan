@@ -234,8 +234,13 @@ catalog — the selector is the ability's grant `Slot` — with the server's ans
 `--report-arg <selector hex>` narrows to one and prints those answers in full, which is the spec a server-side
 stance has to reproduce; see [player-actions.md](../subsystems/player-actions.md)),
 `combo-swings` (every melee-combo swing in the corpus, resolved against the `Combos` catalog — the census
-[combos.md](../subsystems/combos.md) quotes: which combo, which step, the `bcc_action_id`→direction map and the
-player/NPC split. `--report-arg <file>` also writes the matched packets whole, for `--report fixture-set`),
+[combos.md](../subsystems/combos.md) quotes: which combo, which step, the `bcc_action_id`→direction map, the
+player/NPC split, and — for #623 — each NPC combo swing attributed to its actor's own spawn, so the combo can be
+grouped against the weapon that picked it. `--report-arg <file>` also writes the matched packets whole, for
+`--report fixture-set`),
+`creature-races` (RDB 1000508, the client's creature RACE table — the names behind `CharacterStats.race`, which
+every NPC carries as a bare number; plus how far that vocabulary reaches into the unresolved open-world spawn
+groups, which is the #518 question),
 `npc-chatter` (the ambient-bark catalog's reach, #331 — the category-50015 page census, every stored `NpcChatter`
 row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
 line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;

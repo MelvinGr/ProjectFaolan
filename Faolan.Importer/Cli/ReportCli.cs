@@ -508,6 +508,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "creature-races":
+				{
+					await CreatureRaces();
+					return 0;
+				}
+
 				case "rdb-types":
 				{
 					RdbTypes(RdbDir());

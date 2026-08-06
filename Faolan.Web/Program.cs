@@ -29,7 +29,7 @@ namespace Faolan.Web
 		{
 			var builder = WebApplication.CreateBuilder(args);
 
-			// appsettings.json FIRST: it is the app's own defaults (logging, CdnUrl), and the shared faolan.json is
+			// appsettings.json FIRST: it is the app's own defaults (logging), and the shared faolan.json is
 			// deployment config, so the shared file has to win over it - not the other way round.
 			//
 			// ⚠️ It used to be the other way round, and appsettings.json shipped `"RdbDir": ""`. An empty value is

@@ -112,9 +112,11 @@ namespace Faolan.Web.Services
 			_rdbDir = config["RdbDir"] is { Length: > 0 } dir
 				? dir
 				: throw new InvalidOperationException("RdbDir not configured - set it to the client's RDB folder in appsettings.Development.json or the RdbDir env var");
-			// Optional ContentMirror proxy base for on-demand (CDN-only) resources, e.g. the CDN race bodies that aren't
-			// in the local RDB. Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
-			_cdnUrl = config["CdnUrl"] is { Length: > 0 } explicitUrl ? explicitUrl : config.CdnMirrorAddress;
+			// The ContentMirror for on-demand (CDN-only) resources - the CDN race bodies that aren't in the local RDB.
+			// Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
+			// The SHARED `CdnMirror` answer, not a Faolan.Web-only key: one name per setting, so pointing the viewer
+			// and the importer at a mirror on another box is the same single override.
+			_cdnUrl = config.CdnMirrorAddress;
 		}
 
 		// The wearable armour-set catalogue (built once from the RDB, then cached). Optionally filtered to a sex.

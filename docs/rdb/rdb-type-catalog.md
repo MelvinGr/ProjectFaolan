@@ -61,7 +61,7 @@ fields (compressed on-disk bytes).
 | 1000505 | Social-rank name table | 1 | 1 | 0 | 380 B |
 | 1000506 | Game data/enum table (1000500x) | 2 | 2 | 0 | 376 B |
 | 1000507 | Game data/enum table (1000500x) | 2 | 2 | 0 | 864 B |
-| 1000508 | Creature name table | 1 | 1 | 0 | 1.6 KB |
+| 1000508 | * CREATURE RACES — the names behind `CharacterStats.race` (108 rows; `--report creature-races`) | 1 | 1 | 0 | 1.6 KB |
 | 1000509 | Game data/enum table (1000500x) | 1 | 1 | 0 | 2.9 KB |
 | 1000510 | Game data/enum table (1000500x) | 1 | 1 | 0 | 1.1 KB |
 | 1000511 | Game data/enum table (1000500x) | 1 | 1 | 0 | 5.3 KB |
