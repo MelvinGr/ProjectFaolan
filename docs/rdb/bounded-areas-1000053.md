@@ -265,6 +265,26 @@ Saddur is the sharper of the two tests, because he is a *known* proximity encoun
 playfield**: Tortage Island carries 51 regions including ambush volumes elsewhere on the map (`BA_PictAmbush`,
 44 units away), so the table is clearly populated there — it simply has nothing for him.
 
+### ⚠️ Nor can they be composed with the 1010506 spawn groups
+
+The other hope, and it fails harder. If an ambush volume CONTAINED the spawn group it fires, the two client
+sources would compose into a real volume-triggered encounter with nothing invented — the region giving the
+trigger, the group giving the creature, the count and the roam bounds.
+
+**84 of the 625 contain a spawn group at all, and only 5 of those contain one whose creature we know** — and
+those five are ambient wildlife wandering through the box: `WolfAmbushD` (map 961) contains `Rabbits 6`,
+`A_PrisonerTrigger` and `C_PrisonerTrigger` (974) contain `Grasslands_Chicken11`/`10`.
+
+Which is what an ambush IS, on reflection: its creatures do not exist until it fires, so they cannot be standing
+in the trigger. The composition was never going to work, and the 5 hits are the proof that a containment test
+here returns noise rather than content.
+
+So the encounter volumes remain **geometry with no behaviour available anywhere**: not from the wire (no capture
+shows a volume-entry ambush firing), not from the client (nothing carries which creature, how many, one-shot or
+repeating), and not from composition. Importing them yields 625 inert regions. What the names ARE good for is a
+hand-authoring seed — 169 of them name a spawnable creature, and Conall's Valley's lettered series
+(`VanirAmbushGormleyA/B/C`) reads as a designer's own encounter list — but that is content design, not decode.
+
 Two incidental observations from that test: `Headless Hollow` and `Jungle Main` are the place-name family this
 page declines to classify by regex, confirming it exists and is identifiable only against a place-name catalog;
 and `NpcStatCore.ClientScryScript` — the obvious place an NPC-attached trigger script would live — is **NULL for
