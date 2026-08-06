@@ -259,7 +259,7 @@ client's own overflow clamp (`CombatShieldRose.Sanitize` — over three shields 
 see them. A player enters the world already guarding the retail default `111`, which is also what their own
 snapshot stat sheet carries (`SubClassStatBlock`, `ShieldAllocation` `0x6F`).
 
-### The swing's ARC is on the wire, and the ack now states it (#673)
+### The swing's DIRECTION is on the wire, and the ack states it (#673)
 
 A swing states its direction in each hit result's own type word, and split by actor the corpus shows a mob does
 this even though it names no direction *ability*:
@@ -269,19 +269,29 @@ this even though it names no direction *ability*:
 | **NPC-actor** (2,691 swings) | never present | `0xCB` ×896, `0xC9` ×545, `0xCA` ×511, `0xCD` ×384, `0xCC` ×373 |
 | **player-actor** (515 swings) | present on all 515 | `0xCB` ×275, `0xC9` ×167, `0xCA` ×145 |
 
-Both ends of the `ShieldArc` → code mapping are the client's own naming, so it is recovered rather than
-assigned: `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}` (the LDB renders `Mid` as `ShieldUp%1%`, i.e.
-the overhead arc), and the codes are pinned to the `Abilities` rows with zero exceptions — `Left` → `0xC9`
-(`Upper Left Attack`), `Right` → `0xCA` (`Upper Right Attack`), `Mid` → `0xCB` (`Overhead Attack`).
+**Five zones, three guards.** The wire alphabet is `SwingDirection` — Upper Left, Upper Right, Overhead, Lower
+Left, Lower Right → `0xC9`..`0xCD` — and the rose that *guards* them is three arcs wide. That is not a modelling
+compromise; it is retail's shape, and the collapse is the client's own: `FUN_005edd90` rewrites `0xCC` → `0xC9`
+and `0xCD` → `0xCA`, folding each lower zone onto the upper one **on its own side**. So `CombatShieldRose.ArcOf`
+maps Lower Left → `Left`, Lower Right → `Right`, Overhead → `Mid`.
 
-We used to draw the arc **twice**: `CombatShieldRose.SwingArc` rolled one for the mitigation while
+That same fold is retail's progression rule — a character swings in three directions and unlocks the two lower
+zones at level 40 (`0x28`, the threshold the fold is gated on) — which is why every captured *player* swing
+carries only the three, while mobs, not being gated, use all five. The full derivation of the five-code alphabet,
+and the two further client sources that pin it, is in
+[`docs/re/behaviorcontrolcenter-grammar.md`](../re/behaviorcontrolcenter-grammar.md).
+
+We used to draw the arc **twice**: `CombatShieldRose` rolled one for the mitigation while
 `BehaviorAcks.HitResultBlock` wrote a constant `0xCB`, so the packet said *overhead* on every swing regardless of
-what the player actually took. It is one draw now, spent on both.
+what the player actually took. `WorldSimulation` now draws one **zone** and spends it on both — the mitigation
+sees `ArcOf(direction)`, the ack `SwingDirectionCode(direction)`.
 
-⚠️ **Retail's mobs swing into five zones and our rose models three.** `0xCC`/`0xCD` appear only on NPC swings and
-match the client's two further abilities, `Lower Left Attack` and `Lower Right Attack` — 757 of 2,709 mob swings.
-That is also why `SwingArc`'s uniform pick is not yet fitted to the measured (non-uniform) distribution:
-renormalising the three we model would assume how the missing quarter would have distributed.
+**The draw is measured, not a placeholder.** Collapsed onto the three guard arcs the corpus's mob swings are
+Left 918 (33.9 %) / Mid 896 (33.1 %) / Right 895 (33.0 %) — χ² 0.37 on 2 df, i.e. uniform. The skew visible in
+the raw five-way counts is the *height* axis the rose does not model: within the two side arcs, 1,056 upper /
+757 lower = **58.2 % upper** (~7σ off even). `RollSwingDirection` is exactly that: a uniform arc, then the
+height. Why retail leans upper is unexplained — and it is not a per-mob repertoire, since 55 of the 56 templates
+with ≥ 8 captured swings use all five zones.
 
 The spawn scaffold's shield word (`SpawnPreIir.WordStatIds[13]` → stat `0xA5`) is deliberately left at 0: 310 of
 the 317 captured PLAYER frames carry 0 there, so retail does not seed a viewer's rose from the spawn either.
@@ -307,20 +317,19 @@ defender's facing) was implemented and **reverted**: the *"attacks from behind l
 damage"* line in the same description is a **separate positional rule**, not the arc split, and the client's
 294-entry balance sheet carries no back/flank number to pair with it.
 
-**An NPC's swing is the same mechanic as a player's — the same Left/Mid/Right and only that.** Nothing about it
-is visible on the mob: the shields drawn over a defender are a **UI overlay** of the rose, not a model or
-animation state, so there is no left-swing/right-swing pose to look for on either side. That is also why the
-corpus is silent — not one of ~63k NPC-actor BCC records carries a direction word, while the player's own
-swings echo back one for one, because a player's direction rides on an *ability id* and a mob has no ability to
-name. The mitigation is server-side either way (the client registers all eight `Combat_*ShieldBonus` tweaks and
-reads none), so nothing needs to be on the wire.
+**An NPC's swing is the same mechanic as a player's.** Nothing about it is visible on the mob: the shields drawn
+over a defender are a **UI overlay** of the rose, not a model or animation state, so there is no
+left-swing/right-swing pose to look for on either side. A mob names no direction *ability* — none of ~63k
+NPC-actor BCC records carries word 5, because a player's direction rides on an ability id and a mob has no
+ability to name — but it does state the direction in each hit result's type word, which is the correction #673
+made to this paragraph.
 
-That leaves the **selector** as the only unknown, and `CombatShieldRose.SwingArc` picks uniformly over the
-three. ⚠️ It is the one placeholder in the class, and what is assumed is the *distribution*, not the mechanic:
-`Roll` is uniform because the corpus measured it uniform, this is uniform because nothing observes it. What
-would replace it is evidence that a mob favours an arc — its own AI tendency, or aiming at the player's weakest
-guard the way a player aims at the mob's.
-[V3: CombatShieldRoseTests.ApplyArcMitigation_AMobsSwingIsMitigatedByTheArcThePlayerStacked]
+So the **selector** is no longer the class's placeholder. `CombatShieldRose.RollSwingDirection` draws a zone from
+the measured mob distribution: uniform over the three guard arcs (χ² 0.37 on 2 df over 2,709 swings), then upper
+at 58.2 % within a side arc. What is *not* modelled is any per-mob tendency — a mob that favours an arc, or aims
+at the player's weakest guard the way a player aims at the mob's. The corpus gives no evidence of either: 55 of
+the 56 well-sampled templates use all five zones.
+[V3: CombatShieldRoseTests.RollSwingDirection_IsUniformOverTheThreeGuardArcs]
 
 The player's guards therefore do work in PvE, matching the live game's "in general, outside of a few battles,
 you can leave them alone for PvE" — and the default `111` spread is the table's neutral entry, so leaving them

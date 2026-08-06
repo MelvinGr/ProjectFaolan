@@ -110,7 +110,7 @@ namespace Faolan.GameServer.World
 		// Send the NPC's attack-animation ack to the player it hit (the decoded "second BccAck" - BehaviorControlCenterIIR
 		// with actor = NPC handle), so the client plays the NPC's swing + the player's hit-react. Visual only - the HP
 		// move rides PushVitals.
-		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, ShieldArc arc);
+		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, SwingDirection direction);
 
 		// Send a caster NPC's spell cast at the player: the ApplySpell (0x6B87E316) from the NPC handle (#232). The
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).

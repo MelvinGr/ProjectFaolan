@@ -176,23 +176,85 @@ namespace Faolan.Tests
 			Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 0, ShieldArc.Mid));
 		}
 
-		// #621: an NPC's swing carries no direction ability, so the server picks the arc it swings into. It is a
-		// direction of the SWING, not of the attacker's position - so the only thing to gate is that it stays inside
-		// the three real arcs and reaches all of them (a stuck selector would silently make one guard the only one
-		// that ever matters).
+		// #621/#673: an NPC's swing carries no direction ability, so the server picks the zone it swings from. It is a
+		// direction of the SWING, not of the attacker's position - so the first thing to gate is that it reaches all
+		// FIVE zones retail's mobs use (a stuck selector would silently make one guard the only one that matters).
 		[Fact]
-		public void SwingArc_IsOneOfTheThreeArcsAndReachesAllOfThem()
+		public void RollSwingDirection_ReachesAllFiveOfTheClientsZones()
 		{
 			var random = new Random(20260805);
-			var seen = new HashSet<ShieldArc>();
-			for (var i = 0; i < 200; i++)
+			var seen = new HashSet<SwingDirection>();
+			for (var i = 0; i < 500; i++)
+				seen.Add(CombatShieldRose.RollSwingDirection(random));
+
+			Assert.Equal(Enum.GetValues<SwingDirection>().ToHashSet(), seen);
+		}
+
+		// The measurement the five-zone model rests on (#673): collapsed onto the three GUARD arcs, the corpus's 2,709
+		// NPC-actor swings are uniform (918/896/895, chi-square 0.37 on 2 df). So the arc draw must stay uniform even
+		// though the zone draw is not - a model fitted to the raw five-way counts would bias the mitigation, which is
+		// the only thing the arc is spent on.
+		[Fact]
+		public void RollSwingDirection_IsUniformOverTheThreeGuardArcs()
+		{
+			var random = new Random(20260805);
+			var counts = new Dictionary<ShieldArc, int> { [ShieldArc.Left] = 0, [ShieldArc.Mid] = 0, [ShieldArc.Right] = 0 };
+			const int rolls = 60000;
+			for (var i = 0; i < rolls; i++)
+				counts[CombatShieldRose.ArcOf(CombatShieldRose.RollSwingDirection(random))]++;
+
+			foreach (var (_, n) in counts)
+				Assert.InRange(n / (double)rolls, 0.32, 0.347);
+		}
+
+		// The height axis IS biased, and measured: within the two side arcs the corpus is 1,056 upper / 757 lower.
+		// Uniform-over-five would put 40% of every side arc's swings in each of upper and lower, so a wide band still
+		// separates the model that was fitted from the one that was not.
+		[Fact]
+		public void RollSwingDirection_LeansUpperWithinASideArc()
+		{
+			var random = new Random(20260805);
+			int upper = 0, lower = 0;
+			for (var i = 0; i < 60000; i++)
 			{
-				var arc = CombatShieldRose.SwingArc(random);
-				Assert.True(arc is ShieldArc.Left or ShieldArc.Mid or ShieldArc.Right);
-				seen.Add(arc);
+				switch (CombatShieldRose.RollSwingDirection(random))
+				{
+					case SwingDirection.UpperLeft or SwingDirection.UpperRight:
+						upper++;
+						break;
+					case SwingDirection.LowerLeft or SwingDirection.LowerRight:
+						lower++;
+						break;
+				}
 			}
 
-			Assert.Equal(3, seen.Count);
+			Assert.InRange(upper / (double)(upper + lower), 0.57, 0.595);
+		}
+
+		// The client's own collapse (`FUN_005edd90` folds Lower Left -> Upper Left and Lower Right -> Upper Right):
+		// a lower zone is guarded by the arc on its OWN side, which is what lets three shields cover five zones.
+		[Theory]
+		[InlineData(SwingDirection.UpperLeft, ShieldArc.Left)]
+		[InlineData(SwingDirection.LowerLeft, ShieldArc.Left)]
+		[InlineData(SwingDirection.UpperRight, ShieldArc.Right)]
+		[InlineData(SwingDirection.LowerRight, ShieldArc.Right)]
+		[InlineData(SwingDirection.Overhead, ShieldArc.Mid)]
+		public void ArcOf_FoldsEachLowerZoneOntoItsOwnSide(SwingDirection direction, ShieldArc expected)
+		{
+			Assert.Equal(expected, CombatShieldRose.ArcOf(direction));
+		}
+
+		// The ability id -> zone mapping, in the client's enum order. `ArcFor` is this composed with `ArcOf`, so this
+		// is what pins the two LOWER abilities that no captured player swing ever carries.
+		[Theory]
+		[InlineData(769094u, SwingDirection.UpperLeft)]
+		[InlineData(769095u, SwingDirection.UpperRight)]
+		[InlineData(769099u, SwingDirection.Overhead)]
+		[InlineData(769096u, SwingDirection.LowerLeft)]
+		[InlineData(769097u, SwingDirection.LowerRight)]
+		public void DirectionFor_MapsTheFiveDirectionAbilities(uint abilityId, SwingDirection expected)
+		{
+			Assert.Equal(expected, CombatShieldRose.DirectionFor(abilityId));
 		}
 
 		// The mob's swing goes through the SAME table as a player's directed swing - a mob hitting a guard the player
@@ -210,27 +272,38 @@ namespace Faolan.Tests
 				Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 111, arc, playerVersusPlayer: true));
 		}
 
-		// #673: the arc the mitigation charges for is the arc the ACK states, and the mapping is the client's own on
-		// both ends - `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}` (LDB `ShieldUp%1%` for Mid, i.e. the
-		// overhead arc) and the codes are pinned to the `Abilities` rows `Upper Left`/`Upper Right`/`Overhead Attack`
-		// with zero exceptions over the corpus. So this asserts a decoded correspondence, not a convention.
+		// #673: the zone the mitigation charges for is the zone the ACK states, and the mapping is the client's own -
+		// `FUN_005e3b30` is the same switch over the same 1..5 order. The first three are pinned to the `Abilities`
+		// rows `Upper Left`/`Upper Right`/`Overhead Attack` by the corpus with zero exceptions, and the two lower ones
+		// by the combo parser's `0xCC -> 0xC9` / `0xCD -> 0xCA` fold. So this asserts a decoded correspondence, not a
+		// convention.
 		[Theory]
-		[InlineData(ShieldArc.Left, (byte)0xC9)]
-		[InlineData(ShieldArc.Right, (byte)0xCA)]
-		[InlineData(ShieldArc.Mid, (byte)0xCB)]
-		public void SwingDirectionCode_IsTheClientsOwnDirectionCode(ShieldArc arc, byte expected)
+		[InlineData(SwingDirection.UpperLeft, (byte)0xC9)]
+		[InlineData(SwingDirection.UpperRight, (byte)0xCA)]
+		[InlineData(SwingDirection.Overhead, (byte)0xCB)]
+		[InlineData(SwingDirection.LowerLeft, (byte)0xCC)]
+		[InlineData(SwingDirection.LowerRight, (byte)0xCD)]
+		public void SwingDirectionCode_IsTheClientsOwnDirectionCode(SwingDirection direction, byte expected)
 		{
-			Assert.Equal(expected, BehaviorAcks.SwingDirectionCode(arc));
+			Assert.Equal(expected, BehaviorAcks.SwingDirectionCode(direction));
 		}
 
-		// Every arc maps, and to a DISTINCT code - a mapping that collapsed two arcs onto one would state the wrong
-		// direction on the wire for one of them and never fail an equality test written arc-by-arc.
+		// Every zone maps, and to a DISTINCT code - a mapping that collapsed two zones onto one would state the wrong
+		// direction on the wire for one of them and never fail an equality test written zone-by-zone.
 		[Fact]
 		public void SwingDirectionCode_IsOneToOneOverTheWholeEnum()
 		{
-			var codes = Enum.GetValues<ShieldArc>().Select(BehaviorAcks.SwingDirectionCode).ToList();
+			var codes = Enum.GetValues<SwingDirection>().Select(BehaviorAcks.SwingDirectionCode).ToList();
 
 			Assert.Equal(codes.Count, codes.Distinct().Count());
+		}
+
+		// The wire alphabet has exactly the five zones the client ships and nothing more - a sixth member would be a
+		// code retail never sends.
+		[Fact]
+		public void SwingDirectionCode_CoversTheFiveCodeAlphabetAndNoOther()
+		{
+			Assert.Equal<byte>([0xC9, 0xCA, 0xCB, 0xCC, 0xCD], Enum.GetValues<SwingDirection>().Select(BehaviorAcks.SwingDirectionCode).Order().ToArray());
 		}
 
 		private static uint[] Arcs(uint value)

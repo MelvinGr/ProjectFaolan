@@ -35,14 +35,12 @@ namespace Faolan.GameServer.Combat
 		public const double MinShiftSeconds = 5.0;
 		public const double MaxShiftSeconds = 12.0;
 
-		// The three `Normal Attack` direction abilities the client puts on the swing tail, named by the LDB. The two
-		// LOWER ids (769096/769097) exist in the ability catalog with slot 0 and appear in no capture, so they are
-		// mapped for completeness but never drive a live swing.
-		private const uint UpperLeftAttack = 769094;
-		private const uint UpperRightAttack = 769095;
-		private const uint LowerLeftAttack = 769096;
-		private const uint LowerRightAttack = 769097;
-		private const uint OverheadAttack = 769099;
+		// The five `Normal Attack` direction abilities the client puts on the swing tail, named by the LDB and in the
+		// client's own enum order (`SwingDirection`). The two LOWER ids carry slot 0 in the catalog and appear on no
+		// captured PLAYER swing - which is the retail unlock rather than an absence: a character swings in three
+		// directions and gains the two lower zones later (`FUN_005edd90` folds them onto the upper zone on the same
+		// side below level 40). Mobs are not gated and use all five.
+		private static readonly uint[] DirectionAbilities = [769094, 769095, 769099, 769096, 769097];
 
 		// `Combat_PvE{n}ShieldBonus` / `Combat_PvP{n}ShieldBonus`, indexed by the shields covering the struck arc.
 		// A POSITIVE entry is a bonus to the ATTACKER: an arc with no guard on it takes 20% more, which is what makes
@@ -101,17 +99,33 @@ namespace Faolan.GameServer.Combat
 			return MinShiftSeconds + random.NextDouble() * (MaxShiftSeconds - MinShiftSeconds);
 		}
 
-		// The arc a swing lands in, or null when the ability is not one of the five directional attacks (a combo step,
-		// a spell, an unarmed jab) - those are undirected and take no arc modifier.
+		// The zone a swing came from, or null when the ability is not one of the five directional attacks (a combo
+		// step, a spell, an unarmed jab) - those are undirected and take no arc modifier.
+		public static SwingDirection? DirectionFor(uint abilityId)
+		{
+			var index = Array.IndexOf(DirectionAbilities, abilityId);
+			return index < 0 ? null : (SwingDirection)index;
+		}
+
+		// The guard arc a zone is covered by. THE CLIENT'S OWN COLLAPSE, not a modelling choice: `FUN_005edd90`
+		// rewrites `Lower Left -> Upper Left` and `Lower Right -> Upper Right`, so a lower zone belongs to the arc on
+		// its own side. Five zones over three arcs is exactly why the rose stays three digits wide while the wire
+		// alphabet is five.
+		public static ShieldArc ArcOf(SwingDirection direction)
+		{
+			return direction switch
+			{
+				SwingDirection.UpperLeft or SwingDirection.LowerLeft => ShieldArc.Left,
+				SwingDirection.UpperRight or SwingDirection.LowerRight => ShieldArc.Right,
+				SwingDirection.Overhead => ShieldArc.Mid,
+				_ => throw new ArgumentOutOfRangeException(nameof(direction), direction, "unknown swing direction")
+			};
+		}
+
+		// The arc a swing lands in, or null when the ability is undirected.
 		public static ShieldArc? ArcFor(uint abilityId)
 		{
-			return abilityId switch
-			{
-				UpperLeftAttack or LowerLeftAttack => ShieldArc.Left,
-				UpperRightAttack or LowerRightAttack => ShieldArc.Right,
-				OverheadAttack => ShieldArc.Mid,
-				_ => null
-			};
+			return DirectionFor(abilityId) is { } direction ? ArcOf(direction) : null;
 		}
 
 		// The arc an NPC's swing lands in (#621). An arc is the direction the ATTACKER SWINGS - left, overhead,
@@ -132,31 +146,39 @@ namespace Faolan.GameServer.Combat
 		// ⚠️ CORRECTED (#673). This used to say "not one of ~63k NPC-actor BCC records carries a direction word".
 		// That is true of the direction ABILITY - a mob has none to name, and the actor-split census confirms word 5
 		// is present on 515 player-actor swings and ZERO of 2,691 NPC-actor ones - but the swing states its direction
-		// a SECOND way, in each hit result's own type word, and that IS on a mob's swing:
-		//
-		//     NPC-actor    0xCB x896  0xC9 x545  0xCA x511  0xCD x384  0xCC x373
-		//     player-actor 0xCB x275  0xC9 x167  0xCA x145
-		//
-		// So the arc is observable after all, and two things follow. The ack now STATES the arc the mitigation
-		// charged for (`BehaviorAcks.SwingDirectionCode`) instead of a constant. And retail's mobs swing into FIVE
-		// zones where we model three: 0xCC/0xCD appear only on NPC swings and match the client's `Lower Left Attack`
-		// and `Lower Right Attack` abilities, which our rose has no arcs for - 757 of 2,709 mob swings.
+		// a SECOND way, in each hit result's own type word, and that IS on a mob's swing.
 		//
 		// Mitigation is server-side either way (the client registers all eight `Combat_{PvE,PvP}{0..3}ShieldBonus`
-		// tweaks and reads none), so the server picks - uniformly over the three, for now.
+		// tweaks and reads none), so the server picks the zone. NO LONGER A PLACEHOLDER - both halves below are
+		// measured over the 2,709 NPC-actor swings in the corpus (`--report bcc-attack-tail`):
 		//
-		// ⚠️ STILL A PLACEHOLDER, but no longer for the reason it says. `Roll` is uniform because the corpus
-		// MEASURED it uniform (chi-square 2.8); this was uniform because "nothing observes it", and #673 showed
-		// something does - the mob's own swings are 0xCB x896 / 0xC9 x545 / 0xCA x511 / 0xCD x384 / 0xCC x373, which
-		// is NOT uniform.
+		//     Upper Left x545  Upper Right x511  Overhead x896  Lower Left x373  Lower Right x384
 		//
-		// It is deliberately not fitted to that yet: 757 of those 2,709 swings land in the two LOWER zones our rose
-		// has no arc for, so renormalising the other three assumes how the missing quarter would have distributed.
-		// Deciding the two lower arcs comes first; the distribution falls out of the same census afterwards.
-		public static ShieldArc SwingArc(Random random)
+		// ⭐ The five-zone alphabet was what made this look unfittable, and collapsing it onto the three ARCS - by
+		// the client's own rule, a lower zone guarded by the arc on its own side - is what settled it:
+		//
+		//     Left 918 (33.9%)   Mid 896 (33.1%)   Right 895 (33.0%)   chi-square 0.37 on 2 df
+		//
+		// So the arc pick IS uniform, and always was - the apparent skew was the height axis the rose does not model.
+		// Within the two side arcs the swing is upper 1,056 / lower 757, i.e. 58.2% upper (n=1,813, 7 sigma off an
+		// even split, so the bias is real rather than sampling noise). WHY it leans upper is not explained here; it
+		// is measured, not derived.
+		//
+		// ⚠️ It is NOT a per-mob repertoire: 55 of the 56 templates with >= 8 captured swings use all five zones, so
+		// there is no "this archetype only swings the three" rule to key it on.
+		private const double UpperShareOfASideArc = 0.582;
+
+		// The zone an NPC's swing comes from: uniform over the three guarded arcs, then the height within a side arc.
+		public static SwingDirection RollSwingDirection(Random random)
 		{
 			ArgumentNullException.ThrowIfNull(random);
-			return (ShieldArc)random.Next(3);
+			var upper = random.NextDouble() < UpperShareOfASideArc;
+			return (ShieldArc)random.Next(3) switch
+			{
+				ShieldArc.Left => upper ? SwingDirection.UpperLeft : SwingDirection.LowerLeft,
+				ShieldArc.Right => upper ? SwingDirection.UpperRight : SwingDirection.LowerRight,
+				_ => SwingDirection.Overhead
+			};
 		}
 
 		// The damage multiplier for a swing into `arc` against `distribution`. 1.0 when the swing carries no direction,

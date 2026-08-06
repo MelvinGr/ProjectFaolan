@@ -131,12 +131,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 		//   Abilities 769099 `Overhead Attack`    -> 0xCB   (253 of 253)
 		//
 		// The corpus also carries 0xCC and 0xCD on swings with no direction ability, and the client ships exactly two
-		// more such abilities - 769096 `Lower Left Attack` and 769097 `Lower Right Attack` - so the alphabet is the
-		// five-zone rose. WHICH of the two lower ones is 0xCC is not established, and is deliberately not guessed.
+		// more such abilities - 769096 `Lower Left Attack` and 769097 `Lower Right Attack`. Both are now pinned from
+		// the exe rather than guessed (#673) - 0xCC is Lower LEFT, 0xCD Lower RIGHT; see `SwingDirection`, which owns
+		// the argument. So the alphabet is the full five-zone rose and `SwingDirectionCode` writes all five.
 		//
-		// ⚠️ So the 0xCB we default to means "Overhead", and every ack we send says overhead while
-		// `CombatShieldRose.SwingArc` picks a uniform arc for the MITIGATION - the wire and the damage disagree.
-		// Open work: #673.
+		// ⚠️ The 0xCB default therefore means "Overhead". Every SENDER passes the direction it actually drew
+		// (`WorldSimulation` draws once and spends it on both the mitigation and the ack), so the default only covers
+		// the undirected callers.
 		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
 		{
 			return HitResultBlock([], [new HitResult(victimHandle, damage, resultType, resultK1, resultK2)]);
@@ -194,25 +195,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return s.ToArray();
 		}
 
-		// The wire code for the arc a swing came in on (#673). Both ends of this mapping are the CLIENT's own
-		// naming, so it is recovered rather than assigned: `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}`
-		// (and the LDB renders Mid as `ShieldUp%1%`, i.e. the overhead arc), while the codes are pinned to the
-		// `Abilities` rows `Upper Left Attack` / `Upper Right Attack` / `Overhead Attack` with zero exceptions over
-		// the corpus - see ResultType above.
-		//
-		// ⚠️ Retail's mobs use FIVE codes and we model three: 0xCC and 0xCD appear only on NPC-actor swings (757 of
-		// 2,709) and match the client's two further abilities, `Lower Left Attack` and `Lower Right Attack`. Our
-		// rose has no lower arcs, so those two swings have no arc to be - which is a gap in the ROSE, not here.
-		public static byte SwingDirectionCode(ShieldArc arc)
+		// The wire code for the zone a swing came in on (#673). It is `SwingDirection` renumbered from 0 to 0xC9, and
+		// that is the CLIENT's own arithmetic rather than a table we chose: `FUN_005e3b30` is the same switch over the
+		// same order, and the first three members are pinned to their `Abilities` rows by the corpus (see ResultType
+		// above). Everything that argues the enum's order is on `SwingDirection`.
+		public static byte SwingDirectionCode(SwingDirection direction)
 		{
-			return arc switch
-			{
-				ShieldArc.Left => 0xC9,
-				ShieldArc.Right => 0xCA,
-				ShieldArc.Mid => 0xCB, // "Mid" is the client's overhead arc, not a middle-height one
-				_ => throw new ArgumentOutOfRangeException(nameof(arc), arc, "unknown shield arc")
-			};
+			return Enum.IsDefined(direction)
+				? (byte)(FirstDirectionCode + (int)direction)
+				: throw new ArgumentOutOfRangeException(nameof(direction), direction, "unknown swing direction");
 		}
+
+		private const byte FirstDirectionCode = 0xC9;
 
 		// One 41-byte result record: who was hit, for how much, and the still-undecoded result codes.
 		internal readonly record struct HitResult(uint VictimHandle, uint Damage, byte ResultType = 0xCB, uint K1 = 1, uint K2 = 2);

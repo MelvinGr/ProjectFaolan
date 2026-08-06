@@ -38,6 +38,25 @@ namespace Faolan.Importer.Cli
 			"Command+0x18C /"
 		];
 
+		// The client's own five-zone direction alphabet, in ITS order (#673). Recovered from the exe, not assigned:
+		//   * `FUN_005e3b30` is `switch (dir) { 1 -> 0xC9, 2 -> 0xCA, default -> 0xCB, 4 -> 0xCC, 5 -> 0xCD }` over an
+		//     internal 1..5 enum (`10` means "random": `rand() % 6 + 1`, so overhead - case 3 AND 6 - draws double);
+		//   * the config keys it registers are `attack_dir_bm_upper_left`, `_upper_right`, `_head`, `_lower_left`,
+		//     `_lower_right`, in that block order (`FUN_0152f740`), which is the same 1..5;
+		//   * `FUN_005edd90`, the combo step-list parser, rewrites `0xCC -> 0xC9` and `0xCD -> 0xCA` below level 40 -
+		//     the lower zones folding onto the UPPER ONE ON THE SAME SIDE, which pins the two sides independently.
+		// The first three are pinned to `Abilities` rows by the corpus with zero exceptions (#661).
+		private static readonly (uint Code, string Name, string Arc)[] Directions =
+		[
+			(0xC9, "Upper Left", "Left"),
+			(0xCA, "Upper Right", "Right"),
+			(0xCB, "Overhead", "Mid"),
+			(0xCC, "Lower Left", "Left"),
+			(0xCD, "Lower Right", "Right")
+		];
+
+		private static readonly HashSet<uint> DirectionCodes = Directions.Select(d => d.Code).ToHashSet();
+
 		private static void BccAttackTail(IReadOnlyList<NamedCapture> captures)
 		{
 			var attacks = new[] { BehaviorId.CombatMelee, BehaviorId.CombatRanged, BehaviorId.CombatUnarmed }.Select(b => (uint)b).ToHashSet();
@@ -57,10 +76,16 @@ namespace Faolan.Importer.Cli
 			var joint = new Dictionary<(uint W4, uint W5), int>();
 			var versusResult = new Dictionary<(uint W4, uint ResultType), int>();
 			var versusDirection = new Dictionary<(uint W5, uint ResultType), int>();
-			// #673: the SwingArc comment says an NPC's swing carries no direction word. Word 5 is an ability id and a
+			// #673: the CombatShieldRose comment said an NPC's swing carries no direction word. Word 5 is an ability id and a
 			// mob has none, so that is true of word 5 - the question is whether the per-victim RESULT type, which
 			// turned out to be the same direction, is present on a mob's swing too. Split by ACTOR to answer it.
 			var byActor = new Dictionary<(bool Player, string Field, uint Value), int>();
+			// #673 part 2: the mob alphabet is FIVE codes where our rose has three arcs. Two questions the actor
+			// split cannot answer - does the five-code alphabet collapse onto the three arcs uniformly, and is the
+			// five-vs-three split a property of the TEMPLATE (some mobs swinging only the three a low-level player
+			// has) rather than of every mob. Keyed by template, never by name (#244).
+			var byTemplate = new Dictionary<uint, Dictionary<uint, int>>();
+			var templateNames = new Dictionary<uint, string>();
 
 			foreach (var c in captures)
 			{
@@ -68,12 +93,22 @@ namespace Faolan.Importer.Cli
 				// EntityHandles.CharacterInstanceBase, so the handle number line cannot answer this on a capture -
 				// the only reliable test is the spawn itself, and `player_stats` is what distinguishes the two.
 				var npcHandles = new HashSet<uint>();
+				var npcTemplates = new Dictionary<uint, uint>();
 				foreach (var p in c.Packets)
 				{
 					if (p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
 						continue;
-					if (p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn) && spawn.Character?.player_stats == null)
-						npcHandles.Add(spawn.Handle);
+					if (!p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn) || spawn.Character?.player_stats != null)
+						continue;
+
+					npcHandles.Add(spawn.Handle);
+					var template = spawn.Character?.npc_stats?.TemplateId ?? 0;
+					if (template == 0)
+						continue;
+
+					npcTemplates[spawn.Handle] = template;
+					if (!string.IsNullOrEmpty(spawn.Character?.Name))
+						templateNames[template] = spawn.Character!.Name!;
 				}
 
 			foreach (var p in c.Packets)
@@ -105,9 +140,16 @@ namespace Faolan.Importer.Cli
 				joint[key] = joint.GetValueOrDefault(key) + 1;
 				var playerActor = !npcHandles.Contains(bcc.Actor);
 				Count(playerActor, "word5 direction", middle[^3]);
+				npcTemplates.TryGetValue(bcc.Actor, out var actorTemplate);
 				foreach (var rt in resultTypes)
 				{
 					Count(playerActor, "result type", rt);
+					if (!playerActor && actorTemplate != 0 && DirectionCodes.Contains(rt))
+					{
+						var perTemplate = byTemplate.TryGetValue(actorTemplate, out var d2) ? d2 : byTemplate[actorTemplate] = [];
+						perTemplate[rt] = perTemplate.GetValueOrDefault(rt) + 1;
+					}
+
 					var rkey = (middle[^4], rt);
 					versusResult[rkey] = versusResult.GetValueOrDefault(rkey) + 1;
 					var dkey = (middle[^3], rt);
@@ -186,6 +228,51 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"      {(player ? "player" : "NPC   "),-7} {field,-16} {named,-20} x{n}");
 			}
 
+			// #673 part 2. The rose has three arcs and the wire has five zones, so the question that decides whether
+			// the swing pick is a placeholder or a measurement is what the five collapse to. The collapse
+			// itself is the CLIENT's (see `Directions`): a lower zone folds onto the upper one on the same side.
+			var npcByCode = Directions.ToDictionary(d => d.Code, d => byActor.GetValueOrDefault((false, "result type", d.Code)));
+			var npcTotal = npcByCode.Values.Sum();
+			Console.WriteLine();
+			Console.WriteLine($"the mob alphabet collapsed onto the THREE shield arcs ({npcTotal} NPC-actor swings):");
+			foreach (var arc in new[] { "Left", "Mid", "Right" })
+			{
+				var members = Directions.Where(d => d.Arc == arc).ToArray();
+				var n = members.Sum(d => npcByCode[d.Code]);
+				var parts = string.Join(" + ", members.Select(d => $"{d.Name} x{npcByCode[d.Code]}"));
+				Console.WriteLine($"      {arc,-6} {n,6}  {Share(n, npcTotal),6}   ({parts})");
+			}
+
+			// Chi-square against a uniform arc pick, 2 df: 5.99 is p=0.05, 9.21 is p=0.01. This is the number that
+			// says whether the server's uniform draw is fitted to retail or merely unfalsified.
+			var expected = npcTotal / 3.0;
+			var chi = new[] { "Left", "Mid", "Right" }
+				.Select(a => Directions.Where(d => d.Arc == a).Sum(d => npcByCode[d.Code]))
+				.Sum(n => (n - expected) * (n - expected) / expected);
+			Console.WriteLine($"      chi-square vs a uniform arc pick = {chi:F2} on 2 df (5.99 = p 0.05)");
+
+			var upper = npcByCode[0xC9u] + npcByCode[0xCAu];
+			var lower = npcByCode[0xCCu] + npcByCode[0xCDu];
+			Console.WriteLine($"      within the two SIDE arcs, upper x{upper} / lower x{lower} = {Share(upper, upper + lower)} upper");
+
+			// Is the five-vs-three split a property of the TEMPLATE? If some mobs only ever swing the three a
+			// low-level player has, that is a per-archetype rule rather than a global distribution.
+			var templatesWithEnough = byTemplate.Where(kv => kv.Value.Values.Sum() >= 8).OrderByDescending(kv => kv.Value.Values.Sum()).ToList();
+			Console.WriteLine();
+			Console.WriteLine($"per TEMPLATE - do some mobs swing only the three upper zones? ({byTemplate.Count} templates, {templatesWithEnough.Count} with >= 8 swings)");
+			Console.WriteLine("template  name                       swings   UL   UR   OH   LL   LR  zones");
+			foreach (var (template, counts) in templatesWithEnough.Take(30))
+			{
+				var n = counts.Values.Sum();
+				var cells = string.Join(" ", Directions.Select(d => $"{counts.GetValueOrDefault(d.Code),4}"));
+				var name = templateNames.GetValueOrDefault(template, "?");
+				Console.WriteLine($"{template,8}  {(name.Length <= 24 ? name : name[..24]),-24} {n,6}  {cells}  {counts.Count(kv => kv.Value > 0)}");
+			}
+
+			var threeZone = templatesWithEnough.Count(kv => kv.Value.GetValueOrDefault(0xCCu) + kv.Value.GetValueOrDefault(0xCDu) == 0);
+			Console.WriteLine($"      {threeZone} of {templatesWithEnough.Count} well-sampled templates NEVER swing a lower zone; "
+			                  + $"{templatesWithEnough.Count - threeZone} do.");
+
 			if (interesting.Count == 0)
 				return;
 
@@ -202,6 +289,8 @@ namespace Faolan.Importer.Cli
 		}
 
 		private static string Label(int i) => i < MiddleSlots.Length ? i.ToString() : "2b";
+
+		private static string Share(int part, int whole) => whole == 0 ? "-" : $"{100.0 * part / whole:0.0}%";
 
 		// A word as the reader sees it plus, when it could plausibly BE one, its float reading - the ticket's
 		// standing hypothesis is that one of these is a charge fraction, and a float is unrecognisable in decimal.

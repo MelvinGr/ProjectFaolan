@@ -74,6 +74,28 @@ namespace Faolan.Core.Network.Codecs.Combat
 		Right
 	}
 
+	// The FIVE zones a swing comes from, which is a finer alphabet than the three arcs that GUARD them (#673). This
+	// is the client's own enum, in its own order, recovered three ways from AgeOfConan.exe:
+	//   * `FUN_005e3b30` maps an internal 1..5 direction to the wire code - `1 -> 0xC9, 2 -> 0xCA, default -> 0xCB,
+	//     4 -> 0xCC, 5 -> 0xCD` (and `10` means "pick one": `rand() % 6 + 1`, so overhead, being cases 3 AND 6,
+	//     draws double);
+	//   * the config keys it registers are `attack_dir_bm_upper_left` / `_upper_right` / `_head` / `_lower_left` /
+	//     `_lower_right`, in that block order (`FUN_0152f740`) - the same 1..5;
+	//   * `FUN_005edd90`, the combo step-list parser, rewrites `0xCC -> 0xC9` and `0xCD -> 0xCA` when the definition's
+	//     level is below 40, i.e. folds each lower zone onto the upper one ON THE SAME SIDE. That is the retail
+	//     mechanic - a character swings in three directions and unlocks the two lower ones later - and it pins which
+	//     side each lower code is on without relying on the order argument.
+	// The first three are independently pinned to their `Abilities` rows by the capture corpus, with zero exceptions
+	// over 499 directed player swings (#661).
+	public enum SwingDirection
+	{
+		UpperLeft,
+		UpperRight,
+		Overhead,
+		LowerLeft,
+		LowerRight
+	}
+
 	// The decimal packing of the guard `Value`. Not encoding - it is how one field's digits mean three arcs, which is
 	// the client's own convention, so it stays off the codec's surface (#530 rule 1).
 	public static class CombatShieldDistribution

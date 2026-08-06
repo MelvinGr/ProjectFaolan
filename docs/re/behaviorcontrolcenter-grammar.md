@@ -196,7 +196,7 @@ opaque capture-derived code, is a **perfect function of it**, with zero exceptio
 
 The corpus carries `0xCC` and `0xCD` as well, on swings with no direction ability, and the client ships exactly
 two more of these abilities — 769096 `Lower Left Attack` and 769097 `Lower Right Attack` — so the alphabet is the
-five-zone rose. Which of the two lower ones is `0xCC` is **not** established and is not guessed here.
+five-zone rose.
 
 Split by ACTOR — classified per capture by whether the actor handle is a known NPC spawn, since a retail
 character id (~`0x0131xxxx`) sits *below* `EntityHandles.CharacterInstanceBase` and the handle number line cannot
@@ -209,11 +209,49 @@ answer it:
 
 So a mob names no ability — it has none — but it **does** state its swing's direction, in the result type, and it
 uses all five zones where the captured players use the three they had unlocked. The arc is therefore observable,
-which is what `CombatShieldRose.SwingArc`'s "nothing observes it" note was wrong about (#673): the ack now states
-the arc the mitigation charged for, via `BehaviorAcks.SwingDirectionCode`.
+which is what `CombatShieldRose`'s "nothing observes it" note was wrong about (#673): the ack now states
+the direction the mitigation charged for, via `BehaviorAcks.SwingDirectionCode`.
 
-⚠️ And retail's mobs swing into **five** zones where our rose models three — 757 of 2,709 mob swings land in
-`0xCC`/`0xCD`, the two `Lower * Attack` abilities we have no arc for.
+### ⭐ The whole five-zone alphabet, from the exe [V1: tools/ghidra/DecompileFns.java]
+
+The corpus pins three of the five codes and can never pin the other two — no captured player swings them, so no
+ability id is ever carried beside them. The client settles it three independent ways:
+
+| | recovered from | says |
+|---|---|---|
+| the **direction → code switch** | `FUN_005e3b30` | `1 → 0xC9, 2 → 0xCA, default → 0xCB, 4 → 0xCC, 5 → 0xCD` over an internal 1..5 enum |
+| the **config key block** | `FUN_0152f740` | registers `attack_dir_bm_upper_left`, `_upper_right`, `_head`, `_lower_left`, `_lower_right` — in that order |
+| the **combo step parser** | `FUN_005edd90` | rewrites `0xCC → 0xC9` and `0xCD → 0xCA` when the definition's level is below `0x28` (40) |
+
+The first two give the order — the same 1..5, and its first three members are exactly the codes the corpus pins,
+so the remaining two follow. The third is the stronger argument and does not depend on the order at all: the fold
+sends each lower code to the **upper code on its own side**, so `0xCC` is a LEFT zone and `0xCD` a RIGHT one.
+
+That fold is retail's own progression rule — a character swings in three directions and unlocks the two lower
+zones later — and it is why every captured player swing carries only `0xC9`/`0xCA`/`0xCB` while mobs, which are
+not gated, use all five.
+
+`FUN_005e3b30` also carries the client's "pick one" path: direction `10` means `rand() % 6 + 1`, and since cases
+3 *and* 6 both fall to `0xCB`, **overhead draws double**. The captured mob distribution's overhead share is
+33.1 %, which is that 2/6 to within noise.
+
+### The mob distribution, and what it is uniform in
+
+`--report bcc-attack-tail` collapses the five zones onto the three guard arcs by the client's own rule above:
+
+| arc | swings | share | |
+|---|---:|---:|---|
+| Left | 918 | 33.9 % | Upper Left ×545 + Lower Left ×373 |
+| Mid | 896 | 33.1 % | Overhead ×896 |
+| Right | 895 | 33.0 % | Upper Right ×511 + Lower Right ×384 |
+
+χ² = **0.37** on 2 df against a uniform arc pick. So the arc is uniform and the apparent skew in the raw five-way
+counts is the *height* axis, which the three-digit rose does not model: within the two side arcs the corpus is
+1,056 upper / 757 lower, i.e. **58.2 % upper** (n = 1,813, ~7σ off an even split). Why it leans upper is not
+explained — it is measured, not derived.
+
+⚠️ It is **not** a per-mob repertoire: 55 of the 56 templates with ≥ 8 captured swings use all five zones, so
+there is no "this archetype only swings three" rule to key it on.
 
 ### The delay phase — behaviorType `0x0E` (#549)
 
