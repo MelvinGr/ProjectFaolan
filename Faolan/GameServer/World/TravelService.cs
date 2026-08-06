@@ -175,10 +175,13 @@ namespace Faolan.GameServer.World
 			if (!destination.FromDialogueDirective && arrival is { } announced)
 				await _output.SendTripDeparture(client, destination.DestinationMapId, announced, sameMap);
 
-			if (sameMap)
+			// `arrival` cannot be null here - the same-map guard above returned - but the compiler cannot see that
+			// through the two conditions, so the pattern re-states it rather than a `.Value` the nullable analysis
+			// warns on.
+			if (sameMap && arrival is { } destinationPoint)
 			{
-				await _output.RelocateOnSameMap(client, arrival.Value);
-				_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to {Arrival} on map {Map} (in place, no loading screen).", character.Name, npcName, arrival,
+				await _output.RelocateOnSameMap(client, destinationPoint);
+				_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to {Arrival} on map {Map} (in place, no loading screen).", character.Name, npcName, destinationPoint,
 					destination.DestinationMapId);
 				return;
 			}
