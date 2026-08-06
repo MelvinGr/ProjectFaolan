@@ -63,36 +63,21 @@ namespace Faolan.Core.Extensions
 			// something that rewrites Host. A bare `host` or `host:port` is fine - the scheme is filled in.
 			public string? CdnMirrorPublicAddress => config["CdnMirror:PublicAddress"];
 
-			// Where a CLIENT of the mirror dials it: the importer's RDB proxy and Faolan.Web's viewer. Derived from the
-			// same `CdnMirror` section the mirror itself reads, so pointing everything at a mirror on another box is one
-			// override (`CdnMirror:PublicAddress`) rather than one per consumer. PublicAddress wins because it is by
-			// definition the reachable address; `Ip` is only a fallback, and it is the BIND address (0.0.0.0 in a
-			// container), which is why it is not the first choice.
+			// Where a CLIENT of the mirror dials it: the importer's RDB proxy and Faolan.Web's viewer. Same key, with
+			// the ONE thing those two need that the mirror does not - a value when it is unset.
 			//
-			// ⚠️ ALWAYS an absolute URL - `http(s)://host:port`, nothing else. Its consumers concatenate a path onto it
-			// (`RdbReader` appends the mirror route), so a bare `host` would produce a relative string that fails at the
-			// HTTP call rather than at the config. Write the scheme in the config too; a bare `host` / `host:port` is
-			// still ACCEPTED and completed here, the same contract Faolan.Web.Content's own `PublicBase` honours, so the
-			// two can never disagree about one value.
-			public string CdnMirrorAddress
-			{
-				get
-				{
-					var configured = config.CdnMirrorPublicAddress?.Trim().TrimEnd('/');
-					var value = string.IsNullOrEmpty(configured)
-						? $"http://{config.CdnMirrorIp}:{config.CdnMirrorPort}"
-						: configured.Contains("://", StringComparison.Ordinal)
-							? configured
-							: $"http://{configured}";
-
-					// The section's Port fills in only when the address does not carry its own.
-					var builder = new UriBuilder(value);
-					if (!value[(value.IndexOf("://", StringComparison.Ordinal) + 3)..].Contains(':', StringComparison.Ordinal))
-						builder.Port = config.CdnMirrorPort;
-
-					return builder.Uri.GetLeftPart(UriPartial.Authority);
-				}
-			}
+			// `CdnMirrorPublicAddress` cannot simply be defaulted, because the two sides read "unset" differently and
+			// both readings are right: to the MIRROR it means "answer with the Host header the client just dialled"
+			// (#552), which is the only correct answer behind a published container port; to a CLIENT of the mirror it
+			// means "the usual local one". So the raw key keeps the mirror's nullable semantics and this is the
+			// client's reading of it - a default, not a second setting.
+			//
+			// ⚠️ The value is an absolute URL, in the config too. Its consumers CONCATENATE onto it (`RdbReader`
+			// appends the mirror route and then `/res/<md5>`), so a bare host would build a relative string that fails
+			// at the HTTP call rather than at the config line that caused it.
+			public string CdnMirrorAddress => config.CdnMirrorPublicAddress is { Length: > 0 } published
+				? published.TrimEnd('/')
+				: $"http://127.0.0.1:{config.CdnMirrorPort}";
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 
 			// Log file location. Optional - defaults to faolan.log in the CWD; point it at a mounted volume (container)

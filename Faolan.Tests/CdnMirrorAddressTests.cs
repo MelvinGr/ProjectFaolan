@@ -6,36 +6,46 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `IConfiguration.CdnMirrorAddress` is the ONE answer to "where is the content mirror" that the importer's RDB
-	// proxy and Faolan.Web's viewer both read, so a mirror on another box is a single `CdnMirror` override rather
+	// `IConfiguration.CdnMirrorAddress` is where a CLIENT of the content mirror - the importer's RDB proxy and
+	// Faolan.Web's viewer - dials it, so a mirror on another box is one `CdnMirror:PublicAddress` override rather
 	// than one setting per consumer.
 	//
-	// The invariant worth gating is that it is ALWAYS an absolute URL. Its consumers concatenate onto it -
-	// `RdbReader` appends the mirror route and then `/res/<md5>` - so a bare `host` would produce a relative string
-	// that fails at the HTTP call, far from the config that caused it.
+	// It is not a second setting: it is `CdnMirrorPublicAddress` plus a DEFAULT. The raw key cannot simply carry
+	// that default, because the two sides read "unset" differently and both readings are right - to the MIRROR it
+	// means "answer with the Host header the client just dialled" (#552, the only correct answer behind a published
+	// container port), to a client it means "the usual local one".
+	//
+	// The invariant worth gating is that the result is an absolute URL: its consumers concatenate onto it
+	// (`RdbReader` appends the mirror route and then `/res/<md5>`), so a relative string would fail at the HTTP
+	// call, far from the config that caused it.
 	public class CdnMirrorAddressTests
 	{
 		[Theory]
-		// Nothing configured: the local mirror on its default port.
-		[InlineData(null, null, null, "http://127.0.0.1:7081")]
-		// The bind address is the fallback, and the section's Port applies to it.
-		[InlineData("10.0.0.4", null, "8080", "http://10.0.0.4:8080")]
-		// PublicAddress wins over Ip - it is the address a client can actually reach.
-		[InlineData("0.0.0.0", "http://192.168.1.5:7081", null, "http://192.168.1.5:7081")]
-		// A bare host / host:port is accepted and completed, the same contract Faolan.Web.Content's PublicBase honours.
-		[InlineData(null, "192.168.1.5", null, "http://192.168.1.5:7081")]
-		[InlineData(null, "192.168.1.5:9000", null, "http://192.168.1.5:9000")]
-		// An explicit port on the address beats the section's Port.
-		[InlineData(null, "http://mirror.lan:9000", "7081", "http://mirror.lan:9000")]
-		// https survives, and a trailing slash is not carried into a concatenated path. The scheme's DEFAULT port is
-		// left implicit (`:443` on https is what `https://` already means), which is still an absolute URL.
-		[InlineData(null, "https://mirror.lan/", "443", "https://mirror.lan")]
-		public void ItIsAlwaysAnAbsoluteUrl(string? ip, string? publicAddress, string? port, string expected)
+		// Unset: the local mirror on its default port.
+		[InlineData(null, null, "http://127.0.0.1:7081")]
+		// Unset, non-default port.
+		[InlineData(null, "8080", "http://127.0.0.1:8080")]
+		// Configured: taken verbatim. The section's Port does NOT apply - the address carries its own.
+		[InlineData("http://192.168.1.5:7081", "9000", "http://192.168.1.5:7081")]
+		// A trailing slash is dropped, because a path is appended to this.
+		[InlineData("https://mirror.lan/", null, "https://mirror.lan")]
+		public void ItIsAlwaysAnAbsoluteUrl(string? publicAddress, string? port, string expected)
 		{
-			var config = Config(("CdnMirror:Ip", ip), ("CdnMirror:PublicAddress", publicAddress), ("CdnMirror:Port", port));
+			var config = Config(("CdnMirror:PublicAddress", publicAddress), ("CdnMirror:Port", port));
 
 			Assert.Equal(expected, config.CdnMirrorAddress);
 			Assert.True(Uri.TryCreate(config.CdnMirrorAddress, UriKind.Absolute, out _));
+		}
+
+		// The BIND address is deliberately not a fallback: `CdnMirror:Ip` is 0.0.0.0 in a container by design, which
+		// is unreachable as a destination - so falling back to it would be wrong in exactly the deployment that has a
+		// non-default value to fall back to.
+		[Fact]
+		public void TheBindAddressIsNotUsedAsADestination()
+		{
+			var config = Config(("CdnMirror:Ip", "0.0.0.0"));
+
+			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress);
 		}
 
 		private static IConfiguration Config(params (string Key, string? Value)[] values)
