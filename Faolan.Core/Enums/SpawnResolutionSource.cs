@@ -22,6 +22,14 @@ namespace Faolan.Core.Enums
 		IdPropagation = 3,
 
 		// Set by hand (a GM/editor pass), overriding any machine guess. Highest confidence.
-		Manual = 4
+		Manual = 4,
+
+		// The group's own DECLARED creature race (RDB 1010506 `category=Race`, whose id is the 1000508 race id)
+		// resolved to the single spawnable template we hold of that race. Only applied where the race is
+		// UNAMBIGUOUS - one candidate template, so there is nothing to choose between - and where the group's name
+		// does not contradict it. The client STATES the race, so this reads data rather than inferring from
+		// geometry: a `GrasslandsRabbit` group declares race 72 = Rabbit and we hold exactly one rabbit. Where a
+		// race has several templates the area is left None rather than one being picked (#518).
+		RaceUnique = 5
 	}
 }

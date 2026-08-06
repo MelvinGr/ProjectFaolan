@@ -5720,8 +5720,8 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine("before:\n" + await Tally());
-			var stats = await SpawnAreaResolver.ResolveAsync(db, roamPaths);
-			Console.WriteLine($"resolved: name={stats.Name} containment={stats.Containment} id-propagation={stats.IdProp}");
+			var stats = await SpawnAreaResolver.ResolveAsync(db, roamPaths, SpawnAreaResolver.LoadRaceNames(rdb));
+			Console.WriteLine($"resolved: name={stats.Name} containment={stats.Containment} id-propagation={stats.IdProp} race-unique={stats.RaceUnique}");
 			Console.WriteLine("after:\n" + await Tally());
 		}
 

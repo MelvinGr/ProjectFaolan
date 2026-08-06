@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -13,8 +16,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The tiered NpcSpawnArea creature resolver (#363): tier 1 name, tier 2 gated containment, tier 3 guarded
-	// id-propagation. The headline case is the shared-community guard - Slaver1 and Poacher1 both sit under Community
-	// 60, so id-propagation would wrongly write "Poacher" onto the slavers; the name-disagreement guard must block it.
+	// id-propagation, tier 4 the group's own declared race (#518). The headline case is the shared-community guard -
+	// Slaver1 and Poacher1 both sit under Community 60, so id-propagation would wrongly write "Poacher" onto the
+	// slavers; the name-disagreement guard must block it. Tier 4's gates are the same idea asked of the RACE.
 	public class SpawnAreaResolverTests
 	{
 		[Fact]
@@ -307,7 +311,7 @@ namespace Faolan.Tests
 			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 		}
 
-		private static NpcTemplate Spawnable(uint id, string name)
+		private static NpcTemplate Spawnable(uint id, string name, uint? race = null)
 		{
 			return new NpcTemplate
 			{
@@ -315,9 +319,168 @@ namespace Faolan.Tests
 				Name = name,
 				StatCore = new NpcStatCore
 				{
-					NpcTemplateId = id
+					NpcTemplateId = id,
+					Race = race
 				}
 			};
+		}
+
+		// --- Tier 4: the group's own DECLARED race (#518) -----------------------------------------------------
+		// A `Race`-category group's id IS the RDB 1000508 race id, so where we hold exactly ONE template of that race
+		// there is nothing to choose between and the area resolves. The three gates are what keep it off a guess:
+		// the race must be unambiguous, the group's own name must not contradict it, and it must not displace a
+		// higher tier.
+
+		private static CreatureRaces Races(params (uint Id, string Name)[] rows)
+		{
+			// Build the record the reader expects rather than the dictionary, so the gates exercise the real parse:
+			// [type][id][version][count] then count x [raceId][nameLength][name].
+			using var ms = new MemoryStream();
+			using var w = new BinaryWriter(ms);
+			w.Write(CreatureRaceTable.RdbType);
+			w.Write(0u);
+			w.Write(1u);
+			w.Write((uint)rows.Length);
+			foreach (var (id, name) in rows)
+			{
+				w.Write(id);
+				w.Write((uint)name.Length);
+				w.Write(Encoding.Latin1.GetBytes(name));
+			}
+
+			w.Flush();
+			return CreatureRaceTable.Parse(ms.ToArray());
+		}
+
+		[Fact]
+		public void TheRaceTable_ParsesToItsOwnDeclaredCount()
+		{
+			var races = Races((72, "Rabbit"), (56, "Rat"), (77, "Giant"));
+
+			Assert.True(races.Exact);
+			Assert.Equal(0, races.TrailingBytes);
+			Assert.Equal("Rabbit", races.Races[72]);
+		}
+
+		// The compound case that made the first cut of this tier under-resolve by 19 areas: `GiantRat01` names Giant
+		// AND Rat, and taking only the FIRST would make the group contradict its own declared race.
+		[Fact]
+		public void AGroupNameNamingSeveralRaces_CorroboratesWhenAnyOfThemIsTheDeclaredOne()
+		{
+			var races = Races((72, "Rabbit"), (56, "Rat"), (77, "Giant"));
+
+			Assert.Equal([56u, 77u], races.MatchRaces("GiantRat01").Order());
+			Assert.False(races.ContradictsRace("GiantRat01", 56));  // names Rat -> corroborates
+			Assert.False(races.ContradictsRace("Territory14", 56)); // names no race -> says nothing, so blocks nothing
+			Assert.True(races.ContradictsRace("RabbitWarren2", 56)); // names ONLY Rabbit -> a real conflict
+		}
+
+		[Fact]
+		public async Task AnUnambiguousRace_ResolvesTheArea_EvenWhenTheTemplateNameSharesNoWordWithTheGroup()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-r-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+
+					// "Old Buck" is the shipped rabbit, and shares no word with "GrasslandsRabbit42" - the whole point
+					// of guarding on the RACE name rather than the creature's.
+					db.NpcTemplates.Add(Spawnable(100, "Old Buck", 72));
+					db.NpcSpawnAreas.Add(Area(4010, 0, "GrasslandsRabbit42", "Race", 72));
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					var stats = await SpawnAreaResolver.ResolveAsync(db, null, Races((72, "Rabbit")));
+					Assert.Equal(1, stats.RaceUnique);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
+					Assert.Equal(100u, a.NpcTemplateId);
+					Assert.Equal(SpawnResolutionSource.RaceUnique, a.ResolvedBy);
+				}
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
+		// The gate that keeps this from being the guess #518 argues against: a race we hold SEVERAL templates for
+		// says which family lives here but not which creature, so the area stays honestly unresolved.
+		[Fact]
+		public async Task AnAmbiguousRace_LeavesTheAreaUnresolved_RatherThanPickingOne()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-ra-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+					db.NpcTemplates.AddRange(Spawnable(100, "Rotting Corpse", 93), Spawnable(101, "Risen Dead", 93));
+					db.NpcSpawnAreas.Add(Area(4010, 0, "CaveUndead1", "Race", 93));
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					var stats = await SpawnAreaResolver.ResolveAsync(db, null, Races((93, "Undead")));
+					Assert.Equal(0, stats.RaceUnique);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
+					Assert.Null(a.NpcTemplateId);
+					Assert.Equal(SpawnResolutionSource.None, a.ResolvedBy);
+				}
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
+		// A group whose own name names a DIFFERENT race than it declares is left alone - the same shape as tier 3's
+		// Slaver-under-Poacher guard, asked of the race instead of the creature.
+		[Fact]
+		public async Task AGroupNameContradictingItsDeclaredRace_IsLeftUnresolved()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-rc-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+					db.NpcTemplates.Add(Spawnable(100, "Mouse", 56));
+					db.NpcSpawnAreas.Add(Area(4010, 0, "CatTerritory", "Race", 56)); // declares Rat, names Cat
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					var stats = await SpawnAreaResolver.ResolveAsync(db, null, Races((56, "Rat"), (43, "Cat")));
+					Assert.Equal(0, stats.RaceUnique);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+					Assert.Null((await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken)).NpcTemplateId);
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
 		}
 	}
 }

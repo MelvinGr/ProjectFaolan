@@ -118,9 +118,24 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
 - **1010506 carries no creature template** (except `Name` groups): the creature `TemplateId` is
   server-authoritative (sent on the wire at spawn), and is **not** in the client RDB — confirmed via the empty
   spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
-  absent from every other resource. So the creature can only be inferred from captures (`SpawnAreaResolver`:
-  name / gated containment / guarded id-propagation), which resolves **506 of the 3,970 areas**; the rest await
+  absent from every other resource. So the creature is inferred (`SpawnAreaResolver`: name / gated containment /
+  guarded id-propagation / the group's declared race), which resolves **790 of the 3,970 areas**; the rest await
   captures or a manual pass. See #363 and #518.
+
+  **The `Race`-category groups are the exception to "inferred from captures".** A group's `id` under that category
+  IS the RDB 1000508 creature-race id — the client STATING what lives there — so where we hold exactly one
+  spawnable template of that race there is nothing left to infer. That tier (`RaceUnique`) resolves **283 areas /
+  1,851 ambient creatures** across 7 creatures, and the identity behind it is independently checked: of the areas
+  already resolved by name/containment/propagation, 369 of 415 carry a template whose `NpcStatCore.Race` equals the
+  race their group declares — two sources that share nothing agreeing at 89%.
+
+  ⚠️ **Unambiguous or nothing.** A race with several candidate templates says which FAMILY lives here, not which
+  creature, so those areas stay unresolved rather than taking an arbitrary one: 283 areas sit on a single-candidate
+  race, 36 on a race with 2–3, 555 on a race with 4+, and 260 on a race we hold no template for at all. Only the
+  first bucket is taken. The tier also runs LAST (it never displaces a name/containment answer) and is blocked when
+  the group's own name names a *different* race — `CatTerritory` declares Rat and is left alone. The guard is on the
+  RACE name, not the creature's: `GrasslandsRabbit42` shares no word with `Old Buck`, which is exactly why the
+  creature-name guard tier 3 uses would have rejected 200 correct areas.
 
   The containment tier votes on captured spawns standing **on the group's wander path**, not merely inside its
   roam AABB (#491). The box also holds the hand-placed NPCs standing in it — a village overlapping a territory,

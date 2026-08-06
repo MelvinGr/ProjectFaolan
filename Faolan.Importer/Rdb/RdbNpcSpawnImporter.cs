@@ -137,8 +137,9 @@ namespace Faolan.Importer.Rdb
 			if (restored > 0)
 				await db.SaveChangesAsync();
 
-			// Infer the creature (NpcTemplateId) per area where we can - name / gated containment / guarded id-prop.
-			var resolved = await SpawnAreaResolver.ResolveAsync(db, roamPaths);
+			// Infer the creature (NpcTemplateId) per area where we can - name / gated containment / guarded id-prop /
+			// the group's own declared race where that race has exactly one candidate template (#518).
+			var resolved = await SpawnAreaResolver.ResolveAsync(db, roamPaths, SpawnAreaResolver.LoadRaceNames(rdb));
 
 			return new Result(maps, areas, points, emptyMaps, unreadable, resolved);
 		}

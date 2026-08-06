@@ -7,12 +7,14 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb;
+using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
 	// Pre-fills each NpcSpawnArea's creature (NpcTemplateId) from what we CAN infer, since the RDB carries WHERE + how
-	// many but never WHICH (#363). Three confidence tiers, applied in order, never overwriting a Manual assignment:
+	// many but never WHICH (#363). Four confidence tiers, applied in order, never overwriting a Manual assignment:
 	//   1. Name         - the group name / Name-id (4-char tag stripped) matches a spawnable NpcTemplate by name.
 	//   2. Containment  - unanimous (>= 2) captured NpcSpawns standing ON the group's RDB wander path; the whole roam
 //                     AABB is only a fallback, gated by the same name guard as tier 3 (#491). Captured maps only.
@@ -21,12 +23,19 @@ namespace Faolan.Importer.Rdb
 	//                     Community 60 is left alone), AND the id must have been resolved by tier 1-2 on THAT MAP
 	//                     (#489) - a numeric id names a family, not a species, so an observation on one playfield
 	//                     says nothing about the same family on another.
+	//   4. RaceUnique   - the group's own DECLARED race (a `Race`-category id IS the RDB 1000508 race id), where we
+	//                     hold exactly ONE spawnable template of that race. The client states the race, so this is
+	//                     the only tier that reads rather than infers; the unambiguity gate is what keeps it from
+	//                     becoming a guess, and a race with several candidates is left unresolved (#518).
 	// Machine assignments are RESET at the start, so this is idempotent and a rules change reaches existing rows;
-	// a Manual assignment is never touched. Measured coverage: 188 of 2,669 areas. The rest await captures / a
-	// manual `.setnpcgroup` pass - honestly unknown rather than wrongly guessed.
+	// a Manual assignment is never touched. The rest await captures / a manual `.setnpcgroup` pass - honestly
+	// unknown rather than wrongly guessed.
 	public static class SpawnAreaResolver
 	{
 		private const float ContainPad = 10f; // captured-spawn search: pad the roam AABB by this (world units), X/Z
+		// The 1010506 group `category` whose id is a creature race (RDB 1000508). Named once - tier 4 keys on it.
+		private const string RaceCategory = "Race";
+
 		private static readonly Regex FourCharTag = new(@"\s*\([0-9A-Za-z]{4}\)\s*$", RegexOptions.Compiled);
 
 		// Name families that carry no creature claim - a group so named may take a propagated creature even if its name
@@ -37,11 +46,21 @@ namespace Faolan.Importer.Rdb
 		private static readonly Regex TrailingIndex = new(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
 		private static readonly Regex Word = new(@"[a-z]+", RegexOptions.Compiled);
 
+		// The client's creature race table (RDB 1000508), or null when the RDB has no such entry. Tier 4's guard needs
+		// the race NAMES, not just the ids, so both callers load it here rather than each rolling their own.
+		public static CreatureRaces? LoadRaceNames(RdbReader rdb)
+		{
+			return rdb.TryGet(CreatureRaceTable.RdbType, 0, out var entry) && rdb.CanRead(entry)
+				? CreatureRaceTable.Parse(rdb.ReadDecompressed(entry))
+				: null;
+		}
+
 		// `roamPaths` maps an NpcSpawnArea id to that territory's RDB wander polylines (1010506 `RoamPaths`). It is the
 		// containment tier's membership test (#491) and is NOT stored in the DB - ~740k points corpus-wide would dwarf
 		// the seed - so both callers read it from the RDB and hand it in. Pass null and tier 2 falls back to the roam
 		// AABB alone, which is the pre-#491 behaviour.
-		public static async Task<ResolveStats> ResolveAsync(DatabaseContext db, IReadOnlyDictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>? roamPaths = null)
+		public static async Task<ResolveStats> ResolveAsync(DatabaseContext db, IReadOnlyDictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>? roamPaths = null,
+			CreatureRaces? raceNames = null)
 		{
 			// Spawnable templates (those with a StatCore) keyed by lowercase name -> a representative TemplateId.
 			var withStatCore = (await db.NpcStatCores.Select(s => s.NpcTemplateId).ToListAsync()).ToHashSet();
@@ -224,6 +243,65 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
+			// ---- Tier 4: the group's own DECLARED race, where that race is UNAMBIGUOUS (#518) ----
+			// A `Race`-category group carries the creature's race id (RDB 1000508) as its `CommunityId`. That is the
+			// client STATING what lives here, not us inferring it from a name or a geometry vote - so where we hold
+			// exactly ONE spawnable template of that race, there is nothing left to choose and the area resolves.
+			//
+			// The unambiguity gate is the whole point, and it is what keeps this off the guess #518 argues against.
+			// Of the unresolved Race groups: 284 areas sit on a race with exactly one candidate template, 36 on a
+			// race with 2-3, 555 on a race with 4 or more, and 260 on a race we hold no template for at all. Only the
+			// first bucket is taken. Standing an ARBITRARY one of eleven Undead templates into a camp would be the
+			// wrong-guess-is-worse-than-absent trade; standing our one rabbit into a `GrasslandsRabbit` group is not.
+			//
+			// Runs LAST so it never displaces a name/containment/propagation answer, and it carries the same
+			// name-contradiction guard tier 3 uses - a group whose own name names a different creature family is
+			// left alone rather than overridden by its race.
+			var raceCandidates = new Dictionary<uint, List<uint>>();
+			foreach (var s in await db
+				         .NpcStatCores.Where(s => s.Race != null && s.Race != 0)
+				         .Select(s => new
+				         {
+					         s.NpcTemplateId,
+					         Race = s.Race!.Value
+				         })
+				         .ToListAsync())
+			{
+				if (!raceCandidates.TryGetValue(s.Race, out var list))
+					raceCandidates[s.Race] = list = [];
+				list.Add(s.NpcTemplateId);
+			}
+
+			var raceUnique = 0;
+			foreach (var a in areas)
+			{
+				if (a.ResolvedBy != SpawnResolutionSource.None || a.Category != RaceCategory || a.CommunityId is not { } raceId)
+					continue;
+
+				// Exactly one candidate, or nothing doing. `Distinct()` because a race's templates are collected per
+				// StatCore row and the same template must not look like two candidates.
+				if (!raceCandidates.TryGetValue(raceId, out var candidates))
+					continue;
+
+				var distinct = candidates.Distinct().ToList();
+				if (distinct.Count != 1)
+					continue;
+
+				// GUARD on the RACE name, not the template name. Tier 3's guard compares the group name to the
+				// creature's name because there a numeric id names a family and the name is the only cross-check.
+				// Here the race itself is named (RDB 1000508), so the sharper question is available: does the group's
+				// own name claim a DIFFERENT race than the one it declares? `GrasslandsRabbit42` declares race 72 and
+				// names Rabbit - agreement, even though the template is called `Old Buck`, which the template-name
+				// guard would have rejected. A name claiming no race at all (`Territory14`) passes: it contradicts
+				// nothing. Only an actual conflict blocks.
+				if (raceNames?.ContradictsRace(a.GroupName, raceId) == true)
+					continue;
+
+				a.NpcTemplateId = distinct[0];
+				a.ResolvedBy = SpawnResolutionSource.RaceUnique;
+				raceUnique++;
+			}
+
 			await db.SaveChangesAsync();
 
 			// #363 auto-link: materialize which captured NpcSpawns each resolved area OWNS (same creature, inside the
@@ -231,7 +309,7 @@ namespace Faolan.Importer.Rdb
 			// have resolved areas (the captured ones); uncaptured maps have no spawns to link.
 			var linked = await LinkCapturedSpawns(db, areas);
 
-			return new ResolveStats(name, contain, idprop, name + contain + idprop, areas.Count, linked);
+			return new ResolveStats(name, contain, idprop, raceUnique, name + contain + idprop + raceUnique, areas.Count, linked);
 		}
 
 		// The one template every candidate agrees on (>= 2 of them), or null when the set is short or split.
@@ -379,5 +457,5 @@ namespace Faolan.Importer.Rdb
 		}
 	}
 
-	public readonly record struct ResolveStats(int Name, int Containment, int IdProp, int Total, int Areas, int Linked);
+	public readonly record struct ResolveStats(int Name, int Containment, int IdProp, int RaceUnique, int Total, int Areas, int Linked);
 }
