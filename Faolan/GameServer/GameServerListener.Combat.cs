@@ -46,9 +46,9 @@ namespace Faolan.GameServer
 				b => b.WriteArrayUInt32Length(SimpleCharKilledByUpdateCodec.Build(dyingHandle, killerEndpoint))));
 		}
 
-		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
+		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, ShieldArc arc)
 		{
-			return CombatService.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
+			return CombatService.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter, arc);
 		}
 
 		Task IWorldOutbound.SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)

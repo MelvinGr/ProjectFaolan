@@ -127,18 +127,32 @@ namespace Faolan.GameServer.Combat
 		// ⚠️ An NPC's swing is NOT a different kind of thing from a player's - it is the same Left/Mid/Right, and
 		// only that (Melvin, 2026-08-05). Nothing about it is visible on the mob: the shields drawn over a defender
 		// are a UI OVERLAY of the rose, not a model or animation state, so there is no left-swing/right-swing pose to
-		// look for on either side. That is also why the corpus is silent - not one of ~63k NPC-actor BCC records
-		// carries a direction word, while the player's own swings echo back one-for-one, because the player's
-		// direction rides on an ABILITY id and a mob has no ability to name.
+		// look for on either side.
 		//
-		// So the mechanic is symmetric and the SELECTOR is the only unknown. Mitigation is server-side either way
-		// (the client registers all eight `Combat_{PvE,PvP}{0..3}ShieldBonus` tweaks and reads none), so the server
-		// picks, uniformly over the three.
+		// ⚠️ CORRECTED (#673). This used to say "not one of ~63k NPC-actor BCC records carries a direction word".
+		// That is true of the direction ABILITY - a mob has none to name, and the actor-split census confirms word 5
+		// is present on 515 player-actor swings and ZERO of 2,691 NPC-actor ones - but the swing states its direction
+		// a SECOND way, in each hit result's own type word, and that IS on a mob's swing:
 		//
-		// ⚠️ PLACEHOLDER, unlike everything else in this class - it is the DISTRIBUTION that is assumed, not the
-		// mechanic. `Roll` is uniform because the corpus MEASURED it uniform (chi-square 2.8); this is uniform
-		// because nothing observes it. What would replace it is evidence that a mob favours an arc (its own AI
-		// tendency, or aiming at the player's weakest guard the way a player aims at the mob's).
+		//     NPC-actor    0xCB x896  0xC9 x545  0xCA x511  0xCD x384  0xCC x373
+		//     player-actor 0xCB x275  0xC9 x167  0xCA x145
+		//
+		// So the arc is observable after all, and two things follow. The ack now STATES the arc the mitigation
+		// charged for (`BehaviorAcks.SwingDirectionCode`) instead of a constant. And retail's mobs swing into FIVE
+		// zones where we model three: 0xCC/0xCD appear only on NPC swings and match the client's `Lower Left Attack`
+		// and `Lower Right Attack` abilities, which our rose has no arcs for - 757 of 2,709 mob swings.
+		//
+		// Mitigation is server-side either way (the client registers all eight `Combat_{PvE,PvP}{0..3}ShieldBonus`
+		// tweaks and reads none), so the server picks - uniformly over the three, for now.
+		//
+		// ⚠️ STILL A PLACEHOLDER, but no longer for the reason it says. `Roll` is uniform because the corpus
+		// MEASURED it uniform (chi-square 2.8); this was uniform because "nothing observes it", and #673 showed
+		// something does - the mob's own swings are 0xCB x896 / 0xC9 x545 / 0xCA x511 / 0xCD x384 / 0xCC x373, which
+		// is NOT uniform.
+		//
+		// It is deliberately not fitted to that yet: 757 of those 2,709 swings land in the two LOWER zones our rose
+		// has no arc for, so renormalising the other three assumes how the missing quarter would have distributed.
+		// Deciding the two lower arcs comes first; the distribution falls out of the same census afterwards.
 		public static ShieldArc SwingArc(Random random)
 		{
 			ArgumentNullException.ThrowIfNull(random);

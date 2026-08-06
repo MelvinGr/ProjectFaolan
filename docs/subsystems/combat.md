@@ -259,6 +259,30 @@ client's own overflow clamp (`CombatShieldRose.Sanitize` — over three shields 
 see them. A player enters the world already guarding the retail default `111`, which is also what their own
 snapshot stat sheet carries (`SubClassStatBlock`, `ShieldAllocation` `0x6F`).
 
+### The swing's ARC is on the wire, and the ack now states it (#673)
+
+A swing states its direction in each hit result's own type word, and split by actor the corpus shows a mob does
+this even though it names no direction *ability*:
+
+| | word 5 (the ability) | the result type |
+|---|---|---|
+| **NPC-actor** (2,691 swings) | never present | `0xCB` ×896, `0xC9` ×545, `0xCA` ×511, `0xCD` ×384, `0xCC` ×373 |
+| **player-actor** (515 swings) | present on all 515 | `0xCB` ×275, `0xC9` ×167, `0xCA` ×145 |
+
+Both ends of the `ShieldArc` → code mapping are the client's own naming, so it is recovered rather than
+assigned: `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}` (the LDB renders `Mid` as `ShieldUp%1%`, i.e.
+the overhead arc), and the codes are pinned to the `Abilities` rows with zero exceptions — `Left` → `0xC9`
+(`Upper Left Attack`), `Right` → `0xCA` (`Upper Right Attack`), `Mid` → `0xCB` (`Overhead Attack`).
+
+We used to draw the arc **twice**: `CombatShieldRose.SwingArc` rolled one for the mitigation while
+`BehaviorAcks.HitResultBlock` wrote a constant `0xCB`, so the packet said *overhead* on every swing regardless of
+what the player actually took. It is one draw now, spent on both.
+
+⚠️ **Retail's mobs swing into five zones and our rose models three.** `0xCC`/`0xCD` appear only on NPC swings and
+match the client's two further abilities, `Lower Left Attack` and `Lower Right Attack` — 757 of 2,709 mob swings.
+That is also why `SwingArc`'s uniform pick is not yet fitted to the measured (non-uniform) distribution:
+renormalising the three we model would assume how the missing quarter would have distributed.
+
 The spawn scaffold's shield word (`SpawnPreIir.WordStatIds[13]` → stat `0xA5`) is deliberately left at 0: 310 of
 the 317 captured PLAYER frames carry 0 there, so retail does not seed a viewer's rose from the spawn either.
 

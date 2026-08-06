@@ -363,17 +363,20 @@ namespace Faolan.GameServer.World
 			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level, character.Level, npc.RangedAttacker), target.ArmorRating, character.Level,
 				target.AttributeWireScore(CharacterStatId.Strength));
 			// #621: the player's shield rose finally does something in PvE. The arc is the direction the MOB SWINGS -
-			// the same left/overhead/right the player's own direction abilities pick - not where the mob is standing;
-			// it is unobservable (no NPC swing carries a direction word and the mitigation is server-side), so the
-			// pick is uniform and marked as the placeholder it is on CombatShieldRose.SwingArc. The player defender
-			// takes the gentler Combat_PvP* column, matching CombatService's rule, and it is applied AFTER armour,
-			// like the player-swing path.
-			damage = (int)CombatShieldRose.ApplyArcMitigation((uint)damage, target.ShieldDistribution,
-				CombatShieldRose.SwingArc(Random.Shared), playerVersusPlayer: true);
+			// the same left/overhead/right the player's own direction abilities pick - not where the mob is standing.
+			// The pick is uniform and marked as the placeholder it is on CombatShieldRose.SwingArc. The player
+			// defender takes the gentler Combat_PvP* column, matching CombatService's rule, and it is applied AFTER
+			// armour, like the player-swing path.
+			//
+			// ⚠️ DRAWN ONCE, spent twice (#673). The swing's direction is on the wire - the hit result's type word IS
+			// it - so the ack below has to state the same arc the mitigation charged for. Two draws made the packet
+			// and the damage disagree on every swing.
+			var arc = CombatShieldRose.SwingArc(Random.Shared);
+			damage = (int)CombatShieldRose.ApplyArcMitigation((uint)damage, target.ShieldDistribution, arc, playerVersusPlayer: true);
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
-			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter);
+			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, arc);
 
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
 				return;

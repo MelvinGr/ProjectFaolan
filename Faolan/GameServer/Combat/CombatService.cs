@@ -754,14 +754,18 @@ namespace Faolan.GameServer.Combat
 		// hit-react. Visual only - the authoritative HP move rides the world-tick StatUpdate, so the damage here is just
 		// the floating combat number. The animation/result params are capture-typical (not semantically decoded); the
 		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.
-		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
+		//
+		// `arc` is the direction the mob swung, and it MUST be the same draw the mitigation spent (#673): the result
+		// record's type word IS that direction on the wire, so sending a constant while rolling an arc for the damage
+		// told the client "overhead" on every swing regardless of what the player actually took.
+		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, ShieldArc arc)
 		{
 			var playerHandle = client.Session.Character.Id;
 			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
 			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter));
+			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, BehaviorAcks.SwingDirectionCode(arc)));
 			return SendWorldPacket(client, body);
 		}
 

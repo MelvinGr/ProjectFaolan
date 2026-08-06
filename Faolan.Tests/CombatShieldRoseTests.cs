@@ -210,6 +210,29 @@ namespace Faolan.Tests
 				Assert.Equal(100u, CombatShieldRose.ApplyArcMitigation(100, 111, arc, playerVersusPlayer: true));
 		}
 
+		// #673: the arc the mitigation charges for is the arc the ACK states, and the mapping is the client's own on
+		// both ends - `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}` (LDB `ShieldUp%1%` for Mid, i.e. the
+		// overhead arc) and the codes are pinned to the `Abilities` rows `Upper Left`/`Upper Right`/`Overhead Attack`
+		// with zero exceptions over the corpus. So this asserts a decoded correspondence, not a convention.
+		[Theory]
+		[InlineData(ShieldArc.Left, (byte)0xC9)]
+		[InlineData(ShieldArc.Right, (byte)0xCA)]
+		[InlineData(ShieldArc.Mid, (byte)0xCB)]
+		public void SwingDirectionCode_IsTheClientsOwnDirectionCode(ShieldArc arc, byte expected)
+		{
+			Assert.Equal(expected, BehaviorAcks.SwingDirectionCode(arc));
+		}
+
+		// Every arc maps, and to a DISTINCT code - a mapping that collapsed two arcs onto one would state the wrong
+		// direction on the wire for one of them and never fail an equality test written arc-by-arc.
+		[Fact]
+		public void SwingDirectionCode_IsOneToOneOverTheWholeEnum()
+		{
+			var codes = Enum.GetValues<ShieldArc>().Select(BehaviorAcks.SwingDirectionCode).ToList();
+
+			Assert.Equal(codes.Count, codes.Distinct().Count());
+		}
+
 		private static uint[] Arcs(uint value)
 		{
 			var (left, mid, right) = CombatShieldDistribution.Unpack(value);

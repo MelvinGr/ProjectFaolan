@@ -4,6 +4,7 @@ using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 
@@ -56,8 +57,25 @@ namespace Faolan.Importer.Cli
 			var joint = new Dictionary<(uint W4, uint W5), int>();
 			var versusResult = new Dictionary<(uint W4, uint ResultType), int>();
 			var versusDirection = new Dictionary<(uint W5, uint ResultType), int>();
+			// #673: the SwingArc comment says an NPC's swing carries no direction word. Word 5 is an ability id and a
+			// mob has none, so that is true of word 5 - the question is whether the per-victim RESULT type, which
+			// turned out to be the same direction, is present on a mob's swing too. Split by ACTOR to answer it.
+			var byActor = new Dictionary<(bool Player, string Field, uint Value), int>();
 
 			foreach (var c in captures)
+			{
+				// Who is an NPC, per capture. A retail character id is ~0x0131xxxx, i.e. BELOW
+				// EntityHandles.CharacterInstanceBase, so the handle number line cannot answer this on a capture -
+				// the only reliable test is the spawn itself, and `player_stats` is what distinguishes the two.
+				var npcHandles = new HashSet<uint>();
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
+						continue;
+					if (p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn) && spawn.Character?.player_stats == null)
+						npcHandles.Add(spawn.Handle);
+				}
+
 			foreach (var p in c.Packets)
 			{
 				if (p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
@@ -85,8 +103,11 @@ namespace Faolan.Importer.Cli
 
 				var key = (middle[^4], middle[^3]);
 				joint[key] = joint.GetValueOrDefault(key) + 1;
+				var playerActor = !npcHandles.Contains(bcc.Actor);
+				Count(playerActor, "word5 direction", middle[^3]);
 				foreach (var rt in resultTypes)
 				{
+					Count(playerActor, "result type", rt);
 					var rkey = (middle[^4], rt);
 					versusResult[rkey] = versusResult.GetValueOrDefault(rkey) + 1;
 					var dkey = (middle[^3], rt);
@@ -95,6 +116,7 @@ namespace Faolan.Importer.Cli
 
 				if (middle.Skip(2).Any(w => w != 0))
 					interesting.Add((c.Name, p.Frame, middle, targets, results));
+			}
 			}
 
 			Console.WriteLine($"{tails} s2c attack tails (Combat:Melee / :Ranged / :Unarmed) across {captures.Count} captures");
@@ -156,6 +178,14 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"      {named,-20} result type 0x{rt:X2}  x{n}");
 			}
 
+			Console.WriteLine();
+			Console.WriteLine("by ACTOR - does a MOB's swing state a direction at all? (#673):");
+			foreach (var ((player, field, value), n) in byActor.OrderBy(kv => kv.Key.Player).ThenBy(kv => kv.Key.Field).ThenByDescending(kv => kv.Value))
+			{
+				var named = abilities.TryGetValue(value, out var an) ? an : value == 0 ? "-" : $"0x{value:X}";
+				Console.WriteLine($"      {(player ? "player" : "NPC   "),-7} {field,-16} {named,-20} x{n}");
+			}
+
 			if (interesting.Count == 0)
 				return;
 
@@ -163,6 +193,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"{interesting.Count} tail(s) with a NON-ZERO word past the selector - the ones that carry anything:");
 			foreach (var (capture, frame, middle, targets, results) in interesting.Take(20))
 				Console.WriteLine($"  {capture} frame {frame}  targets={targets} results={results}  [{string.Join(" ", middle.Select(Describe))}]");
+
+			void Count(bool player, string field, uint value)
+			{
+				var key = (player, field, value);
+				byActor[key] = byActor.GetValueOrDefault(key) + 1;
+			}
 		}
 
 		private static string Label(int i) => i < MiddleSlots.Length ? i.ToString() : "2b";

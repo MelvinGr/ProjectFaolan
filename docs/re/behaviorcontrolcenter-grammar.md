@@ -198,9 +198,22 @@ The corpus carries `0xCC` and `0xCD` as well, on swings with no direction abilit
 two more of these abilities — 769096 `Lower Left Attack` and 769097 `Lower Right Attack` — so the alphabet is the
 five-zone rose. Which of the two lower ones is `0xCC` is **not** established and is not guessed here.
 
-⚠️ Word 5 is zero on an NPC's swing (a mob has no ability to name), but the result type is present on those too,
-so a defender's direction information is on the wire either way. What that means for the shield rose's
-server-side arc pick is #673.
+Split by ACTOR — classified per capture by whether the actor handle is a known NPC spawn, since a retail
+character id (~`0x0131xxxx`) sits *below* `EntityHandles.CharacterInstanceBase` and the handle number line cannot
+answer it:
+
+| | word 5 (the ability) | the result type |
+|---|---|---|
+| **NPC-actor** (2,691 swings) | **never present** | `0xCB` ×896, `0xC9` ×545, `0xCA` ×511, `0xCD` ×384, `0xCC` ×373 |
+| **player-actor** (515 swings) | present on 515 | `0xCB` ×275, `0xC9` ×167, `0xCA` ×145 |
+
+So a mob names no ability — it has none — but it **does** state its swing's direction, in the result type, and it
+uses all five zones where the captured players use the three they had unlocked. The arc is therefore observable,
+which is what `CombatShieldRose.SwingArc`'s "nothing observes it" note was wrong about (#673): the ack now states
+the arc the mitigation charged for, via `BehaviorAcks.SwingDirectionCode`.
+
+⚠️ And retail's mobs swing into **five** zones where our rose models three — 757 of 2,709 mob swings land in
+`0xCC`/`0xCD`, the two `Lower * Attack` abilities we have no arc for.
 
 ### The delay phase — behaviorType `0x0E` (#549)
 

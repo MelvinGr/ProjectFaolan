@@ -194,6 +194,26 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return s.ToArray();
 		}
 
+		// The wire code for the arc a swing came in on (#673). Both ends of this mapping are the CLIENT's own
+		// naming, so it is recovered rather than assigned: `ShieldArc` is named for `Combat_Shield_{Left,Mid,Right}`
+		// (and the LDB renders Mid as `ShieldUp%1%`, i.e. the overhead arc), while the codes are pinned to the
+		// `Abilities` rows `Upper Left Attack` / `Upper Right Attack` / `Overhead Attack` with zero exceptions over
+		// the corpus - see ResultType above.
+		//
+		// ⚠️ Retail's mobs use FIVE codes and we model three: 0xCC and 0xCD appear only on NPC-actor swings (757 of
+		// 2,709) and match the client's two further abilities, `Lower Left Attack` and `Lower Right Attack`. Our
+		// rose has no lower arcs, so those two swings have no arc to be - which is a gap in the ROSE, not here.
+		public static byte SwingDirectionCode(ShieldArc arc)
+		{
+			return arc switch
+			{
+				ShieldArc.Left => 0xC9,
+				ShieldArc.Right => 0xCA,
+				ShieldArc.Mid => 0xCB, // "Mid" is the client's overhead arc, not a middle-height one
+				_ => throw new ArgumentOutOfRangeException(nameof(arc), arc, "unknown shield arc")
+			};
+		}
+
 		// One 41-byte result record: who was hit, for how much, and the still-undecoded result codes.
 		internal readonly record struct HitResult(uint VictimHandle, uint Damage, byte ResultType = 0xCB, uint K1 = 1, uint K2 = 2);
 
