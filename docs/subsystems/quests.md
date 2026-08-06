@@ -165,6 +165,28 @@ The completing packet names the goal that **just** completed. On a single-goal q
 head goal, which is why naming `QuestDefinition.GoalId` looked right for so long; on a multi-goal quest it is
 not (12371 closes on 3497 while its head goal is 3495).
 
+### Goals recovered from a second full-update record, and what makes one PARTIAL
+
+`QuestGoalDefinition.Partial` marks a goal recovered from the second 50304 record of its `QuestFullUpdate` -
+identity and objective text only, with no verb, target, count or marker block. It is what
+`AllGoalsComplete`, `MatchingKillGoal` and `QuestObjectiveRegion.Build` skip on, so a partial goal is INVISIBLE
+in-client: its quest presents as if it had one fewer objective.
+
+Two rows were in that state, both on quests granted and completed between snapshots so no login ever HELD them.
+One is now typed:
+
+- **10287 g7363 "Ask Tina about Nadini"** — typed from its own objective TEXT. The rule that already wires
+  "Talk/Speak/Report to X" did not recognise `Ask X about Y`, because the name follows the verb instead of a
+  to/with. Over all 7,317 catalog goals exactly THREE objectives begin with "Ask", so the shape is unambiguous;
+  the goal is now `TalkToNpc` on **Tina** (NpcTemplate 2805, who has captured dialogue), count 1, and the quest
+  presents with both of its objectives.
+- **12369 g7134 "Find the gate key"** — still partial. It is a `Collect` (kind 23) with no typed reference, so
+  what it needs is the ITEM id, and no mechanical rule supplies one. ⚠️ Circumstantially it is almost certainly
+  **`Acheronian Gate Key` (item 193186)**: it is the only item in the catalog whose name contains "gate key",
+  and the sibling goal on the same quest is "Unlock the Acheronian gate". That is a one-quest inference, not a
+  rule, and it is deliberately NOT seeded — a wrong quest item makes a quest silently un-completable, which is
+  worse than an objective that does not render. Tracked on Gitea #527.
+
 *Sources:* `xxx_mage-necromancer_login_play2_tortage_city_first-quests` fr4247/4815/4872/5488,
 `Hoxxling_mage-heraldofxotli_login_gameplay2` fr4310/4367/4447/5102 and `…_login_gameplay` fr3633/3634/11942,
 `xxx_mage-{demo,necromancer}_login_play*`, `loot-drag-1538` fr2843. Gated by `QuestGoalHandoffTests`.

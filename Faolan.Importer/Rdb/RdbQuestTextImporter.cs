@@ -38,6 +38,23 @@ namespace Faolan.Importer.Rdb
 		// Aquilonia".
 		private static readonly Regex TalkObjective = new(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+		// The other shape of the same objective: "ASK <someone> ABOUT <something>". It is a talk goal - the player
+		// opens a greeting and nothing changes hands - but the name follows the VERB rather than a to/with, so
+		// `Recipient` cannot find it and `TalkObjective` does not recognise it. That is why quest 10287's "Ask Tina
+		// about Nadini" (goal 7363) sat `Partial` and its quest presented in-client as a ONE-goal quest (#527).
+		//
+		// Measured before it was added, over all 7,317 catalog goals: exactly THREE objectives begin with "Ask", and
+		// the shape is not ambiguous with anything else -
+		//   7363  "Ask Tina about Nadini"                                    -> Tina (NpcTemplate 2805)
+		//   6597  "Ask Cavan about the Gambler"                              -> Cavan (9141); already typed, so the
+		//                                                                       bootstrap guard above skips it
+		//   11739 "Ask a Faction Contact for Information on the Assassinations" -> "Faction Contact", which is not an
+		//                                                                       NPC we hold, so it lands in the
+		//                                                                       withoutNpc count rather than silently
+		// `for` is accepted beside `about` for that third one: the verb is what makes it a talk goal, and refusing the
+		// preposition would only hide the one case worth counting.
+		private static readonly Regex AskObjective = new(@"^\s*Ask\s+(?:an?\s+)?([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)\s+(?:about|for)\s", RegexOptions.Compiled);
+
 		// The two PRECONDITION shapes the client states in a goal's text. They are RECORDED, not used to refuse the
 		// wiring: the goal is typed normally and QuestProgress.PreconditionMet enforces it at the trigger, where the
 		// live player is known. See QuestGoalDefinition.RequiredLevel.
@@ -81,7 +98,8 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				if (!isDeliver && !TalkObjective.IsMatch(text))
+				var ask = AskObjective.Match(text);
+				if (!isDeliver && !TalkObjective.IsMatch(text) && !ask.Success)
 				{
 					notOurShape++;
 					continue;
@@ -111,14 +129,15 @@ namespace Faolan.Importer.Rdb
 					? text[..rank.Index]
 					: text;
 
+				// "Ask X about Y" names X directly after the verb; every other shape names it after a to/with.
 				var match = Recipient.Matches(nameText).LastOrDefault();
-				if (match == null)
+				if (match == null && !ask.Success)
 				{
 					noName++;
 					continue;
 				}
 
-				var recipient = match.Groups[1].Value.Trim();
+				var recipient = (ask.Success ? ask : match!).Groups[1].Value.Trim();
 
 				// The name is wired whether or not we hold that NPC. It is the client's own statement of who the goal
 				// is about, so recording it is right regardless of spawn coverage - and the goal then works the moment
@@ -132,6 +151,14 @@ namespace Faolan.Importer.Rdb
 
 				goal.GoalType = QuestGoalType.TalkToNpc;
 				goal.TargetName = recipient;
+
+				// A goal this rule types is now COMPLETE - kind, target and count - so it stops being partial and
+				// starts counting. `Partial` is what `AllGoalsComplete`, `MatchingKillGoal` and
+				// `QuestObjectiveRegion.Build` skip on, so leaving it set would wire the goal and still render the
+				// quest as if it had one fewer objective (#527). Only cleared here, where the row is actually filled.
+				if (goal.Partial && goal.RequiredCount > 0)
+					goal.Partial = false;
+
 				wired++;
 			}
 
