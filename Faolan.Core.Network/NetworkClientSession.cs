@@ -169,6 +169,12 @@ namespace Faolan.Core.Network
 		// and the spell id otherwise. Session state by nature: a relog re-arms nothing, which is what retail does.
 		Dictionary<uint, long> SpellReadyAt { get; }
 
+		// #623: the same thing for melee COMBOS, keyed by the combo id. Separate from SpellReadyAt because a combo's
+		// reuse time is the catalog's own `Combo.Cooldown` (seconds) rather than the payload spell's recast, and the
+		// two are not the same number - `Grim Corruption II` has a 0 s combo cooldown and its spell has a recast.
+		// Session state by nature, exactly as SpellReadyAt: a relog re-arms nothing.
+		Dictionary<uint, long> ComboReadyAt { get; }
+
 		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
 		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
@@ -304,6 +310,7 @@ namespace Faolan.Core.Network
 		public uint ActiveCastToken { get; set; }
 
 		public Dictionary<uint, long> SpellReadyAt { get; } = [];
+		public Dictionary<uint, long> ComboReadyAt { get; } = [];
 		public uint? ConversationAgentInstance { get; set; }
 		public uint? ConversationEndedNpcHandle { get; set; }
 		public uint? ConversationNpcHandle { get; set; }

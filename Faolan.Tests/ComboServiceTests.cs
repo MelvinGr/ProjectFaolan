@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -145,6 +146,66 @@ namespace Faolan.Tests
 			var (service, client) = Setup();
 
 			Assert.Null(await service.TrackSwing(client, Swing(0xDEADBEEF)));
+		}
+
+		// #623: the reuse gate. `Cunning Strike VI` carries a 14 s `Combo.Cooldown`, so once its finisher lands the
+		// next OPENER of the same combo resolves as a plain white swing instead of starting a fresh attempt.
+		[Fact]
+		public async Task ACompletedCombo_RefusesItsNextOpenerForTheCatalogCooldown()
+		{
+			var (service, client) = Setup();
+
+			await service.TrackSwing(client, Swing(ThreeStep));
+			await service.TrackSwing(client, Swing(ThreeStep, 1));
+			Assert.True((await service.TrackSwing(client, Swing(ThreeStep, 2)))!.IsFinisher);
+
+			Assert.Null(await service.TrackSwing(client, Swing(ThreeStep)));
+
+			// The refusal leaves NO half-open attempt behind: a step-1 swing after it is a fresh opener's worth of
+			// state, not step 2 of a combo that never started.
+			Assert.Null(client.Session.ActiveComboId);
+			Assert.Equal(0, client.Session.ActiveComboStep);
+		}
+
+		// The gate is per combo id, so a different combo is unaffected by the one on cooldown.
+		[Fact]
+		public async Task AnotherCombo_IsNotHeldByTheFirstOnesCooldown()
+		{
+			var (service, client) = Setup();
+
+			await service.TrackSwing(client, Swing(ThreeStep));
+			await service.TrackSwing(client, Swing(ThreeStep, 1));
+			await service.TrackSwing(client, Swing(ThreeStep, 2));
+
+			Assert.NotNull(await service.TrackSwing(client, Swing(TwoStep)));
+		}
+
+		// A combo whose catalog cooldown is 0 - 452 of the 744 shipped rows, including `Grim Corruption II` - arms
+		// nothing, so it can be chained back to back exactly as before.
+		[Fact]
+		public async Task AZeroCooldownCombo_ArmsNothing()
+		{
+			var (service, client) = Setup();
+
+			await service.TrackSwing(client, Swing(TwoStep));
+			Assert.True((await service.TrackSwing(client, Swing(TwoStep, 1)))!.IsFinisher);
+
+			Assert.Empty(client.Session.ComboReadyAt);
+			Assert.NotNull(await service.TrackSwing(client, Swing(TwoStep)));
+		}
+
+		// Only the OPENER is gated: a sequence already under way runs to its finisher. Arranged by arming the timer
+		// directly, because the only way to get mid-attempt with the combo on cooldown is a client that ignored it.
+		[Fact]
+		public async Task AnAttemptAlreadyUnderWay_IsNotCutOffByTheCooldown()
+		{
+			var (service, client) = Setup();
+
+			Assert.NotNull(await service.TrackSwing(client, Swing(ThreeStep)));
+			client.Session.ComboReadyAt[ThreeStep] = Environment.TickCount64 + 60_000;
+
+			Assert.NotNull(await service.TrackSwing(client, Swing(ThreeStep, 1)));
+			Assert.True((await service.TrackSwing(client, Swing(ThreeStep, 2)))!.IsFinisher);
 		}
 
 		// The client's own stamina formula: MaxStamina x (Combo.Stamina / 100) x animationSeconds / StaminaDivisor.

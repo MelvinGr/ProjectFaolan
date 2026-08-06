@@ -288,8 +288,23 @@ affordable (`FUN_007d5930`), so the two ends agree rather than letting a player 
 ⚠️ The **DPS half of the same table is a tooltip number**, not the damage formula — see `ClassComboScaling` and
 `docs/rdb/client-data-tables.md`. Nothing here scales damage by it.
 
+**Reuse time.** `Combo.Cooldown` (seconds; 292 of the 744 rows carry one, from 5 s up to 300 s) is enforced per
+session in `NetworkClientSession.ComboReadyAt`, keyed by the combo id. It is armed when the combo **goes off** —
+on the finisher, so a sequence the player breaks half-way costs nothing — and it gates the **opener** only: an
+attempt already under way runs to its finisher rather than being cut off mid-sequence.
+
+A refused opener resolves as an ordinary white swing and **nothing else is sent**. That is the same refusal shape
+the spell recast gate uses, for the same reason: retail's client will not *send* a combo whose own recast is still
+running (its timer greys the icon), so retail's server has no captured answer to one. There is no on-screen
+refusal line to send — every `FormatFeedback` template resolves a client-validated content hash (Gitea #664) — and
+a chat line would be text retail never sends here, so the refusal is logged instead.
+
+The key is the combo **id**, not a line: unlike a spell, whose ranks share one `SetSpellLineRecastTime` group, a
+combo's ranks replace one another in the book (you hold *Vicious Strike II* **or** *III*, never both), so no two
+ranks are ever held at once to need a shared timer. `Combo.ParentId` chains the tree if that turns out to be wrong.
+
 Gated by `ComboServiceTests` (the runtime) and `ComboWireTests` (the wire claims, against the captured swings in
 the `combo-swings.bin` fixture).
 
-Open work — combo cooldowns (`Combo.Cooldown`), the combo-completed on-screen feedback, and NPC combos on the
-server's own AI — is tracked on **Gitea #139**; spellweaving polish on **Gitea #141**.
+Open work — the combo-completed on-screen feedback and NPC combos on the server's own AI — is tracked on
+**Gitea #623**; spellweaving polish on **Gitea #141**.

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
@@ -88,6 +89,31 @@ namespace Faolan.GameServer.Combat
 			// sequence, so it is collapsed to the single step it means.
 			var step = message.ComboAttackNum == UnsteppedAttackNum ? 0 : (int)message.ComboAttackNum;
 
+			// #623: the reuse gate. A combo that OPENS while its own `Combo.Cooldown` is still running resolves as an
+			// ordinary white swing - the combo payload is withheld and nothing else is sent. That refusal shape is
+			// #271's, for the same reason: retail's client will not SEND a combo whose recast is still ticking (its
+			// own timer greys the icon), so retail's server has no captured answer to one and the honest refusal is
+			// to withhold the payload rather than invent a reply. The on-screen refusal line #623 asked for does not
+			// exist as something we can build - every FormatFeedback template resolves a client-validated content
+			// hash (#664) - and a chat line is text retail never sends here, so this logs instead.
+			//
+			// Only the OPENER is gated. Once an attempt is running the steps are the client walking a sequence it
+			// already committed to, and cutting it off mid-way would leave the player mid-combo with no finisher.
+			//
+			// The refused swing resolves through the plain-hit path, so its zone comes from the request tail's
+			// direction ability rather than from the catalog (#673's first source, present on 408 of the 515 captured
+			// player swings). On the minority that carry no ability word the ack falls back to Overhead - a fidelity
+			// loss confined to a case retail's own client does not produce.
+			if (step == 0 && RemainingCooldownMs(session, message.ComboId) is var remaining && remaining > 0)
+			{
+				_logger.LogInformation("Combo {Combo} ({Name}) REFUSED: {Remaining} ms of its {Cooldown} s reuse time left.",
+					message.ComboId, entry.Combo.Name, remaining, entry.Combo.Cooldown);
+				session.ActiveComboId = null;
+				session.ActiveComboStep = 0;
+				session.ActiveComboCentiseconds = 0;
+				return null;
+			}
+
 			// A step that does not continue the running attempt restarts it. Retail does this itself (the assassin
 			// capture re-sends step 0 twice for one Cunning Strike), and the client is authoritative on which combo
 			// is running, so this is bookkeeping - not a rejection.
@@ -108,9 +134,24 @@ namespace Faolan.GameServer.Combat
 				session.ActiveComboId = null;
 				session.ActiveComboStep = 0;
 				session.ActiveComboCentiseconds = 0;
+
+				// #623: the reuse time starts when the combo GOES OFF, not when it opens - a sequence the player
+				// breaks half-way costs no cooldown. Same placement, and the same reasoning, as the spell recast
+				// arming in the cast path (#271).
+				if (entry.Combo.Cooldown > 0)
+					session.ComboReadyAt[message.ComboId] = Environment.TickCount64 + entry.Combo.Cooldown * 1000L;
 			}
 
 			return swing;
+		}
+
+		// Milliseconds left on this combo's reuse time, 0 when it is ready. Keyed by the COMBO id rather than by a
+		// line: unlike a spell, whose ranks share one `SetSpellLineRecastTime` group, a combo's ranks replace one
+		// another in the book (you hold `Vicious Strike II` OR `III`, never both), so there is no observable case of
+		// two ranks needing one shared timer. Combo.ParentId does chain the tree if that ever turns out to be wrong.
+		private static long RemainingCooldownMs(INetworkClientSession session, uint comboId)
+		{
+			return session.ComboReadyAt.TryGetValue(comboId, out var readyAt) ? Math.Max(0, readyAt - Environment.TickCount64) : 0;
 		}
 
 		// The stamina a completed combo costs, by the client's own formula (FUN_007d7ba0):
