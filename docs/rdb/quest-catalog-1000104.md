@@ -67,6 +67,41 @@ precisely so nobody plans a decode around a column of zeroes.
 | `Quest.start_scry_script_id` | **0** | dead |
 | `QuestGoal.phase` | 7327 | |
 
+### "Dead" is two different things, and only one of them is an absent field
+
+That column counts rows whose value is **non-zero**, which conflates a field retail never emits with one it
+emits as zero. Walking the record as raw protobuf — tallying `(field number, wire type)` per submessage rather
+than reading it through the schema — separates them:
+
+| | fields |
+|---|---|
+| **never emitted at all** | `MainQuest.condition_script_id` (6), `Quest.start_scry_script_id` (5) |
+| **emitted on every row, carrying zero** | `MainQuest.type` (7), `Quest.tier` (6), `Quest.start_new_tier` (7), `MainQuest.xp_reward`/`cash_reward` (15/16 — present on 2,181 of 2,183) |
+
+Only the first pair is genuinely absent from the shipped data. The distinction matters for the same reason
+[protobuf presence](../protocol/README.md) does anywhere else: an unset optional and a zero read back
+identically through a generated getter, so "0 populated" on its own cannot tell you which you are looking at.
+
+### The layout is fully accounted for — there is no undecoded region
+
+The same raw walk consumes the **whole** payload: every submessage parses to its own end, the top level parses
+to EOF, and no byte is left over. Every field number that appears is declared in
+[`aoc-client-protos.proto`](../../Faolan.Core/Protobuf/aoc-client-protos.proto), and no undeclared one appears
+on any row. `--report rdb-quest-catalog` prints this census on every run, cross-checking each observed tag
+against the tags the generated classes declare — so a field we parse straight past would show up as
+`⚠️ UNDECLARED` rather than going unnoticed.
+
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — top level is `version` ×1, `main_quest` ×2183,
+`quest` ×5050, `quest_goal` ×7327 and nothing else; 0 unparseable submessages, 0 trailing bytes.
+`QuestGoal` carries exactly fields 1–5 on **all 7,327** rows — `template_id`, `hash`, `name`,
+`quest_template_id`, `phase`.]
+
+⚠️ That is the answer to "could the catalog supply a goal's missing definition?" — **no**, and mechanically so
+rather than by not having looked. A `QuestGoal` row is identity + name + parent + phase; it carries no verb, no
+target, no required count and no marker block, and there is no unaccounted space in the record for them to hide
+in. The two `Partial` goals of #527 therefore need a capture that HOLDS them across a login, not another pass
+over this table.
+
 **Duplicate template ids are real and are not all identical.** 2 `MainQuest` ids, 8 `Quest` ids and 26
 `QuestGoal` ids repeat; of those, 2 lines and 15 goals have rows that **differ**. A "first record wins" dedup
 would silently drop a definition — the same trap as

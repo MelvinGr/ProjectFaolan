@@ -105,6 +105,11 @@ namespace Faolan.Importer.Cli
 			Census("Quest.start_new_tier", catalog.Quests.Count(q => q.StartNewTier), quests.Count);
 			Census("QuestGoal.phase", catalog.QuestGoals.Count(g => g.Phase != 0), catalog.QuestGoals.Count);
 
+			// The census above counts NON-DEFAULT values, which cannot tell a field retail never emits from one it
+			// emits as zero - a generated getter reads both back as 0. The raw walk below can, and it also answers the
+			// question the schema cannot: is there anything in this record we do not parse?
+			RawFieldCensus(rdbDir);
+
 			// `prev` is a single-parent PREREQUISITE pointer between chapters, not a doubly-linked order: it is
 			// populated two orders of magnitude more often than `next`, and almost none of the links are reciprocal.
 			// Saying so with the numbers beside it is what stops the next reader reading it as a quest chain.
@@ -214,19 +219,180 @@ namespace Faolan.Importer.Cli
 			return $"{g.TemplateId}\t{g.Hash}\t{g.QuestTemplateId}\t{g.Phase}\t{Flatten(g.Name ?? "")}";
 		}
 
-		// Shared with the importer module so the RDB type, the header width and the protobuf entry point are
-		// stated once. Returns null when the client's RDB has no such entry.
-		internal static QuestGiverList? ReadQuestCatalog(string rdbDir)
+		// The record walked as RAW protobuf - `(field number, wire type)` tallied per submessage - rather than read
+		// through the schema. Two things only this can answer:
+		//
+		//  1. **Absent vs zero.** protobuf-net generates `get => __pbn__X.GetValueOrDefault()`, so an unset optional
+		//     and a zero are indistinguishable through the parsed object. Counting the bytes separates them:
+		//     `MainQuest.condition_script_id` and `Quest.start_scry_script_id` are never EMITTED, while
+		//     `MainQuest.type` / `Quest.tier` / `Quest.start_new_tier` ride on every row carrying zero. Same trap as
+		//     the `spawn_animation` misreading in #607, on the reading side.
+		//  2. **Whether anything here goes unparsed.** A schema-driven read silently skips a field number it does not
+		//     declare; this cross-checks every observed tag against the tags the generated classes declare, and
+		//     reports the leftover bytes. That is what makes "the layout is fully known" a measurement rather than an
+		//     assumption - and what says the catalog CANNOT supply a quest goal's missing verb/target/count (#527):
+		//     a QuestGoal is fields 1-5 with no unaccounted space for them to hide in.
+		private static void RawFieldCensus(string rdbDir)
+		{
+			var payload = ReadQuestCatalogPayload(rdbDir);
+			if (payload == null)
+				return;
+
+			// Field number of each repeated list on QuestGiverList, paired with the element type whose declared tags
+			// it is checked against. Read off the generated classes, so a schema change cannot leave this stale.
+			(int Field, string Name, Type Element)[] lists =
+			[
+				(2, "quest_giver", typeof(QuestGiverList.QuestGiver)),
+				(3, "main_quest", typeof(QuestGiverList.MainQuest)),
+				(4, "quest", typeof(QuestGiverList.Quest)),
+				(5, "quest_giver_pos", typeof(QuestGiverList.QuestGiverPos)),
+				(6, "quest_goal", typeof(QuestGiverList.QuestGoal))
+			];
+
+			var top = new SortedDictionary<(int Field, int Wire), int>();
+			var sub = lists.ToDictionary(l => l.Name, _ => new SortedDictionary<(int Field, int Wire), int>());
+			var rows = lists.ToDictionary(l => l.Name, _ => 0);
+			var unparseable = 0;
+
+			var trailing = WalkFields(payload, (field, wire, body) =>
+			{
+				top.TryGetValue((field, wire), out var n);
+				top[(field, wire)] = n + 1;
+
+				var list = lists.FirstOrDefault(l => l.Field == field);
+				if (list.Name == null || wire != 2)
+					return;
+
+				rows[list.Name]++;
+				if (WalkFields(body, (f, w, _) =>
+				    {
+					    sub[list.Name].TryGetValue((f, w), out var c);
+					    sub[list.Name][(f, w)] = c + 1;
+				    }) != 0)
+					unparseable++;
+			});
+
+			Console.WriteLine();
+			Console.WriteLine("--- raw field census (the bytes, not the schema: absent vs zero, and anything unparsed) ---");
+			Console.WriteLine($"  top level  {string.Join(", ", top.Select(kv => $"field {kv.Key.Field}/wt{kv.Key.Wire} x{kv.Value}"))}");
+			Console.WriteLine($"  trailing bytes {trailing}, submessages that did not parse to their own end: {unparseable}" +
+			                  (trailing == 0 && unparseable == 0 ? "   <-- the record is fully accounted for" : "   ⚠️  UNDECODED REGION"));
+
+			foreach (var (_, name, element) in lists)
+			{
+				if (rows[name] == 0)
+					continue;
+
+				// The tags the generated class declares. An observed tag missing from this set is a field we parse
+				// straight past; a declared tag missing from the observed set is one the shipped data never sends.
+				var declared = element.GetProperties()
+					.SelectMany(p => p.GetCustomAttributes(typeof(ProtoBuf.ProtoMemberAttribute), true))
+					.Cast<ProtoBuf.ProtoMemberAttribute>()
+					.Select(a => a.Tag)
+					.ToHashSet();
+				var observed = sub[name].Keys.Select(k => k.Field).ToHashSet();
+
+				Console.WriteLine();
+				Console.WriteLine($"  {name} x{rows[name]}");
+				foreach (var ((field, wire), count) in sub[name])
+				{
+					var note = declared.Contains(field)
+						? count == rows[name] ? "  on every row" : ""
+						: "   ⚠️  UNDECLARED - parsed straight past";
+					Console.WriteLine($"    field {field,-3} wt {wire}  x{count,-6}{note}");
+				}
+
+				var never = declared.Except(observed).OrderBy(t => t).ToList();
+				if (never.Count > 0)
+					Console.WriteLine($"    declared but NEVER EMITTED: {string.Join(", ", never)}  (absent, not zero)");
+			}
+		}
+
+		// Walk a protobuf buffer field by field, calling `onField` for each. Returns the number of TRAILING bytes -
+		// 0 means the buffer parsed exactly to its end, anything else means the grammar is wrong. Deliberately local
+		// to this report: it is a diagnostic over shipped bytes, not a wire path.
+		private static int WalkFields(ReadOnlySpan<byte> body, ReadFieldCallback onField)
+		{
+			var i = 0;
+			while (i < body.Length)
+			{
+				var start = i;
+				if (!TryReadVarint(body, ref i, out var key))
+					return body.Length - start;
+
+				var field = (int)(key >> 3);
+				var wire = (int)(key & 7);
+				switch (wire)
+				{
+					case 0:
+						if (!TryReadVarint(body, ref i, out _))
+							return body.Length - start;
+						onField(field, wire, default);
+						break;
+					case 1:
+					case 5:
+						var fixedWidth = wire == 1 ? 8 : 4;
+						if (i + fixedWidth > body.Length)
+							return body.Length - start;
+						onField(field, wire, body.Slice(i, fixedWidth));
+						i += fixedWidth;
+						break;
+					case 2:
+						if (!TryReadVarint(body, ref i, out var length) || i + (int)length > body.Length)
+							return body.Length - start;
+						onField(field, wire, body.Slice(i, (int)length));
+						i += (int)length;
+						break;
+					default:
+						return body.Length - start; // group wire types: not used by any of these messages
+				}
+			}
+
+			return 0;
+		}
+
+		private delegate void ReadFieldCallback(int field, int wire, ReadOnlySpan<byte> body);
+
+		private static bool TryReadVarint(ReadOnlySpan<byte> body, ref int i, out ulong value)
+		{
+			value = 0;
+			for (var shift = 0; shift < 64; shift += 7)
+			{
+				if (i >= body.Length)
+					return false;
+
+				var b = body[i++];
+				value |= (ulong)(b & 0x7f) << shift;
+				if ((b & 0x80) == 0)
+					return true;
+			}
+
+			return false;
+		}
+
+		// The record's protobuf payload - everything after the 12-byte RDB-Id header. Null when the client's RDB has
+		// no such entry.
+		private static byte[]? ReadQuestCatalogPayload(string rdbDir)
 		{
 			using var rdb = OpenRdb(rdbDir);
 			if (!rdb.TryGet(QuestCatalogRdbType, 0, out var entry))
 				return null;
 
 			var raw = rdb.ReadDecompressed(entry);
-			if (raw.Length <= QuestCatalogHeaderBytes)
+			return raw.Length <= QuestCatalogHeaderBytes
+				? null
+				: raw[QuestCatalogHeaderBytes..];
+		}
+
+		// Shared with the importer module so the RDB type, the header width and the protobuf entry point are
+		// stated once. Returns null when the client's RDB has no such entry.
+		internal static QuestGiverList? ReadQuestCatalog(string rdbDir)
+		{
+			var payload = ReadQuestCatalogPayload(rdbDir);
+			if (payload == null)
 				return null;
 
-			using var ms = new MemoryStream(raw, QuestCatalogHeaderBytes, raw.Length - QuestCatalogHeaderBytes);
+			using var ms = new MemoryStream(payload);
 			return ProtoBuf.Serializer.Deserialize<QuestGiverList>(ms);
 		}
 	}
