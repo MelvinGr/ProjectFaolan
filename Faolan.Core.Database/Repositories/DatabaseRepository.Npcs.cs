@@ -256,6 +256,13 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(t => t.Spells)
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Chatter)
+				// And the bark's PARAMETER slots, or the session slot never reaches the wire (#691). Lazy loading is
+				// off, so without this `NpcChatterColumns.ToBark` reads an EMPTY `row.Parameters` and composes a
+				// remoteformat carrying NO `<parameter>` elements at all - which is a perfectly well-formed bark, so
+				// nothing throws. The client then has nothing to substitute and renders the macro literally: "You
+				// should consider joining a guild, {DetectedChar.name}!". #691 filled that slot per RECIPIENT, which
+				// cannot help while the slot is dropped a layer earlier, here at load.
+				.ThenInclude(c => c.Parameters)
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.StatCore)
 				.Include(n => n.PatrolNodes)
@@ -265,7 +272,7 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Words)
 				.Where(n => n.MapId == mapId && (forClass == null || n.ClassId == null || n.ClassId == forClass))
-				// SIX collection navigations off one root. As a single query that is one JOIN whose row count is their
+				// SEVEN collection navigations off one root. As a single query that is one JOIN whose row count is their
 				// PRODUCT - every morph repeated once per equipment slot per spell per chatter line per patrol word - and
 				// EF then dedups it client-side. It cost 2.3s to return Tortage beach's 95 spawns, which is the bulk of
 				// the first-entry stall on a map (the zone load is memoized, so it is paid once per map per process).
