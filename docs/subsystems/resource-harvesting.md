@@ -7,7 +7,7 @@ is no harvesting-specific protocol: retail delivers the resource through the ord
 
 Harvest nodes reach the client as `DestructibleFullUpdateIIR` (`0x6BD56736`) world objects. Their **max health of
 1000** is what identifies one — it is the discriminator that separates them from guild-city pieces at 1,000,000
-([#498](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/498)) and from a destructible CNPC at 70,000.
+(Gitea #498) and from a destructible CNPC at 70,000.
 The `(current, max)` pair sits at **body-end −20 / −16**.
 
 All 141 nodes across 20 names were already imported into `WorldObjects` by `WorldObjectExtractor` and already

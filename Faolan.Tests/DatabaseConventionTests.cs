@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		private static readonly Dictionary<string, string> FluentForeignKeyAllowlist = new(StringComparer.Ordinal);
 		private static readonly Regex FluentForeignKey = new(@"\.Has(Foreign|Principal)Key\s*[(<]");
 
-		// ⚠️ Timestamps are DateTimeOffset, never DateTime (Melvin's standing rule). A DateTime carries no offset, so
+		// ⚠️ Timestamps are DateTimeOffset, never DateTime (the maintainer's standing rule). A DateTime carries no offset, so
 		// the instant it records is ambiguous the moment the process, host or deployment changes timezone - and it
 		// round-trips through SQLite with its Kind reset to Unspecified, so a value written as UTC reads back
 		// comparing wrong against a local `now`. DateTimeOffset carries the offset and cannot lose it.

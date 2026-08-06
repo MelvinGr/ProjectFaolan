@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		// the identification is what broke.
 		[Theory]
 		[InlineData("Granite Rock", 161206u, 40u)] // `just mined`
-		[InlineData("Oak Tree", 161213u, 60u)] // `gethering wood` - the tree Melvin chopped down
+		[InlineData("Oak Tree", 161213u, 60u)] // `gethering wood` - the tree the maintainer chopped down
 		[InlineData("Iron Node", 161196u, 40u)] // `mining iron`
 		public void TheMeasuredNodes_YieldWhatTheCaptureShowed(string node, uint itemId, uint count)
 		{

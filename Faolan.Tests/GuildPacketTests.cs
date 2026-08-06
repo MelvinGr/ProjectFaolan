@@ -43,12 +43,14 @@ namespace Faolan.Tests
 				MessageOfTheDay = ""
 			};
 			// The creator as the CAPTURE recorded them: this asserts against captured bytes, so the name has to be the
-			// one encoded in Golden/GuildCreated.bin. It is the one place a real captured character name is still
-			// spelled out in the tests (#417) - everywhere the name is free input it is a pseudonym.
+			// one encoded in Golden/GuildCreated.bin. It is one of the three places a real captured character name is
+			// still spelled out in the tests (#417, with MailMessageCodecTests and TradepostMailBodyTests) -
+			// everywhere else the name is free input and is a pseudonym instead. The `personal-name-ok` marker
+			// below is what tells the pre-commit name check that this one is load-bearing rather than an oversight.
 			var creator = new Character
 			{
 				Id = 0x110099BD,
-				Name = "DemoL80", // the capture's creator name - must match the golden bytes
+				Name = "DemoL80", // personal-name-ok: the capture's creator name - must match the golden bytes
 				GuildRank = GuildRank.Leader,
 				Level = 80,
 				Class = (ConanClass)0x2C

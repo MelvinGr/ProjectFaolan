@@ -1131,7 +1131,7 @@ independent of the gap, so neither is evidence against the curve. The boss facto
 modelled** — see below.
 
 Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
-[#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479).
+Gitea #479.
 
 ### The "elite" outliers were mostly a MEASUREMENT FAULT (#671)
 
@@ -1172,7 +1172,7 @@ Three templates, 69 hits, clustered — a ~3× boss factor, and the same figure 
 `NpcFlags`, `Normalset`, `NpcType`, `SuperFamily`, `ProfessionType`, `Community`, `Side`, `Disposition` and
 `Health` were all checked and none separates them — `Boros` shares its `NpcFlags` with `Pillager` and its health
 pool (4,605) with an ordinary `Hired Bodyguard`. The multiplier is blocked on the client's own rank tag, which
-is [#508](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/508)'s column.
+is Gitea #508's column.
 
 **Health was tested as an alternative BASE and rejected.** An elite's pool is what makes it an elite, so
 `damage = k × the attacker's own max health` would explain "elites hit harder" with no archetype column at all.
@@ -1251,7 +1251,7 @@ It also settles a question the corpus left open: the log prints what the player 
 capturing it pins the display-vs-wire scale by direct correspondence instead of by the kill-ratio argument.
 
 **Best value:** run `/logcombat on` for the SAME fight that is being packet-captured
-([#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)). One pcap plus one log gives both sides of
+(Gitea #479). One pcap plus one log gives both sides of
 every number.
 
 ### Measure damage as a FRACTION of the target, not as a number

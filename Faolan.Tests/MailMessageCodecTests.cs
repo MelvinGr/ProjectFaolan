@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 
 			Assert.Equal(0x20d82b631c0c578ful, mail.MailId);
-			Assert.Equal("AssassinL23", mail.RecipientName); // the capture's recipient - must match the blob
+			Assert.Equal("AssassinL23", mail.RecipientName); // personal-name-ok: the capture's recipient - must match the blob
 			Assert.Equal(0x08006f31u, mail.RecipientClass);
 			Assert.Equal("", mail.SenderName); // system mail - empty sender name
 			Assert.Equal(0ul, mail.Money);

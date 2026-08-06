@@ -42,8 +42,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Assassin_AtLevel23_ReproducesAssassinL23sCapturedSheet()
 		{
-			var assassinl23 = new VitalAttributes(20, 56, 39, 26, 79);
-			var stats = CharacterMaxStats.For(ConanClass.Assassin, 23, assassinl23);
+			var assassinL23 = new VitalAttributes(20, 56, 39, 26, 79);
+			var stats = CharacterMaxStats.For(ConanClass.Assassin, 23, assassinL23);
 
 			Assert.Equal(1220u, stats.Health);  // 772 class base + 8 x 56 Constitution;      + 50 gear = 1270
 			Assert.Equal(1046u, stats.Stamina); // 736 class base + 2 x (20 + 79 + 56);       + 102 gear = 1148

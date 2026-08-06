@@ -6,7 +6,7 @@ Project Faolan is an Age of Conan server protocol emulator (C#, .NET 10). **Pack
 primary truth source** — the code intentionally mirrors retail traffic byte-for-byte rather than
 abstracting it; if local behavior diverges from a retail capture, fix local to match. This file plus `docs/`
 are the deep-dive (architecture, protocol notes, RE methodology); `README.md` is the regular repo readme
-(overview + build/run). Open work is tracked as **Gitea issues** (`melvin/projectfaolan` on
+(overview + build/run). Open work is tracked as **Gitea issues** (the `projectfaolan` repo on
 `git.groenendaal.io`), grouped by `area:*` labels — NOT in a TODO file. Create/close issues there as work
 lands (see the agent memory `issue_tracking_in_gitea` for the API recipe). Inline `TODO §N` / `TODO.md`
 mentions still scattered through **code comments** are historical pointers (left as-is, not a live file); the
@@ -55,7 +55,7 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 
 # EF migrations (context lives in Faolan.Core.Database; the migrations themselves are PER PROVIDER, in
 # Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations).
-# ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP. Melvin's standing call (2026-07-26): do not scaffold Postgres
+# ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP. The maintainer's standing call (2026-07-26): do not scaffold Postgres
 # migrations. It is not a new divergence - Postgres was already 16 migrations behind (8 vs 24) when the rule was set,
 # so it has not been migratable for a long time. The Postgres PROVIDER code stays (Faolan.Core.Database is
 # provider-agnostic and faolan.sql loads into both), but its migration chain is dead: bringing Postgres back means
@@ -346,7 +346,7 @@ assuming a command exists; several older ones were removed, and any MCP tools wr
 ## Capture data
 
 The 349 MB of retail traces, the Ghidra project and the baked terrain live in a separate PRIVATE repo,
-[ProjectFaolan-Data](https://git.groenendaal.io/MelvinGr/ProjectFaolan-Data), so this repo stays small
+**ProjectFaolan-Data** on the same Gitea host, so this repo stays small
 (and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
 `Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--RdbDir` likewise).
 
@@ -398,7 +398,7 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
   - **Docs:** the relevant `docs/` page(s); if you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
     (`FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`); repoint any doc/code pointer you
     moved or deleted; add/verify `[Vn: …]` tags for new protocol claims.
-  - **Gitea issue** (`melvin/projectfaolan`): comment the outcome and **close** it when the work lands (or strip
+  - **Gitea issue** (the `projectfaolan` repo): comment the outcome and **close** it when the work lands (or strip
     `needs-testing` per its rule after an in-client check — pass OR fail); **create** an issue for any follow-up,
     gap, or `[V0: …]` unknown you surfaced, so it lives on the backlog, not just in your head.
   - **Agent memory:** if you learned something *non-obvious and durable* (a gotcha, a decision and its why, a

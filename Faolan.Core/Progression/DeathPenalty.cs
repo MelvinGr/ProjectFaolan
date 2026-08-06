@@ -14,7 +14,7 @@ namespace Faolan.Core.Progression
 	///         re-applies the player's surviving buffs with their REMAINING durations, and both
 	///         <c>Death Penalty 1</c> (1,261,960 ms left of 1,800,000) and <c>Death Penalty 2</c> (1,775,260 ms left)
 	///         are in the same batch - two independent countdowns from two separate deaths, ~8.9 min and ~28 s old.
-	///         The lava death at 20:26:01 then adds <c>Death Penalty 3</c> on top. (Confirmed with Melvin: all tiers
+	///         The lava death at 20:26:01 then adds <c>Death Penalty 3</c> on top. (Confirmed with the maintainer: all tiers
 	///         can be active simultaneously.)
 	///     </para>
 	///     <para>

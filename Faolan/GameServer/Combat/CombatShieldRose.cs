@@ -139,7 +139,7 @@ namespace Faolan.GameServer.Combat
 		// back/flank number to go with it.
 		//
 		// ⚠️ An NPC's swing is NOT a different kind of thing from a player's - it is the same Left/Mid/Right, and
-		// only that (Melvin, 2026-08-05). Nothing about it is visible on the mob: the shields drawn over a defender
+		// only that (the maintainer, 2026-08-05). Nothing about it is visible on the mob: the shields drawn over a defender
 		// are a UI OVERLAY of the rose, not a model or animation state, so there is no left-swing/right-swing pose to
 		// look for on either side.
 		//

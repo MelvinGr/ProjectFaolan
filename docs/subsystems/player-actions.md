@@ -93,7 +93,7 @@ other pairing on this page was read with that offset and then confirmed against 
 
 The second capture is the load-bearing part. `NecroL80_mage-necromancer_login_cast-general-abilities` carries no
 chat annotations at all, yet walks the same selectors in the same shape — including `0x068` twice, each time
-with a `SetShadowCoverageIIR`. Nothing there depends on reading Melvin's typing.
+with a `SetShadowCoverageIIR`. Nothing there depends on reading the annotator's typing.
 [V2: NecroL80_mage-necromancer_login_cast-general-abilities.tshark.json]
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json]
 

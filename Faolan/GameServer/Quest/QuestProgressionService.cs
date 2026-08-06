@@ -351,7 +351,7 @@ namespace Faolan.GameServer.Quest
 
 				// The hand-in TAKES the goods. Placed AFTER the `current >= required` re-fire guard above, so talking to
 				// the recipient a second time cannot take a second set. Nothing in the corpus shows the removal - retail
-				// completes the delivery and moves on without a captured DispatchRemoveItem - so this is Melvin's call
+				// completes the delivery and moves on without a captured DispatchRemoveItem - so this is the maintainer's call
 				// (2026-08-01) rather than a decoded fact: a delivery the player walks away from still holding is not a
 				// delivery. HoldsDeliveryItem has already verified the count is present.
 				if (QuestProgress.IsDelivery(goal))
@@ -391,7 +391,7 @@ namespace Faolan.GameServer.Quest
 		// which is what the check demanded, so it is what gets handed over - extras the player is carrying stay theirs.
 		//
 		// ⚠️ Nothing in the corpus shows the removal (retail completes the delivery without a captured
-		// DispatchRemoveItem in the frames around it), so this is a design decision - Melvin's, 2026-08-01 - and not a
+		// DispatchRemoveItem in the frames around it), so this is a design decision - the maintainer's, 2026-08-01 - and not a
 		// decoded fact: a delivery you walk away from still holding the goods is not a delivery. Recorded here because
 		// the day a capture shows otherwise, this is the one place to change.
 		//

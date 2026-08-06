@@ -9,7 +9,7 @@ The point of this file is that a gap can never go silent. A doc that quietly omi
 > **Not the same as the coverage matrix.** [`gen/coverage.md`](gen/coverage.md) counts *message types* with no
 > builder. This file lists *facts* inside messages we DO build — the fields we copy verbatim without understanding.
 
-Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives on the backlog, not just here.
+Every gap below is a tracked Gitea issue, so it lives on the backlog, not just here.
 
 ---
 

@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			var capturedXml = MailMessageCodec.Parse(Convert.FromHexString(CapturedMail)).BodyXml;
 
 			// Recipient = the captured character, because the captured XML this is compared against contains it (#417).
-			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("AssassinL23" /* the capture's buyer - must match the golden XML */,
+			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("AssassinL23" /* personal-name-ok: the capture's buyer - must match the golden XML */,
 				7310868733973495813ul, // the mail XML's param-1 item id (decimal, distinct from the saleId)
 				TradepostMailBodyCodec.CapturedItemNameEscaped, "Ponakin", "25"));
 

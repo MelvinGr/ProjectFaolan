@@ -449,7 +449,7 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 
 - **`CLAUDE.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
   (the orientation guide for anyone, human or AI, working in the codebase).
-- **Gitea issues** (`melvin/projectfaolan`) — the tracker of open work, grouped by `area:*` labels.
+- **Gitea issues** (the `projectfaolan` repo) — the tracker of open work, grouped by `area:*` labels.
 - **[`docs/protocol/`](docs/protocol/README.md)** — the verified wire-protocol reference: framing, opcodes,
   message layouts and encodings, where every stated fact carries a verification tag a test resolves and the
   machine-derivable pages are generated from the code. Start at its `README.md`.
