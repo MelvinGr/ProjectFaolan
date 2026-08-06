@@ -1343,3 +1343,40 @@ damage look 50x too low. Per-target fractions are stable across the same data.
 
 The rows above level 5 in that table (0.0%, "700,000 hits to kill") are exactly the unkillable population showing
 itself - which is a useful check that the split is real and not an artefact.
+
+## The rating quad is `400 × level − 300` (#685)
+
+`AttackRating` (0x398), `DefenseRating` (0x39A), `MagicRating` (0x39B) and `MagicalResist` (0x39D) are one
+number, and it is a **formula** rather than a table: level 1 is 100 and every level adds 400, so level 80 is
+31,700. `CombatRatingCurve.For(level)`.
+
+Measured over the whole corpus by sweeping every captured `StatIIR` (`0xF98E10B3`) carrying one of the four ids:
+
+| | |
+|---|---|
+| records | 2,100 (525 of each id — they always move together) |
+| captures | 31 |
+| characters | 13, across 6 classes |
+| distinct values | 8 — 100, 500, 900, 1300, 1700, 8900, 9300, 31700 |
+| levels | 1–5, 23, 24, 80 |
+| records off the line | **0** |
+
+The low end is a line rather than five coincidences because three beach captures walk a single character 1 → 5 a
+level at a time, and the per-character progressions are monotonic throughout. It is class-independent — a
+soldier-guardian, a rogue-assassin, a necromancer, a demonologist and a Herald of Xotli all sit on it.
+[V3: CombatRatingCurveTests.MatchesEveryCapturedValue]
+
+⚠️ **This is the BASE**, the same way `ClassAttributeBase` is. Gear and buffs plainly move real combat ratings in
+retail, but no capture isolates one — every character measured was wearing what it was wearing — so a future
+contribution adds *on top* of this rather than replacing it.
+
+⚠️ **It is not a spellweave record.** These four were modelled as the necromancer weave's "fire stages" with the
+level-80 caster's 31,700 mistaken for a burst constant; 20 of the 31 captures that carry them contain no weaving
+at all. See [`combos.md`](combos.md).
+
+`SnapshotStatSheet` authors the quad from the character's level, which is what took the four off
+`SnapshotStatSheetAuthoringTests`' not-modelled list.
+
+[V0: what makes retail RE-send the quad. It arrives in bursts of four with irregular 5–35 s gaps — 32 bursts in
+one 15-minute capture — mostly alone in their own packets, so it is event-driven rather than a timer; a stat-sheet
+recompute is the obvious candidate. The value is settled, the cadence is not.]

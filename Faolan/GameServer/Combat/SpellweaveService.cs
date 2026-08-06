@@ -160,11 +160,13 @@ namespace Faolan.GameServer.Combat
 			// Clear IsSpellweaving FIRST so the meter/add loops stop before we tear the trance down.
 			session.IsSpellweaving = false;
 
-			if (profile != null)
-			{
-				foreach (var stage in profile.FireStages)
-					await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(caster, stage, SpellweaveCatalog.CapturedFireRating)));
-			}
+			// ⚠️ The four StatIIR records this used to send on fire are GONE (#685), and they were never the weave's.
+			// They were modelled as opaque "fire stages" 0x398/0x39B/0x39A/0x39D with a constant 0x7BD4 trailer; the ids
+			// are the client's AttackRating / MagicRating / DefenseRating / MagicalResist and the "constant" was that
+			// level-80 necromancer's own rating. Across the corpus those records appear in 31 captures, and 20 of them
+			// contain no spellweaving at all - including a Herald of Xotli, which cannot weave. They are the level-scaled
+			// rating quad (CombatRatingCurve, `400 x level - 300`) and the weave capture is simply where one was held.
+			// So a weave pushes nothing here; its real effect is the componentIndex -> effect table, still open on #141.
 
 			// The trance-EXIT animation: take the character out of the weave pose (without it it stays stuck kneeling).
 			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveTranceExit(caster)));

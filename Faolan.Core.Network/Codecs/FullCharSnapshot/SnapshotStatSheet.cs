@@ -38,6 +38,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// Authored CONDITIONALLY - only for the levels SkillPointCurve has actually measured (#507). Declared here
 			// regardless, because the slot varies across captured characters and this is where that is accounted for.
 			CharacterStatId.SkillPoints,
+
+			// The level-derived rating quad (#685) - see CombatRatingCurve.
+			CharacterStatId.AttackRating, CharacterStatId.DefenseRating, CharacterStatId.MagicRating, CharacterStatId.MagicalResist,
 			// The murder-point pool, now derived from the character rather than carried as a fixed 0 (#503).
 			CharacterStatId.MurderPoints,
 			// Stat 0x0A9 `ChosenGod`, likewise (#553) - authored as an opaque wire number, since the client never
@@ -133,6 +136,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// baseline's own value rather than having a guess written over it.
 			if (SkillPointCurve.For(character.Level) is { } skillPoints)
 				yield return (CharacterStatId.SkillPoints, skillPoints);
+
+			// The rating QUAD - AttackRating / DefenseRating / MagicRating / MagicalResist - which unlike the skill
+			// points above IS a formula, `400 x level - 300`, exact on all 2,100 captured records (#685). All four take
+			// the same value, so they are emitted from one number. Level-derived like `Level` itself, so a captured
+			// sheet's copy is stale the moment the character dings.
+			var rating = CombatRatingCurve.For(character.Level);
+			foreach (var stat in CombatRatingCurve.Stats)
+				yield return (stat, rating);
 
 			// The PvP murder-point pool (#503). Stat 0x449, which the client's own LDB string table names "Murder
 			// Points"; the wire value is what the capture shows moving at a player kill. Carried unconditionally - 0 is

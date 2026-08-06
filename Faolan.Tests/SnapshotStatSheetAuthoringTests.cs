@@ -41,12 +41,8 @@ namespace Faolan.Tests
 			[CharacterStatId.AnnihilationWins] = "PvP minigame counters not tracked",
 			[CharacterStatId.AnnihilationLosses] = "PvP minigame counters not tracked",
 
-			// Skills and ratings: real character stats, but ours are not derived yet (#401 armour/mitigation is the
-			// nearest live work).
-			[CharacterStatId.MagicalResist] = "ratings not derived (#401)",
-			[CharacterStatId.MagicRating] = "ratings not derived (#401)",
-			[CharacterStatId.AttackRating] = "ratings not derived (#401)",
-			[CharacterStatId.DefenseRating] = "ratings not derived (#401)",
+			// Skills: real character stats, but ours are not derived yet. (The rating QUAD used to sit here too -
+			// AttackRating / DefenseRating / MagicRating / MagicalResist are now derived from level, #685.)
 			[CharacterStatId.Perception] = "skills not derived",
 			[CharacterStatId.Climbing] = "skills not derived",
 			[CharacterStatId.Hiding] = "skills not derived",

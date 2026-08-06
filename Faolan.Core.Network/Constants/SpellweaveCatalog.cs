@@ -13,14 +13,13 @@ namespace Faolan.Core.Network.Constants
 	public sealed record SpellweaveProfile(
 		uint[] TranceBuffs, // ApplySpell (base<<8)|rank ids sent on activate to open the trance
 		uint[] WeaveElements, // element BASE ids (full spell id >> 8); the add's componentIndex indexes into this list
-		uint[] FireStages, // the STAT IDS the deactivate burst sets (AttackRating/MagicRating/DefenseRating/ResistRating - see CapturedFireRating)
 		uint StackingBuffBase); // the Spellweaving(1) buff BASE re-applied at an incremented id each picker reappear (stacks)
 
 	public static class SpellweaveCatalog
 	{
 		private static readonly SpellweaveProfile Necromancer =
-			new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000], [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D], [0x398, 0x39B, 0x39A, 0x39D],
-				0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
+			new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000], [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D],
+				0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5aa each reappear
 
 		private static readonly Dictionary<ConanClass, SpellweaveProfile> Profiles = new Dictionary<ConanClass, SpellweaveProfile>
 		{
@@ -29,15 +28,14 @@ namespace Faolan.Core.Network.Constants
 		};
 
 		// Necromancer (NecroL80 capture): trance buffs 0x37F29800/0x37E5A800/0x3969D000; weave elements Arcane Renewal
-		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
-		// 0x398/0x39B/0x39A/0x39D.
-
-		// ⚠️ The value the deactivate burst carries on all four stats. It is NOT a burst constant (#678): the four
-		// "fire stage" ids are the client's `AttackRating` / `MagicRating` / `DefenseRating` / `ResistRating`, so this
-		// is that level-80 necromancer's OWN combat rating - the same word takes 100 / 500 / 900 / 1300 / 1700 across
-		// the corpus, tracking whoever was being described. Kept so the weave sends what it sent before the record was
-		// decoded; what a weave should actually push is Gitea #685.
-		public const uint CapturedFireRating = 31700;
+		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D.
+		//
+		// ⚠️ There are no "fire stages" and there is no `CapturedFireRating` (#685, both removed). The deactivate burst
+		// was modelled as four opaque stage ids 0x398/0x39B/0x39A/0x39D carrying a constant 31700. The ids are the
+		// client's AttackRating / MagicRating / DefenseRating / MagicalResist and 31700 is that level-80 necromancer's
+		// own rating: `400 x level - 300` (CombatRatingCurve). Those records appear in 31 captures and 20 of them
+		// contain no spellweaving at all - a Herald of Xotli among them, which cannot weave - so they were never part
+		// of the weave, and the weave capture is simply where one landed.
 
 		// "Exhausted" (spell base 0xB90), the debuff retail applies when the ENERGY pool empties - on the sprint path as
 		// much as the weave, which is why it lives here beside the pool rather than inside the weave service.

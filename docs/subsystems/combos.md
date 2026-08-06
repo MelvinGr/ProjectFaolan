@@ -260,9 +260,18 @@ stat reaches exactly 0 at 20:53:41.247 and in the same millisecond retail sends 
 id `000B9000` (base `0xB90`, form 0 = apply), applyTo == applyFrom == the player; 3.4s later, on the first push that
 lifts energy back above zero (1019), it sends `000B9001` — the form-1 END twin with an empty payload. The client has
 its own exhausted STATE keyed on the same stat, but that is separate from the icon.
-- **Fire / cancel**: on the 2nd toggle, the s2c `f98e10b3` burst (the weave firing) + trance-buff end-twins + a
-  trance-EXIT BCC. Per add: the component's own spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1)
-  buff re-applies at an incremented id each picker reappear (stacks ~x2).
+- **Fire / cancel**: on the 2nd toggle, trance-buff end-twins + a trance-EXIT BCC. Per add: the component's own
+  spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1) buff re-applies at an incremented id each
+  picker reappear (stacks ~x2).
+
+⚠️ **The `f98e10b3` burst next to the fire is NOT the weave firing** (#685). Those four `StatIIR` records were read
+as opaque "fire stages" `0x398 / 0x39B / 0x39A / 0x39D` carrying a constant `0x7BD4`. Every part of that is a
+misread: the ids are the client's own `AttackRating` / `MagicRating` / `DefenseRating` / `MagicalResist`, and
+31,700 is that **level-80 necromancer's own rating**. Swept across the corpus the four appear in **2,100 records
+over 31 captures**, and **20 of those captures contain no spellweaving at all** — including a Herald of Xotli,
+which cannot weave. They are the level-scaled rating quad ([`combat.md`](combat.md)), and the weave capture is
+simply where one landed. The emit is gone; a weave pushes nothing here, and its real effect (the
+`componentIndex -> effect` blend) is still open on #141.
 - `0x2085` (~2s heartbeat) and food/potion `UseItem` (BCC `BehaviorId` 0x0e) are NOT part of the weave.
 
 ## Implementation (spellweaving, Necromancer)
@@ -278,12 +287,13 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   screens too), `SendFeedback`, `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `IsMounted` — the trance roots
   the caster and plays a kneeling pose, so opening one from the saddle is refused with an on-screen line rather
   than pinning a rider mid-gallop.
-- `CombatReactiveCodec` (`Faolan.Core.Network/Codecs/Combat/CombatReactiveCodec.cs`) — reactive-list, stat-gauge,
-  buff-data and fire-stage builders.
+- `CombatReactiveCodec` (`Faolan.Core.Network/Codecs/Combat/CombatReactiveCodec.cs`) — reactive-list, stat-gauge
+  and buff-data builders.
 - `BehaviorAnimations` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimations.cs`) — the trance /
   component / EXIT BCC animations (BCC `0x642CD3D6` is the generic behaviour channel, shared with combat).
 - `SpellweaveCatalog` (`Faolan.Core.Network/Constants/SpellweaveCatalog.cs`) — the per-class `SpellweaveProfile`
-  (Necromancer only) + `EnergyMaxForClass`.
+  (Necromancer only) + `EnergyMaxForClass`. Its `FireStages` / `CapturedFireRating` are **gone** — see the
+  rating-quad note above.
 - `GameServerListener.Buffs.cs` — `SendSprintBar` (`0x200E`) + the persistent energy loop (`RunEnergyMirror`:
   drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain itself is client-side, the server
   mirrors it). The loop also pushes `CharacterStatId.Energy` on the retail cadence and owns the sprint-path

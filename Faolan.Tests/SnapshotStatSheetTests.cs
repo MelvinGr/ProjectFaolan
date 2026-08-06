@@ -70,7 +70,9 @@ namespace Faolan.Tests
 		{
 			var sheet = SnapshotStatSheet.For(Char80(), null, Captured());
 
-			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.AttackRating));
+			// (AttackRating used to be the example here. It is derived from level now - `400 x level - 300`, #685 -
+			// so the pair below are two skills that genuinely still are not.)
+			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Climbing));
 			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Perception));
 		}
 

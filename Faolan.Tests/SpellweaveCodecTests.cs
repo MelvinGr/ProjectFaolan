@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using Xunit;
@@ -35,15 +36,23 @@ namespace Faolan.Tests
 			Assert.Equal(expected, SpellweaveCatalog.EnergyMaxForClass(characterClass));
 		}
 
-		[Theory, InlineData(0x398u, "f98e10b30000c3500802e5d4010000039800007bd4"), InlineData(0x39Bu, "f98e10b30000c3500802e5d4010000039b00007bd4"),
-		 InlineData(0x39Au, "f98e10b30000c3500802e5d4010000039a00007bd4"), InlineData(0x39Du, "f98e10b30000c3500802e5d4010000039d00007bd4")]
-		// frame#1843
-		// frame#1844
-		// frame#1845
-		// frame#1846
-		public void BuildFireStage_Necro_MatchesCapture(uint fireId, string expected)
+		// ⚠️ These four records are NOT part of the weave (#685) - they were modelled as its "fire stages" because this
+		// capture happens to hold them near a deactivate. Across the corpus they appear in 31 captures and 20 of those
+		// contain no spellweaving at all, a Herald of Xotli among them, which cannot weave. They are the level-scaled
+		// rating quad, and the capture's "constant" 0x7BD4 = 31,700 is this level-80 necromancer's own value.
+		//
+		// The bytes stay as a golden because they are real retail bytes - but built the way they are now DERIVED, so
+		// this doubles as the end-to-end proof that `400 x level - 300` reproduces what retail sent.
+		[Theory, InlineData(CharacterStatId.AttackRating, "f98e10b30000c3500802e5d4010000039800007bd4"),
+		 InlineData(CharacterStatId.MagicRating, "f98e10b30000c3500802e5d4010000039b00007bd4"),
+		 InlineData(CharacterStatId.DefenseRating, "f98e10b30000c3500802e5d4010000039a00007bd4"),
+		 InlineData(CharacterStatId.MagicalResist, "f98e10b30000c3500802e5d4010000039d00007bd4")]
+		// frames #1843-#1846
+		public void BuildRatingQuad_AtLevel80_MatchesCapture(CharacterStatId stat, string expected)
 		{
-			var bytes = StatCodec.Build(StatIirs.ForCharacter(0x0802E5D4, fireId, SpellweaveCatalog.CapturedFireRating));
+			Assert.Contains(stat, CombatRatingCurve.Stats);
+
+			var bytes = StatCodec.Build(StatIirs.ForCharacter(0x0802E5D4, (uint)stat, CombatRatingCurve.For(80)));
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 
