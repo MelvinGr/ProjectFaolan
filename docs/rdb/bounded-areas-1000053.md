@@ -353,8 +353,9 @@ Gitea #519.
 43 regions over 24 maps, and this is the first bucket that is neither a duplicate nor a dead end: it describes
 transitions we cannot currently express.
 
-**It is not our doors.** Our zone lines are `UseObject` on a `WorldObject` (`DoorFullUpdateIIR`/SimpleDynel), 22
-of them configured with a destination. The two sets are **disjoint**: only map 1020 has both, and there the door
+**It is not our doors.** Our zone lines are `UseObject` on a `WorldObject` (`DoorFullUpdateIIR`/SimpleDynel),
+**141** of them configured with a destination — over 19 source maps to 42 destinations, each with an exact arrival
+position and its confirmation-box key where it raises one (#637). The two sets are **disjoint**: only map 1020 has both, and there the door
 (`To Ymir's Pass`, at 1149/226) and the region (`ArenaTeleport`, at 232/554) are nowhere near each other. **No
 door falls inside any teleport region.** These are additional transitions, and they fire on *entering a volume*
 rather than on interacting with an object.
@@ -368,7 +369,7 @@ Four sub-families:
 
 | family | example | destination recoverable? |
 |---|---|---|
-| named destination | `BA_Teleport_ChosainProvince`, `BA_teleport_paikang`, `BA_TeleportToConarch` ×3 | **yes, from the name** — 9 resolve straight to a `Map` row, 12 with a `To…` strip |
+| named destination | `BA_Teleport_ChosainProvince`, `BA_teleport_paikang`, `BA_TeleportToConarch` ×3 | **yes, from the name** — 7 of the 36 on real playfields, under a rule tight enough not to invent (see below) |
 | zone-line **edge strips** | `BA_Teleport_NorthernGrasslands` (737 × 109), `BA_Teleport_ChosainProvince` (582 × 89) on Kara Korum, lying along the map border at z ≈ −60…49 | yes — this is the outdoor Khitai zone line: walk off the edge, arrive in the neighbour |
 | `BA_TeleportOut` ×7 | Blessed Caves, Cavern of Malice, Crevice of Malice, Enigmata of Yag | **no** — "out" implies the parent zone and never names it |
 | lettered **pairs** | The Enigmata of Yag's `BA_TeleportA_1`/`A_2`, `B_1`/`B_2`, `C_1`/`C_2`, `D_1`/`D_2` | **self-sufficient** — the pairing IS the data; walk into one pad, arrive at its twin |
@@ -390,6 +391,21 @@ point, so `A_1`↔`A_2` is complete information with no capture and no name reso
 (A naming inconsistency worth knowing: Cradle of Decay's exit box is `BA_Teleport_FotD` on the real playfield
 1026 but `BA_Teleport_WLoZ` on the 967 audio variant — the same geometry with two different claimed
 destinations. Trust the real playfield.)
+
+### ⚠️ Resolving the destination NAME is looser than it looks
+
+Three rules reach a `Map` row: the map's **name** (`BA_Teleport_ChosainProvince`), its **acronym** — initials with
+lowercase connectives, `FotD` → Field of the Dead and `WLoZ` → Wild Lands of Zelata — and its **first word**
+(`BA_TeleportToConarch` → Conarch Village). The acronym is a different convention from the prefix-abbreviations the
+area banners use (#680), and it has to be gated or it invents: an ungated pass resolved **17 of 36 and 10 were
+junk**, because a 1–2 letter "acronym" matches anything (`TeleportArea` → "Area" → `A` → map 330 `AntonA`;
+`Audio Portal` → `Asgardian Pass`; `BoundedArea_teleport` → `backdrops`). Requiring ≥3 characters with two
+capitals, and excluding the dev playfields from the candidate set, leaves **7**.
+
+⚠️ **`Map.Name` is not unique**, which caps what any name rule can do here. Three rows are called
+`Wild Lands of Zelata` (507, 939, **2080**), so `BA_Teleport_WLoZ` on The Maze cannot be resolved by name at all —
+even though the 2080 ↔ 2082 pair above is real and readable by eye. Any name → map resolution in this table needs
+a tiebreak beyond the string.
 
 ## The zone / area-name regions exist — found by containment, not by name
 
