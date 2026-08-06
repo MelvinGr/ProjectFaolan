@@ -40,5 +40,13 @@ namespace Faolan.GameServer
 		{
 			return _simulation.RelocateSameMap(client, arrival);
 		}
+
+		// #635: a `{teleportplayer}` directive may state only X and Z, so the arrival height comes off the baked
+		// terrain. Null when none is loaded for that map (TerrainDir unset, or the map has no baked file) - the
+		// service then falls back to the destination's default spawn rather than guessing a height.
+		float? ITravelOutbound.GroundHeight(uint mapId, float x, float z)
+		{
+			return _simulation.Terrain?.GroundHeight(mapId, x, z);
+		}
 	}
 }

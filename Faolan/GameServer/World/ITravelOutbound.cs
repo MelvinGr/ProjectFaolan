@@ -20,5 +20,11 @@ namespace Faolan.GameServer.World
 
 		// A SAME-MAP trip: relocate in place, with no loading screen - the wire path the revive teleport already uses.
 		Task RelocateOnSameMap(INetworkClient client, Vector3 arrival);
+
+		// #635: the baked terrain height at (x, z), or null when no terrain is loaded for that map. A
+		// `{teleportplayer}` directive may state only X and Z - Wagoner Polus's `{teleportplayer 349 564 1000}` does -
+		// and dropping the whole arrival for a missing height would send the player to the map's default spawn
+		// instead of where the NPC said. Through the port because the terrain lives on the simulation, not here.
+		float? GroundHeight(uint mapId, float x, float z);
 	}
 }

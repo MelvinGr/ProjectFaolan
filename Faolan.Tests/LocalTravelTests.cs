@@ -101,6 +101,56 @@ namespace Faolan.Tests
 			Assert.Equal([], trips.Where(t => !screens.Contains(t)).ToArray());
 		}
 
+		// #635: the SECOND travel mechanism - the three travellers who carry their destination inline in their dialogue
+		// TEXT as a `{teleportplayer}` directive, harvested by `rdb-dialogue-teleports` into this same table.
+		//
+		// Pinned by VALUE, not by count, because the values are the decode: the grammar is
+		// `{teleportplayer <x> <z> [y <y>] <map>}`, and the load-bearing reading is that the two leading numbers are X
+		// and Z with the height carried optionally behind a literal `y`. The Smuggler's row is the one the corpus
+		// checks - `{teleportplayer 210 205 y 11 4579}` against a capture that lands the player at (210.0, 10.5, 205.0)
+		// on playfield 4579 - so a row of (210, 11, 205) is that reading and (210, 205, 11) would be the wrong one.
+		//
+		// [V2: NecroL80_..._disconnect-after-wayfarer t=105.8 (the Smuggler's line) -> 111.7 (IntendedTeleport 4579) ->
+		// 112.3 (arrival), and t=516.2 -> 519.4 for Polus]
+		[Theory]
+		[InlineData("Tortage Smuggler", 4579u, 210f, 11f, 205f, 6f)]
+		[InlineData("Wagoner Polus", 1000u, 349f, null, 564f, 3f)] // no height in the directive - ground-snapped at run time
+		[InlineData("Sigurd", 4020u, 55.7f, 158.1f, 113.9f, 0f)] // no {delay} - retail teleports as the line lands
+		public void EachDirectiveTraveller_CarriesTheTripItsTextStates(string npc, uint map, float x, float? y, float z, float delay)
+		{
+			var rows = ShippedRows(
+					"SELECT NpcName, DestinationMapId, ArrivalX, ArrivalY, ArrivalZ, DelaySeconds, Cost, FromDialogueDirective FROM TravelDestinations WHERE FromDialogueDirective = 1",
+					r => (Npc: r.GetString(0), Map: (uint)r.GetInt64(1), X: (float)r.GetDouble(2), Y: r.IsDBNull(3)
+						? (float?)null
+						: (float)r.GetDouble(3), Z: (float)r.GetDouble(4), Delay: (float)r.GetDouble(5), HasCost: !r.IsDBNull(6)))
+				.ToList();
+
+			var row = Assert.Single(rows, t => t.Npc == npc);
+			Assert.Equal(map, row.Map);
+			Assert.Equal(x, row.X, 3);
+			Assert.Equal(y.HasValue, row.Y.HasValue);
+			if (y.HasValue)
+				Assert.Equal(y.Value, row.Y!.Value, 3);
+
+			Assert.Equal(z, row.Z, 3);
+			Assert.Equal(delay, row.Delay, 3);
+
+			// A directive traveller charges nothing - there is no fare and no trade window anywhere in the flow - so a
+			// NULL Cost here means FREE, unlike a wagoner's NULL, which means "the capture never showed the wallet move".
+			Assert.False(row.HasCost);
+		}
+
+		// The captured wagoner trips carry no delay: retail teleports on the pick. Pinned so the column stays the
+		// directive travellers' own property rather than drifting onto the paid ones.
+		[Fact]
+		public void ACapturedWagonerTrip_HasNoDelay()
+		{
+			var delays = ShippedRows("SELECT DelaySeconds FROM TravelDestinations WHERE FromDialogueDirective = 0", r => (float)r.GetDouble(0)).ToList();
+
+			Assert.NotEmpty(delays);
+			Assert.All(delays, d => Assert.Equal(0f, d));
+		}
+
 		private static IEnumerable<T> ShippedRows<T>(string sql, Func<SqliteDataReader, T> read)
 		{
 			var rows = new List<T>();

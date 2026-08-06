@@ -179,6 +179,43 @@ namespace Faolan.Core.Rdb
 			return strings;
 		}
 
+		// The ENCRYPTED twin of EnglishPlaintext: the ciphertext of every string on an English encrypted page, ready to
+		// be handed to `LdbKey.Decrypt` with the per-string key our own tables hold. The eleven encrypted categories
+		// (quest objectives, NPC dialogue, …) are not readable from the RDB alone - the key is per string and the
+		// SERVER sends it - so the readable set is exactly what we have captured a `key=` for.
+		//
+		// Here rather than in a report because the IMPORTER wants it too (RdbDialogueTeleportImporter), which is the
+		// same reason EnglishPlaintext lives here: this is the RDB grammar's concern, not a report's.
+		public static Dictionary<(uint Category, uint Id), byte[]> EnglishCiphertext(RdbReader rdb)
+		{
+			var language = LdbLanguageIndex.LanguageByPage(rdb);
+			var blobs = new Dictionary<(uint, uint), byte[]>();
+
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			{
+				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue; // not a readable record (CDN-only / not zlib)
+				}
+
+				if (CategoryOf(body) == 0 || FlagsOf(body) != 1)
+					continue; // not a TDC2 page, or a PLAINTEXT one
+
+				foreach (var entry in ParseRaw(body))
+					blobs[(entry.Category, entry.Id)] = entry.Bytes;
+			}
+
+			return blobs;
+		}
+
 		public readonly record struct Entry(uint Category, uint Id, string Value);
 
 		public readonly record struct RawEntry(uint Category, uint Id, byte[] Bytes);

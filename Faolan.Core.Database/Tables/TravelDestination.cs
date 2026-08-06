@@ -85,5 +85,19 @@ namespace Faolan.Core.Database.Tables
 		public float? ArrivalX { get; set; }
 		public float? ArrivalY { get; set; }
 		public float? ArrivalZ { get; set; }
+
+		// How long the NPC's parting line stays on screen before the trip runs (#635). 0 on every CAPTURED wagoner
+		// trip - retail teleports on the pick, with no pause - and non-zero only on the `{teleportplayer}` travellers,
+		// whose dialogue text states it inline: `{delay 6}` for the Tortage Smuggler, `{delay 3}` for Wagoner Polus,
+		// and none at all for Sigurd. Measured against the capture: the Smuggler's line lands at t=105.8 and the
+		// IntendedTeleport at t=111.7.
+		public float DelaySeconds { get; set; }
+
+		// #635: this row was harvested from an inline `{teleportplayer}` directive in the destination screen's own
+		// dialogue TEXT, rather than from a captured trip's GameActionListIIR. Both produce the same trip and take the
+		// same runtime path; the flag exists because the two have different EVIDENCE and different completeness - a
+		// directive row's arrival is exactly what the text says, and it never states a fare (there is none) or a
+		// destination list, so a NULL `Cost` here means "free", not "unmeasured".
+		public bool FromDialogueDirective { get; set; }
 	}
 }

@@ -3776,7 +3776,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("Cost")
                         .HasColumnType("INTEGER");
 
+                    b.Property<float>("DelaySeconds")
+                        .HasColumnType("REAL");
+
                     b.Property<uint>("DestinationMapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("FromDialogueDirective")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("NpcName")

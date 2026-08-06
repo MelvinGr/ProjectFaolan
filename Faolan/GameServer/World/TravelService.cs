@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -131,10 +132,30 @@ namespace Faolan.GameServer.World
 		{
 			ArgumentNullException.ThrowIfNull(destination);
 
+			var arrival = ArrivalOf(destination);
+
+			// #635: a `{teleportplayer}` traveller's line stays up before the trip runs - `{delay 6}` for the Tortage
+			// Smuggler, `{delay 3}` for Wagoner Polus - so the screen the caller has already served is on the player's
+			// display for that long, exactly as in retail. Scheduled rather than awaited so the conversation's own
+			// reply chain is not held behind it, and re-checked on the way out: a player who logged off in the
+			// meantime is not teleported into a session that no longer exists.
+			if (destination.DelaySeconds > 0)
+			{
+				Task.RunAfter((int)(destination.DelaySeconds * 1000), async () =>
+				{
+					if (client.Session.Account != null)
+						await Depart(client, npcName, destination, arrival);
+				}, _logger);
+
+				return;
+			}
+
+			await Depart(client, npcName, destination, arrival);
+		}
+
+		private async Task Depart(INetworkClient client, string npcName, TravelDestination destination, Vector3? arrival)
+		{
 			var character = client.Session.Character;
-			var arrival = destination.ArrivalX is { } x && destination.ArrivalY is { } y && destination.ArrivalZ is { } z
-				? new Vector3(x, y, z)
-				: (Vector3?)null;
 
 			// Same map = relocate in place (retail's `Local=1`); different map = the full changemap handoff. A same-map
 			// trip with no arrival point would move the player nowhere at all, so it is refused rather than silently
@@ -155,6 +176,31 @@ namespace Faolan.GameServer.World
 
 			await _output.TravelToMap(character.Id, destination.DestinationMapId, arrival);
 			_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to map {Map}.", character.Name, npcName, destination.DestinationMapId);
+		}
+
+		// Where the trip lands. A CAPTURED trip states all three coordinates (they come straight off the
+		// GameActionListIIR's `xpos`/`ypos`/`zpos`), so this is only ever interesting for a `{teleportplayer}`
+		// directive (#635): the grammar makes the height optional behind a literal `y`, and Wagoner Polus's
+		// `{teleportplayer 349 564 1000}` omits it.
+		//
+		// A missing height is GROUND-SNAPPED rather than discarded. Throwing the whole arrival away for it would send
+		// the player to the destination map's default respawn - somewhere else entirely - when the NPC has just told
+		// them exactly where they are going. If the map has no baked terrain loaded there is nothing to snap to and
+		// the default spawn is then the honest answer.
+		private Vector3? ArrivalOf(TravelDestination destination)
+		{
+			if (destination.ArrivalX is not { } x || destination.ArrivalZ is not { } z)
+				return null;
+
+			if (destination.ArrivalY is { } y)
+				return new Vector3(x, y, z);
+
+			if (_output.GroundHeight(destination.DestinationMapId, x, z) is { } ground)
+				return new Vector3(x, ground, z);
+
+			_logger.LogWarning("Travel: destination on map {Map} states ({X:F1}, {Z:F1}) but no height, and no terrain is loaded there - falling back to the map's default spawn.",
+				destination.DestinationMapId, x, z);
+			return null;
 		}
 
 	}

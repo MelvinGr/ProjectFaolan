@@ -430,32 +430,7 @@ namespace Faolan.Importer.Cli
 		private static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobs(string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var language = LdbLanguageIndex.LanguageByPage(rdb);
-			var blobs = new Dictionary<(uint, uint), byte[]>();
-
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
-			{
-				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
-					continue;
-
-				byte[] body;
-				try
-				{
-					body = rdb.ReadDecompressed(e);
-				}
-				catch
-				{
-					continue; // not a readable record (CDN-only / not zlib)
-				}
-
-				if (LdbStringIndex.CategoryOf(body) == 0 || LdbStringIndex.FlagsOf(body) != 1)
-					continue; // not a TDC2 page, or a plaintext one
-
-				foreach (var entry in LdbStringIndex.ParseRaw(body))
-					blobs[(entry.Category, entry.Id)] = entry.Bytes;
-			}
-
-			return blobs;
+			return LdbStringIndex.EnglishCiphertext(rdb);
 		}
 
 		// `--report-arg` as a comma-separated list of goal ids and/or quest ids; empty = every goal.

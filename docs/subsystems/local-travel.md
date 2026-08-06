@@ -119,23 +119,59 @@ fact. The runtime charges nothing and logs the gap.
 have a name in the LDB (`[FOTD]Take me to the Haunted Forest.`) and coordinates nowhere, because the trip is
 what reveals them.
 
-## Other travellers use a different mechanism
+## Other travellers state their trip in the dialogue TEXT
 
-Not every traveller is a wagoneer with a list. The **Tortage Smuggler** and **Wagoner Polus** carry the
-destination inline in their dialogue TEXT instead, as a `{teleportplayer}` directive the server acts on after a
-`{delay}`:
+Not every traveller is a wagoneer with a list. **Three** NPCs carry the destination inline in their dialogue
+text instead, as a `{teleportplayer}` directive the server acts on — no fare, no trade window, no list:
 
 ```
-Then we go.{delay 6}{teleportplayer 210 205 y 11 4579}
-Climb aboard, then. […]{delay 3}{teleportplayer 349 564 1000}{hidegoodbye}{quit}
+Tortage Smuggler   Then we go.{delay 6}{teleportplayer 210 205 y 11 4579}
+Wagoner Polus      Climb aboard, then. […]{delay 3}{teleportplayer 349 564 1000}{hidegoodbye}{quit}
+Sigurd             Then I wish you luck.{gameactiononnpc …}{teleportplayer 55.7 113.9 y 158.1 4020}{showgoodbye}
 ```
 
-Both are followed by an `IntendedTeleport` naming exactly the trailing number (4579 "Abandoned Warehouse",
-1000), so the directive's last token is the destination map. That path is decoded but not implemented — it
-needs a dialogue-directive runtime rather than a table — and it is what settles the old "the third captured
-trip's NPC is ambiguous" question: **Osithma's tree has no travel option at all** (it is pure flavour), so the
-traveller in `disconnect-after-wayfarer` is the Tortage Smuggler, which independently confirms the smuggler
-exception in the criminal gate.
+The grammar, from all three plus the capture that confirms one:
+
+```
+{teleportplayer <x> <z> [y <y>] <mapId>}
+```
+
+The **last** token is the destination playfield and the leading ones are the arrival position, **X then Z**,
+with the height carried optionally behind a literal `y`. [V2: `NecroL80_…_disconnect-after-wayfarer` t=105.8 (the
+Smuggler's line) → 111.7 (`IntendedTeleport` naming 4579) → 112.3, and the player arrives at (210.0, 10.5,
+205.0) — matching `210 205 y 11` read as x=210 z=205 y=11; the same shape for Polus at t=516.2 → 519.4]
+
+⚠️ **The directive never reaches the server at run time.** A conversation screen carries only an LDB reference
+(category + string id + the per-string key); the text lives in the client's install and the server ships no LDB.
+So the only way to act on one is to read it at IMPORT — which is why this is an RDB module and not a
+dialogue-VM feature:
+
+```zsh
+dotnet run --project Faolan.Importer -- --only rdb-dialogue-teleports --RdbDir <rdb-dir> --captures <data-repo>/Captures
+```
+
+It writes ordinary `TravelDestination` rows, keyed by the dialogue **edge** whose pick lands on the directive
+screen — which is exactly what that table already is ("the wiring is the row" above), so the trip runs through
+the same capture-verified runtime the wagoners use rather than through a second one. Two columns separate the
+two kinds:
+
+- **`DelaySeconds`** — how long the parting line stays up before the trip runs. 0 on every captured wagoner trip
+  (retail teleports on the pick) and non-zero only here, where the text states it inline.
+- **`FromDialogueDirective`** — which evidence the row came from. It also changes what a NULL `Cost` MEANS: on a
+  directive row it is *free* (there is no fare anywhere in the flow), where on a wagoner row it is *unmeasured*.
+
+⚠️ **Polus states no height** (`{teleportplayer 349 564 1000}`), so the arrival is **ground-snapped** off the
+baked terrain at run time. Discarding the whole arrival for a missing Y would send the player to the map's
+default respawn — somewhere else entirely — when the NPC has just said exactly where they are going. With no
+terrain loaded for that map there is nothing to snap to, and the default spawn is then the honest answer.
+
+⚠️ **Sigurd was not in the original write-up** of this mechanism, which named only the first two. He is the same
+thing with no `{delay}` (retail teleports as the line lands) and an extra `{gameactiononnpc
+StartClientSideScryScript}` that plays a cutscene — unwired, and independent of the trip.
+
+This is also what settles the old "the third captured trip's NPC is ambiguous" question: **Osithma's tree has no
+travel option at all** (it is pure flavour), so the traveller in `disconnect-after-wayfarer` is the Tortage
+Smuggler, which independently confirms the smuggler exception in the criminal gate.
 
 ## The criminal gate
 
