@@ -46,6 +46,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// An empty table is the minimal (no-morph) form, not an appearance; an entry carrying runtime state, or
 			// a non-empty closing list, means this stream is more than the appearance and is not what the from-DB
 			// build reproduces. Both keep this classifier NARROWER than the reader it runs on.
+			//
+			// ⚠️ "runtime state" is the WRONG READING of Word2, and it costs two NPCs their whole appearance (#672).
+			// Censused over every captured table (`--report spawn-diff`, the Word2 footer): of 756 tables exactly
+			// TWO carry a non-zero Word2, and on both it is a CONTIGUOUS PREFIX numbered from 1 - Turach's first
+			// three entries hold 1/2/3 and Kincaid's first four hold 1/2/3/4, with every later entry zero. Runtime
+			// state would be scattered and arbitrary; a dense 1..N prefix is an ordinal. Those two NPCs are declined
+			// here and so spawn BALD.
+			//
+			// It is still rejected, because accepting it would mean writing a table `BuildPostIir` cannot reproduce:
+			// `NpcSpawnMorph` has no column for the field, so the round-trip would silently drop it. Widening this
+			// means the column FIRST, then the emit, then a re-harvest - not a one-line relaxation here.
 			if (npc.Morphs.Count == 0 || npc.Morphs.Exists(m => m.Word2 != 0 || m.Flag != 0))
 				return false;
 			if (npc.EntryTableX != ListFrame.Empty || npc.EntryTableMarker != ListFrame.Empty)

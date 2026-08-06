@@ -1967,6 +1967,10 @@ namespace Faolan.Importer.Cli
 			// report names, and a name can span several template ids (two "Poacher" types stand on one map).
 			var tally = new SortedDictionary<string, SpawnVerdict>();
 			var seen = new HashSet<(uint, float, float, float)>();
+			var word2Tables = 0;
+			var word2NonZero = 0;
+			var word2Values = new Dictionary<uint, int>();
+			var word2Prefix = new Dictionary<string, int>();
 
 			foreach (var capture in captures)
 			{
@@ -2053,11 +2057,34 @@ namespace Faolan.Importer.Cli
 							+ (fields.Count > 0 ? $" [{string.Join(", ", fields.Take(6))}{(fields.Count > 6 ? ", ..." : "")}]" : ""));
 					}
 
+					if (captured.Post?.Slot is NpcEntrySlot census && census.Morphs.Count > 0)
+					{
+						word2Tables++;
+						var nonZero = census.Morphs.FindAll(m => m.Word2 != 0);
+						if (nonZero.Count > 0)
+						{
+							word2NonZero++;
+							foreach (var m in nonZero)
+								word2Values[m.Word2] = word2Values.GetValueOrDefault(m.Word2) + 1;
+
+							// "the first N entries and no others" is the shape an ordered appearance field has and
+							// scattered runtime state does not.
+							var prefix = census.Morphs.FindIndex(m => m.Word2 == 0);
+							var contiguous = prefix >= 0 && !census.Morphs.Skip(prefix).Any(m => m.Word2 != 0);
+							var key = contiguous ? $"{prefix} entries" : "scattered";
+							word2Prefix[key] = word2Prefix.GetValueOrDefault(key) + 1;
+						}
+					}
+
 					var theirMorphs = Morphs(captured);
 					var ourMorphs = Morphs(ours);
 					if (!theirMorphs.SequenceEqual(ourMorphs))
 						faults.Add($"appearance {theirMorphs.Count} morphs vs {ourMorphs.Count}"
-							+ (theirMorphs.Count == ourMorphs.Count ? " (same count, different values)" : ""));
+							+ (theirMorphs.Count == ourMorphs.Count
+								? " (same count, different values)"
+								: theirMorphs.Count > 0 && ourMorphs.Count == 0
+									? $" - BALD, declined because {AppearanceDeclineReason(captured)}"
+									: ""));
 					else if (captured.Post?.MovementMode != ours.Post?.MovementMode)
 						faults.Add($"post-IIR movement mode {captured.Post?.MovementMode} vs {ours.Post?.MovementMode}");
 
@@ -2071,6 +2098,16 @@ namespace Faolan.Importer.Cli
 					v.Note ??= string.Join("; ", faults);
 				}
 			}
+
+			// #672: the classifier declines a whole appearance table on ONE entry with a non-zero Word2, and every
+			// bald NPC found so far declines for exactly that. So census the field across every captured table: if
+			// it were runtime noise it would be scattered, and if it is part of the appearance it will have shape.
+			Console.WriteLine();
+			Console.WriteLine("appearance Word2 census (the field that declines a table - #672):");
+			Console.WriteLine($"  tables with a morph list: {word2Tables}, of which {word2NonZero} carry a non-zero Word2 on some entry");
+			Console.WriteLine($"  Word2 values: {string.Join(", ", word2Values.OrderByDescending(kv => kv.Value).Take(10).Select(kv => $"{kv.Key} x{kv.Value}"))}");
+			Console.WriteLine($"  and on a carrying table, the non-zero entries are its FIRST {string.Join("/", word2Prefix.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Key} ({kv.Value})"))}");
+			Console.WriteLine();
 
 			Console.WriteLine("spawn-diff: every captured NPC spawn rebuilt from its DB row - CoreCharacter message +");
 			Console.WriteLine("appearance table compared (the pre-IIR is our generated scaffold by design, so it is not).");
@@ -2092,6 +2129,32 @@ namespace Faolan.Importer.Cli
 
 			// The appearance table as (morph id, value) pairs. Empty for an animal, whose post-IIR carries no entry
 			// slot of this shape - so "0 vs 0" is a match, not two absences papering over each other.
+			// #672: WHY a captured appearance table did not become morph rows. `NpcSpawnAppearance.TryLiftLenient` is
+			// deliberately narrower than the reader it runs on and declines the whole table on any of four
+			// conditions; a spawn that lands here renders BALD, so which condition fired is the whole question. It
+			// re-states the classifier's conditions rather than calling it, because the classifier answers bool - and
+			// the two are gated together by NpcSpawnAppearanceTests, so they cannot drift apart silently.
+			static string AppearanceDeclineReason(SimpleCharFullUpdateIIR captured)
+			{
+				var post = captured.Post;
+				if (post == null)
+					return "the post-IIR did not decode";
+				if (post.Slot is not NpcEntrySlot npc)
+					return $"the entry slot is {post.Slot?.GetType().Name ?? "absent"}, not an NPC slot";
+				if (npc.Morphs.Count == 0)
+					return "the table is empty (the minimal no-morph form)";
+
+				var runtime = npc.Morphs.FindIndex(m => m.Word2 != 0 || m.Flag != 0);
+				if (runtime >= 0)
+					return $"entry {runtime} carries runtime state (Word2={npc.Morphs[runtime].Word2}, Flag={npc.Morphs[runtime].Flag})";
+				if (npc.EntryTableX != ListFrame.Empty || npc.EntryTableMarker != ListFrame.Empty)
+					return $"the entry table is not empty (X=0x{npc.EntryTableX:X}, marker=0x{npc.EntryTableMarker:X})";
+				if (post.EndPairs.Count > 0 || post.EndPairs2.Count > 0 || post.EndPairs3.Count > 0)
+					return $"a closing list is not empty ({post.EndPairs.Count}/{post.EndPairs2.Count}/{post.EndPairs3.Count} pairs)";
+
+				return "no classifier condition fires - the rows are missing for another reason (a stale import?)";
+			}
+
 			static List<(uint, float)> Morphs(SimpleCharFullUpdateIIR spawn)
 			{
 				return spawn.Post?.Slot is NpcEntrySlot npc
