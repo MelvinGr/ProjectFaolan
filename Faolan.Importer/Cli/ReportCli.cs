@@ -3574,7 +3574,7 @@ namespace Faolan.Importer.Cli
 			int manifests = 0, withGeometry = 0, geomLocal = 0, geomCdn = 0, texLocal = 0, texCdn = 0, texMissing = 0;
 			foreach (var e in rdb.EntriesOfType(RdbAssetExtractor.MeshIndexFileType))
 			{
-				if (e.Size == 0 || !e.IsLocal)
+				if (e.Size == 0 || !rdb.CanRead(e))
 					continue;
 
 				manifests++;

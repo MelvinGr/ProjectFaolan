@@ -87,6 +87,24 @@ Significant de-risking — the tool and format are identified:
 > most of our maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the
 > on-demand ones.
 >
+> ⚠️ **Never gate a read on `Entry.IsLocal`, and never build a bare `new RdbReader(dir)`** (Gitea #674). `IsLocal`
+> reads as "skip the unreadable ones" and means "skip everything not packed in `NN.rdbdata`"; a reader built without
+> a mirror base makes `CanRead` collapse into exactly that. Neither fails, warns or moves a row count - the import
+> just quietly covers less of the game, and for several types that is MOST of it:
+>
+> | type | local | CDN-only |
+> |---|---:|---:|
+> | 1010001 RENDERMESH | 51,183 | 44,106 |
+> | 1010013 in-game map tiles | 73 | 580 |
+> | 1010506 NPC spawn layouts | 240 | 577 |
+> | 1070003 tilemaps | 244 | 276 |
+> | 1000053 bounded areas | 204 | 274 |
+> | 1010004 / 1066606 textures | 24,248 / 1,531 | 11,051 / 4,649 |
+>
+> The correct gate is `rdb.CanRead(entry)` plus an **empty-body guard** - a CDN miss returns empty rather than
+> throwing. `IsLocal` has one legitimate use left: REPORTING where a resource physically lives. Both rules are gated
+> by `RdbCdnGateTests`.
+>
 > The XML's `name` is the world-EDITOR object label, NOT a display name, and is not unique (95 points are
 > "ResurrectionAIPoint0"); no display-name/text-id attribute exists on the element at all, so a player-facing name is
 > not recoverable from this file (#372). Also carried: `RestorationLevel` (a percent) and `Orientation` (yaw radians),

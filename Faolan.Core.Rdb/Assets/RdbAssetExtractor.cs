@@ -531,7 +531,7 @@ namespace Faolan.Core.Rdb.Assets
 			byte[]? template = null;
 			foreach (var type in new uint[] { 1000020, 1000620 })
 			{
-				if (rdb.TryGet(type, itemId, out var e) && e is { IsLocal: true, Size: > 0 })
+				if (rdb.TryGet(type, itemId, out var e) && e.Size > 0 && rdb.CanRead(e))
 				{
 					try
 					{
@@ -1080,10 +1080,14 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			if (!rdb.TryGet(type, id, out var e))
 				return ("missing", 0, null);
-			if (!e.IsLocal)
-				return ("cdn", e.Size, null); // on-demand CDN resource; fetch-by-hash is a later step
+			if (!rdb.CanRead(e))
+				return ("cdn", e.Size, null); // on-demand, and no mirror configured (or it already missed on this hash)
 
+			// A CDN texture is pulled through the mirror exactly as the viewer's own TryDecodeTexture does - the dump
+			// used to hard-skip every one, which is 11,051 of type 1010004, 4,649 of 1066606 and 580 of 1010013.
 			var payload = rdb.ReadDecompressed(e);
+			if (payload.Length == 0)
+				return ("cdn-miss", e.Size, null); // the mirror could not serve it; RdbReader returns empty, not a throw
 
 			// FCTX container -> DDS.
 			if (FctxConverter.IsFctx(payload) || FctxTypes.Contains(type))
@@ -1358,7 +1362,7 @@ namespace Faolan.Core.Rdb.Assets
 			var idx = new Dictionary<uint, HashSet<string>>();
 			foreach (var e in rdb.EntriesOfType(SkeletonType))
 			{
-				if (!e.IsLocal || e.Size == 0)
+				if (e.Size == 0 || !rdb.CanRead(e))
 					continue;
 
 				try
