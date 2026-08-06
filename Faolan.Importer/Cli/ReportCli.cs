@@ -1638,6 +1638,8 @@ namespace Faolan.Importer.Cli
 			// curve to be fitted through it. `hitsToKill` below already makes this caveat; the melee table did not.
 			var fromNpcByAttacker = new Dictionary<(uint Template, uint Level), List<uint>>();
 			var attackerHealth = new Dictionary<(uint Template, uint Level), uint>();
+			// level -> every captured spawn health at that level (the `hp/curve` denominator, see below).
+			var healthByLevel = new Dictionary<uint, List<uint>>();
 			var attackerNames = new Dictionary<uint, string>();
 			var attackerPlayerLevel = new Dictionary<(uint Template, uint Level), uint>();
 
@@ -1648,7 +1650,7 @@ namespace Faolan.Importer.Cli
 				var spawnHealth = new Dictionary<uint, uint>();
 				var names = new Dictionary<uint, string>();
 				var templates = new Dictionary<uint, uint>();
-				uint playerLevel = 0;
+				var playerLevels = new Dictionary<uint, uint>();
 				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
 				{
 					var spawnBody = e.Data is { Length: >= 12 }
@@ -1661,14 +1663,27 @@ namespace Faolan.Importer.Cli
 							names[e.Handle] = e.Name;
 						templates[e.Handle] = e.TemplateId;
 						if (st.Health > 0)
+						{
 							spawnHealth[e.Handle] = st.Health;
+							// The level's health CURVE, from every captured spawn rather than only the ones that hit
+							// the player. Built off the attackers alone it was a median of one to three values, so
+							// nearly every row read exactly 1.0 - a column that cannot separate an elite from a
+							// critter is worse than no column, because it looks like it did (#671).
+							(healthByLevel.TryGetValue(st.Level, out var hl) ? hl : healthByLevel[st.Level] = []).Add(st.Health);
+						}
 					}
 				}
 
-				// The CAPTURING player's own level. NpcSpawnExtractor drops the player's spawn (handle >= the character
+				// PLAYER levels, PER HANDLE. NpcSpawnExtractor drops the player's spawn (handle >= the character
 				// instance base), which is exactly the record that carries it, so read it straight off the raw spawns.
-				// Needed because the interesting variable is not the mob's level but the GAP to the player's - see the
-				// `lvl gap` column below.
+				// Needed because the interesting variable is not the mob's level but the GAP to whoever it HIT - see
+				// the `lvl gap` column below.
+				//
+				// ⚠️ Kept per handle rather than collapsed to the capture's MAXIMUM, which is what it used to be.
+				// A capture is not one player: any level-80 stranger who walks past is spawned into it, and the max
+				// then stamped `pc lvl 80` onto every mob in the file. Every one of #671's "elite" outliers is a
+				// low-level mob scored against a gap it never fought, so the whole elite question was an artifact of
+				// this line (#671).
 				foreach (var p in c.Packets)
 				{
 					if (p is not { IsIirCarrier: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
@@ -1680,8 +1695,8 @@ namespace Faolan.Importer.Cli
 
 					// `Body` is already past the packet prologue+header, so it IS the IIR body the reader wants -
 					// unlike NpcSpawnEntry.Data above, which is the whole packet and has to be sliced.
-					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > playerLevel)
-						playerLevel = pst.Level;
+					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > 0)
+						playerLevels[sb.ReadU32Be(12)] = pst.Level;
 				}
 
 				// Track each entity's last-seen HealthCurrent from the stat updates, so a hit can be compared with the
@@ -1813,8 +1828,9 @@ namespace Faolan.Importer.Cli
 								attackerHealth[key] = attackerHp;
 							if (names.TryGetValue(hit.Attacker, out var attackerName))
 								attackerNames[attackerTemplate] = attackerName;
-							if (playerLevel > 0)
-								attackerPlayerLevel[key] = playerLevel;
+							// The level of the player this hit actually LANDED ON, by victim handle.
+							if (playerLevels.TryGetValue(hit.Target, out var victimLevel))
+								attackerPlayerLevel[key] = victimLevel;
 						}
 					}
 
@@ -1870,12 +1886,17 @@ namespace Faolan.Importer.Cli
 			// against a curve nothing ran (#479).
 			// `level, level` = a player at the mob's own level, i.e. the un-penalised case - the level-gap penalty
 			// (#488) is a separate factor and the column below is the one that shows it.
-			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => CombatResolver.ResolveNpcAttackDamage(level, level));
+			// ⚠️ WIRE units, not the resolver's display return. Captured damage is a wire number, and comparing it
+			// to the display value multiplied every `x model` in this report by 100 from #572 until #671 caught it.
+			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => CombatResolver.NpcAttackDamageWire(level, level));
 
 			// Per attacker, so the archetype spread is visible instead of averaged away. `x model` is the measured
 			// median over what the server would deal at that level: ~1.0 means the level curve fits this attacker.
 			Console.WriteLine($"\n=== NPC -> PLAYER, BY ATTACKER (the level buckets above mix archetypes) ===");
-			Console.WriteLine($"{"level",5} {"tpl",8} {"attacker",-24} {"hits",5} {"min",7} {"median",7} {"max",7} {"ours",7} {"x model",8} {"pc lvl",7} {"lvl gap",8}");
+			Console.WriteLine("⚠️ `x model` is scored in WIRE units on both sides. `modes` splits an attacker's hits at their");
+			Console.WriteLine("   largest RATIO gap when that gap is >= 3x with 2+ hits either side - a median taken across two");
+			Console.WriteLine("   mechanics (an auto-swing and a special) describes neither, which is what #671 stalled on.");
+			Console.WriteLine($"{"level",5} {"tpl",8} {"attacker",-24} {"hits",5} {"min",7} {"median",7} {"max",7} {"ours",7} {"x model",8} {"pc lvl",7} {"lvl gap",8} {"hp/curve",9} {"hit%hp",7}  modes");
 			foreach (var ((template, level), hits) in fromNpcByAttacker.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.Template))
 			{
 				var sorted = hits.Order().ToList();
@@ -1884,13 +1905,97 @@ namespace Faolan.Importer.Cli
 				// Scored against what the server would ACTUALLY deal to that player - the level-gap penalty included
 				// (#488) - so `x model` reads 1.0 when we reproduce the fight rather than only when the gap is 0. Rows
 				// with no resolvable player level fall back to the un-penalised curve.
-				var ours = CombatResolver.ResolveNpcAttackDamage(level, pcLvl > 0 ? pcLvl : level);
-				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 24),-24} {sorted.Count,5} {sorted[0],7} {median,7} {sorted[^1],7} {ours,7} {(ours > 0 ? (double)median / ours : 0),8:F2} {(pcLvl > 0 ? pcLvl.ToString() : "-"),7} {(pcLvl > 0 ? ((int)pcLvl - (int)level).ToString() : "-"),8}");
+				var ours = CombatResolver.NpcAttackDamageWire(level, pcLvl > 0 ? pcLvl : level);
+
+				var hp = attackerHealth.GetValueOrDefault((template, level));
+				var levelHp = healthByLevel.TryGetValue(level, out var pool) && pool.Count > 0 ? pool.Order().ToList()[pool.Count / 2] : 0;
+				var hpRatio = hp > 0 && levelHp > 0 ? (double)hp / levelHp : 0;
+
+				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 24),-24} {sorted.Count,5} {sorted[0],7} {median,7} {sorted[^1],7} {ours,7} {(ours > 0 ? (double)median / ours : 0),8:F2} {(pcLvl > 0 ? pcLvl.ToString() : "-"),7} {(pcLvl > 0 ? ((int)pcLvl - (int)level).ToString() : "-"),8} {(hpRatio > 0 ? hpRatio.ToString("F1") : "-"),9} {(hp > 0 ? (100.0 * median / hp).ToString("F2") : "-"),7}  {Modes(sorted, ours)}");
+			}
+
+			// ⭐ THE HEAD-TO-HEAD (#671). The ticket asked for an ELITE multiplier on top of the level curve. The
+			// better question is whether LEVEL is the right base at all: we also hold the attacker's own maximum
+			// health (`NpcSpawn.Health`), and a swing that is a fixed share of the swinger's pool would explain the
+			// "elites hit harder" observation without an archetype column, because an elite's pool is what makes it
+			// an elite.
+			//
+			// Scored only where the model is not being asked to do the level-gap's job too - |gap| <= 2 - and only
+			// on rows with enough hits to have a median worth the name. The statistic is the SPREAD: a predictor
+			// whose ratio clusters is the one that predicts.
+			var comparable = fromNpcByAttacker
+				.Where(kv => kv.Value.Count >= 8 && attackerHealth.ContainsKey(kv.Key) && attackerPlayerLevel.TryGetValue(kv.Key, out var pc) && Math.Abs((int)pc - (int)kv.Key.Level) <= 2)
+				.Select(kv =>
+				{
+					var sorted = kv.Value.Order().ToList();
+					var median = sorted[sorted.Count / 2];
+					var model = CombatResolver.NpcAttackDamageWire(kv.Key.Level, attackerPlayerLevel[kv.Key]);
+					return (Name: attackerNames.GetValueOrDefault(kv.Key.Template, "?"), kv.Key.Level, sorted.Count,
+						ByLevel: model > 0 ? (double)median / model : 0,
+						ByHealth: 100.0 * median / attackerHealth[kv.Key]);
+				})
+				.OrderBy(r => r.Level)
+				.ToList();
+
+			Console.WriteLine();
+			Console.WriteLine($"=== NPC -> PLAYER: is LEVEL or the attacker's own HEALTH the better base? ({comparable.Count} rows, |gap| <= 2, >= 8 hits) ===");
+			Console.WriteLine($"{"level",5} {"attacker",-26} {"hits",5} {"x level model",14} {"% of own hp",12}");
+			foreach (var r in comparable)
+				Console.WriteLine($"{r.Level,5} {Trunc(r.Name, 26),-26} {r.Count,5} {r.ByLevel,14:F2} {r.ByHealth,12:F2}");
+
+			if (comparable.Count >= 3)
+			{
+				Console.WriteLine($"  by LEVEL : min {comparable.Min(r => r.ByLevel):F2} max {comparable.Max(r => r.ByLevel):F2}"
+				                  + $" -> spread {comparable.Max(r => r.ByLevel) / Math.Max(0.0001, comparable.Min(r => r.ByLevel)):F1}x");
+				Console.WriteLine($"  by HEALTH: min {comparable.Min(r => r.ByHealth):F2}% max {comparable.Max(r => r.ByHealth):F2}%"
+				                  + $" -> spread {comparable.Max(r => r.ByHealth) / Math.Max(0.0001, comparable.Min(r => r.ByHealth)):F1}x"
+				                  + $", median {comparable.Select(r => r.ByHealth).Order().ToList()[comparable.Count / 2]:F2}%");
 			}
 
 			static string Trunc(string s, int n)
 			{
 				return s.Length <= n ? s : s[..n];
+			}
+
+			// Splits an attacker's hits at the largest RATIO gap between consecutive sorted values, when that gap is
+			// wide enough and both sides are populated. A per-archetype damage multiplier cannot express two
+			// mechanics in one number, so before fitting one the question is whether there IS one number: `Vanir
+			// Sentinel` L26's 25 hits run 127 / 4191 / 5217, where 127 is what the level-gap model predicts and 5217
+			// is 40x that. One template, one level, one player, one fight - and two mechanics.
+			static string Modes(List<uint> sorted, uint model)
+			{
+				const double splitRatio = 3.0;
+				const int minSide = 2;
+				if (sorted.Count < 2 * minSide)
+					return "-";
+
+				var at = -1;
+				var best = splitRatio;
+				for (var i = minSide - 1; i <= sorted.Count - minSide - 1; i++)
+				{
+					if (sorted[i] == 0)
+						continue;
+
+					var ratio = (double)sorted[i + 1] / sorted[i];
+					if (ratio <= best)
+						continue;
+
+					best = ratio;
+					at = i;
+				}
+
+				if (at < 0)
+					return "one";
+
+				var low = sorted[..(at + 1)];
+				var high = sorted[(at + 1)..];
+				return $"TWO: {low.Count}x median {low[low.Count / 2]} ({Times(low[low.Count / 2], model)})"
+				       + $" | {high.Count}x median {high[high.Count / 2]} ({Times(high[high.Count / 2], model)}), {best:F1}x apart";
+			}
+
+			static string Times(uint value, uint model)
+			{
+				return model > 0 ? $"{(double)value / model:F2}x" : "-";
 			}
 			Report("PLAYER -> NPC (the shape an NPC-armour model has to reproduce)", toNpc, null);
 			Console.WriteLine($"\n=== PLAYER -> NPC as a FRACTION of the target's own health ===");

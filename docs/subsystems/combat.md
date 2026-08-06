@@ -1101,11 +1101,59 @@ template's 12 hits.
 ⚠️ **The mirror case is deliberately NOT modelled.** A mob *above* the player measures 5.15 and 6.99 at gap −19,
 which points the right way but is one hit each — and a higher-level mob already hits harder through `level × 100`.
 
-⚠️ **Elite/boss attackers sit far above this table** (`Black Ring Assassin` 4.94 at gap 17) and ranged mobs far
-below it. Both are per-archetype and independent of the gap, so neither is evidence against the curve.
+⚠️ **Named BOSSES sit ~3× above this table** and ranged mobs a fifth below it. Both are per-archetype and
+independent of the gap, so neither is evidence against the curve. The boss factor is measured but **not
+modelled** — see below.
 
 Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
 [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479).
+
+### The "elite" outliers were mostly a MEASUREMENT FAULT (#671)
+
+Four attackers read 5–27× the curve and looked like an elite archetype. Two of them were an artifact of the
+report, and finding that is what the elite question actually turned on.
+
+`--report npc-damage` took **the capture's MAXIMUM player level** as "the player". A capture is not one player:
+any level-80 stranger who walks past is spawned into it, and the max then stamped `pc lvl 80` onto every mob in
+the file. Attributed instead by the hit's own **victim handle**:
+
+| attacker | before | after |
+|---|---|---|
+| `Wild Boar` L25 | gap 55, **19.58×** | gap 1, **2.15×** |
+| `Vanir Sentinel` L26 | gap 54, **14.65×** | gap 0, **1.61×** |
+
+Both ordinary. The "bimodal within one template" reading of `Vanir Sentinel` goes with it — its 25 hits are one
+mode at 4191 with a single stray 127, not two mechanics (`--report npc-damage` now splits an attacker's hits at
+their largest ratio gap, so that question is answered by the report rather than by eye).
+
+⚠️ **And the whole `x model` column had been 100× wrong since #572.** That change moved
+`ResolveNpcAttackDamage`'s return to display units while captured damage is a WIRE number, so a level-1
+`Pillager` read as "139× the model" instead of 1.39×. `CombatResolver.NpcAttackDamageWire` is the wire-unit
+entry point the report scores against; the display value is that ÷ the vitals scale.
+
+Of the other two, `Gaud Guardsman` (23.97×) is a **city guard**: 304,944 health and `Normalset = 32`, exactly
+like `Tarantia City Guard`, `Poitain Guard` and every other town guard. It is not an ordinary combat NPC.
+
+**What survives is a boss row**, at gap 0 with the level curve unpenalised:
+
+| attacker | level | hits | `x model` |
+|---|---:|---:|---:|
+| `Eerika of the Maidens` | 80 | 18 | 3.41 |
+| `Boros` | 80 | 19 | 2.74 |
+| `Ravenous Crocodile Follower` | 80 | 32 | 2.72 |
+
+Three templates, 69 hits, clustered — a ~3× boss factor, and the same figure the ticket's first pass called
+"a plausible boss multiplier". It is **not shipped**, because nothing in the data identifies a boss:
+`NpcFlags`, `Normalset`, `NpcType`, `SuperFamily`, `ProfessionType`, `Community`, `Side`, `Disposition` and
+`Health` were all checked and none separates them — `Boros` shares its `NpcFlags` with `Pillager` and its health
+pool (4,605) with an ordinary `Hired Bodyguard`. The multiplier is blocked on the client's own rank tag, which
+is [#508](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/508)'s column.
+
+**Health was tested as an alternative BASE and rejected.** An elite's pool is what makes it an elite, so
+`damage = k × the attacker's own max health` would explain "elites hit harder" with no archetype column at all.
+Over the 10 rows with ≥ 8 hits at |gap| ≤ 2 the two predictors are near-equivalent — the level model spreads
+0.77–3.41 (4.4×), health 1.22–4.76 % (3.9×, median 2.98 %) — which is not enough to move the base of the damage
+model. `--report npc-damage` prints the head-to-head so a wider corpus can re-decide it.
 
 ### A mob that SHOOTS deals a fifth of one that swings (#671)
 

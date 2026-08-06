@@ -393,9 +393,21 @@ namespace Faolan.GameServer.Combat
 		// `ranged` is whether the mob SHOOTS rather than swings (`NpcWeapon.IsRanged`) - see RangedPercent.
 		public static uint ResolveNpcAttackDamage(uint npcLevel, uint targetLevel, bool ranged = false)
 		{
+			return Math.Max(1u, NpcAttackDamageWire(npcLevel, targetLevel, ranged) / CharacterStatId.HealthMax.GetScale());
+		}
+
+		// The same curve BEFORE the display conversion, i.e. in the units the CAPTURES are in.
+		//
+		// ⚠️ This exists because the two scales were compared against each other for real. `--report npc-damage`
+		// scores every captured attacker against `ResolveNpcAttackDamage`, and captured damage is a WIRE number - so
+		// when #572 moved the resolver's return to display units, every `x model` in that report silently multiplied
+		// by 100. A level-1 `Pillager` read as "139x the model" instead of 1.39x, and #671's whole elite/archetype
+		// analysis is read off that column. A measurement tool that is wrong by a constant is worse than one that is
+		// missing, because it still looks like evidence.
+		public static uint NpcAttackDamageWire(uint npcLevel, uint targetLevel, bool ranged = false)
+		{
 			var scale = LevelGapPercent(npcLevel, targetLevel) * (ranged ? RangedPercent : 100u) / 100;
-			var wire = Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * scale / 100;
-			return Math.Max(1u, wire / CharacterStatId.HealthMax.GetScale());
+			return Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * scale / 100;
 		}
 
 		// A RANGED mob deals about a fifth of what a melee mob of the same level does - a factor independent of the
