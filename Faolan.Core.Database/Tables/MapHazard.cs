@@ -7,6 +7,15 @@ namespace Faolan.Core.Database.Tables
 	// A scripted HAZARD AREA on a playfield: a region that hurts or kills a player who walks into it (#504). The lava
 	// on Ymir's Pass is the decoded case; the shape generalises to every other hazard family the client carries.
 	//
+	// ⚠️ **This table is slated to MERGE into MapRegion (#679).** They are the same physical thing stored twice - both
+	// a 1000053 `<boundedarea>` prism, both derived-keyed for the same reason, each with its own parallel vertex
+	// table, and `EnvironmentService.Contains` already carries two near-identical overloads over one shared
+	// `InPrism`. The target shape is one MapRegion for the geometry plus a 1:1 BEHAVIOUR side table (the
+	// NpcTemplate/NpcStatCore pattern), which makes the "client owns WHERE, server owns WHAT" split below
+	// structural instead of a comment - and lets a region's geometry be imported without implying it has hazard
+	// behaviour, which is what currently blocks the other hazard families. Do not add columns here without reading
+	// that ticket first.
+	//
 	// The geometry is CLIENT DATA, and finding that is what made this a real feature rather than a one-point guess.
 	// The client's RDB type 1000053 (BOUNDEDAREAS, 478 records) is plaintext XML, one record PER PLAYFIELD (the record
 	// id IS the map id), holding 8323 named `<boundedarea>` prisms - each a `<vertice>` list of (x, z) pairs plus a

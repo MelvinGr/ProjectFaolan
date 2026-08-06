@@ -30,6 +30,12 @@ namespace Faolan.Core.Database.Tables
 	// exactly - and the nullable FKs that point here (RespawnPoint, QuestGoalDefinition) need a single column to
 	// express SetNull, which a composite cannot.
 	[Index(nameof(MapId), nameof(Name), IsUnique = true)]
+	// ⚠️ **MapHazard is slated to merge INTO this table (#679)**, with hazard behaviour moving to a 1:1 side table -
+	// the two are the same 1000053 prism stored twice. `MapArea` folds in later still, as a nullable AreaNameId
+	// column, once its rows come from the client and it stops carrying geometry of its own. Until then MapArea is a
+	// CONSUMER of a region (like RespawnPoint and QuestGoalDefinition), not a kind of one: its bounds are a sampled
+	// hull, and merging an approximation into the table of exact client polygons is the mistake MapHazard's own
+	// comment warns about.
 	public class MapRegion : BaseEntity, IDerivedKey
 	{
 		public static uint ComputeId(uint mapId, string name)
