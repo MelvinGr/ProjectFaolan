@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
@@ -11,6 +12,44 @@ namespace Faolan.Tests
 	// caster = 0x0802E5D4; the golden hex is the frame body with the 0x2000 carrier's u32 length prefix stripped.
 	public class BehaviorAnimationsTests
 	{
+		// #676: a ranged NPC's swing, byte-exact against the pair retail sent for ONE shot -
+		// Hoxxling_mage-heraldofxotli_login_gameplay frames 9017 (begin) and 9038 (complete). The two differ in the
+		// sequence word and in nothing else: same swing counter, same args, byte-identical 82-byte tail.
+		//
+		// It is a whole SHOT rather than one record on purpose. Our archers used to send a single `Combat:Melee`
+		// (0x0F) ack - a sword swing for a bow, and only the opening half of the action - which is what this issue is.
+		[Theory]
+		[InlineData(BehaviorAnimations.RangedBeginSeq,
+			"642cd3d60000c35000017e160004000000100000001908f8df04180328183000520908d0860310f1dcc50958536051" +
+			"000000000000000000000001000000000000000000000000000000000000000000000000000000010000c35001316e710000000006000000cd00000000000000010000003f00000002000000000000000000")]
+		[InlineData(BehaviorAnimations.RangedCompleteSeq,
+			"642cd3d60000c35000017e16000a000000100000001908f8df04180328183000520908d0860310f1dcc50958536051" +
+			"000000000000000000000001000000000000000000000000000000000000000000000000000000010000c35001316e710000000006000000cd00000000000000010000003f00000002000000000000000000")]
+		public void ANpcShot_MatchesCapture(ushort sequence, string expected)
+		{
+			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(0x00017E16, 0x01316E71, 63, 77816, 3, sequence, BehaviorId.CombatRanged, 24, 83, 81, 0xCD));
+
+			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
+		}
+
+		// The one thing that separates the ranged result block from the melee one: a single trailing 0x00. That is
+		// the whole reason every captured ranged tail is one byte longer than the melee tail of the same shape
+		// (82 against 81 with one result), and getting it wrong makes the client read past the record.
+		[Fact]
+		public void TheRangedResultBlock_IsTheMeleeOnePlusOneTrailingZero()
+		{
+			var melee = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(0x00017E16, 0x01316E71, 63, 77816, 3, BehaviorAnimations.RangedBeginSeq, BehaviorId.CombatMelee, 24, 83,
+				81, 0xCD));
+			var ranged = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(0x00017E16, 0x01316E71, 63, 77816, 3, BehaviorAnimations.RangedBeginSeq, BehaviorId.CombatRanged, 24, 83,
+				81, 0xCD));
+
+			Assert.Equal(melee.Length + 1, ranged.Length);
+			Assert.Equal(0x00, ranged[^1]);
+			// ...and the only other difference is the behaviour id itself, four bytes in at a known offset.
+			Assert.Equal((uint)BehaviorId.CombatMelee, BehaviorControlCenterCodec.Parse(melee).BehaviorId);
+			Assert.Equal((uint)BehaviorId.CombatRanged, BehaviorControlCenterCodec.Parse(ranged).BehaviorId);
+		}
+
 		[Theory, InlineData((ushort)0x0004, "642cd3d60000c3500802e5d40004000000120000001708c5c80210071809280a3000520908d0860310d4cb8b400000c8780001217400000006"),
 		 InlineData((ushort)0x000f, "642cd3d60000c3500802e5d4000f000000120000001708c5c80210071809280a3000520908d0860310d4cb8b400000c8780001217400000006")]
 		// F2793 (hold-echo, seq 0x0004) / F2801 (hold-assert, seq 0x000f): the object-action STATE that holds the seated pose.

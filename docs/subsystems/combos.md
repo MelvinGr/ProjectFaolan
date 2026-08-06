@@ -424,11 +424,14 @@ is swung by only **3 of the 6** captured shield-bearing templates — the three 
 a shield does not make a guardian. Two-handers and dual-wielders carry two or three candidate families
 (`barbarian` / `conqueror` / `hox`) and no template swings two of them.
 
-⚠️ **Ranged is answered but not wired.** `ranger` is the only family at criteria 26/32, there is no
-`combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows — so no archetype is
-needed there at all. What blocks it is the CARRIER: our ranged NPCs send the melee ack (`BehaviorId.CombatMelee`),
-where retail's ranged swings are `CombatRanged` (0x10) with a different tail and a three-phase sequence. Tracked
-on **Gitea #676**.
+**Ranged needs no archetype at all, and is wired since #676.** `ranger` is the only family at criteria 26/32,
+there is no `combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows. A bow
+draws from `combo_npc_ranger_bow_*` and a crossbow from `combo_npc_ranger_crossbow_*`, at the rate retail shows
+for a shot — **57 of 418 acks, 13.6%**, against melee's 28.4%. A THROWN weapon stays plain: no
+`combo_npc_*_thrown_*` row exists.
+
+What had to land first was the CARRIER, because a bow combo on a melee ack would have been wrong in a new way —
+see `docs/subsystems/combat.md`.
 
 Gated by `NpcComboTests`, which locks the catalog premise, the mapping, the coverage over the shipped spawn set,
 the `Criteria` decode, the level ceiling, the two answered buckets and the ones deliberately refused — and that

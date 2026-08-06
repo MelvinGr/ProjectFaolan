@@ -1070,6 +1070,31 @@ player's level alongside, two effects separate out that the buckets render as on
 - a **level-GAP penalty** - see below; modelled since #488.
 - **ranged mobs deal ~0.2 of same-level melee** even at gap 0 - see below; modelled since #671.
 
+### A SHOT is a different record from a swing (#676)
+
+A ranged NPC's attack is `Combat:Ranged` (`BehaviorId` 0x10), not `Combat:Melee` (0x0F), and it differs from a
+swing in three ways. Until #676 our archers sent the melee ack - a sword swing played for a bow, and only the
+opening half of the action.
+
+| | melee 0x0F | ranged 0x10 |
+|---|---|---|
+| records per attack | **one**, seq 0x0004 (1,957 of 2,117) | **two**: seq 0x0004 BEGIN then 0x000A COMPLETE (212 / 196 of 424) |
+| result-block tail | 81 bytes with one result | **82** - the same block plus one trailing `0x00` |
+| `bcc_action_id` | ~0xBEEC (48876), per-NPC jitter of a few | 77813-77817, modal 77817 |
+| combo rate | 427 of 1,504 acks (28.4%) | 57 of 418 (13.6%) |
+
+The two records of one shot carry the **same** swing counter, the same combo id and a byte-identical tail, which
+is what identifies them as one attack rather than two. `Combat:Unarmed` (0x11) is the melee shape and carries no
+combo at all - 0 of 769.
+
+⚠️ The complete may also carry `anim_random` (CommandMessage field 4). It is on only 26 of the 196 captured
+completes, so we omit it: that is sending a subset of what retail sends, not inventing a value.
+
+⚠️ The tail itself needed no new decode - #536/#661 had already accounted for all 3,687 captured attack tails
+across all three behaviours, **including** the ranged trailing byte. What was missing was only the builder.
+
+[V3: BehaviorAnimationsTests.ANpcShot_MatchesCapture - rebuilds both records of one captured shot byte-exact]
+
 ### The level-GAP penalty is a cliff, not a slope (#488)
 
 A mob well below the player barely scratches them, and the drop happens over **two levels**:

@@ -213,6 +213,29 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static BehaviorControlCenterIIR NpcAttackAck(uint npcHandle, uint playerHandle, uint damage, uint typeId, uint swingCounter, uint f5 = 24, uint f11 = 64, uint f12 = 56,
 			byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, uint comboId = 0)
 		{
+			return NpcAttackAck(npcHandle, playerHandle, damage, typeId, swingCounter, NpcAttackAckSeq, BehaviorId.CombatMelee, f5, f11, f12, resultType, resultK1, resultK2, comboId);
+		}
+
+		// The BEHAVIOUR a shot rides on, and the two phases of one (#676).
+		//
+		// A ranged NPC's swing is `Combat:Ranged` (0x10), not `Combat:Melee` - a different behaviour id, one extra
+		// trailing byte on the result block, and TWO records per shot rather than one: a BEGIN at seq 0x0004 and a
+		// COMPLETE at seq 0x000A, which the corpus sends in near-equal numbers (212 / 196 over 424 records) carrying
+		// the SAME swing counter, the same combo id and a byte-identical tail. Melee has no such pair - its 2,117
+		// records are seq 0x0004 on 1,957 of them and it carries no complete.
+		//
+		// ⚠️ The complete may also carry `anim_random` (field 4), and we do not send it: it is on only 26 of the 196
+		// captured completes, so omitting it is sending a subset of what retail sends rather than inventing a value.
+		public const ushort RangedBeginSeq = 0x0004;
+		public const ushort RangedCompleteSeq = 0x000A;
+
+		// The `bcc_action_id` a ranged NPC shot names, the ranged twin of melee's 0xBEEC. The corpus clusters it at
+		// 77813-77817 with the same per-NPC jitter melee shows, and 77817 is the modal value (146 of 424).
+		public const uint NpcShotBehaviorType = 77817;
+
+		public static BehaviorControlCenterIIR NpcAttackAck(uint npcHandle, uint playerHandle, uint damage, uint typeId, uint swingCounter, ushort sequence, BehaviorId behavior, uint f5 = 24,
+			uint f11 = 64, uint f12 = 56, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, uint comboId = 0)
+		{
 			// args protobuf: {f1=TypeId, f3=swingCounter, f5, f6=0, f7=combo, f10=Target{f1=0xC350, f2=player}, f11, f12}.
 			// NO f2/Mode - that field is present only on player-initiated actions and is the NPC-vs-player tell.
 			// CommandMessage field 10 is the TARGET - a ProtoID32 { type, instance }, not the "spell target" the old
@@ -233,8 +256,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var args = message.ToProtobuf();
 
 			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 81 bytes with the roles
-			// swapped, and it was written out in both files until #530 wave 7.
-			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, (uint)BehaviorId.CombatMelee, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2));
+			// swapped, and it was written out in both files until #530 wave 7. A ranged shot's block closes with one
+			// extra 0x00, which is the only thing that differs (#676).
+			var ranged = behavior == BehaviorId.CombatRanged;
+			return new BehaviorControlCenterIIR(npcHandle, sequence, (uint)behavior, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2, ranged));
 		}
 
 		// Sit the actor on a world object (a bench): plays "chair_sit_calm" aimed at the object. `remoteformat` is the

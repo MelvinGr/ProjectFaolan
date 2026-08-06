@@ -31,22 +31,27 @@ namespace Faolan.GameServer.Combat
 		public const uint TwoHandBlunt = 30014;
 		public const uint Dagger = 30015;
 		public const uint Polearm = 30016;
+		public const uint Bow = 30017;
+		public const uint Crossbow = 30018;
+		public const uint Thrown = 30019;
 
 		// #623: how often retail puts a combo on an NPC's melee swing. Measured over the corpus
 		// (`--report combo-swings`): 427 of 1,504 s2c `Combat:Melee` acks whose actor is a named NPC carry a
 		// `combo_id`. The rest are plain swings, so a mob that combos every swing reads nothing like retail's.
 		//
 		// `Combat:Unarmed` is 0 of 769 - an animal has no weapon, so it has no combo, which falls out of the weapon
-		// lookup below rather than needing its own rule. `Combat:Ranged` is 57 of 418 (13.6%) and is NOT modelled -
-		// not for want of knowing WHICH combo (that is settled, see ClassComboFamily) but because the ack itself is
-		// the wrong record: #676.
+		// lookup below rather than needing its own rule.
 		public const double MeleeComboShare = 427.0 / 1504.0;
+
+		// The same rate for a SHOT, and it is materially lower: 57 of the 418 captured `Combat:Ranged` acks carry a
+		// combo. Every one of those 57 is a `combo_npc_ranger_*` row, because no generic ranged row exists (#676).
+		public const double RangedComboShare = 57.0 / 418.0;
 
 		// The client's weapon SEARCH CATEGORIES that are ranged. Only 30017 appears on an NPC in the corpus; the
 		// other two are here because they are the same KIND of weapon and a crossbow mob would otherwise silently be
 		// treated as melee. That is the direction to be wrong in: the measurement is "a mob that shoots you deals a
 		// fifth", not "a mob holding item class 30017 does".
-		private static readonly FrozenSet<uint> RangedCategories = new uint[] { 30017, 30018, 30019 }.ToFrozenSet();
+		private static readonly FrozenSet<uint> RangedCategories = new[] { Bow, Crossbow, Thrown }.ToFrozenSet();
 
 		// Whether this NPC attacks at range - i.e. whether its MAIN HAND holds a bow/crossbow/thrown weapon.
 		// False for an unarmed NPC and for every animal, which is what makes this safe to ask of any spawn.
@@ -112,18 +117,19 @@ namespace Faolan.GameServer.Combat
 		//             template swings two of them. A per-NPC property with three candidates.
 		//   dual 1h   `barbarian_dual` / `conqueror_dual`, same shape.
 		//
-		// ⚠️ BOW/CROSSBOW is answered but not wired. `combo_npc_ranger_{bow,crossbow}_*` is the only family at those
-		// weapon criteria - there is no `combo_npc_generic_bow` to fall back on - and all 57 captured ranged combos
-		// are ranger rows, so no archetype is needed at all. What stops it is the CARRIER: our ranged NPCs send the
-		// melee ack (`BehaviorId.CombatMelee`), and retail's ranged swings are `CombatRanged` with a different tail
-		// and a three-phase sequence. Putting a bow combo on a melee ack would be wrong in a new way. See #676.
+		// BOW and CROSSBOW need no archetype at all, and are wired since #676 put the shot on its own carrier:
+		// `combo_npc_ranger_{bow,crossbow}_*` is the ONLY family at those weapon criteria (26 and 32), there is no
+		// `combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows. THROWN (30019)
+		// is deliberately absent - no `combo_npc_*_thrown_*` row exists, so a javelin mob throws plain.
 		public static string? ClassComboFamily(IEnumerable<INpcEquipment>? equipment)
 		{
 			return CategoryIn(equipment, MainHandPos) switch
 			{
-				Dagger  => "combo_npc_assassin_",
-				Polearm => "combo_npc_guardian_polearm_",
-				_       => null
+				Dagger   => "combo_npc_assassin_",
+				Polearm  => "combo_npc_guardian_polearm_",
+				Bow      => "combo_npc_ranger_bow_",
+				Crossbow => "combo_npc_ranger_crossbow_",
+				_        => null
 			};
 		}
 

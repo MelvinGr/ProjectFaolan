@@ -101,9 +101,9 @@ namespace Faolan.Tests
 			Assert.Equal(expected, NpcWeapon.MeleeComboName(Equip(main, off)));
 		}
 
-		// The cases that carry NO combo, and they are the ones retail leaves plain too: `Combat:Unarmed` is 0 of 769
-		// captured acks. A bow gets none because there is no `combo_npc_generic_bow` row - retail's archers swing the
-		// `combo_npc_ranger_bow_*` class family instead, which needs the archetype we do not hold (#675).
+		// The cases that carry no GENERIC combo, and they are the ones retail leaves plain too: `Combat:Unarmed` is
+		// 0 of 769 captured acks. A bow gets none HERE because there is no `combo_npc_generic_bow` row - an archer's
+		// combos are the `combo_npc_ranger_bow_*` class family, which `ClassComboFamily` answers instead (#676).
 		[Theory]
 		[InlineData(0u)] // unarmed - every animal
 		[InlineData(30017u)] // bow
@@ -183,6 +183,7 @@ namespace Faolan.Tests
 		public void TheComboShare_IsTheMeasuredCorpusRate()
 		{
 			Assert.InRange(NpcWeapon.MeleeComboShare, 0.28, 0.29);
+			Assert.InRange(NpcWeapon.RangedComboShare, 0.13, 0.14); // 57 of 418 captured Combat:Ranged acks
 			Assert.True(NpcWeapon.ClassComboShare is > 0.58 and < 0.59, $"{NpcWeapon.ClassComboShare}"); // 92 class / 65 generic over the two wired weapons
 		}
 
@@ -220,6 +221,8 @@ namespace Faolan.Tests
 		[Theory]
 		[InlineData(NpcWeapon.Dagger, "combo_npc_assassin_")]
 		[InlineData(NpcWeapon.Polearm, "combo_npc_guardian_polearm_")]
+		[InlineData(NpcWeapon.Bow, "combo_npc_ranger_bow_")]
+		[InlineData(NpcWeapon.Crossbow, "combo_npc_ranger_crossbow_")]
 		public async Task AWeaponThatAnswersTheArchetype_ResolvesItsClassFamily(uint main, string family)
 		{
 			Assert.Equal(family, NpcWeapon.ClassComboFamily(Equip(main, 0)));
@@ -239,15 +242,16 @@ namespace Faolan.Tests
 		//             shield-bearing templates, the three Vanir ones swinging only generic
 		//   2h/dual   `barbarian` / `conqueror` / `hox` all appear on two-handers (blunt AND edge) and no template
 		//             swings two of them, so it is a per-NPC property with two or three candidates
-		//   bow       ANSWERED (ranger is the only family at those criteria and there is no generic bow row) but not
-		//             wired: the carrier is wrong, our ranged NPCs send the melee ack. See #676.
+		//
+		// BOW/CROSSBOW is no longer among them - #676 gave the shot its own carrier, so the ranger family that was
+		// answered all along is wired.
 		[Theory]
 		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.Shield)]
 		[InlineData(NpcWeapon.TwoHandEdge, 0u)]
 		[InlineData(NpcWeapon.TwoHandBlunt, 0u)]
 		[InlineData(NpcWeapon.OneHandEdge, NpcWeapon.OneHandEdge)]
 		[InlineData(NpcWeapon.OneHandBlunt, 0u)]
-		[InlineData(30017u, 0u)] // bow - answered, but the ranged ack is #676
+		[InlineData(NpcWeapon.Thrown, 0u)] // a javelin - ranged, but no `combo_npc_*_thrown_*` row exists
 		[InlineData(0u, 0u)] // unarmed
 		public async Task AWeaponThatDoesNotAnswerTheArchetype_SwingsGenericOnly(uint main, uint off)
 		{

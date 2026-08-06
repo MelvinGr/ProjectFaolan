@@ -382,13 +382,31 @@ namespace Faolan.GameServer.World
 			// #675: and when it does, a mob whose weapon answers its archetype swings a CLASS row about as often as
 			// its generic one (the corpus splits 92/65 over the two wired weapons). Which rank is drawn from the rows
 			// its level allows - retail's level-75 mobs still swing the rank-1 row, so there is no "highest wins".
-			var comboId = npc.MeleeComboId != 0 && Random.Shared.NextDouble() < NpcWeapon.MeleeComboShare
-				? npc.MeleeComboId
+			//
+			// A SHOT takes the other branch entirely (#676): there is no `combo_npc_generic_bow` row, so an archer
+			// either carries a ranger row or swings plain, at the lower rate retail shows for ranged (13.6% against
+			// melee's 28.4%).
+			var classCombo = npc.ClassComboIds.Length > 0
+				? npc.ClassComboIds[Random.Shared.Next(npc.ClassComboIds.Length)]
 				: 0;
-			if (comboId != 0 && npc.ClassComboIds.Length > 0 && Random.Shared.NextDouble() < NpcWeapon.ClassComboShare)
-				comboId = npc.ClassComboIds[Random.Shared.Next(npc.ClassComboIds.Length)];
 
-			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, direction, comboId);
+			uint comboId;
+			if (npc.RangedAttacker)
+			{
+				comboId = classCombo != 0 && Random.Shared.NextDouble() < NpcWeapon.RangedComboShare
+					? classCombo
+					: 0;
+			}
+			else
+			{
+				comboId = npc.MeleeComboId != 0 && Random.Shared.NextDouble() < NpcWeapon.MeleeComboShare
+					? npc.MeleeComboId
+					: 0;
+				if (comboId != 0 && classCombo != 0 && Random.Shared.NextDouble() < NpcWeapon.ClassComboShare)
+					comboId = classCombo;
+			}
+
+			await _output.SendNpcAttackAnimation(client!, npc.Handle, (uint)damage, ++npc.AttackSwingCounter, direction, comboId, npc.RangedAttacker);
 
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
 				return;

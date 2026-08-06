@@ -142,9 +142,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// ⚠️ The 0xCB default therefore means "Overhead". Every SENDER passes the direction it actually drew
 		// (`WorldSimulation` draws once and spends it on both the mitigation and the ack), so the default only covers
 		// the undirected callers.
-		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
+		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2, bool ranged = false)
 		{
-			return HitResultBlock([], [new HitResult(victimHandle, damage, resultType, resultK1, resultK2)]);
+			return HitResultBlock([], [new HitResult(victimHandle, damage, resultType, resultK1, resultK2)], ranged);
 		}
 
 		// The words between the target list and the result count, in the EIGHT-word form we send. DECODED against
@@ -166,7 +166,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// Word 1 must stay 1 - it is the selector, and any other value changes the block's own length.
 		private static readonly uint[] MiddleWords = [0, 1, 0, 0, 0, 0, 0, 0];
 
-		internal static byte[] HitResultBlock(IReadOnlyList<uint> targets, IReadOnlyList<HitResult> results)
+		// `Combat:Ranged` closes the block with one extra 0x00 (#676). Not a field: it is why every ranged tail in the
+		// corpus is exactly one byte longer than the melee tail of the same shape - 82 against 81 with one result,
+		// 41 against 40 with none - and it is the ONLY difference between the two.
+		internal static byte[] HitResultBlock(IReadOnlyList<uint> targets, IReadOnlyList<HitResult> results, bool ranged = false)
 		{
 			ArgumentNullException.ThrowIfNull(targets);
 			ArgumentNullException.ThrowIfNull(results);
@@ -195,6 +198,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 					.WriteUInt32(0)
 					.WriteUInt32(0);
 			}
+
+			if (ranged)
+				s.WriteByte(0x00);
 
 			return s.ToArray();
 		}

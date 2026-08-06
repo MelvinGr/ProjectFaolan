@@ -774,17 +774,37 @@ namespace Faolan.GameServer.Combat
 		// `comboId` (#623) is the `combo_npc_generic_*` row this swing performs, 0 for a plain one. It rides the same
 		// `combo_id` field a player's combo swing uses, which is what makes the client play the combo's animation and
 		// name it in the combat log rather than showing a generic hit.
-		public static Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, SwingDirection direction, uint comboId = 0)
+		public static async Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter, SwingDirection direction, uint comboId = 0, bool ranged = false)
 		{
 			var playerHandle = client.Session.Character.Id;
 			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
-			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, BehaviorAcks.SwingDirectionCode(direction),
-				comboId: comboId));
-			return SendWorldPacket(client, body);
+			// which played the player's hit-react + audio but left the NPC body un-animated.) A SHOT names its own
+			// cluster, 77813-77817 (#676).
+			var resultType = BehaviorAcks.SwingDirectionCode(direction);
+			if (!ranged)
+			{
+				await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, resultType, comboId: comboId)));
+				return;
+			}
+
+			// #676: a shot is TWO records - begin then complete - carrying the same swing counter, the same combo and
+			// a byte-identical tail. Sending only the begin left the client with a half-finished action; sending the
+			// melee behaviour, which is what happened until now, played a sword swing for a bow.
+			foreach (var sequence in new[] { BehaviorAnimations.RangedBeginSeq, BehaviorAnimations.RangedCompleteSeq })
+			{
+				var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, BehaviorAnimations.NpcShotBehaviorType, swingCounter, sequence,
+					BehaviorId.CombatRanged, RangedFlags, RangedRechargeTime, RangedActivationTime, resultType, comboId: comboId));
+				await SendWorldPacket(client, body);
+			}
 		}
+
+		// What a captured NPC shot carries in the three args melee sets differently: flags 24 (357 of 424), recharge
+		// 83 and activation 81 (365 each) - the modal values, chosen the same way melee's 24/64/56 were.
+		private const uint RangedFlags = 24;
+		private const uint RangedRechargeTime = 83;
+		private const uint RangedActivationTime = 81;
 
 		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
 		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
