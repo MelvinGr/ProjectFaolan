@@ -65,9 +65,13 @@ fall distance does not. [V3: FallDamageTests.DebuffTier_ReproducesEveryCorpusObs
 
 ## Hazard volumes
 
-A `MapHazard` is a region that hurts or kills on entry. The **geometry is client data** — imported from the RDB
-bounded-area table, exactly, with no tolerance — while the **behaviour is ours**. Full evidence, format and the
-survey of everything else in that table: [`docs/rdb/bounded-areas-1000053.md`](../rdb/bounded-areas-1000053.md).
+A hazard is a region that hurts or kills on entry. The **geometry is client data** — imported from the RDB
+bounded-area table into `MapRegion`, exactly, with no tolerance — while the **behaviour is ours**. That split is
+structural rather than a convention: `MapHazard` is a **1:1 side table on the region** carrying only
+`EffectSpellId` / `Damage` / `Lethal` (#679). It used to be a table of its own holding a second copy of the prism
+and its own vertex ring, which meant importing a volume's geometry implied it was a hazard — and that is what kept
+the other hazard families out even as inert volumes. Full evidence, format and the survey of everything else in
+that table: [`docs/rdb/bounded-areas-1000053.md`](../rdb/bounded-areas-1000053.md).
 
 The decoded case is lava, whose whole sequence the annotated capture shows end to end:
 

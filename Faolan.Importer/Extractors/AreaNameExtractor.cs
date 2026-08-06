@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Captures;
@@ -100,15 +101,17 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Aggregates the raw sightings into one MapArea per (map, areaNameId): the bounds hull over every position
-		// that banner was seen firing at, plus how many sightings back it.
+		// that banner was seen firing at.
 		//
 		// NOT a vote. The old Merge picked ONE id per map by majority, because Map.AreaNameId could hold only one -
 		// which silently discarded five of Old Tarantia's six areas. Every distinct id is a distinct area and they
 		// all survive here.
 		//
 		// The hull is an interim shape, not the retail volume: it can only cover ground a captured player actually
-		// walked. With one sighting it is a point; the caller pairs it with a radius rather than treating it as a
-		// hard polygon. It tightens as more marked dumps land.
+		// walked. With one sighting it is a POINT (MinX == MaxX), which is how a degenerate row is spotted without a
+		// second column that can disagree with the bounds; the caller pairs it with a radius rather than treating it
+		// as a hard polygon. It tightens as more marked dumps land, and #679's client-recovered rows replace it
+		// outright wherever the region's own name is the banner text.
 		public static List<MapArea> MergeAreas(IEnumerable<MapAreaName> all)
 		{
 			var byArea = new Dictionary<(uint Map, uint Area), MapArea>();
@@ -126,7 +129,7 @@ namespace Faolan.Importer.Extractors
 						MaxY = s.Y,
 						MinZ = s.Z,
 						MaxZ = s.Z,
-						SampleCount = 1
+						Source = AreaBannerSource.Captured
 					};
 					continue;
 				}
@@ -137,7 +140,6 @@ namespace Faolan.Importer.Extractors
 				area.MaxY = Math.Max(area.MaxY, s.Y);
 				area.MinZ = Math.Min(area.MinZ, s.Z);
 				area.MaxZ = Math.Max(area.MaxZ, s.Z);
-				area.SampleCount++;
 			}
 
 			return byArea.Values.ToList();

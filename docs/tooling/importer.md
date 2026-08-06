@@ -98,8 +98,8 @@ names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `rdb-spells` (the spell catalog + the 155-row mount catalog, [mounts.md](../subsystems/mounts.md)),
 `rdb-abilities`,
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
-`rdb-hazards` (lava volumes), `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — depends on
-`rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
+`rdb-regions` (the bounded-area trigger volumes a subsystem consumes — discovery pads, quest goal regions, area
+banners and the lava hazards; depends on `rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
 
 TSV-sourced: `starter-spells` — the create-flow starter kit, registered late so it lands after the catalog.
 

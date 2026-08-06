@@ -80,7 +80,7 @@ namespace Faolan.GameServer.World
 		// runs, at which point "the previous position" is no longer available to compare against.
 		public float LastGroundedY { get; set; }
 
-		// The MapHazard.Id the player is currently standing in, or null for none (#504). Same crossing-vs-inside role
+		// The MapHazard.RegionId the player is currently standing in, or null for none (#504). Same crossing-vs-inside role
 		// as CurrentAreaNameId above: a hazard fires on ENTRY (the client's own feedback token names the trigger
 		// `playerenter(3)`), so re-firing it every tick while the player burns would be wrong.
 		public uint? CurrentHazardId { get; set; }

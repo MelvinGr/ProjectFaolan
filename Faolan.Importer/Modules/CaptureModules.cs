@@ -729,19 +729,53 @@ namespace Faolan.Importer.Modules
 			if (areas.Count == 0)
 				return new ImportResult("no area banners in the captures.");
 
-			// Replace-all: the hull is derived wholly from the current capture set, so a stale row from a previous
-			// run would keep bounds no capture supports any more.
-			ctx.Db.MapAreas.RemoveRange(ctx.Db.MapAreas);
+			// Replace the CAPTURED rows: the hull is derived wholly from the current capture set, so a stale row from a
+			// previous run would keep bounds no capture supports any more.
+			//
+			// ⚠️ Only the captured ones (#679). The client-recovered rows are `rdb-regions`' to own and this module
+			// cannot rebuild them (it has no RDB), so wiping the table here would silently drop 100-odd areas on
+			// playfields no capture has ever visited, and nothing in this run would put them back.
+			ctx.Db.MapAreas.RemoveRange(ctx.Db.MapAreas.Where(a => a.Source == AreaBannerSource.Captured));
+
+			// A CORROBORATED row is a client row the wire also saw, so it survives this rebuild - but only as what the
+			// client alone can still say. Dropped back to ClientName with its hull cleared, and promoted again below by
+			// whichever sightings the current capture set actually holds; otherwise a banner that left the corpus would
+			// keep bounds no capture supports any more, which is the whole reason this module replaces rather than merges.
+			var seen = await ctx.Db.MapAreas.Where(a => a.Source == AreaBannerSource.Corroborated).ToListAsync();
+			foreach (var a in seen)
+			{
+				a.Source = AreaBannerSource.ClientName;
+				a.MinX = a.MaxX = a.MinY = a.MaxY = a.MinZ = a.MaxZ = 0f;
+			}
+
 			await ctx.Db.SaveChangesAsync();
 
 			var maps = (await ctx.Db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var client = await ctx.Db.MapAreas.ToDictionaryAsync(a => (a.MapId, a.AreaNameId));
 			var added = 0;
 			var skipped = 0;
+			var corroborated = 0;
 			foreach (var area in areas)
 			{
 				if (!maps.Contains(area.MapId))
 				{
 					skipped++; // a banner on a playfield we never imported - would FK-fault
+					continue;
+				}
+
+				// A banner the client recovery already found and the wire has now SEEN: two routes that share no
+				// evidence landing on the same id. The row records the agreement and gains the hull, keeping the
+				// region the name join bound it to.
+				if (client.TryGetValue((area.MapId, area.AreaNameId), out var existing))
+				{
+					existing.Source = AreaBannerSource.Corroborated;
+					existing.MinX = area.MinX;
+					existing.MaxX = area.MaxX;
+					existing.MinY = area.MinY;
+					existing.MaxY = area.MaxY;
+					existing.MinZ = area.MinZ;
+					existing.MaxZ = area.MaxZ;
+					corroborated++;
 					continue;
 				}
 
@@ -752,7 +786,8 @@ namespace Faolan.Importer.Modules
 			await ctx.Db.SaveChangesAsync();
 			var multi = areas.GroupBy(a => a.MapId).Count(g => g.Count() > 1);
 			return new ImportResult(
-				$"{added} named sub-areas across {areas.Select(a => a.MapId).Distinct().Count()} maps ({multi} with more than one){(skipped > 0 ? $", {skipped} on unknown maps" : "")}.");
+				$"{added} named sub-areas across {areas.Select(a => a.MapId).Distinct().Count()} maps ({multi} with more than one)" +
+				$"{(corroborated > 0 ? $", {corroborated} confirming a client-recovered banner" : "")}{(skipped > 0 ? $", {skipped} on unknown maps" : "")}.");
 		}
 	}
 

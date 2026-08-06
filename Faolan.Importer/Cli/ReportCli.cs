@@ -516,7 +516,7 @@ namespace Faolan.Importer.Cli
 
 				case "area-banner-names":
 				{
-					await AreaBannerNames(RdbDir());
+					await AreaBannerNamesReport(RdbDir());
 					return 0;
 				}
 				case "creature-races":

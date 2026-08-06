@@ -13,29 +13,21 @@ namespace Faolan.Core.Database.Tables
 	// consumes: resurrection-point discovery volumes (#519) and quest ReachArea goal regions (#521), with the area
 	// banners (#348) the next candidate.
 	//
-	// ⚠️ ONLY REGIONS WITH A CONSUMER ARE IMPORTED - about 34 of the table's 8,917, not the lot. That is the same
-	// deliberate limit MapHazard draws for lava: a region is only as meaningful as the behaviour attached to it, and
-	// bulk-importing thousands of named volumes nothing reads is data that rots. RdbRegionImporter reports every
-	// region a consumer asked for and did not get, rather than skipping silently.
+	// ⚠️ ONLY REGIONS WITH A CONSUMER ARE IMPORTED - about 140 of the table's 8,917, not the lot. A region is only as
+	// meaningful as the behaviour attached to it, and bulk-importing thousands of named volumes nothing reads is data
+	// that rots. RdbRegionImporter reports every region a consumer asked for and did not get, rather than skipping
+	// silently.
 	//
-	// ⚠️ Deliberately SEPARATE from MapHazard for now, which is the same shape (a named prism with a vertex ring)
-	// plus its effect columns. Folding the two is the right end state - MapHazard becomes a satellite of this
-	// holding only EffectSpellId/Damage/Lethal - but NOT while that table is the one piece of geometry proven
-	// against a capture to 262 ms (MapHazardGeometryTests). Migrating 105 volumes and 5,396 vertices for tidiness
-	// would risk the only wire-validated containment path we have. Do it when the hazard path is being touched anyway.
-	//
-	// A DERIVED key rather than the natural (MapId, Name) composite, for MapHazard's reason: the vertex rows hang
-	// off this one, and carrying a NAME string down into every one of them is what DerivedKey exists to avoid. The
+	// A DERIVED key rather than the natural (MapId, Name) composite: the vertex rows hang off this one, and carrying
+	// a NAME string down into every one of them is what DerivedKey exists to avoid. The
 	// id is a pure function of (MapId, Name) and the client RDB is fixed content, so a re-import reproduces it
 	// exactly - and the nullable FKs that point here (RespawnPoint, QuestGoalDefinition) need a single column to
 	// express SetNull, which a composite cannot.
 	[Index(nameof(MapId), nameof(Name), IsUnique = true)]
-	// ⚠️ **MapHazard is slated to merge INTO this table (#679)**, with hazard behaviour moving to a 1:1 side table -
-	// the two are the same 1000053 prism stored twice. `MapArea` folds in later still, as a nullable AreaNameId
-	// column, once its rows come from the client and it stops carrying geometry of its own. Until then MapArea is a
-	// CONSUMER of a region (like RespawnPoint and QuestGoalDefinition), not a kind of one: its bounds are a sampled
-	// hull, and merging an approximation into the table of exact client polygons is the mistake MapHazard's own
-	// comment warns about.
+	// `MapArea` may fold in later still, as a nullable AreaNameId column, once EVERY banner has a client volume to
+	// hang on. Until then it is a CONSUMER of a region (like RespawnPoint and QuestGoalDefinition), not a kind of
+	// one: the banners with no client volume keep a sampled hull, and merging an approximation into the table of
+	// exact client polygons is the mistake MapHazard's comment warns about.
 	public class MapRegion : BaseEntity, IDerivedKey
 	{
 		public static uint ComputeId(uint mapId, string name)
@@ -80,5 +72,11 @@ namespace Faolan.Core.Database.Tables
 
 		// The boundary polygon, in RDB order; cascade-delete with the region.
 		public virtual ICollection<MapRegionVertex> Vertices { get; set; } = [];
+
+		// What this region DOES to a player who enters it, where that is a hazard (#504/#679) - null for the ordinary
+		// case, which is every region imported for a discovery volume, a quest goal or an area banner. Behaviour is a
+		// 1:1 side table rather than columns here so that importing a volume's geometry never implies it hurts
+		// anybody; see MapHazard.
+		public virtual MapHazard? Hazard { get; set; }
 	}
 }

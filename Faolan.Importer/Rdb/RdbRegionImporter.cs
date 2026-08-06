@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;
@@ -14,19 +15,22 @@ namespace Faolan.Importer.Rdb
 	// MapRegion + MapRegionVertex, and links each consumer to its region. The server has no RDB access, so geometry
 	// the runtime needs has to come through here. Survey + format: docs/rdb/bounded-areas-1000053.md.
 	//
-	// Three consumers today, each replacing an approximation with the client's real volume:
+	// Four consumers today, each replacing an approximation with the client's real volume:
 	//   - RESURRECTION DISCOVERY (#519): a `*_RezDiscovery` / `*_Discovery` region that CONTAINS one of our
 	//     RespawnPoints is that point's discovery volume. 13 of them exist against a hardcoded 30-unit radius.
 	//   - QUEST ReachArea REGIONS (#521): a goal whose `TrailingCategory` is 51200 carries a bounded-area reference;
 	//     LDB category 51200 (`bounded_areas.bounded_area`) turns `TrailingRefId` into the region's NAME, and that
 	//     names a region in the goal's playfield.
-	//   - AREA BANNERS (#513/#348): the sub-area whose boundary floats the top-of-screen name. Matched GEOMETRICALLY
-	//     (a banner is an LDB string id, a region is a place name - nothing joins them by text) and gated on the
-	//     client's crossing-notifier scry script. Replaces a hull over captured walk positions with the real volume.
+	//   - AREA BANNERS (#513/#348): the sub-area whose boundary floats the top-of-screen name. Two independent
+	//     matches, and where both fire they agree: the client's own NAME against the recovered banner text
+	//     (AreaBannerNames, #679) and - for the banners whose region carries an internal name - the captured firing
+	//     position, geometrically.
+	//   - LAVA HAZARDS (#504): the volumes that kill a player who walks in. Only the GEOMETRY is imported here; what
+	//     the hazard DOES is the MapHazard side table, which is ours to fill (see that table).
 	//
-	// ⚠️ ONLY WANTED REGIONS ARE IMPORTED - about 34 of the table's 8,917. Bulk-importing thousands of named volumes
-	// nothing reads is data that rots, and it is the same limit RdbHazardImporter draws for lava. Everything a
-	// consumer asked for and did not get is REPORTED, never skipped silently (importer_silent_skip_is_data_loss).
+	// ⚠️ ONLY WANTED REGIONS ARE IMPORTED - about 140 of the table's 8,917. Bulk-importing thousands of named volumes
+	// nothing reads is data that rots. Everything a consumer asked for and did not get is REPORTED, never skipped
+	// silently (importer_silent_skip_is_data_loss).
 	//
 	// Clean rebuild each run: the set is fully derived from the fixed client RDB, and the derived key means a
 	// re-import reproduces the same ids, so faolan.sql does not churn.
@@ -36,8 +40,7 @@ namespace Faolan.Importer.Rdb
 		// descriptor table in the TDL1 language record. Plaintext (unlike the quest/dialogue categories).
 		public const uint BoundedAreaNameCategory = 51200;
 
-		// The id space above this is a VARIANT playfield numbering (0x40000000 | <playfield>) that is not a Map.Id -
-		// the same set RdbHazardImporter skips.
+		// The id space above this is a VARIANT playfield numbering (0x40000000 | <playfield>) that is not a Map.Id.
 		private const uint VariantIdBase = 0x40000000;
 
 		// A RESURRECTION-POINT discovery volume. `Rez` is load-bearing and is the client's own discriminator: it
@@ -50,15 +53,30 @@ namespace Faolan.Importer.Rdb
 		// a matching name, not a tighter volume - so anchor on `Rez` and leave area discovery to whoever implements it.
 		private static readonly Regex DiscoveryName = new(@"rezdiscov", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+		// Lava by name. Anchored on the word so `LavaDamage-3` / `BA_lava_dmg1` / `LavaArea2` / `HazardLava` all match.
+		private static readonly Regex LavaName = new(@"lava", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// Names that mention lava but are NOT a damage volume: the ambient audio/music companion regions. These also
+		// carry a non-zero scryid (a CLIENT script), which is the independent check applied below - the name test is
+		// belt-and-braces for an export that forgot the scryid.
+		private static readonly Regex NotALavaVolume = new(@"music|sfx|reverb|reveb|ambient|^camp\s*\d", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// Lava's decoded behaviour, from chat-annotated-4's death on Ymir's Pass: apply Incineration (3773837, 3 s) and
+		// kill. Lethal rather than a damage number because retail sends NO StatDamage at all for that death.
+		private const uint IncinerationSpellId = 3773837;
+
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBaseUrl)
 		{
+			// The CDN base matters: 274 of the 478 bounded-area records are on-demand (not in the local .rdbdata
+			// files), and Ymir's Pass is one of them. Without it CanRead rejects them and the import silently finds no
+			// lava at all.
 			using var rdb = new RdbReader(rdbDir, cdnBaseUrl);
 
+			var notes = new List<string>();
 			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
-			var areasByMap = ReadRegions(rdb, ourMaps);
+			var areasByMap = ReadRegions(rdb, ourMaps, notes);
 			var names = BoundedAreaNames(rdb);
 
-			var notes = new List<string>();
 			// The wanted set, keyed by (map, name) so two consumers asking for the same region share one row.
 			var wanted = new Dictionary<(uint Map, string Name), BoundedAreaCollection.BoundedArea>();
 
@@ -70,8 +88,28 @@ namespace Faolan.Importer.Rdb
 				.ToListAsync();
 			var regionFor = MatchGoalRegions(goals, names, areasByMap, wanted, notes);
 
+			// The banners, from BOTH directions (#679). The client's own recovery runs first because it is the one that
+			// can create rows: it reaches playfields no capture has visited. The captured rows are then matched
+			// geometrically, which is the only route left for a banner whose region carries an internal name.
 			var banners = await db.MapAreas.ToListAsync();
-			var bannerFor = MatchBannerRegions(banners, areasByMap, wanted, notes);
+			// Every row the WIRE has seen - `Corroborated` included, since that is a captured row the client also
+			// recovered. Filtering to `Captured` alone would drop an anchor on the second run of the importer, and
+			// the run would resolve less than the one before it for no reason anybody could see.
+			var capturedByMap = banners
+				.Where(b => b.Source != AreaBannerSource.ClientName)
+				.GroupBy(b => b.MapId)
+				.ToDictionary(g => g.Key, g => (IReadOnlyCollection<uint>)g.Select(b => b.AreaNameId).ToList());
+
+			var recovered = AreaBannerNames.Recover(rdb);
+			var clientFor = MergeClientBanners(db, banners, AreaBannerNames.MatchRegions(areasByMap, recovered.Banners, capturedByMap, notes), wanted, areasByMap);
+
+			// Only the CAPTURED rows the client recovery did not already place are matched geometrically: a
+			// client-sourced row has no hull to match with (its bounds are zero), and a row the name join placed is
+			// already on the region that bears its name, which is an identity rather than an inference.
+			var placed = clientFor.Select(c => c.Area).ToHashSet();
+			var bannerFor = MatchBannerRegions(banners.Where(b => !placed.Contains(b)).ToList(), banners, areasByMap, wanted, notes);
+
+			var hazards = MatchLavaVolumes(areasByMap, wanted, notes);
 
 			// ---- Rebuild the region rows ----
 			// Clear the FKs first: both are SetNull, but EF will not reorder the delete for us, and a stale link to a
@@ -84,6 +122,9 @@ namespace Faolan.Importer.Rdb
 				b.RegionId = null;
 			await db.SaveChangesAsync();
 
+			// The hazards cascade with their region, but EF only cascades what it has LOADED - clearing them here
+			// makes the rebuild independent of whether the provider enforces the FK.
+			db.MapHazards.RemoveRange(db.MapHazards);
 			db.MapRegions.RemoveRange(db.MapRegions);
 			await db.SaveChangesAsync();
 
@@ -125,19 +166,88 @@ namespace Faolan.Importer.Rdb
 				point.DiscoveryRegionId = MapRegion.ComputeId(key.Map, key.Name);
 			foreach (var (goal, key) in regionFor)
 				goal.RegionId = MapRegion.ComputeId(key.Map, key.Name);
-			foreach (var (banner, key) in bannerFor)
+			foreach (var (banner, key) in bannerFor.Concat(clientFor))
 				banner.RegionId = MapRegion.ComputeId(key.Map, key.Name);
 
+			// ---- The hazard BEHAVIOUR side table (#504/#679) ----
+			// Written after the regions exist, because it is keyed by the region's own id: what a volume does is ours
+			// to say, where it is belongs to the client.
+			foreach (var key in hazards)
+			{
+				db.MapHazards.Add(new MapHazard
+				{
+					RegionId = MapRegion.ComputeId(key.Map, key.Name),
+					EffectSpellId = IncinerationSpellId,
+					Damage = 0,
+					Lethal = true
+				});
+			}
+
 			await db.SaveChangesAsync();
-			return new Result(wanted.Count, vertices, discoveryFor.Count, regionFor.Count, bannerFor.Count, notes);
+			return new Result(wanted.Count, vertices, discoveryFor.Count, regionFor.Count, bannerFor.Count + clientFor.Count,
+				clientFor.Count(c => c.Area.Source == AreaBannerSource.ClientName), recovered, hazards.Count, notes);
 		}
 
-		// Every parseable 1000053 record for a playfield we host, as map -> the regions with a testable footprint.
-		private static Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> ReadRegions(RdbReader rdb, HashSet<uint> ourMaps)
+		// Turns the client-recovered banners into MapArea rows (#679) and asks for the regions they name.
+		//
+		// A recovered banner IS an area: the id is what goes on the wire and the region is the volume that fires it, so
+		// unlike a captured sighting there is no hull and nothing approximate about it. Where a capture already recorded
+		// the same (playfield, id) the row STAYS `Captured` - the wire saw it, which the client cannot corroborate any
+		// better - and only picks up the region link, which is the half the capture did not have.
+		private static List<(MapArea Area, (uint Map, string Name) Key)> MergeClientBanners(
+			DatabaseContext db,
+			List<MapArea> banners,
+			IReadOnlyList<AreaBannerNames.Match> matches,
+			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
+			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap)
+		{
+			var byKey = banners.ToDictionary(b => (b.MapId, b.AreaNameId));
+			var linked = new List<(MapArea, (uint, string))>();
+			foreach (var match in matches)
+			{
+				var area = areasByMap[match.MapId].First(a => a.Name == match.RegionName);
+				wanted[(match.MapId, match.RegionName)] = area;
+
+				if (byKey.TryGetValue((match.MapId, match.AreaNameId), out var banner))
+				{
+					// Both routes found it - as long as the row that is already there came from the WIRE. A row this
+					// importer wrote on an earlier run is not a second witness to anything, and promoting one would
+					// turn every client row into "corroborated" on the second run.
+					if (banner.Source != AreaBannerSource.ClientName)
+						banner.Source = AreaBannerSource.Corroborated;
+				}
+				else
+				{
+					banner = new MapArea
+					{
+						MapId = match.MapId,
+						AreaNameId = match.AreaNameId,
+						Source = AreaBannerSource.ClientName
+					};
+
+					db.MapAreas.Add(banner);
+					banners.Add(banner);
+					byKey[(match.MapId, match.AreaNameId)] = banner;
+				}
+
+				linked.Add((banner, (match.MapId, match.RegionName)));
+			}
+
+			return linked;
+		}
+
+		// Every parseable 1000053 record for a playfield we host, as map -> the regions with a testable footprint. A
+		// record we cannot read is REPORTED: a hazard family that quietly went missing because its playfield failed to
+		// decompress looks exactly like a family the client does not ship.
+		private static Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> ReadRegions(RdbReader rdb, HashSet<uint> ourMaps, List<string> notes)
 		{
 			var byMap = new Dictionary<uint, List<BoundedAreaCollection.BoundedArea>>();
+			var unreadable = 0;
 			foreach (var e in rdb.EntriesOfType(BoundedAreaCollection.ResourceType).Where(rdb.CanRead).OrderBy(e => e.Id))
 			{
+				// The id space above VariantIdBase is a VARIANT playfield numbering (0x40000000 | <playfield>) that is
+				// not a Map.Id. Skipped rather than masked: nothing shows the variant is the same content, and masking
+				// would silently merge two records into one region set.
 				if (e.Id >= VariantIdBase || !ourMaps.Contains(e.Id))
 					continue;
 
@@ -148,16 +258,72 @@ namespace Faolan.Importer.Rdb
 				}
 				catch
 				{
+					unreadable++;
 					continue;
 				}
 
 				if (dec.Length == 0 || !BoundedAreaCollection.TryParse(dec, out var collection) || collection == null)
+				{
+					unreadable++;
 					continue;
+				}
 
 				byMap[e.Id] = collection.Areas.Where(a => a.IsPolygon).ToList();
 			}
 
+			if (unreadable > 0)
+				notes.Add($"{unreadable} bounded-area record(s) for playfields we host would not read - every region on them is missing, not absent");
+
 			return byMap;
+		}
+
+		// The LAVA volumes (#504). Only lava, and that is a deliberate limit rather than an oversight: the same
+		// records hold hundreds of other hazard-shaped names (`TrapBA`, `BA_SpikeTrap`, `SnakePitBA`,
+		// `PlayerDrowns_Dies`, `BA_PoisonFog`, `BADeathBridge`, ...) whose behaviour NOTHING in the corpus shows.
+		// Importing them means shipping hundreds of GUESSED kill volumes, and one wrong guess silently kills players
+		// on a map nobody is testing, which is strictly worse than the feature being absent. Lava is in because it is
+		// the family the wire actually pins (see MapHazard).
+		//
+		// Every REJECTED lava-named area is reported with its reason. A silent `continue` in an importer is data loss
+		// you find out about months later: if a future client export moves the damage volumes behind a scryid, these
+		// lines are what say so.
+		private static List<(uint Map, string Name)> MatchLavaVolumes(
+			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
+			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
+			List<string> notes)
+		{
+			var matched = new List<(uint, string)>();
+			foreach (var (mapId, areas) in areasByMap.OrderBy(kv => kv.Key))
+			{
+				foreach (var area in areas)
+				{
+					if (!LavaName.IsMatch(area.Name))
+						continue;
+
+					if (area.ScryId != 0)
+					{
+						notes.Add($"lava '{area.Name}' on map {mapId}: scryid {area.ScryId} = a CLIENT script (ambient/audio region), not a damage volume");
+						continue;
+					}
+
+					if (NotALavaVolume.IsMatch(area.Name))
+					{
+						notes.Add($"lava '{area.Name}' on map {mapId}: name is an ambient/label region, not a damage volume");
+						continue;
+					}
+
+					if (float.IsNaN(area.MinY) || float.IsNaN(area.MaxY))
+					{
+						notes.Add($"lava '{area.Name}' on map {mapId}: no <heights> range, so the prism is unbounded vertically");
+						continue;
+					}
+
+					wanted[(mapId, area.Name)] = area;
+					matched.Add((mapId, area.Name));
+				}
+			}
+
+			return matched;
 		}
 
 		// LDB category 51200: the bounded-area id -> name table, from the ENGLISH pages. Language matters even for
@@ -230,11 +396,15 @@ namespace Faolan.Importer.Rdb
 			return matched;
 		}
 
-		// An AREA BANNER's trigger volume (#513/#348). `MapArea` is a hull over the positions retail actually fired
+		// A CAPTURED banner's trigger volume (#513/#348). `MapArea` is a hull over the positions retail actually fired
 		// each banner at, which under-covers by construction; this finds the client region that hull sits in.
 		//
-		// Matched geometrically, because a banner's identity is an LDB string id and a region's is a place name -
-		// there is nothing to join on by text. Three gates, all of which have to hold:
+		// The route of last resort, and still the only one for a banner whose region carries an INTERNAL name: Old
+		// Tarantia's volumes are `BA_Bridge`/`BA_EastGate`, never the "Bridge of Vilerus I" the banner renders, so the
+		// name join (#679) cannot reach them and geometry is all there is. Where both routes fire they agree - which is
+		// the cross-check neither could give itself - so this only runs on what the name join left over.
+		//
+		// Matched geometrically, i.e. on the position rather than the text. Three gates, all of which have to hold:
 		//
 		//   1. The region runs the CROSSING-NOTIFIER scry script. A volume that does not tell the server the player
 		//      entered it cannot be what fires a server-sent banner, and this is what excludes the audio regions,
@@ -248,19 +418,23 @@ namespace Faolan.Importer.Rdb
 		// the boundary and a near-miss is expected - 6 of 22 land outside every notifier region. Padding the test
 		// until they match would be fitting the answer; those keep the captured hull, which is what it is for.
 		private static List<(MapArea Area, (uint Map, string Name) Key)> MatchBannerRegions(
-			List<MapArea> banners,
+			List<MapArea> unplaced,
+			List<MapArea> allBanners,
 			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
 			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
 			List<string> notes)
 		{
 			var matched = new List<(MapArea, (uint, string))>();
-			foreach (var byMap in banners.GroupBy(b => b.MapId))
+			foreach (var byMap in unplaced.GroupBy(b => b.MapId))
 			{
 				if (!areasByMap.TryGetValue(byMap.Key, out var areas))
 					continue;
 
-				var siblings = byMap.ToList();
-				foreach (var banner in siblings)
+				// ⚠️ The separation gate is measured against EVERY banner on the playfield, not just the ones still
+				// looking for a region. Scoping it to the unplaced ones let a region that swallows a name-matched
+				// banner's samples through, which is precisely the region that cannot be the trigger for either.
+				var siblings = allBanners.Where(b => b.MapId == byMap.Key && b.Source != AreaBannerSource.ClientName).ToList();
+				foreach (var banner in byMap)
 				{
 					var cx = (banner.MinX + banner.MaxX) / 2f;
 					var cz = (banner.MinZ + banner.MaxZ) / 2f;
@@ -344,6 +518,15 @@ namespace Faolan.Importer.Rdb
 			return matched;
 		}
 
-		public readonly record struct Result(int Regions, int Vertices, int DiscoveryLinks, int GoalLinks, int BannerLinks, IReadOnlyList<string> Notes);
+		public readonly record struct Result(
+			int Regions,
+			int Vertices,
+			int DiscoveryLinks,
+			int GoalLinks,
+			int BannerLinks,
+			int ClientBanners,
+			AreaBannerNames.Recovery Recovered,
+			int Hazards,
+			IReadOnlyList<string> Notes);
 	}
 }

@@ -321,40 +321,6 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	// Lava hazard volumes from the client's bounded-area trigger table (RDB type 1000053, #504). Clean rebuild - the
-	// set is fully derived from the fixed client RDB, so Overwrite-only.
-	public sealed class RdbHazardsModule : IImportModule
-	{
-		public IReadOnlyList<string> DependsOn => [];
-
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
-		{
-			WriteMode.Overwrite
-		};
-
-		public ImportSource Source => ImportSource.Rdb;
-
-		public string Description => "Lava hazard volumes from the RDB bounded-area trigger table (1000053, #504).";
-		public string Name => "rdb-hazards";
-
-		public async Task<ImportResult> RunAsync(ImportContext ctx)
-		{
-			var r = await RdbHazardImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
-			// Every rejected lava-named area is REPORTED with its reason rather than silently dropped - a quiet skip in
-			// an importer is data loss nobody notices for months.
-			foreach (var note in r.Notes)
-				ctx.Out.WriteLine($"  rdb-hazards skipped {note}");
-
-			return new ImportResult($"{r.Hazards} lava hazard volumes ({r.Vertices} vertices) across {r.Maps} playfields " +
-			                        $"({r.SkippedAreas} lava-named areas skipped, {r.Unreadable} unreadable).");
-		}
-	}
-
-	// The bounded-area trigger volumes a subsystem actually consumes (RDB 1000053, #519/#521), into MapRegion. Clean
-	// rebuild - the set is derived from the fixed client RDB - so Overwrite-only, like the hazards.
-	//
-	// Depends on rdb-respawns and the quest import: it links regions to the RespawnPoints and QuestGoalDefinitions
-	// that are already in the DB, so running it against a database without them imports nothing and reports so.
 	// Quest wiring read from the goals' own DECRYPTED objective text (#520/#521). RDB-backed, so it is opt-in and
 	// separate from the capture-driven `quest-wiring`.
 	public sealed class RdbQuestTextModule : IImportModule
@@ -431,6 +397,15 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// The bounded-area trigger volumes a subsystem actually consumes (RDB 1000053, #519/#521/#513/#504), into
+	// MapRegion. Clean rebuild - the set is derived from the fixed client RDB - so Overwrite-only.
+	//
+	// Depends on rdb-respawns and the quest import: it links regions to the RespawnPoints and QuestGoalDefinitions
+	// that are already in the DB, so running it against a database without them imports nothing and reports so.
+	//
+	// The LAVA volumes come through here too (#679). They used to have a module of their own, `rdb-hazards`, over a
+	// MapHazard table that carried its own copy of the geometry; a hazard is now a BEHAVIOUR side table on the region,
+	// so one importer owns the 1000053 geometry and there is nothing left for a second module to rebuild.
 	public sealed class RdbRegionsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => ["rdb-respawns"];
@@ -453,7 +428,7 @@ namespace Faolan.Importer.Modules
 				ctx.Out.WriteLine($"  rdb-regions unresolved: {note}");
 
 			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s), " +
-			                        $"{r.GoalLinks} quest goal region(s) and {r.BannerLinks} area-banner volume(s).");
+			                        $"{r.GoalLinks} quest goal region(s) and {r.BannerLinks} area-banner volume(s); {r.Hazards} lava hazard(s).");
 		}
 	}
 

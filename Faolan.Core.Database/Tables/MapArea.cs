@@ -1,24 +1,27 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One named SUB-AREA of a playfield: the region that floats the top-of-screen area banner when a player walks
-	// into it (#348). A map has MANY - Old Tarantia alone fires six (Bridge of Vilerus I, The East Gate, The West
-	// Gate, ...) - which is why this is a child table and not the single `Map.AreaNameId` scalar it replaces.
+	// One named SUB-AREA of a playfield: the region that floats the top-of-screen area banner when a player walks into
+	// it (#348). A map has MANY - Old Tarantia alone fires six (Bridge of Vilerus I, The East Gate, The West Gate, ...)
+	// - which is why this is a child table and not the single `Map.AreaNameId` scalar it replaces.
 	//
 	// ⚠️ **The TEXT is the CLIENT'S.** We put `AreaNameId` on the wire and nothing else (`SendAreaNameBanner` ->
 	// `AreaNameBanner`), and the client renders the string - "The West Gate" sits in English LDB page 974162. An
 	// earlier version of this comment said the banner text was "server-side"; that is wrong, and so is the reading of
 	// the evidence it cited. Neither this table nor `MapRegion` carries display text and neither should.
 	//
-	// What IS ours is the pair of things the client cannot answer: WHICH area the player is in, and hence which id to
-	// send. The client's bounded-area record does not name a banner id, so the region -> AreaNameId link had to be
-	// reconstructed, and it was reconstructed GEOMETRICALLY (see RegionId below, #513).
+	// What IS ours is the pair of things the client cannot answer on its own: WHICH area the player is in, and hence
+	// which id to send. The client's bounded-area record does not name a banner id - so the region -> AreaNameId link
+	// had to be reconstructed, and it now comes from two independent directions (see Source):
 	//
-	// The hull below is CAPTURE-SOURCED for the same reason - `AreaNameExtractor` pairs every captured
-	// FormatFeedbackIIR with the player's position at that moment - and it stays the fallback for the 10 banners the
-	// geometric match could not corroborate.
+	//   * from a CAPTURE, pairing every captured FormatFeedbackIIR with the player's position at that moment
+	//     (AreaNameExtractor), then matching that hull to the client volume containing it (#513);
+	//   * from the CLIENT ALONE, because the banner id is a parameter inside the localized token and the LDB key is
+	//     the elf28 hash of the whole token string - which inverts by sweeping the parameter, recovering both the id
+	//     and its text, and the client's own region NAME is usually that text (#679, AreaBannerNames).
 	//
 	// ⚠️ Two claims that have already been wrong here once each, so they are worth stating carefully:
 	//   - "the fire position lands in no client region except a collision volume" - FALSE. It lands in `BA_Bridge`,
@@ -47,23 +50,26 @@ namespace Faolan.Core.Database.Tables
 		//
 		//   elf28("DisplayedText(3)|GenericDisplayAreaName|3474586") == 19303910 == cat 50025 "Castle Approach"
 		//
-		// So resolving one is a pure hash, with no per-page "pin" needed (the #291 caveat below does not apply to
-		// these): hash the token, look the result up in category 50025.
-		// `--report ldb-strings --report-arg "id:#<n>"` does the lookup.
+		// So resolving one is a pure hash, with no per-page "pin" needed (the #291 caveat does not apply to these):
+		// hash the token, look the result up in category 50025. `--report ldb-strings --report-arg "id:#<n>"` does the
+		// lookup, and `--report area-banner-names` does the whole table at once by INVERTING that hash.
 		//
-		// That also CORROBORATES the geometric region match by name, which nothing else could: 3373519 resolves to
+		// That also CORROBORATES the region match by name, which nothing else could: 3373519 resolves to
 		// "Bridge of Vilerus I" and is linked to `BA_Bridge`, 3385037/3385038 to "The East Gate"/"The West Gate" on
 		// `BA_EastGate`/`BA_WestGate`, and 3147973 to "The Southern Bridge" on the region of that exact name.
 		public uint AreaNameId { get; set; }
 		public uint MapId { get; set; }
 
-		// The client's REAL trigger volume for this banner (#513), or null where we could not corroborate one - those
+		// The client's REAL trigger volume for this banner (#513/#679), or null where we could not find one - those
 		// fall back to the captured hull below plus WorldSimulation's slack.
 		//
 		// The volume replaces an approximation with the thing itself: `BA_Bridge` is a 9-vertex polygon spanning
 		// x 924-960, z 718-845 and only 10 units tall, against a hull over seven sampled walk positions padded by a
 		// flat runtime slack. SetNull rather than cascade - losing the volume must degrade to the hull, never delete
 		// the area.
+		//
+		// ⚠️ A `Source = ClientName` row ALWAYS has one (the region is where the match happened), so a null here means
+		// a captured banner whose volume is still unidentified - which is the remaining gap, not a normal state.
 		public uint? RegionId { get; set; }
 
 		[ForeignKey(nameof(RegionId))]
@@ -72,31 +78,26 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 
+		// Where the (MapId, AreaNameId) pair came from - see AreaBannerSource. This replaced a `SampleCount` (#679):
+		// a client-sourced row has no samples at all, and writing 0 there would have read as "no evidence backs this
+		// area" when it means "not capture-derived" - a value that looks like data but is really provenance.
+		//
+		// Nothing was lost with the count. What it was kept for was spotting a DEGENERATE fallback hull (one sighting
+		// = a zero-area box that only fires because of AreaBannerSlack), and the bounds say that themselves:
+		// `MinX == MaxX && MinZ == MaxZ` is exactly that row, without a second column that can disagree with them.
+		public AreaBannerSource Source { get; set; }
+
 		public float MaxX { get; set; }
 		public float MaxY { get; set; }
 		public float MaxZ { get; set; }
 
-		// The axis-aligned bounds of the captured sightings - the interim region shape. A HULL OVER SAMPLES, not the
-		// retail trigger volume: it can only cover ground a captured player actually walked, so it UNDER-covers by
-		// construction and WorldSimulation widens it with AreaBannerSlack rather than treating it as a hard polygon.
-		// It tightens with every new dump; no chat marker needed - a plain dump carries the banner and the position.
+		// The axis-aligned bounds of the captured sightings - the interim region shape, and ALL ZERO on a client-sourced
+		// row, which carries an exact volume instead and never falls back. A HULL OVER SAMPLES, not the retail trigger
+		// volume: it can only cover ground a captured player actually walked, so it UNDER-covers by construction and
+		// WorldSimulation widens it with AreaBannerSlack rather than treating it as a hard polygon. It tightens with
+		// every new dump; no chat marker needed - a plain dump carries the banner and the position.
 		public float MinX { get; set; }
 		public float MinY { get; set; }
 		public float MinZ { get; set; }
-
-		// How many captured banners back this area. 1 = a single sighting, so the bounds are a point and only the
-		// slack does any work; more samples = a real strip (Bridge of Vilerus I has seven, spanning z 711..848 -
-		// a bridge deck, not scatter).
-		//
-		// DIAGNOSTIC ONLY - nothing branches on it. It is kept because it is the one thing that says how much the
-		// FALLBACK hull is worth, and 10 of the 22 areas are still on that path after #513; a `samples=1` row and a
-		// `samples=18` row are not the same kind of evidence even though the columns look alike.
-		//
-		// ⚠️ **Do not carry it into client-sourced rows** (#679). A row built from the client's own region + the
-		// recovered banner id has no samples, and writing 0 there would read as "no evidence backs this area" when
-		// it means "not capture-derived at all" - a value that looks like data but is really provenance. When those
-		// rows land, this becomes a Source enum (the shape `NpcSpawnArea.ResolvedBy` already uses) and the count
-		// either folds into it or goes. Melvin's call, 2026-08-06: fold it into #679 rather than removing it now.
-		public uint SampleCount { get; set; }
 	}
 }

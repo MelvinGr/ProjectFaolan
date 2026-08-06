@@ -15,15 +15,17 @@ because this has been stated wrongly twice:
 
 - **The TEXT is the client's.** The server sends an `AreaNameId` and nothing else; the client renders the string.
   "The West Gate" is in English LDB page 974162.
-- **The GEOMETRY is the client's too** — it ships the trigger volumes, and 12 are now imported and driving the
+- **The GEOMETRY is the client's too** — it ships the trigger volumes, and 116 are now imported and driving the
   banners. See [the zone / area-name section](#the-zone--area-name-regions-exist--found-by-containment-not-by-name).
-- **What is ours** is only the LINK between them: which region carries which `AreaNameId`. The client's
-  bounded-area record does not name a banner id, which is why the pairing had to be reconstructed geometrically.
+- **The LINK is RECOVERABLE from the client as well** (#679), which is newer and was not expected: the banner id
+  is a parameter inside the localized token, so the hash that keys the string INVERTS, and the client's own region
+  names are those strings. What stays ours is deciding which area a player is in and sending the id.
 
 The old evidence for "the text is server-side" does not support it. Scanning all 410,433 local RDB records for a
 banner's text id found chance collisions, and none of the 22 `AreaNameId`s resolves through our LDB page index —
-but that is a statement about our **id → (page, index) lookup**, which is #291's un-pinned page base, not about
-the strings being absent. Searched by content they are plainly there.
+but the second half is a statement about our **id → (page, index) lookup** applied to a number that was never an
+LDB id in the first place. Searched by content the strings are plainly there; searched by the hash of their token
+the ids are too.
 
 ## Format
 
@@ -89,7 +91,7 @@ For the lava, the server's own feedback names its script class outright:
 
 `GenericHazardiousBoundedArea`, triggered by `playerenter(3)`. So the division of labour is **the client owns
 WHERE, the server owns WHAT**: geometry is imported from here, and the effect (which spell, how much damage,
-whether it kills) is server data — `MapHazard`'s own columns.
+whether it kills) is server data — the `MapHazard` side table's columns.
 
 ## Validated against the wire
 
@@ -112,7 +114,7 @@ tolerance at all**. [V3: MapHazardGeometryTests.CapturedTrack_CrossesTheClientPo
 
 ## What is in the 8,917 areas
 
-Classified by name. Only the **lava** row is imported today (see `MapHazard` for why the rest are deliberately
+Classified by name. Only the **lava** row gets hazard behaviour today (see `MapHazard` for why the rest are deliberately
 left out — they are hazard-shaped by name with no wire evidence, and a mis-guessed kill volume is worse than a
 missing one). The remaining buckets each touch an open subsystem.
 
@@ -387,20 +389,28 @@ regions do ship with the client**, so #348's note that they are "server-side and
 captures" is wrong about the geometry. It is not right about the text either — the client renders that from its
 own LDB. What is genuinely ours is the LINK from a region to its `AreaNameId`, and nothing else.
 
-### The ambiguity is resolved by the region's SCRY SCRIPT, and 12 are now imported
+### Both blockers are gone: the scry script, and the banner id itself
 
-One of the two blockers below is gone. The other stands.
-
-- **No id link *for the banner* — still true.** The banner's `AreaNameId` is not the ELF-28 hash of the region
-  name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits), and **none of the 22 ids
-  resolves through our LDB page index**. So there is nothing to join a region to a banner id by, and the match can
-  only ever be geometric. ⚠️ That is a missing *link*, not a missing *string*: the client renders these banners
-  from its own LDB, and searching by content finds them (`The West Gate` → page 974162). The id lookup is #291.
 - **~~Containment is ambiguous~~ — SOLVED.** The ambiguity was entirely the audio and collision regions, and the
   client separates those itself: a region's `<scryid>` says which client script it runs, and **220656 is the
   crossing NOTIFIER** — the script that tells the server the player entered. A region that never notifies the
   server cannot be what fires a server-sent banner, so filtering on it is not a heuristic but a statement of
   mechanism.
+- **~~No id link for the banner~~ — SOLVED (#679).** The old reading was that the banner's `AreaNameId` is not the
+  ELF-28 hash of the region name (13 spellings of all 5,308 distinct region names against all 22 ids — zero hits)
+  and that **none of the 22 ids resolves through our LDB page index** — so nothing could join a region to a banner
+  id and the match could only ever be geometric. The second half is true and means nothing, because the id is not
+  an LDB key at all. It is a **parameter inside the localized token**, and the LDB key is the hash of the whole
+  token string:
+
+  ```
+  <localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|3474586'>
+  elf28("DisplayedText(3)|GenericDisplayAreaName|3474586") == 19303910 == cat 50025 "Castle Approach"
+  ```
+
+  That looks one-way, but the parameter is a small integer, so the hash **inverts by sweeping it**: hash every
+  candidate, keep the ones landing on a real category-50025 id. Sweeping 0..40M recovers **1,139 hits, and all 22
+  captured banner ids are among them with their exact text**.
 
 [V1: Faolan.Importer/Rdb/BoundedAreaClassifier.cs — 479 regions over 60 playfields carry `scryid 220656`. On Old
 Tarantia it selects exactly the `BA_*` sub-areas, on Tarantia Noble District the named quarters (Noble Quarters,
@@ -409,22 +419,66 @@ Old Tarantia's `3373519` from *four* containing regions (tightest `City_sounds`,
 **exactly one**, `BA_Bridge` at 4,615 u². `--report bounded-areas --report-arg area-banners` prints the whole
 test.]
 
-⚠️ It is **not** "the banner script". 4 dismount volumes, 5 fire hazards, a respawn-discovery area and 3 encounter
-triggers carry it too — it means *this volume talks to the server*, which is a weaker and more useful claim than
-identification. It is a FILTER; pairing it with a captured banner is what identifies one.
+[V1: Faolan.Importer/Rdb/AreaBannerNames.cs — the sweep and the join; `--report area-banner-names` prints both.
+`AreaBannerNamesTests.ABannerIdsToken_HashesToItsLdbKey` pins the arithmetic above with no client RDB present.]
 
-**Imported** by `RdbRegionImporter` (`rdb-regions`) under three gates: the scry filter, containment of the
-banner's captured hull, and SEPARATION — a region holding two banners' samples cannot be what distinguishes them,
-so it is rejected for both. That resolves **12 of the 22**; `WorldSimulation` then tests the polygon with no slack
-where one is linked and falls back to the hull elsewhere.
+⚠️ The scry id is **not** "the banner script". 4 dismount volumes, 5 fire hazards, a respawn-discovery area and 3
+encounter triggers carry it too — it means *this volume talks to the server*, which is a weaker and more useful
+claim than identification. It is a FILTER; what identifies one is a captured banner or a name match.
 
-⚠️ **No tolerance on the containment test, deliberately.** A banner fires ON ENTRY, so its sample sits right at the
-boundary and a near-miss is expected — 10 of 22 land outside every notifier region (including `3373522`, the
-best-sampled at 18 sightings, whose hull spills outside `BA_TradingPost` at the edges). Padding until they match
-would be fitting the answer. Those keep the captured hull, which is what it is for.
+⚠️ And a hash hit is **not** a banner on its own. ELF-28 has 2^28 buckets, so sweeping 40M candidates against
+3,808 category-50025 ids yields ~567 chance collisions — roughly half the hits — and a collision's text is drawn
+from the same table of place names, so it looks exactly as plausible as a real one.
 
-The prize was real: 11 of `MapArea`'s 22 rows rest on a **single sample**, i.e. a zero-area point that only works
-with a runtime slack, and the client ships true polygons for the same places.
+### What makes a hit real: the region name, inside the playfield's id block
+
+The recovery pays off because the client also names its own regions after the same places. So a hit becomes a row
+only when a crossing-notifier region **on some playfield is named exactly that text** — after normalising the
+three ways the client spells one place: a widget prefix (`BA_Bridge`, `Fifo-CascadeFalls`,
+`BA_FIFO_ValleyOfGiants` — FIFO is the client's own name for the banner widget), run-together words
+(`CrawlingDunes` ↔ "Crawling Dunes") and punctuation (`Atzels Approach` ↔ "Atzel's Approach").
+
+That alone is not enough, because the name is ambiguous far more often than not: 41 different ids render "Outlaw
+Camp", one per playfield that has one. The second gate is the **id block**. Real ids arrive in per-playfield runs —
+`358073..358089` on map 1080, `277705..277809` on Field of the Dead, `4186119..4186225` on map 974 — because they
+were handed out a playfield at a time. So a candidate must sit in one of that playfield's own blocks, where a block
+is a cluster of anchors: ids already pinned there either by being the only recovered id in the whole client with
+that text, or by a capture. A one-anchor cluster counts only if that anchor is **captured** — wire truth needs no
+corroboration, a lone name match does, and this is what rejects map 1010's `Fifo-CimmerianSettlement`, whose name
+matches "Cimmerian Settlement" exactly once at 711411 while every other banner on that playfield is 37098xx.
+
+A run is not gapless (1080 skips 358080, 358085 and 358087) and a playfield can own several blocks: Old Tarantia
+has 3373519..3373530, 3385037..3385038 and its Outlaw Camp at 3906077. Hence a cluster test rather than one range.
+
+### What that produces: 122 areas over 14 playfields, from 22 over 7
+
+| | banners | playfields | with the client's real trigger volume |
+|---|---|---|---|
+| captured only (before #679) | 22 | 7 | 12 |
+| now | **122** | **14** | **116** |
+
+Provenance is on the row (`MapArea.Source`): **13 captured** (the wire saw the id; region matched geometrically or
+not at all), **100 client-name** (recovered from the client, on playfields including several no capture has ever
+visited), and **9 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
+one is a position track against a wire packet and the other a hash inversion against a string table. **Nothing
+produces a disagreement.**
+
+**Imported** by `RdbRegionImporter` (`rdb-regions`). The geometric route still runs, on the banners the name join
+cannot reach, under three gates: the scry filter, containment of the banner's captured hull, and SEPARATION — a
+region holding two banners' samples cannot be what distinguishes them, so it is rejected for both. It is the only
+route left for Old Tarantia, whose volumes are named `BA_Bridge`/`BA_EastGate` rather than the "Bridge of Vilerus
+I" / "The East Gate" the banner renders. `WorldSimulation` then tests the polygon with no slack where a region is
+linked, and falls back to the hull elsewhere.
+
+⚠️ **No tolerance on the geometric containment test, deliberately.** A banner fires ON ENTRY, so its sample sits
+right at the boundary and a near-miss is expected. Padding until they match would be fitting the answer. Those keep
+the captured hull, which is what it is for — **6 rows** still do.
+
+⚠️ A one-sighting hull is weaker evidence than it looks, and the name join is what showed it. Map 1010's "Pass to
+Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` at x 53..110, while its single captured sample sits
+at (659, 537) — 600 units away, inside `Fifo-CimmerianSettlement`, which is also where the *other* banner captured
+on that playfield was sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there.
+[V3: MapRegionGeometryTests.ACorroboratedBanner_WasCapturedFiringInsideTheRegionItsNameMatched]
 
 ⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
 unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language
@@ -468,11 +522,11 @@ both halves are now mechanical: the kind from the text, the polygon from the ref
 
 ## Import
 
-Two modules read this table, and both import a DELIBERATELY SMALL slice of it — the regions some subsystem
+**One** module reads this table, and it imports a DELIBERATELY SMALL slice of it — the regions some subsystem
 actually consumes. The server has no RDB access, so anything the runtime needs has to come through here; what
 nothing reads stays out.
 
-`RdbRegionImporter` (the opt-in `rdb-regions` module) imports **14 regions / 59 vertices** into `MapRegion` +
+`RdbRegionImporter` (the opt-in `rdb-regions` module) imports **235 regions / 6,899 vertices** into `MapRegion` +
 `MapRegionVertex` and links each to its consumer:
 
 - **11 resurrection-point discovery volumes** (#519) → `RespawnPoint.DiscoveryRegionId`, matched by containment:
@@ -487,9 +541,14 @@ nothing reads stays out.
   reference (see below). `BossRoom` resolves even though goal 14073 carries no `MapId`, because the name occurs on
   exactly one hosted playfield; ambiguity is reported rather than guessed.
 
-`RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
-`MapHazardVertex`: **105 volumes / 5,396 vertices over 22 playfields**, from Tortage Volcano and the Acheronian
-Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.
+- **116 area-banner volumes** (#513/#348/#679) → `MapArea.RegionId`, by the name join and the id blocks above,
+  with geometry as the fallback for the banners whose region carries an internal name.
+- **105 lava hazards** (#504) → a `MapHazard` row *on the region*, over 22 playfields, from Tortage Volcano and the
+  Acheronian Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.
+  ⚠️ Only the GEOMETRY comes from the client. What a hazard does — which spell, how much damage, whether it kills —
+  is server data, and since #679 that split is structural: `MapHazard` is a 1:1 BEHAVIOUR side table keyed to the
+  region, not a second copy of the prism. It used to be a table of its own with its own `MapHazardVertex` ring and
+  its own `rdb-hazards` module; both are gone, and importing a volume's geometry no longer implies it hurts anybody.
 
 Seven lava-named areas are skipped and the importer prints why for each — all seven are the scripted ambient
 companions (`Lava` on 917/942/5012, `Lava Area` on 944/4010, `LavaUpper` on 5012, `BA_Lava_music` on 1090). A
@@ -508,6 +567,7 @@ numbering, which is not a `Map.Id`.
 Both are gated by `BoundedAreaCollectionTests`.
 
 ```zsh
-dotnet run --project Faolan.Importer -- --only rdb-hazards --RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --only rdb-regions --mode overwrite --RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --report area-banner-names --RdbDir <rdb-dir> --captures <data-repo>/Captures
 dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1000053:1090 --out <dir> --RdbDir <rdb-dir> --captures <data-repo>/Captures
 ```

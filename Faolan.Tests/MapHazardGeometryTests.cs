@@ -17,6 +17,9 @@ namespace Faolan.Tests
 	// The polygon is inlined rather than read from faolan.db on purpose: this gate is about the GEOMETRY agreeing with
 	// the wire, so it must keep failing if a re-import changes the shape, and it must run from a plain clone with no
 	// client RDB present.
+	//
+	// The volume is a `MapRegion` and not a `MapHazard` since #679: a hazard is the BEHAVIOUR half (what it applies,
+	// whether it kills) hanging off the client's volume, so the geometry this gate is about lives on the region.
 	public class MapHazardGeometryTests
 	{
 		// (x, z) pairs in RDB ring order. Implicitly closed - the first point is not repeated.
@@ -42,9 +45,9 @@ namespace Faolan.Tests
 			1273.5176f, 461.5400f, 1275.2941f, 461.7766f, 1281.7207f, 464.0984f
 		];
 
-		private static MapHazard Lava7()
+		private static MapRegion Lava7()
 		{
-			var hazard = new MapHazard
+			var region = new MapRegion
 			{
 				MapId = 1090,
 				Name = "BA_Lava7",
@@ -54,13 +57,12 @@ namespace Faolan.Tests
 				MaxX = 1299.1436767578125f,
 				MinZ = 440.4229431152344f,
 				MaxZ = 480.6639709472656f,
-				EffectSpellId = 3773837,
-				Lethal = true
+				Hazard = new MapHazard { EffectSpellId = 3773837, Lethal = true }
 			};
 
 			for (var i = 0; i < Lava7Ring.Length / 2; i++)
 			{
-				hazard.Vertices.Add(new MapHazardVertex
+				region.Vertices.Add(new MapRegionVertex
 				{
 					Sequence = i,
 					X = Lava7Ring[i * 2],
@@ -68,7 +70,7 @@ namespace Faolan.Tests
 				});
 			}
 
-			return hazard;
+			return region;
 		}
 
 		// The crossing, sample by sample. This is the whole claim: the client's polygon and the server's trigger are
@@ -112,10 +114,10 @@ namespace Faolan.Tests
 		[InlineData(1285.0f, 445.0f)]
 		public void InsideTheBoundingBox_IsNotInsideTheFlow(float x, float z)
 		{
-			var hazard = Lava7();
-			Assert.InRange(x, hazard.MinX, hazard.MaxX);
-			Assert.InRange(z, hazard.MinZ, hazard.MaxZ);
-			Assert.False(EnvironmentService.Contains(hazard, new Vector3(x, 238.0f, z)));
+			var region = Lava7();
+			Assert.InRange(x, region.MinX, region.MaxX);
+			Assert.InRange(z, region.MinZ, region.MaxZ);
+			Assert.False(EnvironmentService.Contains(region, new Vector3(x, 238.0f, z)));
 		}
 
 		// The ring is implicitly closed. Dropping the wrap-around edge leaks the polygon open along it, so this asserts
@@ -123,7 +125,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheRingIsClosed_AndAHazardWithoutEnoughVerticesIsInert()
 		{
-			var degenerate = new MapHazard
+			var degenerate = new MapRegion
 			{
 				MapId = 1090,
 				Name = "degenerate",
@@ -134,8 +136,8 @@ namespace Faolan.Tests
 				MinZ = 0f,
 				MaxZ = 10f
 			};
-			degenerate.Vertices.Add(new MapHazardVertex { Sequence = 0, X = 0f, Z = 0f });
-			degenerate.Vertices.Add(new MapHazardVertex { Sequence = 1, X = 10f, Z = 10f });
+			degenerate.Vertices.Add(new MapRegionVertex { Sequence = 0, X = 0f, Z = 0f });
+			degenerate.Vertices.Add(new MapRegionVertex { Sequence = 1, X = 10f, Z = 10f });
 
 			Assert.False(EnvironmentService.Contains(degenerate, new Vector3(5f, 50f, 5f)));
 		}
@@ -147,7 +149,7 @@ namespace Faolan.Tests
 		public void VertexOrder_ComesFromSequence_NotFromTheCollectionOrder()
 		{
 			var shuffled = Lava7();
-			var reversed = new List<MapHazardVertex>(shuffled.Vertices);
+			var reversed = new List<MapRegionVertex>(shuffled.Vertices);
 			reversed.Reverse();
 			shuffled.Vertices.Clear();
 			foreach (var v in reversed)

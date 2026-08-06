@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Rdb;
@@ -73,7 +75,12 @@ namespace Faolan.Importer.Cli
 			await using var db = OpenDb();
 			var mapNames = await db.Maps.ToDictionaryAsync(m => m.Id, m => m.Name ?? "");
 			var byMap = records.ToDictionary(r => r.MapId, r => r.Areas);
-			var banners = (await db.MapAreas.ToListAsync()).GroupBy(a => a.MapId).ToDictionary(g => g.Key, g => g.ToList());
+			// CAPTURED rows only: this test is "does a client region contain the hull retail fired the banner in", and a
+			// client-sourced row (#679) has no hull at all - it was matched by NAME onto the region itself, so feeding
+			// it in here would test a zero-size box at the origin against every playfield.
+			var banners = (await db.MapAreas.Where(a => a.Source != AreaBannerSource.ClientName).ToListAsync())
+				.GroupBy(a => a.MapId)
+				.ToDictionary(g => g.Key, g => g.ToList());
 
 			Console.WriteLine("=== area-banner cross-check: is a MapArea's region in RDB 1000053? ===");
 			Console.WriteLine("A candidate must CONTAIN this banner's captured footprint and EXCLUDE every other banner on the map.");
@@ -108,7 +115,7 @@ namespace Faolan.Importer.Cli
 
 					if (holding.Count == 0)
 					{
-						Console.WriteLine($"   banner {a.AreaNameId,-10} samples={a.SampleCount,-3} -> NO client region contains it");
+						Console.WriteLine($"   banner {a.AreaNameId,-10} {Hull(a),-10} -> NO client region contains it");
 						continue;
 					}
 
@@ -124,7 +131,7 @@ namespace Faolan.Importer.Cli
 						separating++;
 
 					var best = holding[0];
-					Console.WriteLine($"   banner {a.AreaNameId,-10} samples={a.SampleCount,-3} -> {holding.Count} containing region(s); "
+					Console.WriteLine($"   banner {a.AreaNameId,-10} {Hull(a),-10} -> {holding.Count} containing region(s); "
 					                  + $"tightest '{best.Region.Name}' {best.Footprint:N0} u², bucket {BoundedAreaClassifier.Slug(BoundedAreaClassifier.Classify(best.Region.Name))}"
 					                  + (clean.Count > 0 ? $"; {clean.Count} SEPARATE the banners -> '{clean[0].Region.Name}'" : "; none separate the banners"));
 				}
@@ -136,6 +143,13 @@ namespace Faolan.Importer.Cli
 				? "  -> the client does NOT ship the banner trigger volumes. MapArea's captured hull stays the only source (#348)."
 				: "  -> candidates exist; check the named regions before importing (#513).");
 			return;
+
+			// A hull over ONE sighting is a point, so it fires only because of the runtime's slack - worth seeing next
+			// to a match, because a point can sit inside a region it has no business claiming.
+			static string Hull(MapArea a)
+			{
+				return a.MinX == a.MaxX && a.MinZ == a.MaxZ ? "hull=point" : $"hull={a.MaxX - a.MinX:F0}x{a.MaxZ - a.MinZ:F0}";
+			}
 
 			static double Footprint(BoundedAreaCollection.BoundedArea r)
 			{

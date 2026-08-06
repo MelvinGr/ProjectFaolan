@@ -1122,9 +1122,12 @@ namespace Faolan.GameServer.World
 					continue; // left an area into unnamed ground - retail shows nothing
 
 				await _output.SendAreaNameBanner(client, now);
-				// Logged by id, not name: MapArea has no name (the client renders the text; decoding one needs a
-				// per-page LDB pin, #291). 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
-				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Samples} captured sighting(s) back it).", client.Session.Character.Name, now, entity.MapId, best!.SampleCount);
+				// Logged by id, not name: MapArea has no name (the client renders the text, and it can be read back
+				// from the id with `--report ldb-strings`). 3373519 is "Bridge of Vilerus I" if you need one by hand.
+				// The region is the useful half of the line - it says whether the banner fired on the client's own
+				// trigger volume or on a captured hull plus slack.
+				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Where}).", client.Session.Character.Name, now, entity.MapId,
+					best!.Region is { } named ? $"'{named.Name}', the client's own volume" : "captured hull + slack");
 			}
 		}
 

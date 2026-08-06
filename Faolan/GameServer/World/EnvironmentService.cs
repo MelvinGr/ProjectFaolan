@@ -131,7 +131,7 @@ namespace Faolan.GameServer.World
 			MapHazard? inside = null;
 			foreach (var hazard in hazards)
 			{
-				if (Contains(hazard, position))
+				if (Contains(hazard.Region, position))
 				{
 					inside = hazard;
 					break;
@@ -144,10 +144,10 @@ namespace Faolan.GameServer.World
 				return;
 			}
 
-			if (entity.CurrentHazardId == inside.Id)
+			if (entity.CurrentHazardId == inside.RegionId)
 				return; // still inside the one that already fired
 
-			entity.CurrentHazardId = inside.Id;
+			entity.CurrentHazardId = inside.RegionId;
 
 			var vitals = entity.Vitals;
 			if (vitals == null || vitals.IsDead)
@@ -160,7 +160,7 @@ namespace Faolan.GameServer.World
 
 			if (entity.GodMode)
 			{
-				_logger.LogInformation("Environment: {Player} entered hazard {Hazard} on map {Map} - .godmode, so no damage.", client.Session.Character?.Name, inside.Id, entity.MapId);
+				_logger.LogInformation("Environment: {Player} entered hazard {Hazard} on map {Map} - .godmode, so no damage.", client.Session.Character?.Name, inside.Region.Name, entity.MapId);
 				return;
 			}
 
@@ -171,7 +171,7 @@ namespace Faolan.GameServer.World
 				// picks it up on the next tick - which is also where the death penalty is applied.
 				vitals.Health = 0;
 				await _output.PushVitals(client, vitals);
-				_logger.LogInformation("Environment: {Player} was killed by hazard {Hazard} on map {Map}.", client.Session.Character?.Name, inside.Id, entity.MapId);
+				_logger.LogInformation("Environment: {Player} was killed by hazard {Hazard} on map {Map}.", client.Session.Character?.Name, inside.Region.Name, entity.MapId);
 				return;
 			}
 
@@ -181,7 +181,7 @@ namespace Faolan.GameServer.World
 			vitals.ApplyHealthDelta(-(int)inside.Damage);
 			await _output.SendEnvironmentalDamage(client, entity.Handle, inside.Damage, (uint)CharacterStatId.HealthCurrent, FallDamage.EnvironmentalSchool);
 			await _output.PushVitals(client, vitals);
-			_logger.LogInformation("Environment: hazard {Hazard} on map {Map} cost {Player} {Damage} health.", inside.Id, entity.MapId, client.Session.Character?.Name, inside.Damage);
+			_logger.LogInformation("Environment: hazard {Hazard} on map {Map} cost {Player} {Damage} health.", inside.Region.Name, entity.MapId, client.Session.Character?.Name, inside.Damage);
 		}
 
 		private async Task<MapHazard[]> GetMapHazardsCached(uint mapId)
@@ -195,25 +195,21 @@ namespace Faolan.GameServer.World
 		}
 
 		// Containment against the client's own polygon - no slack anywhere, because unlike a MapArea banner hull this
-		// geometry is EXACT (it is the volume the client draws the lava with). Adding tolerance to a volume that kills
-		// would kill players on the walkable ledge beside it.
+		// geometry is EXACT (it is the volume the client draws the lava with, and the volume a quest goal or a
+		// resurrection pad was drawn as). Adding tolerance to a volume that kills would kill players on the walkable
+		// ledge beside it.
 		//
 		// Three tests, cheapest first: the Y range, then the AABB, then the polygon walk. The AABB is only a reject
-		// filter - the volumes are concave ribbons tracing a lava flow (up to 583 vertices) whose bounding boxes cover
-		// a lot of safe ground, so an AABB hit means "worth walking", never "inside".
-		public static bool Contains(MapHazard hazard, Vector3 p)
-		{
-			// Ordered by Sequence: a polygon is only meaningful in ring order, and EF gives no ordering guarantee on a
-			// navigation collection. Reading them as loaded produced a self-intersecting ring on some hazards.
-			return InPrism(p, hazard.MinY, hazard.MaxY, hazard.MinX, hazard.MaxX, hazard.MinZ, hazard.MaxZ,
-				hazard.Vertices.OrderBy(v => v.Sequence).Select(v => (v.X, v.Z)));
-		}
-
-		// The same test for an imported bounded-area region (MapRegion): resurrection-point discovery volumes (#519)
-		// and quest ReachArea goal regions (#521). One routine for both tables rather than a second copy of a ray
-		// cast - the ordering trap above applies identically, and it is not the kind of thing to rediscover twice.
+		// filter - a lava volume is a concave ribbon tracing the flow (up to 583 vertices) whose bounding box covers a
+		// lot of safe ground, so an AABB hit means "worth walking", never "inside".
+		//
+		// ONE routine for every consumer (#679): hazards used to carry their own copy of the geometry and so had a
+		// near-identical second overload. The ordering trap below is exactly the kind of thing that must not be
+		// rediscovered twice.
 		public static bool Contains(MapRegion region, Vector3 p)
 		{
+			// Ordered by Sequence: a polygon is only meaningful in ring order, and EF gives no ordering guarantee on a
+			// navigation collection. Reading them as loaded produced a self-intersecting ring on some volumes.
 			return InPrism(p, region.MinY, region.MaxY, region.MinX, region.MaxX, region.MinZ, region.MaxZ,
 				region.Vertices.OrderBy(v => v.Sequence).Select(v => (v.X, v.Z)));
 		}

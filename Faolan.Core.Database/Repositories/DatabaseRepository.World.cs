@@ -95,15 +95,17 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.TravelDestinations.Where(d => d.NpcName == npcName).ToArrayAsync();
 		}
 
-		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry (#504). Includes the
-		// boundary polygon: containment is a point-in-polygon test, so a hazard without its vertices is not a hazard.
-		// (Lazy loading is deliberately off, so the Include is required - see CLAUDE.md.)
+		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry (#504). A hazard is the
+		// BEHAVIOUR half, so its region comes with it, boundary polygon and all: containment is a point-in-polygon
+		// test, and a hazard without vertices is not a hazard. (Lazy loading is deliberately off, so the Includes are
+		// required - see CLAUDE.md.)
 		public async Task<MapHazard[]> GetMapHazards(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
-				.MapHazards.Where(h => h.MapId == mapId)
-				.Include(h => h.Vertices)
+				.MapHazards.Where(h => h.Region.MapId == mapId)
+				.Include(h => h.Region)
+				.ThenInclude(r => r.Vertices)
 				.ToArrayAsync();
 		}
 
