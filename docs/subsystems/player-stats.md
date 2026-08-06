@@ -389,6 +389,21 @@ copies) because several of them share a stat id within one list and the id alone
 `CharacterValueIndex` map and the `(statId, value)` sheet are two models of the same words, and where they have
 been checked against each other they have disagreed — reconciling the rest is the remaining half of Gitea #447.
 
+### `ChosenGod` (0x0A9) — a stat we author without knowing what it MEANS (#553)
+
+The snapshot emitted a hard `0` here for every character. It varies in retail: 183 of the 184 captured snapshots
+carry `0` and one carries `1`, so a fixed value is a character wearing someone else's number. `Character.ChosenGod`
+now persists it and `SnapshotStatSheet` authors it, with `.religion <n>` as the setter — AoC picks a deity during
+the Tortage storyline, which is not modelled, so a GM command is the standard bootstrap.
+
+⚠️ **The value is carried as an opaque wire number and no deity name is attached to it**, because the mapping
+cannot be recovered. The client *stores* this stat and never reads it back: `ConstScan` finds exactly two uses of
+`0xA9` as a stat id in the whole image and both are WRITES, there is no `GetStat(0xA9)` anywhere, and the one class
+that gives the id a dedicated slot (`FUN_00843d10` / `FUN_00843d40`, field `+0x244`) only mirrors it — see
+[`../re/aoc-client-stat-names.md`](../re/aoc-client-stat-names.md). So it is a **server-side number**: there is no
+integer→Mitra/Set/Ymir table hidden in the client, and no in-client check could confirm one either, because nothing
+the client draws depends on it. `0` = has not chosen is the only value the corpus establishes.
+
 ## Open follow-ups
 > Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.
 

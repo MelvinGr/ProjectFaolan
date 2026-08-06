@@ -39,7 +39,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// regardless, because the slot varies across captured characters and this is where that is accounted for.
 			CharacterStatId.SkillPoints,
 			// The murder-point pool, now derived from the character rather than carried as a fixed 0 (#503).
-			CharacterStatId.MurderPoints
+			CharacterStatId.MurderPoints,
+			// The chosen deity, likewise (#553) - authored as an opaque wire number, since the client never reads the
+			// stat back and no integer -> deity mapping is recoverable from it.
+			CharacterStatId.ChosenGod
 		];
 
 		/// <summary>
@@ -136,6 +139,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// the correct value for a character that has never murdered anyone, and it is what every captured character
 			// holds, so this replaces the fixed 0 with the same number derived from the column that now tracks it.
 			yield return (CharacterStatId.MurderPoints, character.MurderPoints);
+
+			// The chosen DEITY (#553). One captured character has picked one and 183 have not, so the fixed 0 was a
+			// per-character value carried as a constant. The number is emitted verbatim and means nothing here: see
+			// Character.ChosenGod for why the integer -> Mitra/Set/Ymir mapping is not recoverable from the client.
+			yield return (CharacterStatId.ChosenGod, character.ChosenGod);
 		}
 
 		// Writes a value at EVERY occurrence of a stat id. A stat can appear in both lists (and twice within

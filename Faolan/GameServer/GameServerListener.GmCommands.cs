@@ -365,6 +365,7 @@ namespace Faolan.GameServer
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
+				["religion"] = ChosenGodCommand,
 				["travel"] = TravelCommand,
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
@@ -592,6 +593,30 @@ namespace Faolan.GameServer
 		}
 
 		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
+		// .religion <n>  - set the character's CHOSEN DEITY, stat 0x0A9 (#553). The standard test bootstrap: retail's
+		// trigger is the Tortage storyline's religion step, which is not modelled, so without this the column can
+		// never be anything but 0.
+		//
+		// ⚠️ The argument is the RAW WIRE NUMBER, not a deity name, and that is not laziness - the integer -> deity
+		// mapping is unrecoverable. The client stores this stat and never reads it back (docs/re/aoc-client-stat-names.md:
+		// two writes of `0xA9`, no `GetStat`), so there is nothing in the client to check a name against and nothing
+		// it draws that a wrong one would show. The corpus pins 0 (has not chosen) and 1, and no more.
+		private async Task ChosenGodCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			if (!uint.TryParse((arguments ?? "").Trim(), out var value))
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id,
+					$"Usage: .religion <n>  (raw stat 0x0A9 value; 0 = none. Currently {character.ChosenGod}.)");
+				return;
+			}
+
+			character.ChosenGod = value;
+			await Database.SetCharacterChosenGod(character.Id, value);
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ChosenGod, value), character.Id);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"ChosenGod set to {value}.");
+		}
+
 		// `.criminal 0` to clear it. The standard test bootstrap: the retail trigger is killing another player, and PvP
 		// player-vs-player combat is not modelled, so without this the criminal branches in ShopService are
 		// unreachable. Also awards the measured murder points so the stat moves as it does in the capture.

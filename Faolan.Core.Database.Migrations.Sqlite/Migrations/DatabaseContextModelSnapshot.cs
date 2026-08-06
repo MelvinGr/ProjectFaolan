@@ -238,6 +238,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("BindRespawnPointId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("ChosenGod")
+                        .HasColumnType("INTEGER");
+
                     b.Property<byte>("Class")
                         .HasColumnType("INTEGER");
 

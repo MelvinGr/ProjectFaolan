@@ -160,6 +160,22 @@ namespace Faolan.Core.Database.Tables
 		// Persisted because it is what the criminal ladder is scored from and it must survive relog.
 		public uint MurderPoints { get; set; }
 
+		// The character's chosen DEITY, as the raw wire value of stat 0x0A9 `ChosenGod` (#553). AoC's religion is
+		// picked during the Tortage storyline, so it is per-character state that has to persist; the snapshot emitted
+		// a hard 0 for everyone, which is a character wearing someone else's number the moment one of them has picked.
+		//
+		// ⚠️ THE VALUE IS AN OPAQUE WIRE NUMBER, NOT A DEITY ENUM, and deliberately so. The corpus pins exactly two
+		// points - 183 of 184 captured snapshots carry 0 and one carries 1 - and the mapping from integer to
+		// Mitra/Set/Ymir CANNOT be recovered: the client stores this stat and never reads it back. `ConstScan` finds
+		// two uses of `0xA9` as a stat id in the whole image and both are WRITES, there is no `GetStat(0xA9)`
+		// anywhere, and the one class that gives the id a dedicated slot (`FUN_00843d10`/`FUN_00843d40`, field
+		// `+0x244`) only mirrors it. See docs/re/aoc-client-stat-names.md - it is a SERVER-side number, so nothing
+		// the client draws depends on it and no in-client check could confirm a mapping either.
+		//
+		// So this column carries the number and makes no claim about what it means. 0 = has not chosen, which is the
+		// only value the corpus establishes; naming the rest waits for evidence rather than for a guess.
+		public uint ChosenGod { get; set; }
+
 		// When the character stops being a CRIMINAL, or null when it is not one. A timestamp rather than a bool
 		// because retail's is a timed debuff (the captured "Criminal" spell 3827287 runs 300 s) and it PERSISTS: in the
 		// annotated capture the debuff outlived a zone change into another instance, so it cannot live on the session.
