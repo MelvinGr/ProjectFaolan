@@ -79,14 +79,14 @@ namespace Faolan.Tests
 		// 9), a value is a plain record beside its module, and neither is called a codec.
 		// `CodecSurfaceConventionTests.NoIcodecImplementations` is what keeps the interface from coming back.
 
-		// (7) The RPC ENDPOINT class ids come from Endpoints, never a hand-rolled hash. Same rule as EntityClass
+		// (7) The RPC ENDPOINT class ids come from the registry, never a hand-rolled hash. Same rule as EntityClass
 		// below, for the other id namespace: these are BKDR-31 hashes of the client's class names
-		// (0xA9ECB95D = hash("GameCharAgent")), and Endpoints.cs is where all fifteen are recovered and named.
-		// CaptureSpellImporter and CaptureCharacterStateImporter had re-declared two of them locally.
+		// (0xA9ECB95D = hash("GameCharAgent")). CaptureSpellImporter and CaptureCharacterStateImporter had
+		// re-declared two of them locally.
 		//
-		// Faolan.Tests is deliberately NOT scanned: Support/ProtocolDocs/OpcodesPage.cs holds the name -> hash table
-		// the docs are generated from and must spell the hashes out, and it is what proves Endpoints right
-		// (ProtocolDocsTests recomputes each one through Bkdr31).
+		// The registry is `Faolan.Core.Constants.RpcInterfaces` (it also carries each class's NAME and its `*Methods`
+		// enum); `Endpoints` forwards to it and stays exempt because its named constants are how callers reach one.
+		// ProtocolDocsTests recomputes every id from its class name, which is what proves the table right.
 		[Fact]
 		public void EndpointClassIdsComeFromEndpoints_NotAHandRolledHash()
 		{
@@ -98,7 +98,7 @@ namespace Faolan.Tests
 				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
 				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
 			{
-				if (Path.GetFileName(file) is "Endpoints.cs") // the registry itself
+				if (Path.GetFileName(file) is "RpcInterfaces.cs" or "Endpoints.cs") // the registry, and the forwarding names
 					continue;
 
 				var lines = File.ReadAllLines(file);

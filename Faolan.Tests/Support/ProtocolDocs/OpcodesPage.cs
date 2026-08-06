@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Protocol;
 
@@ -19,43 +20,26 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	{
 		public const string RelativePath = "docs/protocol/gen/opcodes.md";
 
-		// Capture-verified RPC class ids (the dissector's table, resolved across ~109k endpoints).
-		private static readonly (string Class, uint Id)[] ExpectedClassIds =
-		[
-			("UniverseInterface", 0x0C384054), ("GameCharInterfaceProject", 0x28377648), ("TradepostAgent", 0x3D744981), ("GameCharAgentProject", 0x5B9756FC), ("UniverseAgent", 0x604DDBA0),
-			("GameInterface", 0x6C67C147), ("CSPlayerAgent", 0x6DD55614), ("PlayerInterface", 0x7D155738), ("PlayerAgent", 0x82F20484), ("GameCharInterface", 0x8B87F791),
-			("GameCharAgent", 0xA9ECB95D), ("GameAgent", 0xB171CE13), ("CSPlayerInterface", 0xBBD560C8), ("TradepostInterface", 0xF2C2D5B5)
-		];
-
-		// Enum -> the client RPC class whose methods it catalogs. The RpcHeader RECEIVER class picks the table:
-		// c2s receivers are *Agent classes, s2c receivers *Interface classes.
-		private static readonly (string Enum, string Class)[] EnumToClass =
-		[
-			("UniverseAgentMethods", "UniverseAgent"), ("UniverseInterfaceMethods", "UniverseInterface"), ("PlayerAgentMethods", "PlayerAgent"), ("PlayerInterfaceMethods", "PlayerInterface"),
-			("CSPlayerAgentMethods", "CSPlayerAgent"), ("CSPlayerInterfaceMethods", "CSPlayerInterface"), ("GameAgentMethods", "GameAgent"), ("GameInterfaceMethods", "GameInterface"),
-			("GameCharAgentMethods", "GameCharAgent"), ("GameCharInterfaceMethods", "GameCharInterface"), ("GameCharAgentProjectMethods", "GameCharAgentProject"),
-			("GameCharInterfaceProjectMethods", "GameCharInterfaceProject"), ("TradepostAgentMethods", "TradepostAgent"), ("TradepostInterfaceMethods", "TradepostInterface")
-		];
-
+		// The class ids + the enum->class pairing come from `RpcInterfaces`, the one owner of both. This page used to
+		// restate them, which is two copies of a table that only stays in step by hand. What stays HERE is the
+		// ASSERTION - recomputing every id from its class name below - because verifying the table is this
+		// generator's job, and owning it is not.
 		public static uint Bkdr31(string name)
 		{
-			uint h = 0;
-			foreach (var c in name)
-				h = unchecked(h * 31 + c);
-			return h;
+			return RpcInterfaces.Bkdr31(name);
 		}
 
 		public static string Render()
 		{
-			foreach (var (cls, expected) in ExpectedClassIds)
+			foreach (var rpc in RpcInterfaces.All)
 			{
-				var actual = Bkdr31(cls);
-				if (actual != expected)
-					throw new InvalidOperationException($"BKDR-31({cls}) = 0x{actual:X8}, expected 0x{expected:X8}");
+				var actual = Bkdr31(rpc.Name);
+				if (actual != rpc.Type)
+					throw new InvalidOperationException($"BKDR-31({rpc.Name}) = 0x{actual:X8}, expected 0x{rpc.Type:X8}");
 			}
 
-			var classByEnum = EnumToClass.ToDictionary(x => x.Enum, x => x.Class);
-			var idByClass = ExpectedClassIds.ToDictionary(x => x.Class, x => x.Id);
+			var classByEnum = RpcInterfaces.All.ToDictionary(r => r.Methods.Name, r => r.Name);
+			var idByClass = RpcInterfaces.All.ToDictionary(r => r.Name, r => r.Type);
 			var notes = OpcodesSource.AllNotes();
 
 			const string iirEnum = "IirTypes"; // the 32-bit IIR sub-opcodes live on iir-types.md

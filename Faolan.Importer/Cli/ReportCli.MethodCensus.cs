@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -20,29 +21,12 @@ namespace Faolan.Importer.Cli
 	// not an identity (see `WireOpcode`): exact on the fifteen index-registered classes, LOSSY on the hash-registered
 	// PlayerAgent/PlayerInterface pair, where `0x20EC` names two methods at once. Those rows print every candidate
 	// name rather than picking one.
+	//
+	// The (class id, name, method enum) registry is `RpcInterfaces` - shared with the docs generator, because that
+	// pairing had already drifted into two copies and an enum matched to the wrong class silently misnames every
+	// frame on it.
 	public static partial class ReportCli
 	{
-		// Endpoint class -> the method enum registered on it. The client's own pairing: an "Agent" class is the
-		// server object the client calls (c2s) and an "Interface" class is the client object the server dispatches
-		// to (s2c), so the RECEIVER class alone decides which table names a frame.
-		private static readonly (uint Type, string Name, Type Methods)[] MethodTables =
-		[
-			(Endpoints.GameAgentType, "GameAgent", typeof(GameAgentMethods)),
-			(Endpoints.GameInterfaceType, "GameInterface", typeof(GameInterfaceMethods)),
-			(Endpoints.GameCharAgentType, "GameCharAgent", typeof(GameCharAgentMethods)),
-			(Endpoints.GameCharInterfaceType, "GameCharInterface", typeof(GameCharInterfaceMethods)),
-			(Endpoints.GameCharAgentProjectType, "GameCharAgentProject", typeof(GameCharAgentProjectMethods)),
-			(Endpoints.GameCharInterfaceProjectType, "GameCharInterfaceProject", typeof(GameCharInterfaceProjectMethods)),
-			(Endpoints.CSPlayerAgentType, "CSPlayerAgent", typeof(CSPlayerAgentMethods)),
-			(Endpoints.CSPlayerInterfaceType, "CSPlayerInterface", typeof(CSPlayerInterfaceMethods)),
-			(Endpoints.PlayerAgentType, "PlayerAgent", typeof(PlayerAgentMethods)),
-			(Endpoints.PlayerInterfaceType, "PlayerInterface", typeof(PlayerInterfaceMethods)),
-			(Endpoints.UniverseAgentType, "UniverseAgent", typeof(UniverseAgentMethods)),
-			(Endpoints.UniverseInterfaceType, "UniverseInterface", typeof(UniverseInterfaceMethods)),
-			(Endpoints.TradepostAgentType, "TradepostAgent", typeof(TradepostAgentMethods)),
-			(Endpoints.TradepostInterfaceType, "TradepostInterface", typeof(TradepostInterfaceMethods))
-		];
-
 		private static void MethodCensus(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
 			var seen = new Dictionary<(uint Receiver, uint Wire, bool Download), (int Count, HashSet<string> Captures, int Bytes)>();
@@ -82,16 +66,16 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"methods matching \"{filter}\" with NO frame in the corpus:");
 			var present = seen.Keys.Select(k => (k.Receiver, k.Wire)).ToHashSet();
 			var absent = 0;
-			foreach (var (type, name, methods) in MethodTables)
-				foreach (var member in Enum.GetValues(methods).Cast<Enum>())
+			foreach (var table in RpcInterfaces.All)
+				foreach (var member in table.Members)
 				{
 					if (!member.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase))
 						continue;
-					if (present.Contains((type, WireOpcode.Of(member))))
+					if (present.Contains((table.Type, WireOpcode.Of(member))))
 						continue;
 
 					absent++;
-					Console.WriteLine($"  {name}.{member} (0x{Convert.ToUInt32(member):X2}, wire 0x{WireOpcode.Of(member):X4})");
+					Console.WriteLine($"  {table.Name}.{member} (0x{Convert.ToUInt32(member):X2}, wire 0x{WireOpcode.Of(member):X4})");
 				}
 
 			if (absent == 0)
@@ -100,18 +84,17 @@ namespace Faolan.Importer.Cli
 
 		private static string ClassName(uint receiver)
 		{
-			return MethodTables.FirstOrDefault(t => t.Type == receiver) is { Name: { } name } ? name : $"0x{receiver:X8}";
+			return RpcInterfaces.ByType(receiver)?.Name ?? $"0x{receiver:X8}";
 		}
 
 		// Every method on the receiver's table whose wire rendering matches. More than one is the hash-registered
 		// pair's ambiguity, not an error, so all of them are printed.
 		private static List<string> NamesFor(uint receiver, uint wire)
 		{
-			var table = MethodTables.FirstOrDefault(t => t.Type == receiver);
-			if (table.Methods == null)
+			if (RpcInterfaces.ByType(receiver) is not { } table)
 				return [$"?0x{wire:X4}"];
 
-			var names = Enum.GetValues(table.Methods).Cast<Enum>().Where(m => WireOpcode.Of(m) == wire).Select(m => m.ToString()).ToList();
+			var names = table.Members.Where(m => WireOpcode.Of(m) == wire).Select(m => m.ToString()).ToList();
 			return names.Count > 0 ? names : [$"?0x{wire:X4}"];
 		}
 	}
