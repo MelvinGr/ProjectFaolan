@@ -19,5 +19,9 @@ namespace Faolan.GameServer.World
 		// Apply a spell to the player as a self-buff (the fall debuff, the hazard's own effect spell). Takes the WIRE
 		// id ((base << 8) | rank) like every other ApplySpell path.
 		Task ApplySelfBuff(INetworkClient client, uint wireSpellId);
+
+		// Unseat the player (#681). The listener's ONE dismount path, because retail ends every dismount with the same
+		// two records whatever caused it - so a no-mount volume reuses it rather than inventing a third.
+		Task SendDismount(INetworkClient client);
 	}
 }

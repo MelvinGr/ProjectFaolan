@@ -96,6 +96,19 @@ namespace Faolan.Core.Database.Tables
 		// the table and a disagreement would be the loudest thing either could say. Nothing disagrees.
 		public AreaBannerSource? AreaNameSource { get; set; }
 
+		// Whether riding is forbidden here (#681): a player who crosses in mounted is UNSEATED, and one inside cannot
+		// mount. The client's own names for these are `HeavensLake_DismountArea`, `BA_NoMount_Fengdu`,
+		// `No_mount_shaulun` - settlements and palaces, the places retail makes you walk.
+		//
+		// A FLAG rather than a MapHazard-style side table, and the difference is the point of that split: a hazard has
+		// parameters to carry (which spell, how much damage, whether it kills) so it needs a row of its own, while a
+		// no-mount volume has none at all - the behaviour is fully described by "here". A 1:1 table holding one
+		// boolean would be a join to learn nothing.
+		//
+		// ⚠️ `Map.PlayfieldFlags` gates mounting per PLAYFIELD; this is the sub-playfield version, so a city inside a
+		// mountable zone stops being rideable. The two are independent and both apply.
+		public bool NoMount { get; set; }
+
 		// What this region DOES to a player who enters it, where that is a hazard (#504/#679) - null for the ordinary
 		// case, which is every region imported for a discovery volume, a quest goal or an area banner. Behaviour is a
 		// 1:1 side table rather than columns here so that importing a volume's geometry never implies it hurts

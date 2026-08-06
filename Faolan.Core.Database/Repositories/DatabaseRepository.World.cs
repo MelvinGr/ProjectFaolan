@@ -14,6 +14,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map?> GetMap(uint id);
 		Task<MapRegion[]> GetAreaBannerRegions(uint mapId);
 		Task<MapHazard[]> GetMapHazards(uint mapId);
+		Task<MapRegion[]> GetNoMountRegions(uint mapId);
 		Task<TravelDestination[]> GetTravelDestinationsFrom(uint fromNodeId);
 		Task<TravelDestination?> GetTravelDestination(uint fromNodeId, uint optionId);
 		Task<TravelDestination[]> GetTravelDestinationsByNpcName(string npcName);
@@ -106,6 +107,17 @@ namespace Faolan.Core.Database.Repositories
 				.MapHazards.Where(h => h.Region.MapId == mapId)
 				.Include(h => h.Region)
 				.ThenInclude(r => r.Vertices)
+				.ToArrayAsync();
+		}
+
+		// The volumes a playfield forbids riding in (#681). Boundary polygon included for the same reason as every
+		// other consumer: containment is a point-in-polygon walk, and lazy loading is off.
+		public async Task<MapRegion[]> GetNoMountRegions(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.MapRegions.Where(r => r.MapId == mapId && r.NoMount)
+				.Include(r => r.Vertices)
 				.ToArrayAsync();
 		}
 

@@ -1989,6 +1989,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("NoMount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("ScryId")
                         .HasColumnType("INTEGER");
 

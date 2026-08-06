@@ -31,6 +31,7 @@ namespace Faolan.GameServer.World
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly ConcurrentDictionary<uint, MapHazard[]> _mapHazards = new();
+		private readonly ConcurrentDictionary<uint, MapRegion[]> _noMountRegions = new();
 		private readonly IEnvironmentOutbound _output;
 
 		public EnvironmentService(IDatabaseRepository database, IEnvironmentOutbound output, ILogger logger)
@@ -46,6 +47,38 @@ namespace Faolan.GameServer.World
 		{
 			await TrackFall(client, entity, position, flags);
 			await CheckHazards(client, entity, position);
+			await CheckNoMount(client, entity, position);
+		}
+
+		// No-mount volumes (#681): riding into a settlement unseats you. Same shape as a hazard - an edge on the
+		// player's own position stream - and it reaches the wire through the SAME dismount the button press uses,
+		// because retail ends every dismount with one record pair whatever caused it.
+		//
+		// No latch, unlike CurrentHazardId: there is nothing to re-fire. Once unseated the player is not mounted, so
+		// the test costs a bool until they mount again - and a player who mounts up INSIDE the volume is unseated on
+		// their next move, which is the behaviour we want anyway and is why this is not gated on the crossing.
+		private async Task CheckNoMount(INetworkClient client, WorldEntity entity, Vector3 position)
+		{
+			if (!entity.IsMounted)
+				return;
+
+			var regions = await GetNoMountRegionsCached(entity.MapId);
+			var inside = regions.FirstOrDefault(r => Contains(r, position));
+			if (inside == null)
+				return;
+
+			await _output.SendDismount(client);
+			_logger.LogInformation("Environment: {Player} was unseated by no-mount volume '{Region}' on map {Map}.", client.Session.Character?.Name, inside.Name, entity.MapId);
+		}
+
+		private async Task<MapRegion[]> GetNoMountRegionsCached(uint mapId)
+		{
+			if (_noMountRegions.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var regions = await _database.GetNoMountRegions(mapId);
+			_noMountRegions[mapId] = regions;
+			return regions;
 		}
 
 		// Fall detection. The client already tells us whether it is off the ground: flag1 CLEARS NoAccelerationVector

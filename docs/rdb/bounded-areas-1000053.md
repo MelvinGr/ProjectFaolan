@@ -608,6 +608,17 @@ nothing reads stays out.
 
 - **140 area banners** (#513/#348/#679/#680) → `MapRegion.AreaNameId`, by the name join and the id blocks above,
   with geometry as the fallback for the banners whose region carries an internal name.
+- **14 no-mount volumes** (#681) → `MapRegion.NoMount`, the settlements and palaces retail makes you walk
+  (`HeavensLake_DismountArea`, `BA_NoMount_Fengdu`, `No_mount_shaulun`). The one other family whose behaviour is
+  not a guess: `SendDismount` is capture-decoded and is the single path retail ends every dismount through, so all
+  that was missing was which ground. A FLAG rather than a side table because the behaviour has no parameters —
+  contrast `MapHazard`, which has three. `Map.PlayfieldFlags` gates riding per playfield; this is the
+  sub-playfield version, and the two are independent.
+  ⚠️ Taken at ANY scryid, unlike lava: 4 of the 14 run the crossing notifier (220656), which is evidence FOR the
+  family, and there is no such thing as an ambient audio twin of a no-mount area.
+  ⚠️ `_` is a WORD character, so a `\bno.?mount` anchor matches neither `BA_NoMount_Fengdu` nor
+  `No_mount_shaulun` — it takes 11 of the 14 and drops all of Kara Korum's, silently. The rule anchors on
+  `(?<![a-z])` instead. [V3: MapRegionGeometryTests.TheNoMountVolumes_AreTheOnesTheClientNames]
 - **105 lava hazards** (#504) → a `MapHazard` row *on the region*, over 22 playfields, from Tortage Volcano and the
   Acheronian Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.
   ⚠️ Only the GEOMETRY comes from the client. What a hazard does — which spell, how much damage, whether it kills —

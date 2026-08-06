@@ -29,6 +29,13 @@ namespace Faolan.GameServer
 			return SendDismount(client);
 		}
 
+		// Same one path, reached from the other side (#681): a no-mount volume unseats through exactly the record pair
+		// the button press and a thrown rider do.
+		Task IEnvironmentOutbound.SendDismount(INetworkClient client)
+		{
+			return SendDismount(client);
+		}
+
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

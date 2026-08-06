@@ -434,8 +434,8 @@ namespace Faolan.Importer.Modules
 				ctx.Out.WriteLine($"  rdb-regions unresolved: {note}");
 
 			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s), " +
-			                        $"{r.GoalLinks} quest goal region(s) and {r.Hazards} lava hazard(s); {r.Banners} area banner(s) " +
-			                        $"({r.GeometricBanners} matched geometrically, {r.DroppedBanners} captured banner(s) dropped).");
+			                        $"{r.GoalLinks} quest goal region(s), {r.Hazards} lava hazard(s) and {r.NoMount} no-mount volume(s); " +
+			                        $"{r.Banners} area banner(s) ({r.GeometricBanners} matched geometrically, {r.DroppedBanners} captured banner(s) dropped).");
 		}
 	}
 

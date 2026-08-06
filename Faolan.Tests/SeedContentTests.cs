@@ -179,15 +179,20 @@ namespace Faolan.Tests
 			var goals = await db.QuestGoalDefinitions.CountAsync(g => g.RegionId != null, ct);
 			var banners = await db.MapRegions.CountAsync(r => r.AreaNameId != null, ct);
 			var hazards = await db.MapHazards.CountAsync(ct);
+			var noMount = await db.MapRegions.CountAsync(r => r.NoMount, ct);
 			Assert.True(discovery >= 11, $"{discovery} respawn points carry a discovery volume; the import resolves 11.");
 			Assert.True(goals >= 3, $"{goals} quest goals carry a region; the import resolves 3.");
 			Assert.True(banners >= 140, $"{banners} volumes carry an area banner; the import resolves 140+ (#513/#679/#680).");
 			Assert.True(hazards >= 100, $"{hazards} hazard volumes carry behaviour; the lava import resolves 100+ (#504).");
+			Assert.True(noMount == 14, $"{noMount} volumes forbid riding; the client ships 14 (#681).");
 
 			var linked = (await db.RespawnPoints.Where(p => p.DiscoveryRegionId != null).Select(p => p.DiscoveryRegionId!.Value).ToListAsync(ct))
 				.Concat(await db.QuestGoalDefinitions.Where(g => g.RegionId != null).Select(g => g.RegionId!.Value).ToListAsync(ct))
 				.Concat(await db.MapRegions.Where(r => r.AreaNameId != null).Select(r => r.Id).ToListAsync(ct))
 				.Concat(await db.MapHazards.Select(h => h.RegionId).ToListAsync(ct))
+				// A no-mount volume is consumed by its own flag - there is no other table to point from, because the
+				// behaviour has no parameters to put in one.
+				.Concat(await db.MapRegions.Where(r => r.NoMount).Select(r => r.Id).ToListAsync(ct))
 				.ToHashSet();
 			var orphans = regions.Where(r => !linked.Contains(r.Id)).Select(r => $"{r.MapId}/{r.Name}").ToList();
 			Assert.True(orphans.Count == 0, $"MapRegions nothing links to: {string.Join(", ", orphans)}");

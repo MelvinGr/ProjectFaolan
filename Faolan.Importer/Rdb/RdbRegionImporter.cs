@@ -66,6 +66,16 @@ namespace Faolan.Importer.Rdb
 		// kill. Lethal rather than a damage number because retail sends NO StatDamage at all for that death.
 		private const uint IncinerationSpellId = 3773837;
 
+		// The no-mount volumes (#681). The client spells the family three ways and every one of them says the same
+		// thing - `HeavensLake_DismountArea`, `BA_NoMount_Fengdu`, `No_mount_shaulun` - so this is a naming test whose
+		// vocabulary is closed, not a guess at a purpose. Anchored so a bare `mount` inside a word cannot match, since
+		// half the world's regions mention mountains.
+		//
+		// ⚠️ The anchor is `(?<![a-z])`, NOT `\b`: `_` is a WORD character, so `\bnomount` does not match
+		// `BA_NoMount_Fengdu` - it silently found 11 of the 14 volumes and dropped all three of Kara Korum's. This is
+		// the exact trap BoundedAreaClassifier's resurrection rule already carries a comment about.
+		private static readonly Regex NoMountName = new(@"dismount|(?<![a-z])no.?mount", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBaseUrl, IReadOnlyList<CapturedBanner> captured)
 		{
 			// The CDN base matters: 274 of the 478 bounded-area records are on-demand (not in the local .rdbdata
@@ -114,6 +124,7 @@ namespace Faolan.Importer.Rdb
 				captured, placedIds, areasByMap, wanted, notes);
 
 			var hazards = MatchLavaVolumes(areasByMap, wanted, notes);
+			var noMount = MatchNoMountVolumes(areasByMap, wanted);
 
 			// ---- Rebuild the region rows ----
 			// Clear the FKs first: both are SetNull, but EF will not reorder the delete for us, and a stale link to a
@@ -194,6 +205,9 @@ namespace Faolan.Importer.Rdb
 			foreach (var b in dropped)
 				notes.Add($"captured banner {b.AreaNameId} on map {b.MapId}: no client volume on that playfield is named after it and its sample separates it from none - DROPPED, the wire saw it but nothing can say where");
 
+			foreach (var key in noMount)
+				regionsById[MapRegion.ComputeId(key.Map, key.Name)].NoMount = true;
+
 			// ---- The hazard BEHAVIOUR side table (#504/#679) ----
 			// Written after the regions exist, because it is keyed by the region's own id: what a volume does is ours
 			// to say, where it is belongs to the client.
@@ -210,7 +224,7 @@ namespace Faolan.Importer.Rdb
 
 			await db.SaveChangesAsync();
 			return new Result(wanted.Count, vertices, discoveryFor.Count, regionFor.Count, byName.Count + byGeometry.Count,
-				byGeometry.Count, dropped.Count, recovered, hazards.Count, notes);
+				byGeometry.Count, dropped.Count, recovered, hazards.Count, noMount.Count, notes);
 		}
 
 		// Every parseable 1000053 record for a playfield we host, as map -> the regions with a testable footprint. A
@@ -298,6 +312,29 @@ namespace Faolan.Importer.Rdb
 					wanted[(mapId, area.Name)] = area;
 					matched.Add((mapId, area.Name));
 				}
+			}
+
+			return matched;
+		}
+
+		// The volumes riding is forbidden in (#681). No behaviour to decide - a no-mount volume has no parameters, so
+		// unlike the lava there is nothing here that could be guessed wrong; the only question is whether the name
+		// means what it says, and this family's vocabulary is closed.
+		//
+		// ⚠️ Taken at ANY scryid, unlike lava. Four of the fourteen run the crossing NOTIFIER (220656) - the client
+		// telling the server the player entered - which is evidence FOR the family rather than against it, and the
+		// other ten run nothing at all. A hazard's `scryid != 0` test excludes ambient audio TWINS of a damage volume;
+		// there is no such thing as an ambient twin of a no-mount area.
+		private static List<(uint Map, string Name)> MatchNoMountVolumes(
+			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
+			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted)
+		{
+			var matched = new List<(uint, string)>();
+			foreach (var (mapId, areas) in areasByMap.OrderBy(kv => kv.Key))
+			foreach (var area in areas.Where(a => NoMountName.IsMatch(a.Name)))
+			{
+				wanted[(mapId, area.Name)] = area;
+				matched.Add((mapId, area.Name));
 			}
 
 			return matched;
@@ -513,6 +550,7 @@ namespace Faolan.Importer.Rdb
 			int DroppedBanners,
 			AreaBannerNames.Recovery Recovered,
 			int Hazards,
+			int NoMount,
 			IReadOnlyList<string> Notes);
 	}
 }

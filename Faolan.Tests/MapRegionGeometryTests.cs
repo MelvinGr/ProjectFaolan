@@ -157,6 +157,39 @@ namespace Faolan.Tests
 				source => Assert.True(banners.Any(r => r.AreaNameSource == source), $"no banner resolved by {source}"));
 		}
 
+		// The NO-MOUNT volumes (#681). Behaviour with no parameters, so what there is to gate is that the family is
+		// there, that it is the family the client names, and that every volume is testable - a degenerate one would
+		// silently never unseat anybody.
+		[Fact]
+		public async Task TheNoMountVolumes_AreTheOnesTheClientNames()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var noMount = await db.MapRegions.Include(r => r.Vertices).Where(r => r.NoMount).ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.Equal(14, noMount.Count);
+			Assert.Equal([6100u, 6200u, 6300u, 6400u], noMount.Select(r => r.MapId).Distinct().Order().ToArray());
+
+			// ⚠️ Kara Korum's three are the reason this asserts the COUNT. The client spells them `BA_NoMount_Fengdu`,
+			// and `_` is a word character - so a `\bno.?mount` anchor matches neither them nor `No_mount_shaulun`, and
+			// the import silently took 11 of the 14 with every other gate still green.
+			Assert.Equal(3, noMount.Count(r => r.MapId == 6200));
+			Assert.All(noMount, r => Assert.True(r.Vertices.Count >= 3, $"'{r.Name}' has no testable footprint"));
+			Assert.All(noMount, r => Assert.True(r.MaxY > r.MinY, $"'{r.Name}' has an empty height range"));
+		}
+
+		// A no-mount volume is a real area you ride INTO, not a doorway: the smallest is 25 x 8 and the largest
+		// 373 x 306. Worth pinning because the runtime tests it on every move of every mounted player - if a harvest
+		// ever produced pin-sized ones, riders would cross them between position samples and never be unseated.
+		[Fact]
+		public async Task ANoMountVolume_IsBigEnoughToRideInto()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var noMount = await db.MapRegions.Where(r => r.NoMount).ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.All(noMount, r => Assert.True((r.MaxX - r.MinX) * (r.MaxZ - r.MinZ) >= 100f,
+				$"'{r.Name}' on map {r.MapId} is {r.MaxX - r.MinX:F0} x {r.MaxZ - r.MinZ:F0} - too small to catch a rider between moves"));
+		}
+
 		// Old Tarantia is the map where the answer can be read by eye, so it is worth pinning by name. Four of these
 		// were matched GEOMETRICALLY, from a hull over captured walk positions, before the client's own names could
 		// be recovered at all - and the two routes agree on `BA_TradingPost` and both gates, which is the check
