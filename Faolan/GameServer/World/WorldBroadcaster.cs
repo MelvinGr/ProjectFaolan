@@ -1793,7 +1793,7 @@ namespace Faolan.GameServer.World
 			// that could drop a bag.
 			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
-				var goal = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				var goal = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
 				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
 					continue;
 
@@ -1842,7 +1842,7 @@ namespace Faolan.GameServer.World
 			var quests = await _database.GetCharacterQuests(character.Id);
 			foreach (var (_, qDef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				var qGoal = qDef.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				var qGoal = QuestProgress.InPlayOrder(qDef.Goals).FirstOrDefault();
 				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(qGoal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
 					return QuestMarkerTurnIn;
 			}

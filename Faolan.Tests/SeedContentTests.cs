@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Microsoft.EntityFrameworkCore;
@@ -826,6 +827,72 @@ namespace Faolan.Tests
 			var mountAbilities = byName.Where(x => x.Name.StartsWith(Ability.MountAbilityNamePrefix, StringComparison.Ordinal)).Select(x => x.Name).Distinct().ToList();
 			Assert.True(mountAbilities.Count == 0,
 				$"mount abilities are in ClassAbility ({string.Join(", ", mountAbilities)}) - they hang off owning a mount, not off a class, and CharacterLoadout grants them from the character's mount summon spells.");
+		}
+
+		// A multi-goal quest's play ORDER is the client's `Phase`. `Sequence` is a WIRE value and must never be
+		// renumbered to serve as one - see QuestGoalDefinition.Sequence, and QuestProgress.InPlayOrder, which is the
+		// only way the runtime is allowed to ask.
+		//
+		// This gate is on the shipped DATA, not the code: it pins the five quests whose goals all carry `N` = 1
+		// because their objectives are PARALLEL. They are what caught the mistake - renumbering them 1..n to make
+		// them sortable rewrote bytes retail sent, and the objective-region golden test failed immediately.
+		[Fact]
+		public async Task ParallelGoalQuests_KeepTheirCapturedOrdinal()
+		{
+			var ct = TestContext.Current.CancellationToken;
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+
+			foreach (var questId in new uint[] { 14020, 16004, 16183, 16888, 17350 })
+			{
+				var seqs = await db.QuestGoalDefinitions.AsNoTracking().Where(g => g.QuestDefinitionId == questId).Select(g => g.Sequence).ToListAsync(ct);
+				Assert.True(seqs.Count > 1, $"quest {questId} should be multi-goal");
+				Assert.True(seqs.TrueForAll(n => n == 1),
+					$"quest {questId}'s goals carry ordinals [{string.Join(",", seqs)}] - retail numbers every goal of a PARALLEL quest 1, and rewriting them breaks the captured objective region.");
+			}
+		}
+
+		// No goal may stay `Partial` (#527). A partial goal is skipped by AllGoalsComplete, MatchingKillGoal and
+		// QuestObjectiveRegion.Build, so a multi-goal quest carrying one silently presents - and completes - as a
+		// quest with fewer goals than it has. Both of the two that existed are now whole, so the shipped count is
+		// zero and any new one has to be resolved rather than accumulating.
+		[Fact]
+		public async Task NoQuestGoal_IsStillPartial()
+		{
+			var ct = TestContext.Current.CancellationToken;
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var partial = await db.QuestGoalDefinitions.AsNoTracking().Where(g => g.Partial).Select(g => new { g.QuestDefinitionId, g.GoalId, g.Name }).ToListAsync(ct);
+
+			Assert.True(partial.Count == 0,
+				$"partial goals remain: {string.Join(", ", partial.Select(p => $"{p.QuestDefinitionId}/{p.GoalId} '{p.Name}'"))} - each is invisible to the progression engine.");
+		}
+
+		// The Acheronian Gate (12369), the quest the two above were found through - and the ONE shipped quest where
+		// `Phase` and `Sequence` disagree, so it is also the gate on InPlayOrder actually being used. Its goals had
+		// been wired to each
+		// OTHER's objective: 3492 "Unlock the Acheronian gate" carried the key loot and 7134 "Find the gate key" was
+		// left inert. The marker is what misled the original seed - Saddur spawns at 521/757 and the world object
+		// "Acheronian Gate" stands at 523.4/754.7, ~3u apart - so the goal's own NAME is what settles which is which.
+		[Fact]
+		public async Task TheAcheronianGate_HasItsTwoGoalsTheRightWayRound()
+		{
+			var ct = TestContext.Current.CancellationToken;
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var goals = await db.QuestGoalDefinitions.AsNoTracking().Where(g => g.QuestDefinitionId == 12369).ToListAsync(ct);
+			goals = QuestProgress.InPlayOrder(goals).ToList();
+
+			Assert.Equal(2, goals.Count);
+
+			// Find the gate key FIRST - it is the goal the corpus shows taking the `Advanced` hand-off.
+			Assert.Equal(7134u, goals[0].GoalId);
+			Assert.Equal(QuestGoalType.LootFromNpc, goals[0].GoalType);
+			Assert.Equal("Saddur", goals[0].TargetName);
+			Assert.Equal(193186u, goals[0].QuestItemId); // "Acheronian Gate Key"
+
+			// Then unlock the gate. ReachArea at its own marker, which is where the gate object stands.
+			Assert.Equal(3492u, goals[1].GoalId);
+			Assert.Equal(QuestGoalType.ReachArea, goals[1].GoalType);
+			Assert.Null(goals[1].TargetName);
+			Assert.True(goals[1].MarkerX > 0 && goals[1].MarkerY > 0, "a ReachArea goal with no marker can never be completed");
 		}
 	}
 }

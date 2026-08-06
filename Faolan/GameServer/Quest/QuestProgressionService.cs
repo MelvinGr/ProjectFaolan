@@ -76,7 +76,7 @@ namespace Faolan.GameServer.Quest
 			// TargetName - server-side, sourced per quest since it's not on the wire). With both set, AdvanceKillGoals
 			// matches a kill of that NPC and advances/completes the quest (e.g. Casilda's 13479 = kill 1 "Scavenger
 			// Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
-			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var firstGoal = def == null ? null : QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
 			var goalRequired = firstGoal is { RequiredCount: > 0 }
 				? firstGoal.RequiredCount
 				: 0u;
@@ -427,7 +427,7 @@ namespace Faolan.GameServer.Quest
 		// a fresh short-lived context). All other goals are read from their store (primary scalar / secondary rows).
 		private async Task<bool> AllGoalsComplete(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition justTicked, uint justProgress)
 		{
-			var primary = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var primary = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
 			var rows = await _database.GetCharacterQuestGoals(characterId, quest.QuestId);
 			return QuestProgress.AllGoalsComplete(def.Goals, g =>
 			{
@@ -452,7 +452,7 @@ namespace Faolan.GameServer.Quest
 			// Reached only via CompleteObjective's `NextQuestId is not null` guard, so the successor id is present.
 			var nextQuestId = def.NextQuestId!.Value;
 			var nextDef = await _database.GetQuestDefinition(nextQuestId);
-			var nextGoal = nextDef?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var nextGoal = nextDef == null ? null : QuestProgress.InPlayOrder(nextDef.Goals).FirstOrDefault();
 			await _database.SetCharacterQuest(character.Id, nextQuestId, QuestState.Active, 0, nextGoal?.RequiredCount ?? 0, nextGoal?.TargetName);
 			if (nextDef != null)
 				await _outbound.SendQuestFullUpdate(client, nextDef);
@@ -589,7 +589,7 @@ namespace Faolan.GameServer.Quest
 
 		private static bool IsPrimaryGoal(QuestDefinition def, QuestGoalDefinition goal)
 		{
-			var primary = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var primary = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
 			return primary != null && primary.GoalId == goal.GoalId;
 		}
 	}

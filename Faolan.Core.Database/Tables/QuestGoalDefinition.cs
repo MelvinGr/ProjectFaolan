@@ -35,6 +35,12 @@ namespace Faolan.Core.Database.Tables
 		// The goal's phase within its quest - `QuestGoal.phase`, populated on every catalog row. 1-based, and it is
 		// the catalog's ordering of a quest's goals (the beach starter's "Enter the jungle" is phase 1 and "Kill
 		// slavemaster Saddur" phase 2). 0 for a goal the catalog omits.
+		//
+		// ⚠️ THIS is the play order, not `Sequence` (#527) - see `QuestProgress.InPlayOrder`, which is how the runtime
+		// must ask for it. The two disagree on exactly one shipped quest, 12369 "The Acheronian Gate", and the corpus
+		// backs the phase: retail's `Advanced` hand-off is only sent on a goal that has a SUCCESSOR, and g7134 "Find
+		// the gate key" (phase 1, `Sequence` 2) is the one that takes it. It is also the field that orders the 7,147
+		// goals which come from the catalog and were never on the wire, so carry no `Sequence` at all.
 		public uint Phase { get; set; }
 
 		// The map the goal's objective/marker sits on (all goal maps are in the Maps catalog).
@@ -215,7 +221,16 @@ namespace Faolan.Core.Database.Tables
 		// captured" would resurrect exactly the ambiguity that bug had. `SeedContentTests
 		// .NoGoalCarriesTheUnharvestedKindZero` still fails on a literal 0, so a real harvest miss is still caught.
 		public uint? Separator { get; set; }
-		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
+		// The per-goal ordinal `N` the wire carries (1, 2, ...) - a CAPTURED VALUE, written straight back out by
+		// QuestObjectiveRegions and byte-exact verified.
+		//
+		// ⚠️ It is NOT the play order, and using it as one is a live trap (#527). Five shipped quests carry `N` = 1 on
+		// EVERY goal - 14020, 16004, 16183, 16888, 17350 - because their objectives are PARALLEL ("collect all seven
+		// faction documents", "kill all three", "use all five stones on the standing stone") and retail has no order
+		// to state. Renumbering them 1..n to make them sortable rewrites bytes retail sent, and
+		// `CompletedQuestJournalGenerationTests` fails on it at once. The play order is `Phase`; ask for it through
+		// `QuestProgress.InPlayOrder`.
+		public uint Sequence { get; set; }
 		public uint TrailingCategory { get; set; }
 
 		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158

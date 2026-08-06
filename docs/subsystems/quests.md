@@ -194,6 +194,26 @@ completing on something a player cannot do without going there. `Craft`, `Use` a
 trigger: `DestroyObject`'s nine goals sit on maps 3034/3044/3045/6130, for which we hold **no world objects at
 all**, so it is blocked on coverage rather than on the trigger.
 
+### Goal ORDER is `Phase`, not `Sequence`
+
+⚠️ A goal row carries two numbers that both look like an index, and only one of them orders anything.
+
+- **`Sequence` is a WIRE value** — the goal's ordinal `N`, written straight back out by `QuestObjectiveRegions`
+  and byte-exact verified against captures. Five shipped quests carry `N` = **1 on every goal** (14020, 16004,
+  16183, 16888, 17350) because their objectives are **parallel** — *"collect all seven faction documents"*,
+  *"kill all three"*, *"use all five stones on the standing stone"* — and retail has no order to state.
+  Renumbering them 1..n to make them sortable rewrites bytes retail sent;
+  `CompletedQuestJournalGenerationTests` fails on it immediately, and
+  `SeedContentTests.ParallelGoalQuests_KeepTheirCapturedOrdinal` pins the five so it cannot be tried again.
+- **`Phase` is the play order** — `QuestGoal.phase` from the client's own quest catalog (RDB 1000104). It is also
+  the *only* order available for the **7,147 of 7,317** goals that came from that catalog and were never on the
+  wire, so carry no `Sequence` at all.
+
+The corpus settles which is which: retail's `Advanced` hand-off is sent only on a goal that has a **successor**,
+and in every captured multi-goal quest the goal that takes it is the lower **phase**. They disagree on exactly
+one shipped quest — 12369 "The Acheronian Gate", where g7134 is phase 1 but `Sequence` 2 — and it is g7134 that
+takes the `Advanced`. `QuestProgress.InPlayOrder` is how the runtime asks; nothing else may sort goals.
+
 ### Goals recovered from a second full-update record, and what makes one PARTIAL
 
 `QuestGoalDefinition.Partial` marks a goal recovered from the second 50304 record of its `QuestFullUpdate` -
@@ -209,12 +229,23 @@ One is now typed:
   to/with. Over all 7,317 catalog goals exactly THREE objectives begin with "Ask", so the shape is unambiguous;
   the goal is now `TalkToNpc` on **Tina** (NpcTemplate 2805, who has captured dialogue), count 1, and the quest
   presents with both of its objectives.
-- **12369 g7134 "Find the gate key"** — still partial. It is a `Collect` (kind 23) with no typed reference, so
-  what it needs is the ITEM id, and no mechanical rule supplies one. ⚠️ Circumstantially it is almost certainly
-  **`Acheronian Gate Key` (item 193186)**: it is the only item in the catalog whose name contains "gate key",
-  and the sibling goal on the same quest is "Unlock the Acheronian gate". That is a one-quest inference, not a
-  rule, and it is deliberately NOT seeded — a wrong quest item makes a quest silently un-completable, which is
-  worse than an objective that does not render. Tracked on Gitea #527.
+- **12369 g7134 "Find the gate key"** — now typed, and the fix turned out to be a *swap* rather than a new
+  inference. The key **is** `Acheronian Gate Key` (item 193186), and the seed already knew that — it had simply
+  hung it on the **wrong goal**. `SeedShipwreckedCityChain` wired g3492 as `LootFromNpc "Saddur"` for 193186 and
+  dismissed g7134 as *"retail's 2nd goal 'unlock the gate' wasn't imported"*, but the imported names say the
+  opposite: **3492 IS "Unlock the Acheronian gate" and 7134 IS "Find the gate key"**.
+
+  What misled it is the marker. It read 3492's `(524, 755)` as Saddur's spot — Saddur spawns at `(521, 757)` —
+  but the world object **"Acheronian Gate" (975369919) stands at `(523.4, 754.7)`, ~3 u away**, so the marker
+  cannot separate them and the goal's own NAME is what settles it. (g7134's marker `(574, 944)` lands on
+  "Acheronian Chest" `(573.6, 946.7)`, the key's other end.) So:
+
+  - **g7134** = `LootFromNpc` **Saddur** → 193186, count 1 — the objective the capture actually records
+    (Saddur dies fr11942 → corpse bag fr11947 → key added fr12023).
+  - **g3492** = `ReachArea` at its own marker, where the gate object stands — the same pattern as stage III's
+    g3498, and the closest trigger we have until a use-the-object goal type exists.
+
+  No goal is `Partial` any more, which `SeedContentTests.NoQuestGoal_IsStillPartial` now keeps true.
 
 *Sources:* `xxx_mage-necromancer_login_play2_tortage_city_first-quests` fr4247/4815/4872/5488,
 `Hoxxling_mage-heraldofxotli_login_gameplay2` fr4310/4367/4447/5102 and `…_login_gameplay` fr3633/3634/11942,

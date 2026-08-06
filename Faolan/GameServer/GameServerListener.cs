@@ -625,7 +625,7 @@ namespace Faolan.GameServer
 				// split QuestProgressionService.IsPrimaryGoal applies, and it has to agree with it or a quest's two
 				// goals would read each other's counters.
 				return definitions.TryGetValue(goal.QuestDefinitionId, out var d)
-				       && d.Goals.OrderBy(g => g.Sequence).FirstOrDefault()?.GoalId == goal.GoalId
+				       && QuestProgress.InPlayOrder(d.Goals).FirstOrDefault()?.GoalId == goal.GoalId
 				       && primaryProgress.TryGetValue(goal.QuestDefinitionId, out var pp)
 					? pp
 					: 0;

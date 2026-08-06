@@ -2193,14 +2193,30 @@ namespace Faolan.Importer.Captures
 		// later"). Idempotent.
 		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
 		{
-			// II "The Acheronian Gate" -> III "The City of Tortage". II's key objective is LOOTING the Acheronian Gate
+			// II "The Acheronian Gate" -> III "The City of Tortage". Its key objective is LOOTING the Acheronian Gate
 			// Key (item 193186) from Saddur's corpse bag - the same kill->loot pattern as Casilda's Tuut key: Hoxxling
 			// gameplay fr11942 Saddur dies -> fr11947 his corpse becomes a loot bag -> fr12023 the key is added to the
-			// 0x71 quest container. So goal 3492 = LootFromNpc "Saddur" (its 524/755 marker is Saddur's spot). (Retail's
-			// 2nd goal 7134 "unlock the gate" wasn't imported.) III's goal 3498 = enter the city (ReachArea @4020,
-			// completes on arrival). III is chain-final for now.
+			// 0x71 quest container.
+			//
+			// ⚠️ That objective is goal **7134** ("Find the gate key"), NOT 3492. This seed had the pair the wrong way
+			// round (#527): it put the loot on 3492 and dismissed 7134 as *"retail's 2nd goal 'unlock the gate' wasn't
+			// imported"*, but the imported NAMES say the opposite - 3492 IS "Unlock the Acheronian gate" and 7134 IS
+			// "Find the gate key". The mix-up came from reading 3492's 524/755 marker as Saddur's spot: Saddur spawns
+			// at 521/757, and the world object **"Acheronian Gate" (975369919) stands at 523.4/754.7**, ~3u away - so
+			// the marker is ambiguous between the two and the goal's own name is what settles it. 7134's marker
+			// (574/944) lands on the "Acheronian Chest" (2018094960, at 573.6/946.7), which is the key's other end.
+			//
+			// The ORDER was wrong for the same reason and is fixed in the RDB catalog importer
+			// (ResequenceGoalsByPhase): the client's phase says 7134 is played first, and the corpus agrees - 7134 is
+			// the goal that takes the `Advanced` hand-off, which only a NON-last goal gets.
+			//
+			// 3492 = ReachArea at the gate itself, the same pattern as III's goal 3498 below - the gate object sits on
+			// its marker, and arriving there with the key is what "unlock" amounts to for us until a use-the-object
+			// goal type exists. III's goal 3498 = enter the city (ReachArea @4020). III is chain-final for now.
 			await Chain(db, 12369, 12373);
-			await SeedGoal(db, 12369, 3492, QuestGoalType.LootFromNpc, "Saddur", 193186);
+			await CorrectAcheronianGateGoals(db);
+			await SeedGoal(db, 12369, 7134, QuestGoalType.LootFromNpc, "Saddur", 193186, 1);
+			await SeedGoal(db, 12369, 3492, QuestGoalType.ReachArea);
 			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
 
 			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
@@ -2227,6 +2243,34 @@ namespace Faolan.Importer.Captures
 			// - the robust stand-in until her dialogue is imported. Chain end (Shipwrecked -> "The Awakening I" is a
 			// separate destiny quest, out of scope; Nadini can't grant it without dialogue).
 			await SeedGoal(db, 10915, 1352, QuestGoalType.ReachArea);
+		}
+
+		// ⚠️ CORRECTIVE, and it has to run BEFORE SeedShipwreckedCityChain's bootstrap guard, exactly like the
+		// TypeItemGoalsFromTrailingCategory reset above: goal 3492 was seeded `LootFromNpc "Saddur"` by the older,
+		// swapped version of that seed, and a wired goal is skipped by `IsWired` forever - so the mistyping would
+		// outlive the fix (#527).
+		//
+		// Narrow on purpose: only the exact row the old seed could have produced. A Quest-editor edit or a hand seed
+		// carries something else and is left alone. It also clears 7134's `Partial` flag, which was set when the goal
+		// was known by identity + objective text only - it now carries its kind tag, marker, count and (below) its
+		// trigger, so it is a whole goal and `AllGoalsComplete` must stop skipping it.
+		private static async Task CorrectAcheronianGateGoals(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.QuestDefinitionId == 12369).ToListAsync();
+			var unlock = goals.Find(g => g.GoalId == 3492);
+			if (unlock is { GoalType: QuestGoalType.LootFromNpc, TargetName: "Saddur", QuestItemId: 193186 })
+			{
+				unlock.GoalType = QuestGoalType.Kill; // the un-wired shape IsWired reads as "not wired"
+				unlock.TargetName = null;
+				unlock.QuestItemId = null;
+				Console.WriteLine("Corrected quest 12369: goal 3492 'Unlock the Acheronian gate' was carrying goal 7134's key loot (#527).");
+			}
+
+			var findKey = goals.Find(g => g.GoalId == 7134);
+			if (findKey is { Partial: true })
+				findKey.Partial = false;
+
+			await db.SaveChangesAsync();
 		}
 
 		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.

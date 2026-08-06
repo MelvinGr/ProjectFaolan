@@ -180,5 +180,6 @@ namespace Faolan.Importer.Rdb
 
 			return new Result(linesAdded, placeholderLines, linesNamed, questsAdded, questsNamed, goalsAdded, goalsNamed, rewards.Count, orphaned);
 		}
+
 	}
 }

@@ -20,6 +20,30 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return goals.Where(g => !g.Partial).All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
 		}
 
+		// A quest's goals in the order they are PLAYED (#527) - which is the client's `Phase`, not `Sequence`.
+		//
+		// ⚠️ Those two are not the same field wearing two names, and using `Sequence` for this is the mistake this
+		// method exists to stop. `Sequence` is a WIRE VALUE: it is written out as the goal's `N` in the objective
+		// region (QuestObjectiveRegions), and it is byte-exact verified against captures - which is why five shipped
+		// quests carry `Sequence` = 1 on EVERY goal. Those are parallel objectives ("collect all seven faction
+		// documents", "kill all three"), and retail numbers them all 1 because there is no order to state. Renumbering
+		// them 1..n to make them sortable changes bytes retail sent, and the golden test says so immediately.
+		//
+		// `Phase` is the client's own step number out of the quest catalog (RDB 1000104). It is what orders a
+		// SEQUENTIAL quest, and the corpus corroborates it: retail's `Advanced` hand-off is only sent on a goal that
+		// has a successor, and in every captured multi-goal quest the goal that takes it is the lower phase. Quest
+		// 12369 "The Acheronian Gate" is where the two visibly disagree - g7134 "Find the gate key" is phase 1 and
+		// takes the `Advanced`, while `Sequence` has it second.
+		//
+		// Ties (a parallel quest, every goal one phase) fall back to `Sequence` then `GoalId`, so the order is
+		// deterministic without pretending the goals are ordered.
+		public static IEnumerable<QuestGoalDefinition> InPlayOrder(IEnumerable<QuestGoalDefinition> goals)
+		{
+			return goals == null
+				? []
+				: goals.OrderBy(g => g.Phase).ThenBy(g => g.Sequence).ThenBy(g => g.GoalId);
+		}
+
 		// LDB category 50200 is `item.name`, so a goal whose TrailingCategory is 50200 has an ITEM TEMPLATE ID in its
 		// TrailingRefId (docs/rdb/ldb-string-index.md).
 		public const uint ItemNameCategory = 50200;
@@ -75,7 +99,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return held is { } rank && rank >= Math.Max(1u, goal.RequiredRank ?? 1u);
 		}
 
-		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
+		// The CollectItem goal for `itemId` (#262): the first (in PLAY order - see InPlayOrder) CollectItem goal whose TrailingRefId is that item
 		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
 		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
 		public static QuestGoalDefinition? MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
@@ -83,13 +107,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (goals == null || itemId == 0)
 				return null;
 
-			return goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId).OrderBy(g => g.Sequence).FirstOrDefault();
+			return InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)).FirstOrDefault();
 		}
 
-		// The goal a trigger of `triggerType` against `targetName` advances (#357): the first (lowest-Sequence) goal of
-		// that type naming that target. Multi-goal quests can have several goals; a trigger fires the one it matches, not
-		// always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced target). The Sequence order
-		// makes the choice deterministic when two goals share a type+target (rare).
+		// The goal a trigger of `triggerType` against `targetName` advances (#357): the first (in PLAY order - see
+		// InPlayOrder) goal of that type naming that target. Multi-goal quests can have several goals; a trigger fires
+		// the one it matches, not always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced
+		// target). The play order makes the choice deterministic when two goals share a type+target (rare).
 		// The LootFromNpc goal a looted item advances (#261). BOTH must match: the bag's source NPC (the goal's
 		// TargetName) and the item the player actually RECEIVED (its QuestItemId). Matching the NPC alone made the goal
 		// fire on taking ANY item off that corpse - and on emptying a bag that never held it - so the quest could
@@ -104,8 +128,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (goals == null || string.IsNullOrEmpty(sourceNpcName) || grantedItemId == 0)
 				return null;
 
-			return goals
-				.OrderBy(g => g.Sequence)
+			return InPlayOrder(goals)
 				.FirstOrDefault(g => g.GoalType == QuestGoalType.LootFromNpc && g.QuestItemId == grantedItemId && !string.IsNullOrEmpty(g.TargetName)
 				                     && g.TargetName.Equals(sourceNpcName, StringComparison.OrdinalIgnoreCase));
 		}
