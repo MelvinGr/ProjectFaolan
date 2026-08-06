@@ -218,11 +218,21 @@ namespace Faolan.Tests
 		// template id equals an item id. `TypeItemGoalsFromTrailingCategory` types them, and this stops a re-harvest
 		// reintroducing the inert form: the row count never moves, only the GoalType does.
 		//
-		// ⚠️ `Deliver` (kind 20) is EXCLUDED on purpose and must stay excluded. It hands the item over rather than
-		// acquiring it, and the goal does not carry the recipient - typing it collect would complete the quest the
-		// moment the player picks the item up, skipping the delivery. That is a silent chain bug; inert is at least
-		// visibly stuck. This asserts the exclusion holds, so a future "tidy up the last inert goals" pass has to
-		// deal with the recipient rather than just widening the rule.
+		// ⚠️ The verbs where OBTAINING the item is not DOING the objective are EXCLUDED on purpose and must stay
+		// excluded - `Deliver` hands it over, `Craft` makes it, `Use` uses it on something, `DestroyObject` destroys a
+		// thing that never enters the bag, and `Investigate` is a place you go and look at. Typing any of them collect
+		// completes the quest the moment the item reaches the backpack, skipping the objective: a silent chain bug,
+		// where inert is at least visibly stuck. Both halves of this gate carry the same set, so a future "tidy up the
+		// last inert goals" pass has to answer the verb rather than just widening the rule.
+		//
+		// ⚠️ It is ONE list on both sides for a reason. It used to exclude `Deliver` alone; when #522 widened the
+		// importer's rule to all five, the twenty rows it correctly reset to un-wired all failed the first half here -
+		// the gate asserting the very mistyping the same commit had just removed.
+		private static readonly uint[] NotSatisfiedByArrival =
+		[
+			(uint)QuestGoalKind.Deliver, (uint)QuestGoalKind.Craft, (uint)QuestGoalKind.Use, (uint)QuestGoalKind.DestroyObject, (uint)QuestGoalKind.Investigate
+		];
+
 		[Fact]
 		public async Task ItemGoals_AreTypedByTheirKindTag()
 		{
@@ -232,20 +242,25 @@ namespace Faolan.Tests
 			var inert = await db
 				.QuestGoalDefinitions.Where(g => g.TrailingCategory == 50200 && g.TrailingRefId > 0
 				                                 && g.GoalType == QuestGoalType.Kill
-				                                 && g.Separator != (uint)QuestGoalKind.Deliver)
+				                                 && !NotSatisfiedByArrival.Contains(g.Separator ?? 0))
 				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
 				.ToListAsync(ct);
 
 			Assert.True(inert.Count == 0, $"acquire-kind item goals still typed as Kill: {string.Join(", ", inert)}");
 
-			// ...and the typing actually happened rather than the category vanishing from the harvest.
+			// ...and the typing actually happened rather than the category vanishing from the harvest. 42, not the 62
+			// this asserted before #522: nineteen of that 62 were the mistyped rows above, and the twentieth is
+			// "Investigate the Ancient Gateway", which is a ReachArea rather than a collect.
 			var collect = await db.QuestGoalDefinitions.CountAsync(g => g.TrailingCategory == 50200 && g.GoalType == QuestGoalType.CollectItem, ct);
-			Assert.True(collect >= 60, $"only {collect} item goals are CollectItem; the harvest carries 62.");
+			Assert.True(collect >= 42, $"only {collect} item goals are CollectItem; the harvest carries 42.");
 
-			// The deliver goals are NOT quietly collect-typed.
-			var mistyped = await db.QuestGoalDefinitions.CountAsync(
-				g => g.Separator == (uint)QuestGoalKind.Deliver && g.GoalType == QuestGoalType.CollectItem, ct);
-			Assert.True(mistyped == 0, $"{mistyped} Deliver-kind goals are typed CollectItem - they would complete without the hand-in.");
+			// ...and none of the five is quietly collect-typed.
+			var mistyped = await db
+				.QuestGoalDefinitions.Where(g => NotSatisfiedByArrival.Contains(g.Separator ?? 0) && g.GoalType == QuestGoalType.CollectItem)
+				.Select(g => $"goal {g.GoalId} (kind {g.Separator})")
+				.ToListAsync(ct);
+
+			Assert.True(mistyped.Count == 0, $"goals whose verb is not satisfied by the item arriving are typed CollectItem: {string.Join(", ", mistyped)}");
 		}
 
 		// The kind tag agrees with the wiring wherever a human established the goal's semantics from a capture. This is
