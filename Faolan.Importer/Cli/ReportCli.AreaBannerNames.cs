@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Rdb.Assets;
+using Faolan.Importer.Captures;
+using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +19,16 @@ namespace Faolan.Importer.Cli
 	// row count.
 	public static partial class ReportCli
 	{
-		private static async Task AreaBannerNamesReport(string rdbDir)
+		// The banners the WIRE was seen carrying, harvested from the captures on the spot. Not read from the database:
+		// since #680 a banner lives as a column on the region that fires it, so the raw sightings are a derivation
+		// input rather than stored state, and a report that wants them has to harvest them the same way the importer
+		// does.
+		private static List<CapturedBanner> CapturedBanners(string capturesDir)
+		{
+			return AreaNameExtractor.Merge(NamedCapture.LoadAll(capturesDir).SelectMany(c => AreaNameExtractor.Extract(c.Packets)));
+		}
+
+		private static async Task AreaBannerNamesReport(string rdbDir, IReadOnlyList<CapturedBanner> captured)
 		{
 			using var rdb = OpenRdb(rdbDir);
 			var recovered = AreaBannerNames.Recover(rdb);
@@ -33,7 +42,6 @@ namespace Faolan.Importer.Cli
 
 			// What the harvest already holds, so the recovery can be checked against it rather than admired.
 			await using var db = OpenDb();
-			var captured = await db.MapAreas.Where(a => a.Source != AreaBannerSource.ClientName).ToListAsync();
 			var byId = recovered.Banners.GroupBy(b => b.Id).ToDictionary(g => g.Key, g => g.First().Text);
 			var found = captured.Count(c => byId.ContainsKey(c.AreaNameId));
 			Console.WriteLine($"--- cross-check against the {captured.Count} CAPTURED banner ids ---");

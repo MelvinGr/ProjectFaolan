@@ -177,16 +177,16 @@ namespace Faolan.Tests
 
 			var discovery = await db.RespawnPoints.CountAsync(p => p.DiscoveryRegionId != null, ct);
 			var goals = await db.QuestGoalDefinitions.CountAsync(g => g.RegionId != null, ct);
-			var banners = await db.MapAreas.CountAsync(a => a.RegionId != null, ct);
+			var banners = await db.MapRegions.CountAsync(r => r.AreaNameId != null, ct);
 			var hazards = await db.MapHazards.CountAsync(ct);
 			Assert.True(discovery >= 11, $"{discovery} respawn points carry a discovery volume; the import resolves 11.");
 			Assert.True(goals >= 3, $"{goals} quest goals carry a region; the import resolves 3.");
-			Assert.True(banners >= 100, $"{banners} area banners carry a trigger volume; the import resolves 100+ (#513/#679).");
+			Assert.True(banners >= 140, $"{banners} volumes carry an area banner; the import resolves 140+ (#513/#679/#680).");
 			Assert.True(hazards >= 100, $"{hazards} hazard volumes carry behaviour; the lava import resolves 100+ (#504).");
 
 			var linked = (await db.RespawnPoints.Where(p => p.DiscoveryRegionId != null).Select(p => p.DiscoveryRegionId!.Value).ToListAsync(ct))
 				.Concat(await db.QuestGoalDefinitions.Where(g => g.RegionId != null).Select(g => g.RegionId!.Value).ToListAsync(ct))
-				.Concat(await db.MapAreas.Where(a => a.RegionId != null).Select(a => a.RegionId!.Value).ToListAsync(ct))
+				.Concat(await db.MapRegions.Where(r => r.AreaNameId != null).Select(r => r.Id).ToListAsync(ct))
 				.Concat(await db.MapHazards.Select(h => h.RegionId).ToListAsync(ct))
 				.ToHashSet();
 			var orphans = regions.Where(r => !linked.Contains(r.Id)).Select(r => $"{r.MapId}/{r.Name}").ToList();

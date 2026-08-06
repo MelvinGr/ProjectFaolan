@@ -68,7 +68,6 @@ namespace Faolan.Core.Database
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
-		DbSet<MapArea> MapAreas { get; }
 		DbSet<MapHazard> MapHazards { get; }
 		DbSet<MapRegion> MapRegions { get; }
 		DbSet<MapRegionVertex> MapRegionVertices { get; }
@@ -172,7 +171,6 @@ namespace Faolan.Core.Database
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
-		public DbSet<MapArea> MapAreas { get; set; }
 		public DbSet<MapHazard> MapHazards { get; set; }
 		public DbSet<MapRegion> MapRegions { get; set; }
 		public DbSet<MapRegionVertex> MapRegionVertices { get; set; }

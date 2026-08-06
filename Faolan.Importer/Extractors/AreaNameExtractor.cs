@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Captures;
@@ -15,6 +13,17 @@ namespace Faolan.Importer.Extractors
 	// position it fired at (#348). One SIGHTING - a map has many areas and each fires repeatedly, so these are
 	// aggregated into MapArea rows by MergeAreas.
 	public sealed record MapAreaName(uint MapId, uint AreaNameId, float X, float Y, float Z);
+
+	// One banner the wire carried on one playfield, with the bounds of every position it was seen firing at. Never
+	// stored - see Merge.
+	public sealed record CapturedBanner(uint MapId, uint AreaNameId, float MinX, float MaxX, float MinY, float MaxY, float MinZ, float MaxZ)
+	{
+		// A hull over ONE sighting is a point: it says where the banner fired once, not where its region is.
+		public bool SingleSighting => MinX == MaxX && MinZ == MaxZ;
+
+		public float CentreX => (MinX + MaxX) / 2f;
+		public float CentreZ => (MinZ + MaxZ) / 2f;
+	}
 
 	// Harvests EVERY area banner from captured gameplay, with the position it fired at. After a MapChange
 	// (PlayfieldFIIR 0x5D85BFC7) the server sends a FormatFeedbackIIR (0x8D5A8B6B) FIFO banner whose remoteformat
@@ -100,53 +109,43 @@ namespace Faolan.Importer.Extractors
 			return results;
 		}
 
-		// Aggregates the raw sightings into one MapArea per (map, areaNameId): the bounds hull over every position
-		// that banner was seen firing at.
+		// The distinct banners the wire was seen carrying, each with the bounds of every position it fired at.
 		//
-		// NOT a vote. The old Merge picked ONE id per map by majority, because Map.AreaNameId could hold only one -
-		// which silently discarded five of Old Tarantia's six areas. Every distinct id is a distinct area and they
-		// all survive here.
+		// Both halves are DERIVATION INPUTS since #680, and nothing here is stored. The (playfield, id) pair is the
+		// valuable one: it PINS a playfield's id numbering, which is what lets an ambiguous name resolve and what a
+		// name match far from that numbering is checked against. The hull is the weak one, and is only still built
+		// because it is the sole route left for a banner whose region carries an internal name - Old Tarantia's
+		// volumes are `BA_Bridge`, never the "Bridge of Vilerus I" the banner renders.
 		//
-		// The hull is an interim shape, not the retail volume: it can only cover ground a captured player actually
-		// walked. With one sighting it is a POINT (MinX == MaxX), which is how a degenerate row is spotted without a
-		// second column that can disagree with the bounds; the caller pairs it with a radius rather than treating it
-		// as a hard polygon. It tightens as more marked dumps land, and #679's client-recovered rows replace it
-		// outright wherever the region's own name is the banner text.
-		public static List<MapArea> MergeAreas(IEnumerable<MapAreaName> all)
+		// ⚠️ It used to BE the region data, as a `MapArea` row the runtime tested with a slack radius. That was an
+		// approximation by construction - it can only cover ground a captured player actually walked, and with one
+		// sighting it is a point - and it is the weakest evidence in the subsystem: a banner fires ON ENTRY, so its
+		// sample sits on the boundary, and a one-sighting hull is placed by whichever move happened to bracket the
+		// banner. On map 1010 that demonstrably put two different banners in one volume, 600 units from where one of
+		// them belongs.
+		public static List<CapturedBanner> Merge(IEnumerable<MapAreaName> all)
 		{
-			var byArea = new Dictionary<(uint Map, uint Area), MapArea>();
+			var byArea = new Dictionary<(uint Map, uint Area), CapturedBanner>();
 			foreach (var s in all)
 			{
-				if (!byArea.TryGetValue((s.MapId, s.AreaNameId), out var area))
+				if (!byArea.TryGetValue((s.MapId, s.AreaNameId), out var banner))
 				{
-					byArea[(s.MapId, s.AreaNameId)] = new MapArea
-					{
-						MapId = s.MapId,
-						AreaNameId = s.AreaNameId,
-						MinX = s.X,
-						MaxX = s.X,
-						MinY = s.Y,
-						MaxY = s.Y,
-						MinZ = s.Z,
-						MaxZ = s.Z,
-						Source = AreaBannerSource.Captured
-					};
+					byArea[(s.MapId, s.AreaNameId)] = new CapturedBanner(s.MapId, s.AreaNameId, s.X, s.X, s.Y, s.Y, s.Z, s.Z);
 					continue;
 				}
 
-				area.MinX = Math.Min(area.MinX, s.X);
-				area.MaxX = Math.Max(area.MaxX, s.X);
-				area.MinY = Math.Min(area.MinY, s.Y);
-				area.MaxY = Math.Max(area.MaxY, s.Y);
-				area.MinZ = Math.Min(area.MinZ, s.Z);
-				area.MaxZ = Math.Max(area.MaxZ, s.Z);
+				byArea[(s.MapId, s.AreaNameId)] = banner with
+				{
+					MinX = Math.Min(banner.MinX, s.X),
+					MaxX = Math.Max(banner.MaxX, s.X),
+					MinY = Math.Min(banner.MinY, s.Y),
+					MaxY = Math.Max(banner.MaxY, s.Y),
+					MinZ = Math.Min(banner.MinZ, s.Z),
+					MaxZ = Math.Max(banner.MaxZ, s.Z)
+				};
 			}
 
-			return byArea.Values.ToList();
+			return byArea.Values.OrderBy(b => b.MapId).ThenBy(b => b.AreaNameId).ToList();
 		}
-
-
-
-
 	}
 }

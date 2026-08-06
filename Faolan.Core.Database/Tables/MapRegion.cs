@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -24,10 +25,6 @@ namespace Faolan.Core.Database.Tables
 	// exactly - and the nullable FKs that point here (RespawnPoint, QuestGoalDefinition) need a single column to
 	// express SetNull, which a composite cannot.
 	[Index(nameof(MapId), nameof(Name), IsUnique = true)]
-	// `MapArea` may fold in later still, as a nullable AreaNameId column, once EVERY banner has a client volume to
-	// hang on. Until then it is a CONSUMER of a region (like RespawnPoint and QuestGoalDefinition), not a kind of
-	// one: the banners with no client volume keep a sampled hull, and merging an approximation into the table of
-	// exact client polygons is the mistake MapHazard's comment warns about.
 	public class MapRegion : BaseEntity, IDerivedKey
 	{
 		public static uint ComputeId(uint mapId, string name)
@@ -72,6 +69,32 @@ namespace Faolan.Core.Database.Tables
 
 		// The boundary polygon, in RDB order; cascade-delete with the region.
 		public virtual ICollection<MapRegionVertex> Vertices { get; set; } = [];
+
+		// The top-of-screen AREA BANNER this region floats when a player walks into it (#348/#513/#679/#680), or null
+		// for the regions imported for something else. What goes on the wire, and nothing else: the CLIENT renders the
+		// string from its own LDB, so there is deliberately no name column here - it would be a stale copy of
+		// something the client answers exactly, in seven languages, from the id alone.
+		//
+		// ⚠️ The id is a PARAMETER inside the localized token, not an LDB key:
+		//
+		//   <localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|3474586'>
+		//   elf28("DisplayedText(3)|GenericDisplayAreaName|3474586") == 19303910 == cat 50025 "Castle Approach"
+		//
+		// so searching the LDB for the number itself always fails, and that failure means nothing. It has been read as
+		// meaning something twice. `--report ldb-strings --report-arg "id:#<elf28 of the token>"` resolves one;
+		// `--report area-banner-names` does the whole table at once by INVERTING that hash.
+		//
+		// This used to be a table of its own, `MapArea`, keyed by (map, banner) and carrying a HULL over the positions
+		// retail was captured firing the banner at - an approximation the runtime had to widen with a slack radius,
+		// because a hull only covers ground a captured player actually walked. Once the recovery could name the
+		// client's own volume for 140 of 142 banners the hull had nothing left to do, and a banner is simply a
+		// property OF a trigger volume. See AreaNameSource for what happened to the last two.
+		public uint? AreaNameId { get; set; }
+
+		// How AreaNameId was arrived at - PROVENANCE, not confidence; null exactly when AreaNameId is. The two routes
+		// share no evidence at all, which is why an agreement between them (`Corroborated`) is the strongest row in
+		// the table and a disagreement would be the loudest thing either could say. Nothing disagrees.
+		public AreaBannerSource? AreaNameSource { get; set; }
 
 		// What this region DOES to a player who enters it, where that is a hazard (#504/#679) - null for the ordinary
 		// case, which is every region imported for a discovery volume, a quest goal or an area banner. Behaviour is a

@@ -100,164 +100,85 @@ namespace Faolan.Tests
 			Assert.False(EnvironmentService.Contains(region, new Vector3(region.MaxX, y, region.MaxZ)));
 		}
 
-		// --- #513/#679: the AREA BANNER volumes -----------------------------------------------------------------
-		// A banner reaches its region by one of two routes and they are checked differently, which is what
-		// MapArea.Source is for. GEOMETRY (Source = Captured) says "the client volume the captured firing hull sits
-		// inside", and is only as good as its separation guard. NAME (ClientName / Corroborated) says "the region
-		// whose own name is the banner's text", which is an identity - so it is held to the agreement between the two
-		// routes instead.
+		// --- #513/#679/#680: the AREA BANNERS -------------------------------------------------------------------
+		// A banner is a COLUMN on the volume that fires it. It used to be a `MapArea` row carrying a hull over the
+		// positions retail was captured firing it at, and the gates here tested that hull against the region it was
+		// matched to. The hull is gone - it was an approximation the runtime had to widen with a slack radius, and
+		// the client ships the real polygon for effectively every banner - so what is shippable is the ASSIGNMENT,
+		// and that is what these hold. The evidence that produced it (hull inside volume, the two routes agreeing)
+		// is checked where the evidence lives: in the importer, against the real corpus, and printed by
+		// `--report area-banner-names`.
 
-		// Every GEOMETRICALLY matched banner's captured firing hull has to sit in the region it was matched to. This
-		// is the whole basis of that match, and it is the thing a rule change would break silently - the link would
-		// still be there, just pointing at the wrong polygon.
-		[Fact]
-		public async Task EveryGeometricallyLinkedBanner_SitsInsideItsOwnClientRegion()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var linked = await db
-				.MapAreas.Include(a => a.Region!.Vertices)
-				.Where(a => a.RegionId != null && a.Source == AreaBannerSource.Captured)
-				.ToListAsync(TestContext.Current.CancellationToken);
-
-			Assert.NotEmpty(linked);
-			foreach (var area in linked)
-			{
-				var centre = new Vector3((area.MinX + area.MaxX) / 2f, (area.Region!.MinY + area.Region.MaxY) / 2f, (area.MinZ + area.MaxZ) / 2f);
-				Assert.True(EnvironmentService.Contains(area.Region, centre),
-					$"banner {area.AreaNameId} on map {area.MapId} is linked to '{area.Region.Name}' but its captured hull centre is outside it");
-			}
-		}
-
-		// The SEPARATION guard on the geometric route: a region holding two banners cannot be what distinguishes them,
-		// so no region may be linked to more than one banner, and a geometrically matched banner's region may not
-		// swallow another banner's captured hull on the same map. Without this the test above passes happily with
-		// every banner on a map pointing at one big region.
-		//
-		// ⚠️ It is NOT applied to the name-matched rows, and that is not an exemption - it is false of the client's own
-		// data. The trigger volumes overlap and nest (`Fifo-CimmerianSettlement` contains the hull of the banner that
-		// belongs to `Fifo-PasstoConarchVillage`), which is why the runtime picks the SMALLEST containing region rather
-		// than assuming one. A name match does not need separation to be right; a geometric one has nothing else.
-		[Fact]
-		public async Task AGeometricallyLinkedRegion_DoesNotContainAnotherBannerOnTheSameMap()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var areas = await db.MapAreas.Include(a => a.Region!.Vertices).ToListAsync(TestContext.Current.CancellationToken);
-
-			// One region, one banner - across BOTH routes. Two banners sharing a trigger volume would mean the server
-			// could never tell which of them the player just walked into.
-			Assert.All(areas.Where(a => a.RegionId != null).GroupBy(a => a.RegionId), g => Assert.Single(g));
-
-			// Only the banners still ARGUING for a region can veto one: a banner whose region is settled by name is not
-			// a second claimant, and its stray sample says the sample is imprecise (see map 1010, where two banners
-			// were sampled inside one volume and the name join pinned one of them 600 units away).
-			var hulls = areas.Where(a => a.Source == AreaBannerSource.Captured).ToList();
-			foreach (var area in areas.Where(a => a.RegionId != null && a.Source == AreaBannerSource.Captured))
-			{
-				var y = (area.Region!.MinY + area.Region.MaxY) / 2f;
-				foreach (var other in hulls.Where(o => o.MapId == area.MapId && o.AreaNameId != area.AreaNameId))
-				{
-					var centre = new Vector3((other.MinX + other.MaxX) / 2f, y, (other.MinZ + other.MaxZ) / 2f);
-					Assert.False(EnvironmentService.Contains(area.Region, centre),
-						$"'{area.Region.Name}' (banner {area.AreaNameId}) also contains banner {other.AreaNameId} - it cannot be what tells them apart");
-				}
-			}
-		}
-
-		// The #679 cross-check, and the reason the name join can be trusted on the playfields no capture has ever
-		// reached: where BOTH routes fire on the same banner they agree. The client's region of that name is where
-		// retail was captured firing it - two arguments sharing no evidence at all, one a position track against a
-		// wire packet and the other a hash inversion against a string table.
-		//
-		// Measured against the region's BOUNDING BOX rather than its polygon, because a banner fires ON ENTRY: every
-		// sighting sits on the boundary, so the centre of a hull over several of them lands just outside a concave
-		// ring about as often as just inside. The box is the claim that actually matters here - same place, not some
-		// other part of the playfield - and on the shipped rows it is exact: every one but the documented exception
-		// is INSIDE the box, and the two that are not are 1.6 and 1.4 units out.
-		//
-		// ⚠️ ONE exception, asserted by name and by count so a second one fails rather than joins it. Map 1010's
-		// "Pass to Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` while its single captured sample sits
-		// 549 x 307 units away, inside `Fifo-CimmerianSettlement` - which is also where the OTHER banner captured on
-		// that playfield was sampled. Two banners cannot both fire from one spot, so the SAMPLE is what is wrong
-		// there, and a gate that trusted it would be pinning the capture's weakest evidence against the client's
-		// strongest.
-		[Fact]
-		public async Task ACorroboratedBanner_WasCapturedFiringWhereItsNameSaysItShould()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var both = await db
-				.MapAreas.Include(a => a.Region)
-				.Where(a => a.Source == AreaBannerSource.Corroborated)
-				.ToListAsync(TestContext.Current.CancellationToken);
-
-			Assert.NotEmpty(both);
-			Assert.All(both, a => Assert.NotNull(a.Region));
-
-			const float near = 2f;
-			var far = both.Where(a =>
-			{
-				var cx = (a.MinX + a.MaxX) / 2f;
-				var cz = (a.MinZ + a.MaxZ) / 2f;
-				return cx < a.Region!.MinX - near || cx > a.Region.MaxX + near || cz < a.Region.MinZ - near || cz > a.Region.MaxZ + near;
-			}).ToList();
-
-			Assert.Equal([3709830u], far.Select(a => a.AreaNameId).ToArray());
-		}
-
-		// Provenance and geometry have to agree about which half of the row is real, because the runtime branches on
-		// exactly that: a row with a region is tested against the client polygon with NO slack, a row without one
-		// against the captured hull WITH it. A client-sourced row carrying a stale hull, or a captured row with none,
-		// would send the banner test down the wrong path without failing anything.
-		[Fact]
-		public async Task ABannersSource_MatchesWhetherItCarriesAHullAndARegion()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var areas = await db.MapAreas.ToListAsync(TestContext.Current.CancellationToken);
-
-			foreach (var a in areas.Where(a => a.Source == AreaBannerSource.ClientName))
-			{
-				Assert.True(a.RegionId != null, $"banner {a.AreaNameId} on map {a.MapId} is client-sourced but has no region - the region IS the match");
-				Assert.True(a.MinX == 0f && a.MaxX == 0f && a.MinZ == 0f && a.MaxZ == 0f,
-					$"banner {a.AreaNameId} on map {a.MapId} is client-sourced but carries a hull; no capture backs it");
-			}
-
-			// The converse: a row the wire saw has a hull, however degenerate. `MinX == MaxX` is one sighting - a point
-			// that only fires because of the runtime's slack - which is what the old SampleCount column was kept for.
-			Assert.All(areas.Where(a => a.Source != AreaBannerSource.ClientName),
-				a => Assert.True(a.MinX != 0f || a.MinZ != 0f, $"banner {a.AreaNameId} on map {a.MapId} claims a capture but has no firing position"));
-		}
-
-		// The FILTER both routes share. Every banner volume runs the client's crossing-notifier scry script; without it
-		// Old Tarantia's banners returned up to four containing regions, the tightest being `City_sounds` at
-		// 142,490 u² - an audio region. A region that never tells the server the player entered it cannot be what fires
-		// a server-sent banner, which is as true of a name match as of a geometric one: "Outlaw Camp" also names audio
-		// and collision volumes.
+		// The FILTER both routes share. Every banner volume runs the client's crossing-notifier scry script; without
+		// it Old Tarantia's banners returned up to four containing regions, the tightest being `City_sounds` at
+		// 142,490 u² - an audio region. A region that never tells the server the player entered it cannot be what
+		// fires a server-sent banner, which is as true of a name match as of a geometric one: "Outlaw Camp" also
+		// names audio and collision volumes.
 		[Fact]
 		public async Task EveryBannerVolume_RunsTheCrossingNotifierScript()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var linked = await db.MapAreas.Include(a => a.Region).Where(a => a.RegionId != null).ToListAsync(TestContext.Current.CancellationToken);
+			var banners = await db.MapRegions.Where(r => r.AreaNameId != null).ToListAsync(TestContext.Current.CancellationToken);
 
-			Assert.All(linked, a => Assert.Equal(BoundedAreaClassifier.CrossingNotifierScryId, a.Region!.ScryId));
+			Assert.NotEmpty(banners);
+			Assert.All(banners, r => Assert.Equal(BoundedAreaClassifier.CrossingNotifierScryId, r.ScryId));
 		}
 
-		// Old Tarantia is the map where the answer can be read by eye, so it is worth pinning by name: the client's
-		// own region names for the four banners we hold several samples of say bridge, trading post, market ward and
-		// the two gates - which is what `MapArea`'s comment lists as Old Tarantia's banner texts, arrived at from a
-		// completely different direction (a hull over captured walk positions).
+		// A banner id identifies ONE area of one playfield, so no two volumes may claim the same one - the server
+		// would have no way to say which of them the player just walked into, and the client renders one string.
+		// Provenance travels with it: a region either has both halves or neither.
+		[Fact]
+		public async Task ABannerIdBelongsToOneVolume_AndCarriesItsProvenance()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var regions = await db.MapRegions.ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.All(regions, r => Assert.Equal(r.AreaNameId == null, r.AreaNameSource == null));
+			Assert.All(regions.Where(r => r.AreaNameId != null).GroupBy(r => r.AreaNameId), g => Assert.Single(g));
+		}
+
+		// The coverage this subsystem exists to have, as a ratchet rather than a description: the recovery reaches
+		// playfields no capture has ever visited, and a rule change that quietly stopped reaching them would leave
+		// every other gate here passing.
+		[Fact]
+		public async Task TheBannerRecovery_ReachesFarMoreThanTheCapturesDid()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var banners = await db.MapRegions.Where(r => r.AreaNameId != null).ToListAsync(TestContext.Current.CancellationToken);
+
+			// 22 banners over 7 playfields were all the captures ever gave, and 12 of those had a volume.
+			Assert.True(banners.Count >= 140, $"{banners.Count} banner volumes; the recovery resolves 140+ (#679/#680)");
+			Assert.True(banners.Select(r => r.MapId).Distinct().Count() >= 13, "the recovery reaches 13+ playfields, against the captures' 7");
+
+			// The three routes all have to still be firing. ClientName is the bulk (playfields no capture visited),
+			// Corroborated is the cross-check, and Captured is the geometric route - the only one that can reach a
+			// banner whose region carries an internal name.
+			Assert.All(new[] { AreaBannerSource.ClientName, AreaBannerSource.Corroborated, AreaBannerSource.Captured },
+				source => Assert.True(banners.Any(r => r.AreaNameSource == source), $"no banner resolved by {source}"));
+		}
+
+		// Old Tarantia is the map where the answer can be read by eye, so it is worth pinning by name. Four of these
+		// were matched GEOMETRICALLY, from a hull over captured walk positions, before the client's own names could
+		// be recovered at all - and the two routes agree on `BA_TradingPost` and both gates, which is the check
+		// neither could give itself.
 		[Fact]
 		public async Task OldTarantiasBanners_LandOnTheRegionsNamedAfterThem()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var byBanner = (await db
-					.MapAreas.Include(a => a.Region)
-					.Where(a => a.MapId == 2000 && a.RegionId != null)
+					.MapRegions.Where(r => r.MapId == 2000 && r.AreaNameId != null)
 					.ToListAsync(TestContext.Current.CancellationToken))
-				.ToDictionary(a => a.AreaNameId, a => a.Region!.Name);
+				.ToDictionary(r => r.AreaNameId!.Value, r => r.Name);
 
-			Assert.Equal("BA_Bridge", byBanner[3373519]); // "Bridge of Vilerus I"
+			Assert.Equal("BA_Bridge", byBanner[3373519]); // "Bridge of Vilerus I" - geometric; the name join cannot reach it
+			Assert.Equal("BA_LionMarket", byBanner[3373521]); // "The Lion's Market" - the possessive s
+			Assert.Equal("BA_TradingPost", byBanner[3373522]); // both routes
+			Assert.Equal("BA_AVRoses", byBanner[3373523]); // "Avenue of Roses" - the abbreviation pass
 			Assert.Equal("BA_MarketWard", byBanner[3373525]);
-			Assert.Equal("BA_EastGate", byBanner[3385037]); // "The East Gate"
-			Assert.Equal("BA_WestGate", byBanner[3385038]); // "The West Gate"
+			Assert.Equal("BA_AVLions", byBanner[3373530]); // "Avenue of Lions"
+			Assert.Equal("BA_EastGate", byBanner[3385037]); // "The East Gate" - the article
+			Assert.Equal("BA_WestGate", byBanner[3385038]);
+			Assert.Equal("Outlaw Camp", byBanner[3906077]); // the generic name, pinned by the wire
 		}
 	}
 }

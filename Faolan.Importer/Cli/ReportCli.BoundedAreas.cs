@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +26,7 @@ namespace Faolan.Importer.Cli
 		// same set RdbHazardImporter skips. Counted separately so the census describes real playfields.
 		private const uint BoundedAreaVariantIdBase = 0x40000000;
 
-		private static async Task BoundedAreas(string rdbDir, string? bucketSlug)
+		private static async Task BoundedAreas(string rdbDir, string? bucketSlug, IReadOnlyList<CapturedBanner> captured)
 		{
 			var records = ReadBoundedAreas(rdbDir);
 			var real = records.Where(r => r.MapId < BoundedAreaVariantIdBase).ToList();
@@ -44,7 +43,7 @@ namespace Faolan.Importer.Cli
 			// all. `--report-arg area-banners` runs that test.
 			if (bucketSlug.Trim().Equals("area-banners", StringComparison.OrdinalIgnoreCase))
 			{
-				await AreaBannerCrossCheck(real);
+				await AreaBannerCrossCheck(real, captured);
 				return;
 			}
 
@@ -70,17 +69,14 @@ namespace Faolan.Importer.Cli
 		// A sub-area trigger has to SEPARATE the sub-areas, so a region only counts as a candidate if it contains
 		// this area's captured footprint AND does not swallow another area's on the same map. That is the property
 		// that would make it the thing that fires the banner.
-		private static async Task AreaBannerCrossCheck(List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> records)
+		private static async Task AreaBannerCrossCheck(List<(uint MapId, IReadOnlyList<BoundedAreaCollection.BoundedArea> Areas)> records, IReadOnlyList<CapturedBanner> captured)
 		{
 			await using var db = OpenDb();
 			var mapNames = await db.Maps.ToDictionaryAsync(m => m.Id, m => m.Name ?? "");
 			var byMap = records.ToDictionary(r => r.MapId, r => r.Areas);
-			// CAPTURED rows only: this test is "does a client region contain the hull retail fired the banner in", and a
-			// client-sourced row (#679) has no hull at all - it was matched by NAME onto the region itself, so feeding
-			// it in here would test a zero-size box at the origin against every playfield.
-			var banners = (await db.MapAreas.Where(a => a.Source != AreaBannerSource.ClientName).ToListAsync())
-				.GroupBy(a => a.MapId)
-				.ToDictionary(g => g.Key, g => g.ToList());
+			// The CAPTURED harvest, straight from the captures: this test is "does a client region contain the hull
+			// retail fired the banner in", so it needs the positions, which are not stored anywhere (#680).
+			var banners = captured.GroupBy(a => a.MapId).ToDictionary(g => g.Key, g => g.ToList());
 
 			Console.WriteLine("=== area-banner cross-check: is a MapArea's region in RDB 1000053? ===");
 			Console.WriteLine("A candidate must CONTAIN this banner's captured footprint and EXCLUDE every other banner on the map.");
@@ -100,8 +96,8 @@ namespace Faolan.Importer.Cli
 				foreach (var a in areas.OrderBy(a => a.AreaNameId))
 				{
 					total++;
-					var cx = (a.MinX + a.MaxX) / 2f;
-					var cz = (a.MinZ + a.MaxZ) / 2f;
+					var cx = a.CentreX;
+					var cz = a.CentreZ;
 
 					// Every polygon holding this banner's centre, tightest first - the tightest is the only one with a
 					// claim to being a sub-area rather than the playfield. Restricted to the CROSSING-NOTIFIER scry
@@ -125,7 +121,7 @@ namespace Faolan.Importer.Cli
 					// distinguishes them.
 					var others = areas.Where(o => o.AreaNameId != a.AreaNameId).ToList();
 					var clean = holding
-						.Where(h => !others.Any(o => h.Region.Contains((o.MinX + o.MaxX) / 2f, (o.MinZ + o.MaxZ) / 2f)))
+						.Where(h => !others.Any(o => h.Region.Contains(o.CentreX, o.CentreZ)))
 						.ToList();
 					if (clean.Count > 0)
 						separating++;
@@ -146,9 +142,9 @@ namespace Faolan.Importer.Cli
 
 			// A hull over ONE sighting is a point, so it fires only because of the runtime's slack - worth seeing next
 			// to a match, because a point can sit inside a region it has no business claiming.
-			static string Hull(MapArea a)
+			static string Hull(CapturedBanner a)
 			{
-				return a.MinX == a.MaxX && a.MinZ == a.MaxZ ? "hull=point" : $"hull={a.MaxX - a.MinX:F0}x{a.MaxZ - a.MinZ:F0}";
+				return a.SingleSighting ? "hull=point" : $"hull={a.MaxX - a.MinX:F0}x{a.MaxZ - a.MinZ:F0}";
 			}
 
 			static double Footprint(BoundedAreaCollection.BoundedArea r)

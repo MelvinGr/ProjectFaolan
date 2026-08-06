@@ -78,7 +78,7 @@ namespace Faolan.Importer.Cli
 			// RDB (+ DB for the cross-checks), no corpus: the bounded-area trigger-volume survey (#513).
 			if (report == "bounded-areas")
 			{
-				await BoundedAreas(RdbDir(), arg);
+				await BoundedAreas(RdbDir(), arg, CapturedBanners(capturesDir));
 				return 0;
 			}
 
@@ -516,7 +516,7 @@ namespace Faolan.Importer.Cli
 
 				case "area-banner-names":
 				{
-					await AreaBannerNamesReport(RdbDir());
+					await AreaBannerNamesReport(RdbDir(), CapturedBanners(capturesDir));
 					return 0;
 				}
 				case "creature-races":

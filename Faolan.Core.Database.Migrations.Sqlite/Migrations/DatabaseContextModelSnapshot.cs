@@ -1921,45 +1921,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Maps");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
-                {
-                    b.Property<uint>("MapId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("AreaNameId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<float>("MaxX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("MaxY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("MaxZ")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("MinX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("MinY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("MinZ")
-                        .HasColumnType("REAL");
-
-                    b.Property<uint?>("RegionId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Source")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("MapId", "AreaNameId");
-
-                    b.HasIndex("RegionId");
-
-                    b.ToTable("MapAreas");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
                 {
                     b.Property<uint>("RegionId")
@@ -1995,6 +1956,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegion", b =>
                 {
                     b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("AreaNameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("AreaNameSource")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("MapId")
@@ -4857,23 +4824,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Navigation("TravelConfirmKey")
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
-                        .WithMany()
-                        .HasForeignKey("MapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "Region")
-                        .WithMany()
-                        .HasForeignKey("RegionId");
-
-                    b.Navigation("Map");
-
-                    b.Navigation("Region");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>

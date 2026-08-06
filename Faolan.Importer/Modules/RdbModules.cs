@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
+using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
@@ -422,13 +424,18 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbRegionImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
+			// The captured banner sightings are harvested here and handed IN - they are an input to the match, not
+			// state (#680): a banner ends up as a column on the region that fires it, so nothing about one is read
+			// back out of the database.
+			var captured = AreaNameExtractor.Merge(ctx.Captures.SelectMany(c => AreaNameExtractor.Extract(c.Packets)));
+			var r = await RdbRegionImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase, captured);
 			// Anything a consumer asked for and did not get is named, not swallowed.
 			foreach (var note in r.Notes)
 				ctx.Out.WriteLine($"  rdb-regions unresolved: {note}");
 
 			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s), " +
-			                        $"{r.GoalLinks} quest goal region(s) and {r.BannerLinks} area-banner volume(s); {r.Hazards} lava hazard(s).");
+			                        $"{r.GoalLinks} quest goal region(s) and {r.Hazards} lava hazard(s); {r.Banners} area banner(s) " +
+			                        $"({r.GeometricBanners} matched geometrically, {r.DroppedBanners} captured banner(s) dropped).");
 		}
 	}
 

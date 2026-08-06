@@ -77,14 +77,6 @@ namespace Faolan.GameServer.World
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
-		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
-		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
-		// an under-estimate of the real region. The slack buys back some of that; the vertical one is looser because
-		// a hull from a handful of samples barely captures an area's height range at all (Bridge of Vilerus I spans
-		// 1 unit of Y across six sightings, which is the bridge deck, not the trigger's true band).
-		private const float AreaBannerSlack = 8f;
-		private const float AreaBannerVerticalSlack = 20f;
-
 		// How close a player must get to discover a resurrection point. The captures can only put a FLOOR under this:
 		// at the two discovery moments they carry, the player was 13.7 and 11.6 units out, but that is where the
 		// player had already GOT to when the server noticed - it bounds the real radius from below, not above. So
@@ -107,7 +99,7 @@ namespace Faolan.GameServer.World
 		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new ConcurrentDictionary<uint, HashSet<uint>>();
 
 		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
-		private readonly ConcurrentDictionary<uint, MapArea[]> _mapAreas = new(); // #348: per-map sub-areas, read every tick
+		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new(); // #348: per-map banner volumes, read every tick
 
 		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
 		private readonly ConcurrentDictionary<uint, RespawnPoint[]> _respawnPointsByMap = new ConcurrentDictionary<uint, RespawnPoint[]>();
@@ -599,12 +591,12 @@ namespace Faolan.GameServer.World
 			return set;
 		}
 
-		private async Task<MapArea[]> GetMapAreasCached(uint mapId)
+		private async Task<MapRegion[]> GetMapAreasCached(uint mapId)
 		{
 			if (_mapAreas.TryGetValue(mapId, out var cached))
 				return cached;
 
-			var areas = await _database.GetMapAreas(mapId);
+			var areas = await _database.GetAreaBannerRegions(mapId);
 			_mapAreas[mapId] = areas;
 			return areas;
 		}
@@ -1071,41 +1063,33 @@ namespace Faolan.GameServer.World
 		}
 
 		// #348: floats the area banner when a player CROSSES into a named sub-area. A map has many - Old Tarantia
-		// fires six - so this is a per-tick position test against MapArea, not a per-playfield event; entering a
-		// playfield lands you in an area and that is simply the first crossing.
+		// fires seventeen - so this is a per-tick position test against the playfield's banner volumes, not a
+		// per-playfield event; entering a playfield lands you in an area and that is simply the first crossing.
 		//
-		// The regions are CAPTURE-DERIVED (the boundary triggers are server-side - no client record references a
-		// banner id), so the bounds are a hull over the positions retail was seen firing each banner at, widened by
-		// AreaBannerSlack because a hull can only cover ground a captured player actually walked. That makes them
-		// approximate: expect a banner slightly early/late at the edges, and expect areas we have no sighting of to
-		// stay silent. It tightens as more marked dumps land.
+		// The volumes are the CLIENT'S OWN (#513/#679/#680): exact concave polygons with a real height band, tested
+		// with NO slack. They used to be a hull over the positions retail was seen firing each banner at, widened by a
+		// slack radius because a hull can only cover ground a captured player actually walked - so banners fired early
+		// or late at the edges, and areas nobody had walked stayed silent. That is gone, and with it the guesswork:
+		// the server now fires on the boundary the client draws.
 		//
-		// The SMALLEST containing area wins: the captured hulls overlap (Old Tarantia's "The West Gate" box sits
-		// inside "The East Gate" box), and the tighter hull is the more specific claim.
+		// The SMALLEST containing volume wins. The client's regions nest and overlap - a ward inside a district - and
+		// the tighter one is the more specific claim.
 		private async Task TickAreaBanners()
 		{
-			foreach (var pair in Players)
+			foreach (var (client, entity) in Players)
 			{
-				var client = pair.Key;
-				var entity = pair.Value;
-
 				var areas = await GetMapAreasCached(entity.MapId);
 				if (areas.Length == 0)
 					continue;
 
-				MapArea? best = null;
+				MapRegion? best = null;
 				var bestVolume = double.MaxValue;
 				foreach (var area in areas)
 				{
-					if (!Contains(area, entity.Position))
+					if (!EnvironmentService.Contains(area, entity.Position))
 						continue;
 
-					// Smallest wins, measured on whichever shape actually decided the hit - a captured hull is a
-					// fraction of the real region's size, so mixing the two would always rank a hull-backed area above
-					// a region-backed one regardless of which is the tighter fit.
-					var volume = area.Region is { } r
-						? (double)(r.MaxX - r.MinX + 1) * (r.MaxZ - r.MinZ + 1)
-						: (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
+					var volume = (double)(area.MaxX - area.MinX + 1) * (area.MaxZ - area.MinZ + 1);
 					if (volume >= bestVolume)
 						continue;
 
@@ -1122,12 +1106,10 @@ namespace Faolan.GameServer.World
 					continue; // left an area into unnamed ground - retail shows nothing
 
 				await _output.SendAreaNameBanner(client, now);
-				// Logged by id, not name: MapArea has no name (the client renders the text, and it can be read back
-				// from the id with `--report ldb-strings`). 3373519 is "Bridge of Vilerus I" if you need one by hand.
-				// The region is the useful half of the line - it says whether the banner fired on the client's own
-				// trigger volume or on a captured hull plus slack.
-				_logger.LogInformation("World: {Player} entered area {Id} on map {Map} ({Where}).", client.Session.Character.Name, now, entity.MapId,
-					best!.Region is { } named ? $"'{named.Name}', the client's own volume" : "captured hull + slack");
+				// Logged by id AND by the client's own name for the volume: the wire carries only the id (the client
+				// renders the text from its own LDB), and the region name is what makes a line readable without a
+				// lookup. 3373519 is "Bridge of Vilerus I" if you need to read one by hand.
+				_logger.LogInformation("World: {Player} entered area {Id} ('{Region}') on map {Map}.", client.Session.Character.Name, now, best!.Name, entity.MapId);
 			}
 		}
 
@@ -1297,22 +1279,6 @@ namespace Faolan.GameServer.World
 					await SendDeathScreen(client, character, pair.Value, pair.Value.Position);
 				}
 			}
-		}
-
-		// #513: the CLIENT'S OWN trigger volume where we have one, and only then the captured hull.
-		//
-		// The two are not the same kind of thing and must not be treated alike. A `MapArea` is a hull over the
-		// positions retail was seen firing the banner at, so it under-covers by construction and needs
-		// `AreaBannerSlack` to fire at all. A `MapRegion` is the polygon the client ships - exact, concave, and
-		// vertically bounded - so it gets NO slack, exactly as the lava volumes do: padding an exact volume is how
-		// a banner starts firing on the road outside the ward it names.
-		private static bool Contains(MapArea area, Vector3 p)
-		{
-			if (area.Region is { } region)
-				return EnvironmentService.Contains(region, p);
-
-			return p.X >= area.MinX - AreaBannerSlack && p.X <= area.MaxX + AreaBannerSlack && p.Z >= area.MinZ - AreaBannerSlack && p.Z <= area.MaxZ + AreaBannerSlack &&
-			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
 		}
 
 	}

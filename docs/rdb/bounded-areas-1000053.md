@@ -154,7 +154,8 @@ contested names, since a mis-ordered rule silently mis-sorts a whole family.
 
 There is deliberately **no rule for a "zone / area names" family**. Those regions are named after the place
 (`Acheronian Ruins`, `The Iron Tower`, `Onyx Chambers`), so identifying one means matching the name against the
-place-name catalog — a data lookup, not a pattern, and `MapArea`'s banner ids are LDB string ids rather than text.
+place-name catalog — a data lookup, not a pattern. Identifying them is #348's job; a regex here would have
+matched nothing and printed a zero row that reads as "the client ships none", which is the opposite of the truth.
 That is #348's job.
 
 ## The client also ships a purpose-built table for two of these buckets
@@ -369,7 +370,7 @@ destinations. Trust the real playfield.)
 
 This page declines to classify a `zone-name` bucket by regex, because the regions are named after the PLACE. That
 makes them invisible to a name rule but **not** invisible: they can be found from the other end, by asking which
-region contains a banner we have already observed. `MapArea` (#348) is exactly that observation set — 22 rows over
+region contains a banner we have already observed. The captured harvest (#348) is exactly that observation set — 22 banners over
 7 playfields, each an `AreaNameId` plus a hull over the positions the banner was seen firing at.
 
 **Every one of the 22 hulls falls inside a region, and 18 of them inside a recognisably PLACE-NAMED one:**
@@ -493,14 +494,26 @@ reported by the importer, because a rule this loose should be readable without r
 | | banners | playfields | with the client's real trigger volume |
 |---|---|---|---|
 | captured only (before #679) | 22 | 7 | 12 |
-| now | **142** | **14** | **140** |
+| now | **140** | **14** | **140** |
 
-Provenance is on the row (`MapArea.Source`): **7 captured** (the wire saw the id; region matched geometrically or
+Provenance is on the row (`MapRegion.AreaNameSource`): **5 captured** (the wire saw the id; region matched geometrically or
 not at all), **120 client-name** (recovered from the client, on playfields including several no capture has ever
 visited), and **15 corroborated** — found by BOTH routes, which is the cross-check neither could give itself, since
 one is a position track against a wire packet and the other a hash inversion against a string table. **Nothing
 produces a disagreement**: 14 of the 15 captured hulls sit inside the box of the region their name picked, the
 other two 1.6 and 1.4 units outside it, against a 549-unit counter-example below.
+
+### Where a banner lives
+
+`MapRegion.AreaNameId` — a nullable column on the trigger volume, plus `AreaNameSource` for which route bound it.
+
+It was a table of its own, `MapArea`, keyed by (playfield, banner) and carrying a **hull** over the positions retail
+was captured firing that banner at. The hull was the region data, and it was an approximation by construction: it
+covers only ground a captured player actually walked, so `WorldSimulation` had to widen it with a slack radius, and
+with one sighting it was a point. Once the client's own volume was recoverable for effectively every banner there
+was nothing left for it to do, and a banner is simply a property OF a volume. The captured sightings are still
+harvested — they PIN each playfield's id numbering, and their hulls are the geometric route's only handle — but
+they are a derivation input now, not stored state.
 
 **Imported** by `RdbRegionImporter` (`rdb-regions`). The geometric route still runs, on the banners the name join
 cannot reach, under three gates: the scry filter, containment of the banner's captured hull, and SEPARATION — a
@@ -515,18 +528,22 @@ region that swallows another banner's samples through, and widening it to every 
 `Fifo-CimmerianSettlement` on the strength of the misplaced sample described below.
 
 ⚠️ **No tolerance on the geometric containment test, deliberately.** A banner fires ON ENTRY, so its sample sits
-right at the boundary and a near-miss is expected. Padding until they match would be fitting the answer. Those keep
-the captured hull, which is what it is for — **2 rows** still do, both on Ymir's Pass (`269294` "Clan Maugh
+right at the boundary and a near-miss is expected. Padding until they match would be fitting the answer. **2 banners** reach
+no volume by either route, both on Ymir's Pass (`269294` "Clan Maugh
 Encampment" and `269449` "Amphitheatre of Karutonia"). That playfield's 1000053 record contains **no notifier volume
 named after either**, and both captured samples land inside the same one, `POI A - The Last Cimmerian House`, so
-nothing separates them. Tracked on the Gitea follow-up; until one of them is identified, `MapArea` cannot collapse
-into a column on this table.
+nothing separates them. **They are DROPPED** (#680): a banner is a property of the volume that fires it, and there
+is no longer anywhere for one with no volume to live. The wire saw them; nothing can say where.
 
 ⚠️ A one-sighting hull is weaker evidence than it looks, and the name join is what showed it. Map 1010's "Pass to
 Conarch Village" (3709830) names `Fifo-PasstoConarchVillage` at x 53..110, while its single captured sample sits
 at (659, 537) — 600 units away, inside `Fifo-CimmerianSettlement`, which is also where the *other* banner captured
-on that playfield was sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there.
-[V3: MapRegionGeometryTests.ACorroboratedBanner_WasCapturedFiringWhereItsNameSaysItShould]
+on that playfield was sampled. Two banners cannot both fire from one spot, so the sample is what is wrong there —
+which is also why the separation gate ignores a banner an identity has already settled.
+
+⚠️ The hull-versus-volume checks are no longer gates on the SEED, because the hull is not in it: they are checks on
+the evidence, and the evidence is the corpus. `--report area-banner-names` prints them. What the seed can be held
+to is the assignment itself, which is what `MapRegionGeometryTests` now does.
 
 ⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
 unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language
@@ -589,7 +606,7 @@ nothing reads stays out.
   reference (see below). `BossRoom` resolves even though goal 14073 carries no `MapId`, because the name occurs on
   exactly one hosted playfield; ambiguity is reported rather than guessed.
 
-- **116 area-banner volumes** (#513/#348/#679) → `MapArea.RegionId`, by the name join and the id blocks above,
+- **140 area banners** (#513/#348/#679/#680) → `MapRegion.AreaNameId`, by the name join and the id blocks above,
   with geometry as the fallback for the banners whose region carries an internal name.
 - **105 lava hazards** (#504) → a `MapHazard` row *on the region*, over 22 playfields, from Tortage Volcano and the
   Acheronian Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.

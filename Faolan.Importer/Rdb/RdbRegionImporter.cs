@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
@@ -65,7 +66,7 @@ namespace Faolan.Importer.Rdb
 		// kill. Lethal rather than a damage number because retail sends NO StatDamage at all for that death.
 		private const uint IncinerationSpellId = 3773837;
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBaseUrl)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBaseUrl, IReadOnlyList<CapturedBanner> captured)
 		{
 			// The CDN base matters: 274 of the 478 bounded-area records are on-demand (not in the local .rdbdata
 			// files), and Ymir's Pass is one of them. Without it CanRead rejects them and the import silently finds no
@@ -88,26 +89,29 @@ namespace Faolan.Importer.Rdb
 				.ToListAsync();
 			var regionFor = MatchGoalRegions(goals, names, areasByMap, wanted, notes);
 
-			// The banners, from BOTH directions (#679). The client's own recovery runs first because it is the one that
-			// can create rows: it reaches playfields no capture has visited. The captured rows are then matched
-			// geometrically, which is the only route left for a banner whose region carries an internal name.
-			var banners = await db.MapAreas.ToListAsync();
-			// Every row the WIRE has seen - `Corroborated` included, since that is a captured row the client also
-			// recovered. Filtering to `Captured` alone would drop an anchor on the second run of the importer, and
-			// the run would resolve less than the one before it for no reason anybody could see.
-			var capturedByMap = banners
-				.Where(b => b.Source != AreaBannerSource.ClientName)
+			// The banners, from BOTH directions (#679/#680). The client's own recovery runs first: it reaches playfields
+			// no capture has visited, and its match is an identity rather than an inference. What is left over goes to
+			// the geometric route, which is the only one that can reach a banner whose region carries an internal name.
+			//
+			// ⚠️ Nothing about a banner is READ from the database here - `captured` is the harvest, in memory. The
+			// banner ends up as a column on the region that fires it (MapRegion.AreaNameId), so the captured sightings
+			// are an INPUT to this run rather than state it updates: the (playfield, id) pairs pin each playfield's id
+			// numbering, and the hulls are the geometric route's only handle.
+			var recovered = AreaBannerNames.Recover(rdb);
+			var capturedByMap = captured
 				.GroupBy(b => b.MapId)
 				.ToDictionary(g => g.Key, g => (IReadOnlyCollection<uint>)g.Select(b => b.AreaNameId).ToList());
 
-			var recovered = AreaBannerNames.Recover(rdb);
-			var clientFor = MergeClientBanners(db, banners, AreaBannerNames.MatchRegions(areasByMap, recovered.Banners, capturedByMap, notes), wanted, areasByMap);
+			var byName = AreaBannerNames.MatchRegions(areasByMap, recovered.Banners, capturedByMap, notes);
+			foreach (var match in byName)
+				wanted[(match.MapId, match.RegionName)] = areasByMap[match.MapId].First(a => a.Name == match.RegionName);
 
-			// Only the CAPTURED rows the client recovery did not already place are matched geometrically: a
-			// client-sourced row has no hull to match with (its bounds are zero), and a row the name join placed is
-			// already on the region that bears its name, which is an identity rather than an inference.
-			var placed = clientFor.Select(c => c.Area).ToHashSet();
-			var bannerFor = MatchBannerRegions(banners.Where(b => !placed.Contains(b)).ToList(), banners, placed, areasByMap, wanted, notes);
+			// Only the captured banners the name join did not already place are matched geometrically - a banner the
+			// name join placed is already on the region that bears its name.
+			var placedIds = byName.Select(m => (m.MapId, m.AreaNameId)).ToHashSet();
+			var byGeometry = MatchBannerRegions(
+				captured.Where(b => !placedIds.Contains((b.MapId, b.AreaNameId))).ToList(),
+				captured, placedIds, areasByMap, wanted, notes);
 
 			var hazards = MatchLavaVolumes(areasByMap, wanted, notes);
 
@@ -118,8 +122,6 @@ namespace Faolan.Importer.Rdb
 				p.DiscoveryRegionId = null;
 			foreach (var g in goals)
 				g.RegionId = null;
-			foreach (var b in banners)
-				b.RegionId = null;
 			await db.SaveChangesAsync();
 
 			// The hazards cascade with their region, but EF only cascades what it has LOADED - clearing them here
@@ -166,8 +168,31 @@ namespace Faolan.Importer.Rdb
 				point.DiscoveryRegionId = MapRegion.ComputeId(key.Map, key.Name);
 			foreach (var (goal, key) in regionFor)
 				goal.RegionId = MapRegion.ComputeId(key.Map, key.Name);
-			foreach (var (banner, key) in bannerFor.Concat(clientFor))
-				banner.RegionId = MapRegion.ComputeId(key.Map, key.Name);
+
+			// ---- The area banners, as a column on the volume that fires them (#680) ----
+			// A banner found by BOTH routes records the agreement rather than either half: the two share no evidence at
+			// all, one being a position track against a wire packet and the other a hash inversion against a string
+			// table, so where they land on the same id that is the strongest thing the table can say.
+			var capturedIds = captured.Select(b => (b.MapId, b.AreaNameId)).ToHashSet();
+			var regionsById = await db.MapRegions.ToDictionaryAsync(r => r.Id);
+			foreach (var (mapId, areaNameId, key, source) in
+			         byName.Select(m => (m.MapId, m.AreaNameId, (Map: m.MapId, Name: m.RegionName),
+					         capturedIds.Contains((m.MapId, m.AreaNameId)) ? AreaBannerSource.Corroborated : AreaBannerSource.ClientName))
+				         .Concat(byGeometry.Select(g => (g.Banner.MapId, g.Banner.AreaNameId, g.Key, AreaBannerSource.Captured))))
+			{
+				var region = regionsById[MapRegion.ComputeId(key.Map, key.Name)];
+				region.AreaNameId = areaNameId;
+				region.AreaNameSource = source;
+				_ = mapId;
+			}
+
+			// Every captured banner this run could NOT put on a volume is named, with its playfield. Since #680 there
+			// is nowhere else for one to live - the banner IS a property of the region that fires it - so a banner
+			// without a region is DROPPED, and saying which is the difference between a known gap and a silent one.
+			var placed = byName.Select(m => (m.MapId, m.AreaNameId)).Concat(byGeometry.Select(g => (g.Banner.MapId, g.Banner.AreaNameId))).ToHashSet();
+			var dropped = captured.Where(b => !placed.Contains((b.MapId, b.AreaNameId))).ToList();
+			foreach (var b in dropped)
+				notes.Add($"captured banner {b.AreaNameId} on map {b.MapId}: no client volume on that playfield is named after it and its sample separates it from none - DROPPED, the wire saw it but nothing can say where");
 
 			// ---- The hazard BEHAVIOUR side table (#504/#679) ----
 			// Written after the regions exist, because it is keyed by the region's own id: what a volume does is ours
@@ -184,56 +209,8 @@ namespace Faolan.Importer.Rdb
 			}
 
 			await db.SaveChangesAsync();
-			return new Result(wanted.Count, vertices, discoveryFor.Count, regionFor.Count, bannerFor.Count + clientFor.Count,
-				clientFor.Count(c => c.Area.Source == AreaBannerSource.ClientName), recovered, hazards.Count, notes);
-		}
-
-		// Turns the client-recovered banners into MapArea rows (#679) and asks for the regions they name.
-		//
-		// A recovered banner IS an area: the id is what goes on the wire and the region is the volume that fires it, so
-		// unlike a captured sighting there is no hull and nothing approximate about it. Where a capture already recorded
-		// the same (playfield, id) the row STAYS `Captured` - the wire saw it, which the client cannot corroborate any
-		// better - and only picks up the region link, which is the half the capture did not have.
-		private static List<(MapArea Area, (uint Map, string Name) Key)> MergeClientBanners(
-			DatabaseContext db,
-			List<MapArea> banners,
-			IReadOnlyList<AreaBannerNames.Match> matches,
-			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
-			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap)
-		{
-			var byKey = banners.ToDictionary(b => (b.MapId, b.AreaNameId));
-			var linked = new List<(MapArea, (uint, string))>();
-			foreach (var match in matches)
-			{
-				var area = areasByMap[match.MapId].First(a => a.Name == match.RegionName);
-				wanted[(match.MapId, match.RegionName)] = area;
-
-				if (byKey.TryGetValue((match.MapId, match.AreaNameId), out var banner))
-				{
-					// Both routes found it - as long as the row that is already there came from the WIRE. A row this
-					// importer wrote on an earlier run is not a second witness to anything, and promoting one would
-					// turn every client row into "corroborated" on the second run.
-					if (banner.Source != AreaBannerSource.ClientName)
-						banner.Source = AreaBannerSource.Corroborated;
-				}
-				else
-				{
-					banner = new MapArea
-					{
-						MapId = match.MapId,
-						AreaNameId = match.AreaNameId,
-						Source = AreaBannerSource.ClientName
-					};
-
-					db.MapAreas.Add(banner);
-					banners.Add(banner);
-					byKey[(match.MapId, match.AreaNameId)] = banner;
-				}
-
-				linked.Add((banner, (match.MapId, match.RegionName)));
-			}
-
-			return linked;
+			return new Result(wanted.Count, vertices, discoveryFor.Count, regionFor.Count, byName.Count + byGeometry.Count,
+				byGeometry.Count, dropped.Count, recovered, hazards.Count, notes);
 		}
 
 		// Every parseable 1000053 record for a playfield we host, as map -> the regions with a testable footprint. A
@@ -396,8 +373,8 @@ namespace Faolan.Importer.Rdb
 			return matched;
 		}
 
-		// A CAPTURED banner's trigger volume (#513/#348). `MapArea` is a hull over the positions retail actually fired
-		// each banner at, which under-covers by construction; this finds the client region that hull sits in.
+		// A CAPTURED banner's trigger volume (#513/#348). The harvest gives a hull over the positions retail actually
+		// fired each banner at, which under-covers by construction; this finds the client region that hull sits in.
 		//
 		// The route of last resort, and still the only one for a banner whose region carries an INTERNAL name: Old
 		// Tarantia's volumes are `BA_Bridge`/`BA_EastGate`, never the "Bridge of Vilerus I" the banner renders, so the
@@ -415,17 +392,18 @@ namespace Faolan.Importer.Rdb
 		//      cannot be what distinguishes them, so it is not the trigger for either.
 		//
 		// ⚠️ Deliberately no tolerance on the containment test. A banner fires ON ENTRY, so its sample sits right at
-		// the boundary and a near-miss is expected - 6 of 22 land outside every notifier region. Padding the test
-		// until they match would be fitting the answer; those keep the captured hull, which is what it is for.
-		private static List<(MapArea Area, (uint Map, string Name) Key)> MatchBannerRegions(
-			List<MapArea> unplaced,
-			List<MapArea> allBanners,
-			HashSet<MapArea> placedByName,
+		// the boundary and a near-miss is expected. Padding the test until they match would be fitting the answer -
+		// and since #680 a banner that reaches no volume is dropped rather than kept on its hull, so the cost of
+		// padding would be wrong areas rather than missing ones.
+		private static List<(CapturedBanner Banner, (uint Map, string Name) Key)> MatchBannerRegions(
+			List<CapturedBanner> unplaced,
+			IReadOnlyList<CapturedBanner> allBanners,
+			HashSet<(uint, uint)> placedByName,
 			Dictionary<uint, List<BoundedAreaCollection.BoundedArea>> areasByMap,
 			Dictionary<(uint, string), BoundedAreaCollection.BoundedArea> wanted,
 			List<string> notes)
 		{
-			var matched = new List<(MapArea, (uint, string))>();
+			var matched = new List<(CapturedBanner, (uint, string))>();
 			foreach (var byMap in unplaced.GroupBy(b => b.MapId))
 			{
 				if (!areasByMap.TryGetValue(byMap.Key, out var areas))
@@ -442,12 +420,12 @@ namespace Faolan.Importer.Rdb
 				// known by name does not get a veto: its stray sample says the sample is imprecise, which is exactly
 				// what a one-sighting hull is, and never that some other region is ambiguous.
 				var siblings = allBanners
-					.Where(b => b.MapId == byMap.Key && b.Source != AreaBannerSource.ClientName && !placedByName.Contains(b))
+					.Where(b => b.MapId == byMap.Key && !placedByName.Contains((b.MapId, b.AreaNameId)))
 					.ToList();
 				foreach (var banner in byMap)
 				{
-					var cx = (banner.MinX + banner.MaxX) / 2f;
-					var cz = (banner.MinZ + banner.MaxZ) / 2f;
+					var cx = banner.CentreX;
+					var cz = banner.CentreZ;
 
 					BoundedAreaCollection.BoundedArea? best = null;
 					var bestBox = double.MaxValue;
@@ -457,7 +435,7 @@ namespace Faolan.Importer.Rdb
 							continue;
 
 						// Gate 3: it must not also hold another banner on this map.
-						if (siblings.Any(o => o.AreaNameId != banner.AreaNameId && a.Contains((o.MinX + o.MaxX) / 2f, (o.MinZ + o.MaxZ) / 2f)))
+						if (siblings.Any(o => o.AreaNameId != banner.AreaNameId && a.Contains(o.CentreX, o.CentreZ)))
 							continue;
 
 						var box = (a.Vertices.Max(v => v.X) - a.Vertices.Min(v => v.X)) * (double)(a.Vertices.Max(v => v.Y) - a.Vertices.Min(v => v.Y));
@@ -469,10 +447,7 @@ namespace Faolan.Importer.Rdb
 					}
 
 					if (best == null)
-					{
-						notes.Add($"banner {banner.AreaNameId} on map {banner.MapId}: no separating crossing-notifier region contains it - keeping the captured hull");
-						continue;
-					}
+						continue; // reported once, by the DROPPED note the caller writes
 
 					wanted[(banner.MapId, best.Name)] = best;
 					matched.Add((banner, (banner.MapId, best.Name)));
@@ -533,8 +508,9 @@ namespace Faolan.Importer.Rdb
 			int Vertices,
 			int DiscoveryLinks,
 			int GoalLinks,
-			int BannerLinks,
-			int ClientBanners,
+			int Banners,
+			int GeometricBanners,
+			int DroppedBanners,
 			AreaBannerNames.Recovery Recovered,
 			int Hazards,
 			IReadOnlyList<string> Notes);

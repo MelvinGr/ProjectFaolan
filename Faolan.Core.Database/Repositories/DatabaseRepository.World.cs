@@ -12,7 +12,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> DeleteWorldObject(uint id);
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<Map?> GetMap(uint id);
-		Task<MapArea[]> GetMapAreas(uint mapId);
+		Task<MapRegion[]> GetAreaBannerRegions(uint mapId);
 		Task<MapHazard[]> GetMapHazards(uint mapId);
 		Task<TravelDestination[]> GetTravelDestinationsFrom(uint fromNodeId);
 		Task<TravelDestination?> GetTravelDestination(uint fromNodeId, uint optionId);
@@ -53,16 +53,16 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Maps.FirstOrDefaultAsync(m => m.Id == id);
 		}
 
-		// The named sub-areas of a playfield - the regions that float the area banner when a player walks in (#348).
-		public async Task<MapArea[]> GetMapAreas(uint mapId)
+		// The named sub-areas of a playfield - the client's own trigger volumes that float the area banner when a
+		// player walks in (#348/#513/#679). Every one carries its boundary polygon: containment is a point-in-polygon
+		// walk, so a volume without vertices would silently never fire. (Lazy loading is deliberately off, so the
+		// Include is required - see CLAUDE.md.)
+		public async Task<MapRegion[]> GetAreaBannerRegions(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			// The client's real trigger volume rides along where we have one (#513): the banner test prefers its
-			// polygon over the captured hull, so its vertices have to be loaded here - lazy loading is off.
 			return await ctx
-				.MapAreas.Where(a => a.MapId == mapId)
-				.Include(a => a.Region!)
-				.ThenInclude(r => r.Vertices)
+				.MapRegions.Where(r => r.MapId == mapId && r.AreaNameId != null)
+				.Include(r => r.Vertices)
 				.ToArrayAsync();
 		}
 
