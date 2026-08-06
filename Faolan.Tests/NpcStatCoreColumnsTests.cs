@@ -8,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
+using Microsoft.Data.Sqlite;
 using ProtoBuf;
 using Xunit;
 
@@ -137,6 +138,110 @@ namespace Faolan.Tests
 			Assert.True(npcs > 1000, $"only {npcs} NPC stat cores in the corpus - the gate would be vacuous");
 			Assert.True(players > 100, $"only {players} player stat cores in the corpus - the gate would be vacuous");
 			Assert.True(wrong.Count == 0, $"{wrong.Count} record(s) disagree with the bit-28 = NPC reading: {string.Join("; ", wrong.Take(5))}");
+		}
+
+		// A TYPE row must not carry a pose the type is only RARELY caught in (#688, the sibling of #602/#605).
+		//
+		// `bcc_state` and the `anim_idle_id` that goes with it are per-spawn-EVENT: 102 of 1024 captured types appear
+		// in more than one state, always lopsidedly. A Citizen (12460) is captured standing 286 times and sitting 5
+		// times - and the representative that reached the lift was one of the 5, so every Citizen in Old Tarantia sat
+		// down, walking around in a seated pose because a MoveTask moves an NPC whatever pose it holds.
+		//
+		// ⚠️ **This does NOT re-derive the importer's mode, and the first draft that did was wrong.** The importer
+		// measures over ALL 120 captures; the committed extract is a sample of them, so on a near-tie the two
+		// legitimately disagree (type 8775 is 32/26 in the extract, and the full corpus puts it the other way round).
+		// A gate that demands equality there is asserting which sample it was fed, not what is true - the same trap as
+		// any other derived gate. What IS stable across both is the SHAPE of the bug: a value that some other value
+		// outnumbers many times over. So the assertion is that margin, and near-ties are deliberately left alone.
+		//
+		// It does not assert "everyone stands" either, which would trade one wrong pose for another: the Door Warden
+		// (19619) is state 11 in all 15 of its sightings, the Beggar sits, the Drunken Pirate is drunk.
+		[Fact]
+		public void BccStateAndIdleAnimation_AreNotAPoseTheTypeIsRarelyCaughtIn()
+		{
+			// How far another value may outnumber the shipped one before it reads as "the representative was caught
+			// mid-emote" rather than "the corpus is thin". The Citizen bug was 57x; the worst near-tie is 1.5x.
+			const int outnumberedBy = 4;
+
+			var states = new Dictionary<uint, Dictionary<uint, int>>();
+			var idles = new Dictionary<uint, Dictionary<uint, int>>();
+
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
+			{
+				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read) || read.Message.npc_stats is not { } npc || !npc.ShouldSerializeTemplateId())
+					continue;
+
+				if (read.Message.Stats?.ShouldSerializeBccState() == true)
+					Tally(states, npc.TemplateId, read.Message.Stats.BccState);
+				if (read.Message.Bcc?.ShouldSerializeAnimIdleId() == true)
+					Tally(idles, npc.TemplateId, read.Message.Bcc.AnimIdleId);
+			}
+
+			// The shipped value is an outlier when the corpus has never seen it, or when another value outnumbers it
+			// by the margin above. Everything closer than that is the sample talking, not the data.
+			static string? Outlier(uint shipped, Dictionary<uint, int> tally, int margin)
+			{
+				var mine = tally.GetValueOrDefault(shipped);
+				var best = tally.OrderByDescending(kv => kv.Value).First();
+				if (mine == 0)
+					return "never captured on this type";
+
+				return best.Value >= mine * margin ? $"outnumbered {best.Value}:{mine} by {best.Key}" : null;
+			}
+
+			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
+			{
+				var tally = into.TryGetValue(template, out var t) ? t : into[template] = [];
+				tally[value] = tally.GetValueOrDefault(value) + 1;
+			}
+
+			var mixed = states.Count(kv => kv.Value.Count > 1);
+			Assert.True(mixed > 50, $"only {mixed} types are captured in more than one bcc_state - the gate would be vacuous");
+
+			using var con = new SqliteConnection($"Data Source={TestPaths.FaolanDb};Mode=ReadOnly");
+			con.Open();
+			using var cmd = con.CreateCommand();
+			// Only types that actually PLACE, because only those reach a player - and because only those are within
+			// the importer's reach. The modal lift is computed over the spawn entries a run harvests, so a core with
+			// no spawn left (42 rows, e.g. the Courtesan, whose 11 sightings say state 1 while its orphaned row still
+			// says 50) is never revisited and keeps whatever it was first given. Those rows are a separate defect -
+			// Gitea #689 - and asserting them here would report that one under this one's name.
+			cmd.CommandText =
+				"""
+				SELECT c.NpcTemplateId, c.BccState, c.AnimIdleId FROM NpcStatCores c
+				WHERE (c.BccState IS NOT NULL OR c.AnimIdleId IS NOT NULL)
+				  AND EXISTS (SELECT 1 FROM NpcSpawns s WHERE s.NpcTemplateId = c.NpcTemplateId)
+				""";
+			using var reader = cmd.ExecuteReader();
+
+			var wrong = new List<string>();
+			var checkedRows = 0;
+			while (reader.Read())
+			{
+				var template = (uint)reader.GetInt64(0);
+				if (!reader.IsDBNull(1) && states.TryGetValue(template, out var seenStates))
+				{
+					checkedRows++;
+					var shipped = (uint)reader.GetInt64(1);
+					if (Outlier(shipped, seenStates, outnumberedBy) is { } why)
+						wrong.Add($"template {template} ships bcc_state {shipped} ({why}); sightings {Format(seenStates)}");
+				}
+
+				if (!reader.IsDBNull(2) && idles.TryGetValue(template, out var seenIdles))
+				{
+					var shipped = (uint)reader.GetInt64(2);
+					if (Outlier(shipped, seenIdles, outnumberedBy) is { } why)
+						wrong.Add($"template {template} ships anim_idle_id {shipped} ({why}); sightings {Format(seenIdles)}");
+				}
+			}
+
+			static string Format(Dictionary<uint, int> tally)
+			{
+				return string.Join(", ", tally.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key}x{kv.Value}"));
+			}
+
+			Assert.True(checkedRows > 500, $"only {checkedRows} shipped cores could be checked against the corpus - the gate would be vacuous");
+			Assert.True(wrong.Count == 0, $"{wrong.Count} shipped stat core(s) carry a pose the type is only rarely caught in:\n  " + string.Join("\n  ", wrong.Take(10)));
 		}
 
 		// The writable, protobuf-mapped scalar properties of a generated message - the ones a column has to exist for.

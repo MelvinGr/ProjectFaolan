@@ -2255,8 +2255,28 @@ namespace Faolan.Importer.Captures
 			// beats the 91.7% a constant scores), and it is 77.9% type-stable over fresh sightings - so it has no
 			// derivation and no resting value, and the only honest improvement left is to stop letting the FIRST
 			// sighting speak for the type.
+			// ⚠️ **`bcc_state` and its `anim_idle_id` need it MORE than either of those, and not having it is what put
+			// half of Old Tarantia on the floor.** They are the state-controller's state and the animation that goes
+			// with it, and they are per-spawn-EVENT: over the corpus 102 of 1024 types are caught in more than one
+			// `bcc_state`, and the split is lopsided every time - a Citizen (12460) is captured standing (state 1,
+			// `anim_idle_id` 42024) 286 times and SITTING (state 9, idle 42176) 5 times. The representative that
+			// reached the lift was one of the 5, so the type's definition of a Citizen became "sitting", and every
+			// Citizen in the world sat down - while still walking around, because a MoveTask moves an NPC whatever
+			// pose it is holding.
+			//
+			// The two are tallied SEPARATELY but move together, because they describe one thing: the majority of a
+			// type's sightings carry both the resting state and its resting idle, so both modes come off the same
+			// spawns. Tallying them independently is still the right shape - it is what keeps a type whose idle
+			// varies for another reason from being dragged by its state.
+			//
+			// ⚠️ Not a blanket reset to 1. 14 types are NEVER captured in state 1 - the Door Warden (19619) is state
+			// 11 in all 15 of its sightings - so a type CAN rest somewhere other than 1, and flattening the column
+			// would trade one wrong pose for another. The mode is a measurement of that type's own sightings and
+			// keeps the Door Warden exactly where retail puts it.
 			var movementModes = new Dictionary<uint, Dictionary<uint, int>>();
 			var spawnAnimations = new Dictionary<uint, Dictionary<uint, int>>();
+			var bccStates = new Dictionary<uint, Dictionary<uint, int>>();
+			var idleAnimations = new Dictionary<uint, Dictionary<uint, int>>();
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0)
@@ -2270,6 +2290,10 @@ namespace Faolan.Importer.Captures
 					Tally(movementModes, e.TemplateId, seen.Message.MovementMode);
 				if (seen.Message.npc_stats?.ShouldSerializeSpawnAnimation() == true)
 					Tally(spawnAnimations, e.TemplateId, seen.Message.npc_stats.SpawnAnimation);
+				if (seen.Message.Stats?.ShouldSerializeBccState() == true)
+					Tally(bccStates, e.TemplateId, seen.Message.Stats.BccState);
+				if (seen.Message.Bcc?.ShouldSerializeAnimIdleId() == true)
+					Tally(idleAnimations, e.TemplateId, seen.Message.Bcc.AnimIdleId);
 			}
 
 			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
@@ -2282,6 +2306,8 @@ namespace Faolan.Importer.Captures
 			// tie-break, and a non-deterministic one would churn faolan.sql on every re-import for no semantic change.
 			var modalMovementMode = Modal(movementModes);
 			var modalSpawnAnimation = Modal(spawnAnimations);
+			var modalBccState = Modal(bccStates);
+			var modalIdleAnimation = Modal(idleAnimations);
 
 			static Dictionary<uint, uint> Modal(Dictionary<uint, Dictionary<uint, int>> tallies)
 			{
@@ -2338,6 +2364,10 @@ namespace Faolan.Importer.Captures
 					npc.StatCore.MovementMode = modalMove;
 				if (npc.StatCore?.SpawnAnimation != null && modalSpawnAnimation.TryGetValue(e.TemplateId, out var modalAnim))
 					npc.StatCore.SpawnAnimation = modalAnim;
+				if (npc.StatCore?.BccState != null && modalBccState.TryGetValue(e.TemplateId, out var modalState))
+					npc.StatCore.BccState = modalState;
+				if (npc.StatCore?.AnimIdleId != null && modalIdleAnimation.TryGetValue(e.TemplateId, out var modalIdle))
+					npc.StatCore.AnimIdleId = modalIdle;
 			}
 
 			await db.SaveChangesAsync();
