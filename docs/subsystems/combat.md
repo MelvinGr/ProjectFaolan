@@ -1025,7 +1025,7 @@ whose level sits at very different distances from the player's. Attributed per t
 player's level alongside, two effects separate out that the buckets render as one apparent cliff:
 
 - a **level-GAP penalty** - see below; modelled since #488.
-- **ranged mobs deal ~0.2 of same-level melee** even at gap 0 (`Poacher Marksman` 0.17, `Bat Pict Archer` 0.21).
+- **ranged mobs deal ~0.2 of same-level melee** even at gap 0 - see below; modelled since #671.
 
 ### The level-GAP penalty is a cliff, not a slope (#488)
 
@@ -1063,6 +1063,40 @@ below it. Both are per-archetype and independent of the gap, so neither is evide
 
 Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
 [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479).
+
+### A mob that SHOOTS deals a fifth of one that swings (#671)
+
+Independent of the level gap, and visible at gap 0-1 where the per-level curve itself is verified. Measured by
+joining `--report npc-damage`'s BY ATTACKER rows to each attacker's **main-hand weapon class**
+(`Items.SearchCategory`, the client's own catalog value - never a name match, #244):
+
+| weapon class | templates | hits | median `x model` |
+|---|---:|---:|---:|
+| **bow (30017)** | 7 | 127 | **0.36** |
+| 1h edge (30011) | 16 | 488 | 1.01 |
+| dagger (30015) | 10 | 122 | 1.02 |
+| 1h blunt (30012) | 7 | 63 | 1.15 |
+| 2h blunt (30014) | 3 | 75 | 1.00 |
+| polearm (30016) | 3 | 289 | 1.39 |
+| none (animals) | 19 | 388 | 1.15 |
+
+The factor is taken from the three **well-sampled** bow templates rather than the median of seven rows of wildly
+different weight: `Poacher Marksman` 8758 at 0.17 (31 hits), `Poacher Marksman` 13961 at 0.18 (18) and
+`Bat Pict Archer` 937 at 0.21 (70) - 119 hits, three templates, two zones, all at gap 0-1.
+`CombatResolver` uses **19 %**.
+
+Every melee class sits at ~1.0, which is what makes this a *ranged* factor rather than a per-weapon damage
+model. A weapon roll would not produce it: the bow's own catalog damage (819-5733) is **higher** than the 1h
+edge's (505-2864) - the opposite of what is measured.
+
+`NpcWeapon.IsRanged` decides it from the spawn's `Pos 6` item, and `WorldEntity.RangedAttacker` carries it to the
+tick. All 258 captured bow placements are at `Pos 6` and none anywhere else, so the main hand alone decides.
+Crossbow (30018) and thrown (30019) count too - neither appears on an NPC in the corpus, but they are the same
+kind of weapon and the measurement is "a mob that shoots you deals a fifth", not "item class 30017 does".
+
+⚠️ Applied to the mob's SWING only, not to its spell: the factor was measured on `DamageResultIIR` melee hits,
+and it is the arrow that lands soft. ⚠️ And it cannot hold at the bottom of the range - a level-3 archer's fifth
+is 0.57 of a display point, and the floor of 1 keeps a landed hit from reading as a miss.
 
 ## The client's own COMBAT LOG - an instrument the packets cannot replace (2026-07-28)
 

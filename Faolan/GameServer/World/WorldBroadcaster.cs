@@ -1043,6 +1043,9 @@ namespace Faolan.GameServer.World
 
 				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals, npc.NpcTemplateId);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
+				// #671: a mob that SHOOTS deals about a fifth of what one that swings does. Decided here, off the
+				// equipment rows this query already Includes, so the combat tick reads a flag rather than a join.
+				entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment);
 				entity.Level = npc.Level;
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
 				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
@@ -1431,6 +1434,7 @@ namespace Faolan.GameServer.World
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.NpcTemplate.Name ?? npcName, vitals, npc.NpcTemplateId);
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
+			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // #671, as in the zone-load path
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
@@ -1483,6 +1487,7 @@ namespace Faolan.GameServer.World
 				: 1;
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
+			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // #671 - from the TYPE's equipment; a pet has no NpcSpawn row
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
 			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
 			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the

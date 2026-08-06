@@ -414,6 +414,12 @@ namespace Faolan.GameServer.World
 		// never hostile here.
 		public bool Hostile { get; set; }
 
+		// Whether this NPC SHOOTS rather than swings - its main hand holds a bow/crossbow/thrown weapon
+		// (`NpcWeapon.IsRanged`). Stamped from the spawn's equipment at load, because that is where the rows are
+		// already Included; combat then only needs the flag (#671). False for a player, an animal and anything
+		// unarmed.
+		public bool RangedAttacker { get; set; }
+
 		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
 		// The tick flips this and emits an NpcEnterCombat/NpcExitCombat effect on the transition; reset on death/respawn.

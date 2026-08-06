@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
@@ -343,6 +344,63 @@ namespace Faolan.Tests
 			var actual = CombatResolver.ResolveNpcAttackDamage(npcLevel, playerLevel);
 
 			Assert.InRange((double)actual / unpenalised, low, high);
+		}
+
+		// #671: a mob that SHOOTS deals about a fifth of what one that swings does, and the factor is independent of
+		// the level gap. Pinned to the three well-sampled bow templates (`Poacher Marksman` 8758 at 0.17 over 31
+		// hits, 13961 at 0.18 over 18, `Bat Pict Archer` 937 at 0.21 over 70 - all at gap 0-1, where the per-level
+		// curve itself is verified).
+		[Theory]
+		[InlineData(20u, 20u)]
+		[InlineData(40u, 40u)]
+		[InlineData(80u, 80u)]
+		[InlineData(75u, 80u)] // and it composes with the level gap rather than replacing it
+		public void ARangedMob_DealsAboutAFifthOfAMeleeOneOfTheSameLevel(uint npcLevel, uint playerLevel)
+		{
+			var melee = CombatResolver.ResolveNpcAttackDamage(npcLevel, playerLevel);
+			var ranged = CombatResolver.ResolveNpcAttackDamage(npcLevel, playerLevel, true);
+
+			Assert.InRange((double)ranged / melee, 0.15, 0.25);
+		}
+
+		// ⚠️ The ratio cannot hold at the BOTTOM of the range, and that is the floor doing its job rather than the
+		// factor failing: a level-3 archer's fifth is 0.57 of a display point, and a hit that lands for 0 reads as a
+		// miss. So the low levels are asserted as "still lands, still softer than a swing" instead.
+		[Theory]
+		[InlineData(1u)]
+		[InlineData(2u)]
+		[InlineData(3u)]
+		public void ALowLevelRangedMob_StillLandsForAtLeastOne(uint level)
+		{
+			var ranged = CombatResolver.ResolveNpcAttackDamage(level, level, true);
+
+			Assert.True(ranged >= 1);
+			Assert.True(ranged <= CombatResolver.ResolveNpcAttackDamage(level, level));
+		}
+
+		// The archetype is read off the item CATALOG, never off a name (#244): three unrelated bow names, one answer.
+		[Theory]
+		[InlineData(30017u, 6u, true)] // bow
+		[InlineData(30018u, 6u, true)] // crossbow
+		[InlineData(30019u, 6u, true)] // thrown
+		[InlineData(30011u, 6u, false)] // 1h edge - the common melee case
+		[InlineData(30016u, 6u, false)] // polearm
+		[InlineData(30017u, 8u, false)] // a bow in the OFF hand is not what the mob attacks with
+		public void NpcWeapon_ReadsTheRangedArchetypeFromTheItemCategory(uint category, uint pos, bool expected)
+		{
+			var equipment = new[]
+			{
+				new NpcSpawnEquipment { Pos = pos, Template = 1, Item = new Item { Id = 1, Name = "whatever", SearchCategory = category } }
+			};
+
+			Assert.Equal(expected, NpcWeapon.IsRanged(equipment));
+		}
+
+		[Fact]
+		public void NpcWeapon_AnUnarmedOrAnimalNpc_IsNotRanged()
+		{
+			Assert.False(NpcWeapon.IsRanged(null));
+			Assert.False(NpcWeapon.IsRanged([]));
 		}
 
 		// The regression that motivated the ticket, stated in the terms it was reported in: a level-80 player wading

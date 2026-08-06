@@ -389,11 +389,40 @@ namespace Faolan.GameServer.Combat
 		// `targetLevel` is who is being HIT: retail's level-gap penalty is applied here (#488), so pass the defender's
 		// level rather than the mob's. A caller measuring the bare per-level curve passes `npcLevel` for both, which
 		// is the un-penalised case by construction.
-		public static uint ResolveNpcAttackDamage(uint npcLevel, uint targetLevel)
+		//
+		// `ranged` is whether the mob SHOOTS rather than swings (`NpcWeapon.IsRanged`) - see RangedPercent.
+		public static uint ResolveNpcAttackDamage(uint npcLevel, uint targetLevel, bool ranged = false)
 		{
-			var wire = Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * LevelGapPercent(npcLevel, targetLevel) / 100;
+			var scale = LevelGapPercent(npcLevel, targetLevel) * (ranged ? RangedPercent : 100u) / 100;
+			var wire = Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * scale / 100;
 			return Math.Max(1u, wire / CharacterStatId.HealthMax.GetScale());
 		}
+
+		// A RANGED mob deals about a fifth of what a melee mob of the same level does - a factor independent of the
+		// level gap, and visible at gap 0-1 where the per-level curve itself is verified (#671).
+		//
+		// Measured by joining `--report npc-damage`'s BY ATTACKER rows to each attacker's MAIN-HAND weapon class
+		// (`Items.SearchCategory`, the client's own catalog value - not a name match, #244):
+		//
+		//     weapon class   templates  hits   median x model
+		//     bow (30017)            7   127   0.36        <- and 119 of those hits are the three below
+		//     1h edge (30011)       16   488   1.01
+		//     dagger  (30015)       10   122   1.02
+		//     1h blunt(30012)        7    63   1.15
+		//     2h blunt(30014)        3    75   1.00
+		//     polearm (30016)        3   289   1.39
+		//     none (animals)        19   388   1.15
+		//
+		// The three well-sampled bow templates are `Poacher Marksman` 8758 at 0.17 (31 hits), `Poacher Marksman`
+		// 13961 at 0.18 (18) and `Bat Pict Archer` 937 at 0.21 (70) - two zones, three templates, 119 hits, all at
+		// gap 0-1. The other four bow rows are 1-4 hits each and two of them are the known archetype outliers
+		// (`Gaud Guardsman`, `Nemedian Sagittarius`), so the factor is taken from the 119 and not from the median of
+		// seven rows of wildly different weight.
+		//
+		// ⚠️ Every melee class sits at ~1.0, which is what makes this a RANGED factor rather than a per-weapon damage
+		// model. A weapon roll would not do that: the bow's own catalog damage (819-5733) is HIGHER than the 1h
+		// edge's (505-2864), i.e. the opposite of what is measured.
+		private const uint RangedPercent = 19;
 
 		// Retail's LEVEL-GAP penalty: a mob well below the player barely scratches them, and the drop is a CLIFF, not
 		// a slope - full damage out to a five-level gap, then two steps to a ~0.11 floor that holds all the way down.
