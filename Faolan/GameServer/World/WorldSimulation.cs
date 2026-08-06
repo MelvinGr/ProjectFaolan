@@ -574,9 +574,36 @@ namespace Faolan.GameServer.World
 				return cached;
 
 			var spell = await _database.GetSpell(baseSpellId);
-			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0, spell?.DotIntervalMs ?? 0);
+			var effect = (DisplayDotDelta(spell?.DotDelta ?? 0), spell?.DotType ?? 0, spell?.DotIntervalMs ?? 0);
 			_dotEffects[baseSpellId] = effect;
 			return effect;
+		}
+
+		// `Spell.DotDelta` is a captured `StatDamageIIR` delta, so it is a WIRE number - and everything it meets at
+		// this layer is DISPLAY: `EntityVitals.Health` is the ÷100 vitals value, the melee path spends the already
+		// converted `CombatResolver.ResolveNpcAttackDamage`, and `SendStatDamage` reports the delta beside that same
+		// display `vitals.Health`. This is #572's unit mismatch one path over, and it bites harder: melee was a curve
+		// we could reason about, while a DoT is a flat captured constant. `Rend` (3236937) ticks -54 every 1.5s, so a
+		// level-1 Scavenger Lackey bled a level-1 player's 88-point pool dry in three ticks - the "level-1 mob kills a
+		// level-1 player" report that #572 was filed for, still reproducing through the buff path after the melee half
+		// was fixed. The corpus goes to -258,352 (`Chill (Rank 5)`), which no display pool survives at all.
+		//
+		// Converted HERE, at the one place a spell row becomes a live effect, rather than at the tick: the value then
+		// reaches BOTH the health application and the wire already in display units, so the two cannot drift apart.
+		// The stored column stays in wire units for the same reason #572 left its curve alone - the captured evidence
+		// is wire, and rewriting it would make the provenance unreadable.
+		//
+		// Magnitude is floored at 1 rather than truncated, so a small DoT still does something: `Rend`'s -54 is 0 under
+		// integer division, and a debuff that ticks for nothing would read as "DoTs are broken" instead of "scaled".
+		// Sign is preserved - a positive delta is a heal-over-time, which floors at +1 by the same rule.
+		private static int DisplayDotDelta(int wireDelta)
+		{
+			if (wireDelta == 0)
+				return 0;
+
+			var scaled = wireDelta / (int)CharacterStatId.HealthMax.GetScale();
+
+			return scaled != 0 ? scaled : Math.Sign(wireDelta);
 		}
 
 		// A character's discovered respawn-point ids, cached (loaded once, updated on discovery) to keep the discovery
