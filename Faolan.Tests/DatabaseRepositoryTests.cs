@@ -902,6 +902,73 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #697: a feat's COMBO bonuses reach combat as `comboId -> bonus`, through the same two hops the spell boosts
+		// take. Two things this has to get right that the spell query does not: the two source tables mean DIFFERENT
+		// things (one weapon attack vs the combo as a whole) so they land in different fields, and their UNITS differ
+		// - `FeatComboAttackModifier.DpsPercent` is a whole percent and `FeatComboModifier` is hundredths, which is
+		// the client's own doing (#593). A single sum would be wrong by 100x on one of them.
+		[Fact]
+		public async Task ComboBonuses_KeepTheTwoKindsApartAndNormaliseTheirUnits()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-combo-bonus-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint characterId = 9;
+				const uint wireFeatId = 80104, templateId = 3527884, otherTemplateId = 3527800;
+				const uint comboId = 3202262, otherComboId = 228651;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Accounts.Add(new Account { Id = 1, UserName = "t", Password = "t", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Characters.Add(new Character { Id = characterId, Name = "Fighter", AccountId = 1, RealmId = 1, Class = ConanClass.Conqueror, Race = Race.Cimmerian });
+					ctx.CharacterFeatSpecs.Add(new CharacterFeatSpec { CharacterId = characterId, Index = 0 });
+					ctx.CharacterFeats.Add(new CharacterFeat { CharacterId = characterId, SpecIndex = 0, FeatId = wireFeatId, Sequence = 0 });
+					ctx.FeatIdMaps.Add(new FeatIdMap { WireFeatId = wireFeatId, TemplateId = templateId, BaseIndex = 801, Rank = 4 });
+					ctx.Feats.Add(new Feat { Id = templateId, Name = "Brutal Cyclone", BaseName = "Brutal Cyclone" });
+					ctx.Feats.Add(new Feat { Id = otherTemplateId, Name = "Untrained", BaseName = "Untrained" });
+
+					// The OPENING attack: +30% damage (a whole percent) and +400 crit rating.
+					ctx.FeatComboAttackModifiers.Add(new FeatComboAttackModifier
+					{
+						FeatId = templateId, Sequence = 0, ComboId = comboId, AttackSlot = ComboAttackSlot.Opening, DpsPercent = 30, CriticalChanceRating = 400, EffectKind = 53250
+					});
+					// The FINISHING attack of the same combo, on the same feat - a second row, not a merge.
+					ctx.FeatComboAttackModifiers.Add(new FeatComboAttackModifier
+					{
+						FeatId = templateId, Sequence = 1, ComboId = comboId, AttackSlot = ComboAttackSlot.Finishing, DpsPercent = 5, EffectKind = 53250
+					});
+					// The WHOLE-combo axis, in hundredths: +20.00%.
+					ctx.FeatComboModifiers.Add(new FeatComboModifier { FeatId = templateId, Sequence = 0, ComboId = comboId, DamagePercentHundredths = 2000, EffectKind = 53209 });
+					// An untrained feat's modifier on another combo: it must not leak in.
+					ctx.FeatComboModifiers.Add(new FeatComboModifier { FeatId = otherTemplateId, Sequence = 0, ComboId = otherComboId, DamagePercentHundredths = 9900, EffectKind = 53209 });
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				var bonuses = await repo.GetCharacterComboBonuses(characterId);
+
+				var bonus = Assert.Single(bonuses).Value;
+				Assert.Equal(3000, bonus.OpeningDamagePercentHundredths); // 30% -> hundredths
+				Assert.Equal(400, bonus.OpeningCriticalRating);
+				Assert.Equal(500, bonus.FinishingDamagePercentHundredths);
+				Assert.Equal(0, bonus.FinishingCriticalRating);
+				Assert.Equal(2000, bonus.SpellDamagePercentHundredths); // already hundredths
+				Assert.DoesNotContain(otherComboId, bonuses.Keys);
+
+				// A step that is neither the opener nor the finisher takes nothing; a one-step combo is both.
+				Assert.Equal(0, bonus.SwingDamagePercentHundredths(false, false));
+				Assert.Equal(3500, bonus.SwingDamagePercentHundredths(true, true));
+				Assert.Equal(400, bonus.CriticalRating(true, true));
+			}
+			finally
+			{
+				TestDb.Delete(dbPath);
+			}
+		}
+
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
 			var options = TestDb.Options(path);

@@ -151,7 +151,13 @@ namespace Faolan.GameServer
 			// ApplySpell takes the WIRE buff id ((base << 8) | rank); the catalog carries the bare base, same as
 			// the cast path (#274).
 			await ApplySpell(client, targetHandle, casterHandle, spellId << 8);
-			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+
+			// #697: the WHOLE-combo damage the player's feats grant (GameAction 53209 `UpgradeCombo` - "improves the
+			// damage inflicted by the Blood for Aid combos"). It lands here rather than on a step's swing because
+			// this is where our model puts a combo's damage: in the finisher's spell. The per-ATTACK bonuses of
+			// kind 53250 are the other half and ride the swings themselves, in SendNormalAttackResponse.
+			var comboDamageBonus = _simulation.PlayerWorldEntity(client)?.ComboBonus(swing.Combo.Id).SpellDamagePercentHundredths ?? 0;
+			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, comboDamageBonus);
 		}
 	}
 }

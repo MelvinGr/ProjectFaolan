@@ -348,6 +348,32 @@ ranks are ever held at once to need a shared timer. `Combo.ParentId` chains the 
 Gated by `ComboServiceTests` (the runtime) and `ComboWireTests` (the wire claims, against the captured swings in
 the `combo-swings.bin` fixture).
 
+### What a player's FEATS do to their combos
+
+Two GameAction kinds in the feat catalog name a combo, and they are not the same statement — see
+[feats.md](feats.md) for their decode. Both are resolved once at world entry into `WorldEntity.ComboBonuses`
+(`comboId → ComboFeatBonus`), the same shape and for the same reason `SpellBoosts` is: a swing must not turn into
+a query.
+
+| kind | what it modifies | where it lands |
+| --- | --- | --- |
+| 53250 `ChangeInheritedWeaponAttack` | one WEAPON ATTACK of the combo — its opener or its finisher | that step's swing damage and its critical roll, in `CombatService.SendNormalAttackResponse` |
+| 53209 `UpgradeCombo` | the combo as a WHOLE | the finisher's SPELL damage, in `ResolveComboFinisher` — which is where this model puts a combo's damage |
+
+So `Fierce Opening` (+30% on every combo's opening attack) makes the first swing of a chain hit harder, and
+`Brutal Blows` (+400 crit rating on Overreach's finisher) makes its last swing crit more often, while `Hexer`
+(+1.00% on the Blood for Aid combos) raises what the finisher's spell lands for. A step that is neither the opener
+nor the finisher takes neither, and a **one-step combo is both** — the two bonuses add.
+
+⚠️ **The two kinds' units differ** and the difference is the client's own: 53250's damage column is a WHOLE
+percent and 53209's is hundredths of a percent. They are normalised to hundredths in the repository query, so
+nothing downstream has to remember which is which. `CombatResolver.ApplyPercentBonus` is the one place a percent
+is applied, shared with the spell-line boost (#590).
+
+`ChangeInheritedWeaponAttack`'s other two axes have no consumer yet and are deliberately not faked: the HATE
+column needs a threat model we have none of (it is 2 rows in the whole catalog), and the damage-TYPE column is
+zero on every shipped record. Tracked in Gitea #697 along with the proc and per-spell-stat tables.
+
 ## NPC combos — the WEAPON picks the row
 
 Retail's mobs combo too, and constantly: **484 of the corpus's 840 combo swings are `combo_npc_*` rows**, from 150

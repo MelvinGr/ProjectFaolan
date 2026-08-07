@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -148,7 +149,7 @@ namespace Faolan.GameServer.World
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
-			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null)
+			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null, IReadOnlyDictionary<uint, ComboFeatBonus>? comboBonuses = null)
 		{
 			var character = client.Session.Character;
 
@@ -188,7 +189,10 @@ namespace Faolan.GameServer.World
 				// the two never disagree about what the character's Intelligence is.
 				Attributes = VitalAttributes.From(classBase, statBonuses),
 				CharacterClass = character.Class,
-				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>()
+				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>(),
+				// #697: what the character's feats do to their combos, resolved once here for the same reason the
+				// spell boosts are - a swing must not turn into a query.
+				ComboBonuses = comboBonuses ?? new Dictionary<uint, ComboFeatBonus>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.

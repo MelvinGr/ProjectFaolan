@@ -510,13 +510,19 @@ namespace Faolan.GameServer.Combat
 			var level = casterLevel == 0
 				? (ushort)1
 				: casterLevel;
-			var damage = 20 + level * 5 + (int)magicDamage;
-			if (spellLinePercentHundredths == 0)
-				return damage;
+			return ApplyPercentBonus(20 + level * 5 + (int)magicDamage, spellLinePercentHundredths);
+		}
 
-			// A debuff-shaped negative can only ever take the hit to 1, never to 0 or below - a boosted spell that
-			// stops dealing damage would read as a miss.
-			return Math.Max(1, (int)((long)damage * (PercentScale + spellLinePercentHundredths) / PercentScale));
+		// A percent bonus stored x100, applied over a FINISHED damage number. Shared by the spell-line feat boost
+		// (#590) and the combo feat bonuses (#697) so the two cannot drift on rounding or on the floor rule.
+		//
+		// A debuff-shaped negative can only ever take the hit to 1, never to 0 or below - a boosted attack that stops
+		// dealing damage would read as a miss.
+		public static int ApplyPercentBonus(int damage, int percentHundredths)
+		{
+			return percentHundredths == 0
+				? damage
+				: Math.Max(1, (int)((long)damage * (PercentScale + percentHundredths) / PercentScale));
 		}
 
 		// A percent modifier is stored x100 (3500 = 35.00%), so 100% is 10000.

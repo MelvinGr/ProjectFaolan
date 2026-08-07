@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -195,6 +196,21 @@ namespace Faolan.GameServer.World
 		public int SpellBoost(uint spellId)
 		{
 			return SpellBoosts.GetValueOrDefault(spellId);
+		}
+
+		/// <summary>
+		///     What this entity's trained feats do to their COMBOS (#697), as <c>comboId -> bonus</c> - the opening
+		///     and finishing weapon attacks' damage and crit rating (GameAction 53250) plus the whole-combo damage
+		///     that lands on the finisher spell (53209). Resolved once at world entry beside
+		///     <see cref="SpellBoosts" />, so a swing is a dictionary lookup. Empty for NPCs and for a character with
+		///     no combo feats, which is most of them.
+		/// </summary>
+		public IReadOnlyDictionary<uint, ComboFeatBonus> ComboBonuses { get; set; } = new Dictionary<uint, ComboFeatBonus>();
+
+		/// <summary>This entity's feat bonus for one combo; <see cref="ComboFeatBonus.None" /> when it has none.</summary>
+		public ComboFeatBonus ComboBonus(uint comboId)
+		{
+			return ComboBonuses.GetValueOrDefault(comboId, ComboFeatBonus.None);
 		}
 
 		/// <summary>

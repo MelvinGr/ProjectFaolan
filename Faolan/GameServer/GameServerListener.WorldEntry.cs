@@ -544,8 +544,11 @@ namespace Faolan.GameServer
 			// #592: the handful of the character's spells that override which ATTRIBUTE their damage scales off. The
 			// class rule covers the rest, so this is usually empty.
 			var spellScaling = await Database.GetCharacterSpellScalingAttributes(character.Id);
+			// #697: and what they do to the character's COMBOS - the opening/finishing weapon attacks' damage and
+			// crit, plus the whole-combo damage that rides the finisher's spell.
+			var comboBonuses = await Database.GetCharacterComboBonuses(character.Id);
 
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling);
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them

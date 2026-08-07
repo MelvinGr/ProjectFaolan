@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -201,12 +202,16 @@ namespace Faolan.GameServer.Combat
 		// Resolves an offensive cast: applies the damage to the target's live vitals (a 0x96B8DC59 update moves the
 		// health bar) and shows the spell hit's floating number via StatDamage (see SendSpellDamageNumber). The
 		// ApplySpell VFX is broadcast by the caller.
-		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
+		//
+		// `extraPercentHundredths` is a caller-supplied boost on top of the caster's own spell-line feat boost - the
+		// combo finisher passes the whole-combo damage its feats grant (#697), which is a property of the COMBO
+		// rather than of the spell and so cannot be read off the caster here.
+		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId, int extraPercentHundredths = 0)
 		{
 			var caster = _sim.PlayerWorldEntity(client);
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, caster?.SpellBoost(spellId) ?? 0);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, (caster?.SpellBoost(spellId) ?? 0) + extraPercentHundredths);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}
@@ -264,12 +269,21 @@ namespace Faolan.GameServer.Combat
 			attackerEntity?.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
 			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
+
+			// #697: what the player's trained feats do to THIS combo attack. A combo's opening and finishing weapon
+			// attacks each carry their own damage and critical-chance bonus (GameAction 53250
+			// `ChangeInheritedWeaponAttack`, #593) - "Fierce Opening" is +30% on every combo's opener, "Brutal Blows"
+			// is +10% crit chance on Overreach's finisher. A plain swing is not part of a combo and takes neither.
+			var comboBonus = combo != null ? attackerEntity?.ComboBonus(combo.Combo.Id) ?? ComboFeatBonus.None : ComboFeatBonus.None;
+			damage = (uint)CombatResolver.ApplyPercentBonus((int)damage, comboBonus.SwingDamagePercentHundredths(combo?.IsOpener == true, combo?.IsFinisher == true));
+
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
 			// their Critical Damage Rating. A crit is NOT a distinct wire flag - RE of all captured DamageResults
 			// (2026-07-22) showed the `type` field is the ATTACKER's damage school (constant per attacker; the player's
 			// physical melee is always type 3), the two trailing fields are always 0, and there is no crit indicator.
 			// So retail conveys a crit purely by the larger number; we send the player's melee type (3) either way.
-			var crit = CombatResolver.IsCriticalHit(attackerEntity?.CriticalRating ?? 0, Random.Shared.Next(100));
+			var criticalRating = (uint)Math.Max(0, (attackerEntity?.CriticalRating ?? 0) + comboBonus.CriticalRating(combo?.IsOpener == true, combo?.IsFinisher == true));
+			var crit = CombatResolver.IsCriticalHit(criticalRating, Random.Shared.Next(100));
 			if (crit)
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
 

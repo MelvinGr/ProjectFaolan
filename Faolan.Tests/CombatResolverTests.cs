@@ -73,6 +73,27 @@ namespace Faolan.Tests
 			Assert.Equal(baseDmg, CombatResolver.ResolveSpellDamage(123, 10)); // no gear = base
 		}
 
+		// #697: the percent step the spell-line feat boost and the combo feat bonuses share, so the two cannot drift
+		// on rounding or on the floor rule. The unit is hundredths of a percent - 3000 is +30%.
+		[Theory]
+		[InlineData(100, 0, 100)] // no bonus is the identity, not a x1 round-trip
+		[InlineData(100, 3000, 130)]
+		[InlineData(100, 10000, 200)]
+		[InlineData(100, -5000, 50)]
+		public void PercentBonus_ScalesAFinishedNumber(int damage, int percentHundredths, int expected)
+		{
+			Assert.Equal(expected, CombatResolver.ApplyPercentBonus(damage, percentHundredths));
+		}
+
+		// A debuff-shaped negative floors at 1: an attack that stops dealing damage entirely would read as a miss,
+		// which is a different thing from a heavily debuffed hit.
+		[Fact]
+		public void PercentBonus_NeverTakesADamagingHitToZero()
+		{
+			Assert.Equal(1, CombatResolver.ApplyPercentBonus(100, -10000));
+			Assert.Equal(1, CombatResolver.ApplyPercentBonus(100, -50000));
+		}
+
 		// The client's own rule, recovered from FUN_01118ce0 and confirmed independently by RDB field 847 -
 		// docs/rdb/spell-scaling.md. Wisdom for every caster; Intelligence for the three classes the client
 		// special-cases; and the rate is TKW_MagicalDpsAbilityModifier = 0.6, truncated (the client's CVTTSS2SI).

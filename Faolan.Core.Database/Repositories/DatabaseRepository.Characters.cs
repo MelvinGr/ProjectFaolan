@@ -50,6 +50,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId);
 
 		/// <summary>
+		///     What a character's trained feats do to their COMBOS (#697), as <c>comboId -> bonus</c>. Summed per
+		///     combo across every feat that names it, on the same "a character holds only the highest rank of each
+		///     feat" rule <see cref="GetCharacterSpellBoosts" /> relies on.
+		/// </summary>
+		Task<IReadOnlyDictionary<uint, ComboFeatBonus>> GetCharacterComboBonuses(uint characterId);
+
+		/// <summary>
 		///     The per-spell scaling-attribute OVERRIDES among a character's KNOWN spells (#592), as
 		///     <c>spellId -> wire stat id</c>. Only spells whose template carries RDB field 847 appear; every other
 		///     spell takes the caster's class attribute (<c>CombatResolver.MagicDamageAttribute</c>), so an absent
@@ -526,6 +533,56 @@ namespace Faolan.Core.Database.Repositories
 			var totals = new Dictionary<uint, int>();
 			foreach (var row in rows)
 				totals[row.Id] = totals.GetValueOrDefault(row.Id) + row.PercentHundredths;
+
+			return totals;
+		}
+
+		// What a character's trained feats do to their combos (#697). Two hops for the same reason
+		// GetCharacterSpellBoosts has two: CharacterFeat.FeatId is a WIRE id and the modifier rows hang off the RDB
+		// TEMPLATE id, which FeatIdMaps bridges.
+		//
+		// TWO tables, kept apart in the result because they are not the same statement: 53250 modifies one weapon
+		// ATTACK of the combo (its opener or its finisher) and 53209 modifies the combo as a whole. Resolved here,
+		// once at world entry, so the swing path stays a dictionary lookup.
+		//
+		// ⚠️ The two tables' units differ - 53250's are whole percents and 53209's hundredths - which is the client's
+		// own doing (#593). Normalised to hundredths here so nothing downstream has to remember which is which.
+		public async Task<IReadOnlyDictionary<uint, ComboFeatBonus>> GetCharacterComboBonuses(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var attacks = await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+				join mod in ctx.FeatComboAttackModifiers on map.TemplateId equals mod.FeatId
+				select new { mod.ComboId, mod.AttackSlot, mod.DpsPercent, mod.CriticalChanceRating }).ToArrayAsync();
+
+			var upgrades = await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+				join mod in ctx.FeatComboModifiers on map.TemplateId equals mod.FeatId
+				select new { mod.ComboId, mod.DamagePercentHundredths }).ToArrayAsync();
+
+			var totals = new Dictionary<uint, ComboFeatBonus>();
+			foreach (var row in attacks)
+			{
+				var bonus = totals.GetValueOrDefault(row.ComboId, ComboFeatBonus.None);
+				totals[row.ComboId] = row.AttackSlot == ComboAttackSlot.Opening
+					? bonus with
+					{
+						OpeningDamagePercentHundredths = bonus.OpeningDamagePercentHundredths + (row.DpsPercent * 100),
+						OpeningCriticalRating = bonus.OpeningCriticalRating + row.CriticalChanceRating
+					}
+					: bonus with
+					{
+						FinishingDamagePercentHundredths = bonus.FinishingDamagePercentHundredths + (row.DpsPercent * 100),
+						FinishingCriticalRating = bonus.FinishingCriticalRating + row.CriticalChanceRating
+					};
+			}
+
+			foreach (var row in upgrades)
+			{
+				var bonus = totals.GetValueOrDefault(row.ComboId, ComboFeatBonus.None);
+				totals[row.ComboId] = bonus with { SpellDamagePercentHundredths = bonus.SpellDamagePercentHundredths + row.DamagePercentHundredths };
+			}
 
 			return totals;
 		}
