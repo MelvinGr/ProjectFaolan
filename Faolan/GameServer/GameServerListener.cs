@@ -164,6 +164,10 @@ namespace Faolan.GameServer
 		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
 		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
 		private readonly BuffStatEffects _buffStats;
+
+		// The INSTANT half of a spell's effect - the pools it moves the moment it lands, where _buffStats owns the
+		// lasting stat deltas (#702).
+		private readonly SpellPoolEffects _poolEffects;
 		private readonly ClaimService _claims;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
@@ -313,6 +317,7 @@ namespace Faolan.GameServer
 			// the roll + the two Fatality ids every captured burst carries.
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
+			_poolEffects = new SpellPoolEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
 			_spellweave = new SpellweaveService(logger, this);
 			// #506/#514: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs), and is

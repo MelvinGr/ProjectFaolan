@@ -1124,6 +1124,38 @@ sit in that same ~2.15 s cluster, but its median is 2.365 s — only 10% high, y
 midpoint, so the half-second snap turned a 10% bias into a reported **2500 ms**. It is the one spell in the corpus
 where the two rules disagree.
 
+### Healing: the INSTANT half of a spell's effect (#702)
+
+A spell's `SpellStatEffects` rows carry two different things, told apart by the record's KIND: the **lasting**
+stat deltas `BuffStatEffects` owns (+62 Hit Rating for 20 minutes) and the **instant** pool moves
+`SpellPoolEffects` owns (a heal). Only the first was ever applied, which meant healing did not exist — 52
+class-castable spells and every health potion in the catalog showed an icon and moved no bar.
+
+| kind | | unit |
+| --- | --- | --- |
+| `Hit` 53002 · `DPSHit` 53013 · `InterpolatedHit` 53219 · `MagicHit` 53256 | a flat pool move | the ×100 vitals scale |
+| `HitPercentage` 53007 | a percent of the pool | a plain percent |
+
+⭐ **`HitPercentage` states its own unit through a carrier's name.** The dev spell `System Spell: Fire AOE damage
+25% of Life` carries **−25** — so that kind is a percent of the pool rather than a value at the stat's display
+scale, which is what tells the two families apart without a fit.
+
+The stat says which pool (27 health, 506 mana, 504 stamina — all three ×100 by the client's own divisor table),
+and the sign says heal versus damage. `Lifestrike`'s five ranks run 3400 → 33700, i.e. 34 → 337 HP.
+
+⚠️ **It fires ONCE, and that is the whole difficulty.** These rows sit beside the lasting deltas on the same
+spell, and the buff paths that touch a spell repeatedly — the relog restore, the expiry sweep, a re-apply that
+refreshes a duration — must not carry them. So it hangs off `ApplySpell` ("a spell just landed on someone") and
+`UseConsumable`, never off `SendMagicBuffIir`, which all of those go through.
+
+⚠️ **`-100000000` is a drain SENTINEL, not an amount** (`Demonic Puppet` carries it); applied literally it would
+kill anything it touched. And `MagicHit` on `HealthMax` is a different mechanic — the `Venomstrike`/`Banestrike`
+ladders are a max-health drain, and none of their carriers are class-castable, so they stay out.
+
+A consumable's heal sits behind the same "already active → no-op" guard the buff does, which is capture-derived
+retail behaviour and, since all four pool-moving potions carry a 60 s duration, amounts to a 60-second potion
+cooldown.
+
 ### A spell can CRIT, and the client's own catalog says which and how hard (#633)
 
 The spell path had no critical hit at all: `ResolveOffensiveCast` computed a number and applied it. Two RDB spell

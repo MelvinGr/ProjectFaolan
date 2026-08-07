@@ -85,6 +85,11 @@ namespace Faolan.GameServer
 
 			var durationCs = spell.DurationMs / 10;
 			await SendMagicBuffIir(client, self, self, wireSpellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client)));
+
+			// #702: and the pool the consumable actually MOVES. A health potion's whole point is the instant heal -
+			// `Daggamalt` -> `Health Potion Effect 10` carries +40500 (405 HP) - and this path used to apply the buff,
+			// consume the item and leave the bar exactly where it was.
+			await ApplyPoolEffects(client, self, spellBase);
 			await RemoveItemFromBackpack(client, slot, 1);
 		}
 

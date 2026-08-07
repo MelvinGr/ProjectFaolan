@@ -170,11 +170,69 @@ namespace Faolan.GameServer
 				var effectWireId = effect.Id << 8;
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
 				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.ApplyNow(effect.Id, effect.DurationMs / 10, CasterLevel(client)));
+				await ApplyPoolEffects(client, applyTo, effect.Id);
 				return;
 			}
 
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client)));
+			await ApplyPoolEffects(client, applyTo, spellId >> 8);
+		}
+
+		// The INSTANT pool move a landing spell carries (#702) - a heal, a mana restore, a stamina refill. Applied
+		// here rather than in the buff engine because it is not a lasting stat: it happens once, when the spell lands.
+		//
+		// ⚠️ ONCE is the whole difficulty. These rows sit beside the lasting deltas on the same spell, and the buff
+		// paths that touch a spell repeatedly - the relog RESTORE, the expiry sweep, a re-apply that refreshes a
+		// duration - must not carry them. So this hangs off ApplySpell, which is "a spell just landed on someone",
+		// and NOT off SendMagicBuffIir, which every one of those paths goes through.
+		//
+		// Only a PLAYER's own pools, for now: every one of the 52 class-castable carriers is a self-heal or a
+		// team-support spell landing on a player, and an NPC's pools have their own path (ApplyNpcDamage) with its own
+		// death lifecycle that a heal must not bypass.
+		private async Task ApplyPoolEffects(INetworkClient client, uint applyTo, uint spellBase)
+		{
+			if (applyTo != client.Session.Character.Id)
+				return;
+
+			var effects = await _poolEffects.ForSpellBase(spellBase);
+			if (effects.Count == 0)
+				return;
+
+			var vitals = _combat.GetOrAddPlayerVitals(client);
+			var moved = false;
+			foreach (var effect in effects)
+			{
+				var max = effect.Pool switch
+				{
+					CharacterStatId.HealthCurrent => vitals.MaxHealth,
+					CharacterStatId.ManaCurrent => vitals.MaxMana,
+					_ => vitals.MaxStamina
+				};
+
+				var amount = effect.For(max);
+				if (amount == 0 || max == 0)
+					continue;
+
+				switch (effect.Pool)
+				{
+					case CharacterStatId.HealthCurrent:
+						vitals.ApplyHealthDelta(amount);
+						break;
+					case CharacterStatId.ManaCurrent:
+						vitals.ApplyManaDelta(amount);
+						break;
+					default:
+						vitals.Stamina = (uint)Math.Clamp((long)vitals.Stamina + amount, 0, max);
+						break;
+				}
+
+				moved = true;
+				Logger.LogInformation("Spell {Spell} moved {Name}'s {Pool} by {Amount}.", spellBase, client.Session.Character.Name, effect.Pool, amount);
+			}
+
+			if (moved)
+				await SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
 		}
 
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
