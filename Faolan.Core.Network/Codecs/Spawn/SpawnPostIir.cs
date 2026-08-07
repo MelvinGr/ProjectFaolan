@@ -202,6 +202,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//   TargetHandle  w9  - the spawning character's own handle on nearly all: the standard [class][handle] entity
 	//                       reference, i.e. who the buff is ON.
 	//   Word6, Trailer    - zero on every record. Carried rather than asserted.
+	// One ACTIVE BUFF on the entity being spawned, in the post-IIR's count-framed list.
+	//
+	// ⚠️ This is how retail tells an OBSERVER about buffs on an entity streaming into view (#677), and it settles
+	// both halves of that ticket without a new capture. It ATTACHES them to the spawn - measured over the corpus,
+	// 1,064 of 17,717 parsed spawn bodies carry at least one, 1,471 records in all - so there is no MagicBuffIIR
+	// fan-out to design.
+	//
+	// ⚠️ And `TimerRemaining` is what retires the ticket's other half. It reasoned that an observer arriving
+	// mid-buff has no apply event to count down from, so an ABSOLUTE expiry stamp on the server's uptime clock
+	// "earns its place" here - and that the observer's client would therefore need `ServerTime_c` live from a
+	// `DispatchPong` reply. None of that is needed: the record states the remaining time directly, and it is a real
+	// remainder rather than the total under another name (it is <= TimerTotal everywhere, and differs from it).
+	// `SourceHandle`/`TargetHandle` carry the attribution a fan-out would have had to invent a place for.
+	// [V3: SpawnBuffRecordTests.RemainingIsNotJustTheTotalAgain]
 	public sealed class ScaffoldBuff
 	{
 		public const int ByteCount = 60;

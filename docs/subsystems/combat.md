@@ -1399,3 +1399,24 @@ at all. See [`combos.md`](combos.md).
 [V0: what makes retail RE-send the quad. It arrives in bursts of four with irregular 5–35 s gaps — 32 bursts in
 one 15-minute capture — mostly alone in their own packets, so it is event-driven rather than a timer; a stat-sheet
 recompute is the obvious candidate. The value is settled, the cadence is not.]
+
+
+## An observer learns a streamed-in entity's buffs from the SPAWN (#677)
+
+There is no fan-out to design. The spawn's post-IIR carries a count-framed `BuffRecords` list, decoded and
+round-tripping, and it is populated on real spawns: **1,064 of 17,717** parsed spawn bodies carry at least one,
+**1,471** records in all. So retail attaches an entity's active buffs to the record that introduces it.
+
+Each record is `[spellId][kind][sourceHandle][stamp][timerTotal][timerRemaining][word6][casterLevel]
+[targetClass][targetHandle][5-word trailer]`, and two of those fields close the design questions #677 opened:
+
+- **`TimerRemaining`** — the ticket reasoned that an observer arriving mid-buff has no apply event to count down
+  from, so an *absolute* expiry stamp on the server's uptime clock "earns its place", and that the observer's
+  client would need `ServerTime_c` live from a `DispatchPong` reply. None of that is required: the record states
+  the remaining time directly. It is a real remainder, not the total under another name — it is `<= TimerTotal`
+  in every captured record and differs from it in many.
+- **`SourceHandle` / `TargetHandle`** — the attribution a separate fan-out would have had to carry somewhere.
+
+What is left of #677 is therefore only the server-side half it also named: NPC-cast buffs are not tracked across
+the streaming boundary, so today there is nothing to put in the list. The WIRE side needs no decode.
+[V3: SpawnBuffRecordTests.RetailAttachesBuffsToTheSPAWN_NotAFanOutAfterIt]
