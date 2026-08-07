@@ -438,6 +438,25 @@ from the walk.
 
 ⚠️ This is a correlation between bursts and grid boundaries, not a read of retail's implementation: it says the
 trigger is *positional and quantised at ~32 u*, not how the cells are indexed or how far the interest reaches.
+
+**Two follow-up measurements, one of which killed the obvious objection.**
+
+*The world-entry burst is not what makes the radius impossible.* The natural complaint about the table above is
+that a capture's `t+0` burst is a world **build** — it states the playfield the player just loaded into, so of
+course it reaches 1,834 u. Excluding every capture's entry burst moves the numbers almost not at all: 243 bursts
+instead of 293, median 211.8 instead of 225.4, and the max only drops from 1,834.5 to **1,757.5**. Mid-session
+streaming reaches just as far. The radius is impossible on its own merits.
+
+*38.6 % of bulk despawns are a **refresh**, not interest loss.* Of the 210 despawn bursts, **81** have most of
+what they dropped re-spawned within 30 s — often within a single second, at the same distances. So the "cycle"
+#529 named is the cell being **re-sent**, not the objects leaving and re-entering range: the Stone Bricks
+respawned 62 u farther away because the player kept walking between the drop and the resend, and the two
+distances describe the walk rather than any interest boundary.
+
+That also settles what reproducing this would buy. Re-sending a cell's whole contents on every boundary
+crossing is visible churn — objects blink — with no gameplay consequence, and our radius model is already the
+gentler behaviour. The measurement is worth having; imitating it is a fidelity-versus-flicker call, not an
+obvious win. `--report dynel-cycle` prints all of the above.
 `InterestManager` is still radius-based — changing it is open work on #529.
 
 ## NPC counter-attack animation ack (decoded 2026-06-15)

@@ -1308,6 +1308,13 @@ namespace Faolan.Importer.Cli
 			var minimumBurst = int.TryParse(arg, out var m) && m > 0 ? m : 4;
 			var spawnDistances = new List<double>();
 			var despawnDistances = new List<double>();
+			// The WORLD-ENTRY burst is a world BUILD, not an interest pass - it states the playfield the player just
+			// loaded into, so it reaches as far as the playfield does. Scored separately, because leaving it in is
+			// what makes the radius verdict read as "something spawned 1834u away" when nothing was streaming at all.
+			var midSessionSpawnDistances = new List<double>();
+			var midSessionDespawnDistances = new List<double>();
+			var refreshBursts = 0;
+			var despawnBursts = 0;
 			var playerAtBurst = new List<Vector3>();
 			var playerEverywhere = new List<Vector3>();
 
@@ -1376,6 +1383,24 @@ namespace Faolan.Importer.Cli
 				if (interesting.Count == 0)
 					continue;
 
+				// A despawn burst is a REFRESH when most of what it dropped comes straight back. #529 read the Stone
+				// Bricks' "removed and restored together" as an interest cycle; if the same handles return within
+				// seconds, it is not interest at all - it is the cell being re-sent, and the distances at each end are
+				// just wherever the player had walked to by then.
+				var refreshWindow = TimeSpan.FromSeconds(30).Ticks;
+				foreach (var burst in interesting.Where(b => !b.Spawn))
+				{
+					var dropped = burst.Handles.ToHashSet();
+					var returned = interesting
+						.Where(b => b.Spawn && b.Ticks > burst.Ticks && b.Ticks - burst.Ticks <= refreshWindow)
+						.SelectMany(b => b.Handles)
+						.ToHashSet();
+					returned.IntersectWith(dropped);
+					despawnBursts++;
+					if (returned.Count * 2 >= dropped.Count)
+						refreshBursts++;
+				}
+
 				Console.WriteLine($"{capture.Name}");
 				var start = interesting[0].Ticks;
 				foreach (var burst in interesting)
@@ -1390,6 +1415,8 @@ namespace Faolan.Importer.Cli
 					// thing that despawned - if those two ranges overlap, no single R can produce the corpus.
 					var extreme = burst.Spawn ? known.Max() : known.Min();
 					(burst.Spawn ? spawnDistances : despawnDistances).Add(extreme);
+					if (burst.Ticks != start)
+						(burst.Spawn ? midSessionSpawnDistances : midSessionDespawnDistances).Add(extreme);
 					playerAtBurst.Add(burst.Player);
 
 					Console.WriteLine($"  t+{TimeSpan.FromTicks(burst.Ticks - start).TotalSeconds,7:0.0}s  {(burst.Spawn ? "SPAWN  " : "DESPAWN")}"
@@ -1402,6 +1429,17 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			Report("SPAWN   farthest-spawned", spawnDistances);
 			Report("DESPAWN nearest-despawned", despawnDistances);
+			Console.WriteLine();
+			Console.WriteLine("Excluding each capture's WORLD-ENTRY burst (a world build, not an interest pass):");
+			Report("SPAWN   farthest-spawned", midSessionSpawnDistances);
+			Report("DESPAWN nearest-despawned", midSessionDespawnDistances);
+			if (despawnBursts > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine($"REFRESH: {refreshBursts} of {despawnBursts} despawn burst(s) ({100.0 * refreshBursts / despawnBursts:0.#}%) had most of what they");
+				Console.WriteLine("  dropped re-spawned within 30s - i.e. the cell was RE-SENT rather than the objects losing interest.");
+			}
+
 			Console.WriteLine();
 			Console.WriteLine("A single interest RADIUS R would need every 'farthest spawned' <= R <= every 'nearest despawned'.");
 			if (spawnDistances.Count > 0 && despawnDistances.Count > 0)
