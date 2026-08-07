@@ -173,7 +173,16 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// definition for. The name branch already cannot match one (their TargetName is null).
 			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill && !g.Partial).OrderBy(g => g.Sequence).ToList();
 
-			if (templateId is { } id && kills.FirstOrDefault(g => g.TrailingRefId == id) is { } byId)
+			// ⚠️ ...and `Partial` was only HALF of that argument. **7,170** non-partial goals also sit at
+			// `GoalType.Kill` with `TrailingRefId 0` - the untyped rump of the catalog - so a template id of 0 matches
+			// the first of them in every active quest. And 0 is reachable: the one caller passes
+			// `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for anything with no template behind it, so
+			// killing such a creature advanced an arbitrary goal of EVERY quest the player had open.
+			//
+			// A 0 means "no type id known", which is what this method's own contract says - so it takes the NAME
+			// branch, exactly as a null does. The three sibling matchers (`MatchingCollectGoal`, `MatchingLootGoal`,
+			// `MatchingEscortGoal`) all guard 0 on entry already; this was the one that did not.
+			if (templateId is > 0 and { } id && kills.FirstOrDefault(g => g.TrailingRefId == id) is { } byId)
 				return byId;
 
 			return string.IsNullOrEmpty(name)

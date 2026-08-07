@@ -462,6 +462,28 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingKillGoal(byName, null, "Nobody")); // no id, wrong name
 		}
 
+		// ⚠️ A template id of ZERO means "no type id known", not "the goal whose TrailingRefId is 0". The shipped
+		// catalog has **7,170** non-partial `Kill` goals sitting at `TrailingRefId 0` - the untyped rump - so a 0
+		// matched the first of them in every active quest, and 0 is reachable: the one caller passes
+		// `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for anything with no template behind it.
+		//
+		// The three sibling matchers guard 0 on entry; this one did not, so killing such a creature advanced an
+		// arbitrary goal of EVERY quest the player had open.
+		[Fact]
+		public void MatchingKillGoal_TreatsAZeroTemplateIdAsUnknown_NotAsAMatch()
+		{
+			var untyped = new[]
+			{
+				new QuestGoalDefinition { Sequence = 1, GoalId = 4242, GoalType = QuestGoalType.Kill, TrailingRefId = 0 },
+				new QuestGoalDefinition { Sequence = 2, GoalId = 4243, GoalType = QuestGoalType.Kill, TargetName = "Scavenger Lackey", TrailingRefId = 0 }
+			};
+
+			// A 0 falls through to the NAME branch, exactly as a null does.
+			Assert.Null(QuestProgress.MatchingKillGoal(untyped, 0, "Nobody At All"));
+			Assert.Null(QuestProgress.MatchingKillGoal(untyped, 0, null!));
+			Assert.Equal(4243u, QuestProgress.MatchingKillGoal(untyped, 0, "Scavenger Lackey")?.GoalId);
+		}
+
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
 		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
 		// refs + objective marker, and the QuestTextRef -> record mapping).
