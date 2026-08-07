@@ -100,14 +100,34 @@ WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB a
 - `assetType` is one of exactly three RDB types: **1010030** MESHINDEXFILE (628 rows), **1010001** RenderMesh
   geometry (298), **1010201** MONSTERDATA (126) - see [`../rdb/rdb-type-catalog.md`](../rdb/rdb-type-catalog.md).
   `assetId` has 199 distinct values.
-- The node list is almost always EMPTY: 1028 of 1052 rows carry `nodeCount == 0`, the other 24 carry exactly one.
-  Those 24 are all `SimpleDynelFullUpdateIIR` signposts/landmarks ("Tortage Keep", "West Dock", "Avenue of
-  Honor", ...) sharing one sign-shaped AABB, and their single node holds just **two distinct values** across the
-  whole corpus: `[id, 0, 0, 0, 0, 34]`. The trailing `34` (`0x22`) is constant; the four middle words are zero;
-  and the leading id CO-VARIES WITH THE ASSET - all 23 objects on asset 4935650 (MONSTERDATA) carry `4998690`,
-  the one on asset 3761257 (MESHINDEXFILE) carries `3139195`. It matches no id in the database (items, spells,
-  maps, npc templates, quests, respawn points), so it is a second client-side resource reference rather than
-  geometry. Two samples cannot pin more than that, which is why those six words keep positional names.
+- The node list is almost always EMPTY, and the nodes that exist are **not geometry** (#687). They are a
+  STANDING PARTICLE EFFECT and the bone it hangs on:
+
+  ```
+  [effect] [0] [0] [0] [0] [attractor]
+  ```
+
+  - **`effect`** (ordinal 0) is an RDB **1010207** record — the particle-effect type. All **11** shipped ids
+    resolve there in the client's own RDB, checked one at a time (`--report rdb-id`).
+  - **`attractor`** (ordinal 5) is the attachment point — the same slot
+    `SimpleDynelVisualChangeCodec.StartParticleEffect` carries. It takes exactly **{34, 35}** and no other value,
+    and it is **constant per effect id** (4998690 and 3139195 always hang on 34, the other nine always on 35).
+    That is what an attachment point is; a coordinate could not be.
+
+  ⚠️ **It is not the visual-change payload with its columns rotated.** That payload's order is client-confirmed
+  from the reader itself (the `if (attractor < 1)` branch): `[effect][attractor][rotation][x][y][z]`, attractor
+  at index **1**. Here it is at index **5**. Two different layouts over the same six semantic fields, not one
+  layout read two ways — which settles the question #687 opened with.
+
+  ⚠️ **The middle four (ordinals 1–4) are `0` in every one of the 127 shipped nodes**, so which is the rotation
+  and which are the offset is **corpus-undecidable**. `[effect][four zeros][attractor]` is the whole of what the
+  data supports.
+
+  ⚠️ The figures above **supersede** "1028 of 1052 rows carry `nodeCount == 0`, the other 24 carry exactly one …
+  just two distinct values … `[id, 0, 0, 0, 0, 34]`". A re-dump grew the corpus: the shipped data now holds
+  **127** nodes over **11** effect ids and **both** 34 and 35. The old sentence read the sample as the
+  population — the id was said to "co-vary with the asset" and to match "no id in the database", which was true
+  of two samples and is not the shape of the thing.
 - An object with no bounds writes the inverted-box sentinel rather than zeros - min `+FLT_MAX` (`0x7f7fffee`),
   max `-FLT_MAX` (`0xff7fff..`).
 - The only name seen in the corpus is `object_closed` (23 rows, all `DoorFullUpdateIIR`-adjacent MONSTERDATA).
