@@ -10,20 +10,24 @@ namespace Faolan.Web.Content
 	// that leaves the mirror on its default port, and `--help` lists what the mirror accepts.
 	public static class MirrorCommand
 	{
-		private static readonly Option<string> Store = FaolanCommandLine.ConfigOption("CdnMirror:Store", "Directory the mirror stores fetched CDN blobs in (default: mirror-store).");
-		private static readonly Option<string> Ip = FaolanCommandLine.ConfigOption("CdnMirror:Ip", "Address to bind (default: 127.0.0.1).");
-		private static readonly Option<string> Port = FaolanCommandLine.ConfigOption("CdnMirror:Port", "Port to bind (default: 7081).");
-		private static readonly Option<string> PublicAddress = FaolanCommandLine.ConfigOption("CdnMirror:PublicAddress", "Address the CLIENT reaches this mirror on, written into the LocalConfig.xml patch addresses (default: the inbound request's Host header).");
+		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
+		// `--help` here cannot describe a default the code does not use - and the mirror's `CdnMirror:PublicAddress`
+		// keeps its deliberate lack of one (unset means "answer with the Host header the client dialled", #552).
+		private static readonly Option<string>[] Options =
+			FaolanSettings.Options("CdnMirror:Store", "CdnMirror:Ip", "CdnMirror:Port", "CdnMirror:PublicAddress");
 
 		// The parsed options as configuration overrides, or null when the parser handled the invocation itself
 		// (--help, or it reported a parse error) - the caller should then exit with `exitCode`.
 		public static Dictionary<string, string?>? Overrides(string[] args, out int exitCode)
 		{
-			var command = new RootCommand("Faolan CDN mirror - a store-and-forward mirror of Age of Conan's UPM content CDN.") { Store, Ip, Port, PublicAddress };
+			var command = new RootCommand("Faolan CDN mirror - a store-and-forward mirror of Age of Conan's UPM content CDN.");
+			foreach (var option in Options)
+				command.Options.Add(option);
+
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
 
-			return FaolanCommandLine.Overrides(result, Store, Ip, Port, PublicAddress);
+			return FaolanCommandLine.Overrides(result, Options);
 		}
 	}
 }

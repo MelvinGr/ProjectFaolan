@@ -342,10 +342,19 @@ Two are worth knowing up front:
 
 Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,
 and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment variables > command line >
-`faolan.user.json` > `faolan.json`**, with both files **optional** (a container can be configured entirely by env
-vars, with no file baked into the image). They live at the repo root, and are found by searching up from the
-working directory — so a tool started from its own project directory still uses the repo's files (`FAOLAN_CONFIG`
-/ `FAOLAN_USER_CONFIG` override).
+`faolan.user.json` > `faolan.json` > built-in defaults**, with both files **optional** (a container can be
+configured entirely by env vars, with no file baked into the image, and the server runs with neither). They live
+at the repo root, and are found by searching up from the working directory — so a tool started from its own
+project directory still uses the repo's files (`FAOLAN_CONFIG` / `FAOLAN_USER_CONFIG` override).
+
+**Every setting is declared once**, in `FaolanSettings` (`Faolan.Core/Cli/FaolanSettings.cs`): its name, its
+`--help` description and its default. That one catalog is both the bottom layer above and the source of each
+executable's `--help`, so a documented default cannot drift from the one the code uses, and a key nothing declares
+cannot be silently read. The committed `faolan.json` is that catalog written out — regenerate it with:
+
+```sh
+dotnet run --project Faolan -- --write-default-config   # every setting at its default; OVERWRITES
+```
 
 **`faolan.user.json` is gitignored, and that is its whole point.** `faolan.json` is committed and has to stay
 machine-agnostic (no `/home/<user>/…` paths, no LAN addresses), so anything true only of *your* checkout goes in
@@ -358,11 +367,15 @@ simply wins. Typical contents:
   "RdbDir": "/path/to/Age of Conan/RDB",
   // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial.
   // A full URL - a path is appended to it, so a bare host would build a relative one
-  "CdnMirror": { "PublicAddress": "http://192.168.1.5:7081" }
+  "CdnMirror": { "PublicAddress": "http://192.168.1.5:7081" },
+  // ...and anything else this checkout wants but a plain deployment should not pay for
+  "Log": { "PacketBytes": true },
+  "Mcp": { "Enabled": true }
 }
 ```
 
-Related keys are grouped into sections; the remaining shared keys stay flat:
+Related keys are grouped into sections; the remaining shared keys stay flat. The defaults below are the
+catalog's — `--help` on any of the executables lists the same values for the subset it offers:
 
 | Key | Meaning |
 | --- | --- |

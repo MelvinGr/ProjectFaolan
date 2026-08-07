@@ -18,14 +18,11 @@ namespace Faolan.Importer.Cli
 	//   - COMMAND options (--only, --dry-run, --report, ...) are per-invocation and belong to the CLI alone.
 	public static class ImporterCommand
 	{
-		// Config keys: the option name IS the configuration path (FaolanCommandLine).
-		private static readonly Option<string> ConnectionString =
-			FaolanCommandLine.ConfigOption("Database:ConnectionString", "Database connection string; overrides faolan.json (the environment wins over both).");
-
-		private static readonly Option<string> Provider = FaolanCommandLine.ConfigOption("Database:Provider", "Database provider: Sqlite or Postgres.");
-
-		private static readonly Option<string> RdbDir =
-			FaolanCommandLine.ConfigOption("RdbDir", "The client's RDB folder (part of the game install). Also RdbDir in faolan.json or the environment.");
+		// Config keys: the option name IS the configuration path, and its description + default come from the one
+		// catalog (FaolanSettings).
+		private static readonly Option<string> ConnectionString = FaolanCommandLine.ConfigOption("Database:ConnectionString");
+		private static readonly Option<string> Provider = FaolanCommandLine.ConfigOption("Database:Provider");
+		private static readonly Option<string> RdbDir = FaolanCommandLine.ConfigOption("RdbDir");
 
 		// Command options.
 		private static readonly Option<string> Captures = new("--captures") { Description = "The capture corpus directory (the private ProjectFaolan-Data repo's Captures/)." };

@@ -12,13 +12,10 @@ namespace Faolan.Web
 	// the importer uses, so one name across the two things that read the client's assets.
 	public static class WebCommand
 	{
+		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
+		// `--help` here cannot describe a default the code does not use.
 		private static readonly Option<string>[] Options =
-		[
-			FaolanCommandLine.ConfigOption("RdbDir", "The client's RDB folder, for the 3D viewer. Optional - the rest of the site runs without it."),
-			FaolanCommandLine.ConfigOption("Database:Provider", "Sqlite or Postgres."),
-			FaolanCommandLine.ConfigOption("Database:ConnectionString", "The database to read the roster and GM data from."),
-			FaolanCommandLine.ConfigOption("CdnMirror:PublicAddress", "The Faolan.Web.Content mirror the viewer fetches on-demand RDB resources from, e.g. http://127.0.0.1:7081.")
-		];
+			FaolanSettings.Options("RdbDir", "Database:Provider", "Database:ConnectionString", "CdnMirror:PublicAddress");
 
 		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the
 		// caller should exit with `exitCode`. ASP.NET's own host arguments (--urls, --environment) are passed

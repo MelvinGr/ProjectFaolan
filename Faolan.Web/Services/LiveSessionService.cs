@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
@@ -40,9 +41,8 @@ namespace Faolan.Web.Services
 		public LiveSessionService(IConfiguration config, ILogger<LiveSessionService> logger)
 		{
 			_logger = logger;
-			// Default to the game server's documented MCP port; overridable so a non-default deployment still resolves.
-			var port = config["Mcp:Port"] ?? "7099";
-			_endpoint = new Uri($"http://127.0.0.1:{port}/mcp");
+			// The game server's MCP port. Always local - Faolan.Web talks to the server process on this machine.
+			_endpoint = new Uri($"http://127.0.0.1:{config.McpPort}/mcp");
 		}
 
 		// A connected character's LIVE map + position (from get_character's Live block), or null if not connected /

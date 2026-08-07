@@ -59,12 +59,7 @@ namespace Faolan.ClientLauncher
 		// see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the normal path is
 		// that the launcher reads the same faolan.json the server does, so a configured Login:PrivateKey automatically
 		// patches its own matching public key and the pair cannot drift.
-		private static readonly Option<string>[] LoginKeys =
-		[
-			FaolanCommandLine.ConfigOption("Login:PrivateKey", "One-off override of the server's private key; the public half patched into the exe is derived from it."),
-			FaolanCommandLine.ConfigOption("Login:PublicKey", "Patch THIS public key in instead of our derived one - for a client that should talk to somebody else's server."),
-			FaolanCommandLine.ConfigOption("Login:RetailPublicKey", "The key to search for in an unpatched exe (default: retail's).")
-		];
+		private static readonly Option<string>[] LoginKeys = FaolanSettings.Options("Login:PrivateKey", "Login:PublicKey", "Login:RetailPublicKey");
 
 		private static readonly Option<bool> PatchLogin = new("--patch-login")
 		{

@@ -19,10 +19,13 @@ namespace Faolan.Core.Cli
 	// meant a valueless flag silently swallowed the option that followed it.
 	public static class FaolanCommandLine
 	{
-		// An option whose name is a configuration path. The description is what `--help` shows.
-		public static Option<string> ConfigOption(string key, string description)
+		// An option whose name is a configuration path, taken from the ONE catalog (FaolanSettings) so its description
+		// and its default cannot drift from the value the code actually uses. A command declares the SUBSET it offers;
+		// the defaults themselves come from the whole catalog in Build, so an executable that reads a setting it does
+		// not declare still gets it.
+		public static Option<string> ConfigOption(string key)
 		{
-			return new Option<string>($"--{key}") { Description = description };
+			return FaolanSettings.Options(key)[0];
 		}
 
 		// Parses argv against `command`, in the one way every executable here does it: a parse error or `--help` is
@@ -51,12 +54,17 @@ namespace Faolan.Core.Cli
 				.ToDictionary(o => o.Name.TrimStart('-'), o => (string?)result.GetValue(o));
 		}
 
-		// faolan.json (optional) < faolan.user.json (optional, gitignored) < command line < environment. The one place
-		// that order is written down. The user file sits directly above the committed one so a per-machine override
-		// needs no edit to a tracked file - see Global.UserConfigPath.
+		// DEFAULTS < faolan.json (optional) < faolan.user.json (optional, gitignored) < command line < environment.
+		// The one place that order is written down. The user file sits directly above the committed one so a
+		// per-machine override needs no edit to a tracked file - see Global.UserConfigPath.
+		//
+		// The defaults layer at the BOTTOM is what lets a consumer write `config["Log:File"]` and get `faolan.log`.
+		// Before it, every read site carried its own `?? "faolan.log"`, which is one copy per reader of a value that
+		// has one definition - and three settings had a fallback but no declaration, so no `--help` mentioned them.
 		public static IConfiguration Build(IEnumerable<KeyValuePair<string, string?>>? commandLine = null)
 		{
 			return new ConfigurationBuilder()
+				.AddInMemoryCollection(FaolanSettings.Defaults)
 				.AddJsonFile(Global.ConfigPath, true)
 				.AddJsonFile(Global.UserConfigPath, true)
 				.AddInMemoryCollection(commandLine ?? [])

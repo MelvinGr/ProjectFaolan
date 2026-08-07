@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.CommandLine;
+using Faolan.Core;
 using Faolan.Core.Cli;
 
 namespace Faolan
@@ -19,40 +21,45 @@ namespace Faolan
 		};
 
 		// Configuration keys - the option name IS the config path, so it is spelled the same here, in faolan.json
-		// and (with __) in the environment.
-		private static readonly Option<string>[] ConfigOptions =
-		[
-			FaolanCommandLine.ConfigOption("Database:Provider", "Sqlite or Postgres."),
-			FaolanCommandLine.ConfigOption("Database:ConnectionString", "The database to serve from; built from faolan.sql on first run if it has no content."),
-			FaolanCommandLine.ConfigOption("ServerIpAddress", "The address the login tier advertises to clients - must be reachable FROM the client."),
-			FaolanCommandLine.ConfigOption("UniverseAgentPort", "Login-tier entry port (7010 is the client's fixed entry point)."),
-			FaolanCommandLine.ConfigOption("PlayerAgentPort", "Login-tier player-agent port."),
-			FaolanCommandLine.ConfigOption("WelcomeString", "Login MOTD."),
-			FaolanCommandLine.ConfigOption("TerrainDir", "Baked terrain directory; without it ground-snap and line-of-sight are disabled."),
-			// The server reads Login:PrivateKey (Program.cs) but never declared it, so it was settable everywhere EXCEPT
-			// here. Login:PublicKey / Login:RetailPublicKey are launcher-side only and stay off the server's line.
-			FaolanCommandLine.ConfigOption("Login:PrivateKey", "The login DH private key (default: the built-in key). Patch clients with the matching public key - Faolan.ClientLauncher --patch-login."),
-			FaolanCommandLine.ConfigOption("Login:AllowUnpatchedClients", "Let a client whose login block we cannot decrypt in on its account NAME alone (default true). False requires a patched client, so the password is actually checked."),
-			FaolanCommandLine.ConfigOption("Mcp:Enabled", "Host the in-process MCP endpoint (default off when unset)."),
-			FaolanCommandLine.ConfigOption("Mcp:Port", "MCP endpoint port."),
-			FaolanCommandLine.ConfigOption("Mcp:Url", "MCP endpoint URL the chat bridge connects to."),
-			FaolanCommandLine.ConfigOption("Log:File", "Log file path (default faolan.log in the CWD)."),
-			FaolanCommandLine.ConfigOption("Log:PacketBytes", "Include the raw byte dump in packet log lines."),
-			FaolanCommandLine.ConfigOption("Account:Premium", "Advertise every account as subscribed (default true)."),
-			FaolanCommandLine.ConfigOption("Account:PremiumCharSlots", "Character slots advertised when premium."),
-			FaolanCommandLine.ConfigOption("Account:FreeCharSlots", "Character slots advertised when not premium.")
-		];
+		// and (with __) in the environment. The description and the DEFAULT come from FaolanSettings, the one catalog,
+		// so `--help` cannot describe a default the code does not use.
+		//
+		// This is a VIEW of that catalog, not the whole of it: Login:PublicKey / Login:RetailPublicKey are
+		// launcher-side and stay off the server's line, and the CdnMirror / ChatBridge keys belong to other
+		// executables. They still get their defaults here, because the defaults layer is built from the catalog
+		// rather than from this list.
+		private static readonly Option<string>[] ConfigOptions = FaolanSettings.Options(
+			"Database:Provider", "Database:ConnectionString", "ServerIpAddress", "UniverseAgentPort", "PlayerAgentPort", "WelcomeString", "TerrainDir",
+			"ClientVersion", "Login:PrivateKey", "Login:AllowUnpatchedClients", "Mcp:Enabled", "Mcp:Port", "Mcp:Url", "Log:File", "Log:PacketBytes",
+			"Account:Premium", "Account:PremiumCharSlots", "Account:FreeCharSlots");
 
-		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the
-		// caller should exit with `exitCode`.
+		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as a file you can
+		// edit. It OVERWRITES what is there, which is why it is an explicit flag and nothing calls it on startup.
+		private static readonly Option<string> WriteDefaultConfig = new("--write-default-config")
+		{
+			Description = "Write a faolan.json containing every setting at its default (to the given path, or the one in use) and exit. OVERWRITES.",
+			Arity = ArgumentArity.ZeroOrOne
+		};
+
+		// Returns null when the parser handled the invocation itself (--help, --write-default-config, or it reported a
+		// parse error); the caller should exit with `exitCode`.
 		public static ServerOptions? Parse(string[] args, out int exitCode)
 		{
-			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role };
+			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role, WriteDefaultConfig };
 			foreach (var option in ConfigOptions)
 				command.Options.Add(option);
 
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
+
+			if (result.GetResult(WriteDefaultConfig) != null)
+			{
+				var path = result.GetValue(WriteDefaultConfig) is { Length: > 0 } given ? given : Global.ConfigPath;
+				FaolanSettings.WriteDefaultJson(path);
+				Console.WriteLine($"Wrote {FaolanSettings.All.Length} settings to {path}");
+
+				return null;
+			}
 
 			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Overrides(result, ConfigOptions));
 		}

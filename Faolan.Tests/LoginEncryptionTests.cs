@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 using Faolan.ClientLauncher;
+using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -195,21 +196,42 @@ namespace Faolan.Tests
 		// never configured this locks out every client the moment it upgrades; and only an explicit "false" may deny,
 		// or a typo'd value quietly turns the password check on and looks like a mass wrong-password outage.
 		[Theory]
-		[InlineData(null, true)] // unset: the historical accept-any behaviour
+		[InlineData(null, true)] // unset: the catalog's default, the historical accept-any behaviour
 		[InlineData("true", true)]
 		[InlineData("True", true)]
 		[InlineData("false", false)]
 		[InlineData("False", false)]
-		[InlineData("no", true)] // not a bool: allow, never a silent deny
-		[InlineData("0", true)]
-		[InlineData("", true)]
 		public void LoginAllowUnpatchedClients_DefaultsToAllowAndOnlyAnExplicitFalseDenies(string? configured, bool expected)
 		{
-			var config = new ConfigurationBuilder()
-				.AddInMemoryCollection([new KeyValuePair<string, string?>("Login:AllowUnpatchedClients", configured)])
-				.Build();
+			Assert.Equal(expected, Config(configured).LoginAllowUnpatchedClients);
+		}
 
-			Assert.Equal(expected, config.LoginAllowUnpatchedClients);
+		// The second half of that polarity, and it used to be `!bool.TryParse(...) || allow` - "anything I cannot read
+		// means allow". That never denies, but it also never TELLS anyone: `AllowUnpatchedClients: 0` was a setting
+		// that read as applied and was not, and the operator's next clue would have been a security review.
+		//
+		// It now throws, naming the key. Still not a silent deny - it is the opposite, the loudest possible reading of
+		// a value nobody can interpret.
+		[Theory]
+		[InlineData("no")]
+		[InlineData("0")]
+		[InlineData("")]
+		public void AValueThatIsNotABool_IsRefusedRatherThanGuessed(string configured)
+		{
+			var error = Assert.Throws<InvalidOperationException>(() => Config(configured).LoginAllowUnpatchedClients);
+
+			Assert.Contains("Login:AllowUnpatchedClients", error.Message);
+		}
+
+		// The catalog's defaults under the configured value - the stack every executable builds (FaolanCommandLine),
+		// so "unset" here means what it means to a deployment.
+		private static IConfiguration Config(string? configured)
+		{
+			var builder = new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults);
+			if (configured != null)
+				builder.AddInMemoryCollection([new KeyValuePair<string, string?>("Login:AllowUnpatchedClients", configured)]);
+
+			return builder.Build();
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -48,6 +49,8 @@ namespace Faolan.Tests
 			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress);
 		}
 
+		// The catalog's defaults UNDER the values named here - the same stack FaolanCommandLine.Build makes, so
+		// "unset" here means what it means to a deployment: the default, not a missing key.
 		private static IConfiguration Config(params (string Key, string? Value)[] values)
 		{
 			var pairs = new Dictionary<string, string?>();
@@ -55,7 +58,10 @@ namespace Faolan.Tests
 				if (value != null)
 					pairs[key] = value;
 
-			return new ConfigurationBuilder().AddInMemoryCollection(pairs).Build();
+			return new ConfigurationBuilder()
+				.AddInMemoryCollection(FaolanSettings.Defaults)
+				.AddInMemoryCollection(pairs)
+				.Build();
 		}
 	}
 }
