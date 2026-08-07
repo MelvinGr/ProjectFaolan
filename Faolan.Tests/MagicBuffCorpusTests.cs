@@ -191,6 +191,72 @@ namespace Faolan.Tests
 			Assert.Equal(3, perSpell.Count(g => g.Select(a => a.Buff.Data[Bool2Offset]).Distinct().Count() > 1));
 		}
 
+		// WHICH level each of the two slots holds (#658). The ticket had them as "two slots we fill from one
+		// argument [that] are demonstrably two numbers", with the route "a cross-tab of each against the caster's
+		// known level would separate them". Resolving handles to levels is not needed - SCOPE separates them, and
+		// the answer is that one is the CASTER's level and the other the TARGET's:
+		//
+		//                            varies within CASTER      varies within TARGET
+		//   descriptor[3] @26          20 of 1075 (1.9%)        48 of 1183 (4.1%)     -> the CASTER's
+		//   CastingLevel  @42          36 of 1075 (3.3%)         6 of 1183 (0.5%)     -> the TARGET's
+		//
+		// `CastingLevel` is six times more stable grouped by target than by caster, and `descriptor[3]` is the other
+		// way round. (Entities are keyed by (capture, handle): a handle is session-scoped, so grouping on the handle
+		// alone merges unrelated entities across captures.)
+		[Fact]
+		public void TheTwoLevelSlots_AreTheCastersAndTheTargets()
+		{
+			var applies = CapturedApplies();
+			var perCaster = applies.GroupBy(a => (Capture(a.Source), a.Buff.ApplyFrom)).ToList();
+			var perTarget = applies.GroupBy(a => (Capture(a.Source), a.Buff.ApplyTo)).ToList();
+
+			static int Unstable<T>(List<IGrouping<T, (string Source, MagicBuffIIR Buff)>> groups, int offset)
+			{
+				return groups.Count(g => g.Select(a => a.Buff.Data.ReadU32Be(offset)).Distinct().Count() > 1);
+			}
+
+			// The load-bearing comparison is each slot against ITSELF under the two groupings, not the two slots
+			// against each other - the populations differ (1075 casters vs 1183 targets).
+			Assert.True(Unstable(perCaster, LevelOffset) < Unstable(perTarget, LevelOffset),
+				"descriptor[3] should be more stable per CASTER than per target");
+			Assert.True(Unstable(perTarget, CastingLevelOffset) < Unstable(perCaster, CastingLevelOffset),
+				"CastingLevel should be more stable per TARGET than per caster");
+
+			// ...and by a wide margin on the one that matters: 6 against 36.
+			Assert.True(Unstable(perCaster, CastingLevelOffset) >= 5 * Unstable(perTarget, CastingLevelOffset),
+				"CastingLevel's target-stability should dominate, not merely edge out, its caster-stability");
+		}
+
+		// The corroboration, and the reason the two agree so often: 2,241 of the 2,929 applies are SELF-applies,
+		// where the caster IS the target and the two levels are one number by construction. Split on that and the
+		// agreement rate splits with it - which is what a caster/target pair predicts and a caster/spell pair
+		// would not.
+		//
+		// ⚠️ 281 self-applies still disagree, so this is not the whole story. 238 of those 281 are ONE spell
+		// (3911037) and the rest spread thinly over 17 more, so it reads as a per-spell exception rather than a
+		// refutation - but it is why the field is not renamed yet.
+		[Fact]
+		public void TheyAgreeOnSelfApplies_AndLargelyDisagreeOtherwise()
+		{
+			var applies = CapturedApplies();
+			var self = applies.Where(a => a.Buff.ApplyFrom == a.Buff.ApplyTo).ToList();
+			var other = applies.Where(a => a.Buff.ApplyFrom != a.Buff.ApplyTo).ToList();
+
+			static double AgreementRate(List<(string Source, MagicBuffIIR Buff)> rows)
+			{
+				return rows.Count == 0 ? 0 : (double)rows.Count(a => a.Buff.Data.ReadU32Be(LevelOffset) == a.Buff.Data.ReadU32Be(CastingLevelOffset)) / rows.Count;
+			}
+
+			Assert.True(self.Count > other.Count, "most captured applies are self-applies");
+			Assert.True(AgreementRate(self) > 0.8, $"self-applies should nearly always agree, got {AgreementRate(self):P0}");
+			Assert.True(AgreementRate(other) < 0.5, $"non-self applies should mostly disagree, got {AgreementRate(other):P0}");
+		}
+
+		private static string Capture(string source)
+		{
+			return source[..source.IndexOf('#')];
+		}
+
 		private static List<(string Source, MagicBuffIIR Buff)> CapturedApplies()
 		{
 			return ParsedBodies().Where(b => b.Buff is { Form: ApplyForm, Data.Length: ApplyPayloadLength }).ToList();

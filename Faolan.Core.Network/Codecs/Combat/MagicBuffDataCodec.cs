@@ -76,9 +76,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The form every live buff send uses: `casterLevel` fills BOTH the descriptor slot and CastingLevel (see the
 		// [V0] note above). It has no default ON PURPOSE, so a new call site has to say whose level it is rather than
 		// inheriting an 80 that is only right for a level-80 character.
-		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel)
+		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, uint? targetLevel = null)
 		{
-			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, expiryStamp, casterLevel));
+			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, expiryStamp, casterLevel, targetLevel));
 		}
 
 		public static MagicBuffData Parse(in ReadOnlySpan<byte> data)
@@ -129,16 +129,29 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The APPLY form every buff we send uses. `expiryStamp` is an ABSOLUTE instant on the server's uptime-milli
 		// clock (`ServerUptimeClock.Milliseconds`), not a duration and not an opaque nonce - see the codec's header.
-		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel)
+		//
+		// ⚠️ The payload holds TWO level slots and they are two different entities' levels (#658): `descriptor[3]`
+		// is the CASTER's and `CastingLevel` is the TARGET's. Measured by SCOPE over all 2,929 captured applies -
+		// `CastingLevel` varies within a target on 6 of 1,183 entities against 36 of 1,075 within a caster, and
+		// `descriptor[3]` is the other way round (20 vs 48). Corroborated by the split that follows from it: 2,241
+		// of the applies are SELF-applies, where the two are one number by construction, and they agree on 87% of
+		// those against 35% of the rest.
+		//
+		// `targetLevel` therefore defaults to `casterLevel`, which is exactly right for a self-apply (most of our
+		// call sites) and is what the single-argument form always assumed. A call site applying a buff to someone
+		// ELSE should pass the target's level.
+		// [V3: MagicBuffCorpusTests.TheTwoLevelSlots_AreTheCastersAndTheTargets]
+		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, uint? targetLevel = null)
 		{
-			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x01, [DescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0], casterLevel, expiryStamp);
+			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x01, [DescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0],
+				targetLevel ?? casterLevel, expiryStamp);
 		}
 
 		// The APPLY form for a buff starting NOW and running for `durationCentiseconds` - the shape every live cast
 		// wants, with the stamp sourced rather than invented. Kept beside Apply so a call site cannot half-source it.
-		public static MagicBuffData ApplyNow(uint spellBaseId, uint durationCentiseconds, uint casterLevel)
+		public static MagicBuffData ApplyNow(uint spellBaseId, uint durationCentiseconds, uint casterLevel, uint? targetLevel = null)
 		{
-			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel);
+			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel, targetLevel);
 		}
 
 		// The APPLY form of a buff with NO CASTER - the wire writes a zero class word where the entity reference would
