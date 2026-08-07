@@ -119,7 +119,24 @@ does nothing and says so, where a wrong id would silently open a trance on the w
 
 ## The implemented stances
 
-**Search**, **hide** and **rest** are answered; the others are not yet.
+**Search**, **hide** and **rest** are answered; the others are not yet — and for **crouch** and **dash** that is
+not a matter of effort. The corpus does not pin either one (`--report player-actions --report-arg 4E4 / 4E6`):
+
+| selector | presses | captures | answering player BCCs attributed |
+|---|---:|---:|---|
+| `0x4E4` crouch | 10 | 5 | **2**, and they disagree — `Transition` action **192670** (form 4, no recharge/activation) in one capture, **192671** (form 0x10, recharge 100 / activation 100) in another. Both are followed by the same `BccAction` **192650**. Three of the five captures answer with nothing. |
+| `0x4E6` dash | 7 | 6 | **1** — `Transition` action **48898** (recharge 33 / activation 53). Six of the seven presses draw no player BCC at all. |
+
+The adjacency of 192670/192671 is *suggestive* of the toggle's two directions — crouch is one selector pressed
+both ways — but one sighting each, in different captures, on different classes, with different shapes is not a
+pairing. Building either from this would be inventing a record, which is the thing that made search/hide/rest
+worth having: each of those has multiple sightings **and** a second, unannotated capture walking the same
+selectors.
+
+⚠️ It also qualifies the rule stated above, that every observed selector is answered by a player BCC. That holds
+for the selectors it was drawn from; it does not hold for these two, where most presses draw none. Whether the
+remainder is client-side or an answer this report does not count (it tallies IIR records, so the
+`DispatchUpdateSprintBar` RPC the dash row above credits would not appear) is itself unresolved.
 
 | | search (`0x064`) | hide enter (`0x068`) | hide leave (`0x068` again) |
 |---|---|---|---|
