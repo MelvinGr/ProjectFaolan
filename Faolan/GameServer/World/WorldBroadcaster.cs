@@ -2448,8 +2448,15 @@ namespace Faolan.GameServer.World
 		//
 		// NOT built: the particle puff retail plays over the brick (`StartParticleEffect` 1010207:3667224 at the
 		// node's position, stopped a second later). The effect id is per-object CONTENT and no column holds one, so
-		// building it would mean hardcoding one capture's dust cloud onto every pickup in the world - Gitea #686
-		// covers harvesting it out of the corpus.
+		// building it would mean hardcoding one capture's dust cloud onto every pickup in the world.
+		//
+		// ⚠️ And harvesting it is NOT the way out, which #686 assumed it was. The corpus holds 192
+		// `StartParticleEffect` records over 13 effect ids, but they are two different phenomena and the ATTRACTOR
+		// separates them cleanly: 191 carry an attachment point (34 or 35) and are STANDING decorations bolted to a
+		// bone - six of their effect ids are literally the ones the objects' own geometry nodes already declare
+		// (#687). Exactly ONE record is a harvest puff: attractor 0 (free-standing at a position), effect 3667224,
+		// handle 0x6AF3 - this brick, in the one capture that harvests one. So a harvested `HarvestEffectId` column
+		// would hold a single row, and building the puff from it is the same hardcoding under a new name.
 		public async Task MarkPickupHarvested(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);

@@ -56,6 +56,30 @@ NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json].
 We model none of this yet: a harvest empties the node in one use and despawns it, and it returns on zone reload.
 Wiring the measured stream up is Gitea #494.
 
+### The particle puff is not harvestable, and the ATTRACTOR is why (#686)
+
+The one part of the sequence we cannot build is the dust cloud —
+`StartParticleEffect` naming an RDB **1010207** record. #686 proposed harvesting it into a nullable column on the
+strength of *"192 `e_StartParticleEffect` records sit in the corpus over ~13 distinct effect ids"*. That count is
+real and it conflates **two different phenomena**, which the payload's own `attractor` word separates cleanly:
+
+| attractor | records | what they are |
+|---|---:|---|
+| **34 / 35** | **191** | a STANDING decoration bolted to a bone. Six of their effect ids are literally the ones the objects' own geometry nodes already declare (#687). |
+| **0** | **1** | free-standing at a position — the harvest puff. Effect `3667224`, handle `0x6AF3`, in the single capture that harvests a quarry brick. |
+
+So the harvestable population is **one record**, and a `HarvestEffectId` column built from it would hold one row.
+Building the puff from that is hardcoding one capture's dust cloud onto every pickup in the world under a new
+name, which is what the current code declines to do — and it declines for the right reason.
+
+What the split *does* buy is a mechanical filter: `attractor == 0` is the harvest family, so the moment more
+harvest captures land the column becomes a one-line lift rather than a judgement call.
+
+⚠️ It also surfaces a **separate** gap worth its own scope: six of the attached effect ids — `150629`, `199753`,
+`199754`, `3198566`, `3198572`, `3198578` — appear on the wire but in **no** geometry node we hold. Those are
+standing decorations our world objects are missing, which is a different subject from the harvest puff the ticket
+was about.
+
 ## The payoff
 
 ```
