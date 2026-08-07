@@ -1545,6 +1545,7 @@ namespace Faolan.Importer.Captures
 			await TypeHandInGoalsFromCatalogName(db);
 			// Orthogonal to the typing rules - it fills a COUNT, not a trigger - so it is not IsWired-guarded.
 			await SetGoalCountsFromCatalogName(db);
+			await TypeKillGoalsFromCatalogName(db);
 			await TypeKillGoalsFromKind(db);
 			await TypeInvestigateGoalsAsReach(db);
 			await TypeLocationGoalsFromTrailingCategory(db);
@@ -1750,6 +1751,72 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Typed {typed} talk goal(s) from the client's own plaintext objective name ({withoutNpc} naming an NPC we do not "
 			                  + $"hold yet, {withoutDialogue} held but with no captured dialogue, so inert either way); {reconciled} short name(s) "
 			                  + $"reconciled to the catalog spelling, {gated} precondition(s) recorded, {noName} naming a role rather than a name (#704).");
+		}
+
+		// A KILL goal whose sentence names a creature we HOLD gets that name as its target (#704).
+		//
+		// A catalog-only kill goal has `TrailingRefId` 0 and no `TargetName`, so `MatchingKillGoal` can match it by
+		// neither id nor name - it is typed-and-inert at best. The sentence names the creature, and the name is exactly
+		// what that matcher's fallback branch wants: it is compared against the LIVE entity's name, which is what a
+		// "kill N of <group>" goal needs anyway (a group has no single template id).
+		//
+		// ⚠️ The name must resolve to exactly one `NpcTemplates` row. That is not politeness about coverage - it is the
+		// safety property. An unresolvable name would be stored and never match anything, which is inert dressed up as
+		// wired; a name we hold is by construction the thing the player can kill. Measured against the 24 goals whose
+		// target the wire established: the extraction reproduces 17 of the strings exactly, and of those that ALSO
+		// resolve to a template it is right 4 times and wrong none.
+		//
+		// The seven it cannot reproduce are all one of three shapes, and all correctly yield nothing rather than a
+		// guess: a ROLE ("Kill the Chief" -> Tribal Chief Rak'tunab, "Kill the Demon" -> Balbet-Zhun), a title the prose
+		// adds or drops ("Kill slavemaster Saddur" -> Saddur, "Kill Zhu-la" -> Heiromonk Zhu-La), and one editorial
+		// rename ("Destroy Po-Sha's Source of Corruption" -> Ravenous Fiend).
+		//
+		// ⚠️ `GatesTargetVisibility` is NOT set, and must not be: these are population mobs, and gating one hides every
+		// same-named NPC from every player not on the quest while forcing NoRespawn. See that column.
+		private static async Task TypeKillGoalsFromCatalogName(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Name != null && g.Name != "").ToListAsync();
+			// Name -> the single template that owns it. A name several templates share is dropped: `MatchingKillGoal`
+			// compares the live entity's NAME, so a shared name is not ambiguous at match time - but it is ambiguous
+			// about which creature the quest MEANT, and three distinct "Scavenger Lackey" templates is the known case.
+			var byName = (await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).ToListAsync())
+				.GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
+				.Where(g => g.Count() == 1)
+				.ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+			int typed = 0, unresolved = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal) || goal.TargetName != null)
+					continue;
+
+				// A goal whose WIRE record names an npc_template is left alone - `RdbQuestGoalTargetImporter` fills those
+				// from the reference, which is direct evidence where the sentence is inferred.
+				if (goal.TrailingCategory == QuestProgress.NpcTemplateNameCategory && goal.TrailingRefId != 0)
+					continue;
+
+				var match = QuestObjectiveText.KillTargetCandidates(goal.Name)
+					.Select(c => byName.TryGetValue(c, out var name) ? name : null)
+					.FirstOrDefault(n => n != null);
+
+				if (match == null)
+				{
+					if (QuestObjectiveText.KillObjective.IsMatch(goal.Name!))
+						unresolved++;
+
+					continue;
+				}
+
+				goal.GoalType = QuestGoalType.Kill;
+				goal.TargetName = match;
+				typed++;
+			}
+
+			if (typed > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Typed {typed} kill goal(s) from the creature their own objective name states; {unresolved} name something that is "
+			                  + "not one creature we hold - a role, a title the prose adds, or a map we have not imported - and stay un-typed (#704).");
 		}
 
 		// The AMOUNT an objective asks for, read from its own sentence (#704). "Hand in 20 Yew", "Collect ten Frost

@@ -165,6 +165,33 @@ names the item is left alone: the reference is direct evidence where the sentenc
 
 `SeedContentTests.DeliveryObjectives_AreOnlyTypedWhenTheHandInCanBeGated` holds the line.
 
+### Kill goals name their creature; collect goals cannot name their item
+
+A catalog-only **kill** goal has `TrailingRefId` 0 and no `TargetName`, so `MatchingKillGoal` can match it by
+neither id nor name. Its sentence names the creature, and that name is exactly what the matcher's fallback branch
+wants — it is compared against the **live entity's name**, which is what a *"kill N of &lt;group&gt;"* goal needs
+anyway, since a group has no single template id. **45** goals qualify and **43** have live spawns.
+
+⚠️ The name must resolve to **exactly one** `NpcTemplates` row. That is the safety property, not politeness about
+coverage: an unresolvable name would be stored and never match anything — inert dressed up as wired — and a name
+several templates share does not say which creature the quest meant (three distinct *Scavenger Lackey* templates
+is the known case). Measured against the 24 goals whose target the wire established, the extraction reproduces 17
+strings exactly and, of those that also resolve to a template, is right **4 times and wrong none**. The seven it
+cannot reproduce all yield nothing rather than a guess: a **role** (*"Kill the Chief"* → Tribal Chief Rak'tunab),
+a **title** the prose adds or drops (*"Kill slavemaster Saddur"* → Saddur, *"Kill Zhu-la"* → Heiromonk Zhu-La),
+and one editorial rename (*"Destroy Po-Sha's Source of Corruption"* → Ravenous Fiend).
+
+⚠️ **`GatesTargetVisibility` is never set by the rule.** These are population mobs, and gating one hides every
+same-named NPC from every player not on the quest and forces `NoRespawn`.
+
+**The COLLECT half is deliberately NOT wired, and the reason is worth keeping.** The same extraction resolves 33
+un-typed collect goals, and against the 42 the wire already answers it agrees 9 times and **disagrees once** —
+goal 5795 *"Get Wolf Pelts"*. The wire wants item **347507**, which our catalog does not hold; the only item named
+*Wolf Pelt* is **3206185**, a different template. An item NAME belongs to several template ids across the real
+game and we hold an arbitrary subset, so resolving a collect goal's item from prose points at the wrong id with
+no way to tell — and a collect goal gated on an item the player can never obtain is silently uncompletable. The
+wire reference is the only reliable id for an item. (See the `same_name_different_number_footgun` note.)
+
 ### The catalog is the ONLY source for a goal's required AMOUNT
 
 ⚠️ `RequiredCount` otherwise comes only from the wire goal record, so a goal no capture has shown sits at **0** —

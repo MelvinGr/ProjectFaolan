@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace Faolan.Importer.Rdb
@@ -118,6 +119,39 @@ namespace Faolan.Importer.Rdb
 		}
 
 		private static readonly Regex LeadingArticle = new(@"^(?:the|a|an|some)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// A KILL: the thing to kill is the noun phrase after the verb. "Kill Vanir Lookouts", "Slay Dogs",
+		// "Kill guards in Villa Paetus".
+		public static readonly Regex KillObjective = new(@"^\s*(?:Kill|Slay|Slaughter|Defeat|Vanquish|Destroy)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// A trailing prepositional clause - "…in Villa Paetus", "…from the battlefield". Trimmed as a SECOND attempt,
+		// never the first, so a target whose own name contains one ("Lurker in the Dark") is tried whole first.
+		private static readonly Regex TrailingClause = new(@"\s+(?:from|in|at|on|near|inside|around|within|for)\s+.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// What a kill objective names, most specific first: the phrase whole, then with a trailing clause trimmed, then
+		// each of those de-pluralised. The caller matches them against the NPC catalog IN THIS ORDER and takes the first
+		// that resolves to exactly one template - the client writes the group plural ("Kill Vanir Lookouts") where the
+		// template is singular, and a live entity's name is the singular one.
+		//
+		// Empty when the sentence is not a kill objective.
+		public static IEnumerable<string> KillTargetCandidates(string? objective)
+		{
+			if (objective is not { Length: > 0 } || KillObjective.Match(objective) is not { Success: true } verb)
+				yield break;
+
+			var phrase = LeadingArticle.Replace(LeadingCount.Replace(objective[verb.Length..].Trim(), ""), "").Trim();
+			if (phrase.Length == 0)
+				yield break;
+
+			foreach (var form in TrailingClause.IsMatch(phrase) ? new[] { phrase, TrailingClause.Replace(phrase, "") } : [phrase])
+			{
+				yield return form;
+				if (form.EndsWith('s'))
+					yield return form[..^1];
+			}
+		}
+
+		private static readonly Regex LeadingCount = new(@"^(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// The AMOUNT an objective asks for, stated right after its verb: "Hand in 20 Yew", "Collect ten Frost Serpent
 		// Skins", "Deliver 3 stone bricks to Turach". Null when the sentence states none.

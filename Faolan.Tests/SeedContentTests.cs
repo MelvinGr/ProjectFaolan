@@ -300,13 +300,41 @@ namespace Faolan.Tests
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
-			var unevidenced = await db
-				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.Separator != (uint)QuestGoalKind.Kill && g.TargetName == null)
-				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
+			var kills = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill)
+				.Select(g => new { g.GoalId, g.QuestDefinitionId, g.Separator, g.TargetName, g.Name })
 				.ToListAsync(ct);
+
+			// The evidence is the client's own kill VERB - as the wire's kind tag, or as the objective sentence
+			// (#704, TypeKillGoalsFromCatalogName). A hand-seeded target is the third and last way.
+			var unevidenced = kills
+				.Where(g => g.Separator != (uint)QuestGoalKind.Kill
+				            && !QuestObjectiveText.KillObjective.IsMatch(g.Name ?? "")
+				            && g.TargetName == null)
+				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
+				.ToList();
 
 			Assert.True(unevidenced.Count == 0,
 				$"goals typed Kill with neither the client's kill verb nor a hand-set target: {string.Join(", ", unevidenced)}");
+
+			// ⚠️ The SAFETY property of the sentence rule: a catalog-only kill goal's target must resolve to exactly ONE
+			// creature we hold. A name we do not hold would be stored and never match anything - inert dressed up as
+			// wired - and a name SEVERAL templates share does not say which creature the quest meant (three distinct
+			// "Scavenger Lackey" templates is the known case).
+			var names = await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).ToListAsync(ct);
+			var owners = names.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+			var unresolvable = kills
+				.Where(g => g.Separator == null && g.TargetName != null)
+				.Where(g => !owners.TryGetValue(g.TargetName!, out var n) || n != 1)
+				.Select(g => $"goal {g.GoalId} targets '{g.TargetName}'")
+				.ToList();
+
+			Assert.True(unresolvable.Count == 0,
+				$"catalog-only kill goals whose target is not exactly one creature we hold: {string.Join(", ", unresolvable)}");
+
+			Assert.True(kills.Count(g => g.Separator == null) >= 45,
+				$"only {kills.Count(g => g.Separator == null)} catalog-only kill goals are typed; the sentence rule types 45.");
 
 			// ...and the typing ran, rather than the verb vanishing from the harvest. All 30 kill-verb goals are typed:
 			// the 24 naming an NPC template (51000) and the 6 naming a monster CATEGORY (51100), which are typed and
