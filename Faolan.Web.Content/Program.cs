@@ -138,12 +138,13 @@ namespace Faolan.Web.Content
 					if (query.Length == 0) // never cache query responses (manifest probes etc.)
 					{
 						Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-						var isNew = !File.Exists(localPath);
 						var tmp = localPath + ".tmp" + Environment.CurrentManagedThreadId;
 						await File.WriteAllBytesAsync(tmp, body);
 						File.Move(tmp, localPath, true);
-						if (isNew)
-							files.AddOrUpdate(tag, 1, (_, n) => n + 1);
+						// The blob is new to the store unconditionally: the only way past the two hit checks with no
+						// query string is File.Exists having said no, under the single-flight gate for this exact path.
+						// (It cost a third File.Exists to ask, and the answer was always the same.)
+						store[tag].Add(body.Length);
 					}
 
 					var m = Interlocked.Increment(ref misses);
@@ -160,36 +161,50 @@ namespace Faolan.Web.Content
 				}
 			});
 
-			// `stored`/`mb` count what THIS run fetched; `files` is the whole store, startup scan included.
-			app.MapGet("/_stats", () => Results.Ok(new
+			// `stored`/`mb` count what THIS run fetched; `files`/`storeMb` are the whole store, startup scan included.
+			app.MapGet("/_stats", () =>
 			{
-				hits = Interlocked.Read(ref hits),
-				stored = Interlocked.Read(ref misses),
-				mb = Interlocked.Read(ref bytes) / 1024f / 1024f,
-				storeDir,
-				files = files.Values.Sum(),
-				filesByTag = new SortedDictionary<string, long>(files, StringComparer.Ordinal)
-			}));
+				var byTag = new SortedDictionary<string, object>(StringComparer.Ordinal);
+				foreach (var (tag, tally) in store)
+					byTag[tag] = new { files = tally.Files, mb = tally.Bytes / 1024f / 1024f };
+
+				return Results.Ok(new
+				{
+					hits = Interlocked.Read(ref hits),
+					stored = Interlocked.Read(ref misses),
+					mb = Interlocked.Read(ref bytes) / 1024f / 1024f,
+					storeDir,
+					files = store.Values.Sum(t => t.Files),
+					storeMb = store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
+					storeByTag = byTag
+				});
+			});
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
-			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} ({Files} files: {ByTag}) patch-addr={PatchAddr}",
-				ip, port, storeDir, files.Values.Sum(), string.Join(", ", files.OrderBy(f => f.Key, StringComparer.Ordinal).Select(f => $"{f.Key}={f.Value}")),
+			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} ({Files} files, {MB:F1} MB: {ByTag}) patch-addr={PatchAddr}",
+				ip, port, storeDir, store.Values.Sum(t => t.Files), store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
+				string.Join(", ", store.OrderBy(s => s.Key, StringComparer.Ordinal).Select(s => $"{s.Key}={s.Value.Files}/{s.Value.Bytes / 1024f / 1024f:F1}MB")),
 				publicAddress is { Length: > 0 } ? PublicBase(publicAddress, default, "http", port) : "<per-request Host header>");
 			app.Run();
 			return 0;
 		}
 
-		// Blobs stored under store/<tag>/upm/<rest>. A `<name>.tmp<threadid>` is a write still in flight (or one a
-		// crash left behind), not a stored blob - a real name is the payload's md5, so it never carries ".tmp".
-		internal static long CountStored(string dir)
+		// Blobs stored under store/<tag>/upm/<rest>: how many, and how many bytes they occupy. A `<name>.tmp<threadid>`
+		// is a write still in flight (or one a crash left behind), not a stored blob - a real name is the payload's
+		// md5, so it never carries ".tmp". Enumerated as FileInfo rather than paths + a File.Length per hit: the
+		// length comes off the directory entry the walk already read, so the size costs no extra syscall.
+		internal static StoreTally ScanStore(string dir)
 		{
+			var tally = new StoreTally();
 			if (!Directory.Exists(dir))
-				return 0;
+				return tally;
 
-			return Directory
-				.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
-				.Count(path => !Path.GetFileName(path.AsSpan()).Contains(".tmp", StringComparison.Ordinal));
+			foreach (var file in new DirectoryInfo(dir).EnumerateFiles("*", SearchOption.AllDirectories))
+				if (!file.Name.AsSpan().Contains(".tmp", StringComparison.Ordinal))
+					tally.Add(file.Length);
+
+			return tally;
 		}
 
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
