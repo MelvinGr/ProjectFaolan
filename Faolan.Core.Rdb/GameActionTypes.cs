@@ -79,12 +79,17 @@ namespace Faolan.Core.Rdb
 		//   key 66   the combo's damage delta on `UpgradeCombo`, a follower SCRIPT GROUP on `SetFollowerScriptGroup`
 		//            (53024), and the proc's incoming/outgoing DIRECTION on the `AddProc` family - the tooltip
 		//            compares it to 1 to pick `AddProcGettingHit` over `AddProcOnHit`.
-		//   key 67   the combo's reuse-time delta on `UpgradeCombo`, and something else again on
-		//            `ChangeInheritedWeaponAttack` (53250), where `Desecrated Blood` carries 100 under a description
-		//            about a spell's "chance to trigger".
+		//   key 67   the combo's reuse-time delta on `UpgradeCombo`, and the combo attack's CRITICAL CHANCE on
+		//            `ChangeInheritedWeaponAttack` (53250).
 		//
 		// So these names are read as `<Type>_<slot>` and are only valid inside the parser for that type. Naming an
 		// unnamed key globally is how a decode gets exported to a type it was never checked against.
+		//
+		// ⚠️ And a SCALE transfers even less than a name does. Keys 66 and 67 are read from the same two
+		// `GameActionStat_e` slots (0x315 / 0x316) on `UpgradeCombo` and on `ChangeInheritedWeaponAttack`, and the
+		// tooltip renders them through DIFFERENT arithmetic on each: `× 0.01` and the float formatter on 53209,
+		// against a raw int on 53250's key 66 and `× 0.025` on its key 67. Reading a 53250 value as 53209's
+		// hundredths-of-a-percent would report a +30% opening-damage feat as +0.30%.
 		//
 		// `UpgradeCombo` (53209): the combo it upgrades plus the two axes it moves. Named from the client's own
 		// item-tooltip builder `FUN_0149e450`, which reads GameActionStat_e 0x315/0x316 (= key 66/67 through the
@@ -111,6 +116,29 @@ namespace Faolan.Core.Rdb
 		public const int KeyProcTrigger = 117;
 		public const int KeyProcAmount = 237;
 		public const int KeyProcComboTarget = 187;
+
+		// `ChangeInheritedWeaponAttack` (53250, `[187 combo, 84, 66, 67, 68, 69]`): the combo plus WHICH of its
+		// weapon attacks, and then three magnitudes and a damage type. Every slot is named by the same tooltip
+		// builder `FUN_0149e450` (branch at `014a1dc5`), which reads GameActionStat_e 0x45F / 0x315 / 0x316 / 0x317 /
+		// 0x318 in that order and renders one localised string per non-zero slot:
+		//
+		//   key 84   the ATTACK: `0` -> `FinishingComboAttack`, `1` -> `OpeningComboAttack`, and the branch RETURNS
+		//            on anything else (`CMP EDI,1; JNZ <bail>` at `014a1e46`) - so it is a two-valued selector, not
+		//            the `Level` its descriptor label suggests. Corroborated by the feats themselves: `Fierce
+		//            Opening` and `Dual Master` ("increases the OPENING damage done by all combos") carry 1.
+		//   key 66   `IncreaseComboDPS` / `DecreaseComboDPS` on the sign - a RAW int with a `%` suffix, so a WHOLE
+		//            percent, unlike 53209's hundredths.
+		//   key 67   `IncreaseComboCriticalChance` / `DecreaseComboCriticalChance` - rendered `× 0.025` (the float at
+		//            `0x020b5944`) with a `%` suffix, i.e. a RATING, 40 points to the percentage point.
+		//   key 68   `IncreaseComboHateAdjustment` / `DecreaseComboHateAdjustment` - raw int + `%`, like key 66.
+		//   key 69   `ChangeComboDamageType` - NOT a magnitude: the client feeds it to `GetLocalisedString(600, v)`,
+		//            so it is an id in the damage-type name table. Zero on all 315 shipped records.
+		public const int KeyComboAttackTarget = 187;
+		public const int KeyComboAttackSlot = 84;
+		public const int KeyComboAttackDps = 66;
+		public const int KeyComboAttackCriticalChance = 67;
+		public const int KeyComboAttackHate = 68;
+		public const int KeyComboAttackDamageType = 69;
 
 		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
 		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.

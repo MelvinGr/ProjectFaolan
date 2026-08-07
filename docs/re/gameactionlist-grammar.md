@@ -318,9 +318,46 @@ both. Imported as `FeatComboModifier`; the recast path that would consume the co
 88 `Spell`, 175 `Amount`) means the same thing wherever it appears; an unnamed one carries no such promise, and
 the catalog shows it does not hold. Key `187` is a per-SPELL target on `ChangeRecastTime` (53031) and
 `ChangeHitPercent` (53030) but a per-COMBO one here; key `66` is a follower script group on
-`SetFollowerScriptGroup` (53024) and the proc DIRECTION on the `AddProc` family; and `ChangeInheritedWeaponAttack`
-(53250) carries key `67` = 100 under a description about a spell's "chance to trigger". Name an unnamed key
-`<Type>_<slot>` and keep it inside that type's parser.
+`SetFollowerScriptGroup` (53024) and the proc DIRECTION on the `AddProc` family; and on
+`ChangeInheritedWeaponAttack` (53250) key `67` is the combo attack's CRITICAL CHANCE, not a cooldown. Name an
+unnamed key `<Type>_<slot>` and keep it inside that type's parser.
+
+⚠️ **And the SCALE transfers even less than the name does.** 53250 reads keys 66 and 67 from the same two
+`GameActionStat_e` slots this type does, and renders them through different arithmetic — see below. Same slot,
+one type apart, three different units.
+
+### `ChangeInheritedWeaponAttack` (53250) — one ATTACK of a combo, on four axes
+
+The sibling of `UpgradeCombo`, and not a variant of it: 53209 moves a combo as a whole, this moves one of its two
+weapon ATTACKS, along axes 53209 has no slot for. 315 records over 12 feats. Its branch of `FUN_0149e450` is at
+`014a1dc5`, which reads all six slots up front and then renders one localised string per non-zero magnitude under
+an attack heading:
+
+| slot | `GameActionStat_e` | what it is | rendered |
+| --- | --- | --- | --- |
+| key `187` | `0x4C3` | the COMBO — 110 of the 112 distinct references resolve against `Combos.Id` | a `comboref://` link |
+| key `84` | `0x45F` | **which attack**: `0` → `FinishingComboAttack`, `1` → `OpeningComboAttack` | the heading |
+| key `66` | `0x315` | the attack's **DPS** delta, signed | raw int + `%` — a WHOLE percent |
+| key `67` | `0x316` | the attack's **critical chance**, signed | `× 0.025` (the float at `0x020b5944`) + `%` |
+| key `68` | `0x317` | the attack's **hate adjustment**, signed | raw int + `%` — a whole percent |
+| key `69` | `0x318` | the attack's **damage TYPE** | `GetLocalisedString(600, value)` — a NAME, not a number |
+
+Each magnitude has an `Increase…` / `Decrease…` pair picked on the value's sign (`IncreaseComboDPS`,
+`IncreaseComboCriticalChance`, `IncreaseComboHateAdjustment`), and a zero is skipped by the same `TEST/JZ` idiom
+53209 uses. `[V1: tools/ghidra/DumpStringsInRange.java]` `[V1: tools/ghidra/XrefsTo.java]`
+`[V1: tools/ghidra/DisasmWin.java]`
+
+⚠️ **Key 84's descriptor label is `Level`, and it does not mean a level here.** The branch does
+`TEST EDI,EDI` → `FinishingComboAttack`, `CMP EDI,1` → `OpeningComboAttack`, and **RETURNS** on anything else
+(`JNZ` at `014a1e46`), so it is a two-valued selector: a third value renders nothing at all. The shipped catalog
+corroborates the polarity by name — `Fierce Opening` and `Dual Master`, whose own text is *"increases the
+**opening** damage done by all combos"*, are the ones carrying `1`.
+
+Exactly one magnitude is non-zero on all 315 records: key 66 on 212 (`Fierce Opening` 30, `Dual Master` 45/75,
+`Smash` 10/20/30, `Crushed Bones` 5…25), key 67 on 101 (`Brutal Blows` 400 = +10%, `Brutal Maiming` 1100,
+`Rupture Armor` 4000), and key 68 on the two rows of the Guardian's `Improved Shield Mastery` — the only feat in
+the catalog that touches threat, which is exactly the feat that should. Key 69 is zero throughout. Imported as
+`FeatComboAttackModifier` (#593).
 
 ### The PROC family — key `88` is the CARRIER's spell, key `236` the TARGET's
 

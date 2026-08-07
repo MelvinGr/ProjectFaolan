@@ -62,6 +62,7 @@ namespace Faolan.Importer.Rdb
 			var featSpellStatMods = new Dictionary<uint, IReadOnlyList<SpellStatModifier>>();
 			var featSpellGrants = new Dictionary<uint, IReadOnlyList<uint>>();
 			var featComboMods = new Dictionary<uint, IReadOnlyList<ComboModifier>>();
+			var featComboAttackMods = new Dictionary<uint, IReadOnlyList<ComboAttackModifier>>();
 			var featProcs = new Dictionary<uint, IReadOnlyList<Proc>>();
 			var skippedUnnamed = 0;
 			var misSlicedElements = 0;
@@ -102,6 +103,7 @@ namespace Faolan.Importer.Rdb
 				misSlicedElements += misSliced;
 				featSpellGrants[e.Id] = ParseSpellGrants(body);
 				featComboMods[e.Id] = ParseComboModifiers(body);
+				featComboAttackMods[e.Id] = ParseComboAttackModifiers(body);
 				featProcs[e.Id] = ParseProcs(body);
 				found.Add(new Feat
 				{
@@ -269,6 +271,29 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
+			// The per-ATTACK combo modifiers (#593), same rule and same scope again.
+			var comboAttackModRows = 0;
+			db.FeatComboAttackModifiers.RemoveRange(await db.FeatComboAttackModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featComboAttackMods.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatComboAttackModifiers.Add(new FeatComboAttackModifier
+					{
+						FeatId = featId,
+						Sequence = i,
+						ComboId = list[i].ComboId,
+						AttackSlot = list[i].Slot,
+						DpsPercent = list[i].DpsPercent,
+						CriticalChanceRating = list[i].CriticalChanceRating,
+						HatePercent = list[i].HatePercent,
+						DamageTypeId = list[i].DamageTypeId,
+						EffectKind = list[i].Kind
+					});
+					comboAttackModRows++;
+				}
+			}
+
 			// The PROCS (#593), same rule and same scope again.
 			var procRows = 0;
 			db.FeatProcs.RemoveRange(await db.FeatProcs.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
@@ -323,7 +348,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || procRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || comboAttackModRows > 0 || procRows > 0)
 				await db.SaveChangesAsync();
 
 			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
@@ -332,10 +357,10 @@ namespace Faolan.Importer.Rdb
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {Procs} procs.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, procRows);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, procRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -754,6 +779,57 @@ namespace Faolan.Importer.Rdb
 		/// <summary>One parsed kind-53209 element: the combo, and its two signed hundredths-of-a-percent deltas.</summary>
 		public readonly record struct ComboModifier(uint Kind, uint ComboId, int DamagePercentHundredths, int CooldownPercentHundredths);
 
+		// One WEAPON ATTACK of a combo (#593): kind 53250 `ChangeInheritedWeaponAttack`,
+		// `[187 combo, 84 attack, 66 dps, 67 crit, 68 hate, 69 damageType]` - 315 records over 12 feats, and the last
+		// of the kinds #593 tabulated.
+		//
+		// The sibling of ParseComboModifiers, not a variant of it: 53209 moves the combo as a whole and this moves
+		// one of its two ATTACKS, along three axes 53209 has no slot for. Every slot is named out of the client's own
+		// tooltip branch at `014a1dc5` - see GameActionTypes and docs/re/gameactionlist-grammar.md.
+		//
+		// ⚠️ The SCALES differ from 53209's even though keys 66/67 are the same two GameActionStat slots: 53250's key
+		// 66 is a WHOLE percent (raw int + `%`) and its key 67 a crit-chance RATING (`× 0.025`), where 53209 renders
+		// both `× 0.01`. Carrying 53209's units across would report `Fierce Opening`'s +30% as +0.30%.
+		public static IReadOnlyList<ComboAttackModifier> ParseComboAttackModifiers(byte[] body)
+		{
+			if (body.Length <= 12)
+				return [];
+
+			var mods = new List<ComboAttackModifier>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != ComboAttackKind)
+					continue;
+
+				var combo = e.Value(GameActionTypes.KeyComboAttackTarget);
+				var slot = e.Value(GameActionTypes.KeyComboAttackSlot);
+				var dps = e.Value(GameActionTypes.KeyComboAttackDps);
+				var crit = e.Value(GameActionTypes.KeyComboAttackCriticalChance);
+				var hate = e.Value(GameActionTypes.KeyComboAttackHate);
+				var damageType = e.Value(GameActionTypes.KeyComboAttackDamageType);
+
+				// A mis-sliced element carrying half a payload is worse than none, and a record that moves no axis at
+				// all is a reference with no magnitude, which nothing can consume.
+				if (combo is null or 0 || slot is null || dps is null || crit is null || hate is null || damageType is null)
+					continue;
+
+				if (dps == 0 && crit == 0 && hate == 0 && damageType == 0)
+					continue;
+
+				// The client REFUSES to render any other selector - its branch returns rather than falling through -
+				// so a third value is a mis-slice, not a third attack we do not model yet.
+				if (slot is not (0 or 1))
+					continue;
+
+				mods.Add(new ComboAttackModifier(e.Kind, combo.Value, (ComboAttackSlot)slot.Value, (int)dps.Value, (int)crit.Value, (int)hate.Value, damageType.Value));
+			}
+
+			return mods;
+		}
+
+		/// <summary>One parsed kind-53250 element - see <see cref="FeatComboAttackModifier" /> for each field's unit.</summary>
+		public readonly record struct ComboAttackModifier(uint Kind, uint ComboId, ComboAttackSlot Slot, int DpsPercent, int CriticalChanceRating, int HatePercent, uint DamageTypeId);
+
 		// The PROCS a feat attaches (#593): 53212 `AddComboProc` `[88, 236, 187 combo, 117, 237]` and 53070
 		// `AddSpellLineProc` `[88, 236, 1 line, 117, 237, 73]` - one shape with the target space swapped, the same
 		// pairing 53075/53030 and 53054/53062 have, so they share a table.
@@ -814,6 +890,7 @@ namespace Faolan.Importer.Rdb
 		private const uint UpgradeComboKind = 53209;
 		private const uint ComboProcKind = 53212;
 		private const uint SpellLineProcKind = 53070;
+		private const uint ComboAttackKind = 53250;
 
 		/// <summary>
 		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
@@ -883,6 +960,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants, int ComboModifiers, int Procs);
+			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs);
 	}
 }

@@ -20,6 +20,7 @@ namespace Faolan.Core.Database
 		DbSet<FeatSpellModifier> FeatSpellModifiers { get; }
 		DbSet<FeatSpellStatModifier> FeatSpellStatModifiers { get; }
 		DbSet<FeatSpellGrant> FeatSpellGrants { get; }
+		DbSet<FeatComboAttackModifier> FeatComboAttackModifiers { get; }
 		DbSet<FeatComboModifier> FeatComboModifiers { get; }
 		DbSet<FeatProc> FeatProcs { get; }
 		DbSet<FeatIdMap> FeatIdMaps { get; }
@@ -123,6 +124,7 @@ namespace Faolan.Core.Database
 		public DbSet<FeatSpellModifier> FeatSpellModifiers { get; set; }
 		public DbSet<FeatSpellStatModifier> FeatSpellStatModifiers { get; set; }
 		public DbSet<FeatSpellGrant> FeatSpellGrants { get; set; }
+		public DbSet<FeatComboAttackModifier> FeatComboAttackModifiers { get; set; }
 		public DbSet<FeatComboModifier> FeatComboModifiers { get; set; }
 		public DbSet<FeatProc> FeatProcs { get; set; }
 		public DbSet<FeatIdMap> FeatIdMaps { get; set; }

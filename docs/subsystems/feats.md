@@ -197,10 +197,22 @@ data comes from.
   sort first by feat id, and behind them sit 239 other targets and 55 distinct values including a −20/−40/−60%
   ladder.
 
-  ⚠️ **Still NOT imported:** 53250 `ChangeInheritedWeaponAttack` (315 records). Its target resolves — 110 of 112
-  references are a `Combos.Id` — but it has no tooltip branch of its own, so keys 66/67/68/84 are unnamed on it,
-  and they are demonstrably NOT what the same key indices mean on `UpgradeCombo`: `Desecrated Blood` carries
-  key 67 = 100 under a description about a spell's "chance to trigger".
+- **`ChangeInheritedWeaponAttack` (53250) — 315 rows in `FeatComboAttackModifier`** (#593). The SIBLING of
+  `UpgradeCombo`, not a variant: 53209 moves a combo as a whole, this moves one of its two weapon ATTACKS, along
+  axes 53209 has no slot for. It DOES have a tooltip branch (`014a1dc5`), which names every slot — key `84` picks
+  `FinishingComboAttack` (0) or `OpeningComboAttack` (1) and the client refuses to render any other value; keys
+  `66`/`67`/`68` are the attack's DPS, critical chance and hate adjustment, each with an Increase/Decrease string
+  chosen on its sign; key `69` is a damage TYPE the client resolves through a name table rather than printing.
+  Exactly one magnitude is set on all 315 records.
+
+  ⚠️ **The SCALES are not `UpgradeCombo`'s, even though keys 66/67 are the same two `GameActionStat_e` slots.**
+  53209 renders both `× 0.01`; 53250 renders key 66 and key 68 as RAW whole percents and key 67 as a crit RATING
+  (`× 0.025`, 40 points to the point). Carrying the neighbour's units across would report `Fierce Opening`'s +30%
+  opening damage as +0.30%. A name transfers by key; an arithmetic does not transfer at all.
+
+  The feats corroborate the reading by their own text: `Fierce Opening` and `Dual Master` ("increases the
+  **opening** damage done by all combos") carry attack 1, and the only two hate rows in the catalog are the
+  Guardian's `Improved Shield Mastery`.
 - **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
   (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
   grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
@@ -225,7 +237,7 @@ data comes from.
   | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id. IMPORTED (#593) |
   | 53212 x421 | `AddComboProc` | **self proc spell, target proc spell, combo, trigger, amount** | the "grant" reading was the pair view: the feat is named for its key-88 spell and key 236 is empty on most records. IMPORTED (#593) |
   | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | the decoded one; `k55` (1 or 2) was never read before |
-  | 53250 x315 | `ChangeInheritedWeaponAttack` | combo, `k84`, `k66`, `k67`, `k68`, `k69` | the target resolves (110/112 are a `Combos.Id`); the four magnitude slots do not — no tooltip branch renders this type |
+  | 53250 x315 | `ChangeInheritedWeaponAttack` | **combo, attack (finishing/opening), DPS %, crit rating, hate %, damage type** | the sibling of 53209, one level down: one ATTACK of the combo rather than the combo. Its branch is at `014a1dc5`; note the scales are NOT 53209's. IMPORTED (#593) |
   | 53070 x289 | `AddSpellLineProc` | **self proc spell, target proc spell, line, trigger, amount, `k73`** | 53212's per-LINE twin; `k73` `Flags` is 0 on every shipped row. IMPORTED (#593) |
   | 53213 / 53211 | `AddProc` / `AddSpellProc` | six words | the live-Frida catalog says four; the RDB widths say six |
 
