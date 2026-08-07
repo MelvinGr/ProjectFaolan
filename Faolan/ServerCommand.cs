@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.CommandLine;
+using System.IO;
 using Faolan.Core;
 using Faolan.Core.Cli;
+using Faolan.Core.Crypt;
 
 namespace Faolan
 {
@@ -41,11 +43,21 @@ namespace Faolan
 			Arity = ArgumentArity.ZeroOrOne
 		};
 
-		// Returns null when the parser handled the invocation itself (--help, --write-default-config, or it reported a
-		// parse error); the caller should exit with `exitCode`.
+		// Generates a fresh login DH private key and writes it to faolan.user.json - the GITIGNORED half of the config,
+		// because a key is per-deployment and faolan.json is committed.
+		private static readonly Option<string> GenerateLoginKey = new("--generate-login-key")
+		{
+			Description = "Generate a new login DH private key into faolan.user.json (or the given path) and exit. Every client must then be re-patched (Faolan.ClientLauncher --patch-login).",
+			Arity = ArgumentArity.ZeroOrOne
+		};
+
+		private static readonly Option<bool> Force = new("--force") { Description = "Let --generate-login-key replace a Login:PrivateKey that is already set." };
+
+		// Returns null when the parser handled the invocation itself (--help, --write-default-config,
+		// --generate-login-key, or it reported a parse error); the caller should exit with `exitCode`.
 		public static ServerOptions? Parse(string[] args, out int exitCode)
 		{
-			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role, WriteDefaultConfig };
+			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role, WriteDefaultConfig, GenerateLoginKey, Force };
 			foreach (var option in ConfigOptions)
 				command.Options.Add(option);
 
@@ -61,7 +73,42 @@ namespace Faolan
 				return null;
 			}
 
+			if (result.GetResult(GenerateLoginKey) != null)
+			{
+				exitCode = GenerateKey(result.GetValue(GenerateLoginKey), result.GetValue(Force));
+
+				return null;
+			}
+
 			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Overrides(result, ConfigOptions));
+		}
+
+		// The private key is written, never PRINTED - it is the one value in this config that is a secret, and a
+		// terminal scrollback is not where it belongs. The derived public half is printed instead, because that is
+		// what has to end up in every client and what tells you the write took effect.
+		private static int GenerateKey(string? given, bool force)
+		{
+			// Default to the user config, because that is where a per-deployment secret belongs; a path is accepted for
+			// the deployment that keeps its config somewhere else, the same as --write-default-config.
+			var path = given is { Length: > 0 } ? given : Global.UserConfigPath;
+			try
+			{
+				var hex = DhKeys.GeneratePrivateHex();
+				UserConfigWriter.Set(path, "Login:PrivateKey", hex, force);
+				DhKeys.Configure(hex);
+			}
+			catch (Exception e) when (e is InvalidOperationException or ArgumentException or IOException)
+			{
+				Console.Error.WriteLine(e.Message);
+
+				return 1;
+			}
+
+			Console.WriteLine($"Wrote a new Login:PrivateKey to {path}");
+			Console.WriteLine($"Its public key is {DhKeys.ServerPublicHex}");
+			Console.WriteLine("⚠️  Every client must now be re-patched (Faolan.ClientLauncher --patch-login) - one that still carries the old key cannot be decrypted, and that fails SILENTLY back to accept-any.");
+
+			return 0;
 		}
 	}
 

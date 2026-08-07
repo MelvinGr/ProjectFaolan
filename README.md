@@ -354,7 +354,12 @@ cannot be silently read. The committed `faolan.json` is that catalog written out
 
 ```sh
 dotnet run --project Faolan -- --write-default-config   # every setting at its default; OVERWRITES
+dotnet run --project Faolan -- --generate-login-key     # a fresh login DH key into faolan.user.json
 ```
+
+Both take an optional path. `--generate-login-key` writes the *user* file because a keypair is per-deployment,
+refuses to replace one that is already set without `--force`, and prints only the derived public half — after
+which every client has to be re-patched (`Faolan.ClientLauncher --patch-login`).
 
 **`faolan.user.json` is gitignored, and that is its whole point.** `faolan.json` is committed and has to stay
 machine-agnostic (no `/home/<user>/…` paths, no LAN addresses), so anything true only of *your* checkout goes in

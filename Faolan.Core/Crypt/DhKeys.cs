@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Security.Cryptography;
 
 namespace Faolan.Core.Crypt
 {
@@ -101,6 +102,28 @@ namespace Faolan.Core.Crypt
 			_private = ParseExponent(hex, "Login:PrivateKey");
 			IsConfigured = true;
 			return true;
+		}
+
+		/// <summary>
+		///     A fresh random private key, as the hex <c>Login:PrivateKey</c> takes. 256 bits, the size of the built-in
+		///     one - the exponent's size is what a brute-force costs, and 256 bits is past reach either way.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Generating one is HALF the job: a client still carries the public key it was patched with, so every
+		///     client has to be re-patched (<c>Faolan.ClientLauncher --patch-login</c>) or its login block stops
+		///     decrypting - which does not fail loudly, it falls back to accept-any. The two move together.
+		/// </remarks>
+		public static string GeneratePrivateHex()
+		{
+			// Rejection-sampled rather than reduced mod N: a modulo would skew the low end, and the loop practically
+			// never runs twice (a 256-bit value is <= 1 with probability 2^-255). ParseExponent is the same bound the
+			// configured path enforces, so a generated key cannot be one the server would refuse.
+			while (true)
+			{
+				var candidate = new BigInteger(RandomNumberGenerator.GetBytes(32), true, true);
+				if (candidate > BigInteger.One && candidate < N)
+					return candidate.ToString("x").TrimStart('0');
+			}
 		}
 
 		/// <summary>

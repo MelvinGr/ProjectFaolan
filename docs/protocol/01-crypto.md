@@ -62,6 +62,18 @@ side derives. [V3: LoginEncryptionTests.ConfigurePublic_OverridesOnlyWhatTheLaun
 ⚠️ The default private key is **not a secret** — it is in this repo's history and in every patched client. It is
 a default, not a credential. A malformed value throws at startup rather than falling back, because a silent
 fallback looks exactly like a working server whose every login is accept-any.
+
+A deployment that wants its own generates one:
+
+```sh
+dotnet run --project Faolan -- --generate-login-key            # into faolan.user.json; --force to replace one
+```
+
+It writes `Login:PrivateKey` into `faolan.user.json` (gitignored — a keypair is per-deployment, and `faolan.json`
+is committed), prints the derived **public** key, and never prints the private one. Generating is half the job:
+every client carries the public key it was patched with, so each must be re-patched
+(`Faolan.ClientLauncher --patch-login`) or its login block stops decrypting — which, again, does not fail loudly.
+[V3: UserConfigWriterTests.AGeneratedKey_IsAUsableExponent]
 [V3: LoginEncryptionTests.Configure_RejectsJunk_AndEmptyKeepsTheDefault]
 
 The whole exchange is validated end-to-end against a reference Python implementation and a recorded fixture.
