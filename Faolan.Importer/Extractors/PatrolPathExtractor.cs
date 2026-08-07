@@ -28,6 +28,11 @@ namespace Faolan.Importer.Extractors
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
 	public static class PatrolPathExtractor
 	{
+		// #703: how close one leg's end must come to the next leg's start for them to be ONE path. Legs that are
+		// genuinely one beat join tightly - 313 of the 450 two-leg tasks join within 5u, most of them within 0.5u -
+		// while a leg that belongs elsewhere misses by 6u to 496u. Same tolerance as the runtime's closed-route test.
+		private const float LegJoinTolerance = 5f;
+
 		// One patrol route per NPC in a capture (#266 patrol). The real route is the mode-1 PathMoveTask waypoint list,
 		// usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by (map, handle) so
 		// the importer correlates a route to its spawn; keeps the RICHEST route per NPC (the most complete path seen
@@ -74,6 +79,12 @@ namespace Faolan.Importer.Extractors
 				// moved her off the cage and cancelled her captive struggle pose (a walking NPC plays locomotion).
 				if (ApproachesACharacter(task.Task))
 					continue;
+
+				// #703: reduce the task to ONE CONTINUOUS route before anything measures it. A captured task carries
+				// the NPC's CURRENT step as well as the beat it is walking, and the two are separate mode-1 legs of the
+				// same mode-4 list; where they don't join, concatenating them fabricates a straight line between two
+				// unrelated places. See TrimToContinuousRoute.
+				TrimToContinuousRoute(task.Task);
 
 				var waypoints = new List<Vector3>();
 				CollectPathWaypoints(task.Task, waypoints);
@@ -127,6 +138,87 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return false;
+		}
+
+		// #703: a stored route must be ONE CONTINUOUS POLYLINE - the runtime walks it waypoint by waypoint, so any
+		// break in it is walked as a straight line between the two sides of the break, through whatever stands there.
+		//
+		// A captured mode-4 ListMoveTask routinely holds TWO mode-1 legs: the NPC's current short step, then the roam
+		// path it is walking. Measured over the 853 harvested routes, every multi-leg task has exactly two legs and
+		// every seam is at that one boundary; the leading leg is 2 waypoints in 450 of 465 cases. Usually the beat
+		// starts where the step ends (median seam 0.7u) and the two are genuinely one path - but in 141 cases the beat
+		// is elsewhere entirely (up to 495.9u away), because a roam path is shared by a GROUP and the NPC joins it
+		// partway rather than at its first waypoint. Two Thunder River spawns of one template carry byte-identical
+		// legs, which is that sharing showing through.
+		//
+		// So: keep the longest run of legs that actually join, and drop the rest. That is the beat - it passes a
+		// median 2.8u from the spawn (max 26.8u, inside the leash) in exactly those 141 cases, so the NPC is standing
+		// on the route it was given; what it is NOT standing on is that route's first waypoint. Dropping the stub
+		// costs 294 waypoints across the corpus and removes every fabricated chord at the source.
+		internal static void TrimToContinuousRoute(MoveTaskNode task)
+		{
+			var legs = new List<(MoveTaskNode Parent, MoveTaskNode Leg)>();
+			CollectPathLegs(task, null!, legs);
+			if (legs.Count < 2)
+				return; // one leg (or none) is continuous by construction
+
+			// Split the legs, in walk order, wherever one does not start where the previous one ended.
+			var runs = new List<List<int>> { new List<int> { 0 } };
+			for (var i = 1; i < legs.Count; i++)
+			{
+				if (Vector3.Distance(LastWaypoint(legs[i - 1].Leg), FirstWaypoint(legs[i].Leg)) > LegJoinTolerance)
+					runs.Add(new List<int>());
+
+				runs[^1].Add(i);
+			}
+
+			if (runs.Count == 1)
+				return; // already continuous - the common case, and nothing is touched
+
+			// The beat is the run carrying the most waypoints; a current-step stub is a couple of points beside it.
+			var keep = runs[0];
+			foreach (var run in runs)
+			{
+				if (WaypointCount(run, legs) > WaypointCount(keep, legs))
+					keep = run;
+			}
+
+			for (var i = 0; i < legs.Count; i++)
+			{
+				if (!keep.Contains(i))
+					legs[i].Parent?.Children.Remove(legs[i].Leg);
+			}
+		}
+
+		private static int WaypointCount(List<int> run, List<(MoveTaskNode Parent, MoveTaskNode Leg)> legs)
+		{
+			var count = 0;
+			foreach (var i in run)
+				count += legs[i].Leg.Waypoints.Count;
+			return count;
+		}
+
+		// The mode-1 legs that carry an explicit waypoint list, in walk order, each with the parent it hangs off (null
+		// for the root). A PathFlags&1 leg names a territory path instead of carrying one (#490) - it holds no geometry,
+		// so it can neither break continuity nor be measured, and is left alone.
+		private static void CollectPathLegs(MoveTaskNode node, MoveTaskNode parent, List<(MoveTaskNode Parent, MoveTaskNode Leg)> legs)
+		{
+			if (node.Mode == 1 && node.Waypoints.Count >= 3)
+				legs.Add((parent, node));
+
+			foreach (var child in node.Children)
+				CollectPathLegs(child, node, legs);
+		}
+
+		private static Vector3 FirstWaypoint(MoveTaskNode leg)
+		{
+			return new Vector3(Bits(leg.Waypoints[0]), Bits(leg.Waypoints[1]), Bits(leg.Waypoints[2]));
+		}
+
+		private static Vector3 LastWaypoint(MoveTaskNode leg)
+		{
+			var i = leg.Waypoints.Count - 3;
+			return new Vector3(Bits(leg.Waypoints[i]), Bits(leg.Waypoints[i + 1]), Bits(leg.Waypoints[i + 2]));
 		}
 
 		// Gathers every PathMoveTask (mode 1) waypoint in a move-task tree (recursing into mode-4 ListMoveTask). The

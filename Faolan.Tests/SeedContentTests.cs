@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -30,6 +31,10 @@ namespace Faolan.Tests
 		// Conarch Armory - the class-specific instance behind Conarch Village's `Armory` door, and the only one any
 		// capture has walked into (Hakotep as a Herald of Xotli, NecroL80 as a Necromancer).
 		private const uint ConarchArmoryMapId = 5007;
+
+		// #703: the harvester's own leg-join tolerance (PatrolPathExtractor.LegJoinTolerance) - legs that are one beat
+		// join within this, a leg that belongs elsewhere misses by far more.
+		private const float PatrolLegJoinTolerance = 5f;
 
 		// A reach objective needs somewhere to walk to. The runtime solves one by proximity to the goal's own map
 		// MARKER, so a ReachArea goal with no marker can never be completed - and a quest that cannot be completed is
@@ -683,6 +688,47 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(failures.Count == 0, $"{failures.Count} shipped patrol(s) cannot be rebuilt: {string.Join(" | ", failures.Take(5))}");
+		}
+
+		// #703: every shipped route must be ONE CONTINUOUS polyline. The runtime walks a route waypoint by waypoint, so
+		// a break in it is not a gap the NPC skips - it is walked, as a straight line between the two sides, through
+		// whatever stands there. That is precisely how Old Tarantia's guards ended up crossing the buildings.
+		//
+		// A captured task carries the NPC's current short step as well as the beat it is walking, as two mode-1 legs of
+		// one mode-4 list. Where they join (median 0.7u) they are genuinely one path; where they don't, concatenating
+		// them fabricates a chord of up to 495.9u. PatrolPathExtractor.TrimToContinuousRoute drops the non-joining leg
+		// at harvest; this is the seed side of that, and it is the assertion that would have caught the original bug in
+		// the shipped data rather than in the client.
+		[Fact]
+		public async Task EveryShippedPatrol_IsOneContinuousPolyline()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var legs = await db.PatrolNodes.Include(n => n.Waypoints).AsNoTracking()
+				.Where(n => n.Waypoints.Count > 0).ToListAsync(ct);
+			Assert.NotEmpty(legs);
+
+			var breaks = new List<string>();
+			foreach (var spawn in legs.GroupBy(n => n.NpcSpawnId))
+			{
+				// Walk order is the tree's own ordering, the same one PatrolRoute.Waypoints concatenates in.
+				var ordered = spawn.OrderBy(n => n.Ordinal).ThenBy(n => n.OrdinalPath, StringComparer.Ordinal).ToList();
+				for (var i = 1; i < ordered.Count; i++)
+				{
+					var previous = ordered[i - 1].Waypoints.OrderBy(w => w.Ordinal).Last();
+					var next = ordered[i].Waypoints.OrderBy(w => w.Ordinal).First();
+					var gap = Vector3.Distance(
+						new Vector3(previous.PositionX, previous.PositionY, previous.PositionZ),
+						new Vector3(next.PositionX, next.PositionY, next.PositionZ));
+
+					if (gap > PatrolLegJoinTolerance)
+						breaks.Add($"spawn {ordered[i].NpcSpawnId}: {gap:F1}u between legs '{ordered[i - 1].OrdinalPath}' and '{ordered[i].OrdinalPath}'");
+				}
+			}
+
+			Assert.True(breaks.Count == 0,
+				$"{breaks.Count} shipped route(s) are not continuous - each break is walked as a straight line through whatever is between: {string.Join(" | ", breaks.Take(5))}");
 		}
 
 		// A CLASS-SPECIFIC map (the city armories) holds a different NPC set per class, so every spawn on one must say
