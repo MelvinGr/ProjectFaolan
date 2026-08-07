@@ -25,17 +25,17 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish ./
 
-# ⚠️ The mirror binds CdnMirror:ListenAddress, which defaults to 127.0.0.1 - LOOPBACK INSIDE THE CONTAINER, i.e. a published
+# ⚠️ The mirror binds Cdn:ListenAddress, which defaults to 127.0.0.1 - LOOPBACK INSIDE THE CONTAINER, i.e. a published
 # port would connect to nothing. So the container default is 0.0.0.0; the port mapping is what limits exposure.
 # Config comes from env vars (faolan.json is optional and not baked in) - see docker-compose.yml.
 #
-# ⚠️ CdnMirror__PublicAddress is REQUIRED and deliberately NOT set here: it is the address a CLIENT dials, which for a
+# ⚠️ Cdn__PublicAddress is REQUIRED and deliberately NOT set here: it is the address a CLIENT dials, which for a
 # published port is the HOST's address, so only the deployment knows it. Baking a value would ship a wrong one - the
 # mirror writes it into the LocalConfig.xml the client then patches itself from. The container exits at startup
 # without it, naming the key.
-ENV CdnMirror__ListenAddress=0.0.0.0 \
-    CdnMirror__Port=7081 \
-    CdnMirror__Store=/app/store
+ENV Cdn__ListenAddress=0.0.0.0 \
+    Cdn__ListenPort=7081 \
+    Cdn__Store=/app/store
 
 # The archive of fetched CDN blobs. Declared so it persists even when compose is not the thing running the image;
 # compose binds a host directory over it, because a full patcher run is many GB and worth keeping.

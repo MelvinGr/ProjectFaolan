@@ -52,28 +52,28 @@ namespace Faolan.Core.Extensions
 			public double ChannelBacklogGraceMs => Double(config, "ChatBridge:BacklogGraceMs");
 			public double ChannelPollMs => Double(config, "ChatBridge:PollMs");
 
-			public string CdnMirrorListenAddress => Required(config, "CdnMirror:ListenAddress");
+			public string CdnListenAddress => Required(config, "Cdn:ListenAddress");
 
 			// The client's RDB folder - part of the game INSTALL, not this repo, so it has no default. One key for
 			// every consumer (Faolan.Web's viewer and the importer's rdb-* modules/reports) and every input method:
 			// `RdbDir` in faolan.json, `RdbDir` in the environment, `--RdbDir <dir>` on the command line.
 			public string? RdbDir => config["RdbDir"];
 
-			// CDN content mirror (Faolan.Web.Content). All optional with the built-in defaults so the mirror runs with no
-			// config at all; override in faolan.json, the environment, or on the command line - all under this one name.
-			public string CdnMirrorStore => Required(config, "CdnMirror:Store");
+			// CDN content mirror (Faolan.Web.Content). Every key but PublicAddress has a built-in default; override any
+			// of them in faolan.json, the environment, or on the command line - all under this one name.
+			public string CdnStore => Required(config, "Cdn:Store");
 
 			// The address the CLIENT reaches the mirror on, used to rewrite LocalConfig.xml's three patch-addr keys.
-			// It is NOT the bind address: in a container CdnMirror:ListenAddress is 0.0.0.0 by design, and on the Docker host the
-			// client dials a published port. So only the operator knows it, and the mirror REFUSES TO START without
-			// it - it used to derive one from the inbound Host header, which is not "what the client dialled" but
-			// whatever the last hop put there. A bare `host` or `host:port` is fine - the scheme is filled in.
-			public string? CdnMirrorPublicAddress => config["CdnMirror:PublicAddress"];
+			// It is NOT the bind address: in a container Cdn:ListenAddress is 0.0.0.0 by design, and on the Docker
+			// host the client dials a published port. So only the operator knows it, and the mirror REFUSES TO START
+			// without it - it used to derive one from the inbound Host header, which is not "what the client dialled"
+			// but whatever the last hop put there. A bare `host` or `host:port` is fine - the scheme is filled in.
+			public string? CdnPublicAddress => config["Cdn:PublicAddress"];
 
 			// Where a CLIENT of the mirror dials it: the importer's RDB proxy and Faolan.Web's viewer. Same key, with
 			// the ONE thing those two need that the mirror does not - a value when it is unset.
 			//
-			// `CdnMirrorPublicAddress` cannot simply be defaulted, because the two sides read "unset" differently and
+			// `CdnPublicAddress` cannot simply be defaulted, because the two sides read "unset" differently and
 			// both readings are right: to the MIRROR it means "I cannot know what a client would dial - refuse to
 			// start", the only honest answer behind a published container port; to a CLIENT of the mirror it means
 			// "the usual local one", because a client that guesses wrong just fails to connect, in front of the
@@ -83,9 +83,9 @@ namespace Faolan.Core.Extensions
 			// ⚠️ The value is an absolute URL, in the config too. Its consumers CONCATENATE onto it (`RdbReader`
 			// appends the mirror route and then `/res/<md5>`), so a bare host would build a relative string that fails
 			// at the HTTP call rather than at the config line that caused it.
-			public string CdnMirrorAddress => config.CdnMirrorPublicAddress is { Length: > 0 } published
+			public string CdnAddress => config.CdnPublicAddress is { Length: > 0 } published
 				? published.TrimEnd('/')
-				: $"http://127.0.0.1:{config.CdnMirrorPort}";
+				: $"http://127.0.0.1:{config.CdnListenPort}";
 
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 
@@ -103,7 +103,7 @@ namespace Faolan.Core.Extensions
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 			public string WelcomeString => Required(config, "WelcomeString");
 
-			public ushort CdnMirrorPort => UShort(config, "CdnMirror:Port");
+			public ushort CdnListenPort => UShort(config, "Cdn:ListenPort");
 
 			public ushort McpPort => UShort(config, "Mcp:Port");
 			public ushort PlayerAgentPort => UShort(config, "PlayerAgentPort");

@@ -28,7 +28,7 @@ namespace Faolan
 		// so `--help` cannot describe a default the code does not use.
 		//
 		// This is a VIEW of that catalog, not the whole of it: Login:PublicKey is launcher-side and stays off the
-		// server's line, and the CdnMirror / ChatBridge keys belong to other
+		// server's line, and the Cdn / ChatBridge keys belong to other
 		// executables. They still get their defaults here, because the defaults layer is built from the catalog
 		// rather than from this list.
 		private static readonly Option<string>[] ConfigOptions = FaolanSettings.Options(

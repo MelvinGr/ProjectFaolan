@@ -56,7 +56,7 @@ namespace Faolan.Tests
 
 		// The other half: a reader built without a CDN base makes `CanRead` collapse into `IsLocal`, so the correct
 		// gate stops helping. Every construction has to hand one over - `ctx.RdbProxyBase` in a module,
-		// `ReportCli.OpenRdb` in a report, `IConfiguration.CdnMirrorAddress` in Faolan.Web.
+		// `ReportCli.OpenRdb` in a report, `IConfiguration.CdnAddress` in Faolan.Web.
 		[Fact]
 		public void EveryRdbReader_IsBuiltWithACdnSource()
 		{
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 
 			Assert.True(offenders.Count == 0,
 				"`new RdbReader(dir)` has no CDN source, so every on-demand record silently disappears. Pass the mirror base "
-				+ "(ctx.RdbProxyBase / ReportCli.OpenRdb / config.CdnMirrorAddress). Offenders: " + string.Join(", ", offenders));
+				+ "(ctx.RdbProxyBase / ReportCli.OpenRdb / config.CdnAddress). Offenders: " + string.Join(", ", offenders));
 		}
 
 		private static IEnumerable<string> SourceFiles()

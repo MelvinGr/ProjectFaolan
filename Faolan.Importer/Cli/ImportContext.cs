@@ -16,14 +16,15 @@ namespace Faolan.Importer.Cli
 		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
 		// Passed to every importer RdbReader so CDN-only records import instead of being skipped.
 		//
-		// Config-derived (`IConfiguration.CdnMirrorAddress`, the same `CdnMirror` section the mirror itself reads), so
+		// Config-derived (`IConfiguration.CdnAddress`, the same `Cdn` section the mirror itself reads), so
 		// a mirror on another box is ONE setting in faolan.user.json rather than a flag on every command; `--rdb-proxy`
 		// still overrides per run. The `/gameupdate/upm/rdb` route is RdbReader's, not config's.
 		// See [[aoc_content_cdn_mirror]].
 		public static string DefaultProxyBase(IConfiguration config)
 		{
-			return config.CdnMirrorAddress;
+			return config.CdnAddress;
 		}
+
 		public required DatabaseContext Db { get; init; }
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();
 

@@ -165,8 +165,8 @@ Modifiers
                        (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
   --rdb-proxy <url>    Faolan.Web.Content mirror ADDRESS for on-demand (le.idx file==0xFF) RDB resources —
                        just the host, e.g. http://127.0.0.1:7081; RdbReader owns the /gameupdate/upm/rdb route.
-                       Defaults to the shared `CdnMirror` config (PublicAddress, else the local mirror on its
-                       Port - never ListenAddress, which is an interface), so a mirror on
+                       Defaults to the shared `Cdn` config (PublicAddress, else the local mirror on its
+                       ListenPort - never ListenAddress, which is an interface), so a mirror on
                        another box is one line in the gitignored faolan.user.json rather than a flag on every
                        command. Every rdb-* module AND every
                        --report fetches CDN-only records through it, and the proxy store-and-forwards so

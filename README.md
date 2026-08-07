@@ -372,7 +372,7 @@ simply wins. Typical contents:
   "RdbDir": "/path/to/Age of Conan/RDB",
   // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial.
   // A full URL - a path is appended to it, so a bare host would build a relative one
-  "CdnMirror": { "PublicAddress": "http://192.168.1.5:7081" },
+  "Cdn": { "PublicAddress": "http://192.168.1.5:7081" },
   // ...and anything else this checkout wants but a plain deployment should not pay for
   "Log": { "PacketBytes": true },
   "Mcp": { "Enabled": true }
@@ -390,7 +390,7 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
 | `Login` `{ PrivateKey, PublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
-| `CdnMirror` `{ Store, ListenAddress, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
+| `Cdn` `{ Store, ListenAddress, ListenPort, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
@@ -401,8 +401,8 @@ environment and on the command line — only the separator differs:
 | method | how |
 | --- | --- |
 | `faolan.json` / `faolan.user.json` | nested: `"Database": { "ConnectionString": … }` |
-| environment | `__` between the parts: `Database__ConnectionString=…`, `Mcp__Port=7098`, `CdnMirror__Store=/data` |
-| command line | the config path itself: `--Database:ConnectionString "…"`, `--CdnMirror:Store /data` |
+| environment | `__` between the parts: `Database__ConnectionString=…`, `Mcp__Port=7098`, `Cdn__Store=/data` |
+| command line | the config path itself: `--Database:ConnectionString "…"`, `--Cdn:Store /data` |
 
 Flat keys are just their own name in all three (`ServerIpAddress=…` / `--ServerIpAddress …`). There are **no
 short aliases** — `--store`, `--ip`, `--port` and `--connectionstring` were a fourth spelling to keep in step and

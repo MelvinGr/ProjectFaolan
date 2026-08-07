@@ -15,7 +15,7 @@ namespace Faolan.Web
 		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
 		// `--help` here cannot describe a default the code does not use.
 		private static readonly Option<string>[] Options =
-			FaolanSettings.Options("RdbDir", "Database:Provider", "Database:ConnectionString", "CdnMirror:PublicAddress");
+			FaolanSettings.Options("RdbDir", "Database:Provider", "Database:ConnectionString", "Cdn:PublicAddress");
 
 		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the
 		// caller should exit with `exitCode`. ASP.NET's own host arguments (--urls, --environment) are passed

@@ -48,16 +48,16 @@ namespace Faolan.Tests
 			Assert.Equal("http://127.0.0.1:7099/mcp", config.McpUrl);
 			Assert.Equal(120_000, config.ChannelBacklogGraceMs);
 			Assert.Equal(1500, config.ChannelPollMs);
-			Assert.Equal("mirror-store", config.CdnMirrorStore);
-			Assert.Equal("127.0.0.1", config.CdnMirrorListenAddress);
-			Assert.Equal(7081, config.CdnMirrorPort);
+			Assert.Equal("mirror-store", config.CdnStore);
+			Assert.Equal("127.0.0.1", config.CdnListenAddress);
+			Assert.Equal(7081, config.CdnListenPort);
 
 			// The two that are OPTIONAL rather than defaulted, and stay null on purpose - one names a game install,
 			// the other a deployment's public address (#552). Their readers handle the null; nothing else may.
 			// (Login:PublicKey is the third, and DhKeys rather than an accessor here reads it.)
 			Assert.Null(config.RdbDir);
-			Assert.Null(config.CdnMirrorPublicAddress);
-			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress); // ...derived from the mirror's own port
+			Assert.Null(config.CdnPublicAddress);
+			Assert.Equal("http://127.0.0.1:7081", config.CdnAddress); // ...derived from the mirror's own port
 		}
 
 		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used

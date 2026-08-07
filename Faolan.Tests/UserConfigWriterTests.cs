@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			                         	// the client's RDB folder
 			                         	"RdbDir": "/games/Age of Conan/RDB",
 
-			                         	"CdnMirror": {
+			                         	"Cdn": {
 			                         		// the mirror runs on another box
 			                         		"PublicAddress": "http://192.168.1.5:7081"
 			                         	}
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 			var config = Read();
 			Assert.Equal("a3f1c2", config["Login:PrivateKey"]);
 			Assert.Equal("/games/Age of Conan/RDB", config["RdbDir"]);
-			Assert.Equal("http://192.168.1.5:7081", config["CdnMirror:PublicAddress"]);
+			Assert.Equal("http://192.168.1.5:7081", config["Cdn:PublicAddress"]);
 
 			var text = File.ReadAllText(_path);
 			Assert.Contains("// the client's RDB folder", text);

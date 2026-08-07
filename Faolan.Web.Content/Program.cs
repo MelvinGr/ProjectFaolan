@@ -49,7 +49,7 @@ namespace Faolan.Web.Content
 
 			// Config precedence (highest wins): environment variables > command line > faolan.json, through the shared
 			// builder so it matches the server and the importer exactly. faolan.json is OPTIONAL - the mirror runs on
-			// its built-in defaults with no file. The command-line key IS the config path (`--CdnMirror:Store <dir>`),
+			// its built-in defaults with no file. The command-line key IS the config path (`--Cdn:Store <dir>`),
 			// declared in MirrorCommand. Sources are cleared first so the order is exactly this (no appsettings.json).
 			var overrides = MirrorCommand.Overrides(args, out var parseExit);
 			if (overrides == null)
@@ -58,9 +58,9 @@ namespace Faolan.Web.Content
 			builder.Configuration.Sources.Clear();
 			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
 
-			var listenAddress = builder.Configuration.CdnMirrorListenAddress;
-			var port = builder.Configuration.CdnMirrorPort;
-			var storeDir = Path.GetFullPath(builder.Configuration.CdnMirrorStore);
+			var listenAddress = builder.Configuration.CdnListenAddress;
+			var port = builder.Configuration.CdnListenPort;
+			var storeDir = Path.GetFullPath(builder.Configuration.CdnStore);
 			Directory.CreateDirectory(storeDir);
 
 			// The address the CLIENT dials, from configuration and nowhere else. It used to fall back to the inbound
@@ -68,14 +68,14 @@ namespace Faolan.Web.Content
 			// whatever the last hop put there, so a proxy, a container port mapping or a plain `curl -H Host:` writes
 			// that value into the LocalConfig.xml a patch run then pins itself to - a wrong patch address that looks
 			// like it worked. Only the operator knows the answer, so an unset key is an error, not a derivation.
-			var publicBase = builder.Configuration.CdnMirrorPublicAddress;
+			var publicBase = builder.Configuration.CdnPublicAddress;
 			if (string.IsNullOrWhiteSpace(publicBase))
 			{
 				Console.Error.WriteLine(
-					"Missing required configuration 'CdnMirror:PublicAddress' - the address a CLIENT reaches this mirror on " +
+					"Missing required configuration 'Cdn:PublicAddress' - the address a CLIENT reaches this mirror on " +
 					$"(e.g. http://192.168.1.5:{port}), written into the patch addresses of every LocalConfig.xml served. " +
-					"Set it in faolan.json / faolan.user.json, in the environment as CdnMirror__PublicAddress, or on the " +
-					"command line as --CdnMirror:PublicAddress.");
+					"Set it in faolan.json / faolan.user.json, in the environment as Cdn__PublicAddress, or on the " +
+					"command line as --Cdn:PublicAddress.");
 				return 1;
 			}
 
@@ -236,8 +236,8 @@ namespace Faolan.Web.Content
 			return Encoding.UTF8.GetBytes(text);
 		}
 
-		// The configured CdnMirror:PublicAddress, normalized to a base URL to concatenate onto. It cannot be derived
-		// from the bind address (in a container CdnMirror:ListenAddress is 0.0.0.0 and a client on the Docker host dials a
+		// The configured Cdn:PublicAddress, normalized to a base URL to concatenate onto. It cannot be derived
+		// from the bind address (in a container Cdn:ListenAddress is 0.0.0.0 and a client on the Docker host dials a
 		// published port) nor from the request (see the caller), so this only tidies what the operator wrote: a bare
 		// `host` or `host:port` gets the scheme it omitted, and a trailing slash comes off because a path follows.
 		internal static string PublicBase(string configured)

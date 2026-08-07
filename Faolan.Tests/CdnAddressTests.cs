@@ -7,11 +7,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `IConfiguration.CdnMirrorAddress` is where a CLIENT of the content mirror - the importer's RDB proxy and
-	// Faolan.Web's viewer - dials it, so a mirror on another box is one `CdnMirror:PublicAddress` override rather
+	// `IConfiguration.CdnAddress` is where a CLIENT of the content mirror - the importer's RDB proxy and
+	// Faolan.Web's viewer - dials it, so a mirror on another box is one `Cdn:PublicAddress` override rather
 	// than one setting per consumer.
 	//
-	// It is not a second setting: it is `CdnMirrorPublicAddress` plus a DEFAULT. The raw key cannot simply carry
+	// It is not a second setting: it is `CdnPublicAddress` plus a DEFAULT. The raw key cannot simply carry
 	// that default, because the two sides read "unset" differently and both readings are right - to the MIRROR it
 	// means "refuse to start", since it would otherwise write a guess into the LocalConfig.xml a patch run pins
 	// itself to, and to a client it means "the usual local one", because a client that guesses wrong merely fails
@@ -20,7 +20,7 @@ namespace Faolan.Tests
 	// The invariant worth gating is that the result is an absolute URL: its consumers concatenate onto it
 	// (`RdbReader` appends the mirror route and then `/res/<md5>`), so a relative string would fail at the HTTP
 	// call, far from the config that caused it.
-	public class CdnMirrorAddressTests
+	public class CdnAddressTests
 	{
 		[Theory]
 		// Unset: the local mirror on its default port.
@@ -33,21 +33,21 @@ namespace Faolan.Tests
 		[InlineData("https://mirror.lan/", null, "https://mirror.lan")]
 		public void ItIsAlwaysAnAbsoluteUrl(string? publicAddress, string? port, string expected)
 		{
-			var config = Config(("CdnMirror:PublicAddress", publicAddress), ("CdnMirror:Port", port));
+			var config = Config(("Cdn:PublicAddress", publicAddress), ("Cdn:ListenPort", port));
 
-			Assert.Equal(expected, config.CdnMirrorAddress);
-			Assert.True(Uri.TryCreate(config.CdnMirrorAddress, UriKind.Absolute, out _));
+			Assert.Equal(expected, config.CdnAddress);
+			Assert.True(Uri.TryCreate(config.CdnAddress, UriKind.Absolute, out _));
 		}
 
-		// The BIND address is deliberately not a fallback: `CdnMirror:ListenAddress` is 0.0.0.0 in a container by
+		// The BIND address is deliberately not a fallback: `Cdn:ListenAddress` is 0.0.0.0 in a container by
 		// design, which is unreachable as a destination - so falling back to it would be wrong in exactly the
 		// deployment that has a non-default value to fall back to.
 		[Fact]
 		public void TheBindAddressIsNotUsedAsADestination()
 		{
-			var config = Config(("CdnMirror:ListenAddress", "0.0.0.0"));
+			var config = Config(("Cdn:ListenAddress", "0.0.0.0"));
 
-			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress);
+			Assert.Equal("http://127.0.0.1:7081", config.CdnAddress);
 		}
 
 		// The catalog's defaults UNDER the values named here - the same stack FaolanCommandLine.Build makes, so

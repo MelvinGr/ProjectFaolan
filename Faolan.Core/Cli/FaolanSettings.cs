@@ -51,12 +51,12 @@ namespace Faolan.Core.Cli
 		/// </param>
 		public sealed record Setting(string Key, string Description, string? Default = null, bool Hidden = false);
 
-		// ⚠️ `CdnMirror:PublicAddress` looks like it wants a default and must NOT have one: the mirror and its clients
+		// ⚠️ `Cdn:PublicAddress` looks like it wants a default and must NOT have one: the mirror and its clients
 		// read "unset" differently and both readings are right - to the MIRROR it means "refuse to start, only the
 		// operator knows what a client dials", to a CLIENT of the mirror it means "the usual local one". A default
 		// here would erase the mirror's reading, which is the whole point of it: a mirror that guesses writes the
 		// guess into the LocalConfig.xml a patch run pins itself to. The client's reading stays where it belongs, on
-		// `IConfigurationExtensions.CdnMirrorAddress`.
+		// `IConfigurationExtensions.CdnAddress`.
 		//
 		// ⚠️ The two Hidden key literals below are the built-in keypair's private half and the key retail's exe ships.
 		// They are DEFAULTS, so they live here with every other default rather than in `DhKeys`, which reads them from
@@ -95,10 +95,10 @@ namespace Faolan.Core.Cli
 			new("ChatBridge:BacklogGraceMs", "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", "120000"),
 			new("ChatBridge:PollMs", "Chat-bridge poll interval, in milliseconds.", "1500"),
 
-			new("CdnMirror:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
-			new("CdnMirror:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
-			new("CdnMirror:Port", "Port the mirror binds.", "7081"),
-			new("CdnMirror:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. REQUIRED by the mirror - it is not the bind address and cannot be derived.")
+			new("Cdn:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
+			new("Cdn:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
+			new("Cdn:ListenPort", "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", "7081"),
+			new("Cdn:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. Full URL, including scheme and port.")
 		];
 
 		private static readonly Dictionary<string, Setting> ByKey = All.ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
