@@ -392,6 +392,58 @@ namespace Faolan.Tests
 				$"TargetNames that are a SHORT FORM of an NPC we hold, so the equality match can never fire: {string.Join(", ", shortForms)}");
 		}
 
+		// A goal flagged `GatesTargetVisibility` must have RESOLVED to a template (#521), because that flag is the only
+		// input to `GetQuestGatedNpcMap` and the map is keyed by template. An unresolved flagged goal is not a smaller
+		// gate - it is NO gate: the NPC stops being hidden and stops being NoRespawn, so a one-time story kill target
+		// respawns and is visible to everyone, silently. The flag would read as set and do nothing.
+		//
+		// This is cheap to satisfy - both flagged goals carry a 51000 reference, so the rule's strongest source already
+		// resolves them - and it is exactly the case where a silent failure is most expensive, since nothing in-client
+		// distinguishes "not gated" from "gated and you qualify".
+		[Fact]
+		public async Task EveryGatedGoal_ResolvesToATemplate()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var flagged = await db
+				.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility)
+				.Select(g => new { g.GoalId, g.TargetName, g.TargetTemplateId })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(flagged);
+
+			var unresolved = flagged.Where(g => g.TargetTemplateId is null or 0).Select(g => $"goal {g.GoalId} '{g.TargetName}'").ToList();
+
+			Assert.True(unresolved.Count == 0,
+				$"GatesTargetVisibility goals with no TargetTemplateId - the flag is silently inert on these: {string.Join(", ", unresolved)}");
+		}
+
+		// A resolved `TargetTemplateId` must AGREE with the goal's own typed reference wherever the goal carries one
+		// (#521). The two are independent statements of the same fact - the client's 51000 `npc_template.name` ref, and
+		// a lookup of the name that ref's LDB string produced - so a disagreement means the resolution rule drifted off
+		// the evidence rather than reading it.
+		//
+		// Measured at 6 agreements and 0 disagreements when the column was introduced. It stays a gate rather than a
+		// one-off measurement because the rule has three sources and the other two are inferential: this is the only
+		// place the inference can be checked against something the client actually said.
+		[Fact]
+		public async Task AResolvedTargetTemplate_AgreesWithTheGoalsOwnReference()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var disagreements = await db
+				.QuestGoalDefinitions.Where(g => g.TargetTemplateId != null
+				                                 && g.TrailingCategory == QuestProgress.NpcTemplateNameCategory && g.TrailingRefId > 0
+				                                 && g.TargetTemplateId != g.TrailingRefId)
+				.Select(g => $"goal {g.GoalId} resolved {g.TargetTemplateId} but its 51000 ref says {g.TrailingRefId}")
+				.ToListAsync(ct);
+
+			Assert.True(disagreements.Count == 0,
+				$"TargetTemplateId contradicting the goal's own npc_template reference: {string.Join(", ", disagreements)}");
+		}
+
 		// The DELIVERY objectives are not typed from their sentence, and that has to stay true (#704).
 		//
 		// They are the larger set by far - Give 656, Hand 504, Return 385, Deliver 309, against Talk 473 / Speak 242 /

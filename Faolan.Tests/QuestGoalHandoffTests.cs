@@ -161,7 +161,7 @@ namespace Faolan.Tests
 
 			public Task ApplyQuestWorldEffects(INetworkClient client) => Task.CompletedTask;
 			public void InvalidateReachGoals(INetworkClient client) { }
-			public Task RefreshQuestMarkerByName(INetworkClient client, string npcName) => Task.CompletedTask;
+			public Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null) => Task.CompletedTask;
 			public Task RefreshQuestVisibility(INetworkClient client) => Task.CompletedTask;
 
 			// #528: the ambusher TYPES the engine sprang, so a gate can assert one fired without a live zone.

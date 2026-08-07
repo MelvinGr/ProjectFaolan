@@ -123,9 +123,10 @@ namespace Faolan.GameServer.World
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
 		private Dictionary<uint, uint> _questGivers = null!;
 
-		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
-		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
-		private Dictionary<string, uint[]> _questGatedNpcs = null!;
+		// Quest-gated NPC TEMPLATE id -> the quest ids that reveal it (#261, re-keyed off the name in #521). Cached once;
+		// an NPC in this map is streamed only to players holding one of its quests active (see WorldEntity.GateQuestIds
+		// / IsVisibleTo).
+		private Dictionary<uint, uint[]> _questGatedNpcs = null!;
 		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
 
 		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs,
@@ -191,17 +192,24 @@ namespace Faolan.GameServer.World
 			player?.PendingReachGoals = null!;
 		}
 
-		// #267: re-send the NAMED NPC's quest marker in-place (handles are session-volatile, so resolve by name in the
-		// player's zone). Unlike RefreshQuestGiverMarker this does NOT gate on the quest-GIVER map, so it also drives the
-		// '?' talk marker for an NPC the player must talk to next (e.g. Casilda after Tuut's key, which activates the
-		// talk stage while she's out of the conversation/stream-in path that would otherwise refresh her marker).
-		public async Task RefreshQuestMarkerByName(INetworkClient client, string npcName)
+		// #267: re-send one NPC's quest marker in-place (handles are session-volatile, so the NPC is resolved in the
+		// player's zone rather than by handle). Unlike RefreshQuestGiverMarker this does NOT gate on the quest-GIVER map,
+		// so it also drives the '?' talk marker for an NPC the player must talk to next (e.g. Casilda after Tuut's key,
+		// which activates the talk stage while she's out of the conversation/stream-in path that would otherwise refresh
+		// her marker).
+		//
+		// #521: resolved by TEMPLATE where the goal has one, name only as the fallback - a marker put on the wrong
+		// same-named NPC points the player at a creature whose greeting will not advance anything.
+		public async Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || string.IsNullOrEmpty(npcName))
+			if (player == null || string.IsNullOrEmpty(npcName) && npcTemplateId is not > 0)
 				return;
 
-			var npc = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && string.Equals(e.Name, npcName, StringComparison.OrdinalIgnoreCase));
+			var npc = npcTemplateId is > 0 and { } templateId
+				? _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.NpcTemplateId == templateId)
+				: _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && string.Equals(e.Name, npcName, StringComparison.OrdinalIgnoreCase));
+
 			if (npc != null)
 				await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc));
 		}
@@ -374,16 +382,18 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
 		}
 
-		// The SOURCE NPC name of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
+		// The SOURCE NPC of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
 		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
-		// is RDB content we don't materialise. Null for a non-bag handle or a bag with no source name.
-		public string? BagSourceName(INetworkClient client, uint bagHandle)
+		// is RDB content we don't materialise. Both halves travel together (#521): the TEMPLATE is what a resolved goal
+		// matches on and the NAME is the fallback for one whose target has no template row yet. (null, 0) for a non-bag
+		// handle or a bag with no source.
+		public (string? Name, uint TemplateId) BagSource(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) && bag.IsLootable)
-				return bag.LootSourceName; // the dead NPC's name (e.g. "Scavenger Tuut"), NOT the bag's "Bag of loot"
+				return (bag.LootSourceName, bag.LootSourceTemplateId); // the dead NPC's identity, NOT the bag's "Bag of loot"
 
-			return null;
+			return (null, 0);
 		}
 
 		// Relays a player's BEHAVIOR (the BehaviorControlCenterIIR swing/cast animation) to every other player who can
@@ -870,7 +880,7 @@ namespace Faolan.GameServer.World
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
 			// bag holding the goal's QUEST ITEM - it must be lootable, not a 50/50 roll.
 			var lootGoalItem = deadNpc.LastAttackerHandle is { } looterHandle
-				? await ActiveLootGoalItemFor(looterHandle, deadNpc.Name)
+				? await ActiveLootGoalItemFor(looterHandle, deadNpc.Name, deadNpc.NpcTemplateId)
 				: null;
 			var questDrop = lootGoalItem.HasValue;
 
@@ -920,7 +930,8 @@ namespace Faolan.GameServer.World
 				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY && MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
 					dropPos = deadNpc.Position with { Y = groundY };
 
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer,
+					deadNpc.NpcTemplateId);
 				_logger.LogInformation(
 					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
 					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
@@ -1043,7 +1054,7 @@ namespace Faolan.GameServer.World
 			// also catches NPCs that stream in while it's on - the toggle only gates whether the label is SENT.
 			var spawnAreas = await _database.GetNpcSpawnAreas(mapId);
 
-			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
+			// #261 quest-gated spawns: NPC template id -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
 			_escortHiddenNpcs ??= await _database.GetEscortHiddenNpcMap();
 
@@ -1103,7 +1114,7 @@ namespace Faolan.GameServer.World
 				if (_escortHiddenNpcs.TryGetValue(npc.NpcTemplateId, out var hideQuest))
 					entity.HideWhenQuestCompletedId = hideQuest;
 
-				if (npcName != null && _questGatedNpcs.TryGetValue(npcName, out var gateQuests))
+				if (_questGatedNpcs.TryGetValue(npc.NpcTemplateId, out var gateQuests))
 				{
 					entity.GateQuestIds = gateQuests;
 					// Quest-gated NPCs are one-time KILL TARGETS (the gate map is exactly the kill-goal targets that
@@ -1807,17 +1818,19 @@ namespace Faolan.GameServer.World
 		// it (#261), or null when they have no such goal. A non-null result forces the bag drop (the item must be
 		// lootable, not a 50/50 roll) and names what to put in it. Both goals in the game data want an actual key:
 		// Saddur -> 193186 "Acheronian Gate Key", Scavenger Tuut -> 319224 "Scavenger's Key", each item type 113 (Quest).
-		private async Task<uint?> ActiveLootGoalItemFor(uint characterId, string npcName)
+		private async Task<uint?> ActiveLootGoalItemFor(uint characterId, string npcName, uint npcTemplateId = 0)
 		{
-			if (string.IsNullOrEmpty(npcName))
+			if (string.IsNullOrEmpty(npcName) && npcTemplateId == 0)
 				return null;
 
 			// One batched read rather than a query per active quest - this sits on the LOOT path, so it ran per kill
 			// that could drop a bag.
 			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
+				// #521: template first, name second - the same test MatchingLootGoal applies when the item is actually
+				// taken. The two must agree, or the drop is forced for a goal the take then refuses to advance.
 				var goal = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
-				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
+				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !QuestProgress.TargetsNpc(goal, npcTemplateId, npcName))
 					continue;
 
 				// A goal that names no item cannot be satisfied: the objective is RECEIVING the item, and there is none
@@ -1865,8 +1878,10 @@ namespace Faolan.GameServer.World
 			var quests = await _database.GetCharacterQuests(character.Id);
 			foreach (var (_, qDef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
+				// #521: template first, name second - the same test the talk TRIGGER uses, so the marker and what
+				// actually fires on the greeting cannot disagree.
 				var qGoal = QuestProgress.InPlayOrder(qDef.Goals).FirstOrDefault();
-				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(qGoal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
+				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && QuestProgress.TargetsNpc(qGoal, npc.NpcTemplateId, npcName))
 					return QuestMarkerTurnIn;
 			}
 
@@ -2387,7 +2402,7 @@ namespace Faolan.GameServer.World
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
 		private async Task<WorldEntity?> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle,
-			string? lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag)
+			string? lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag, uint lootSourceTemplateId = 0)
 		{
 			// #363 container variant: default is the generic bag; a boss/raid drop passes a bigger chest (LargeChest, …).
 			var template = LootContainerTemplate.Create(variant);
@@ -2415,6 +2430,7 @@ namespace Faolan.GameServer.World
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
 			bag.LootSourceName = lootSourceName!; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
+			bag.LootSourceTemplateId = lootSourceTemplateId; // ...and its stable type, which the goal matches first (#521)
 			bag.LootItems.AddRange(loot.Select(l => l.Id)); // exactly the displayed set, same order as the window
 			_sim.World.ZoneFor(mapId, instanceId).Add(bag);
 

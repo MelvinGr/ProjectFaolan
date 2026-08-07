@@ -613,6 +613,11 @@ namespace Faolan.GameServer.World
 		// is the match key for a LootFromNpc quest goal (#261), since the quest item itself is RDB content we don't
 		// materialise. Null for a standalone bag (no source NPC).
 		public string LootSourceName { get; set; } = null!;
+
+		// The same corpse's NPC TEMPLATE id, carried beside the name so a LootFromNpc goal can match on the stable type
+		// rather than a display string (#521) - `Saddur` is two different templates. 0 for a standalone bag, or one
+		// dropped by something with no template behind it, which reads as "type unknown" and falls back to the name.
+		public uint LootSourceTemplateId { get; set; }
 		public string Name { get; }
 
 		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a

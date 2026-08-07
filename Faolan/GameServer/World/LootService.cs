@@ -73,8 +73,8 @@ namespace Faolan.GameServer.World
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 
-			// Capture the bag's source NPC name BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
-			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
+			// Capture the bag's source NPC BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
+			var source = _broadcaster.BagSource(client, bagHandle);
 
 			var items = _broadcaster.TakeBagItems(client, bagHandle);
 			var granted = 0;
@@ -88,7 +88,7 @@ namespace Faolan.GameServer.World
 				// Quest chain (#261): the goal is satisfied by RECEIVING its quest item, so it
 				// advances per granted item - not once per loot-all. Looting a bag without that item in it, or a
 				// take that bounced off a full backpack, advances nothing.
-				await _questProgression.AdvanceLootGoals(client, sourceNpc!, itemTemplateId);
+				await _questProgression.AdvanceLootGoals(client, source.Name!, itemTemplateId, source.TemplateId);
 			}
 
 			if (items.Count > 0)
@@ -149,10 +149,10 @@ namespace Faolan.GameServer.World
 
 			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} desired slot {Slot}.", bagHandle, itemIndex, looterHandle, desiredPosition);
 
-			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
+			var source = _broadcaster.BagSource(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
 			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex, (int)desiredPosition))
-				await _questProgression.AdvanceLootGoals(client, sourceNpc!, item.Value); // #261: the goal wants THIS item
+				await _questProgression.AdvanceLootGoals(client, source.Name!, item.Value, source.TemplateId); // #261: the goal wants THIS item
 
 			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
 			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.

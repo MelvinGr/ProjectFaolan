@@ -217,8 +217,8 @@ There is a **third** reference on the goal, and it is not an LDB one — see
 `TrailingCategory` is therefore a **type tag on the target reference**, and it resolves completely: all **107**
 goals with a non-zero `TrailingRefId` resolve in their declared category, giving `Stolen Goods`, `Mangy Yeti
 Pelt`, `Gormley's Buried Treasure`, `Quarry Stonebrick`, `Taskmaster Olaf`, `Vanir Master Polluter`,
-`Akil-Atsu's Head`, … where `QuestGoalDefinition.TargetName` is currently filled in for only a couple of
-hand-seeded goals. (Use the **English** pages — the language record names them — and decode **UTF-8**; merging
+`Akil-Atsu's Head`, … which is one of the sources `QuestGoalDefinition.TargetName` and its resolved twin
+`TargetTemplateId` are filled from (see [`../subsystems/quests.md`](../subsystems/quests.md)). (Use the **English** pages — the language record names them — and decode **UTF-8**; merging
 all seven languages silently yields French.)
 
 ⚠️ **A 51200 reference does NOT by itself mean the goal is a `ReachArea`.** Only three goals carry one:
@@ -320,10 +320,11 @@ merely unobserved. Fixing the remaining 19 is a feature gap, not a bug.
 ### …and the 24 NPC goals (`51000`) already work
 
 Worth recording so nobody "fixes" them: all 24 are `GoalType.Kill` referencing an `npc_template` — typed from the
-client's own kill verb, not inherited from a default — and `MatchingKillGoal` resolves by `TrailingRefId` first. So the kill matches on the template id the goal already
-carries, and writing `TargetName` from the LDB would be **cosmetic**, not enabling. (It does validate the decode:
-on the two goals where a human did set it — Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for
-that exact ref.)
+client's own kill verb, not inherited from a default — and `MatchingKillGoal` resolves by the target template
+first. So the kill matches on the template id the goal already carries, and writing `TargetName` from the LDB is
+**cosmetic** for these, not enabling. (It does validate the decode: on the two goals where a human did set it —
+Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for that exact ref. Those same refs are now what
+`ResolveGoalTargetTemplates` reads as its strongest source.)
 
 ## Eleven categories are ENCRYPTED — SOLVED: the server sends a per-string key
 

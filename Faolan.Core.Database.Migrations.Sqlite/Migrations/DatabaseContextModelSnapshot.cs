@@ -3127,6 +3127,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<uint?>("TargetTemplateId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("TrailingCategory")
                         .HasColumnType("INTEGER");
 
@@ -3159,6 +3162,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("QuestItemId");
 
                     b.HasIndex("RegionId");
+
+                    b.HasIndex("TargetTemplateId");
 
                     b.ToTable("QuestGoalDefinitions");
                 });
@@ -5271,6 +5276,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("RegionId");
 
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "TargetTemplate")
+                        .WithMany()
+                        .HasForeignKey("TargetTemplateId");
+
                     b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "ObjectiveKey", b1 =>
                         {
                             b1.Property<uint>("QuestGoalDefinitionGoalId")
@@ -5339,6 +5348,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("QuestItem");
 
                     b.Navigation("Region");
+
+                    b.Navigation("TargetTemplate");
 
                     b.Navigation("TrailingKey")
                         .IsRequired();

@@ -130,7 +130,7 @@ namespace Faolan.Tests
 
 			public Task ApplyQuestWorldEffects(INetworkClient client) => Task.CompletedTask;
 			public void InvalidateReachGoals(INetworkClient client) { }
-			public Task RefreshQuestMarkerByName(INetworkClient client, string npcName) => Task.CompletedTask;
+			public Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null) => Task.CompletedTask;
 			public Task RefreshQuestVisibility(INetworkClient client) => Task.CompletedTask;
 			public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null) => Task.CompletedTask;
 			public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update) => Task.CompletedTask;

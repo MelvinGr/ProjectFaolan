@@ -253,13 +253,13 @@ namespace Faolan.GameServer.Dialogue
 			// the freeing dialogue shows once, then the stage completes; the next talk sees the post-freeing
 			// (completed) state and gets the post-quest greeting.
 			//
-			// ⚠️ This one is matched by NAME and stays that way (#646). A TalkToNpc goal's target is
-			// `QuestGoalDefinition.TargetName`, a string in the CLIENT's own RDB data, and the goal's TrailingRefId is
-			// not the NPC at all - on the 12 talk goals that carry one it is the item the player HANDS OVER (quest
-			// 12371's Turach goal carries 193400, the Shipwrecked stone brick). So there is no template id on the goal
-			// side to match against; resolving those names is #521's job. The name comes off the node we just served,
-			// so it is the label of the template we routed to rather than a second lookup.
-			await _questProgression.AdvanceTalkGoals(client, opened.NpcName);
+			// ⚠️ Matched by TEMPLATE first, name second (#521). It used to be name-only, because a TalkToNpc goal's
+			// own TrailingRefId is not the NPC at all - on the 12 talk goals that carry one it is the item the player
+			// HANDS OVER (quest 12371's Turach goal carries 193400, the Shipwrecked stone brick) - so the goal had no
+			// id to match against. `QuestGoalDefinition.TargetTemplateId` is that id: resolved at import from the name
+			// the client's own RDB data states. Both are passed because only 278 goals have resolved so far; the rest
+			// name NPCs on maps that have not been imported and still match on the string.
+			await _questProgression.AdvanceTalkGoals(client, opened.NpcName, npcTemplateId);
 			return true;
 		}
 

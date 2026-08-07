@@ -92,12 +92,14 @@ import) is now **dropped with a report line** rather than stored as an unreachab
 route a click to it. And the `#<handle>` stand-in identity is gone: it existed only because a NULL cannot key a
 row, and the name no longer keys anything.
 
-Two lookups deliberately stay name-keyed, and both are the same reason: `QuestGoalDefinition.TargetName` is a
-string in the CLIENT's own RDB data that we do not resolve yet (32 of its 48 distinct names match no template at
-all — Gitea #521). So the TalkToNpc goal match and `GetQuestGatedNpcMap` compare name against name. The Escort goal
-does NOT: its `TrailingRefId` really is the escortee's template (Casilda 9411 on quest 12407), so it matches by id.
-A TalkToNpc goal's `TrailingRefId` is the item the player HANDS OVER, not the NPC — quest 12371's Turach goal
-carries `193400`, the Shipwrecked stone brick — which is why it has no id to match on.
+The two lookups that used to stay name-keyed have followed (#521). `QuestGoalDefinition.TargetTemplateId` resolves
+the goal's target to a template at import, so both the TalkToNpc goal match and `GetQuestGatedNpcMap` compare
+template against template; the name survives as the fallback for the 586 goals naming NPCs on maps not yet
+imported. That mattered most for the gate, which was hiding the wrong same-named NPC — see
+[`quests.md`](quests.md). The Escort goal never needed it: its `TrailingRefId` really is the escortee's template
+(Casilda 9411 on quest 12407). A TalkToNpc goal's `TrailingRefId` is the item the player HANDS OVER, not the NPC —
+quest 12371's Turach goal carries `193400`, the Shipwrecked stone brick — which is why it had no id of its own to
+match on and needed the resolved column.
 
 ### The fold: from harvested walks to the graph
 

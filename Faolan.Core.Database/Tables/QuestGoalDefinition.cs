@@ -153,6 +153,33 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TargetName { get; set; }
 
+		// The NPC TEMPLATE this goal is about - the same target as `TargetName`, resolved to the stable id (#521).
+		// RESOLVED, not harvested: only 6 goals carry a `51000` reference we can read it off directly, and the other
+		// 272 get it by looking their name up in the catalog (ImportOps.ResolveGoalTargetTemplates). It adds no
+		// information
+		// - it FREEZES a lookup, which is the point: the ambiguity is settled once, at import, with the goal's own
+		// evidence to hand, instead of being re-guessed by every matcher from a string.
+		//
+		// Prefer this over `TargetName` wherever a trigger matches a live entity: a template is exactly one kind of
+		// NPC, while a display name is ambiguous in the world - `Saddur` is TWO templates (2993 on the Stygian Galley,
+		// 9500 on Tortage Island) and `Halen van Dummy` is 27. That is not hypothetical: keying the quest-gate map on
+		// the name hid the GALLEY Saddur from every player not holding a Tortage Island quest, because goal 3490 flags
+		// the beach one. Same move `ConversationNode` made in #646, for the same reason.
+		//
+		// ⚠️ NULL on 586 of the 864 goals that name a target, and that is NOT a resolution failure to fix by relaxing
+		// the rule - the world data is simply INCOMPLETE. Those goals name NPCs (`Genzio`, `Captain Sakumbe`,
+		// `Mithrelle`) on maps that have not been imported yet, so there is no `NpcTemplates` row to point at and an FK
+		// cannot hold a dangling id. They keep matching by NAME and light up on their own as those maps land.
+		//
+		// So `TargetName` STAYS, and is not deprecated by this: it is the fallback for those 586, the only key a
+		// "kill N of <group>" goal can use (a group has no single template), and the human-readable label in reports.
+		// The pair is exactly the arrangement `MatchingKillGoal` already had via `TrailingRefId` - id first, name
+		// second - now available to the talk and loot paths too.
+		public uint? TargetTemplateId { get; set; }
+
+		[ForeignKey(nameof(TargetTemplateId))]
+		public virtual NpcTemplate? TargetTemplate { get; set; }
+
 		// TRUE when killing this goal's target is a ONE-TIME STORY event, which makes that NPC quest-GATED: it is
 		// streamed only to a player holding this quest active, and it does not respawn once killed
 		// (DatabaseRepository.GetQuestGatedNpcMap -> WorldEntity.GateQuestIds / NoRespawn, #261). Saddur and Scavenger

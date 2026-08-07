@@ -18,18 +18,34 @@ namespace Faolan.Tests
 	// loot ... she is still locked".
 	public class QuestGatedNpcVisibilityTests
 	{
-		private const string Tuut = "Scavenger Tuut";
+		private const uint Tuut = 11561; // the Scavenger Tuut NPC TEMPLATE (#521: the map is keyed by template, not name)
 		private const uint TheScavenger = 13479; // Kill Tuut - the goal that carries GatesTargetVisibility
 		private const uint TheScavengersKey = 13563; // Loot the key OFF Tuut - targets him, but is not the flagged goal
+
+		// The GALLEY Saddur - a second template sharing the beach Saddur's display name, on the Stygian Galley (4000)
+		// rather than Tortage Island (4010). No quest targets it and nothing flags it, so it must not be gated.
+		private const uint GalleySaddur = 2993;
 
 		[Fact]
 		public async Task GatedNpc_IsRevealedByEveryQuestTargetingIt_NotOnlyTheFlaggedGoal()
 		{
 			var map = await Repo().GetQuestGatedNpcMap();
 
-			Assert.True(map.TryGetValue(Tuut, out var reveals), $"{Tuut} is a quest-gated NPC");
+			Assert.True(map.TryGetValue(Tuut, out var reveals), "Scavenger Tuut is a quest-gated NPC");
 			Assert.Contains(TheScavenger, reveals); // the flagged Kill goal still gates him
 			Assert.Contains(TheScavengersKey, reveals); // ...and the Loot quest keeps him visible to hand the key over
+		}
+
+		// #521: the gate used to key on the NAME, which stamped GateQuestIds + NoRespawn onto EVERY same-named template.
+		// `Saddur` is two of them and goal 3490 flags only the Tortage Island one (9500), so the Stygian Galley Saddur
+		// was hidden from every player not carrying a Tortage Island quest they cannot have yet - on the intro playfield.
+		[Fact]
+		public async Task ASameNamedNpcThatNoQuestTargets_IsNotGated()
+		{
+			var map = await Repo().GetQuestGatedNpcMap();
+
+			Assert.True(map.ContainsKey(9500), "the Tortage Island Saddur IS the flagged kill target");
+			Assert.False(map.ContainsKey(GalleySaddur), "the Stygian Galley Saddur merely shares his name and must stay visible");
 		}
 
 		[Fact]
@@ -37,16 +53,16 @@ namespace Faolan.Tests
 		{
 			// Widening the REVEAL set must not widen the GATED set: an NPC no goal flags stays ungated, so a
 			// mechanically-resolved kill target (#521) does not hide its population or stop respawning. Every gated
-			// name must own at least one flagged goal.
+			// template must own at least one flagged goal.
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 			var map = await Repo().GetQuestGatedNpcMap();
 
-			foreach (var name in map.Keys)
+			foreach (var templateId in map.Keys)
 			{
 				Assert.True(
-					await db.QuestGoalDefinitions.AnyAsync(g => g.TargetName == name && g.GatesTargetVisibility, ct),
-					$"{name} is gated, so some goal targeting it must carry GatesTargetVisibility");
+					await db.QuestGoalDefinitions.AnyAsync(g => g.TargetTemplateId == templateId && g.GatesTargetVisibility, ct),
+					$"template {templateId} is gated, so some goal targeting it must carry GatesTargetVisibility");
 			}
 		}
 

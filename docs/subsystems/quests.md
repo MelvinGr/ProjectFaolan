@@ -22,10 +22,10 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 
 | type | fired by | matched on |
 |---|---|---|
-| `Kill` | `CombatService` on an NPC death | `TrailingRefId == NpcTemplateId` first, `TargetName` as fallback |
-| `LootFromNpc` | `LootService` when an item leaves a corpse bag | the bag's source NPC **and** the item id |
-| `TalkToNpc` | `ConversationService` on the NPC greeting | `TargetName`. **Solves** the goal (jumps to required) rather than +1, so a "deliver N to X" hand-in completes in one talk |
-| `Escort` | the `UseObject` handler, on the object that plays the escortee's farewell | `TargetName`, resolved from `ConversationNode.TriggerWorldObjectId` — see below |
+| `Kill` | `CombatService` on an NPC death | the target **template**, `TargetName` as fallback |
+| `LootFromNpc` | `LootService` when an item leaves a corpse bag | the bag's source NPC (template, name as fallback) **and** the item id |
+| `TalkToNpc` | `ConversationService` on the NPC greeting | the target **template**, `TargetName` as fallback. **Solves** the goal (jumps to required) rather than +1, so a "deliver N to X" hand-in completes in one talk |
+| `Escort` | the `UseObject` handler, on the object that plays the escortee's farewell | `TrailingRefId` — the escortee's template, resolved from `ConversationNode.TriggerWorldObjectId`, see below |
 | `ReachArea` | the move handler, per accepted move | the goal's **region** if it has one, else a 40-unit radius around its map marker |
 | `CollectItem` | **any item reaching the inventory** | `TrailingRefId == item template id` |
 
@@ -88,6 +88,43 @@ And it found `10`, `24` and `25` — three values the enum did not have at all.
 
 All 107 resolve. That reference is the target, so `TargetName` is mostly a label: kill goals already match on the
 template id and only fall back to the name.
+
+### …and every goal type now matches on a template first
+
+`QuestGoalDefinition.TargetTemplateId` is the id half of the target, resolved at import
+(`ImportOps.ResolveGoalTargetTemplates`) so that the talk and loot paths match the way the kill path always has.
+A display name is **ambiguous in the world** — `Saddur` is two templates and `Halen van Dummy` is 27 — and that
+was a live defect, not a theoretical one: the quest-gate map keyed on the string, so flagging the Tortage Island
+Saddur (9500) also stamped `GateQuestIds` + `NoRespawn` onto the **Stygian Galley** Saddur (2993), hiding an NPC
+on the intro playfield from every player not carrying a Tortage Island quest they cannot have yet.
+
+Three sources, strongest first:
+
+| # | source | goals |
+|---|---|---:|
+| 1 | the goal's own `51000` reference — the client states the template | 6 |
+| 2 | `TargetName` matching exactly one `NpcTemplates` row | 271 |
+| 3 | `TargetName` + the goal's own `MapId`, when several rows carry the name | 1 |
+
+Rule 3 is the interesting one. `MapId` cannot be a general match key — it is a **marker pin** and is NULL on 809
+of the 864 goals that name a target — but where it *is* set it separates same-named templates cleanly, because
+they stand on different maps. Goal 7134 *"Find the gate key"* names `Saddur`, carries no reference, and both
+Saddurs are candidates until its `MapId` 4010 picks the Tortage Island one. Its sibling goal 3490 resolves to the
+**same** template by rule 1, which is the cross-check that the map reading is right.
+
+Nothing is guessed: an ambiguity the three rules cannot settle is left NULL and reported, because a wrong template
+matches the wrong creature silently while a missing one just falls back to the name. One goal is in that state —
+4771 *"Talk to Alyssa"*, two Alyssas and no map on the goal to separate them.
+
+⚠️ **`TargetName` is not deprecated by this and does not wither away.** 586 goals keep it as their only key,
+because they name NPCs on maps that have not been imported yet and an FK cannot hold an id with no row — that
+includes 18 whose own `51000` reference we can read perfectly well. It is also the only key a *"kill N of
+&lt;group&gt;"* goal can use, since a group has no single template. The rule only assigns an id when the name
+resolves **unambiguously**, so it can never narrow a group match.
+
+The asymmetry in `QuestProgress.TargetsNpc` is the point: a goal that HAS a template is matched on the id **alone**
+and never gets a second chance on the string. Falling through to a name compare is exactly how the galley Saddur
+got caught.
 
 **The `51000` half fills `TargetName` mechanically** (`RdbQuestGoalTargetImporter`), and which source it takes
 from is load-bearing. `LDB[51000]` is keyed by template id, so the goal names its target twice — as an id and as a
@@ -443,7 +480,7 @@ text, *"Overcome the Emperor's Manifested Nightmares"*, which is a defeat object
 ## Wiring is bootstrap-only
 
 The harvested goal carries the wire fields; the *server trigger* fields (`GoalType`, `TargetName`,
-`QuestItemId`, `NextQuestId`) are applied afterwards by the `quest-wiring` importer module, and every step there
+`TargetTemplateId`, `QuestItemId`, `NextQuestId`) are applied afterwards by the `quest-wiring` importer module, and every step there
 skips a goal that is already wired. So a hand edit — or the `/admin/quests` editor in Faolan.Web — survives a
 re-import, while a freshly harvested quest still bootstraps.
 
@@ -489,11 +526,15 @@ do not respawn once killed (`WorldEntity.GateQuestIds` / `NoRespawn`, fed by
 `DatabaseRepository.GetQuestGatedNpcMap`). Saddur and Scavenger Tuut are the two, and retail solo-instances both.
 
 Membership is the goal's own **`GatesTargetVisibility`** column, set by hand. It used to be *derived* from "a
-`Kill` goal that has a `TargetName`", which was true of the only two goals ever wired and false in general — the
-gate keys on the **name**, so it hides every same-named NPC in the world, and it forces `NoRespawn`, which caps a
-goal at however many spawns exist. Filling the target names mechanically therefore turned quest 12057 (*kill 9
-Vanir Polluters*, 8 spawns in the world) into a permanently uncompletable quest, stuck at 8/9 with nothing left
-alive.
+`Kill` goal that has a `TargetName`", which was true of the only two goals ever wired and false in general — it
+forces `NoRespawn`, which caps a goal at however many spawns exist. Filling the target names mechanically therefore
+turned quest 12057 (*kill 9 Vanir Polluters*, 8 spawns in the world) into a permanently uncompletable quest, stuck
+at 8/9 with nothing left alive.
+
+The map is keyed by **template** (#521). It was keyed by name until that bit: the flag on the Tortage Island
+Saddur also gated the Stygian Galley one. `SeedContentTests.EveryGatedGoal_ResolvesToATemplate` holds the line,
+because an unresolved flagged goal is not a *narrower* gate but **no gate at all** — the NPC silently stops being
+hidden and starts respawning, and nothing in-client distinguishes that from "gated, and you qualify".
 
 Whether a target is a unique story NPC or a population mob is not stated anywhere in the client data we can read,
 so it is a column and not a rule. `SeedContentTests.GatedKillTargets_HaveEnoughSpawnsToFinishTheGoal` asserts the

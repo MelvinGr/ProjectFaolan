@@ -1551,6 +1551,120 @@ namespace Faolan.Importer.Captures
 			await TypeLocationGoalsFromTrailingCategory(db);
 			await DeriveQuestIndexFromLine(db);
 			await SeedQuestWorldEffects(db);
+			// LAST, and deliberately so: it resolves whatever `TargetName` the steps above settled on, so it has to see
+			// their final answer. Orthogonal to all of them - it fills an ID for a target already chosen, never a
+			// trigger - so it is not IsWired-guarded.
+			await ResolveGoalTargetTemplates(db);
+		}
+
+		// Resolve a goal's `TargetName` to the stable `TargetTemplateId` (#521) - the id half of the pair described on
+		// that column. A display name is ambiguous in the world (`Saddur` is two templates, `Halen van Dummy` 27), so
+		// every trigger that matches a live entity wants the id and keeps the name only as a fallback.
+		//
+		// ⚠️ ORDER IS EVIDENCE STRENGTH again, and the three sources are genuinely different in kind:
+		//
+		//   1. the goal's OWN typed reference - `TrailingCategory` 51000 is `npc_template.name`, so `TrailingRefId` IS
+		//      the target's template id, stated by the client. Direct evidence, and it is the only source that needs no
+		//      string comparison at all. It never contradicts the name where both exist: measured over every such goal,
+		//      6 agree and 0 disagree (the other 18 name a template no imported map holds - see below).
+		//   2. the NAME, when exactly ONE catalog row carries it. 271 goals, and the bulk of the fill.
+		//   3. the name plus the goal's OWN MAP, when several rows carry it. `MapId` cannot be a general match key - it
+		//      is a marker pin and is NULL on 809 of these goals - but where it IS set it separates same-named
+		//      templates cleanly, because they stand on different maps. Goal 7134 "Find the gate key" is the case that
+		//      needs it: it names `Saddur`, carries no reference, and both Saddurs are candidates until its `MapId`
+		//      4010 picks the Tortage Island one (9500) over the Stygian Galley one (2993). Its sibling goal 3490
+		//      resolves by rule 1 to the SAME template, which is the cross-check that says the map reading is right.
+		//
+		// Anything still ambiguous is left NULL and REPORTED, never guessed: a wrong template is worse than no template,
+		// because the name fallback still works and a wrong id silently matches the wrong creature. One goal is in that
+		// state today - 4771 "Talk to Alyssa", two Alyssas (13457 City of Tortage, 19616 Old Tarantia) and no map on the
+		// goal to separate them.
+		//
+		// ⚠️ A template we do not hold cannot be stored: `TargetTemplateId` is an FK, and an id with no row fails the
+		// constraint. That is what caps the fill at 278 of 864 - the remaining goals name NPCs on maps that have not
+		// been imported yet, INCLUDING 18 whose own 51000 reference we can read perfectly well. Those keep matching by
+		// name and resolve themselves as the maps land, which is also why this rule is safe to re-run.
+		//
+		// BOOTSTRAP-ONLY on its own column: a goal that already has a template id (a hand pick settling an ambiguity,
+		// or a prior run) is left alone.
+		private static async Task ResolveGoalTargetTemplates(DatabaseContext db)
+		{
+			var goals = await db
+				.QuestGoalDefinitions.Where(g => g.TargetTemplateId == null && g.TargetName != null && g.TargetName != "")
+				.ToListAsync();
+
+			var templates = await db.NpcTemplates.Select(t => new { t.TemplateId, t.Name }).ToListAsync();
+			var held = templates.Select(t => t.TemplateId).ToHashSet();
+			var byName = templates
+				.Where(t => !string.IsNullOrEmpty(t.Name))
+				.GroupBy(t => t.Name!, StringComparer.OrdinalIgnoreCase)
+				.ToDictionary(g => g.Key, g => g.Select(t => t.TemplateId).Distinct().ToList(), StringComparer.OrdinalIgnoreCase);
+
+			// Which maps each template stands on - the rule-3 discriminator. A template with no spawn contributes
+			// nothing, so it can never be picked by map, which is correct: it is not on the goal's map either.
+			var mapsOf = (await db.NpcSpawns.Select(s => new { s.NpcTemplateId, s.MapId }).Distinct().ToListAsync())
+				.GroupBy(s => s.NpcTemplateId)
+				.ToDictionary(g => g.Key, g => g.Select(s => s.MapId).ToHashSet());
+
+			int byReference = 0, byUniqueName = 0, byMap = 0, ambiguous = 0, notHeld = 0, unknownName = 0;
+			var unresolved = new List<string>();
+			foreach (var goal in goals)
+			{
+				// 1. the goal's own typed reference.
+				if (goal.TrailingCategory == QuestProgress.NpcTemplateNameCategory && goal.TrailingRefId > 0)
+				{
+					if (held.Contains(goal.TrailingRefId))
+					{
+						goal.TargetTemplateId = goal.TrailingRefId;
+						byReference++;
+						continue;
+					}
+
+					// The client states the template and no imported map holds it. Counted separately from a name that
+					// resolves to nothing: this one is a KNOWN answer we cannot store yet, not an unresolvable string.
+					notHeld++;
+					continue;
+				}
+
+				if (!byName.TryGetValue(goal.TargetName!, out var candidates))
+				{
+					unknownName++;
+					continue;
+				}
+
+				// 2. exactly one catalog row carries the name.
+				if (candidates.Count == 1)
+				{
+					goal.TargetTemplateId = candidates[0];
+					byUniqueName++;
+					continue;
+				}
+
+				// 3. several do - let the goal's own map choose, and only when it picks exactly one.
+				var onGoalMap = goal.MapId is { } mapId
+					? candidates.Where(id => mapsOf.TryGetValue(id, out var maps) && maps.Contains(mapId)).ToList()
+					: [];
+
+				if (onGoalMap.Count == 1)
+				{
+					goal.TargetTemplateId = onGoalMap[0];
+					byMap++;
+					continue;
+				}
+
+				ambiguous++;
+				unresolved.Add($"goal {goal.GoalId} '{goal.TargetName}' -> {candidates.Count} templates ({string.Join("/", candidates)})");
+			}
+
+			if (byReference + byUniqueName + byMap > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Resolved {byReference + byUniqueName + byMap} quest goal target template(s): {byReference} from the goal's own 51000 "
+			                  + $"reference, {byUniqueName} from a uniquely-named catalog row, {byMap} from the name + the goal's own map (#521).");
+			Console.WriteLine($"  Left by NAME only: {notHeld} whose stated template no imported map holds, {unknownName} whose name matches no "
+			                  + $"catalog row, {ambiguous} genuinely ambiguous. These still match on TargetName.");
+			foreach (var line in unresolved)
+				Console.WriteLine($"  ambiguous: {line}");
 		}
 
 		// A goal whose TRAILING REFERENCE is an ITEM is a gather objective, so type it `CollectItem` (#521). The goal

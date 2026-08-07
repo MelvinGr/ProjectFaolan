@@ -136,6 +136,49 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)).FirstOrDefault();
 		}
 
+		// The NPC TEMPLATE a goal targets, or null when it has not been resolved to one (#521). Two sources, and they
+		// never disagree - the second is where the first came from wherever both exist:
+		//
+		//   `TargetTemplateId`  the resolved column, available to every goal type (ImportOps.ResolveGoalTargetTemplates).
+		//   `TrailingRefId`     the goal's own typed reference, but ONLY when its category says it is an npc_template
+		//                       ref. Kept as a second source because a hand-authored or Quest-editor goal can carry a
+		//                       target reference without having been through the resolver.
+		//
+		// ⚠️ Category 0 is allowed through on the reference, as it always has been: that is a goal with no typed
+		// reference at all, where `TrailingRefId` means what the person who set it meant. Every OTHER category is a
+		// different id space - six shipped kill goals point at a monster category (51100, ids 246,944..10,367,287) and
+		// comparing one to a template id is a category error that is safe only while the two spaces do not collide.
+		public static uint? TargetTemplateOf(QuestGoalDefinition goal)
+		{
+			if (goal.TargetTemplateId is > 0 and { } resolved)
+				return resolved;
+
+			return goal.TrailingRefId > 0 && goal.TrailingCategory is 0 or NpcTemplateNameCategory
+				? goal.TrailingRefId
+				: null;
+		}
+
+		// Whether `goal` targets the live NPC identified by (`templateId`, `name`) - the id-first/name-second pair the
+		// kill path has always used, now shared by every target-matching trigger (#521).
+		//
+		// ⚠️ A goal that HAS a resolved template is matched on the id ALONE - the name is never consulted as a second
+		// chance. That asymmetry is the whole point. `Saddur` is two templates (2993 on the Stygian Galley, 9500 on
+		// Tortage Island); letting a goal that names 9500 fall through to a string compare would match the galley one,
+		// which is precisely the bug this replaced. An unresolved id means "unknown", not "no".
+		//
+		// The name branch is NOT a legacy path and does not shrink to nothing as the world data fills in. It is the only
+		// key a goal can use when its target is a GROUP rather than one creature - several templates sharing one name,
+		// where the shared string is what catches every variant - and it carries the 586 goals whose NPCs live on maps
+		// that have not been imported yet.
+		public static bool TargetsNpc(QuestGoalDefinition goal, uint? templateId, string? name)
+		{
+			if (TargetTemplateOf(goal) is { } target)
+				return templateId is > 0 and { } id && id == target;
+
+			return !string.IsNullOrEmpty(goal.TargetName) && !string.IsNullOrEmpty(name)
+			       && goal.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase);
+		}
+
 		// The goal a trigger of `triggerType` against `targetName` advances (#357): the first (in PLAY order - see
 		// InPlayOrder) goal of that type naming that target. Multi-goal quests can have several goals; a trigger fires
 		// the one it matches, not always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced
@@ -149,14 +192,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// names its item (3492 Saddur -> 193186, 5867 Scavenger Tuut -> 319224), so one without is a data gap, not a
 		// shape to support with a wildcard - and the loot path says so out loud when it meets one
 		// (WorldBroadcaster.ActiveLootGoalItemFor) rather than quietly accepting any item in its place.
-		public static QuestGoalDefinition? MatchingLootGoal(IEnumerable<QuestGoalDefinition> goals, string sourceNpcName, uint grantedItemId)
+		public static QuestGoalDefinition? MatchingLootGoal(IEnumerable<QuestGoalDefinition> goals, string sourceNpcName, uint grantedItemId,
+			uint? sourceTemplateId = null)
 		{
-			if (goals == null || string.IsNullOrEmpty(sourceNpcName) || grantedItemId == 0)
+			if (goals == null || grantedItemId == 0 || string.IsNullOrEmpty(sourceNpcName) && sourceTemplateId is not > 0)
 				return null;
 
 			return InPlayOrder(goals)
-				.FirstOrDefault(g => g.GoalType == QuestGoalType.LootFromNpc && g.QuestItemId == grantedItemId && !string.IsNullOrEmpty(g.TargetName)
-				                     && g.TargetName.Equals(sourceNpcName, StringComparison.OrdinalIgnoreCase));
+				.FirstOrDefault(g => g.GoalType == QuestGoalType.LootFromNpc && g.QuestItemId == grantedItemId
+				                     && TargetsNpc(g, sourceTemplateId, sourceNpcName));
 		}
 
 		// The Escort goal the escortee with `templateId` advances (#646). An Escort goal's TrailingRefId IS the
@@ -173,14 +217,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 				.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId == templateId);
 		}
 
-		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
+		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName,
+			uint? targetTemplateId = null)
 		{
-			if (goals == null || string.IsNullOrEmpty(targetName))
+			if (goals == null || string.IsNullOrEmpty(targetName) && targetTemplateId is not > 0)
 				return null;
 
 			return goals
 				.OrderBy(g => g.Sequence)
-				.FirstOrDefault(g => g.GoalType == triggerType && !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(targetName, StringComparison.OrdinalIgnoreCase));
+				.FirstOrDefault(g => g.GoalType == triggerType && TargetsNpc(g, targetTemplateId, targetName));
 		}
 
 		// The Kill goal a kill of the NPC with `templateId` advances (#262). The target key is the goal's TrailingRefId -
@@ -200,7 +245,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill && !g.Partial).OrderBy(g => g.Sequence).ToList();
 
 			// ⚠️ Both guards below are the same mistake caught twice: a goal that never named an NPC still reached the
-			// by-id branch, where its TrailingRefId was compared against a template id it is not.
+			// by-id branch, where its TrailingRefId was compared against a template id it is not. Both now live in
+			// TargetTemplateOf, which is what decides whether a goal HAS a target id at all:
 			//
 			//   templateId 0 - the one caller passes `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for
 			//     anything with no template behind it, while this method's contract says a null/0 means "no type id
@@ -211,15 +257,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 			//     at a monster CATEGORY instead (51100 `categorytree.description` - "Kill Atzel's Watch", "Kill Undeads
 			//     in Xibaluku"), whose ids run 246,944..10,367,287 in an id space of their own. Comparing one to a
 			//     template id is a category error that happens to be safe only while no template id collides with it.
-			//     Category 0 is allowed through: that is a hand-authored or editor goal with no typed reference at all,
-			//     where TrailingRefId means what the person who set it meant.
-			if (templateId is > 0 and { } id
-			    && kills.FirstOrDefault(g => g.TrailingRefId == id && g.TrailingCategory is 0 or NpcTemplateNameCategory) is { } byId)
+			//
+			// TWO PASSES, and it stays two rather than collapsing into one TargetsNpc scan: a quest can hold both an
+			// id-targeted and a name-targeted kill goal, and a single pass would hand the kill to whichever comes first
+			// in sequence even when a later goal names the creature's exact template. An id match is better evidence
+			// than a string match no matter where it sits in the quest.
+			if (templateId is > 0 and { } id && kills.FirstOrDefault(g => TargetTemplateOf(g) == id) is { } byId)
 				return byId;
 
+			// ⚠️ Name pass, restricted to goals with NO target id. A goal that names a template and did not match it
+			// above has answered - it is not this creature - and must not get a second chance on a string that two
+			// templates share (see TargetsNpc).
 			return string.IsNullOrEmpty(name)
 				? null
-				: kills.FirstOrDefault(g => !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase));
+				: kills.FirstOrDefault(g => TargetTemplateOf(g) is null && !string.IsNullOrEmpty(g.TargetName)
+				                            && g.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase));
 		}
 	}
 }

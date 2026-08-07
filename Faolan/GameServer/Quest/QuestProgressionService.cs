@@ -118,15 +118,17 @@ namespace Faolan.GameServer.Quest
 		// asks for exactly that item from exactly that NPC. Called per granted item, not per loot action - the goal is
 		// satisfied by HOLDING the quest item, not by having opened the bag it was in, so a take that failed to reach the
 		// backpack (full bag - the item goes back) advances nothing.
-		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName, uint grantedItemId)
+		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName, uint grantedItemId, uint? sourceTemplateId = null)
 		{
-			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName, grantedItemId);
+			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName, grantedItemId, npcTemplateId: sourceTemplateId);
 		}
 
 		// The player opened `npcName`'s greeting: advance any active talk goal targeting it (e.g. freeing Casilda).
-		public Task AdvanceTalkGoals(INetworkClient client, string npcName)
+		// `npcTemplateId` is the greeted NPC's stable type (#521); the name stays for goals that have no resolved
+		// template - the greeter may be on a map whose creatures we have not imported.
+		public Task AdvanceTalkGoals(INetworkClient client, string npcName, uint? npcTemplateId = null)
 		{
-			return Advance(client, QuestGoalType.TalkToNpc, npcName);
+			return Advance(client, QuestGoalType.TalkToNpc, npcName, npcTemplateId: npcTemplateId);
 		}
 
 		// The escort reached its destination: complete any active Escort goal for the escortee TEMPLATE (#521/#523).
@@ -289,7 +291,13 @@ namespace Faolan.GameServer.Quest
 		// stage, or (chainless kill) awaits turn-in at the giver - the legacy #47 path.
 		// `step` is how much a single trigger is worth - 1 for a kill/talk/loot, but a granted STACK advances a collect
 		// goal by its whole count (picking up 3 bricks at once is 3 of the 3).
-		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null, uint step = 1)
+		//
+		// ⚠️ TWO id parameters, because `targetTemplateId` does not mean one thing across the trigger types: it is the
+		// killed/escorted NPC for Kill and Escort, but the ITEM for Collect and Loot. `npcTemplateId` is always the NPC
+		// (#521) - the bag's source creature on a loot, the greeted creature on a talk - so the loot path can match on
+		// both halves of what it knows. Kill and Escort leave it null; their NPC is already in the other slot.
+		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null, uint step = 1,
+			uint? npcTemplateId = null)
 		{
 			var character = client.Session.Character;
 			if (character == null || (string.IsNullOrEmpty(targetName) && targetTemplateId is null))
@@ -300,17 +308,21 @@ namespace Faolan.GameServer.Quest
 			var changed = false;
 			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				// Match the goal to advance: a kill by the STABLE target template id (TrailingRefId), name as fallback; a
-				// collect by its item id (TrailingRefId); an ESCORT by the escortee's template (also TrailingRefId, #646);
-				// a LOOT by the bag's source NPC AND the item received; a TALK by name, because a talk goal's
-				// TrailingRefId is the hand-over ITEM rather than the NPC - #262.
+				// Match the goal to advance: a kill by the STABLE target template id, name as fallback; a collect by its
+				// item id (TrailingRefId); an ESCORT by the escortee's template (TrailingRefId, #646); a LOOT by the bag's
+				// source NPC AND the item received; a TALK by the greeted NPC - #262.
+				//
+				// #521: the loot and talk paths now pass the NPC's TEMPLATE alongside its name, so they match the same
+				// way the kill path always has - id first, name only where the goal has no resolved template. A talk
+				// goal's own TrailingRefId is no help there (it is the hand-over ITEM, not the NPC); the resolved
+				// `TargetTemplateId` column is what gives those two an id to match on at all.
 				var goal = triggerType switch
 				{
 					QuestGoalType.Kill        => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
 					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
-					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0),
+					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0, npcTemplateId),
 					QuestGoalType.Escort      => QuestProgress.MatchingEscortGoal(def.Goals, targetTemplateId ?? 0),
-					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
+					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName, npcTemplateId)
 				};
 				if (goal == null)
 					continue;
@@ -464,8 +476,8 @@ namespace Faolan.GameServer.Quest
 			// #267: if the next stage is "talk to NPC X" (e.g. 13563 loot -> 13480 talk Casilda), push X's '?' marker
 			// now. The supersession happens away from X (looting Tuut's corpse), so without this her '?' wouldn't appear
 			// until the client re-polls/re-streams her - and she's often still in view, so that never fires.
-			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && !string.IsNullOrEmpty(nextGoal.TargetName))
-				await _outbound.RefreshQuestMarkerByName(client, nextGoal.TargetName);
+			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && (!string.IsNullOrEmpty(nextGoal.TargetName) || nextGoal.TargetTemplateId is > 0))
+				await _outbound.RefreshQuestMarkerFor(client, nextGoal.TargetName!, nextGoal.TargetTemplateId);
 
 			// #262: the new stage may carry a ReachArea goal (Shipwrecked II "find the gate key", III "enter the city")
 			// - drop the player's once-lazy reach cache so the next move reloads it and starts watching the new area.

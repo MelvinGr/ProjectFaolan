@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
-		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
+		Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<uint, uint>> GetQuestGiverMap();
 		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
@@ -288,10 +288,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToArrayAsync();
 		}
 
-		// NPC name -> the quest ids that reveal it (#261). ⚠️ Membership is the goal's own GatesTargetVisibility flag,
-		// NOT "a Kill goal that happens to carry a TargetName". The gate keys on the NAME and forces NoRespawn, so
-		// implying it from the target made every mechanically-resolved kill target (#521) hide its whole population and
-		// stop respawning - see QuestGoalDefinition.GatesTargetVisibility for the quest that broke.
+		// NPC TEMPLATE id -> the quest ids that reveal it (#261). ⚠️ Membership is the goal's own GatesTargetVisibility
+		// flag, NOT "a Kill goal that happens to carry a target". The gate forces NoRespawn, so implying it from the
+		// target made every mechanically-resolved kill target (#521) hide its whole population and stop respawning -
+		// see QuestGoalDefinition.GatesTargetVisibility for the quest that broke.
 		// ⚠️ The flag decides WHICH NPCs are gated; it does NOT decide which quests REVEAL them. Those are two questions
 		// and answering both with `GatesTargetVisibility` softlocked the Casilda chain (#574). Scavenger Tuut is gated
 		// by 13479 "The Scavenger" (Kill, the flagged goal), but 13563 "The Scavenger's Key" (Loot) targets him too -
@@ -305,31 +305,38 @@ namespace Faolan.Core.Database.Repositories
 		// set keeps the flag's original job intact: a mechanically-resolved kill target (#521) that nothing flags
 		// still gates nothing, so it does not hide its population or stop respawning.
 		//
-		// ⚠️ This one stays keyed by NAME while everything around it moved to the template id (#646), and deliberately
-		// so: both sides of it are `QuestGoalDefinition.TargetName`, a string in the client's OWN RDB data that we do
-		// not resolve yet - 32 of its 48 distinct names match no template at all. Re-keying it would mean inventing
-		// that resolution, which is #521's job, not this lookup's. The giver set is compared against those same names,
-		// so it reads the node's NpcName label rather than its template.
-		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
+		// ⚠️ It USED TO key on the name, which was a live bug (#521). `Saddur` is TWO templates - 2993 on the Stygian
+		// Galley and 9500 on Tortage Island - and goal 3490 flags the Tortage one. Keying the gate on the string
+		// therefore stamped GateQuestIds + NoRespawn onto the GALLEY Saddur as well, hiding an NPC on the intro
+		// playfield from every player who was not carrying a Tortage Island quest they cannot have yet. A template is
+		// exactly one kind of NPC; a display name is ambiguous in the world (`Halen van Dummy` is 27 of them), which is
+		// the same reason ConversationNode re-keyed in #646. Both sides moved together: the giver set reads the node's
+		// NpcTemplateId, not its NpcName label.
+		//
+		// A goal whose target has not RESOLVED to a template (TargetTemplateId null - 586 of them, naming NPCs on maps
+		// that have not been imported) is simply not in this map. That is correct on both sides: it cannot gate an NPC
+		// that does not exist here, and it cannot reveal one either. `SeedContentTests.EveryGatedGoal_ResolvesToATemplate`
+		// keeps the FLAGGED goals out of that bucket, since a flag on an unresolved goal would be silently inert.
+		public async Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var givers = (await ctx.ConversationEdges.Where(e => e.GrantQuestId > 0).Select(e => e.From.NpcName).Distinct().ToListAsync()).ToHashSet();
+			var givers = (await ctx.ConversationEdges.Where(e => e.GrantQuestId > 0).Select(e => e.From.NpcTemplateId).Distinct().ToListAsync()).ToHashSet();
 
 			var targeted = await ctx
-				.QuestGoalDefinitions.Where(g => g.TargetName != null && g.TargetName != "")
+				.QuestGoalDefinitions.Where(g => g.TargetTemplateId != null)
 				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.QuestId, (g, d) => new
 				{
-					g.TargetName,
+					TargetTemplateId = g.TargetTemplateId!.Value,
 					d.QuestId,
 					g.GatesTargetVisibility
 				})
 				.Distinct()
 				.ToListAsync();
 
-			var gated = targeted.Where(x => x.GatesTargetVisibility).Select(x => x.TargetName!).ToHashSet();
+			var gated = targeted.Where(x => x.GatesTargetVisibility).Select(x => x.TargetTemplateId).ToHashSet();
 
-			return targeted.Where(x => gated.Contains(x.TargetName!) && !givers.Contains(x.TargetName!))
-				.GroupBy(x => x.TargetName!)
+			return targeted.Where(x => gated.Contains(x.TargetTemplateId) && !givers.Contains(x.TargetTemplateId))
+				.GroupBy(x => x.TargetTemplateId)
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 

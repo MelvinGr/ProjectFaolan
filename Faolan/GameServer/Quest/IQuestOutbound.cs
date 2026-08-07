@@ -26,7 +26,7 @@ namespace Faolan.GameServer.Quest
 		// #267: re-send the named NPC's quest marker to the player in-place (handles are session-volatile, so by NAME).
 		// Used after a chain stage supersedes to a TALK goal while that NPC is away (e.g. looting Tuut's key activates
 		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.
-		Task RefreshQuestMarkerByName(INetworkClient client, string npcName);
+		Task RefreshQuestMarkerFor(INetworkClient client, string npcName, uint? npcTemplateId = null);
 
 		// #528: a goal that springs an AMBUSH just advanced for the first time - put the ambusher in the world beside
 		// the player after the definition's delay. No-op when the player is no longer there to ambush.
