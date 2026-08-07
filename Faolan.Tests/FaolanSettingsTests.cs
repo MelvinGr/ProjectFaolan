@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.Equal(120_000, config.ChannelBacklogGraceMs);
 			Assert.Equal(1500, config.ChannelPollMs);
 			Assert.Equal("mirror-store", config.CdnMirrorStore);
-			Assert.Equal("127.0.0.1", config.CdnMirrorIp);
+			Assert.Equal("127.0.0.1", config.CdnMirrorListenAddress);
 			Assert.Equal(7081, config.CdnMirrorPort);
 
 			// The two that are OPTIONAL rather than defaulted, and stay null on purpose - one names a game install,

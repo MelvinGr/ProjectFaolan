@@ -52,7 +52,7 @@ namespace Faolan.Core.Extensions
 			public double ChannelBacklogGraceMs => Double(config, "ChatBridge:BacklogGraceMs");
 			public double ChannelPollMs => Double(config, "ChatBridge:PollMs");
 
-			public string CdnMirrorIp => Required(config, "CdnMirror:Ip");
+			public string CdnMirrorListenAddress => Required(config, "CdnMirror:ListenAddress");
 
 			// The client's RDB folder - part of the game INSTALL, not this repo, so it has no default. One key for
 			// every consumer (Faolan.Web's viewer and the importer's rdb-* modules/reports) and every input method:
@@ -64,7 +64,7 @@ namespace Faolan.Core.Extensions
 			public string CdnMirrorStore => Required(config, "CdnMirror:Store");
 
 			// The address the CLIENT reaches the mirror on, used to rewrite LocalConfig.xml's three patch-addr keys.
-			// It is NOT the bind address: in a container CdnMirror:Ip is 0.0.0.0 by design, and on the Docker host the
+			// It is NOT the bind address: in a container CdnMirror:ListenAddress is 0.0.0.0 by design, and on the Docker host the
 			// client dials a published port. So only the operator knows it, and the mirror REFUSES TO START without
 			// it - it used to derive one from the inbound Host header, which is not "what the client dialled" but
 			// whatever the last hop put there. A bare `host` or `host:port` is fine - the scheme is filled in.
@@ -86,6 +86,7 @@ namespace Faolan.Core.Extensions
 			public string CdnMirrorAddress => config.CdnMirrorPublicAddress is { Length: > 0 } published
 				? published.TrimEnd('/')
 				: $"http://127.0.0.1:{config.CdnMirrorPort}";
+
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 
 			// Log file location. Optional - defaults to faolan.log in the CWD; point it at a mounted volume (container)

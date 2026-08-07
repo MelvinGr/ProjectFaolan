@@ -76,8 +76,8 @@
 	"CdnMirror": {
 		// Directory the mirror stores fetched CDN blobs in.
 		"Store": "mirror-store",
-		// Address the mirror binds.
-		"Ip": "127.0.0.1",
+		// Address the mirror BINDS - an interface, not the address a client dials.
+		"ListenAddress": "127.0.0.1",
 		// Port the mirror binds.
 		"Port": 7081
 		// Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. REQUIRED by the mirror - it is not the bind address and cannot be derived.

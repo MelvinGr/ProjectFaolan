@@ -155,7 +155,7 @@ services:
 # ⚠️ It fetches from the real Age of Conan CDN on a miss, so it needs outbound internet. On a hit it never leaves
 #    disk. The store is content-addressed (the last path segment IS the payload md5), so it is self-verifying and
 #    safe to share between runs - and worth persisting: a full patcher run is many GB.
-# ⚠️ `CdnMirror__Ip` MUST be 0.0.0.0 here (the image defaults it): the code's own default is 127.0.0.1, which
+# ⚠️ `CdnMirror__ListenAddress` MUST be 0.0.0.0 here (the image defaults it): the code's own default is 127.0.0.1, which
 #    inside a container is loopback the published port cannot reach.
 # ⚠️ `CdnMirror__PublicAddress` is REQUIRED - the mirror exits at startup without it. The LocalConfig.xml it serves
 #    back rewrites the patch addresses to point at the mirror, and only you know what a client can dial: NOT the bind
@@ -168,7 +168,7 @@ services:
 #      dockerfile: Faolan.Web.Content/Dockerfile
 #    image: projectfaolan-cdn
 #    environment:
-#      CdnMirror__Ip: "0.0.0.0"       # bind all interfaces IN the container (the code default, 127.0.0.1, is unreachable)
+#      CdnMirror__ListenAddress: "0.0.0.0"   # bind all interfaces IN the container (the code default, 127.0.0.1, is unreachable)
 #      CdnMirror__Port: 7081
 #      CdnMirror__Store: "/app/store"
 #      CdnMirror__PublicAddress: "gameserver.example.com:7081"   # REQUIRED: what a CLIENT dials, written into LocalConfig.xml

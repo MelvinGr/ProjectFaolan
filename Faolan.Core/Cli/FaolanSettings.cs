@@ -96,7 +96,7 @@ namespace Faolan.Core.Cli
 			new("ChatBridge:PollMs", "Chat-bridge poll interval, in milliseconds.", "1500"),
 
 			new("CdnMirror:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
-			new("CdnMirror:Ip", "Address the mirror binds.", "127.0.0.1"),
+			new("CdnMirror:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
 			new("CdnMirror:Port", "Port the mirror binds.", "7081"),
 			new("CdnMirror:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. REQUIRED by the mirror - it is not the bind address and cannot be derived.")
 		];

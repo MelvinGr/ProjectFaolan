@@ -14,7 +14,7 @@ namespace Faolan.Web.Content
 		// `--help` here cannot describe a default the code does not use - and the mirror's `CdnMirror:PublicAddress`
 		// keeps its deliberate lack of one, because to the mirror unset means "refuse to start" (Program.Main).
 		private static readonly Option<string>[] Options =
-			FaolanSettings.Options("CdnMirror:Store", "CdnMirror:Ip", "CdnMirror:Port", "CdnMirror:PublicAddress");
+			FaolanSettings.Options("CdnMirror:Store", "CdnMirror:ListenAddress", "CdnMirror:Port", "CdnMirror:PublicAddress");
 
 		// The parsed options as configuration overrides, or null when the parser handled the invocation itself
 		// (--help, or it reported a parse error) - the caller should then exit with `exitCode`.
@@ -24,10 +24,9 @@ namespace Faolan.Web.Content
 			foreach (var option in Options)
 				command.Options.Add(option);
 
-			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
-				return null;
-
-			return FaolanCommandLine.Overrides(result, Options);
+			return FaolanCommandLine.Parse(command, args, out exitCode) is { } result
+				? FaolanCommandLine.Overrides(result, Options)
+				: null;
 		}
 	}
 }

@@ -58,7 +58,7 @@ namespace Faolan.Web.Content
 			builder.Configuration.Sources.Clear();
 			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
 
-			var ip = builder.Configuration.CdnMirrorIp;
+			var listenAddress = builder.Configuration.CdnMirrorListenAddress;
 			var port = builder.Configuration.CdnMirrorPort;
 			var storeDir = Path.GetFullPath(builder.Configuration.CdnMirrorStore);
 			Directory.CreateDirectory(storeDir);
@@ -81,7 +81,7 @@ namespace Faolan.Web.Content
 
 			publicBase = PublicBase(publicBase);
 
-			builder.WebHost.UseUrls($"http://{ip}:{port}");
+			builder.WebHost.UseUrls($"http://{listenAddress}:{port}");
 			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
 			// own decompressor expects. Requesting identity upstream keeps HTTP out of the picture entirely.
 			builder
@@ -196,8 +196,8 @@ namespace Faolan.Web.Content
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
-			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} ({Files} files, {MB:F1} MB: {ByTag}) patch-addr={PatchAddr}",
-				ip, port, storeDir, store.Values.Sum(t => t.Files), store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
+			log.LogInformation("Faolan.Web.Content on http://{ListenAddress}:{Port} store={Store} ({Files} files, {MB:F1} MB: {ByTag}) patch-addr={PatchAddr}",
+				listenAddress, port, storeDir, store.Values.Sum(t => t.Files), store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
 				string.Join(", ", store.OrderBy(s => s.Key, StringComparer.Ordinal).Select(s => $"{s.Key}={s.Value.Files}/{s.Value.Bytes / 1024f / 1024f:F1}MB")),
 				publicBase);
 			app.Run();
@@ -230,11 +230,14 @@ namespace Faolan.Web.Content
 			var text = Encoding.UTF8.GetString(body);
 			foreach (var (tag, host) in Upstreams)
 				text = text.Replace($"{host}/upm", $"{publicBase}/{tag}/upm");
+
+			// TODO: Also replace UniverseAddr with Config.ServerIpAddress:Config.UniverseAgentPort
+
 			return Encoding.UTF8.GetBytes(text);
 		}
 
 		// The configured CdnMirror:PublicAddress, normalized to a base URL to concatenate onto. It cannot be derived
-		// from the bind address (in a container CdnMirror:Ip is 0.0.0.0 and a client on the Docker host dials a
+		// from the bind address (in a container CdnMirror:ListenAddress is 0.0.0.0 and a client on the Docker host dials a
 		// published port) nor from the request (see the caller), so this only tidies what the operator wrote: a bare
 		// `host` or `host:port` gets the scheme it omitted, and a trailing slash comes off because a path follows.
 		internal static string PublicBase(string configured)

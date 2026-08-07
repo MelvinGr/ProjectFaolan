@@ -25,7 +25,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish ./
 
-# ⚠️ The mirror binds CdnMirror:Ip, which defaults to 127.0.0.1 - LOOPBACK INSIDE THE CONTAINER, i.e. a published
+# ⚠️ The mirror binds CdnMirror:ListenAddress, which defaults to 127.0.0.1 - LOOPBACK INSIDE THE CONTAINER, i.e. a published
 # port would connect to nothing. So the container default is 0.0.0.0; the port mapping is what limits exposure.
 # Config comes from env vars (faolan.json is optional and not baked in) - see docker-compose.yml.
 #
@@ -33,7 +33,7 @@ COPY --from=build /app/publish ./
 # published port is the HOST's address, so only the deployment knows it. Baking a value would ship a wrong one - the
 # mirror writes it into the LocalConfig.xml the client then patches itself from. The container exits at startup
 # without it, naming the key.
-ENV CdnMirror__Ip=0.0.0.0 \
+ENV CdnMirror__ListenAddress=0.0.0.0 \
     CdnMirror__Port=7081 \
     CdnMirror__Store=/app/store
 

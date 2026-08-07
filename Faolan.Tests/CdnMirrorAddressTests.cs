@@ -39,13 +39,13 @@ namespace Faolan.Tests
 			Assert.True(Uri.TryCreate(config.CdnMirrorAddress, UriKind.Absolute, out _));
 		}
 
-		// The BIND address is deliberately not a fallback: `CdnMirror:Ip` is 0.0.0.0 in a container by design, which
-		// is unreachable as a destination - so falling back to it would be wrong in exactly the deployment that has a
-		// non-default value to fall back to.
+		// The BIND address is deliberately not a fallback: `CdnMirror:ListenAddress` is 0.0.0.0 in a container by
+		// design, which is unreachable as a destination - so falling back to it would be wrong in exactly the
+		// deployment that has a non-default value to fall back to.
 		[Fact]
 		public void TheBindAddressIsNotUsedAsADestination()
 		{
-			var config = Config(("CdnMirror:Ip", "0.0.0.0"));
+			var config = Config(("CdnMirror:ListenAddress", "0.0.0.0"));
 
 			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress);
 		}

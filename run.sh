@@ -24,7 +24,7 @@ case "$command" in
         shift
         dotnet run --project ./Faolan.Web.Content/Faolan.Web.Content.csproj -- \
             --CdnMirror:Store "/mnt/btrfs/@games/mirror-archive" \
-            --CdnMirror:Ip 127.0.0.1 \
+            --CdnMirror:ListenAddress 127.0.0.1 \
             --CdnMirror:Port 7081 \
             "$@"
         ;;
