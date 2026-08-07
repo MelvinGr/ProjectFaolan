@@ -194,6 +194,26 @@ namespace Faolan.Core.Database.Tables
 		// **bit 3 (0x08): still unnamed.** It has no effect on this panel (the sweep is trustworthy there - no GM
 		// override is involved) and a read-watchpoint on a live record caught only the bit-10 test, so its consumer is
 		// elsewhere. It is 6 quests: 12381, 12583, 12889, 13473, 16004, 16183. Gitea #570.
+		//
+		// RULED OUT so far, so the next attempt does not re-walk them. Each is a candidate that FITS all six and
+		// still fails, because it also fits most of the quests that do NOT carry the bit:
+		//   * "the line pays no reward" - true of all 6 (XpReward and MoneyReward both 0), and ALSO of 69 of the
+		//     other 93 flagged quests. Necessary, nowhere near sufficient. This is the observation the ticket
+		//     recorded; measuring the other side of it is what kills it.
+		//   * a ZONE or dev tag - the 6 spread across four different bracket tags in their line names
+		//     ([Conall's_Valley], [Khopshef_Province] x2, [Kheshatta_Kalanthes], [Northern Grasslands] x2) with no
+		//     marker in common.
+		//   * goal COUNT or goal KIND - a tendency, not a rule. The 6 average 3.8 goals against 1.5, and 5 of 6
+		//     carry a count-style goal (Collect 23 / DestroyObject 25) against 26% - but 12889 is a single Kill goal
+		//     and breaks both.
+		//   * the line's TIER - both 0 and 1 appear among the six.
+		//
+		// ⚠️ Worth knowing while looking at bit 4: every bracket tag that carries it is Khitai/RoTG content
+		// (`RoTG_Storyline`, Northern Grasslands, Warmonk Monastery, Chosain_Province, Mines_of_Chosain,
+		// Kang_Pagoda, Kara Korum, Paikang, Alchemist_4) and every tag without it is base game. That is 12 of the 14
+		// Northern Grasslands lines; the 2 that lack it are exactly the counterexamples that (correctly) ruled
+		// "expansion" out as the DEFINITION. So expansion is an ~86% correlate of "not shareable" rather than the
+		// thing itself - which is what you would expect of a design flag expansion content nearly always sets.
 		public uint QuestLineFlags { get; set; }
 
 		// @+0x20 - the quest's MONEY reward, the twin of XpReward below (u64 money at 0x20, u32 xp at 0x28,
