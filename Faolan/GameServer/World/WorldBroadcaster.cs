@@ -54,6 +54,10 @@ namespace Faolan.GameServer.World
 		private const double LootBagExpirySeconds = 120.0;
 		private const double PatrolDwellSeconds = 2.0;
 
+		// #703: how close a route's last waypoint must come back to its first for the route to count as CLOSED (walked
+		// round and round) rather than open (walked back down again). 494 of the 1,318 stored routes close this way.
+		private const float RouteClosedTolerance = 5f;
+
 		// How far a loot bag may be ground-snapped from the NPC's death Y. The snap fixes death-moment Y drift (tall /
 		// flying creatures, MoveTask Z-drift #190) - a few metres. Beyond that the heightmap is describing the OUTDOOR
 		// SURFACE above an interior/cave kill, not the floor the creature stood on, so the snap is refused and the
@@ -1120,6 +1124,13 @@ namespace Faolan.GameServer.World
 					if (waypoints.Count > 0)
 					{
 						entity.PatrolWaypoints = waypoints;
+						// #703: an ORDERED route, so the tick WALKS it waypoint by waypoint instead of drifting to a
+						// random one of its waypoints - that straight line is what sent Old Tarantia's guards through
+						// the houses. A route whose ends meet is walked round and round; an open one is walked back
+						// down again; either way it joins at the waypoint nearest where it spawned.
+						entity.WalksRoute = true;
+						entity.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
+						entity.RejoinRouteAtNearest();
 						entity.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
 						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
 						entity.ArmPatrolCycle();

@@ -1,0 +1,166 @@
+using System;
+using System.Numerics;
+using Faolan.GameServer.Combat;
+using Faolan.GameServer.World;
+using Xunit;
+
+namespace Faolan.Tests
+{
+	// #703: a harvested patrol route is an ORDERED, densely sampled polyline - the path the retail NPC actually walked,
+	// which in a city means down the street and round the corner. The #266 wander threw that order away: it picked a
+	// RANDOM waypoint off the list and moved the NPC there in one straight line, so an Old Tarantia guard walked
+	// through the block instead of round it. These gates hold the walk ON the polyline.
+	public class PatrolRouteWalkTests
+	{
+		[Fact]
+		public void ClosedRoute_KeepsGoingRoundInTheSameDirection()
+		{
+			// Ends that meet: the wrap from last back to first IS a route segment, so there is nothing to turn round for.
+			var square = new[]
+			{
+				new Vector3(0, 0, 0), new Vector3(0, 0, 30), new Vector3(30, 0, 30), new Vector3(30, 0, 0),
+				new Vector3(0, 0, 0)
+			};
+			var (world, npc) = Walker(square);
+
+			for (var i = 0; i < 600; i++)
+				world.Tick(0.1);
+
+			Assert.True(npc.RouteLoops);
+			Assert.False(npc.RouteBackwards); // a closed route never reverses - it wraps
+			Assert.True(OnPolyline(square, npc.Position) <= 1f);
+		}
+
+		[Fact]
+		public void OpenRoute_TurnsRoundAtTheEnd_RatherThanCuttingBackToTheStart()
+		{
+			// An Old Tarantia beat does not close: its two ends are ~77u and a row of houses apart. Jumping from the
+			// last waypoint back to the first would draw exactly the through-the-building line this change removes, so
+			// an open route is walked back DOWN its own polyline instead.
+			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 40), new Vector3(40, 0, 40) };
+			var (world, npc) = Walker(street);
+
+			var reachedFarEnd = false;
+			var cameBack = false;
+			var turnedRound = false;
+			for (var i = 0; i < 400; i++)
+			{
+				world.Tick(0.1);
+				Assert.True(OnPolyline(street, npc.Position) <= 1f, $"left the route at {npc.Position}");
+				turnedRound |= npc.RouteBackwards;
+				if (Vector3.Distance(npc.Position, street[^1]) < 1f)
+					reachedFarEnd = true;
+				else if (reachedFarEnd && Vector3.Distance(npc.Position, street[0]) < 1f)
+					cameBack = true;
+			}
+
+			Assert.True(reachedFarEnd, "the walk never got to the far end of the beat");
+			Assert.True(turnedRound, "an open route turns round rather than wrapping");
+			Assert.True(cameBack, "it never walked back down the polyline to the start");
+		}
+
+		[Fact]
+		public void RouteWalker_AfterAChase_RejoinsAtTheNEARESTWaypoint()
+		{
+			// Dragged off its beat, an NPC must pick the route up where it now stands. Resuming the stale index would
+			// send it back across the map to a leg it left behind - a long straight line through everything between.
+			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 40), new Vector3(0, 0, 80) };
+			var (_, npc) = Walker(street);
+
+			npc.Position = new Vector3(3, 0, 78); // where a chase ended: right beside the LAST waypoint
+			npc.RouteInterrupted = true;
+			npc.RejoinRouteAtNearest();
+
+			Assert.Equal(2, npc.RouteIndex);
+			Assert.False(npc.RouteInterrupted);
+		}
+
+		[Fact]
+		public void RouteWalker_StaysOnTheStreet_InsteadOfCuttingTheCorner()
+		{
+			// The reported bug, in miniature: an L-shaped street. The old wander's random-anchor pick draws the diagonal
+			// - straight through whatever building fills the corner. Walking the waypoints in order cannot.
+			var corner = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 60), new Vector3(60, 0, 60) };
+			var (world, npc) = Walker(corner);
+
+			var reachedCorner = false;
+			for (var i = 0; i < 300; i++)
+			{
+				world.Tick(0.1);
+				Assert.True(OnPolyline(corner, npc.Position) <= 1f, $"cut the corner at {npc.Position}");
+				if (Vector3.Distance(npc.Position, corner[1]) < 1.5f)
+					reachedCorner = true;
+			}
+
+			Assert.True(reachedCorner, "the walk never rounded the corner - it must pass through the waypoint");
+		}
+
+		[Fact]
+		public void RouteWalker_TakesTheWaypointAltitude_SoAStaircaseIsClimbed()
+		{
+			// A captured beat carries real altitudes (an Old Tarantia route climbs 99 -> 112 up a staircase). Keeping
+			// the current Y - right for a chase across flat ground - would walk it through the steps at ground level.
+			var stairs = new[] { new Vector3(0, 100, 0), new Vector3(0, 112, 30) };
+			var (world, npc) = Walker(stairs);
+
+			var climbed = false;
+			for (var i = 0; i < 100; i++)
+			{
+				world.Tick(0.1);
+				// The height gap closes in step with the horizontal one, so the NPC is on the STAIRS the whole way up.
+				var expected = 100f + 12f * Math.Clamp(npc.Position.Z / 30f, 0f, 1f);
+				Assert.Equal(expected, npc.Position.Y, 1);
+				climbed |= npc.Position.Y > 111f;
+			}
+
+			Assert.True(climbed, "never reached the top of the stairs");
+		}
+
+		[Fact]
+		public void RouteWalker_WalksContinuously_RatherThanDriftingOnTheWanderClock()
+		{
+			// The wander moved once every 25-60s. A patrol walks: after a couple of seconds the NPC has covered ground.
+			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 200) };
+			var (world, npc) = Walker(street);
+
+			for (var i = 0; i < 30; i++) // 3 seconds
+				world.Tick(0.1);
+
+			Assert.True(npc.Position.Z > 15f, $"barely moved in 3s: {npc.Position}");
+		}
+
+		// The distance from `point` to the nearest SEGMENT of the polyline - how far off its own route the NPC is.
+		private static float OnPolyline(Vector3[] route, Vector3 point)
+		{
+			var nearest = float.MaxValue;
+			for (var i = 1; i < route.Length; i++)
+				nearest = MathF.Min(nearest, ToSegment(route[i - 1], route[i], point));
+			return nearest;
+		}
+
+		private static float ToSegment(Vector3 a, Vector3 b, Vector3 p)
+		{
+			var ab = b - a;
+			var lengthSquared = ab.LengthSquared();
+			if (lengthSquared < 1e-6f)
+				return Vector3.Distance(a, p);
+
+			var t = Math.Clamp(Vector3.Dot(p - a, ab) / lengthSquared, 0f, 1f);
+			return Vector3.Distance(a + ab * t, p);
+		}
+
+		// A live NPC in a zone, standing on the first waypoint of `route` and walking it - the runtime wiring
+		// WorldBroadcaster does when it attaches a harvested route to a spawn.
+		private static (WorldState World, WorldEntity Npc) Walker(Vector3[] route)
+		{
+			var world = new WorldState();
+			var npc = WorldEntity.ForNpc(10, 2000, route[0], Quaternion.Identity, "Tarantia Guard", EntityVitals.FromMax(100, 0, 100));
+			world.Place(npc, 2000, route[0], Quaternion.Identity);
+			npc.PatrolWaypoints = route;
+			npc.WalksRoute = true;
+			npc.RouteLoops = route.Length > 2 && Vector3.Distance(route[0], route[^1]) <= 5f;
+			npc.RejoinRouteAtNearest();
+			return (world, npc);
+		}
+	}
+}

@@ -55,6 +55,10 @@ namespace Faolan.GameServer.World
 		// the cycle length (path traversal time + dwell) when the route is issued; the tick counts it down.
 		private double _patrolReissueRemaining;
 
+		// #703: seconds a route walker stands still at the end of a beat before turning round; counts down instead of
+		// stepping. Only the ENDS pause - a patrol that stopped at every waypoint would twitch its way down the street.
+		private double _routeDwellRemaining;
+
 		// Remaining time (seconds) until respawn while dead; meaningless when alive.
 		private double _respawnRemaining;
 
@@ -380,6 +384,28 @@ namespace Faolan.GameServer.World
 		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
 		// client walks the route), so the server just issues the captured route once per spawn/respawn.
 		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
+
+		// #703: a HARVESTED route is an ORDERED polyline - retail's own street-following path, sampled densely (the
+		// median gap between consecutive waypoints is 5.8u across the 1,318 stored routes, p90 12.8u). It must be
+		// walked waypoint BY waypoint, in order: the #266 wander instead picks a RANDOM anchor off the list and draws
+		// one straight line to it, and in a city that line goes through whatever stands between - which is how Old
+		// Tarantia's guards ended up walking through buildings. True only for a captured route; an ambient POOL's
+		// points (#363) are scatter anchors within an area with no order to them, and keep the random drift.
+		public bool WalksRoute { get; set; }
+
+		// Whether the route closes on itself (last waypoint back at the first): a closed route is walked round and
+		// round, an open one is walked back DOWN again on arrival. Jumping from the last waypoint to the first on an
+		// open route would draw exactly the cross-country straight line this change exists to remove - the two ends of
+		// an Old Tarantia guard's beat are 77u and a block of houses apart.
+		public bool RouteLoops { get; set; }
+
+		// The waypoint the route walk is currently heading for, and which way along the list it is going.
+		public int RouteIndex { get; set; }
+		public bool RouteBackwards { get; set; }
+
+		// Set while a route walker is doing something else (chasing, walking home): its index no longer describes where
+		// it stands, so the walk rejoins at the NEAREST waypoint rather than resuming a leg it has been dragged off.
+		public bool RouteInterrupted { get; set; }
 
 		// For an NPC: the quest ids that gate this NPC's visibility (null/empty = ungated, seen by everyone). A gated
 		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
@@ -775,6 +801,66 @@ namespace Faolan.GameServer.World
 			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
 		}
 
+		// #703: the waypoint the route walk is heading for. Only meaningful while WalksRoute (a route always has at
+		// least one waypoint - Patrols is exactly PatrolWaypoints.Count > 0).
+		public Vector3 RouteWaypoint => PatrolWaypoints[Math.Clamp(RouteIndex, 0, PatrolWaypoints.Count - 1)];
+
+		// #703: arrived at the current waypoint - take the next one along the route. A closed route wraps; an open one
+		// turns round at each end and walks back down the same polyline, so the NPC is never off the harvested path.
+		// Returns true when it turned round or completed a lap, which is where the walk pauses (retail patrols dwell at
+		// the ends of a beat rather than pivoting on the spot).
+		public bool AdvanceRoute()
+		{
+			if (PatrolWaypoints.Count <= 1)
+				return true;
+
+			var next = RouteIndex + (RouteBackwards ? -1 : 1);
+			if (next >= 0 && next < PatrolWaypoints.Count)
+			{
+				RouteIndex = next;
+				return false;
+			}
+
+			if (RouteLoops)
+			{
+				// Round again from the other end - on a closed route that step IS a route segment, not a shortcut.
+				RouteIndex = RouteBackwards ? PatrolWaypoints.Count - 1 : 0;
+				return true;
+			}
+
+			RouteBackwards = !RouteBackwards;
+			RouteIndex = Math.Clamp(RouteIndex + (RouteBackwards ? -1 : 1), 0, PatrolWaypoints.Count - 1);
+			return true;
+		}
+
+		// #703: (re)join the route at the waypoint nearest to where the entity actually stands. Called when the route
+		// walk starts and after anything that moved it off its leg (a chase, a leash walk home) - resuming the stale
+		// index would send it back across the map to a waypoint it left behind. Horizontal distance: the route carries
+		// real altitudes (an Old Tarantia beat climbs a staircase, 99 -> 112) and a waypoint one floor up is still the
+		// nearest place to rejoin.
+		public void RejoinRouteAtNearest()
+		{
+			RouteInterrupted = false;
+			if (PatrolWaypoints.Count == 0)
+				return;
+
+			var nearest = 0;
+			var nearestDistance = float.MaxValue;
+			for (var i = 0; i < PatrolWaypoints.Count; i++)
+			{
+				var dx = PatrolWaypoints[i].X - Position.X;
+				var dz = PatrolWaypoints[i].Z - Position.Z;
+				var distance = dx * dx + dz * dz;
+				if (distance >= nearestDistance)
+					continue;
+
+				nearestDistance = distance;
+				nearest = i;
+			}
+
+			RouteIndex = nearest;
+		}
+
 		// The next wander destination: an anchor point other than where we already are (so the move isn't a no-op).
 		// `isOccupied` (#363 ambient pools): when supplied, PREFER an anchor no other entity is parked on, so pool
 		// members spread across their area's points instead of stacking; falls back to any non-current anchor when
@@ -878,6 +964,22 @@ namespace Faolan.GameServer.World
 
 			_patrolReissueRemaining -= dt;
 			return _patrolReissueRemaining <= 0;
+		}
+
+		// #703: pauses a route walker for `seconds` (the dwell at the end of a beat).
+		public void ArmRouteDwell(double seconds)
+		{
+			_routeDwellRemaining = seconds;
+		}
+
+		// #703: counts the route dwell down; true once the walk may step again (so an un-armed walker walks straight on).
+		public bool TickRouteDwell(double dt)
+		{
+			if (_routeDwellRemaining <= 0)
+				return true;
+
+			_routeDwellRemaining -= dt;
+			return _routeDwellRemaining <= 0;
 		}
 
 		// A summoned NoRespawn NPC: once dead, run its respawn timer DOWN as a despawn timer instead of reviving -

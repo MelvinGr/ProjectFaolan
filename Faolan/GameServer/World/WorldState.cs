@@ -30,6 +30,15 @@ namespace Faolan.GameServer.World
 		// How close a player must be for a hostile NPC to aggro + attack (world units).
 		public const float NpcAggroRange = 20f;
 
+		// #703: how close a route walker must get to a waypoint to count as having reached it and take the next one.
+		// Small relative to the 5.8u median gap between waypoints, so the walk stays ON the harvested polyline rather
+		// than cutting each corner - the corners are what keep it in the street.
+		public const float RouteWaypointReached = 0.75f;
+
+		// #703: how long a route walker stands at the end of its beat before turning round. Retail patrols pause at
+		// the ends rather than pivoting on the spot; the number is ours (no capture pins it), same as PatrolDwellSeconds.
+		public const double RouteTurnaroundDwellSeconds = 3.0;
+
 		// #284 line-of-sight (tier 1, cheap heuristic): the max VERTICAL (Y/up) separation at which a hostile NPC will
 		// still aggro a player. Aggro range is otherwise a 3D sphere, so without this an NPC aggros a player standing
 		// directly above/below it - through a floor/ceiling or across a big drop (the most jarring "sees through
@@ -368,6 +377,7 @@ namespace Faolan.GameServer.World
 					{
 						SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
 						entity.ArmAttackCooldown(NpcAttackInterval);
+						entity.RouteInterrupted = true; // #703: walked off its beat - rejoin at the nearest waypoint after
 						if (homeDist > NpcMeleeRange)
 						{
 							// #565: the walk home also descends to the SPAWN's altitude. Movement otherwise keeps the
@@ -392,6 +402,19 @@ namespace Faolan.GameServer.World
 					{
 						SetCombat(entity, false); // no target in range: disengage and sheathe
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
+
+						// #703: a ROUTE walker resumes its beat here, and must NOT be stopped first - EndMove would close
+						// its move stream every idle tick. It keeps one continuous walk instead, so the flush/stop below is
+						// for the wander and the chase, which genuinely end.
+						if (entity.WalksRoute)
+						{
+							if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcCombatMemorySeconds))
+								entity.Vitals.ReviveToFull();
+
+							WalkRoute(entity);
+							continue;
+						}
+
 						EndMove(entity, true, WorldTickEffectType.NpcMove); // stop if we were mid-chase (#272)
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						//
@@ -442,6 +465,7 @@ namespace Faolan.GameServer.World
 					// the tick the mob acquires its target, while it's still closing the distance (#218). The target rides
 					// the effect so the broadcaster can also push the aggro (HateList/ThreatLevel, #216).
 					SetCombat(entity, true, target);
+					entity.RouteInterrupted = true; // #703: a chase leaves the beat; the walk rejoins at the nearest waypoint
 
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
 					// is broadcast in retail-sized segments (StepAndStream throttle, #272) so the client interpolates the
@@ -550,6 +574,45 @@ namespace Faolan.GameServer.World
 				e.MoveFrom = e.MoveOrigin; // the segment the broadcaster sends (MoveFrom -> Position)
 				e.MoveOrigin = e.Position; // re-anchor for the next segment
 				effects.Add(new WorldTickEffect(e, moveType, target));
+			}
+
+			// #703: walks `e` along its harvested route - one waypoint at a time, in the order the route was captured in.
+			//
+			// This is the whole fix for NPCs cutting through buildings. A harvested route is a dense street-following
+			// polyline (median 5.8u between waypoints), and the #266 wander threw that order away: it picked a RANDOM
+			// waypoint and moved the entity there in one straight line, which in a city goes through the block rather
+			// than round it. Walking the polyline in order keeps every step on ground the retail NPC actually walked,
+			// with no collision data needed - the route IS the collision answer, sampled by whoever captured it.
+			//
+			// Movement is the same StepAndStream the chase uses (#272), so the client interpolates ~6u segments and the
+			// server model stays where the client renders it. The waypoint's own Y is the target altitude, so a beat
+			// that climbs a staircase climbs it instead of walking through the steps at the ground floor's height.
+			void WalkRoute(WorldEntity e)
+			{
+				if (e.RouteInterrupted)
+					e.RejoinRouteAtNearest(); // chased or leashed off the beat: pick it up where it now stands
+
+				if (!e.TickRouteDwell(deltaSeconds))
+				{
+					EndMove(e, true, WorldTickEffectType.NpcMove); // standing at the end of the beat: close the stream
+					return;
+				}
+
+				var waypoint = e.RouteWaypoint;
+				var dx = waypoint.X - e.Position.X;
+				var dz = waypoint.Z - e.Position.Z;
+				var distance = MathF.Sqrt(dx * dx + dz * dz);
+				if (distance > RouteWaypointReached)
+				{
+					StepAndStream(e, dx, dz, distance, 0f, WorldTickEffectType.NpcMove, null!, waypoint.Y);
+					return;
+				}
+
+				// Arrived. Land exactly on it (so the next leg starts from the polyline, not a fraction short of it) and
+				// take the next waypoint; pause only where the route turns round or a lap closes.
+				e.Position = new Vector3(waypoint.X, waypoint.Y, waypoint.Z);
+				if (e.AdvanceRoute())
+					e.ArmRouteDwell(RouteTurnaroundDwellSeconds);
 			}
 
 			// Ends `e`'s move (it reached its target / home / leader): flushes the trailing sub-segment the throttle didn't
