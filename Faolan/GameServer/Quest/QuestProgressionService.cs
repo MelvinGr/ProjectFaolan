@@ -401,11 +401,14 @@ namespace Faolan.GameServer.Quest
 		private async Task ConsumeDeliveryItems(INetworkClient client, uint characterId, QuestGoalDefinition goal, uint required)
 		{
 			var wanted = Math.Max(1u, required);
-			var taken = await _economy.TakeItemsFromInventory(client, goal.TrailingRefId, wanted);
+			// The item comes from QuestProgress.DeliveryItemId, not from the wire field directly: a delivery resolved
+			// from the client's catalog sentence names its item in QuestItemId and has no trailing reference at all.
+			var itemId = QuestProgress.DeliveryItemId(goal);
+			var taken = await _economy.TakeItemsFromInventory(client, itemId, wanted);
 			if (taken < wanted)
 			{
 				_logger.LogWarning("Hand-in of goal {Goal}: took {Taken} of {Wanted} x item {Item} from character {Character} - the delivery check passed, so the inventory changed mid-hand-in.",
-					goal.GoalId, taken, wanted, goal.TrailingRefId, characterId);
+					goal.GoalId, taken, wanted, itemId, characterId);
 			}
 		}
 
@@ -417,8 +420,9 @@ namespace Faolan.GameServer.Quest
 				return true;
 
 			// Summed across slots: a stack can be split over several cells, and a split stack is still the items.
+			var itemId = QuestProgress.DeliveryItemId(goal);
 			var inventory = await _database.GetCharacterInventory(characterId);
-			var held = inventory.Where(i => i.ItemId == goal.TrailingRefId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
+			var held = inventory.Where(i => i.ItemId == itemId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
 			return QuestProgress.CanHandIn(goal, held);
 		}
 

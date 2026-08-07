@@ -54,15 +54,36 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public const uint NpcTemplateNameCategory = 51000;
 
 		// Whether a goal is a DELIVERY - a hand-in that takes something OUT of the player's hands, rather than an
-		// objective that puts something in them. Identified by the goal's own captured data: the client's kind tag
-		// (`Separator`) says `Deliver`, and the trailing reference types the thing being handed over as an item.
+		// objective that puts something in them. TWO shapes, because the evidence arrives two ways:
 		//
-		// Keyed on the captured fields rather than on GoalType, which is OUR wiring - a hand-in is typed TalkToNpc
-		// (the talk is what triggers it), so testing GoalType could not tell a delivery from an ordinary talk goal.
+		//   CAPTURED  the client's kind tag (`Separator`) says `Deliver` and the trailing reference types the thing
+		//             being handed over as an item. Available for the 170 goals a capture has shown.
+		//   RESOLVED  a TalkToNpc goal carrying a `QuestItemId` (#704). The other 7,147 goals come from the client's
+		//             quest CATALOG, which carries the objective sentence and no kind tag at all - so a hand-in there
+		//             is one whose item was resolved from its own words ("Give the Crate of Steel to Turach" ->
+		//             Items 31055) and written to the server-side column.
+		//
+		// ⚠️ The captured shape deliberately does NOT test GoalType - a hand-in is typed TalkToNpc, since the talk is
+		// what triggers it, so GoalType alone cannot tell a delivery from an ordinary talk goal. The resolved shape
+		// tests it for the opposite reason: `QuestItemId` is also what a LootFromNpc goal names (the item its target's
+		// corpse bag must hold), and a loot goal is emphatically not a hand-in. TalkToNpc + a quest item IS one.
 		public static bool IsDelivery(QuestGoalDefinition goal)
 		{
-			return goal != null && goal.Separator == (uint)QuestGoalKind.Deliver
-			                    && goal.TrailingCategory == ItemNameCategory && goal.TrailingRefId != 0;
+			if (goal == null)
+				return false;
+
+			return goal.Separator == (uint)QuestGoalKind.Deliver && goal.TrailingCategory == ItemNameCategory && goal.TrailingRefId != 0
+			       || goal.GoalType == QuestGoalType.TalkToNpc && goal.QuestItemId is > 0;
+		}
+
+		// The item a delivery hands over - what must be HELD to complete it and what is taken when it completes. The
+		// resolved shape's `QuestItemId` wins: a goal that has both is one whose item someone confirmed against the
+		// catalog, which is strictly better evidence than the raw wire reference. 0 when the goal is not a delivery.
+		public static uint DeliveryItemId(QuestGoalDefinition goal)
+		{
+			return !IsDelivery(goal)
+				? 0
+				: goal.QuestItemId ?? goal.TrailingRefId;
 		}
 
 		// Whether `heldCount` of the delivered item is enough to hand `goal` in (#521). Non-deliveries always pass, so

@@ -61,10 +61,25 @@ namespace Faolan.Core.Database.Tables
 
 		public uint QuestDefinitionId { get; set; }
 
-		// For a LootFromNpc goal: the QUEST ITEM the TargetName NPC's corpse bag must contain, as an
-		// Items.Id (#261). NULL = no specific item (the goal still completes on looting the bag - it matches on the
-		// source NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take
-		// it (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's item drops the same way.
+		// The Items.Id of the QUEST ITEM this goal is about - read per GoalType, and it is the goal's own SERVER-side
+		// statement of which item, independent of the wire's trailing reference.
+		//
+		//   LootFromNpc  the item the TargetName NPC's corpse bag must contain (#261). NULL = no specific item (the
+		//                goal still completes on looting the bag - it matches on the source NPC, not contents). When
+		//                set, the bag-drop guarantees it so the player can SEE and take it (Scavenger Tuut's bag ->
+		//                319224 "Scavenger's Key").
+		//   TalkToNpc    the item HANDED OVER (#704). A hand-in is triggered by the talk, so it is typed TalkToNpc, and
+		//                this is what makes it a DELIVERY rather than an ordinary talk goal - see
+		//                QuestProgress.IsDelivery, which reads exactly that pair. It is what the player must be
+		//                carrying (CanHandIn) and what is taken when the hand-in goes through.
+		//
+		// Why the second reading had to exist: a captured delivery names its item in the WIRE record
+		// (`Separator` = Deliver + a 50200 trailing reference), and the 7,147 goals that come from the client's quest
+		// CATALOG carry no kind tag and no reference at all - only the objective sentence. Resolving that sentence
+		// ("Give the Crate of Steel to Turach" -> Items 31055) has to land somewhere, and inventing a wire field would
+		// be a lie about what the capture showed. This column is server-side, so it is the honest home.
+		//
+		// Data-driven either way: any quest's item drops, or is handed over, the same way.
 		public uint? QuestItemId { get; set; }
 
 		[ForeignKey(nameof(QuestItemId))]

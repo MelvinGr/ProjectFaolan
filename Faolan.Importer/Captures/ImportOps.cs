@@ -1542,6 +1542,7 @@ namespace Faolan.Importer.Captures
 			await SeedCasildaQuestSnapshot(db);
 			await TypeItemGoalsFromTrailingCategory(db); // first of the rules: it also CORRECTS rows an older version mistyped
 			await TypeTalkGoalsFromCatalogName(db);
+			await TypeHandInGoalsFromCatalogName(db);
 			await TypeKillGoalsFromKind(db);
 			await TypeInvestigateGoalsAsReach(db);
 			await TypeLocationGoalsFromTrailingCategory(db);
@@ -1747,6 +1748,105 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Typed {typed} talk goal(s) from the client's own plaintext objective name ({withoutNpc} naming an NPC we do not "
 			                  + $"hold yet, {withoutDialogue} held but with no captured dialogue, so inert either way); {reconciled} short name(s) "
 			                  + $"reconciled to the catalog spelling, {gated} precondition(s) recorded, {noName} naming a role rather than a name (#704).");
+		}
+
+		// A HAND-IN goal whose sentence names BOTH ends - the recipient and the goods - is a gateable delivery, so type
+		// it and record the item (#704).
+		//
+		// ⚠️ This is the exception to "the delivery shapes are not typed from the sentence", and the condition is what
+		// makes it safe rather than the verb. The blanket refusal exists because a delivery must be gated on the player
+		// HOLDING the goods (QuestProgress.CanHandIn), and a catalog-only goal has no wire kind and no item reference
+		// to gate on - so typing it TalkToNpc completes the quest on a bare greeting with the goods still in the shop.
+		// That argument disappears the moment the item RESOLVES: `QuestItemId` is exactly what CanHandIn now reads, so
+		// these goals are gated as tightly as a captured `Deliver` is. The 1,846 whose item does not resolve stay
+		// `None`, unchanged.
+		//
+		// BOTH ends must resolve unambiguously, and the item must be the WHOLE noun phrase (see
+		// QuestObjectiveText.HandOverPhrase for why a substring match is not good enough - it is twice as productive
+		// and 40% wrong). Nine goals qualify today; five of their recipients have captured dialogue, so those are
+		// playable now and the rest start working when theirs is captured.
+		private static async Task TypeHandInGoalsFromCatalogName(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Name != null && g.Name != "").ToListAsync();
+			var npcNames = (await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+			// Name -> the single item that owns it. A name held by SEVERAL catalog rows is dropped: `CanHandIn` tests one
+			// template id, so picking either would gate on an item the player may legitimately not be the holder of.
+			var itemsByName = (await db.Items.Where(i => i.Name != null).Select(i => new { i.Id, i.Name }).ToListAsync())
+				.GroupBy(i => i.Name!, StringComparer.OrdinalIgnoreCase)
+				.Where(g => g.Select(i => i.Id).Distinct().Count() == 1)
+				.ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+			int typed = 0, noRecipient = 0, noItem = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal) || QuestObjectiveText.HandOverPhrase(goal.Name) is not { } phrase)
+					continue;
+
+				// ⚠️ A goal whose WIRE record already names the item is left alone - the reference is direct evidence
+				// where the sentence is inferred, and `IsDelivery`'s captured branch already gates it. Worth being
+				// explicit rather than relying on run order: this rule fires before the opt-in `rdb-quest-text` module,
+				// so without the guard the sentence would quietly outrank the capture on goal 5792.
+				//
+				// The two agree wherever both exist, which is what makes the sentence trustworthy at all: over the 12
+				// captured `Deliver` goals the phrase resolves 6 and matches the wire's item id on all 6, with zero
+				// disagreements. The other 6 name something the catalog does not hold under that spelling ("3 stone
+				// bricks", "the Remedy", "the Letter"), and the two "Cimmerian Furs" goals resolve to a name TWO items
+				// share - which the wire separates and this rule refuses, as it refuses every ambiguous name.
+				if (goal.TrailingCategory == QuestProgress.ItemNameCategory && goal.TrailingRefId != 0)
+					continue;
+
+				var read = QuestObjectiveText.Read(goal.Name);
+				if (read.Recipient is not { } recipient)
+				{
+					noRecipient++;
+					continue;
+				}
+
+				if (!npcNames.Contains(recipient))
+				{
+					var titled = npcNames.Where(n => n.EndsWith(' ' + recipient, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+					if (titled.Count != 1)
+					{
+						// The recipient is not an NPC we hold. Unlike a pure talk goal - where the name is recorded
+						// anyway and the goal waits for its map - a delivery with an unresolvable END is not worth
+						// typing: the gate below still needs the item, and both halves have to land for it to be safe.
+						noRecipient++;
+						continue;
+					}
+
+					recipient = titled[0];
+				}
+
+				// The catalog spells some objectives in the plural ("Give the Wolf Tails to Cavan" against the item
+				// `Wolf Tail`). One trailing `s`, and only after the exact form has failed.
+				if (!itemsByName.TryGetValue(phrase, out var itemId)
+				    && !(phrase.EndsWith('s') && itemsByName.TryGetValue(phrase[..^1], out itemId)))
+				{
+					noItem++;
+					continue;
+				}
+
+				if (read.RequiredLevel is { } level)
+					goal.RequiredLevel = level;
+
+				if (read.RequiredRankTitle is { } title)
+				{
+					goal.RequiredRankTitle = title;
+					goal.RequiredRank = read.RequiredRank;
+				}
+
+				goal.GoalType = QuestGoalType.TalkToNpc;
+				goal.TargetName = recipient;
+				goal.QuestItemId = itemId;
+				typed++;
+			}
+
+			if (typed > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Typed {typed} hand-in goal(s) from the client's own plaintext objective name, each with the item it hands over so "
+			                  + $"the hand-in is GATED; {noRecipient} name a recipient we cannot resolve, {noItem} a hand-over phrase that is not an "
+			                  + "item we hold - both stay un-typed rather than completing on a bare greeting (#704).");
 		}
 
 		// A goal is a KILL goal because the client's own VERB says so (`Separator` = QuestGoalKind.Kill), and for no other

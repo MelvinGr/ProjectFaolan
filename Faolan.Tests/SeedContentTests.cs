@@ -373,18 +373,20 @@ namespace Faolan.Tests
 		// typing one `TalkToNpc` completes it on a bare greeting with the goods still in the shop - the over-eager
 		// trigger #522 spent its length removing, reintroduced at 30x the scale.
 		//
-		// ⚠️ Scoped to goals NEVER SEEN ON THE WIRE (`Separator` null) - which is precisely the set the sentence rule
-		// reaches that nothing else did, and precisely the set with no kind tag and no trailing reference to gate on.
-		// A goal the wire HAS shown carries its kind, and the `Deliver` machinery owns it: `IsDelivery` reads those two
-		// captured fields, so a captured hand-in is gated by construction or visibly is not.
+		// ⚠️ Scoped to goals NEVER SEEN ON THE WIRE (`Separator` null): the set with no kind tag and no trailing
+		// reference, which is exactly what the sentence rules reach and nothing else did. A goal the wire HAS shown
+		// carries its kind and the `Deliver` machinery owns it - `IsDelivery` reads those two captured fields.
 		//
-		// (One captured hand-in is genuinely ungated and stays that way: goal 400 "Give Laranga's letter to Tina" is a
-		// `Deliver` whose wire record carries NO trailing reference - the corpus only ever full-updates it, and a
-		// full-update does not carry the target - and "Laranga's letter" is not in `Items` either, so gating on it
-		// would make the Shipwrecked chain uncompletable rather than merely un-gated. That is a coverage gap in the
-		// captures, not a rule leaking, which is why the scope below expresses it instead of an id allowlist.)
+		// The invariant is NOT "no hand-in is typed" - it is "a typed hand-in is GATEABLE". `TypeHandInGoalsFromCatalogName`
+		// types the nine whose sentence resolves both ends and records the item in `QuestItemId`, which is precisely
+		// what `CanHandIn` reads. What must never appear is a hand-in typed `TalkToNpc` with neither.
+		//
+		// (One CAPTURED hand-in is genuinely ungated and stays that way, which is why the scope above matters: goal 400
+		// "Give Laranga's letter to Tina" is a `Deliver` whose wire record carries no trailing reference - the corpus
+		// only ever full-updates it - and "Laranga's letter" is not in `Items` either, so gating on it would make the
+		// Shipwrecked chain uncompletable rather than merely un-gated.)
 		[Fact]
-		public async Task DeliveryObjectives_AreNotTypedFromTheirSentenceAlone()
+		public async Task DeliveryObjectives_AreOnlyTypedWhenTheHandInCanBeGated()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
@@ -394,16 +396,24 @@ namespace Faolan.Tests
 				                                 && (g.Name.StartsWith("Give ") || g.Name.StartsWith("Hand ")
 				                                     || g.Name.StartsWith("Deliver ") || g.Name.StartsWith("Return ")
 				                                     || g.Name.StartsWith("Bring ")))
-				.Select(g => $"goal {g.GoalId} '{g.Name!}'")
+				.Select(g => new { g.GoalId, g.QuestItemId, Name = g.Name! })
 				.ToListAsync(ct);
 
-			Assert.True(handIns.Count == 0,
-				$"catalog-only hand-in goals typed TalkToNpc, with no kind tag and no item reference for CanHandIn to gate on "
-				+ $"- they complete on a bare greeting: {string.Join(", ", handIns)}");
+			var ungated = handIns.Where(g => g.QuestItemId is null or 0).Select(g => $"goal {g.GoalId} '{g.Name}'").ToList();
+			Assert.True(ungated.Count == 0,
+				"catalog-only hand-in goals typed TalkToNpc with no QuestItemId for CanHandIn to gate on "
+				+ $"- they complete on a bare greeting: {string.Join(", ", ungated)}");
 
-			// ...and the rule that must not sweep them up really did run, so this is not vacuous.
-			var typed = await db.QuestGoalDefinitions.CountAsync(g => g.GoalType == QuestGoalType.TalkToNpc && g.Separator == null, ct);
-			Assert.True(typed >= 700, $"only {typed} catalog-only goals are typed TalkToNpc; the sentence rule types 753.");
+			// ...and every item they DO name is a real catalog row, or the gate tests an item nobody can hold and the
+			// quest becomes uncompletable instead of merely un-gated.
+			foreach (var handIn in handIns)
+				Assert.True(await db.Items.AnyAsync(i => i.Id == handIn.QuestItemId, ct),
+					$"goal {handIn.GoalId} '{handIn.Name}' hands over item {handIn.QuestItemId}, which is not in the catalog.");
+
+			// ...and both sentence rules really did run, so none of this is vacuous.
+			Assert.True(handIns.Count >= 9, $"only {handIns.Count} catalog-only hand-in goals are typed; the rule types 9.");
+			var talk = await db.QuestGoalDefinitions.CountAsync(g => g.GoalType == QuestGoalType.TalkToNpc && g.Separator == null, ct);
+			Assert.True(talk >= 700, $"only {talk} catalog-only goals are typed TalkToNpc; the sentence rules type 762.");
 		}
 
 		// A goal's own SENTENCE outranks its map marker (#522).

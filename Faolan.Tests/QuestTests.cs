@@ -282,6 +282,52 @@ namespace Faolan.Tests
 			Assert.True(QuestProgress.CanHandIn(single, 1));
 		}
 
+		// The SECOND delivery shape (#704): a hand-in whose evidence is the client's plaintext objective sentence
+		// rather than a captured wire record. 7,147 goals come from the quest CATALOG, which carries no kind tag and no
+		// trailing reference at all, so a hand-in there is one whose item was resolved from its own words - "Give the
+		// Crate of Steel to Turach" -> Items 31055 - and written to the server-side `QuestItemId`.
+		//
+		// ⚠️ It has to be `TalkToNpc` + `QuestItemId`, never `QuestItemId` alone: a `LootFromNpc` goal names its item in
+		// the same column (what its target's corpse bag must hold), and gating a loot goal on carrying the item first
+		// would make it uncompletable - you loot it to GET it.
+		[Fact]
+		public void IsDelivery_AlsoReadsAResolvedQuestItem_ButNeverOnALootGoal()
+		{
+			var resolved = new QuestGoalDefinition
+			{
+				GoalId = 1371, GoalType = QuestGoalType.TalkToNpc, TargetName = "Turach",
+				QuestItemId = 31055, RequiredCount = 1 // "Give the Crate of Steel to Turach"
+			};
+
+			Assert.True(QuestProgress.IsDelivery(resolved));
+			Assert.Equal(31055u, QuestProgress.DeliveryItemId(resolved));
+			Assert.False(QuestProgress.CanHandIn(resolved, 0));
+			Assert.True(QuestProgress.CanHandIn(resolved, 1));
+
+			// A LOOT goal carries the same column and must NOT become a delivery - you loot the key to get it.
+			var loot = new QuestGoalDefinition
+			{
+				GoalId = 5867, GoalType = QuestGoalType.LootFromNpc, TargetName = "Scavenger Tuut", QuestItemId = 319224
+			};
+			Assert.False(QuestProgress.IsDelivery(loot));
+			Assert.Equal(0u, QuestProgress.DeliveryItemId(loot));
+			Assert.True(QuestProgress.CanHandIn(loot, 0));
+
+			// An ordinary talk goal with no item is unaffected.
+			Assert.False(QuestProgress.IsDelivery(GoalSeq(1, 13480, QuestGoalType.TalkToNpc, "Casilda")));
+
+			// The CAPTURED shape still resolves its item from the wire reference, and a goal carrying both prefers the
+			// resolved one - someone confirmed that id against the catalog.
+			var captured = new QuestGoalDefinition
+			{
+				GoalId = 3497, GoalType = QuestGoalType.TalkToNpc, Separator = (uint)QuestGoalKind.Deliver,
+				TrailingCategory = QuestProgress.ItemNameCategory, TrailingRefId = 193400
+			};
+			Assert.Equal(193400u, QuestProgress.DeliveryItemId(captured));
+			captured.QuestItemId = 31055;
+			Assert.Equal(31055u, QuestProgress.DeliveryItemId(captured));
+		}
+
 		// The hand-in TAKES the goods (#521), and the two ways that goes wrong are both invisible from a single full
 		// stack: over-taking a larger stack, and missing a stack split across cells or containers.
 		[Fact]

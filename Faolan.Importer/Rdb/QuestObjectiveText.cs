@@ -86,6 +86,38 @@ namespace Faolan.Importer.Rdb
 				level, rank.Success ? rank.Groups[1].Value.Trim() : null, rank.Success ? uint.Parse(rank.Groups[2].Value) : null);
 		}
 
+		// A HAND-IN: the player carries something to someone. Distinct from the pure talk shapes above because an item
+		// changes hands, which is the whole difficulty - the trigger is still the talk, but it must be gated on
+		// actually holding the goods (QuestProgress.CanHandIn).
+		public static readonly Regex HandInObjective = new(@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// What a hand-in sentence hands over: the noun phrase between the verb and the "to <recipient>" that closes it.
+		//
+		// ⚠️ It is returned as a WHOLE PHRASE, and the caller must match it against the item catalog EXACTLY. Matching
+		// any catalog name that merely appears somewhere in the sentence is far more productive and mostly wrong: over
+		// the un-typed hand-ins it resolves 15 goals and about 40% of them are junk - "Give the Veteran's Sword to
+		// Daorgan", "…Bow to Adha" and "…Shield to Sian" all collapse onto one item named "Veteran", and "Give Ingots
+		// of Blue Silver to Jocund" resolves to "Silver". The strict form yields 9 and every one is right, which is
+		// the trade this codebase makes every time: a wrong target reads as wired and can never fire.
+		//
+		// Null when the sentence is not a hand-in or names no recipient.
+		public static string? HandOverPhrase(string? objective)
+		{
+			if (objective is not { Length: > 0 } || HandInObjective.Match(objective) is not { Success: true } verb)
+				return null;
+
+			// The LAST "to <Name>", because the item itself can contain one ("Deliver the Letter to Cul Chieftain",
+			// where "Letter to Cul Chieftain" is the catalog item and Cul Chieftain is the recipient).
+			var closers = Recipient.Matches(objective);
+			if (closers.Count == 0)
+				return null;
+
+			var phrase = objective[verb.Length..closers[^1].Index].Trim();
+			return LeadingArticle.Replace(phrase, "") is { Length: > 0 } stripped ? stripped : null;
+		}
+
+		private static readonly Regex LeadingArticle = new(@"^(?:the|a|an|some)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
 		// Whether the objective sentence names a verb that a MAP MARKER cannot stand in for (#522).
 		//
 		// ⚠️ This exists because the marker is the WEAKEST evidence a goal carries and it was being read first. A goal

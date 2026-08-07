@@ -131,12 +131,39 @@ read from the wrong copy. Reading `Name` instead types **753** goals `TalkToNpc`
 of those with captured dialogue, so playable now. The patterns and the reading live on `QuestObjectiveText` and
 both importers share them, so the two cannot drift.
 
-⚠️ **The DELIVERY shapes are deliberately NOT typed from the sentence**, and they are the larger set — *Give* 656,
-*Hand* 504, *Return* 385, *Deliver* 309, against *Talk* 473 / *Speak* 242 / *Report* 225. A delivery hands an item
-**over**, so it must be gated on the player holding it, and `QuestProgress.CanHandIn` keys on the **wire** kind
-(`Separator` = `Deliver`) plus the item the trailing reference names. A catalog-only goal has neither, so typing
-one `TalkToNpc` completes it on a bare greeting with the goods still in the shop. They stay `None` until their
-wire record is captured. `SeedContentTests.DeliveryObjectives_AreNotTypedFromTheirSentenceAlone` holds the line.
+⚠️ **A DELIVERY is only typed when the sentence resolves BOTH ends**, and the deliveries are the larger set —
+*Give* 656, *Hand* 504, *Return* 385, *Deliver* 309, against *Talk* 473 / *Speak* 242 / *Report* 225. A delivery
+hands an item **over**, so it must be gated on the player holding it; typing one `TalkToNpc` with nothing to gate
+on completes the quest on a bare greeting with the goods still in the shop.
+
+So `QuestProgress.IsDelivery` reads **two shapes**, because the evidence arrives two ways:
+
+| | how the item is named |
+|---|---|
+| **captured** | `Separator` = `Deliver` + a `50200` trailing reference — the 170 goals a capture has shown |
+| **resolved** | `TalkToNpc` + `QuestItemId` — the item read out of the goal's own sentence and written to the server-side column |
+
+The resolved shape is why the catalog goals are reachable at all: they carry no kind tag and no reference, only
+words. *"Give the Crate of Steel to Turach"* → `Items` 31055, and the goal is then gated exactly as tightly as a
+captured `Deliver`. **Nine** qualify; five of their recipients have captured dialogue, so those are playable now.
+The 1,846 whose recipient or item does not resolve stay `None`.
+
+⚠️ It must be `TalkToNpc` **+** `QuestItemId`, never the column alone — a `LootFromNpc` goal names its item in the
+same column, and gating a loot goal on already carrying the item makes it uncompletable.
+
+⚠️ The hand-over phrase must be the **whole noun phrase** between the verb and the closing *"to &lt;recipient&gt;"*,
+matched exactly. Accepting any catalog name that merely appears in the sentence resolves 15 goals instead of 9
+and about 40% are junk: *"Give the Veteran's Sword to Daorgan"*, *"…Bow to Adha"* and *"…Shield to Sian"* all
+collapse onto one item named *Veteran*, and *"Give Ingots of Blue Silver to Jocund"* resolves to *Silver*.
+
+**The two sources agree wherever both exist**, which is what makes the sentence trustworthy: across the 12
+captured `Deliver` goals the phrase resolves 6 and matches the wire's item id on **all 6, with zero
+disagreements**. The other 6 name something the catalog does not hold under that spelling (*"3 stone bricks"*,
+*"the Remedy"*, *"the Letter"*), and the two *Cimmerian Furs* goals resolve to a name **two** items share — which
+the wire separates and the rule refuses, as it refuses every ambiguous name. A goal whose wire record already
+names the item is left alone: the reference is direct evidence where the sentence is inferred.
+
+`SeedContentTests.DeliveryObjectives_AreOnlyTypedWhenTheHandInCanBeGated` holds the line.
 
 ### Wiring rules run in order of EVIDENCE STRENGTH
 
