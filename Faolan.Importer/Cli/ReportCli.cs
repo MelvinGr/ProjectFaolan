@@ -61,6 +61,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// DB-only, no corpus and no RDB: how much of the imported spell-effect table reaches a live engine (#701).
+			if (report == "spell-effect-gap")
+			{
+				await SpellEffectGap(arg);
+				return 0;
+			}
+
 			// RDB-only, no corpus: the client's stat-name table (LDB cat 615).
 			if (report == "ldb-stat-names")
 			{

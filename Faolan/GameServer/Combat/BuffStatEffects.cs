@@ -58,7 +58,22 @@ namespace Faolan.GameServer.Combat
 		// the row's three ramp columns carry the rest (#599). Honored through LevelRamp at the carrier's level - see
 		// Delta.At. Their percent twin 53068 `InterpolatedModifyAsRating` is deliberately absent, for the same reason
 		// 53067 is: a percentage is not an addition.
-		private static readonly HashSet<uint> FlatKinds = [53045, 53189, 53220, 53221];
+		//
+		// 53110 `TempChangeSkill` is `Modify` with a duration in its name, and four things say so rather than one:
+		//   - its KEY LIST is `[0 Stat, 39 Value]`, character-for-character the one 53045 `Modify` carries
+		//     (GameActionTypes) - so the record is the same shape read the same way;
+		//   - its own RAMPED twin 53221 `InterpolatedTempChangeSkill` was already on this list, classified as a flat
+		//     ramp off `Runed Flesh`'s level-tiled ranks. 53221 is to 53110 what 53220 is to 53045, so honoring the
+		//     interpolated half while calling the plain half "unclassified" was the list disagreeing with itself;
+		//   - on the stats whose unit is already proven its amounts land in THAT unit, not a rescaled one:
+		//     `Skin of Iron` carries 10000 on slashing/piercing/crushing/poison invulnerability, the same +100% step
+		//     `Magic Shield` states with 53045 on cold, and `Soul of Mitra` carries 90 damage deflection next to
+		//     `Phoenix Cloak`'s 53045 +40/+50;
+		//   - `Soul of Mitra`'s own client description - "shielding the priest from almost all damage" - names the
+		//     effect that deflection row expresses, which was landing nowhere.
+		// Its other 356 rows are a POLYMORPH tail (Head Mesh, Monster Data, Scale, Super Family) plus Natural Energy
+		// Regeneration, and the stat gate below goes on holding those: a shapeshift is not `gear + sum(buffs)`.
+		private static readonly HashSet<uint> FlatKinds = [53045, 53110, 53189, 53220, 53221];
 
 		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. The apply is
 		// null for the ones the server does not model yet, which are still pushed so the character sheet reflects the
@@ -190,6 +205,32 @@ namespace Faolan.GameServer.Combat
 			return Recompute(entity, await EnsureLoaded());
 		}
 
+		// Whether an imported row reaches the live stat engine, and when it does not, WHICH of the two gates stopped
+		// it. Public because the imported-vs-applied gap gets counted from outside the server (`--report
+		// spell-effect-gap`), and a census that re-implements the gate is how #701 came to be filed off a figure that
+		// was four times the real one and pointed at the wrong half of the problem. There is one policy; it lives here.
+		// Whether this stat is one the engine can express at all - the second half of Classify, on its own, because
+		// "how many of the rows a kind drops land on a stat we already model" is what says whether admitting that
+		// kind is worth anything, and that question is about the stat with the kind held aside.
+		public static bool Models(CharacterStatId stat)
+		{
+			return HonoredStats.ContainsKey(stat);
+		}
+
+		public static Gate Classify(SpellStatEffect row)
+		{
+			var isPercent = row.EffectKind == PercentKind;
+			if (!isPercent && !FlatKinds.Contains(row.EffectKind))
+				return Gate.UnhandledKind;
+
+			// The stat gate is the same for both kinds: a percentage of a stat whose scale we have not verified is
+			// no more usable than a flat amount of it.
+			if (!HonoredStats.ContainsKey(row.StatId))
+				return isPercent ? Gate.PercentOnUnmodelledStat : Gate.UnmodelledStat;
+
+			return isPercent ? Gate.Percent : Gate.Flat;
+		}
+
 		// The catalog build, as a pure function over the imported rows: filter to what we honor and convert each
 		// amount to display units. Also reports what was dropped, so the load summary can say how big the gap is.
 		internal static Catalog BuildCatalog(IEnumerable<SpellStatEffect> rows)
@@ -199,23 +240,20 @@ namespace Faolan.GameServer.Combat
 			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0;
 			foreach (var row in rows)
 			{
-				var isPercent = row.EffectKind == PercentKind;
-				if (!isPercent && !FlatKinds.Contains(row.EffectKind))
+				switch (Classify(row))
 				{
-					kindSkipped++;
-					continue;
+					case Gate.UnhandledKind:
+						kindSkipped++;
+						continue;
+					case Gate.PercentOnUnmodelledStat:
+						percentSkipped++;
+						continue;
+					case Gate.UnmodelledStat:
+						statSkipped++;
+						continue;
 				}
 
-				// The stat gate is the same for both kinds: a percentage of a stat whose scale we have not verified is
-				// no more usable than a flat amount of it.
-				if (!HonoredStats.ContainsKey(row.StatId))
-				{
-					if (isPercent)
-						percentSkipped++;
-					else
-						statSkipped++;
-					continue;
-				}
+				var isPercent = row.EffectKind == PercentKind;
 
 				// A percentage is NOT in the stat's units - it is x100 of a percent - so it is carried raw, while a
 				// flat amount converts to display units here.
@@ -376,6 +414,19 @@ namespace Faolan.GameServer.Combat
 			{
 				_loadLock.Release();
 			}
+		}
+
+		// The gate's answer for one imported row - honored, or dropped and by which half. The two dropped-stat members
+		// are kept apart rather than merged because they are different work: a PERCENT record on an unmodelled stat
+		// needs the stat admitted, while a flat one may need only that too - the load summary has always reported them
+		// separately and the split is what says which.
+		public enum Gate
+		{
+			Flat,
+			Percent,
+			UnhandledKind,
+			UnmodelledStat,
+			PercentOnUnmodelledStat
 		}
 
 		// One honored delta a spell carries: which stat, and what it is worth. Not a bare amount because a delta is

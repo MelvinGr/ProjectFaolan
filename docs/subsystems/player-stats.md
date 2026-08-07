@@ -70,13 +70,25 @@ Consequences worth knowing:
 
 ### What `BuffStatEffects` honors, and the test that decides it (#699/#700)
 
-Of the **6,133** imported `SpellStatEffect` rows, **2,229 (36%)** are applied. The rest split into two very
-different piles, and conflating them is the mistake to avoid:
+Of the **5,369** imported `SpellStatEffect` rows, **2,624 (49%)** are applied — 2,179 as lasting stat deltas here
+and 445 as instant pool moves by `SpellPoolEffects` (#702). The rest split into two very different piles, and
+conflating them is the mistake to avoid:
 
 | dropped by | rows | what they are |
 | --- | ---: | --- |
-| **KIND** | 2,015 over 48 kinds | not stat deltas at all — `StartParticleEffect`/`StopParticleEffect` (490), `Hit`/`InterpolatedHit`/`MagicHit`/`DPSHit` (321), `TempChangeSkill` (364), `NanoResistance` (359), `RemoveBuff`, `AreaKnockback`, `SetSpellLineRecastTime`… These belong to a general spell-effect dispatcher, which this class deliberately is not |
-| **STAT** | ~1,900 over ~145 stats | real flat deltas on stats not on the allowlist |
+| **KIND** | 502 over 9 kinds | not stat deltas at all — `Set` (155), `SpellLineStatModifier` (149) and `SpellStatModifier` (123) which target another SPELL rather than the carrier, `SetFlag` (47), `AddAbsorb` (12) |
+| **STAT** | 2,243 over ~140 stats | real deltas on stats not on the allowlist — led by `DamageMultiplier` (316), `NaturalEnergyRegeneration` (198), `WeaponDamageMelee` (184), `Scale` (153), `MagicDamageModifier` (152) |
+
+⚠️ **Those counts are re-derived, never hand-taken.** `dotnet run --project Faolan.Importer -- --report
+spell-effect-gap` asks the two engines to classify every shipped row and prints exactly this breakdown (`--report-arg
+<kind or stat id>` lists the rows behind one line, with the spell that carries them). Gitea #701 is the cautionary
+case: it was filed off a hand-census reading *"2,015 rows over 48 kinds dropped by KIND"*, and by the time anyone
+read it the by-key element fix and the pool engine had reshaped the table underneath — the kind gate had become the
+**smaller** half, so the ticket's headline pointed at the wrong work.
+
+⭐ **Ranking the kinds by row count is what misleads.** What says whether admitting a kind is worth anything is how
+many of its rows land on a stat the engine *already models*, and the two numbers are nearly unrelated: of the 502
+rows the kind gate drops, **5** are on a modelled stat. The report prints that as its own column.
 
 ⚠️ **The allowlist's original test — "is the wire scale verified" — no longer excludes anything**, because
 `StatDisplayScale` transcribes the client's own divisor rule and covers every id. Reading it as the live test is
@@ -99,6 +111,24 @@ The families admitted on that rule: all eleven damage-school **invulnerability r
 Shield` +10000 cold is +100%, `Crom` +20000, `Fire Pit` −20000), the three **out-of-combat regens** plus
 `NaturalHealthRegen` (whose mana and stamina siblings were already in — `0x383`/`0x384`/`0x385` are one run and
 only the middle two were listed), `EvadeChance`, `BaseSpellDamage` and `HealthTapAmount`.
+
+### The KIND half of the gate has its own admission test, and it is the UNIT
+
+The baseline rule above decides *stats*. What decides a **kind** is whether its amount arrives in the units the
+stat is already proven to use — and `53110 TempChangeSkill` is the case that shows why the question has to be
+asked separately. It sat outside the honored kinds as "unclassified" while its own **ramped twin** `53221
+InterpolatedTempChangeSkill` sat inside them, which is the list disagreeing with itself: 53221 is to 53110 exactly
+what the already-honored 53220 is to 53045, and all four carry the same `[0 Stat, 39 Value]` slots.
+
+The units settle it. `Skin of Iron` carries **10000** on slashing/piercing/crushing/poison invulnerability — the
+same +100% step `Magic Shield` states with 53045 on cold — and `Soul of Mitra`, whose client description reads
+*"shielding the priest from almost all damage"*, carries **90** damage deflection beside `Phoenix Cloak`'s 53045
++40/+50. Those rows were landing nowhere.
+
+⚠️ **Admitting the kind admitted nothing else**, because the two halves of the gate are independent: 53110's bulk
+is a POLYMORPH tail (Head Mesh, Monster Data, Scale, Super Family) plus Natural Energy Regeneration, and the stat
+half goes on holding all of it — a shapeshift is not `gear + sum(buffs)` in any units.
+[V3: BuffStatEffectsTests.TempChangeSkill_IsFlat_LikeItsAlreadyHonoredInterpolatedTwin]
 - **×10000 is real.** Five ids sit in BOTH predicate sets and the client multiplies the divisors (an explicit
   `MULSS` against the same `100.0` constant): `0x00FF` Evade Level Growth, `0x013C` Variance, `0x013D`,
   `0x0140` Magic Variance, `0x0397` Critical Blast Chance.

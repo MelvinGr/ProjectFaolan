@@ -73,21 +73,29 @@ namespace Faolan.GameServer.Combat
 			return catalog.TryGetValue(spellBase, out var effects) ? effects : [];
 		}
 
+		// Whether this imported row is an instant pool move this engine applies. Public for the same reason
+		// `BuffStatEffects.Classify` is: the imported-vs-applied census (`--report spell-effect-gap`) has to ask both
+		// engines whether a row lands anywhere, and a census that copies the rule instead of calling it drifts away
+		// from it - which is exactly how #701's count came to be four times the real one.
+		public static bool Applies(SpellStatEffect row)
+		{
+			return (row.EffectKind == PercentKind || FlatKinds.Contains(row.EffectKind))
+			       && Pools.Contains(row.StatId)
+			       && row.Amount != 0
+			       && Math.Abs(row.Amount) < DrainSentinel;
+		}
+
 		// The catalog build, as a pure function over the imported rows, so it is testable without a database.
 		internal static Dictionary<uint, PoolEffect[]> BuildCatalog(IEnumerable<SpellStatEffect> rows)
 		{
 			var bySpell = new Dictionary<uint, List<PoolEffect>>();
 			foreach (var row in rows)
 			{
-				var isPercent = row.EffectKind == PercentKind;
-				if (!isPercent && !FlatKinds.Contains(row.EffectKind))
+				if (!Applies(row))
 					continue;
 
-				var pool = row.StatId;
-				if (!Pools.Contains(pool) || row.Amount == 0 || Math.Abs(row.Amount) >= DrainSentinel)
-					continue;
-
-				(bySpell.TryGetValue(row.SpellId, out var list) ? list : bySpell[row.SpellId] = []).Add(new PoolEffect(pool, row.Amount, isPercent));
+				(bySpell.TryGetValue(row.SpellId, out var list) ? list : bySpell[row.SpellId] = [])
+					.Add(new PoolEffect(row.StatId, row.Amount, row.EffectKind == PercentKind));
 			}
 
 			return bySpell.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());

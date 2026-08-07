@@ -79,12 +79,12 @@ namespace Faolan.Web.Content
 			long hits = 0, misses = 0, bytes = 0;
 			var inflight = new ConcurrentDictionary<string, SemaphoreSlim>();
 
-			// How many blobs the store already holds, per upstream tag. Walked ONCE here (a fully mirrored store is
-			// ~100k files, so /_stats must not re-walk it per request) and then kept live by the store path below -
-			// every miss that lands a new file increments its tag.
-			var files = new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
+			// What the store already HOLDS per upstream tag - blob count and total size. Walked ONCE here (a fully
+			// mirrored store is ~100k files, so /_stats must not re-walk it per request) and then kept live by the
+			// store path below - every miss that lands a blob adds it to its tag's tally.
+			var store = new ConcurrentDictionary<string, StoreTally>(StringComparer.Ordinal);
 			foreach (var tag in Upstreams.Keys)
-				files[tag] = CountStored(Path.Combine(storeDir, tag, "upm"));
+				store[tag] = ScanStore(Path.Combine(storeDir, tag, "upm"));
 
 			app.MapGet("/{tag}/upm/{**rest}", async (string tag, string rest, HttpContext ctx, IHttpClientFactory http) =>
 			{

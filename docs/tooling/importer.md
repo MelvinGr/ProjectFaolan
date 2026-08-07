@@ -246,6 +246,14 @@ where that mattered),
 `method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
 and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
 evidence that decides whether a ticket is "decode it" or "capture it"),
+`spell-effect-gap` (Db-only, no corpus and no RDB: how much of the imported `SpellStatEffects` table reaches a live
+engine, and for the rest, which of the two gates stopped it — the KIND one, or the STAT one. It asks
+`BuffStatEffects.Classify` and `SpellPoolEffects.Applies` rather than re-deriving them, so it cannot report a policy
+the server does not have. ⚠️ Its load-bearing column is the last one on the KIND table: how many of a kind's rows
+land on a stat the engine ALREADY models, which is what says whether admitting the kind is worth anything and is
+nearly unrelated to its row count. Gitea #701 is why it exists — that ticket was filed off a hand-census that had
+gone four times stale and named the wrong gate. `--report-arg <kind or stat id>` lists the rows behind one line with
+the spell that carries them; see [player-stats.md](../subsystems/player-stats.md)),
 `creature-races` (RDB 1000508, the client's creature RACE table — the names behind `CharacterStats.race`, which
 every NPC carries as a bare number; plus how far that vocabulary reaches into the unresolved open-world spawn
 groups, which is the #518 question),

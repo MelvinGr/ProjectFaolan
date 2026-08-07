@@ -2,7 +2,11 @@
 
 A spell's RDB template (type `1040005`) carries the same `[2][9]` stat-modifier region item templates do, parsed
 by the same code (`ItemTemplateStatModifiers`, see [item-template-stats.md](item-template-stats.md)) and imported
-per spell as `SpellStatEffect` rows: **866 spells, 1714 records**.
+per spell as `SpellStatEffect` rows: **2,806 spells, 5,369 records**.
+
+⚠️ **Do not hand-count this table.** Both the row total and the kind census have been restated from a manual read
+before and gone stale by a wide margin — `--report spell-effect-gap` re-derives them from the shipped database and
+asks the live engines which rows they apply, so it cannot report a policy the server does not have.
 
 The record is ten `u32` LE words:
 
@@ -24,8 +28,8 @@ how to read `amount`**.
 | 53220, 53221 | a **LEVEL RAMP** in the stat's own wire scale - `Amount` is only its LOW endpoint | the record carries four slots, not one: `lerp(174 @ 172, 175 @ 173)` over the carrier's level, decompiled from the client's apply ([gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). `Runed Flesh`'s ranks tile the level line 25-40 / 40-55 / 55-70 / 70-80 with values continuous across each seam. Carried as `SpellStatEffect.HighAmount` / `LowLevel` / `HighLevel` and resolved by `LevelRamp.ValueAt` |
 | 53067 | **percent × 100** | Philtre of Guile `0x138`=200, Refined Philtre of Guile `0x138`=500 - and the client's own elixir descriptions read "boost the Character's total Critical Rating by an additional **2%** / **5%**". The same 2/5 and 10/20 tiering recurs across every 53067 consumable |
 | 53068 | the **percent twin of the ramp** - percent × 100 at both endpoints | `InterpolatedModifyAsRating` is to 53067 what 53220 is to 53045: same four ramp slots, percentage units. One shipped row, on a dev test spell, and its element is too short to read the ramp from - imported but never honored |
-| 53219, 53002, 53007, 53013 | a **health effect**, not a buff stat | they only ever carry `0x1B` (Health): Lifestrike R1-R5 = 3400…33700 (an instant heal, `DurationMs` 0), and the `-100000000` drain/kill sentinel on non-buff spells |
-| 53110, 53162, … | unclassified | no evidence either way yet |
+| 53219, 53002, 53007, 53013 | an **instant pool move**, not a buff stat | health, mana or stamina at the ×100 vitals scale: Lifestrike R1-R5 = 3400…33700 (an instant heal, `DurationMs` 0), and the `-100000000` drain/kill sentinel on non-buff spells. Applied by `SpellPoolEffects` (#702), not by the stat engine |
+| 53110 | **flat**, exactly like 53045 — `Modify` with a duration in its name | its key list is `[0 Stat, 39 Value]`, character-for-character 53045's; its own ramped twin 53221 was already classified flat; and on stats whose unit is settled its amounts land in THAT unit — `Skin of Iron` carries the same +10000 = +100% step on four schools that `Magic Shield` carries with 53045 on cold, and `Soul of Mitra` (*"shielding the priest from almost all damage"*) carries 90 damage deflection beside `Phoenix Cloak`'s 53045 +40. Its bulk is a POLYMORPH tail — Head Mesh, Monster Data, Scale — which the STAT gate holds, not this one |
 
 Attributes are the one place the spell and item regions disagree on SCALE: a spell stores **display units**
 (`Potion of Strength (4h)` carries `0x324`=2, and the client's description for the sibling `0x32E` records reads

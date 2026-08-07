@@ -15,6 +15,7 @@ namespace Faolan.Tests
 		private const uint FlatKind = 53220; // Battle Cry / Fend / Shielding Litany
 		private const uint AttributeKind = 53189; // the potions
 		private const uint HealthKind = 53219; // Lifestrike's heal - not a buff stat
+		private const uint TempChangeSkill = 53110; // Skin of Iron / Soul of Mitra - `Modify` with a duration in its name
 
 		// A rating's amount is stored at the same wire scale item modifiers use, because it IS the same field: +62 Hit
 		// Rating on a buff and on a ring are the same number in the same units.
@@ -241,6 +242,76 @@ namespace Faolan.Tests
 			Assert.Equal(3, catalog.BySpellBase.Count);
 			Assert.Equal(1, catalog.StatSkipped);
 			Assert.DoesNotContain(4292427u, catalog.BySpellBase.Keys);
+		}
+
+		// ⚠️ The admission test for the KIND half of the gate, which is a different question and used to be answered
+		// less carefully. 53110 `TempChangeSkill` sat outside `FlatKinds` as "unclassified" while its own RAMPED twin
+		// 53221 `InterpolatedTempChangeSkill` sat inside it - the list disagreeing with itself, since 53221 is to
+		// 53110 exactly what the already-honored 53220 is to 53045.
+		//
+		// What settles it is the UNIT, not the name: on stats whose scale is already proven, `TempChangeSkill`'s
+		// amounts land in that same unit rather than a rescaled one. `Skin of Iron` carries the same +10000 = +100%
+		// step on four schools that `Magic Shield` carries with 53045 on cold, and `Soul of Mitra` - whose client
+		// description is "shielding the priest from almost all damage" - carries 90 deflection beside `Phoenix
+		// Cloak`'s 53045 +40. Both were landing nowhere.
+		[Fact]
+		public void TempChangeSkill_IsFlat_LikeItsAlreadyHonoredInterpolatedTwin()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(166828, CharacterStatId.SlashingInvulnerability, TempChangeSkill, 10000), // Skin of Iron
+				Row(197061, CharacterStatId.DamageDeflection, TempChangeSkill, 90) // Soul of Mitra
+			]);
+
+			Assert.Equal(0, catalog.KindSkipped);
+
+			// In DISPLAY units, like every other flat delta: the invulnerabilities are ×100, so the 10000 the record
+			// carries is the +100% the client draws - the same number `Magic Shield` produces through 53045. Damage
+			// deflection is ×1, so 90 stays 90.
+			Assert.Equal([Delta(CharacterStatId.SlashingInvulnerability, 100)], catalog.BySpellBase[166828]);
+			Assert.Equal([Delta(CharacterStatId.DamageDeflection, 90)], catalog.BySpellBase[197061]);
+		}
+
+		// ...and admitting the kind does NOT admit what else it carries. 53110's bulk is a POLYMORPH tail - a
+		// shapeshift buff assigning a head mesh or a creature scale - which is not `gear + sum(buffs)` in any units,
+		// and which the STAT half of the gate goes on holding. The two halves are independent, which is the reason
+		// widening one was safe.
+		[Fact]
+		public void TempChangeSkill_DoesNotSmuggleInThePolymorphTail()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(4934382, (CharacterStatId)64, TempChangeSkill, 4048194), // Head Mesh: an RDB record id
+				Row(4934382, CharacterStatId.Scale, TempChangeSkill, 300)
+			]);
+
+			Assert.Empty(catalog.BySpellBase);
+			Assert.Equal(2, catalog.StatSkipped);
+		}
+
+		// The gate answers for a row from ONE place, because the imported-vs-applied census is taken from outside the
+		// server (`--report spell-effect-gap`) and a census that re-derives the rule drifts from it. #701 is the
+		// cautionary case: it was filed off a hand-count that had gone four times stale and named the wrong gate as
+		// the problem.
+		[Fact]
+		public void ClassifyAndBuildCatalog_AreTheSamePolicy()
+		{
+			SpellStatEffect[] rows =
+			[
+				Row(145213, CharacterStatId.HitRating, FlatKind, 62), // honored, flat
+				Row(4331123, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 200), // honored, percent
+				Row(4239189, CharacterStatId.HealthMax, 53026, 100000), // `Set` - an assignment, not a delta
+				Row(216453, (CharacterStatId)977, FlatKind, 1466), // Retributive Damage - stat not modelled
+				Row(5003553, (CharacterStatId)490, BuffStatEffects.PercentKind, 750) // percent on an unmodelled stat
+			];
+
+			Assert.Equal([
+				BuffStatEffects.Gate.Flat, BuffStatEffects.Gate.Percent, BuffStatEffects.Gate.UnhandledKind,
+				BuffStatEffects.Gate.UnmodelledStat, BuffStatEffects.Gate.PercentOnUnmodelledStat
+			], System.Array.ConvertAll(rows, BuffStatEffects.Classify));
+
+			var catalog = BuffStatEffects.BuildCatalog(rows);
+			Assert.Equal(1, catalog.KindSkipped);
+			Assert.Equal(1, catalog.StatSkipped);
+			Assert.Equal(1, catalog.PercentSkipped);
 		}
 
 		// The whole point: a buff raises the live stat, and losing the buff puts it back to the gear baseline.
