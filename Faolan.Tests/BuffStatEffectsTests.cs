@@ -187,6 +187,39 @@ namespace Faolan.Tests
 			Assert.Equal(2, catalog.StatSkipped);
 		}
 
+		// The three RESISTANCE stats used to fall through that same gate, for no reason: all three are x1, so there
+		// was no scale to verify. Between them they were dropping 370 imported rows - including the `-20 Chance of
+		// Being Staggered` every horse's `Mounted` buff carries, which is visible in the client's own buff tooltip
+		// while the number went nowhere.
+		[Fact]
+		public void TheResistanceStats_AreHonoredRatherThanSkipped()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(3271454, CharacterStatId.StaggeringChance, FlatKind, -20), // Mounted
+				Row(4292427, CharacterStatId.KnockbackResistance, FlatKind, 100), // Turtle Formation
+				Row(3155969, CharacterStatId.DamageDeflection, FlatKind, 40) // Phoenix Cloak (Rank 2)
+			]);
+
+			Assert.Equal(0, catalog.StatSkipped);
+			Assert.Equal(3, catalog.BySpellBase.Count);
+			Assert.Equal(-20, catalog.BySpellBase[3271454][0].Amount);
+		}
+
+		// KnockbackResistance is the one of the three with a LIVE consumer - `KnockbackService` reads it off
+		// `BuffedStats` before falling back to the gear bonus - so honoring it is what makes a resisting BUFF resist a
+		// knockback rather than only a resisting item.
+		[Fact]
+		public void KnockbackResistanceFromABuff_ReachesTheLiveStats()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(4292427, CharacterStatId.KnockbackResistance, FlatKind, 100)]);
+			var entity = Player();
+
+			entity.ActiveBuffs[4292427 << 8] = new ActiveBuff(4292427 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(100u, entity.BuffedStats[CharacterStatId.KnockbackResistance]);
+		}
+
 		// The whole point: a buff raises the live stat, and losing the buff puts it back to the gear baseline.
 		[Fact]
 		public void BuffRaisesTheLiveStat_AndEndingItRestoresTheGearBaseline()

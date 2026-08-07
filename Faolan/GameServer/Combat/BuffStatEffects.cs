@@ -89,6 +89,22 @@ namespace Faolan.GameServer.Combat
 			[CharacterStatId.ManaMax] = (e, v) => e.Vitals?.SetMaxFromBonus(CharacterStatId.ManaMax, (int)v) ?? v,
 			[CharacterStatId.StaminaMax] = (e, v) => e.Vitals?.SetMaxFromBonus(CharacterStatId.StaminaMax, (int)v) ?? v,
 
+			// The three RESISTANCE stats a buff can move. All three are ×1 (docs/subsystems/player-stats.md), so there
+			// is no scale to verify - which is the only thing this gate is for - and between them they were dropping
+			// 370 imported rows on the floor: `Turtle Formation` +100 knockback resistance, `Phoenix Cloak` +40/+50
+			// damage deflection, and the `-20 Chance of Being Staggered` every horse's `Mounted` buff carries.
+			//
+			// KnockbackResistance is the one with a live consumer: `KnockbackService` already reads it off
+			// `BuffedStats` and falls back to the gear bonus, so honoring it here is what makes a knockback-resisting
+			// BUFF actually resist one rather than only a knockback-resisting item.
+			//
+			// The other two are sheet-only for now, like the attributes below: the stat is real and the client draws
+			// it, but no server model consults it - there is no stagger mechanic at all (#699), and damage deflection
+			// has no consumer either.
+			[CharacterStatId.KnockbackResistance] = null,
+			[CharacterStatId.DamageDeflection] = null,
+			[CharacterStatId.StaggeringChance] = null,
+
 			// The five attributes: display-unit amounts (see SpellScale), pushed for the sheet. No server model reads
 			// them yet - the attribute-driven formulas (armor from Strength, …) are still client-side.
 			[CharacterStatId.Strength] = null,

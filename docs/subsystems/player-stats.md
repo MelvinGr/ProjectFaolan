@@ -57,6 +57,16 @@ Consequences worth knowing:
 - **The ten previously unmeasurable stats are answered.** ×100: `920` Attack Rating, `922` Defense Rating,
   `923` Magic Rating, `925` Magical Resist, `252` Miss Chance, `535` Healing Efficiency, `861` Magic Damage
   Modifier. ×1: `974` Damage Deflection, `1037` Knockback Resistance, `156` Chance of Being Staggered.
+
+  ⚠️ Those last three sat on `BuffStatEffects`' un-honored list for months *after* their scale was settled here,
+  which is the failure mode the allowlist invites: it exists to hold back stats whose SCALE is unverified, and
+  nothing walks it back when a scale is answered. 370 imported rows were being dropped — `Turtle Formation`'s
+  +100 Knockback Resistance, `Phoenix Cloak`'s +40/+50 Damage Deflection, and the −20 Chance of Being Staggered
+  every horse's `Mounted` buff carries, which the client draws in its own buff tooltip while the number went
+  nowhere. All three are honored now. Knockback Resistance is the one with a live consumer
+  (`KnockbackService` reads it off `BuffedStats`), so a resisting BUFF now resists where only a resisting ITEM
+  did before; the other two are sheet-only, because nothing server-side reads them — there is no stagger
+  mechanic at all (Gitea #699).
 - **×10000 is real.** Five ids sit in BOTH predicate sets and the client multiplies the divisors (an explicit
   `MULSS` against the same `100.0` constant): `0x00FF` Evade Level Growth, `0x013C` Variance, `0x013D`,
   `0x0140` Magic Variance, `0x0397` Critical Blast Chance.
