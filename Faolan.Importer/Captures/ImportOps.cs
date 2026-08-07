@@ -1176,6 +1176,13 @@ namespace Faolan.Importer.Captures
 		// So: use it on a table built from the SAME corpus you are importing (a fresh DB, or after a full re-harvest),
 		// and read the listing first anywhere else. The transient-loot-bag purge below stays, because it keys on what
 		// a row IS rather than on whether a capture still exists.
+		//
+		// ⚠️ **This table is the ONLY one that drifts**, which #481 asked and is worth not re-asking. A full default
+		// run under a global `--mode overwrite --dry-run` reports a negative delta for exactly three tables, and all
+		// three are this one: `WorldObjects` (-87 today, up from the 62 the ticket measured), its cascaded
+		// `WorldObjectWords` (-57), and the `TravelDestinations` (-3) a dependent module hangs off the rows being
+		// deleted. Every other capture module comes out even. So there is no fourth generation of residue waiting
+		// elsewhere, and the shape is specific to this table rather than a general property of upsert modules.
 		public static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects, bool overwrite = false)
 		{
 			// Purge any transient loot-bag rows that leaked in from old runtime persistence: a dropped loot bag is a
