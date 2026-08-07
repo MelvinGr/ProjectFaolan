@@ -49,10 +49,17 @@ namespace Faolan.GameServer.Combat
 		// 10000 -> 12000 for a +20% effect, i.e. 10000 IS 1.00.
 		private const int PercentScale = 10000;
 
-		// The kinds whose Amount ADDS to the stat (as opposed to a percent modifier or a health effect). Classified
-		// empirically over all 1714 imported records: these carry values that read as flat in their own units against
+		// The kinds whose Amount ADDS to the stat (as opposed to a percent modifier or an instant pool move). Classified
+		// empirically over every imported record: these carry values that read as flat in their own units against
 		// the spell's rank ladder and the client's description text (Fend +1000 Armor / +500 Protection, Battle Cry
 		// +62 Hit Rating, "Augmente la Dextérité de 1" for the 0x32E=1 record).
+		//
+		// 53189 `AddPercentSkillModifier` used to be here and is deliberately gone. It carries NO stat key at all
+		// (`[66 SkillType, 67, 39]`), so under the old positional read its 69 rows were applied to whatever word sat
+		// at slot 0; the by-key fix stopped storing them, and `SpellPoolEffectTests.EveryStoredRowsKind_ActuallyCarries
+		// AStat` now gates the kind out of the table entirely. Leaving it listed here was dead policy reading as live -
+		// the same rot this file warns about below - and it made 53189 look like the attribute kind when every
+		// attribute row is in fact 53045. (It remains a real kind on the ITEM side, where its key list is read whole.)
 		//
 		// ⚠️ 53220/53221 are additive but NOT flat: they are a LEVEL RAMP whose Amount is only the low endpoint, and
 		// the row's three ramp columns carry the rest (#599). Honored through LevelRamp at the carrier's level - see
@@ -73,7 +80,7 @@ namespace Faolan.GameServer.Combat
 		//     effect that deflection row expresses, which was landing nowhere.
 		// Its other 356 rows are a POLYMORPH tail (Head Mesh, Monster Data, Scale, Super Family) plus Natural Energy
 		// Regeneration, and the stat gate below goes on holding those: a shapeshift is not `gear + sum(buffs)`.
-		private static readonly HashSet<uint> FlatKinds = [53045, 53110, 53189, 53220, 53221];
+		private static readonly HashSet<uint> FlatKinds = [53045, 53110, 53220, 53221];
 
 		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. The apply is
 		// null for the ones the server does not model yet, which are still pushed so the character sheet reflects the

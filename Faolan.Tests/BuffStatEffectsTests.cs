@@ -13,7 +13,10 @@ namespace Faolan.Tests
 	public class BuffStatEffectsTests
 	{
 		private const uint FlatKind = 53220; // Battle Cry / Fend / Shielding Litany
-		private const uint AttributeKind = 53189; // the potions
+		// ⚠️ The potions carry 53045, NOT 53189. 53189 `AddPercentSkillModifier` has no stat key at all, so its rows
+		// were a positional misread and no longer reach the table (`SpellPoolEffectTests
+		// .EveryStoredRowsKind_ActuallyCarriesAStat`); naming it "AttributeKind" here outlived that.
+		private const uint AttributeKind = 53045;
 		private const uint HealthKind = 53219; // Lifestrike's heal - not a buff stat
 		private const uint TempChangeSkill = 53110; // Skin of Iron / Soul of Mitra - `Modify` with a duration in its name
 
