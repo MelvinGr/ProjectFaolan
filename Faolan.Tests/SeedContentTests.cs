@@ -364,6 +364,48 @@ namespace Faolan.Tests
 				$"TargetNames that are a SHORT FORM of an NPC we hold, so the equality match can never fire: {string.Join(", ", shortForms)}");
 		}
 
+		// The DELIVERY objectives are not typed from their sentence, and that has to stay true (#704).
+		//
+		// They are the larger set by far - Give 656, Hand 504, Return 385, Deliver 309, against Talk 473 / Speak 242 /
+		// Report 225 - so the temptation to sweep them up with the talk goals is real and recurring. A delivery hands
+		// an item OVER, so it must be gated on the player holding it: `QuestProgress.CanHandIn` keys on the WIRE kind
+		// (`Separator` = Deliver) and on the item the trailing reference names. A catalog-only goal has neither, so
+		// typing one `TalkToNpc` completes it on a bare greeting with the goods still in the shop - the over-eager
+		// trigger #522 spent its length removing, reintroduced at 30x the scale.
+		//
+		// ⚠️ Scoped to goals NEVER SEEN ON THE WIRE (`Separator` null) - which is precisely the set the sentence rule
+		// reaches that nothing else did, and precisely the set with no kind tag and no trailing reference to gate on.
+		// A goal the wire HAS shown carries its kind, and the `Deliver` machinery owns it: `IsDelivery` reads those two
+		// captured fields, so a captured hand-in is gated by construction or visibly is not.
+		//
+		// (One captured hand-in is genuinely ungated and stays that way: goal 400 "Give Laranga's letter to Tina" is a
+		// `Deliver` whose wire record carries NO trailing reference - the corpus only ever full-updates it, and a
+		// full-update does not carry the target - and "Laranga's letter" is not in `Items` either, so gating on it
+		// would make the Shipwrecked chain uncompletable rather than merely un-gated. That is a coverage gap in the
+		// captures, not a rule leaking, which is why the scope below expresses it instead of an id allowlist.)
+		[Fact]
+		public async Task DeliveryObjectives_AreNotTypedFromTheirSentenceAlone()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var handIns = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.TalkToNpc && g.Separator == null && g.Name != null
+				                                 && (g.Name.StartsWith("Give ") || g.Name.StartsWith("Hand ")
+				                                     || g.Name.StartsWith("Deliver ") || g.Name.StartsWith("Return ")
+				                                     || g.Name.StartsWith("Bring ")))
+				.Select(g => $"goal {g.GoalId} '{g.Name!}'")
+				.ToListAsync(ct);
+
+			Assert.True(handIns.Count == 0,
+				$"catalog-only hand-in goals typed TalkToNpc, with no kind tag and no item reference for CanHandIn to gate on "
+				+ $"- they complete on a bare greeting: {string.Join(", ", handIns)}");
+
+			// ...and the rule that must not sweep them up really did run, so this is not vacuous.
+			var typed = await db.QuestGoalDefinitions.CountAsync(g => g.GoalType == QuestGoalType.TalkToNpc && g.Separator == null, ct);
+			Assert.True(typed >= 700, $"only {typed} catalog-only goals are typed TalkToNpc; the sentence rule types 753.");
+		}
+
 		// A goal's own SENTENCE outranks its map marker (#522).
 		//
 		// The marker is the weakest evidence a goal carries, and `TypeLocationGoalsFromTrailingCategory` was reading it

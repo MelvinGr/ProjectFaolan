@@ -1524,16 +1524,27 @@ namespace Faolan.Importer.Captures
 		// Trigger/chain seeds are BOOTSTRAP-ONLY (see SeedGoal/Chain), so a re-run never reverts a Quest-editor edit.
 		public static async Task WireQuests(DatabaseContext db)
 		{
-			await TypeItemGoalsFromTrailingCategory(db);
-			await TypeLocationGoalsFromTrailingCategory(db);
-			await TypeInvestigateGoalsAsReach(db);
+			// ⚠️ ORDER IS EVIDENCE STRENGTH, strongest first, because every step is bootstrap-only: whoever types a goal
+			// first wins and the rest skip it. Getting this backwards is not a style question - it silently produces
+			// wrong triggers, twice now (#522: the marker rule beat the goal's own sentence and turned seven talks and
+			// an escort into walk-ups; #704: the sentence rule beat the Nadini override, whose whole point is that she
+			// has no imported dialogue so a greeting can never fire).
+			//
+			//   1. a HUMAN decided        - the Seed* steps, including every editorial call (GatesTargetVisibility,
+			//                               the Nadini stand-in) and everything no source states (QuestItemId, chains)
+			//   2. the goal's own VERB    - its plaintext objective sentence, then the wire kind tag
+			//   3. its TYPED REFERENCE    - "the trailing ref is an item, so this is a gather"
+			//   4. its MAP MARKER         - the weakest: a pin sits on whatever the objective is ABOUT, which is the
+			//                               NPC to talk to as readily as the place to walk to
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
-			// LAST of the typing rules, and after the Seed* steps on purpose: a hand-seeded kill already carries its
-			// editorial extras (Scavenger Tuut's GatesTargetVisibility), and typing it first would make the seed skip it.
+			await TypeItemGoalsFromTrailingCategory(db); // first of the rules: it also CORRECTS rows an older version mistyped
+			await TypeTalkGoalsFromCatalogName(db);
 			await TypeKillGoalsFromKind(db);
+			await TypeInvestigateGoalsAsReach(db);
+			await TypeLocationGoalsFromTrailingCategory(db);
 			await DeriveQuestIndexFromLine(db);
 			await SeedQuestWorldEffects(db);
 		}
@@ -1647,6 +1658,97 @@ namespace Faolan.Importer.Captures
 			(uint)QuestGoalKind.Deliver, (uint)QuestGoalKind.Craft, (uint)QuestGoalKind.Use, (uint)QuestGoalKind.DestroyObject, (uint)QuestGoalKind.Investigate
 		}.ToFrozenSet();
 
+		// A goal whose own objective SENTENCE asks the player to go and talk to someone is a `TalkToNpc` goal, and the
+		// sentence names who (#704).
+		//
+		// The sentence is `QuestGoalDefinition.Name` - the PLAINTEXT `QuestGoal.name` of the client's quest catalog
+		// (RDB 1000104), a column on 7,299 of 7,317 goals. `RdbQuestTextImporter` had been asking the same question of
+		// the *encrypted* LDB 50304 text and reporting **7,147 goals "unreadable"**: they were not unreadable, they were
+		// being read from the source that needs a per-string TEA key only a capture yields. Same sentence, and this one
+		// is free - which also means the rule belongs in the capture-driven module rather than an opt-in RDB one, so it
+		// runs on every import and can sit BEFORE the marker rule that would otherwise claim these goals.
+		//
+		// ⚠️ PURE TALK SHAPES ONLY - "Talk/Speak/Report to X", "Ask X about Y". The DELIVERY shapes are the larger set
+		// by far (Give 656, Hand 504, Return 385, Deliver 309 against Talk 473 / Speak 242 / Report 225) and they are
+		// deliberately NOT typed from the sentence. A delivery hands an item over, so it must be gated on the player
+		// HOLDING it - QuestProgress.CanHandIn, which keys on the wire kind (`Separator` = Deliver) and the item the
+		// trailing reference names. A catalog-only goal has neither, so typing one TalkToNpc would complete it on a
+		// bare greeting with the goods still in the shop: the same over-eager trigger #522 spent its length removing.
+		// They stay `None` until their wire record is captured, and `RdbQuestTextImporter` keeps that half.
+		//
+		// The name is reconciled against the NPC catalog exactly as the text rule does it - a `TargetName` is a MATCH
+		// KEY compared for equality, and prose gives the short form ("Bronwith" for "Battlemaster Bronwith").
+		//
+		// BOOTSTRAP-ONLY. A target we do not hold is recorded anyway and COUNTED: it is the client's own statement of
+		// who the goal is about, and the goal starts working the day its map is imported.
+		private static async Task TypeTalkGoalsFromCatalogName(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Name != null && g.Name != "").ToListAsync();
+			var npcNames = (await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+			// A TalkToNpc goal advances only once a GREETING is served, so an NPC with no ConversationNode rows cannot
+			// complete one however correctly it is wired. Counted apart from "NPC missing" because the fix differs: one
+			// needs the map's spawns, the other a capture of the dialogue.
+			var withDialogue = (await db.ConversationNodes.Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+			int typed = 0, noName = 0, gated = 0, reconciled = 0, withoutNpc = 0, withoutDialogue = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal))
+					continue;
+
+				var read = QuestObjectiveText.Read(goal.Name);
+				if (!read.IsTalkShape)
+					continue;
+
+				if (read.Recipient is not { } recipient)
+				{
+					// The sentence names a ROLE, not a name - "Talk to the city guard", "Talk to the Red Hand
+					// Sergeant". Only the goal's MARKER can say which NPC that is, and 868 of 7,317 goals have none.
+					noName++;
+					continue;
+				}
+
+				if (!npcNames.Contains(recipient))
+				{
+					var titled = npcNames.Where(n => n.EndsWith(' ' + recipient, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+					if (titled.Count == 1)
+					{
+						recipient = titled[0];
+						reconciled++;
+					}
+				}
+
+				if (read.RequiredLevel is { } level)
+				{
+					goal.RequiredLevel = level;
+					gated++;
+				}
+
+				if (read.RequiredRankTitle is { } title)
+				{
+					goal.RequiredRankTitle = title;
+					goal.RequiredRank = read.RequiredRank;
+					gated++;
+				}
+
+				if (!npcNames.Contains(recipient))
+					withoutNpc++;
+				else if (!withDialogue.Contains(recipient))
+					withoutDialogue++;
+
+				goal.GoalType = QuestGoalType.TalkToNpc;
+				goal.TargetName = recipient;
+				typed++;
+			}
+
+			if (typed > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Typed {typed} talk goal(s) from the client's own plaintext objective name ({withoutNpc} naming an NPC we do not "
+			                  + $"hold yet, {withoutDialogue} held but with no captured dialogue, so inert either way); {reconciled} short name(s) "
+			                  + $"reconciled to the catalog spelling, {gated} precondition(s) recorded, {noName} naming a role rather than a name (#704).");
+		}
+
 		// A goal is a KILL goal because the client's own VERB says so (`Separator` = QuestGoalKind.Kill), and for no other
 		// reason (#522).
 		//
@@ -1662,8 +1764,8 @@ namespace Faolan.Importer.Captures
 		//      that group can be expanded. Typing them anything else would be a lie about a goal we read correctly, and
 		//      leaving them at `None` would lose the one thing the client did tell us.
 		//
-		// BOOTSTRAP-ONLY like every wiring step, and it runs after the Seed* steps so a hand-seeded kill keeps the
-		// editorial fields (GatesTargetVisibility) that only a seed sets.
+		// BOOTSTRAP-ONLY like every wiring step; the Seed* steps run before it (see WireQuests) so a hand-seeded kill
+		// keeps the editorial fields - GatesTargetVisibility - that only a seed sets.
 		private static async Task TypeKillGoalsFromKind(DatabaseContext db)
 		{
 			var goals = await db.QuestGoalDefinitions.Where(g => g.Separator == (uint)QuestGoalKind.Kill).ToListAsync();

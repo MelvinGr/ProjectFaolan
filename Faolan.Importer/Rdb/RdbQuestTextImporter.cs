@@ -26,46 +26,11 @@ namespace Faolan.Importer.Rdb
 		// `quest_goal_templates.goal_name` - the goal's own display text.
 		private const uint GoalNameCategory = 50304;
 
-		// The NPC in an objective line: the LAST "to <Name>" / "with <Name>" in it. LAST, not first, because the item
-		// can contain one ("Deliver the Head of Athyr-Bast to Hashima") and the person always closes the phrase. A name
-		// is one or two Capitalised words, allowing the apostrophes and hyphens real names carry (`Jen-ta`,
-		// `Akil-Atsu`), which also stops it at the trailing qualifier retail appends ("at the refugee camp", "on the
-		// Lacheish Plains").
-		private static readonly Regex Recipient = new(@"\b(?:to|with)\s+([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)", RegexOptions.Compiled);
-
-		// A goal whose text ASKS the player to go and speak to someone - the same TalkToNpc trigger a delivery uses,
-		// just without an item changing hands. "Speak with Kern Wolfeye", "Report to Mei-zhu", "Talk to King Conan of
-		// Aquilonia".
-		//
-		// The two objective SHAPES live on QuestObjectiveText, because the capture-driven wiring has to ask the same
-		// question of the PLAINTEXT catalog name (see that class) and cannot reach in here for it.
-		private static readonly Regex TalkObjective = QuestObjectiveText.TalkObjective;
-
-		// The other shape of the same objective: "ASK <someone> ABOUT <something>". It is a talk goal - the player
-		// opens a greeting and nothing changes hands - but the name follows the VERB rather than a to/with, so
-		// `Recipient` cannot find it and `TalkObjective` does not recognise it. That is why quest 10287's "Ask Tina
-		// about Nadini" (goal 7363) sat `Partial` and its quest presented in-client as a ONE-goal quest (#527).
-		//
-		// Measured before it was added, over all 7,317 catalog goals: exactly THREE objectives begin with "Ask", and
-		// the shape is not ambiguous with anything else -
-		//   7363  "Ask Tina about Nadini"                                    -> Tina (NpcTemplate 2805)
-		//   6597  "Ask Cavan about the Gambler"                              -> Cavan (9141); already typed, so the
-		//                                                                       bootstrap guard above skips it
-		//   11739 "Ask a Faction Contact for Information on the Assassinations" -> "Faction Contact", which is not an
-		//                                                                       NPC we hold, so it lands in the
-		//                                                                       withoutNpc count rather than silently
-		// `for` is accepted beside `about` for that third one: the verb is what makes it a talk goal, and refusing the
-		// preposition would only hide the one case worth counting.
-		private static readonly Regex AskObjective = QuestObjectiveText.AskObjective;
-
-		// The two PRECONDITION shapes the client states in a goal's text. They are RECORDED, not used to refuse the
-		// wiring: the goal is typed normally and QuestProgress.PreconditionMet enforces it at the trigger, where the
-		// live player is known. See QuestGoalDefinition.RequiredLevel.
-		//   "Talk to Sharak (level 30)"
-		private static readonly Regex LevelPrecondition = new(@"\(\s*level\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-		//   "…to Itsing When You Have Become an Acolyte (Rank 1)"  -> title "Acolyte", rank 1
-		private static readonly Regex RankPrecondition = new(@"When You Have Become (?:an?\s+)?([A-Za-z][\w \-']*?)\s*\(\s*Rank\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		// Every pattern and the reading itself live on QuestObjectiveText (#704): the capture-driven wiring in
+		// `ImportOps` has to ask the same questions of the PLAINTEXT catalog `Name` column, and one implementation is the
+		// only way the two stay in step. The shapes it knows, and why each is there, are documented on that class -
+		// including the "Ask X about Y" form, which is why quest 10287's "Ask Tina about Nadini" (goal 7363) sat `Partial`
+		// and its quest presented in-client as a ONE-goal quest (#527).
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
@@ -103,46 +68,34 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				var ask = AskObjective.Match(text);
-				if (!isDeliver && !TalkObjective.IsMatch(text) && !ask.Success)
+				var read = QuestObjectiveText.Read(text);
+				if (!isDeliver && !read.IsTalkShape)
 				{
 					notOurShape++;
+					continue;
+				}
+
+				if (read.Recipient is not { } recipient)
+				{
+					noName++;
 					continue;
 				}
 
 				// The precondition is RECORDED and the goal is still wired. Refusing to wire it would have thrown the
 				// information away and needed a re-harvest the day the gate can be evaluated; carrying it means only
 				// QuestProgress.PreconditionMet has to learn a new answer.
-				var rank = RankPrecondition.Match(text);
-				if (LevelPrecondition.Match(text) is { Success: true } lvl)
+				if (read.RequiredLevel is { } lvl)
 				{
-					goal.RequiredLevel = uint.Parse(lvl.Groups[1].Value);
+					goal.RequiredLevel = lvl;
 					gated++;
 				}
 
-				if (rank.Success)
+				if (read.RequiredRankTitle is { } title)
 				{
-					goal.RequiredRankTitle = rank.Groups[1].Value.Trim();
-					goal.RequiredRank = uint.Parse(rank.Groups[2].Value);
+					goal.RequiredRankTitle = title;
+					goal.RequiredRank = read.RequiredRank;
 					gated++;
 				}
-
-				// ⚠️ Match the NAME on the text with the precondition clause REMOVED. "…to Itsing When You Have Become an
-				// Acolyte" otherwise yields "Itsing When": the name pattern takes up to two Capitalised words and `When`
-				// is one, so the clause silently becomes part of the recipient and no NPC ever matches it.
-				var nameText = rank.Success
-					? text[..rank.Index]
-					: text;
-
-				// "Ask X about Y" names X directly after the verb; every other shape names it after a to/with.
-				var match = Recipient.Matches(nameText).LastOrDefault();
-				if (match == null && !ask.Success)
-				{
-					noName++;
-					continue;
-				}
-
-				var recipient = (ask.Success ? ask : match!).Groups[1].Value.Trim();
 
 				// ⚠️ RECONCILE the sentence's name against the catalog before storing it. `TargetName` is a MATCH KEY,
 				// compared for EQUALITY against the live entity's name - and prose uses the short form where the world

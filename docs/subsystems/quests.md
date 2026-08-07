@@ -116,6 +116,45 @@ So the client's own words are now a source for goal wiring, alongside the kind t
 goal 1448 is *"Enter the jungle"* (`RegionScoped`), 3490 *"Kill slavemaster Saddur"* (`Kill`), 3495 *"Get 3 stone
 bricks"* (`Collect`), 3497 *"Deliver 3 stone bricks to Turach"* (`Deliver`).
 
+### …and the same sentence is in PLAINTEXT, for 43× more goals
+
+⚠️ That encrypted category is the **expensive** copy. The client's quest catalog (RDB 1000104) carries the same
+sentence as `QuestGoal.name`, in plaintext, and it is already a column on every row — `QuestGoalDefinition.Name`:
+
+| source | goals | cost |
+|---|---:|---|
+| LDB `50304`, encrypted | 170 | a per-string TEA key only a **capture** yields, plus an `RdbDir` |
+| `QuestGoal.name`, plaintext → `Name` | **7,299** | none |
+
+`RdbQuestTextImporter` had been reporting **7,147 goals "unreadable"**. They were not unreadable; they were being
+read from the wrong copy. Reading `Name` instead types **753** goals `TalkToNpc` — 201 naming an NPC we hold, 53
+of those with captured dialogue, so playable now. The patterns and the reading live on `QuestObjectiveText` and
+both importers share them, so the two cannot drift.
+
+⚠️ **The DELIVERY shapes are deliberately NOT typed from the sentence**, and they are the larger set — *Give* 656,
+*Hand* 504, *Return* 385, *Deliver* 309, against *Talk* 473 / *Speak* 242 / *Report* 225. A delivery hands an item
+**over**, so it must be gated on the player holding it, and `QuestProgress.CanHandIn` keys on the **wire** kind
+(`Separator` = `Deliver`) plus the item the trailing reference names. A catalog-only goal has neither, so typing
+one `TalkToNpc` completes it on a bare greeting with the goods still in the shop. They stay `None` until their
+wire record is captured. `SeedContentTests.DeliveryObjectives_AreNotTypedFromTheirSentenceAlone` holds the line.
+
+### Wiring rules run in order of EVIDENCE STRENGTH
+
+Every wiring step is bootstrap-only, so **whoever types a goal first wins and the rest skip it**. That makes the
+order in `ImportOps.WireQuests` load-bearing rather than cosmetic — it has produced wrong triggers twice:
+
+1. **a human decided** — the `Seed*` steps: editorial calls (`GatesTargetVisibility`, the Nadini stand-in) and
+   everything no source states (`QuestItemId`, chain successors)
+2. **the goal's own VERB** — its plaintext objective sentence, then the wire kind tag
+3. **its TYPED REFERENCE** — *"the trailing ref is an item, so this is a gather"*
+4. **its MAP MARKER** — the weakest: a pin sits on whatever the objective is *about*, which is as readily the NPC
+   to talk to as the place to walk to
+
+Both regressions were the order being wrong. #522: the marker rule beat the sentence, turning seven talk goals
+into walk-ups and closing Casilda's escort the instant it began. #704: the sentence rule beat the Nadini
+override, whose whole point is that she has **no imported dialogue**, so a greeting can never fire and only a
+reach can complete the goal.
+
 ## Collect goals do not care how the item arrives
 
 A gather objective is satisfied by **holding** the item. The client's data says which item and how many, and
