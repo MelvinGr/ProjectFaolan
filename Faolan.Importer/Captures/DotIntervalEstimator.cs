@@ -29,8 +29,20 @@ namespace Faolan.Importer.Captures
 	// Such a train is indistinguishable from a genuinely slower tick using gaps alone, and this estimator will
 	// confidently return the multiple. One spell in the corpus looks like this: Aura: Fire Weave, whose 17 gaps
 	// cluster at 0.92 / 1.23 / 1.53 / 1.84 - spaced by ~0.3 s, i.e. plausibly a ~0.3 s pulse seen 3-6 ticks at a
-	// time, which is neither the 500 ms the hand scan recorded nor the 1500 ms the median here yields. It is left
-	// disagreeing rather than special-cased; see the Gitea issue.
+	// time.
+	//
+	// ⚠️ **That ~0.3 s reading does not survive a significance test, so do NOT build a harmonic/GCD estimator on
+	// it** (#524). Sweeping every candidate period and scoring the residuals is degenerate on its own - the smaller
+	// the candidate, the better it fits, because every gap is within p/2 of some multiple - so the score has to be
+	// read against what CHANCE gives: residuals of unrelated data are ~U(-p/2, p/2), i.e. rms = p/sqrt(12). Against
+	// that null the best fit these 17 gaps admit is a ratio of **0.66** (at 155 / 310 ms), and running the identical
+	// sweep over RANDOM gaps spanning the same range finds a median best of **0.70**, with 5% of trials reaching
+	// 0.57. So 0.66 sits inside the noise: the gaps contain no recoverable fundamental, and a harmonic estimator
+	// would be fitting the sweep's own degeneracy rather than a period.
+	//
+	// The measured 1500 ms therefore stands as the only supported value, and it is what the seed carries. (The
+	// disagreement the issue recorded is gone - the hand scan's 500 ms was never supported by these gaps either,
+	// nothing sitting near it.)
 	public static class DotIntervalEstimator
 	{
 		// A gap outside this range is not a tick of the spell we are watching: below it we are looking at two effects
