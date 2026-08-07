@@ -204,6 +204,53 @@ namespace Faolan.Core.Rdb
 			return mods;
 		}
 
+		/// <summary>
+		///     The stat effects a template's region carries, read BY KEY rather than by POSITION (#701).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         ⚠️ This is what <see cref="Parse" /> should always have been for the spell catalog. The pair view
+		///         returns payload words 0 and 1 <b>whatever keys they belong to</b>, and that is only (stat, amount)
+		///         for the 12 kinds whose key list opens with key 0. For the other 41 it silently files another
+		///         field's value as a stat id: `NanoResistance` `[152, 39]` reported its key-152 word as
+		///         `Team`/`State`/`SellModifier`, `SetSpellLineRecastTime` `[1, 39]` reported a spell LINE as a stat,
+		///         and `StartParticleEffect` `[209, …]` reported the BYTE LENGTH of a string. 1,200 of the 6,133
+		///         shipped rows were that.
+		///     </para>
+		///     <para>
+		///         The MAGNITUDE is the first key AFTER the stat in the type's own key list, which is one rule that
+		///         gets all twelve right: key 39 `Value` on `Modify`, key 2 on `Hit`, key 168 on `InterpolatedHit`,
+		///         key 174 (the ramp's low endpoint) on `InterpolatedModify`, key 70 on `AddAbsorb`, and key 39 again
+		///         on `Set`, whose stat is at slot 1 rather than slot 0. It is also exactly what the positional read
+		///         was doing by accident wherever the stat happens to come first - so this changes no VALUE that was
+		///         already right, it only stops inventing the ones that were not.
+		///     </para>
+		/// </remarks>
+		public static IReadOnlyList<Modifier> ParseSpellStatEffects(ReadOnlySpan<byte> body)
+		{
+			var mods = new List<Modifier>();
+			foreach (var e in ParseElements(body))
+			{
+				// An UNREGISTERED kind has no key list, so nothing says where its stat is - and the catalog covers
+				// every id the client registers, which makes an unregistered one retired data rather than a gap.
+				if (e.Type is not { } type)
+					continue;
+
+				var statSlot = type.SlotOf(GameActionTypes.KeyStat);
+				if (statSlot < 0 || statSlot + 1 >= type.Keys.Length)
+					continue; // this kind carries no stat, or no slot after it to hold a magnitude
+
+				var stat = e.Value(GameActionTypes.KeyStat);
+				var amount = e.Value(type.Keys[statSlot + 1]);
+				if (stat is null or 0 or >= MaxStatId || amount is null)
+					continue;
+
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp));
+			}
+
+			return mods;
+		}
+
 		// One element walk for both pair readers. `inStatRange` picks which side of the stat-id bound to keep.
 		private static IReadOnlyList<Modifier> Scan(ReadOnlySpan<byte> body, bool inStatRange)
 		{

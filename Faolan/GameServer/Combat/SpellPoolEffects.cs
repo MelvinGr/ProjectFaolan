@@ -30,7 +30,12 @@ namespace Faolan.GameServer.Combat
 		// The kinds whose Amount is an instant, FLAT move of a pool at the ×100 wire scale. `Hit` and its variants
 		// are all one thing as far as a pool is concerned - the distinctions between them (magical, DPS-scaled,
 		// interpolated) are about how retail COMPUTED the number, not about what to do with it.
-		private static readonly HashSet<uint> FlatKinds = [53002, 53013, 53219, 53256];
+		//
+		// ⚠️ `MagicHit` (53256) is NOT here, and its absence is a decode rather than an omission: its key list is
+		// `[39 Value, 71]` and carries no stat key at all, so it can never name a pool. It used to appear in this
+		// table under stat 1 `HealthMax` with the `Venomstrike`/`Banestrike` rank ladders, which is what made it look
+		// like a max-health drain - that "stat" was key 39's own value, read positionally (#701).
+		private static readonly HashSet<uint> FlatKinds = [53002, 53013, 53219];
 
 		// ⭐ `HitPercentage` states its own unit through a carrier's NAME: the dev spell
 		// `System Spell: Fire AOE damage 25% of Life` carries -25. So this kind's Amount is a plain percent OF THE
@@ -38,9 +43,8 @@ namespace Faolan.GameServer.Combat
 		// needing a fit.
 		private const uint PercentKind = 53007;
 
-		// The three CURRENT-pool stats. Deliberately not the MAX ones: `MagicHit` on 1 `HealthMax` carries the
-		// `Venomstrike`/`Banestrike` rank ladders (-7727 … -41153), which is a max-health drain and a different
-		// mechanic - and none of its carriers are class-castable, so guessing at it buys nothing.
+		// The three CURRENT-pool stats. Deliberately not the MAX ones: a `HealthMax` row here would be a max-health
+		// change rather than a heal, which is a different mechanic with its own clamping.
 		private static readonly HashSet<CharacterStatId> Pools = [CharacterStatId.HealthCurrent, CharacterStatId.ManaCurrent, CharacterStatId.StaminaCurrent];
 
 		// ⚠️ The DRAIN SENTINEL. `Demonic Puppet` carries -100000000 on health, which is a marker rather than a

@@ -56,16 +56,25 @@ namespace Faolan.Tests
 			Assert.Empty(SpellPoolEffects.BuildCatalog([Row(3, CharacterStatId.HealthCurrent, Hit, -100_000_000)]));
 		}
 
-		// The MAX pools are a different mechanic and stay out: `MagicHit` on `HealthMax` carries the
-		// `Venomstrike`/`Banestrike` rank ladders, which is a max-health drain, and none of its carriers are
-		// class-castable - so guessing at it buys nothing.
+		// The MAX pools are a different mechanic and stay out - a `HealthMax` row is a max-health change, not a heal.
 		[Fact]
 		public void MaxPoolRows_AreNotInstantEffects()
 		{
 			Assert.Empty(SpellPoolEffects.BuildCatalog([
-				Row(4, CharacterStatId.HealthMax, MagicHit, -27968), // Venomstrike (Rank 5)
+				Row(4, CharacterStatId.HealthMax, Hit, -27968),
 				Row(5, CharacterStatId.ManaMax, Hit, 100)
 			]));
+		}
+
+		// ⚠️ `MagicHit` carries NO stat key (`[39 Value, 71]`), so it can never name a pool - and it is out of the
+		// kind set for that reason rather than by judgement. It used to reach this table under stat 1 `HealthMax`
+		// with the `Venomstrike`/`Banestrike` ladders, which read as a max-health drain; that "stat" was key 39's own
+		// value, read positionally (#701). Nothing carries it now, and nothing should.
+		[Fact]
+		public void MagicHit_CarriesNoStatAndIsNotAPoolEffect()
+		{
+			Assert.Empty(SpellPoolEffects.BuildCatalog([Row(6, CharacterStatId.HealthCurrent, MagicHit, -1567)]));
+			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53256"));
 		}
 
 		// A LASTING stat delta is the buff engine's, not this one's - the two families live in the same table and are
@@ -117,6 +126,29 @@ namespace Faolan.Tests
 
 			var potion = Assert.Single(potions);
 			Assert.Equal(40500, potion.Amount); // 405 HP at the vitals scale
+		}
+
+		// ⭐ The invariant the key-addressed read establishes (#701): every stored row's KIND carries a stat key, so
+		// its `StatId` column is a stat rather than whatever field happened to sit in payload word 0. 1,191 rows
+		// failed this before - `StartParticleEffect` filing a string's BYTE LENGTH as a stat id, `NanoResistance`
+		// filing key 152, `SetSpellLineRecastTime` filing a spell LINE.
+		[Fact]
+		public void EveryStoredRowsKind_ActuallyCarriesAStat()
+		{
+			var kindsWithoutAStat = new[] { 53238u, 53239u, 53162u, 53189u, 53097u, 53077u, 53043u, 53256u, 53010u, 53105u };
+			var offenders = Scalar($"SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind IN ({string.Join(",", kindsWithoutAStat)})");
+
+			Assert.Equal(0u, offenders);
+		}
+
+		private static uint Scalar(string sql)
+		{
+			using var con = new SqliteConnection($"Data Source={TestPaths.FaolanDb};Mode=ReadOnly");
+			con.Open();
+			using var cmd = con.CreateCommand();
+			cmd.CommandText = sql;
+
+			return (uint)(long)(cmd.ExecuteScalar() ?? 0L);
 		}
 
 		private static List<(string Name, int Amount)> Query(string sql)

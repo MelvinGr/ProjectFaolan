@@ -216,6 +216,10 @@ namespace Faolan.Importer.Rdb
 			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
 			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
 			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
+
+			// Every spell record this run PARSED - the scope the stat-effect delete runs over, which is deliberately
+			// wider than the set that still HAS effects (#701).
+			var statEffectScope = new HashSet<uint>();
 			// #627: (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
 			var mounts = new Dictionary<uint, (uint CreatureId, ItemQuality? Quality)>();
 			// #640: (spell id -> pet summon params) off the 53261 element's ScriptParams string. Written onto the Spell
@@ -380,7 +384,12 @@ namespace Faolan.Importer.Rdb
 					map[target] = value;
 				}
 
-				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
+				// Every record PARSED is scoped for the stat-effect sync below, not just those that still yield
+				// effects (#701). Keying the delete off the RESULTS means a spell whose list becomes empty - because
+				// the parse got stricter - keeps its old rows for ever, so a change that REMOVES bad data would leave
+				// the bad data sitting there. Same lesson, same shape, as RdbFeatImporter's effect sync.
+				statEffectScope.Add(entry.Id);
+				var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body.AsSpan(12));
 				if (mods.Count > 0)
 				{
 					var deltas = new Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>();
@@ -515,7 +524,7 @@ namespace Faolan.Importer.Rdb
 
 			// #367: sync the SpellStatEffect rows now that every affected spell exists (FK). Delete-then-insert per
 			// spell is idempotent and matches the region being authoritative for a spell's stat deltas.
-			var affected = statEffects.Keys.ToList();
+			var affected = statEffectScope.ToList();
 			var stale = await db.SpellStatEffects.Where(e => affected.Contains(e.SpellId)).ToListAsync();
 			if (stale.Count > 0)
 				db.SpellStatEffects.RemoveRange(stale);

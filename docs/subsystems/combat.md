@@ -1149,12 +1149,45 @@ refreshes a duration — must not carry them. So it hangs off `ApplySpell` ("a s
 `UseConsumable`, never off `SendMagicBuffIir`, which all of those go through.
 
 ⚠️ **`-100000000` is a drain SENTINEL, not an amount** (`Demonic Puppet` carries it); applied literally it would
-kill anything it touched. And `MagicHit` on `HealthMax` is a different mechanic — the `Venomstrike`/`Banestrike`
-ladders are a max-health drain, and none of their carriers are class-castable, so they stay out.
+kill anything it touched.
+
+⚠️ **`MagicHit` carries no stat at all.** Its key list is `[39 Value, 71]`, so it can never name a pool. It used
+to appear in the table under stat 1 `HealthMax` with the `Venomstrike`/`Banestrike` rank ladders, which read as a
+max-health drain — that "stat" was key 39's own value, read positionally. See the key-addressing note below.
 
 A consumable's heal sits behind the same "already active → no-op" guard the buff does, which is capture-derived
 retail behaviour and, since all four pool-moving potions carry a 60 s duration, amounts to a 60-second potion
 cooldown.
+
+### ⚠️ A stat effect is addressed BY KEY, and 1,191 rows were not (#701)
+
+`SpellStatEffects` is `(SpellId, StatId, EffectKind, Amount)`, and it was filled by the POSITIONAL pair view -
+payload words 0 and 1, *whatever keys they belong to*. That is only `(stat, amount)` for the twelve kinds whose
+key list opens with key `0`. For the other 41 it silently filed another field's value as a stat id:
+
+| kind | key list | what its "StatId" really was |
+| --- | --- | --- |
+| `StartParticleEffect` 53238 | `[209, 86, 138, 28, 29, 30]` | the BYTE LENGTH of a string (key 209 is text) |
+| `NanoResistance` 53162 | `[152, 39]` | key 152 — reported as `Team` / `State` / `SellModifier` |
+| `SetSpellLineRecastTime` 53077 | `[1, 39]` | a spell LINE |
+| `MagicHit` 53256 | `[39, 71]` | key 39's own VALUE |
+| `Set` 53026 | `[55, 0, 39]` | key 55 — its stat is one slot along |
+
+**The magnitude is the first key AFTER the stat in the type's own key list**, which is one rule that gets all
+twelve right: key `39 Value` on `Modify`, key `2` on `Hit`, key `168` on `InterpolatedHit`, key `174` (the ramp's
+low endpoint) on `InterpolatedModify`, key `70` on `AddAbsorb`, and key `39` again on `Set`. It is also exactly
+what the positional read was doing by accident wherever the stat comes first — so the change altered **no value
+that was already right**.
+
+Measured over the shipped catalog: **1,191 rows removed**, **427 ADDED** — the recovery half matters as much,
+because a stat that is not at slot 0 was invisible before (`Set` 155, `SpellLineStatModifier` 149,
+`SpellStatModifier` 123). Nine rows also changed KIND: the `Yuggoth Rising` records that read as "kinds"
+`1000, 2000 … 9000` were an unregistered element being read positionally, and are `Modify` with the same amounts.
+
+⚠️ **A second bug the same fix exposed.** The delete was scoped to the spells that still HAVE effects, so a spell
+whose list became empty kept its old rows for ever — a change that REMOVES bad data would have left it in place.
+It is scoped to every record PARSED now, which is the same lesson `RdbFeatImporter`'s effect sync carries.
+[V3: SpellPoolEffectTests.EveryStoredRowsKind_ActuallyCarriesAStat]
 
 ### A spell can CRIT, and the client's own catalog says which and how hard (#633)
 
