@@ -416,6 +416,45 @@ namespace Faolan.Tests
 			Assert.True(talk >= 700, $"only {talk} catalog-only goals are typed TalkToNpc; the sentence rules type 762.");
 		}
 
+		// A goal that ASKS FOR N states N in its own objective sentence, and it must be stored (#704).
+		//
+		// `RequiredCount` otherwise comes only from the wire goal record, so a goal no capture has shown sits at 0 -
+		// and the runtime reads 0 as ONE (`Math.Max(RequiredCount, 1)`). 58 shipped goals were in that state, 28 asking
+		// for more than one: *"Hand in 20 Yew"* completed on the first log, silently, with the journal showing 1/1.
+		//
+		// The client's quest catalog is the ONLY source for these counts, so a regression here restores a bug nothing
+		// else can see - the quest looks finished because as far as the server knows it is.
+		[Fact]
+		public async Task GoalsThatStateAnAmount_CarryIt()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var named = await db
+				.QuestGoalDefinitions.Where(g => g.Name != null && g.Name != "")
+				.Select(g => new { g.GoalId, g.RequiredCount, g.Separator, Name = g.Name! })
+				.ToListAsync(ct);
+
+			var missing = named
+				.Where(g => QuestObjectiveText.StatedCount(g.Name) is { } n && n > 1 && g.RequiredCount < n)
+				.Select(g => $"goal {g.GoalId} '{g.Name}' asks for {QuestObjectiveText.StatedCount(g.Name)} but stores {g.RequiredCount}")
+				.ToList();
+
+			Assert.True(missing.Count == 0,
+				$"goals whose objective states an amount larger than their RequiredCount - they complete early: {string.Join(", ", missing)}");
+
+			// ...and the rule ran. 28 of the 58 ask for more than one.
+			var counted = named.Count(g => QuestObjectiveText.StatedCount(g.Name) is > 1 && g.RequiredCount > 1);
+			Assert.True(counted >= 28, $"only {counted} goals carry a stated amount above 1; the catalog states 28.");
+
+			// ⚠️ And the two the WIRE also carries must still match it - `RequiredCount` is written back out in the
+			// byte-exact @609 region, so a sentence-read value overwriting a captured one is a golden-test break
+			// waiting to happen. The rule is scoped to catalog-only goals precisely to make that impossible.
+			foreach (var wire in named.Where(g => g.Separator != null && QuestObjectiveText.StatedCount(g.Name) is not null))
+				Assert.True(QuestObjectiveText.StatedCount(wire.Name) == wire.RequiredCount,
+					$"goal {wire.GoalId} '{wire.Name}': the sentence says {QuestObjectiveText.StatedCount(wire.Name)}, the capture says {wire.RequiredCount}.");
+		}
+
 		// A goal's own SENTENCE outranks its map marker (#522).
 		//
 		// The marker is the weakest evidence a goal carries, and `TypeLocationGoalsFromTrailingCategory` was reading it

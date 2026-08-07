@@ -1,3 +1,4 @@
+using System;
 using System.Text.RegularExpressions;
 
 namespace Faolan.Importer.Rdb
@@ -117,6 +118,34 @@ namespace Faolan.Importer.Rdb
 		}
 
 		private static readonly Regex LeadingArticle = new(@"^(?:the|a|an|some)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// The AMOUNT an objective asks for, stated right after its verb: "Hand in 20 Yew", "Collect ten Frost Serpent
+		// Skins", "Deliver 3 stone bricks to Turach". Null when the sentence states none.
+		//
+		// This is the one thing the catalog says that NOTHING else records. `RequiredCount` otherwise comes only from
+		// the wire goal record, so a goal no capture has shown sits at 0 - which the runtime reads as 1
+		// (`Math.Max(RequiredCount, 1)`), and "collect twenty" completes on the first one. 58 shipped goals were in
+		// exactly that state.
+		//
+		// Both spellings, because the client uses both: a numeral, or the words one..ten.
+		private static readonly Regex CountedObjective = new(
+			@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring|Get|Collect|Gather|Obtain|Recover|Kill|Slay|Destroy)\s+"
+			+ @"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		private static readonly string[] NumberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+		public static uint? StatedCount(string? objective)
+		{
+			if (objective is not { Length: > 0 } || CountedObjective.Match(objective) is not { Success: true } m)
+				return null;
+
+			var word = m.Groups[1].Value;
+			if (uint.TryParse(word, out var n))
+				return n > 0 ? n : null;
+
+			var index = Array.FindIndex(NumberWords, w => string.Equals(w, word, StringComparison.OrdinalIgnoreCase));
+			return index > 0 ? (uint)index : null;
+		}
 
 		// Whether the objective sentence names a verb that a MAP MARKER cannot stand in for (#522).
 		//

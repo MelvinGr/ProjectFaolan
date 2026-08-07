@@ -165,6 +165,20 @@ names the item is left alone: the reference is direct evidence where the sentenc
 
 `SeedContentTests.DeliveryObjectives_AreOnlyTypedWhenTheHandInCanBeGated` holds the line.
 
+### The catalog is the ONLY source for a goal's required AMOUNT
+
+⚠️ `RequiredCount` otherwise comes only from the wire goal record, so a goal no capture has shown sits at **0** —
+and the runtime reads 0 as **one** (`Math.Max(RequiredCount, 1)`). **58** shipped goals were in that state, 28 of
+them asking for more than one: *"Hand in 20 Yew"* completed on the first log, silently, with the journal showing
+1/1. The sentence states it, in numerals or the words *one*..*ten*, and `QuestObjectiveText.StatedCount` reads it.
+
+⚠️ Scoped to **catalog-only** goals (`Separator` null) plus `RequiredCount == 0`, and that guard is what makes
+writing a wire field safe: `RequiredCount` is written straight back out in the byte-exact @609 objective region.
+Measured — none of the 58 rides the login snapshot, and none belongs to a quest with *any* wire goal, so no region
+we build can contain one. The two goals the wire *does* carry (3495 *"Get 3 stone bricks"*, 3497 *"Deliver 3 stone
+bricks to Turach"*) both say 3 and were both captured as 3, which is what makes the reading credible; the guard is
+what makes it safe. `SeedContentTests.GoalsThatStateAnAmount_CarryIt` checks both halves.
+
 ### Wiring rules run in order of EVIDENCE STRENGTH
 
 Every wiring step is bootstrap-only, so **whoever types a goal first wins and the rest skip it**. That makes the

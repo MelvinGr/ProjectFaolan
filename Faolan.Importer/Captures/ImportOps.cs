@@ -1543,6 +1543,8 @@ namespace Faolan.Importer.Captures
 			await TypeItemGoalsFromTrailingCategory(db); // first of the rules: it also CORRECTS rows an older version mistyped
 			await TypeTalkGoalsFromCatalogName(db);
 			await TypeHandInGoalsFromCatalogName(db);
+			// Orthogonal to the typing rules - it fills a COUNT, not a trigger - so it is not IsWired-guarded.
+			await SetGoalCountsFromCatalogName(db);
 			await TypeKillGoalsFromKind(db);
 			await TypeInvestigateGoalsAsReach(db);
 			await TypeLocationGoalsFromTrailingCategory(db);
@@ -1748,6 +1750,46 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Typed {typed} talk goal(s) from the client's own plaintext objective name ({withoutNpc} naming an NPC we do not "
 			                  + $"hold yet, {withoutDialogue} held but with no captured dialogue, so inert either way); {reconciled} short name(s) "
 			                  + $"reconciled to the catalog spelling, {gated} precondition(s) recorded, {noName} naming a role rather than a name (#704).");
+		}
+
+		// The AMOUNT an objective asks for, read from its own sentence (#704). "Hand in 20 Yew", "Collect ten Frost
+		// Serpent Skins".
+		//
+		// This is the one thing the client's quest catalog states that NOTHING else records. `RequiredCount` otherwise
+		// comes only from the wire goal record, so a goal no capture has shown sits at 0 - and the runtime reads 0 as
+		// ONE (`Math.Max(RequiredCount, 1)` in AllGoalsComplete and CanHandIn). 58 shipped goals were in exactly that
+		// state, 28 of them asking for more than one: "Hand in 20 Yew" completed on the first log.
+		//
+		// ⚠️ CATALOG-ONLY GOALS, and that guard is what makes writing a wire field safe. `RequiredCount` is written
+		// straight back out in the byte-exact @609 objective region, so overwriting a captured one would break the
+		// golden tests. A goal with `Separator` null was never on the wire: measured, none of the 58 rides the login
+		// snapshot and none belongs to a quest with ANY wire goal, so no region we build can contain one. Paired with
+		// `RequiredCount == 0` (never harvested, never hand-set), this cannot touch a value anyone has established.
+		//
+		// The sentence AGREES with the wire wherever both exist - goals 3495 "Get 3 stone bricks" and 3497 "Deliver 3
+		// stone bricks to Turach" both say 3 and both were captured as 3. Two samples is thin, so the guard above is
+		// what carries the safety; the agreement is only what makes the reading credible.
+		private static async Task SetGoalCountsFromCatalogName(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Separator == null && g.RequiredCount == 0 && g.Name != null && g.Name != "").ToListAsync();
+
+			int set = 0, plural = 0;
+			foreach (var goal in goals)
+			{
+				if (QuestObjectiveText.StatedCount(goal.Name) is not { } count)
+					continue;
+
+				goal.RequiredCount = count;
+				set++;
+				if (count > 1)
+					plural++;
+			}
+
+			if (set > 0)
+				await db.SaveChangesAsync();
+
+			Console.WriteLine($"Read the required amount off {set} goal(s) own objective name ({plural} asking for more than one - they completed "
+			                  + "on the FIRST tick before, since an un-harvested count of 0 reads as 1) (#704).");
 		}
 
 		// A HAND-IN goal whose sentence names BOTH ends - the recipient and the goods - is a gateable delivery, so type
