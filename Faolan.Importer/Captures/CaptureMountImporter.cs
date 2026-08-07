@@ -33,6 +33,7 @@ namespace Faolan.Importer.Captures
 			// Every FA015807 spawn across the captures whose name is one of the wanted mounts; keep the first (most
 			// complete) per creature name.
 			var byName = new Dictionary<string, NpcSpawnEntry>();
+			var modes = new PerSpawnEventModes();
 			foreach (var capture in captures)
 			foreach (var e in NpcSpawnExtractor.Extract(capture))
 			{
@@ -41,6 +42,14 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				byName.TryAdd(key, e);
+
+				// #689: tally EVERY sighting, not just the representative kept above. The four per-spawn-event fields
+				// are corrected to the mode over all of them, and byName keeps only the first - so without this the
+				// representative's pose IS the type's pose, which is exactly the bug #688 fixed for placed NPCs and
+				// this path never got.
+				var seenBody = WorldObjectColumns.ExtractBody(e.Data);
+				if (seenBody != null && SpawnBodyReader.TryReadCharacterMessage(seenBody, out var seen))
+					modes.Observe(e.TemplateId, seen.Message);
 			}
 
 			if (byName.Count == 0)
@@ -81,6 +90,11 @@ namespace Faolan.Importer.Captures
 					}
 					type.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
 
+					// #689: the four per-spawn-event fields come from the MODE over every sighting, not from the one
+					// representative above. A summoned creature has no NpcSpawns placement, so nothing else ever
+					// revisits this row - the representative's pose would be permanent.
+					modes.Apply(e.TemplateId, type.StatCore);
+
 					type.Equipment.Clear();
 					foreach (var entry in read.Message.InventoryEntries)
 					{
@@ -114,6 +128,18 @@ namespace Faolan.Importer.Captures
 
 				seeded++;
 			}
+
+			// #689: the four per-spawn-event fields are corrected on EVERY type the sweep saw, not only the
+			// representatives lifted above. Same-named siblings (four Courtesans, two Cobras, two Chickens, two Bulls,
+			// two Drunk Pirates) are shadowed by the byName dedup and have no placement either, so nothing else in the
+			// importer ever revisits them - they kept their first lift's pose permanently.
+			var observedCores = await db.NpcTemplates
+				.Where(n => n.StatCore != null)
+				.Include(n => n.StatCore)
+				.ToDictionaryAsync(n => n.TemplateId, n => n.StatCore!);
+			var corrected = modes.CorrectObservedTypes(observedCores);
+			if (corrected > 0)
+				System.Console.WriteLine($"[mounts] corrected the per-spawn-event pose on {corrected} type(s) the byName dedup shadows (#689).");
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureMountImporter: lifted {Seeded} mount creature type(s) ({Names}).", seeded, string.Join(", ", byName.Keys));

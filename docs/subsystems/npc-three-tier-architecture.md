@@ -68,6 +68,42 @@ table:
 Constant-everywhere fields (`Side`, `MovementMultiplier`, `Mount*`, the `*Blend` flags, `SpawnAnimation`
 which is zeroed on every fresh spawn) are hardcoded in the builder rather than stored.
 
+## The four per-spawn-event fields, and who corrects them (#605/#688/#689)
+
+`MovementMode`, `npc_stats.SpawnAnimation`, `Stats.BccState` and `Bcc.AnimIdleId` are **rolled per spawn
+event**, not properties of the type. A type's core is lifted from ONE representative sighting, so whatever that
+NPC happened to be doing at capture time would become the type's definition of itself and be inherited by every
+placement. `PerSpawnEventModes` tallies each field over **all** of a type's sightings and keeps the **mode**.
+
+⚠️ Not a blanket reset to a resting value. 14 types are never captured in `BccState` 1 — the Door Warden
+(19619) is state 11 in all 15 of its sightings — so a type *can* rest somewhere other than the common value.
+
+⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
+companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are
+summoned, not placed — so every one of them kept its representative's pose permanently. That is why 42 stat
+cores had no spawn and none of them was ever revisited (#689). The tally is now shared and runs on all three
+paths.
+
+There is a second reason those rows froze, and it is worth knowing: the pet/mount importers keep **one
+representative per NAME**, and several creature names cover more than one template — **four** Courtesans, two
+Cobras, two Chickens, two Bulls, two Drunk Pirates. The siblings the dedup shadows are lifted by nothing and
+placed by nothing. `PerSpawnEventModes.CorrectObservedTypes` therefore corrects every template the sweep saw a
+sighting of, not only the ones a caller lifted — which is what moved Courtesan 11479 off `BccState` 50 (its own
+sightings are 1×10, 50×1) onto 1.
+
+**What an orphan core is, and why it stays.** Of the 42, **35 are summon targets** (pets, companions, minions —
+referenced by NAME from `SpellEffects.Template`), **one is an encounter boss** (Eerika of the Maidens, swapped
+in by #502), and **eight of the summon targets are also ambient-area members** (Sheep in 56 areas, Cobra 33,
+Chicken 18, Panther 15, Dog 9) spawned by area pools rather than placements. None of that is a dropped
+placement — they are entities the game never places, and deleting their cores would break pets and the Damsel
+encounter.
+
+**Residue: one row.** `Drunk Pirate` **7383** ships `BccState` 41 / idle 41297 where its same-named twin 9327
+sits on 1 / 42024 — and the current corpus has **no sighting of 7383 at all**, so no re-harvest can correct it.
+That is the ticket's title, for the right reason at last. `NpcStatCoreColumnsTests
+.BccStateAndIdleAnimation_AreNotAPoseTheTypeIsRarelyCaughtIn` now covers unplaced types too; it used to exclude
+anything without an `NpcSpawns` row, which is exactly what hid all of this.
+
 ## Feasibility (verified)
 
 Decoding all 1043 captured stat cores confirmed the lift can be byte-exact:

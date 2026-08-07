@@ -2317,45 +2317,15 @@ namespace Faolan.Importer.Captures
 			// 11 in all 15 of its sightings - so a type CAN rest somewhere other than 1, and flattening the column
 			// would trade one wrong pose for another. The mode is a measurement of that type's own sightings and
 			// keeps the Door Warden exactly where retail puts it.
-			var movementModes = new Dictionary<uint, Dictionary<uint, int>>();
-			var spawnAnimations = new Dictionary<uint, Dictionary<uint, int>>();
-			var bccStates = new Dictionary<uint, Dictionary<uint, int>>();
-			var idleAnimations = new Dictionary<uint, Dictionary<uint, int>>();
+			var modes = new PerSpawnEventModes();
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0)
 					continue;
 
 				var b = WorldObjectColumns.ExtractBody(e.Data);
-				if (b == null || !SpawnBodyReader.TryReadCharacterMessage(b, out var seen))
-					continue;
-
-				if (seen.Message.ShouldSerializeMovementMode())
-					Tally(movementModes, e.TemplateId, seen.Message.MovementMode);
-				if (seen.Message.npc_stats?.ShouldSerializeSpawnAnimation() == true)
-					Tally(spawnAnimations, e.TemplateId, seen.Message.npc_stats.SpawnAnimation);
-				if (seen.Message.Stats?.ShouldSerializeBccState() == true)
-					Tally(bccStates, e.TemplateId, seen.Message.Stats.BccState);
-				if (seen.Message.Bcc?.ShouldSerializeAnimIdleId() == true)
-					Tally(idleAnimations, e.TemplateId, seen.Message.Bcc.AnimIdleId);
-			}
-
-			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
-			{
-				var tally = into.TryGetValue(template, out var t) ? t : into[template] = [];
-				tally[value] = tally.GetValueOrDefault(value) + 1;
-			}
-
-			// Ties broken by the LOWER value so the lift is deterministic - a dictionary's enumeration order is not a
-			// tie-break, and a non-deterministic one would churn faolan.sql on every re-import for no semantic change.
-			var modalMovementMode = Modal(movementModes);
-			var modalSpawnAnimation = Modal(spawnAnimations);
-			var modalBccState = Modal(bccStates);
-			var modalIdleAnimation = Modal(idleAnimations);
-
-			static Dictionary<uint, uint> Modal(Dictionary<uint, Dictionary<uint, int>> tallies)
-			{
-				return tallies.ToDictionary(kv => kv.Key, kv => kv.Value.OrderByDescending(m => m.Value).ThenBy(m => m.Key).First().Key);
+				if (b != null && SpawnBodyReader.TryReadCharacterMessage(b, out var seen))
+					modes.Observe(e.TemplateId, seen.Message);
 			}
 
 			foreach (var e in entries)
@@ -2400,18 +2370,10 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// #605: these two are the fields the representative spawn must NOT decide on its own - both are rolled
-				// per spawn event, so overwrite whatever Lift took from the representative with the modal value over
-				// all of this type's sightings. Presence is preserved: a type that never sends the field keeps it
-				// null, which keeps it off the wire.
-				if (npc.StatCore?.MovementMode != null && modalMovementMode.TryGetValue(e.TemplateId, out var modalMove))
-					npc.StatCore.MovementMode = modalMove;
-				if (npc.StatCore?.SpawnAnimation != null && modalSpawnAnimation.TryGetValue(e.TemplateId, out var modalAnim))
-					npc.StatCore.SpawnAnimation = modalAnim;
-				if (npc.StatCore?.BccState != null && modalBccState.TryGetValue(e.TemplateId, out var modalState))
-					npc.StatCore.BccState = modalState;
-				if (npc.StatCore?.AnimIdleId != null && modalIdleAnimation.TryGetValue(e.TemplateId, out var modalIdle))
-					npc.StatCore.AnimIdleId = modalIdle;
+				// #605/#688: the fields the representative spawn must NOT decide on its own - all four are rolled per
+				// spawn event, so the mode over ALL of this type's sightings replaces whatever Lift took from the
+				// representative. See PerSpawnEventModes, which is shared with the pet/mount importers (#689).
+				modes.Apply(e.TemplateId, npc.StatCore);
 			}
 
 			await db.SaveChangesAsync();

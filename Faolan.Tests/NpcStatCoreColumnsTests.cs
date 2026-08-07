@@ -201,16 +201,19 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={TestPaths.FaolanDb};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			// Only types that actually PLACE, because only those reach a player - and because only those are within
-			// the importer's reach. The modal lift is computed over the spawn entries a run harvests, so a core with
-			// no spawn left (42 rows, e.g. the Courtesan, whose 11 sightings say state 1 while its orphaned row still
-			// says 50) is never revisited and keeps whatever it was first given. Those rows are a separate defect -
-			// Gitea #689 - and asserting them here would report that one under this one's name.
+			// EVERY core with one of the two fields, placed or not (#689). This used to exclude types with no
+			// `NpcSpawns` row, on the reading that they were beyond the importer's reach - 42 rows, the Courtesan
+			// among them. That reading was wrong twice over: those rows are overwhelmingly SUMMON targets (pets,
+			// companions, minions) and encounter bosses, which are never placed BY DESIGN rather than by a dropped
+			// placement; and they were only unreachable because the modal correction lived inline in the placed-NPC
+			// path, so the pet/mount importers never ran it. They do now, so the exclusion would hide a live gate.
+			//
+			// A template the CORPUS has no sighting of is still skipped, but by the `TryGetValue` below rather than by
+			// a proxy - that is the honest condition, and it is a much smaller set.
 			cmd.CommandText =
 				"""
 				SELECT c.NpcTemplateId, c.BccState, c.AnimIdleId FROM NpcStatCores c
-				WHERE (c.BccState IS NOT NULL OR c.AnimIdleId IS NOT NULL)
-				  AND EXISTS (SELECT 1 FROM NpcSpawns s WHERE s.NpcTemplateId = c.NpcTemplateId)
+				WHERE c.BccState IS NOT NULL OR c.AnimIdleId IS NOT NULL
 				""";
 			using var reader = cmd.ExecuteReader();
 
