@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -78,6 +79,13 @@ namespace Faolan.Web.Content
 			long hits = 0, misses = 0, bytes = 0;
 			var inflight = new ConcurrentDictionary<string, SemaphoreSlim>();
 
+			// How many blobs the store already holds, per upstream tag. Walked ONCE here (a fully mirrored store is
+			// ~100k files, so /_stats must not re-walk it per request) and then kept live by the store path below -
+			// every miss that lands a new file increments its tag.
+			var files = new ConcurrentDictionary<string, long>(StringComparer.Ordinal);
+			foreach (var tag in Upstreams.Keys)
+				files[tag] = CountStored(Path.Combine(storeDir, tag, "upm"));
+
 			app.MapGet("/{tag}/upm/{**rest}", async (string tag, string rest, HttpContext ctx, IHttpClientFactory http) =>
 			{
 				if (!Upstreams.TryGetValue(tag, out var upstreamBase))
@@ -130,9 +138,12 @@ namespace Faolan.Web.Content
 					if (query.Length == 0) // never cache query responses (manifest probes etc.)
 					{
 						Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+						var isNew = !File.Exists(localPath);
 						var tmp = localPath + ".tmp" + Environment.CurrentManagedThreadId;
 						await File.WriteAllBytesAsync(tmp, body);
 						File.Move(tmp, localPath, true);
+						if (isNew)
+							files.AddOrUpdate(tag, 1, (_, n) => n + 1);
 					}
 
 					var m = Interlocked.Increment(ref misses);
@@ -149,20 +160,36 @@ namespace Faolan.Web.Content
 				}
 			});
 
+			// `stored`/`mb` count what THIS run fetched; `files` is the whole store, startup scan included.
 			app.MapGet("/_stats", () => Results.Ok(new
 			{
 				hits = Interlocked.Read(ref hits),
 				stored = Interlocked.Read(ref misses),
 				mb = Interlocked.Read(ref bytes) / 1024f / 1024f,
-				storeDir
+				storeDir,
+				files = files.Values.Sum(),
+				filesByTag = new SortedDictionary<string, long>(files, StringComparer.Ordinal)
 			}));
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Global.StartupBanner));
 
-			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} patch-addr={PatchAddr}", ip, port, storeDir,
+			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} ({Files} files: {ByTag}) patch-addr={PatchAddr}",
+				ip, port, storeDir, files.Values.Sum(), string.Join(", ", files.OrderBy(f => f.Key, StringComparer.Ordinal).Select(f => $"{f.Key}={f.Value}")),
 				publicAddress is { Length: > 0 } ? PublicBase(publicAddress, default, "http", port) : "<per-request Host header>");
 			app.Run();
 			return 0;
+		}
+
+		// Blobs stored under store/<tag>/upm/<rest>. A `<name>.tmp<threadid>` is a write still in flight (or one a
+		// crash left behind), not a stored blob - a real name is the payload's md5, so it never carries ".tmp".
+		internal static long CountStored(string dir)
+		{
+			if (!Directory.Exists(dir))
+				return 0;
+
+			return Directory
+				.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+				.Count(path => !Path.GetFileName(path.AsSpan()).Contains(".tmp", StringComparison.Ordinal));
 		}
 
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
