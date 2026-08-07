@@ -9,6 +9,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
@@ -158,6 +159,32 @@ namespace Faolan.GameServer
 			// kind 53250 are the other half and ride the swings themselves, in SendNormalAttackResponse.
 			var comboDamageBonus = _simulation.PlayerWorldEntity(client)?.ComboBonus(swing.Combo.Id).SpellDamagePercentHundredths ?? 0;
 			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, comboDamageBonus);
+
+			// ⭐ And what the combo's own NAME says it does. `Guardian_20b_knockback_Shield_Sweep_II` is a knockback,
+			// and 25 player combos across six classes are - `Shield Sweep`, `Clobber`, `Ferocious Smack`, `Batter
+			// Aside`, `Stagger`, `Volley Backwards`. The name is the ONLY place that is stated: every one of those
+			// combos resolves to a spell with a zero duration and no stat effects, so the payload says nothing.
+			//
+			// `KnockbackService` existed with no gameplay trigger at all - a GM command was its only caller.
+			await ApplyComboKnockback(client, swing, targetHandle);
+		}
+
+		// Shoves the victim away from the caster when the landing combo is a knockback (ComboEffect). Silent for a
+		// combo that is not one, for a victim that is not in the caster's zone, and for a shove the victim resists
+		// outright - all three are the service's own no-ops rather than conditions worth logging per swing.
+		private async Task ApplyComboKnockback(INetworkClient client, ComboSwing swing, uint targetHandle)
+		{
+			if (!ComboEffect.IsKnockback(swing.Combo.Name))
+				return;
+
+			if (_simulation.PlayerWorldEntity(client) is not { } caster)
+				return;
+
+			if (_simulation.World.ZoneForEntity(caster) is not { } zone || !zone.TryGet(targetHandle, out var victim))
+				return;
+
+			if (await _knockback.Knock(victim, caster.Position))
+				Logger.LogInformation("Combo '{Combo}' knocked {Victim} back.", swing.Combo.Name, victim.Name);
 		}
 	}
 }

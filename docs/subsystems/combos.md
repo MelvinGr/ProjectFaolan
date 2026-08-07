@@ -348,6 +348,39 @@ ranks are ever held at once to need a shared timer. `Combo.ParentId` chains the 
 Gated by `ComboServiceTests` (the runtime) and `ComboWireTests` (the wire claims, against the captured swings in
 the `combo-swings.bin` fixture).
 
+### ⭐ A combo's NAME states what it does
+
+The client's combo catalog names a player combo `<Class>_<level>[_<expansion>]_<category>_<Name>`, and the
+category token is a small closed vocabulary across the 675 player combos:
+
+| token | combos | | token | combos |
+| --- | ---: | --- | --- | ---: |
+| `knockback` | **30** | | `snare` | 13 |
+| `multihit` | 41 | | `manaburn` | 7 |
+| `dot` | 26 | | `armorbreak` | 7 |
+| `damagedetaunt` | 26 | | `stun` | 6 |
+| `damagetaunt` | 18 | | the taunt/detaunt and debuff families | … |
+
+**It is the only place the effect family is stated.** A combo's own spell says nothing about it: every stagger
+combo resolves to a `Stagger I..V` / `Staggering Blow I..IV` record with a **zero duration and no stat effects**.
+So `Halberdier_15_knockback_Stagger_I` knocking back is a fact recorded in the name and nowhere else.
+
+⚠️ **Match the token, not a slot.** The Khitai combos carry an expansion token that pushes the category one
+position along (`Barbarian_80_khitai_knockback_Clobber_V`), and only 422 of the 675 player names match the plain
+four-token shape at all — the weapon specials (`2h_Sword_Wheel_of_Death`, `Oar_Special`) are a different grammar.
+Reading `parts[2]` finds **25** knockbacks instead of 30, and the five it drops are the **rank-V top ability** of
+five of the six ladders. That is a measurement I got wrong before the gate caught it.
+[V3: ComboEffectTests.TheShippedCatalog_CarriesTheKnockbackCombos]
+
+**Wired today: `knockback`.** The finisher of a knockback combo shoves its target away from the caster through
+`KnockbackService`, whose only caller before this was a GM command — the mechanism existed with no gameplay
+trigger. Six classes' ladders do it: `Shield Sweep` (Guardian), `Clobber` (Barbarian), `Ferocious Smack` (Bear
+Shaman), `Batter Aside` (Conqueror), `Stagger` (Halberdier), `Volley Backwards` (Ranger). The victim's
+`KnockbackResistance` is consulted, which is what a resisting buff now moves (#699).
+
+The other categories are deliberately NOT listed in `ComboEffect`: a token there is a claim that something happens
+when the combo lands, and naming one we do not act on would read as implemented.
+
 ### What a player's FEATS do to their combos
 
 Two GameAction kinds in the feat catalog name a combo, and they are not the same statement — see
