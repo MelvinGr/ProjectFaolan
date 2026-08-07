@@ -4,15 +4,17 @@
 name source than LDB category 615: the LDB names none of the `1000000+` range at all, and most of the `0x545..0x593`
 run is unnamed there too, while this table names both.
 
-Data: [`aoc-client-stat-names.tsv`](aoc-client-stat-names.tsv) — 747 ids, `statId <tab> hex <tab> clientName`.
-630 of them are now members of `CharacterStatId`; the rest are ids the enum already carried, which keep the names
-whatever decoded them first rather than being renamed out from under their callers. One id is deliberately absent:
-the client uses `Deaths` for **both** `0x292` (which the enum already has) and `0x542`.
+Data: [`aoc-client-stat-names.tsv`](aoc-client-stat-names.tsv) — **1,511** ids,
+`statId <tab> hex <tab> clientName`. 1,234 of them are members of `CharacterStatId`; the rest are ids the enum
+already carried, which keep the names whatever decoded them first rather than being renamed out from under their
+callers. One id is deliberately absent: `0x542`, whose client name is `Deaths` — a name this enum already uses for
+`0x292` (from LDB 615, where the client's own table calls that one `PvPTotalDeaths`). That is a genuine two-source
+disagreement, not a duplicate name in the client.
 
 Regenerate with:
 
 ```zsh
-FROM=01d00000 TO=01e60000 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
+FROM=01d00000 TO=01e80000 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
   -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpStatNameTable.java
 ```
 
@@ -58,11 +60,50 @@ behind the yellow sprint/spellweave bar. See [`../subsystems/combos.md`](../subs
 
 **`1000070` `DailyPvPKills`** and `1000069` `DailyPvEKills`, the counters paired with `ChainKillIIR_t`.
 
-⚠️ The sweep is by code shape, not by table bounds, so a `PUSH <string>` followed by a `MOV [global],<imm>` anywhere
-in the swept range can produce a false pair. Ids **below 768** were dominated by such pairs (an audio-preset init
-gave `8` "Cave", `11` "Carpeted Hallway", `2` "LoadingMusic") and are excluded from the TSV; every retained name is a
-plain identifier. The retained rows have not been individually verified beyond the spot checks above — treat a name
-as strong evidence, not as a citation, until the id is used.
+## The sub-768 half, and how it stopped being noise
+
+The first sweep kept a pair when the STORED VALUE looked like a plausible stat id — a guess about the data rather
+than a bound on the table. Below 768 the false pairs dominated it (a nearby audio-preset init stores `8` "Cave",
+`11` "Carpeted Hallway", `2` "LoadingMusic" in exactly this shape), so the whole range was thrown away and the TSV
+stopped at 768.
+
+**The fix is to key on the descriptor SLOT** — the address the id is written TO. The descriptors live in two
+contiguous global regions and the id sits at a fixed offset inside each 0xA0-byte record:
+
+| region | what it holds | id at `slot % 0xA0` |
+| --- | --- | --- |
+| `0x0298F000..0x029CC000` | the main table | `0x00`, `0x20`, `0x40`, `0x60` (1,361 of them) or `0x80` |
+| `0x021B8000..0x021BC000` | the `1000000+` table | `0x98` |
+
+That is a statement about the table, so it does not care what the value looks like, and it comes with its own
+check: a descriptor writes its id exactly ONCE, so a correct filter yields **no duplicate ids**. It yields 1,511
+rows and 1,511 distinct ids. What the offset set EXCLUDES is the point — `0x44` and `0x64` are two neighbouring
+fields a descriptor also writes, and they are where the head-of-region artifacts live (four descriptors whose kind
+word is 8, which would otherwise claim id 8 from `TimeExist`).
+
+⚠️ **CONSUME and EMIT have to be different tests**, and getting that wrong loses rows in both directions. The
+pending name is consumed by the first store into the TABLE carrying a non-zero value — not by every store (which
+pairs a name with a kind word, losing `GameAction_LocalizerType` and seven others) and not only by an id-slot store
+(which lets a name run past its own descriptor into the next one's id, mislabelling `3 AttackSpeed` as
+`VolumeMass`).
+
+**It is a strict widening, not a re-reading.** All 747 names the id-filtered sweep found are reproduced with **zero
+disagreements**; 764 ids are added, 762 of them below 768.
+
+The retained rows have not been individually verified beyond the spot checks above — treat a name as strong
+evidence, not as a citation, until the id is used.
+
+### What the sub-768 half named
+
+- **`0x069` `NextPowersessionReset` / `0x06A` `PowerSessionRemaining`.** The second was in the enum as
+  `LastKillNumber`, "a per-kill sequence number, semantics unknown", and it is in the captured snapshot at `0x14`
+  — a full session of 20. That reframes Gitea #656: the live observation of stat 106 counting 20/19/18 DOWN while
+  `DailyPvPKills` counts 0/1/2 UP is a **power session being spent by kills**, not a second kill counter.
+- **`0x292` is `PvPTotalDeaths`, not `Deaths`**, sitting in a coherent run — `656 PvPTotalKills`,
+  `657 PvPFinishingBlows`, `658 PvPTotalDeaths`, `659 PvPMatchesWon`, `660 PvPMatchesLost`. So the client does NOT
+  use `Deaths` twice, and the belief that it did was the old sweep mispairing `0x542`'s name onto a neighbour.
+- The engine's Anarchy-Online lineage shows through the low ids — `4 Breed`, `13 MagicBurden`, `17
+  MemorizationSlot` — which is itself a check on the range: those are names nothing in this codebase would invent.
 
 ## ⚠️ A name is not a consumer: `ChosenGod` (`0x0A9`) is stored and never read
 

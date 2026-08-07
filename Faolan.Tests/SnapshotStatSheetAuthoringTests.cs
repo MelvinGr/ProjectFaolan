@@ -27,7 +27,11 @@ namespace Faolan.Tests
 			// the gate below rejects them if listed. (MurderPoints used to be in that group; it is now AUTHORED from
 			// Character.MurderPoints - #503 - since the criminal system needs it to move.)
 			[CharacterStatId.Played] = "play time not tracked",
-			[CharacterStatId.LastKillNumber] = "a per-kill sequence number, semantics unknown",
+			// #625: the client's own table calls 0x06A `PowerSessionRemaining` and 0x069 `NextPowersessionReset`, which
+			// retires the "per-kill sequence number, semantics unknown" reading. The captured snapshot's 0x14 is a
+			// FULL power session (20), and the live observation behind #656 - it counting 20/19/18 down while
+			// `DailyPvPKills` counts 0/1/2 up - is a session being spent by kills. Still not tracked.
+			[CharacterStatId.PowerSessionRemaining] = "the power session is not modelled",
 			[CharacterStatId.PreviousHealth] = "derived from combat history we do not keep",
 			[CharacterStatId.DeathEffectXp] = "death-penalty XP not tracked",
 			[CharacterStatId.PvpExp] = "PvP progression not tracked",
