@@ -15,7 +15,7 @@ namespace Faolan.ClientLauncher
 	// `--username`, ... no longer read a value past the end of argv and crash with an IndexOutOfRangeException.
 	//
 	// Two kinds of option live here, as everywhere else in the repo:
-	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey, Login:RetailPublicKey) name a setting that also lives in
+	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey) name a setting that also lives in
 	//     faolan.json and the environment, so the option's NAME is the configuration path and its value is resolved
 	//     through the shared builder (FaolanCommandLine) - the launcher patches the key the server is holding
 	//     without a second setting to keep in step.
@@ -59,7 +59,7 @@ namespace Faolan.ClientLauncher
 		// see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the normal path is
 		// that the launcher reads the same faolan.json the server does, so a configured Login:PrivateKey automatically
 		// patches its own matching public key and the pair cannot drift.
-		private static readonly Option<string>[] LoginKeys = FaolanSettings.Options("Login:PrivateKey", "Login:PublicKey", "Login:RetailPublicKey");
+		private static readonly Option<string>[] LoginKeys = FaolanSettings.Options("Login:PrivateKey", "Login:PublicKey");
 
 		private static readonly Option<bool> PatchLogin = new("--patch-login")
 		{

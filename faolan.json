@@ -33,12 +33,10 @@
 	"ClientVersion": "v5.01.0@602248",
 
 	"Login": {
-		// The login DH private key (default: the built-in key). Patch clients with the matching public key - Faolan.ClientLauncher --patch-login.
+		// The login DH private key (default: the built-in one, which is public - generate your own with --generate-login-key). Patch clients with the matching public key: Faolan.ClientLauncher --patch-login.
 		//"PrivateKey": ""
 		// Patch THIS public key into the exe instead of our derived one - for a client that should talk to somebody else's server.
 		//"PublicKey": ""
-		// The key to search for in an unpatched exe (default: retail's).
-		//"RetailPublicKey": ""
 		// Let a client whose login block we cannot decrypt in on its account NAME alone. False requires a patched client, so the password is actually checked.
 		"AllowUnpatchedClients": true
 	},

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -26,15 +27,15 @@ namespace Faolan.ClientLauncher
 		// null-terminated in a fixed 73-byte region (offset 0x1C4D4C0). See memory client_launcher_notes_url.
 		private static readonly byte[] OriginalNotesUrl = "http://msgs.ageofconan.com/launchernotes2.php?UniverseName=%s&Language=%s"u8.ToArray();
 
-		// The key the exe ships with - what we search for and replace. In DhKeys (settable as Login:RetailPublicKey),
-		// so the launcher and any other consumer agree on what "unpatched" looks like.
-		private static byte[] OriginalPublicKey => Encoding.ASCII.GetBytes(DhKeys.RetailPublicHex);
+		// The DH prime, as the exe stores it. NOT a patch target - it is the one OTHER 256-char hex string in the
+		// file, and the key slot is found by excluding it.
+		private static byte[] Prime => Encoding.ASCII.GetBytes(DhKeys.PrimeHex);
 
 		public enum Result
 		{
-			Patched, // the exe carried the Funcom (or Cellao, for Restore) key and was rewritten
+			Patched, // the key slot held some other key and was rewritten
 			AlreadyDone, // the target key is already in place - nothing to do
-			NotFound // neither key found - wrong/incompatible exe
+			NotFound // no key slot in this file - wrong/incompatible exe
 		}
 
 		// Redirect the launcher-notes URL to `newUrl` (retail's msgs.ageofconan.com host is dead, so the login screen
@@ -67,27 +68,64 @@ namespace Faolan.ClientLauncher
 			return Result.Patched;
 		}
 
+		// Writes `newBytes` into every DH public-key slot in the exe.
+		//
+		// ⚠️ The slot is found by SHAPE, not by the value retail ships. Searching for retail's key meant an exe could be
+		// patched exactly once: after that it carries OUR key, so a second patch - which is what rotating the server
+		// key needs (`--generate-login-key`) - found nothing and reported NotFound. You had to --restore from the .bak
+		// first, and nothing said so.
+		//
+		// The shape is exact and was read off the file: a NUL-delimited run of exactly 256 ASCII hex characters. There
+		// are precisely two such runs in AgeOfConan.exe (and in AgeOfConanDX10.exe) - the public key at 0x01bf6c18 and
+		// the DH prime 0x108 bytes after it - so "the 256-hex string that is not the prime" names the key slot whatever
+		// value is currently in it. Excluding the prime is the part that matters: it is the same width and the same
+		// alphabet, and overwriting it would break the handshake for every client, patched or not.
 		public static Result PatchPublicKey(string exePath, byte[] newBytes)
 		{
 			var bytes = File.ReadAllBytes(exePath);
+			var slots = PublicKeySlots(bytes);
+			if (slots.Count == 0)
+				return Result.NotFound;
 
-			var original = OriginalPublicKey;
-			var replaced = 0;
-			for (var i = IndexOf(bytes, original, 0); i >= 0; i = IndexOf(bytes, original, i + original.Length))
+			if (slots.All(at => bytes.AsSpan(at, newBytes.Length).SequenceEqual(newBytes)))
+				return Result.AlreadyDone;
+
+			foreach (var at in slots)
+				newBytes.CopyTo(bytes, at);
+
+			File.WriteAllBytes(exePath, bytes);
+
+			return Result.Patched;
+		}
+
+		// Every offset holding a DH public key: a maximal run of exactly PublicHexLength ASCII hex characters, NUL on
+		// both sides, that is not the prime.
+		private static List<int> PublicKeySlots(byte[] bytes)
+		{
+			var slots = new List<int>();
+			var prime = Prime;
+			for (var i = 0; i < bytes.Length; i++)
 			{
-				newBytes.CopyTo(bytes, i);
-				replaced++;
+				if (!IsHex(bytes[i]))
+					continue;
+
+				var start = i;
+				while (i < bytes.Length && IsHex(bytes[i]))
+					i++;
+
+				if (i - start != DhKeys.PublicHexLength || start == 0 || bytes[start - 1] != 0 || i >= bytes.Length || bytes[i] != 0)
+					continue;
+
+				if (!bytes.AsSpan(start, prime.Length).SequenceEqual(prime))
+					slots.Add(start);
 			}
 
-			if (replaced > 0)
-			{
-				File.WriteAllBytes(exePath, bytes);
-				return Result.Patched;
-			}
+			return slots;
+		}
 
-			return IndexOf(bytes, newBytes, 0) >= 0
-				? Result.AlreadyDone
-				: Result.NotFound;
+		private static bool IsHex(byte b)
+		{
+			return b is >= (byte)'0' and <= (byte)'9' or >= (byte)'a' and <= (byte)'f' or >= (byte)'A' and <= (byte)'F';
 		}
 
 		// A launcher-notes replacement is valid when it matches the client's fixed format contract: http:// only (the

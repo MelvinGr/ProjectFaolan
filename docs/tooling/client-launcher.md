@@ -76,7 +76,6 @@ Faolan.ClientLauncher [options]
   --Login:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
   --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
                       talk to somebody else's server
-  --Login:RetailPublicKey <hex>  the key to search for in an unpatched exe (default: retail's)
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their
                       .bak, then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
@@ -131,8 +130,13 @@ By default any password is accepted. To enforce the real password, the client mu
   connects, so flip it only once your clients are patched.
 - **The launcher reads the same `faolan.json` (and the same environment) the server does**, so a deployment that
   overrides `Login:PrivateKey` gets the matching public key patched in by derivation — there is no second setting
-  to keep in step. `Login:PublicKey` / `Login:RetailPublicKey` cover the two cases where the launcher's key is not
-  ours; see [01-crypto.md](../protocol/01-crypto.md#configuring-the-keypair).
+  to keep in step. `Login:PublicKey` covers the one case where the launcher's key is not ours;
+  see [01-crypto.md](../protocol/01-crypto.md#configuring-the-keypair).
+- **The key SLOT is found by shape, not by retail's value**, so an exe that is already patched can be patched
+  again — which is what rotating the server key needs. The slot is the NUL-delimited run of exactly 256 ASCII hex
+  characters that is not the DH prime; the real exe holds exactly two such runs, the key at `0x01bf6c18` and the
+  prime `0x108` bytes after it. The prime is never written.
+  [V3: ClientExePatcherTests.ItRePatchesAnAlreadyPatchedExe]
 
 ---
 

@@ -54,6 +54,7 @@ namespace Faolan.Tests
 
 			// The two that are OPTIONAL rather than defaulted, and stay null on purpose - one names a game install,
 			// the other a deployment's public address (#552). Their readers handle the null; nothing else may.
+			// (Login:PublicKey is the third, and DhKeys rather than an accessor here reads it.)
 			Assert.Null(config.RdbDir);
 			Assert.Null(config.CdnMirrorPublicAddress);
 			Assert.Equal("http://127.0.0.1:7081", config.CdnMirrorAddress); // ...derived from the mirror's own port
@@ -113,8 +114,15 @@ namespace Faolan.Tests
 
 				// Case-insensitive because a JSON `true` comes back through the reader as "True", which is the same
 				// value to every parser that reads it - the catalog spells it lower-case because JSON does.
+				//
+				// A Hidden setting reads back as null on purpose: its default applies (it is in the defaults layer)
+				// but is not WRITTEN here, because it is key material and a config file full of key literals invites
+				// someone to edit half of a pair. The optional ones are null for the plainer reason.
 				foreach (var setting in FaolanSettings.All)
-					Assert.Equal(setting.Default, config[setting.Key], StringComparer.OrdinalIgnoreCase); // ...null for the optional ones: commented out
+					Assert.Equal(setting.Hidden ? null : setting.Default, config[setting.Key], StringComparer.OrdinalIgnoreCase);
+
+				// ...and Hidden really does mean "applies anyway", or it would just be a missing default.
+				Assert.Equal(FaolanSettings.Get("Login:PrivateKey").Default, new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build()["Login:PrivateKey"]);
 			}
 			finally
 			{
@@ -122,8 +130,8 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The committed faolan.json is that generated file with a couple of values flipped for the dev run, so every
-		// key in it must be a catalog key. This is what catches a setting RENAMED in code and left behind in the
+		// The committed faolan.json IS that generated file (this checkout's own deviations live in the gitignored
+		// faolan.user.json), so every key in it must be a catalog key. This is what catches a setting RENAMED in code and left behind in the
 		// config: the stale key loads fine, is read by nobody, and the deployment silently runs on the default.
 		[Fact]
 		public void TheCommittedConfig_NamesOnlyCatalogKeys()

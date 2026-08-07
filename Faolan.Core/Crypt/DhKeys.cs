@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using System.Security.Cryptography;
+using Faolan.Core.Cli;
 
 namespace Faolan.Core.Crypt
 {
@@ -26,9 +27,10 @@ namespace Faolan.Core.Crypt
 	///         launcher reads the SAME key out of the SAME config, so re-patching is all that is needed.
 	///     </para>
 	///     <para>
-	///         Three settings, one per role: <c>Login:PrivateKey</c> is the server's, <c>Login:PublicKey</c> is what the
-	///         launcher patches in (defaulting to the derived half of the private one, so it never has to be set), and
-	///         <c>Login:RetailPublicKey</c> is the key the launcher searches for in an unpatched exe.
+	///         Two settings, one per role: <c>Login:PrivateKey</c> is the server's, and <c>Login:PublicKey</c> is what
+	///         the launcher patches in (defaulting to the derived half of the private one, so it never has to be set).
+	///         There is no setting for the key the launcher searches FOR - it finds the slot by shape, so it can
+	///         re-patch a client it already patched (see <c>ClientExePatcher.PatchPublicKey</c>).
 	///     </para>
 	/// </remarks>
 	public static class DhKeys
@@ -39,17 +41,16 @@ namespace Faolan.Core.Crypt
 
 		public static readonly BigInteger G = 5;
 
-		private const string DefaultRetailPublicHex =
-			"9c32cc23d559ca90fc31be72df817d0e124769e809f936bc14360ff4bed758f260a0d596584eacbbc2b88bdd410416163e11dbf62173393fbc0c6fefb2d855f1a03dec8e9f105bbad91b3437d8eb73fe2f44159597aa4053cf788d2f9d7012fb8d7c4ce3876f7d6cd5d0c31754f4cd96166708641958de54a6def5657b9f2e92";
-
-		private const string DefaultPrivateHex = "7ad852c6494f664e8df21446285ecd6f400cf20e1d872ee96136d7744887424b";
+		// The built-in private key is a DEFAULT, and every default in this repo lives in one place - the settings
+		// catalog, which is also what --help and the generated faolan.json read. It used to be a `const` here, which
+		// made this class a second place a key could be written down and a `--help` line could disagree with.
+		private static string DefaultPrivateHex => FaolanSettings.Get("Login:PrivateKey").Default!;
 
 		/// <summary>The hex length the exe stores a DH public key at - a fixed 256-char ASCII field.</summary>
 		public const int PublicHexLength = 256;
 
 		private static BigInteger _private = ParseHex(DefaultPrivateHex);
 		private static string? _publicOverride;
-		private static string _retailPublic = DefaultRetailPublicHex;
 
 		/// <summary>Our DH private key. Server-side only; never patched into a client.</summary>
 		public static BigInteger ServerPrivate => _private;
@@ -76,32 +77,31 @@ namespace Faolan.Core.Crypt
 		public static string ClientPatchPublicHex => _publicOverride ?? ServerPublicHex;
 
 		/// <summary>
-		///     The key an unpatched client ships with - what the launcher searches for and replaces. Retail's by default;
-		///     <c>Login:RetailPublicKey</c> overrides it for a client build that ships a different one.
+		///     <see cref="N" /> as the exe stores it - the same 256-char hex field as a public key. Not a patch target:
+		///     the launcher finds the key slot by excluding this.
 		/// </summary>
-		public static string RetailPublicHex => _retailPublic;
-
-		/// <summary>Whether a private key other than the built-in default is in force.</summary>
-		public static bool IsConfigured { get; private set; }
+		public static string PrimeHex => ToPublicHex(N);
 
 		/// <summary>
-		///     Applies a private key from config. Null/empty keeps the built-in default and returns false, so the caller
-		///     can report WHICH key is in force rather than leaving it implicit.
+		///     Whether a private key other than the built-in default is in force - compared by VALUE, not by whether
+		///     the setting was present. The default now comes down the configuration stack like any other value, so
+		///     "was it set?" is always yes and would make every caller announce a configured key that isn't one.
+		/// </summary>
+		public static bool IsConfigured => _private != ParseHex(DefaultPrivateHex);
+
+		/// <summary>
+		///     Applies a private key from config. Null/empty keeps the built-in default; the return is
+		///     <see cref="IsConfigured" />, so the caller can report WHICH key is in force rather than leaving it
+		///     implicit - and passing the default explicitly reports the same as passing nothing, because it is the
+		///     same key.
 		/// </summary>
 		/// <exception cref="ArgumentException">Not parseable hex, or not a sane positive integer - fail loudly.</exception>
 		public static bool Configure(string? privateKeyHex)
 		{
 			var hex = privateKeyHex?.Trim();
-			if (string.IsNullOrEmpty(hex))
-			{
-				_private = ParseHex(DefaultPrivateHex);
-				IsConfigured = false;
-				return false;
-			}
+			_private = string.IsNullOrEmpty(hex) ? ParseHex(DefaultPrivateHex) : ParseExponent(hex, "Login:PrivateKey");
 
-			_private = ParseExponent(hex, "Login:PrivateKey");
-			IsConfigured = true;
-			return true;
+			return IsConfigured;
 		}
 
 		/// <summary>
@@ -127,18 +127,13 @@ namespace Faolan.Core.Crypt
 		}
 
 		/// <summary>
-		///     Applies the two LAUNCHER-side public keys from config: the one to patch IN (<c>Login:PublicKey</c>, default
-		///     = our derived public key) and the one to search FOR (<c>Login:RetailPublicKey</c>, default = the key retail
-		///     ships). Null/empty restores the default for either. Returns true if <c>Login:PublicKey</c> is overriding
-		///     the derived key, so the caller can say so - a client patched with someone else's key cannot log in here.
+		///     Applies the LAUNCHER-side public key from config (<c>Login:PublicKey</c>, default = our derived public
+		///     key). Null/empty restores the default. Returns true if it is overriding the derived key, so the caller
+		///     can say so - a client patched with someone else's key cannot log in here.
 		/// </summary>
 		/// <exception cref="ArgumentException">Not parseable hex, or out of range - fail loudly.</exception>
-		public static bool ConfigurePublic(string? publicKeyHex, string? retailPublicKeyHex = null)
+		public static bool ConfigurePublic(string? publicKeyHex)
 		{
-			_retailPublic = string.IsNullOrWhiteSpace(retailPublicKeyHex)
-				? DefaultRetailPublicHex
-				: ToPublicHex(ParseExponent(retailPublicKeyHex.Trim(), "Login:RetailPublicKey"));
-
 			var hex = publicKeyHex?.Trim();
 			_publicOverride = string.IsNullOrEmpty(hex)
 				? null

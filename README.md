@@ -388,7 +388,7 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | `ServerIpAddress` | the address the login tier advertises to clients (must be reachable from the client) |
 | `UniverseAgentPort` / `PlayerAgentPort` | login-tier listen ports (7010 is the fixed client entry point) |
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
-| `Login` `{ PrivateKey, PublicKey, RetailPublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
+| `Login` `{ PrivateKey, PublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
 | `CdnMirror` `{ Store, Ip, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + bind address; `PublicAddress` is the address written into the patch config it serves back (default: the request's `Host`) **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |

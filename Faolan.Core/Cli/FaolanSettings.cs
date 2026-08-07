@@ -43,18 +43,23 @@ namespace Faolan.Core.Cli
 		///     keypair, a deployment's public address). Everything else has one, so the server runs with no
 		///     configuration file at all.
 		/// </summary>
-		public sealed record Setting(string Key, string Description, string? Default = null);
+		/// <param name="Hidden">
+		///     The default APPLIES but is not written into the generated config file, nor spelled out in
+		///     <c>--help</c>. For the two key literals: a config file carrying key material invites someone to edit
+		///     half of a pair, and a 256-char hex line in a `--help` listing is noise. The description says what the
+		///     default is in words instead.
+		/// </param>
+		public sealed record Setting(string Key, string Description, string? Default = null, bool Hidden = false);
 
-		// ⚠️ Two settings that look like they want a default here and must NOT have one.
+		// ⚠️ `CdnMirror:PublicAddress` looks like it wants a default and must NOT have one: the mirror and its clients
+		// read "unset" differently and both readings are right - to the MIRROR it means "answer with the Host header
+		// the client just dialled" (#552), to a CLIENT of the mirror it means "the usual local one". A default here
+		// would erase the mirror's reading. The client's reading stays where it belongs, on
+		// `IConfigurationExtensions.CdnMirrorAddress`.
 		//
-		// `Login:PrivateKey` - its default is `DhKeys`' built-in key, and writing the hex here would be a SECOND copy
-		// of a keypair whose whole point is that there is one. `DhKeys.Configure(null)` keeps its own; that is why
-		// this entry is a null default rather than the hex.
-		//
-		// `CdnMirror:PublicAddress` - the mirror and its clients read "unset" differently and both readings are
-		// right: to the MIRROR it means "answer with the Host header the client just dialled" (#552); to a CLIENT of
-		// the mirror it means "the usual local one". A default here would erase the mirror's reading. The client's
-		// reading stays where it belongs, on `IConfigurationExtensions.CdnMirrorAddress`.
+		// ⚠️ The two Hidden key literals below are the built-in keypair's private half and the key retail's exe ships.
+		// They are DEFAULTS, so they live here with every other default rather than in `DhKeys`, which reads them from
+		// this list - one home, and no chance of `--help` naming a different key from the one the code uses.
 		public static readonly Setting[] All =
 		[
 			new("Database:Provider", "Sqlite or Postgres.", "Sqlite"),
@@ -67,9 +72,11 @@ namespace Faolan.Core.Cli
 			new("RdbDir", "The client's RDB folder. Part of the game INSTALL, so it has no default."),
 			new("ClientVersion", "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
 
-			new("Login:PrivateKey", "The login DH private key (default: the built-in key). Patch clients with the matching public key - Faolan.ClientLauncher --patch-login."),
+			// The historical CellAO key. NOT a secret - it is in this repo's history and in every client ever patched
+			// with it - which is exactly why a deployment that wants a real one runs `--generate-login-key`.
+			new("Login:PrivateKey", "The login DH private key (default: the built-in one, which is public - generate your own with --generate-login-key). Patch clients with the matching public key: Faolan.ClientLauncher --patch-login.",
+				"7ad852c6494f664e8df21446285ecd6f400cf20e1d872ee96136d7744887424b", true),
 			new("Login:PublicKey", "Patch THIS public key into the exe instead of our derived one - for a client that should talk to somebody else's server."),
-			new("Login:RetailPublicKey", "The key to search for in an unpatched exe (default: retail's)."),
 			new("Login:AllowUnpatchedClients",
 				"Let a client whose login block we cannot decrypt in on its account NAME alone. False requires a patched client, so the password is actually checked.", "true"),
 
@@ -123,9 +130,12 @@ namespace Faolan.Core.Cli
 			// The default is SHOWN, not applied by the parser: applying it here would make every option "passed" and
 			// so shadow faolan.json with the default, which is precisely the bug FaolanCommandLine.Overrides avoids by
 			// dropping options the user did not pass.
-			var description = setting.Default is { } value
-				? $"{setting.Description} (default: {value})"
-				: $"{setting.Description} (optional)";
+			var description = setting switch
+			{
+				{ Hidden: true } => setting.Description, // ...which says what its default is in words
+				{ Default: { } value } => $"{setting.Description} (default: {value})",
+				_ => $"{setting.Description} (optional)"
+			};
 
 			return new Option<string>($"--{setting.Key}") { Description = description };
 		}
@@ -237,9 +247,10 @@ namespace Faolan.Core.Cli
 		{
 			var indent = new string('\t', depth);
 			var name = depth == 1 ? setting.Key : Name(setting);
-			var line = $"{indent}\"{name}\": {Literal(setting.Default ?? "")}";
+			var written = setting is { Default: not null, Hidden: false };
+			var line = $"{indent}\"{name}\": {Literal(written ? setting.Default! : "")}";
 
-			return new Block([$"{indent}// {setting.Description}", setting.Default == null ? Comment(line) : line], setting.Default != null);
+			return new Block([$"{indent}// {setting.Description}", written ? line : Comment(line)], written);
 		}
 
 		// The comma goes after every LIVE entry but the last one, and the commented-out entries in between are skipped

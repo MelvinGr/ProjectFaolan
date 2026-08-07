@@ -200,7 +200,7 @@ namespace Faolan.ClientLauncher
 				// keep in step. A malformed key throws here rather than producing an exe that silently cannot log in.
 				var config = FaolanCommandLine.Build(options.LoginKeys);
 				DhKeys.Configure(config["Login:PrivateKey"]);
-				if (DhKeys.ConfigurePublic(config["Login:PublicKey"], config["Login:RetailPublicKey"]))
+				if (DhKeys.ConfigurePublic(config["Login:PublicKey"]))
 					Console.WriteLine("login-key : using the configured Login:PublicKey - this client will NOT log in to a server holding a different private key");
 				else if (DhKeys.IsConfigured)
 					Console.WriteLine("login-key : deriving the public key from the configured Login:PrivateKey");

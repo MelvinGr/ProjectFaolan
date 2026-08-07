@@ -32,24 +32,30 @@ What happens to that unpatched client is `Login:AllowUnpatchedClients` (`Univers
 `AnswerChallenge` handler). **True by default** — the accept-any fallback, so enabling password validation never
 locks out a client that predates it. Set it false for a deployment that hands out patched clients and wants the
 password to actually be required; the refusal is the same `InvalidLogin` reason a wrong password gets, and the
-server log names the real cause. Only an explicit `false` denies: an unset or unparseable value allows, because
-a typo must not read as "deny every login".
+server log names the real cause. Only an explicit `false` denies — a typo must not read as "deny every login" —
+and a value that is not a bool at all (`0`, `no`) is REFUSED rather than guessed, naming the key. It used to
+silently mean "allow", which is a setting that reads as applied and is not.
 [V3: LoginEncryptionTests.LoginAllowUnpatchedClients_DefaultsToAllowAndOnlyAnExplicitFalseDenies]
+[V3: LoginEncryptionTests.AValueThatIsNotABool_IsRefusedRatherThanGuessed]
 
 The server's public key is exactly `g^ServerPrivate mod N` for the baked-in keypair — this is the value the
 launcher patches into the client. [V3: LoginEncryptionTests.ServerPublic_IsCellaoPublicKey]
 
 ## Configuring the keypair
 
-All three keys live in `Faolan.Core/Crypt/DhKeys.cs` and come from the shared config (`faolan.json` < command
-line < environment), one setting per role:
+Both keys come from the shared config (`faolan.json` < command line < environment), one setting per role, and
+their defaults live in the settings catalog (`Faolan.Core/Cli/FaolanSettings.cs`) with every other default:
 
 | key | who reads it | default |
 |---|---|---|
 | `Login:PrivateKey` | the **server** — the only half it needs | the historical CellAO key |
 | `Login:PublicKey` | the **launcher**, as what to patch IN | `g^PrivateKey mod N`, i.e. derived |
-| `Login:RetailPublicKey` | the **launcher**, as what to search FOR | the key retail's exe ships |
 | `Login:AllowUnpatchedClients` | the **server** — may a client it cannot decrypt log in? | `true` (accept-any) |
+
+There is deliberately no setting for the key the launcher SEARCHES for. It finds the 256-hex slot in the exe by
+shape — the NUL-delimited run of that width which is not the DH prime — so it can re-patch a client it already
+patched, which searching for retail's value could not do.
+[V3: ClientExePatcherTests.ItRePatchesAnAlreadyPatchedExe]
 
 The launcher reads the same `faolan.json` the server does, so overriding `Login:PrivateKey` is enough — it
 patches the matching public key by derivation and the pair cannot drift.

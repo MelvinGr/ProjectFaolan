@@ -163,7 +163,6 @@ namespace Faolan.Tests
 				Assert.Equal(DhKeys.ClientPatchPublicHex, Encoding.ASCII.GetString(ClientExePatcher.NewPublicKey));
 
 				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePublic("not-hex"));
-				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePublic(null, "not-hex"));
 			}
 			finally
 			{
@@ -171,22 +170,14 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The key the launcher SEARCHES for defaults to retail's and is overridable for a client build shipping another.
+		// The prime as the exe stores it: the same 256-char hex field a public key sits in, which is exactly why the
+		// launcher has to be able to tell them apart.
 		[Fact]
-		public void RetailPublicKey_DefaultsToRetailsAndIsOverridable()
+		public void PrimeHex_IsAFullWidthHexRendering()
 		{
-			try
-			{
-				Assert.StartsWith("9c32cc23d559ca90", DhKeys.RetailPublicHex);
-				Assert.Equal(DhKeys.PublicHexLength, DhKeys.RetailPublicHex.Length);
-
-				DhKeys.ConfigurePublic(null, "a3f1c2");
-				Assert.EndsWith("a3f1c2", DhKeys.RetailPublicHex);
-			}
-			finally
-			{
-				DhKeys.ConfigurePublic(null);
-			}
+			Assert.Equal(DhKeys.PublicHexLength, DhKeys.PrimeHex.Length);
+			Assert.Equal(DhKeys.N, DhKeys.ParseHex(DhKeys.PrimeHex));
+			Assert.StartsWith("eca2e8c85d863dcd", DhKeys.PrimeHex);
 		}
 
 		// Whether an UNPATCHED client (one whose block we cannot decrypt, so it proved only the account name) may log
