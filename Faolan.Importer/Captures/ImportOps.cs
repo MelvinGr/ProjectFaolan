@@ -1943,20 +1943,6 @@ namespace Faolan.Importer.Captures
 			return pkt;
 		}
 
-		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
-		// BOOTSTRAP-ONLY (#262): only sets an UN-chained quest (NextQuestId still null), so a re-import never clobbers a
-		// successor set by hand (the Quest editor) or a prior run. A fresh capture-harvested quest has NextQuestId null,
-		// so it still bootstraps; a chain-end seed (null) is a no-op on the already-null quest.
-		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
-		{
-			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
-			if (quest == null || quest.NextQuestId != null)
-				return;
-
-			quest.NextQuestId = nextQuestId;
-			await db.SaveChangesAsync();
-		}
-
 		// Every entity handle this session's server bound to an OWNER, i.e. every summoned creature - read off the
 		// wire's own owner-binding (`PetIIR` mode 0 assign / mode 1 dismiss, #307) instead of a roster of pet names.
 		//
@@ -2021,11 +2007,39 @@ namespace Faolan.Importer.Captures
 			return goal.GoalType != QuestGoalType.None;
 		}
 
-		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). Idempotent.
+		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
+		// BOOTSTRAP-ONLY (#262): only sets an UN-chained quest (NextQuestId still null), so a re-import never clobbers a
+		// successor set by hand (the Quest editor) or a prior run. A fresh capture-harvested quest has NextQuestId null,
+		// so it still bootstraps; a chain-end seed (null) is a no-op on the already-null quest.
+		//
+		// ⚠️ Still needed: `NextQuestId` is NOT in the harvest. Measured with every seed absent (#705), all five chained
+		// quests came back null - the supersession is visible in a capture as a sequence of events, not as a field.
+		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
+		{
+			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null || quest.NextQuestId != null)
+				return;
+
+			quest.NextQuestId = nextQuestId;
+			await db.SaveChangesAsync();
+		}
+
+		// The beach starter (quest 10238): the `Quest_c` scalars the harvest does NOT carry, plus its two triggers.
+		//
+		// ⚠️ The per-goal @609 TRANSCRIPTION is gone (#705). It used to restate both goals' whole objective record -
+		// `Separator`, `SubId`, marker, `Extra5/6`, the objective/trailing refs and categories, and FOUR hard-coded
+		// base85 LDB keys. Measured field by field against a blanked probe: the `quests` harvest reproduces every one
+		// of them exactly, keys included, and recreates the goal rows from nothing if they are deleted outright. Only
+		// goal 1448's `TrailingLocalized` differs, and it is kept below.
+		//
+		// ⚠️ The `Quest_c` scalars are NOT the same story and stay. The first pass at this deleted them on a
+		// measurement that had `--only quests` restoring them - which was wrong, because that plan silently INCLUDES
+		// `quest-wiring`, so the seed was restoring its own values. Re-measured with the seed absent, the harvest
+		// carries `Level` and `IndexMagic` and nothing else here: dropping the rest takes `HasSnapshotRecord` with it,
+		// and 10238 falls out of the login snapshot (objective regions 98 of 99 instead of 99).
 		private static async Task SeedBeachQuestGoals(DatabaseContext db)
 		{
-			const uint beachQuestId = 10238;
-			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == beachQuestId);
+			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == 10238);
 			if (quest == null)
 				return;
 
@@ -2034,93 +2048,43 @@ namespace Faolan.Importer.Captures
 			quest.FieldEc = 1;
 			quest.FieldF0 = 0x96;
 			quest.FieldF8 = 15;
-			quest.Level = 1;
 			quest.HasSnapshotRecord = true;
-			quest.XpReward = 0;
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTrailerWord = 0x000156E7;
 			// The magic, the (sequence, remaining) pair and the line catalog are DERIVED from QuestLines +
-			// JournalSequence by DeriveQuestIndexFromLine (#641) - they were ~10 values transcribed from the capture,
-			// and the line already holds every one of them. tf1/tf2 are stamped non-zero here so that step knows this
-			// quest's index is one the snapshot builds from; it overwrites both with the derived pair.
+			// JournalSequence by DeriveQuestIndexFromLine (#641). tf1/tf2 are stamped non-zero here so that step knows
+			// this quest's index is one the snapshot builds from; it overwrites both with the derived pair.
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 1;
 
-			// Overlay the two goals' full @609 detail (find-or-create by GoalId): the extractor may have already emitted
-			// goal 1448 as the harvested PRIMARY goal (wire fields only) - this completes it and adds goal 3490 - so the
-			// beach byte-exact @609 region is authoritative here regardless of what the capture harvested.
-			var goal1 = quest.Goals.FirstOrDefault(g => g.GoalId == 1448) ?? Add(quest, 1448);
-			goal1.Sequence = 1;
-			goal1.RequiredCount = 1;
-			goal1.Separator = 9;
-			goal1.SubId = 180;
-			goal1.MapId = 4010;
-			goal1.MarkerX = 416;
-			goal1.MarkerY = 701;
-			goal1.Extra5 = 0;
-			goal1.Extra6 = 0;
-			goal1.ObjectiveRefId = 1448;
-			goal1.ObjectiveCategory = 50304;
-			goal1.ObjectiveKey = LdbKey.Decode("pARATX1!DX]&#92;So+0*A9B") ?? new();
-			goal1.TrailingRefId = 180;
-			goal1.TrailingCategory = 51200;
-			goal1.TrailingKey = LdbKey.Decode("b2Y2],LfVfAVps*9JX*G") ?? new();
-			goal1.TrailingLocalized = false;
-			goal1.TrailingFlags = "";
-			// #262: goal 1448 = "Enter the jungle" - a REACH objective (region ref 180/cat 51200, NOT a kill). Solved
-			// when the player walks within range of its map marker (416,701 on 4010, the jungle mouth on the way to
-			// Saddur), via the move-handler reach check. No TargetName (it's a place, not an NPC). BOOTSTRAP-ONLY.
-			if (!IsWired(goal1))
-				goal1.GoalType = QuestGoalType.ReachArea;
-
-			var goal2 = quest.Goals.FirstOrDefault(g => g.GoalId == 3490) ?? Add(quest, 3490);
-			goal2.Sequence = 2;
-			goal2.RequiredCount = 1;
-			goal2.Separator = 12;
-			goal2.SubId = 0;
-			goal2.MapId = 4010;
-			goal2.MarkerX = 521;
-			goal2.MarkerY = 757;
-			goal2.Extra5 = 70099;
-			goal2.Extra6 = 0x36314C56;
-			goal2.ObjectiveRefId = 3490;
-			goal2.ObjectiveCategory = 50304;
-			goal2.ObjectiveKey = LdbKey.Decode("cA!(EbPpfzUK&#92;WPN@!H!") ?? new();
-			goal2.TrailingRefId = 9500;
-			goal2.TrailingCategory = 51000;
-			goal2.TrailingKey = LdbKey.Decode("]+/sUK&#39;G3mO)clF`)9Jh") ?? new();
-			goal2.TrailingLocalized = true;
-			goal2.TrailingFlags = "m";
-
-			// #262: the SERVER-trigger fields (the wire/@609 detail above only drives the journal DISPLAY). 10238 is
-			// "Shipwrecked / I. The Slaver" (start Kalanthes, aoc.fandom.com/wiki/Quest:Shipwrecked): its completing goal
-			// is 3490 = "Kill slavemaster Saddur" (TrailingRefId 9500 = Saddur's template, at his 521/757 spawn), which
-			// supersedes to stage II "The Acheronian Gate" (12369) - proven by the Hoxxling gameplay capture
-			// (Saddur dies fr11942 -> 10238 completes -> 12369 -> 12373). BOOTSTRAP-ONLY (see IsWired / Chain): a
-			// re-import won't revert these once the Quest editor (or a prior run) has wired them.
-			quest.NextQuestId ??= 12369;
-			if (!IsWired(goal2))
-			{
-				goal2.GoalType = QuestGoalType.Kill;
-				goal2.TargetName = "Saddur";
-				goal2.GatesTargetVisibility = true; // one-time story target: hidden until 10238 is active, stays dead
-			}
+			// The one @609 field the harvest disagrees with: the capture set this quest carries writes goal 1448's
+			// trailing text as `<remoteformat>` (the FieldF0 == 150 spelling), not the `<localized>` one - see
+			// QuestDefinition.FieldF0, which selects between them.
+			if (quest.Goals.FirstOrDefault(g => g.GoalId == 1448) is { } jungle)
+				jungle.TrailingLocalized = false;
 
 			await db.SaveChangesAsync();
-			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) + Saddur kill trigger -> 12369 (#262).");
 
-			static QuestGoalDefinition Add(QuestDefinition q, uint goalId)
-			{
-				var g = new QuestGoalDefinition
-				{
-					GoalId = goalId
-				};
-				q.Goals.Add(g);
-				return g;
-			}
+			// 10238 is "Shipwrecked / I. The Slaver"; its completing goal 3490 is "Kill slavemaster Saddur", proven by
+			// the Hoxxling gameplay capture (Saddur dies fr11942 -> 10238 completes -> 12369 -> 12373). The kill VERB
+			// types the goal, so what is seeded is the editorial half: `GatesTargetVisibility` (a call the client's data
+			// does not state anywhere - see that column) and `TargetName`, because the objective says "slavemaster
+			// Saddur" while the live NPC is "Saddur".
+			//
+			// Goal 1448 "Enter the jungle" is a reach at its own marker. Its reference is a 51200 bounded AREA rather
+			// than a location, so TypeLocationGoalsFromTrailingCategory does not see it, and a `RegionScoped` goal is
+			// not a reach by kind alone (goal 11712 has RequiredCount 3 - the region SCOPES the objective). Its verb is
+			// what settles it, so it stays a seed until the "Enter <place>" shape is a rule (#704).
+			await SeedGoal(db, 10238, 1448, QuestGoalType.ReachArea);
+			await SeedGoal(db, 10238, 3490, QuestGoalType.Kill, "Saddur", gatesVisibility: true);
+			await Chain(db, 10238, 12369);
 		}
 
 		// The Tortage intro quest CHAIN (#261): 13479 is a four-stage supersession chain. Idempotent.
+		//
+		// ⚠️ Nothing here turned out to be removable (#705). `NextQuestId` is NOT harvested - measured with the seeds
+		// absent, every chained quest came back null, because a supersession is visible in a capture as a SEQUENCE OF
+		// EVENTS rather than a field - and neither is goal 3544's escortee template id.
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
 			await Chain(db, 13479, 13563);
@@ -2128,9 +2092,11 @@ namespace Faolan.Importer.Captures
 			// (retail solo-instances him). The only kill goal besides Saddur that gets it; see GatesTargetVisibility.
 			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1, gatesVisibility: true);
 			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
-			// and takes the actual key, not just an empty source-matched bag.
+			// and takes the actual key, not just an empty source-matched bag. WHICH corpse holds WHICH quest item is in
+			// neither the wire goal record nor the RDB catalog, so this one is genuinely un-harvestable today (#705).
 			await Chain(db, 13563, 13480);
 			await SeedGoal(db, 13563, 5867, QuestGoalType.LootFromNpc, "Scavenger Tuut", 319224, 1);
+			// "Free Casilda" - a talk objective whose verb no talk shape recognises.
 			await Chain(db, 13480, 12407);
 			await SeedGoal(db, 13480, 5745, QuestGoalType.TalkToNpc, "Casilda", required: 1);
 			await Chain(db, 12407, null); // escort is the chain end
@@ -2140,6 +2106,10 @@ namespace Faolan.Importer.Captures
 			// resolves her by ID not name (#262). Set AUTHORITATIVELY every run (not bootstrap-only): the capture's escort
 			// @609 carries no trailing ref and this module runs after the objective-goals refresh, so it must win. Byte-
 			// safe - 12407's objective region is not in the tested set.
+			//
+			// ⚠️ Re-measured for #705 and it stays: a blanked column comes back 0 from the refresh, and a DELETED row is
+			// recreated with 0 as well. (The first pass read a probe whose row had been recreated while this override was
+			// still in place - the same self-confirming measurement that briefly took the Quest_c scalars out.)
 			var escortGoal = await db.QuestGoalDefinitions.FirstOrDefaultAsync(g => g.QuestDefinitionId == 12407 && g.GoalId == 3544);
 			if (escortGoal != null)
 			{
@@ -2148,50 +2118,26 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Casilda's quest 13479 snapshot Quest_c scalars (#255): journal-record fields that live ONLY in the
-		// FullChar snapshot. Idempotent - set every run.
+		// Casilda's quest 13479 `Quest_c` scalars (#255): the journal-record fields that live ONLY in the FullChar
+		// snapshot and are not in the harvest. Idempotent - set every run.
+		//
+		// ⚠️ Its per-goal @609 transcription is gone (#705): goal 5744's whole objective record - `Separator`, `SubId`,
+		// marker, `Extra5/6`, refs, categories, both LDB keys - is reproduced EXACTLY by the harvest, field for field.
+		// `Level`, `Field118`, `FieldEc`, `HasSnapshotRecord` and `QuestLineFlags` are harvested too; these five are not.
 		private static async Task SeedCasildaQuestSnapshot(DatabaseContext db)
 		{
-			var quest = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs).FirstOrDefaultAsync(q => q.QuestId == 13479);
+			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == 13479);
 			if (quest == null)
 				return;
 
-			quest.Level = 3;
-			quest.HasSnapshotRecord = true;
-			quest.Field118 = 3;
-			quest.QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags;
-			quest.FieldEc = 1;
 			quest.FieldF0 = 80;
 			quest.FieldF8 = 7;
 			quest.XpReward = 80;
-			// Derived from line 1054 by DeriveQuestIndexFromLine (#641) - magic 0x52524C33 ("RRL3") is QuestLines.Magic
-			// and the catalog is the line's four steps in JournalSequence order. See the beach seed's note.
+			// Overwritten with the derived pair by DeriveQuestIndexFromLine (#641); non-zero here so that step knows
+			// this quest's index is one the snapshot builds from. See the beach seed's note.
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 1;
-
-			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
-			if (goal != null)
-			{
-				goal.Sequence = 1;
-				goal.Separator = 12;
-				goal.SubId = 0;
-				goal.MapId = 4010;
-				goal.MarkerX = 327;
-				goal.MarkerY = 678;
-				goal.Extra5 = 70099;
-				goal.Extra6 = 0x54375554;
-				goal.ObjectiveRefId = 5744;
-				goal.ObjectiveCategory = 50304;
-				goal.ObjectiveKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.Objective)?.KeyText ?? new();
-				goal.TrailingRefId = 11561;
-				goal.TrailingCategory = 51000;
-				goal.TrailingKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.ObjectiveLocalized)?.KeyText ?? new();
-				goal.TrailingLocalized = true;
-				goal.TrailingFlags = "m";
-			}
-
 			await db.SaveChangesAsync();
-			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars + @609 objective goal (#255).");
 		}
 
 		// Configure one goal's SERVER-trigger fields (find-or-create by GoalId): the type + how it's matched at runtime
