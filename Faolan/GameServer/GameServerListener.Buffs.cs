@@ -217,14 +217,22 @@ namespace Faolan.GameServer
 				switch (effect.Pool)
 				{
 					case CharacterStatId.HealthCurrent:
+					{
 						vitals.ApplyHealthDelta(amount);
 						break;
+					}
+
 					case CharacterStatId.ManaCurrent:
+					{
 						vitals.ApplyManaDelta(amount);
 						break;
+					}
+
 					default:
+					{
 						vitals.Stamina = (uint)Math.Clamp((long)vitals.Stamina + amount, 0, max);
 						break;
+					}
 				}
 
 				moved = true;

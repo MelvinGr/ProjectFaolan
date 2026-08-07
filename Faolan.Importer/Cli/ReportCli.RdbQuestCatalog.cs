@@ -324,26 +324,37 @@ namespace Faolan.Importer.Cli
 				switch (wire)
 				{
 					case 0:
+					{
 						if (!TryReadVarint(body, ref i, out _))
 							return body.Length - start;
 						onField(field, wire, default);
 						break;
+					}
+
 					case 1:
 					case 5:
+					{
 						var fixedWidth = wire == 1 ? 8 : 4;
 						if (i + fixedWidth > body.Length)
 							return body.Length - start;
 						onField(field, wire, body.Slice(i, fixedWidth));
 						i += fixedWidth;
 						break;
+					}
+
 					case 2:
+					{
 						if (!TryReadVarint(body, ref i, out var length) || i + (int)length > body.Length)
 							return body.Length - start;
 						onField(field, wire, body.Slice(i, (int)length));
 						i += (int)length;
 						break;
+					}
+
 					default:
+					{
 						return body.Length - start; // group wire types: not used by any of these messages
+					}
 				}
 			}
 

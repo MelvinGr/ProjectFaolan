@@ -220,11 +220,16 @@ namespace Faolan.Tests
 				switch (CombatShieldRose.RollSwingDirection(random))
 				{
 					case SwingDirection.UpperLeft or SwingDirection.UpperRight:
+					{
 						upper++;
 						break;
+					}
+
 					case SwingDirection.LowerLeft or SwingDirection.LowerRight:
+					{
 						lower++;
 						break;
+					}
 				}
 			}
 

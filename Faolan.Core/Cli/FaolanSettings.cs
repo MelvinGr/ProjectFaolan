@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.CommandLine;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using Faolan.Core.Enums;
@@ -35,8 +37,7 @@ namespace Faolan.Core.Cli
 	///     <para>
 	///         The layering that results:
 	///         <b>
-	///             defaults &lt; faolan.json &lt; faolan.user.json &lt; command line &lt;
-	///             environment
+	///             defaults &lt; faolan.json &lt; faolan.user.json &lt; command line &lt; environment
 	///         </b>
 	///         . Because the bottom layer always supplies a value, a consumer reads
 	///         <c>config["Log:File"]</c> and gets <c>faolan.log</c> - the <c>?? "faolan.log"</c> that used to sit at
@@ -47,81 +48,94 @@ namespace Faolan.Core.Cli
 	{
 		public static readonly ImmutableArray<Setting> All =
 		[
-			new Setting("Database:Provider", "Sqlite or Postgres.", "Sqlite"),
-			new Setting("Database:ConnectionString", "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
-			new Setting("ServerIpAddress", "The address the login tier advertises to clients - must be reachable FROM the client.", "127.0.0.1"),
-			new Setting("UniverseAgentPort", "UniverseAgent port. (Main entry point).", "7010"), new Setting("PlayerAgentPort", "PlayerAgent port.", "7011"),
-			new Setting("WelcomeString", "Login MOTD.", "Welcome to Project Faolan!"),
-			new Setting("TerrainDir", "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
-			new Setting("RdbDir", "The client's RDB folder. Usually not needed."),
-			new Setting("ClientVersion", "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
-			new Setting("Login:PrivateKey", "The server private key (Generate with --generate-login-key)"),
-			new Setting("Login:PublicKey", "Patch clients with Faolan.ClientLauncher --patch-login."),
-			new Setting("Login:AllowUnpatchedClients",
-				"Let a client whose login block we cannot decrypt in on its account NAME alone. False requires a patched client, so the password is actually checked.", "true"),
-			new Setting("Account:Premium", "Advertise every account as subscribed.", "true"), new Setting("Account:PremiumCharSlots", "Character slots advertised when premium.", "10"),
-			new Setting("Account:FreeCharSlots", "Character slots advertised when not premium.", "4"), new Setting("Log:File", "Log file path.", "faolan.log"),
-			new Setting("Log:PacketBytes", "Include the raw byte dump in packet log lines.", "false"), new Setting("Mcp:Enabled", "Host the in-process MCP endpoint.", "false"),
-			new Setting("Mcp:Port", "MCP endpoint port.", "7099"),
-			new Setting("ChatBridge:Url", "MCP endpoint the chat bridge DIALS. Defaults to the local server's own Mcp:Port, so set it only for a bridge on another host."),
-			new Setting("ChatBridge:BacklogGraceMs", "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", "120000"),
-			new Setting("ChatBridge:PollMs", "Chat-bridge poll interval, in milliseconds.", "1500"), new Setting("Cdn:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
-			new Setting("Cdn:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
-			new Setting("Cdn:ListenPort", "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", "7081"),
-			new Setting("Cdn:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. Full URL, including scheme and port.")
+			new Setting(Keys.DatabaseProvider, Enum.GetValues<FaolanDbProvider>().JoinAsString(", "), FaolanDbProvider.Sqlite),
+			new Setting(Keys.DatabaseConnectionString, "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
+			new Setting(Keys.ServerAddress, "The address the login tier advertises to clients - must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
+			new Setting(Keys.ServerUniverseAgentPort, "UniverseAgent port. (Main entry point).", 7010),
+			new Setting(Keys.ServerPlayerAgentPort, "PlayerAgent port.", 7011),
+			new Setting(Keys.ServerWelcomeString, "Login MOTD.", "Welcome to Project Faolan!"),
+			new Setting(Keys.ContentTerrainDir, "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
+			new Setting(Keys.ContentRdbDir, "The client's RDB folder. Usually not needed.", null),
+			new Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
+			new Setting(Keys.LoginPrivateKey, "The server private key. Generate one with --generate-login-key.", null),
+			new Setting(Keys.LoginPublicKey, "Patch clients with Faolan.ClientLauncher --patch-login. (Only used by Faolan.ClientLauncher)", null),
+			new Setting(Keys.LoginAllowUnpatchedClients, "Let a unpatched client login with its account NAME alone. False requires a patched client & Login:PrivateKey filed.", true),
+			new Setting(Keys.AccountPremium, "Advertise every account as subscribed.", true),
+			new Setting(Keys.AccountPremiumCharSlots, "Character slots advertised when premium.", 10),
+			new Setting(Keys.AccountFreeCharSlots, "Character slots advertised when not premium.", 4),
+			new Setting(Keys.LogFile, "Log file path.", "faolan.log"),
+			new Setting(Keys.LogPacketBytes, "Include the raw byte dump in packet log lines.", false),
+			new Setting(Keys.McpEnabled, "Host the in-process MCP endpoint.", false),
+			new Setting(Keys.McpPort, "MCP endpoint port.", 7099),
+			new Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)", false),
+			new Setting(Keys.ChatBridgeBacklogGraceMs, "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", 120_000),
+			new Setting(Keys.ChatBridgePollMs, "Chat-bridge poll interval, in milliseconds.", 1500),
+			new Setting(Keys.CdnStore, "Directory the mirror stores fetched CDN blobs in.", "./cdn-store"),
+			new Setting(Keys.CdnListenAddress, "Address the mirror BINDS - an interface, not the address a client dials.", "0.0.0.0"),
+			new Setting(Keys.CdnListenPort, "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", 7081),
+			new Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (Only used by Faolan.ClientLauncher)", "http://127.0.0.1:7081")
 		];
 
 		/// <summary>
 		///     The DEFAULTS configuration layer: every setting that has one. The bottom of
 		///     <see cref="FaolanCommandLine.Build" />'s stack.
 		/// </summary>
-		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Where(s => s.Default != null).Select(s => new KeyValuePair<string, string?>(s.Key, s.Default));
+		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(s => new KeyValuePair<string, string?>(s.Key, s.DefaultText));
 
 		private static readonly Dictionary<string, Setting> ByKey = All.ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
 
 		extension(IConfiguration config)
 		{
-			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(config["Database:Provider"], true);
+			public BigInteger? LoginPrivateKey => config[Keys.LoginPrivateKey] is { } pk
+				? HexExtensions.ToBigInteger(pk)
+				: null;
 
-			public bool AccountPremium => config["Account:Premium"].To<bool>();
+			public BigInteger? LoginPublicKey => config[Keys.LoginPublicKey] is { } pk
+				? HexExtensions.ToBigInteger(pk)
+				: null;
 
-			public bool LogPacketBytes => config["Log:PacketBytes"].To<bool>();
+			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(config[Keys.DatabaseProvider]!, true);
 
-			public bool LoginAllowUnpatchedClients => config["Login:AllowUnpatchedClients"].To<bool>();
-			public bool McpEnabled => config["Mcp:Enabled"].To<bool>();
+			public TimeSpan ChatBridgeBacklogGrace => TimeSpan.FromMilliseconds(config[Keys.ChatBridgeBacklogGraceMs]!.To<double>());
+			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(config[Keys.ChatBridgePollMs]!.To<double>());
 
-			public float ChatBridgeBacklogGraceMs => config["ChatBridge:BacklogGraceMs"].To<float>();
-			public float ChatBridgePollMs => config["ChatBridge:PollMs"].To<float>();
+			public bool AccountPremium => config[Keys.AccountPremium]!.To<bool>();
 
-			public string CdnListenAddress => config["Cdn:ListenAddress"];
+			public bool ChatBridgeEnabled => config.McpEnabled && config[Keys.ChatBridgeEnabled]!.To<bool>();
 
-			public string CdnStore => config["Cdn:Store"];
+			public bool LogPacketBytes => config[Keys.LogPacketBytes]!.To<bool>();
 
-			public string ChatBridgeUrl => config["ChatBridge:Url"];
+			public bool LoginAllowUnpatchedClients => config[Keys.LoginAllowUnpatchedClients]!.To<bool>() || config.LoginPrivateKey == null;
+			public bool McpEnabled => config[Keys.McpEnabled]!.To<bool>();
 
-			public string ClientVersion => config["ClientVersion"];
+			public string CdnListenAddress => config[Keys.CdnListenAddress]!;
 
-			public string DatabaseConnectionString => config["Database:ConnectionString"];
+			public string CdnStore => config[Keys.CdnStore]!;
 
-			public string LogFile => config["Log:File"];
-			public string ServerIpAddress => config["ServerIpAddress"];
-			public string WelcomeString => config["WelcomeString"];
+			public string ClientVersion => config[Keys.ContentClientVersion]!;
 
-			public string? CdnPublicAddress => config["Cdn:PublicAddress"];
+			public string DatabaseConnectionString => config[Keys.DatabaseConnectionString]!;
 
-			public string? LoginPrivateKey => config["Login:PrivateKey"];
-			public string? LoginPublicKey => config["Login:PublicKey"];
+			public string LogFile => config[Keys.LogFile]!;
 
-			public string? RdbDir => config["RdbDir"];
-			public uint AccountFreeCharSlots => config["Account:FreeCharSlots"].To<uint>();
+			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
 
-			public uint AccountPremiumCharSlots => config["Account:PremiumCharSlots"].To<uint>();
+			public string ServerAddress => config[Keys.ServerAddress]!;
+			public string WelcomeString => config[Keys.ServerWelcomeString]!;
 
-			public ushort CdnListenPort => config["Cdn:ListenPort"].To<ushort>();
+			public string? CdnPublicAddress => config[Keys.CdnPublicAddress];
 
-			public ushort McpPort => config["Mcp:Port"].To<ushort>();
-			public ushort PlayerAgentPort => config["PlayerAgentPort"].To<ushort>();
-			public ushort UniverseAgentPort => config["UniverseAgentPort"].To<ushort>();
+			public string? RdbDir => config[Keys.ContentRdbDir];
+			public string? TerrainDir => config[Keys.ContentTerrainDir];
+			public uint AccountFreeCharSlots => config[Keys.AccountFreeCharSlots]!.To<uint>();
+
+			public uint AccountPremiumCharSlots => config[Keys.AccountPremiumCharSlots]!.To<uint>();
+
+			public ushort CdnListenPort => config[Keys.CdnListenPort]!.To<ushort>();
+
+			public ushort McpPort => config[Keys.McpPort]!.To<ushort>();
+			public ushort PlayerAgentPort => config[Keys.ServerPlayerAgentPort]!.To<ushort>();
+			public ushort UniverseAgentPort => config[Keys.ServerUniverseAgentPort]!.To<ushort>();
 		}
 
 		/// <summary>
@@ -143,16 +157,10 @@ namespace Faolan.Core.Cli
 				.AppendLine("// also the bottom layer of the configuration stack, so a key deleted from this file still has its default. The")
 				.AppendLine("// layering is: defaults < faolan.json < faolan.user.json < command line < environment.")
 				.AppendLine("//")
-				.AppendLine("// The commented-out keys are the OPTIONAL ones - they name something outside this repo (a game install, a keypair,")
-				.AppendLine("// a deployment's public address), so there is nothing it could default them to.")
-				.AppendLine("//")
 				.AppendLine("// Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them")
 				.AppendLine("// in faolan.user.json (gitignored, same keys, it simply wins).")
 				.AppendLine("{");
 
-			// The catalog's ORDER is the file's order, and a section is a RUN of consecutive keys sharing a prefix -
-			// which is why the catalog groups them. Nothing sorts here: the order is editorial (what a reader needs
-			// first) and a sort would scatter it.
 			var blocks = new List<Block>();
 			for (var i = 0; i < All.Length; i++)
 			{
@@ -174,8 +182,6 @@ namespace Faolan.Core.Cli
 			Join(blocks);
 			for (var i = 0; i < blocks.Count; i++)
 			{
-				// A blank line either side of a section object, so a run of top-level keys and the object next to it do
-				// not read as one run.
 				if (i > 0 && (blocks[i].Section || blocks[i - 1].Section))
 					text.AppendLine();
 
@@ -193,6 +199,53 @@ namespace Faolan.Core.Cli
 			return ByKey.TryGetValue(key, out var setting)
 				? setting
 				: throw new ArgumentException($"'{key}' is not a Faolan setting. Add it to FaolanSettings.All - that is the only list.", nameof(key));
+		}
+
+		/// <summary>
+		///     The configuration PATH of every setting, as a constant.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         A key is spelled in two places that have to agree - its <see cref="All" /> entry and the accessor
+		///         that reads it - and as a string literal that agreement is a matter of care. A typo in an accessor
+		///         resolves to <c>null</c> and then fails as an NRE or a parse error at whatever startup first needs
+		///         the value, nowhere near the line that caused it; <see cref="Get" /> only guards the OTHER path, a
+		///         <c>*Command</c>'s option list. As a const both paths are a compile error.
+		///     </para>
+		///     <para>
+		///         Named for the setting rather than its section, so <c>Keys.LogFile</c> sits beside the
+		///         <c>config.LogFile</c> that reads it, and ordered by name - which is also section order, since the
+		///         names carry their section as a prefix, and it is where the member-layout cleanup leaves them.
+		///     </para>
+		/// </remarks>
+		public static class Keys
+		{
+			public const string AccountFreeCharSlots = "Account:FreeCharSlots";
+			public const string AccountPremium = "Account:Premium";
+			public const string AccountPremiumCharSlots = "Account:PremiumCharSlots";
+			public const string CdnListenAddress = "Cdn:ListenAddress";
+			public const string CdnListenPort = "Cdn:ListenPort";
+			public const string CdnPublicAddress = "Cdn:PublicAddress";
+			public const string CdnStore = "Cdn:Store";
+			public const string ChatBridgeBacklogGraceMs = "ChatBridge:BacklogGraceMs";
+			public const string ChatBridgeEnabled = "ChatBridge:Enabled";
+			public const string ChatBridgePollMs = "ChatBridge:PollMs";
+			public const string ContentClientVersion = "Content:ClientVersion";
+			public const string ContentRdbDir = "Content:RdbDir";
+			public const string ContentTerrainDir = "Content:TerrainDir";
+			public const string DatabaseConnectionString = "Database:ConnectionString";
+			public const string DatabaseProvider = "Database:Provider";
+			public const string LogFile = "Log:File";
+			public const string LogPacketBytes = "Log:PacketBytes";
+			public const string LoginAllowUnpatchedClients = "Login:AllowUnpatchedClients";
+			public const string LoginPrivateKey = "Login:PrivateKey";
+			public const string LoginPublicKey = "Login:PublicKey";
+			public const string McpEnabled = "Mcp:Enabled";
+			public const string McpPort = "Mcp:Port";
+			public const string ServerAddress = "Server:Address";
+			public const string ServerPlayerAgentPort = "Server:PlayerAgentPort";
+			public const string ServerUniverseAgentPort = "Server:UniverseAgentPort";
+			public const string ServerWelcomeString = "Server:WelcomeString";
 		}
 
 		/// <summary>
@@ -231,8 +284,8 @@ namespace Faolan.Core.Cli
 			var name = depth == 1
 				? setting.Key
 				: Name(setting);
-			var written = setting is { Default: not null, Hidden: false };
-			var line = $"{indent}\"{name}\": {Literal(written ? setting.Default! : "")}";
+			var written = setting.Default != null;
+			var line = $"{indent}\"{name}\": {Literal(setting.Default)}";
 
 			return new Block([
 				$"{indent}// {setting.Description}", written
@@ -241,8 +294,6 @@ namespace Faolan.Core.Cli
 			], written);
 		}
 
-		// The comma goes after every LIVE entry but the last one, and the commented-out entries in between are skipped
-		// - a comma on the last live line before a run of comments would close the object on a dangling separator.
 		private static void Join(List<Block> blocks)
 		{
 			var last = blocks.FindLastIndex(b => b.Live);
@@ -253,15 +304,19 @@ namespace Faolan.Core.Cli
 			}
 		}
 
-		// A default is stored as TEXT (it is a configuration value), so the JSON it renders as follows its shape:
-		// true/false and whole numbers unquoted, everything else a string. Getting this wrong would be invisible here
-		// and load fine either way - the configuration binder reads every value back as text - but the file is read by
-		// people too, and a quoted port reads as a typo.
-		private static string Literal(string value)
+		private static string Literal(object? value)
 		{
-			return value is "true" or "false" || (value.Length > 0 && value.All(char.IsAsciiDigit))
-				? value
-				: JsonSerializer.Serialize(value);
+			return value switch
+			{
+				null => "\"\"",
+				bool b => b
+					? "true"
+					: "false",
+				string s       => JsonSerializer.Serialize(s),
+				Enum e         => JsonSerializer.Serialize(e.ToString()),
+				IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+				_              => JsonSerializer.Serialize(value.ToString())
+			};
 		}
 
 		private static string Name(Setting setting)
@@ -269,8 +324,6 @@ namespace Faolan.Core.Cli
 			return setting.Key[(setting.Key.IndexOf(':') + 1)..];
 		}
 
-		// One "Section": { … } object. A section whose settings are ALL optional is commented out whole - an empty
-		// object would read as a section with nothing in it rather than one nobody has set.
 		private static Block Object(string section, List<Setting> settings)
 		{
 			var entries = settings.Select(s => Entry(s, 2)).ToList();
@@ -290,14 +343,10 @@ namespace Faolan.Core.Cli
 
 		private static Option<string> Option(Setting setting)
 		{
-			// The default is SHOWN, not applied by the parser: applying it here would make every option "passed" and
-			// so shadow faolan.json with the default, which is precisely the bug FaolanCommandLine.Overrides avoids by
-			// dropping options the user did not pass.
 			var description = setting switch
 			{
-				{ Hidden: true }       => setting.Description, // ...which says what its default is in words
-				{ Default: { } value } => $"{setting.Description} (default: {value})",
-				_                      => $"{setting.Description} (optional)"
+				{ DefaultText: { } value } => $"{setting.Description} (default: {value})",
+				_                          => $"{setting.Description} (optional)"
 			};
 
 			return new Option<string>($"--{setting.Key}")
@@ -316,17 +365,34 @@ namespace Faolan.Core.Cli
 
 		/// <summary>
 		///     One setting. A null <paramref name="Default" /> means the setting is genuinely OPTIONAL - there is
-		///     nothing this repo could put there, because the value names something outside it (a game install, a
-		///     keypair, a deployment's public address). Everything else has one, so the server runs with no
+		///     nothing this repo could put there, because the value names something outside it (a game install, this
+		///     deployment's own keypair, a public address). Everything else has one, so the server runs with no
 		///     configuration file at all.
 		/// </summary>
-		/// <param name="Hidden">
-		///     The default APPLIES but is not written into the generated config file, nor spelled out in
-		///     <c>--help</c>. For the two key literals: a config file carrying key material invites someone to edit
-		///     half of a pair, and a 256-char hex line in a `--help` listing is noise. The description says what the
-		///     default is in words instead.
-		/// </param>
-		public sealed record Setting(string Key, string Description, string? Default = null, bool Hidden = false);
+		public sealed record Setting(string Key, string Description, object? Default)
+		{
+			/// <summary>
+			///     The default as the configuration STACK carries it: every provider is string-keyed, so this is what
+			///     lands in the defaults layer and what <c>--help</c> prints.
+			/// </summary>
+			/// <remarks>
+			///     Invariant culture, and <c>true</c>/<c>false</c> lower-cased rather than .NET's <c>True</c>: the value
+			///     is read back by parsers AND by people, and a float rendered under a comma-decimal locale would not
+			///     round-trip through <c>float.Parse</c> at all. Rendering lives here, once, so the defaults layer and
+			///     <see cref="Literal" /> cannot disagree about what a value looks like.
+			/// </remarks>
+			public string? DefaultText => Default switch
+			{
+				null => null, //"null",
+				bool b => b
+					? "true"
+					: "false",
+				string s       => s,
+				Enum e         => e.ToString(),
+				IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+				_              => Default.ToString()
+			};
+		}
 
 		private sealed record Block(List<string> Lines, bool Live, bool Section = false);
 	}

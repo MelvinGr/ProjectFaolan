@@ -5,10 +5,10 @@ Every captured NPC spawn carries ~200 bytes of the **retail server's own heap**.
 Harvest it with:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report scaffold-heap --captures <data-repo>/Captures --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report scaffold-heap --captures <data-repo>/Captures --Content:RdbDir <rdb-dir>
 ```
 
-`--RdbDir` is optional (it is only used to decrypt the LDB strings the harvest finds; without it they are
+`--Content:RdbDir` is optional (it is only used to decrypt the LDB strings the harvest finds; without it they are
 named but not read). `--report-arg runs` lists every distinct string; `--report-arg dump` writes a hex dump
 of every distinct block.
 

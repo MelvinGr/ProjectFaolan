@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
@@ -20,7 +21,7 @@ namespace Faolan.Importer.Cli
 		// `TerrainService.HasLineOfSight`, so if that test says "blocked" too often, aggro collapses to exactly
 		// `NpcMeleeRange` - which is the reported symptom, and is indistinguishable in-client from the range constant
 		// being too small. This measures it OFFLINE, over the real baked terrain and the real spawn positions, instead
-		// of A/B-ing a server with and without `TerrainDir`.
+		// of A/B-ing a server with and without `Content:TerrainDir`.
 		//
 		// For each NPC spawn on the map it fires rays to eight compass points at a range of distances, each at the
 		// terrain's own ground height (i.e. where a player standing there would be), and tabulates the outcome by
@@ -40,7 +41,7 @@ namespace Faolan.Importer.Cli
 			var mapId = spec.Length > 0 && uint.TryParse(spec[0], out var m) ? m : 4010u;
 			var maxRange = spec.Length == 2 && float.TryParse(spec[1], out var r) ? r : 20f;
 
-			var terrainDir = _options.TerrainOut ?? CliConfig.Resolve(_options.ConfigOverrides)["TerrainDir"] ?? "Terrain";
+			var terrainDir = _options.TerrainOut ?? CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentTerrainDir] ?? "Terrain";
 			var terrain = new TerrainService(terrainDir, NullLogger.Instance);
 			if (!terrain.Available)
 			{

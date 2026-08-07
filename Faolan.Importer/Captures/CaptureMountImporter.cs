@@ -28,7 +28,7 @@ namespace Faolan.Importer.Captures
 			var wanted = (await db.Mounts.Include(m => m.Spell).Select(m => m.Spell.Name).ToListAsync()).Select(n => n.ToLowerInvariant()).ToHashSet();
 			if (wanted.Count == 0)
 				throw new InvalidOperationException(
-					"CaptureMountImporter: the Mounts catalog is empty, so there is nothing to match the captured spawns against. It is imported from the RDB spell records - run `--only rdb-spells --RdbDir <dir>` first (#627).");
+					"CaptureMountImporter: the Mounts catalog is empty, so there is nothing to match the captured spawns against. It is imported from the RDB spell records - run `--only rdb-spells --Content:RdbDir <dir>` first (#627).");
 
 			// Every FA015807 spawn across the captures whose name is one of the wanted mounts; keep the first (most
 			// complete) per creature name.

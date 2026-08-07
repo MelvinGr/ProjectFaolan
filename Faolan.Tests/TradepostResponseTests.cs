@@ -28,7 +28,7 @@ namespace Faolan.Tests
 			var client = new RecordingNetworkClient(0);
 			await TradepostResponses.SendOpenTradepost(client, position);
 
-			Assert.Equal(expected, ToHex(Assert.Single(client.Sent)));
+			Assert.Equal(expected, Convert.ToHexStringLower(Assert.Single(client.Sent)));
 		}
 
 		// The captured single-row DispatchTradepostSearchResults (NecroL80 auctionhouse pkt#1028: seller "Jocko",
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			var client = new RecordingNetworkClient(0);
 			await TradepostResponses.SendSearchResults(client, InterfaceInstance, [JockoListing()]);
 
-			Assert.Equal(expected, ToHex(Assert.Single(client.Sent)));
+			Assert.Equal(expected, Convert.ToHexStringLower(Assert.Single(client.Sent)));
 		}
 
 		// The single captured auctionhouse row (pkt#1028) as a DB listing - shared with TradepostListingCodecTests.
@@ -78,11 +78,6 @@ namespace Faolan.Tests
 				ItemLevel = 1,
 				ItemHash = 0
 			};
-		}
-
-		private static string ToHex(byte[] bytes)
-		{
-			return Convert.ToHexStringLower(bytes);
 		}
 	}
 }

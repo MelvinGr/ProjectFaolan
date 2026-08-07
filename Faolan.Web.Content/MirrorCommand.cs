@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Web.Content
 {
@@ -14,7 +15,7 @@ namespace Faolan.Web.Content
 		// `--help` here cannot describe a default the code does not use - and the mirror's `Cdn:PublicAddress`
 		// keeps its deliberate lack of one, because to the mirror unset means "refuse to start" (Program.Main).
 		private static readonly Option<string>[] Options =
-			FaolanSettings.Options("Cdn:Store", "Cdn:ListenAddress", "Cdn:ListenPort", "Cdn:PublicAddress");
+			FaolanSettings.Options(Keys.CdnStore, Keys.CdnListenAddress, Keys.CdnListenPort, Keys.CdnPublicAddress);
 
 		// The parsed options as configuration overrides, or null when the parser handled the invocation itself
 		// (--help, or it reported a parse error) - the caller should then exit with `exitCode`.

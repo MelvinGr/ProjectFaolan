@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.ClientLauncher
 {
@@ -59,7 +60,7 @@ namespace Faolan.ClientLauncher
 		// see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the normal path is
 		// that the launcher reads the same faolan.json the server does, so a configured Login:PrivateKey automatically
 		// patches its own matching public key and the pair cannot drift.
-		private static readonly Option<string>[] LoginKeys = FaolanSettings.Options("Login:PrivateKey", "Login:PublicKey");
+		private static readonly Option<string>[] LoginKeys = FaolanSettings.Options(Keys.LoginPrivateKey, Keys.LoginPublicKey);
 
 		private static readonly Option<bool> PatchLogin = new("--patch-login")
 		{

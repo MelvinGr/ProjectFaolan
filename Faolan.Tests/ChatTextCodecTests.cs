@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -25,7 +26,7 @@ namespace Faolan.Tests
 		                                        "202f3e3c2f72656d6f7465666f726d61743e0040000001";
 
 		// The record now LEADS with its sub-opcode: the carrier's [u32 len] is the sender's (#530 rule 2), written by
-		// WorldIir.Send. So every captured oracle here is compared against `Record(...)` - the capture minus its
+		// WorldIir.Send. So every captured oracle here is compared against `CapturedRecord.Bytes(...)` - the capture minus its
 		// first four bytes. No wire byte moved.
 		[Fact]
 		public void Build_FromArbitraryXml_LeadsWithTheSubopcode()
@@ -40,27 +41,17 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_FromParsedFields_MatchesCapture()
 		{
-			var p = ChatTextCodec.Parse(Record(CriteriaLineBody));
+			var p = ChatTextCodec.Parse(CapturedRecord.Bytes(CriteriaLineBody));
 
 			var rebuilt = ChatTextCodec.Build(p);
 
-			Assert.Equal(RecordHex(CriteriaLineBody), Convert.ToHexStringLower(rebuilt));
-		}
-
-		private static byte[] Record(string capturedHex)
-		{
-			return Convert.FromHexString(RecordHex(capturedHex));
-		}
-
-		private static string RecordHex(string capturedHex)
-		{
-			return capturedHex[8..];
+			Assert.Equal(CapturedRecord.Hex(CriteriaLineBody), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
 		public void Parse_DecodesTheSystemLine()
 		{
-			var p = ChatTextCodec.Parse(Record(CriteriaLineBody));
+			var p = ChatTextCodec.Parse(CapturedRecord.Bytes(CriteriaLineBody));
 
 			Assert.Equal(0x110099bdu, p.Instance);
 			var xml = Encoding.ASCII.GetString(p.Xml);

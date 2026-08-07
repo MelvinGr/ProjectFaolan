@@ -42,7 +42,7 @@ namespace Faolan.Web.Services
 		{
 			_logger = logger;
 			// The game server's MCP port. Always local - Faolan.Web talks to the server process on this machine.
-			_endpoint = new Uri(config.ChatBridgeUrl);
+			_endpoint = new Uri(config.McpUrl);
 		}
 
 		// A connected character's LIVE map + position (from get_character's Live block), or null if not connected /

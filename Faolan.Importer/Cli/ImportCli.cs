@@ -8,6 +8,7 @@ using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Microsoft.Data.Sqlite;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
@@ -18,7 +19,7 @@ namespace Faolan.Importer.Cli
 		public static async Task<int> RunAsync(ImporterOptions options)
 		{
 			var capturesDir = options.Captures;
-			var rdbDir = CliConfig.Resolve(options.ConfigOverrides)["RdbDir"];
+			var rdbDir = CliConfig.Resolve(options.ConfigOverrides)[Keys.ContentRdbDir];
 
 			// --report <name>: read-only diagnostics (no import, bypasses the runner).
 			if (options.Report != null)

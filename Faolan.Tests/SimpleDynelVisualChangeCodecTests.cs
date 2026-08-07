@@ -5,6 +5,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -39,7 +40,7 @@ namespace Faolan.Tests
 		[Theory, MemberData(nameof(CapturedBodies))]
 		public void CapturedBody_ParsesToItsKind_AndReEncodesByteExact(uint kind, string capturedHex)
 		{
-			var record = Convert.FromHexString(capturedHex)[4..]; // the carrier's [u32 len] is the sender's (#530 rule 2)
+			var record = CapturedRecord.Bytes(capturedHex); // the carrier's [u32 len] is the sender's (#530 rule 2)
 
 			var parsed = SimpleDynelVisualChangeCodec.Parse(record);
 

@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Faolan.Core.Cli;
 using Faolan.Core.Enums;
 using Faolan.Tests.Support;
 using Microsoft.Extensions.Configuration;
 using Xunit;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Tests
 {
@@ -32,7 +34,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(FaolanDbProvider.Sqlite, config.DatabaseProvider);
 			Assert.Equal("Data Source=faolan.db", config.DatabaseConnectionString);
-			Assert.Equal("127.0.0.1", config.ServerIpAddress);
+			Assert.Equal("127.0.0.1", config.ServerAddress);
 			Assert.Equal(7010, config.UniverseAgentPort);
 			Assert.Equal(7011, config.PlayerAgentPort);
 			Assert.Equal("Welcome to Project Faolan!", config.WelcomeString);
@@ -45,55 +47,54 @@ namespace Faolan.Tests
 			Assert.False(config.LogPacketBytes);
 			Assert.False(config.McpEnabled);
 			Assert.Equal(7099, config.McpPort);
-			Assert.Equal("http://127.0.0.1:7099/mcp", config.ChatBridgeUrl); // ...derived from that port, not a second literal
-			Assert.Equal(120_000, config.ChatBridgeBacklogGraceMs);
-			Assert.Equal(1500, config.ChatBridgePollMs);
-			Assert.Equal("mirror-store", config.CdnStore);
+			Assert.Equal("http://127.0.0.1:7099/mcp", config.McpUrl); // ...derived from that port, not a second literal
+			Assert.True(config.ChatBridgeEnabled);
+			Assert.Equal(120_000, config.ChatBridgeBacklogGrace.TotalMilliseconds);
+			Assert.Equal(1500, config.ChatBridgePoll.TotalMilliseconds);
+			Assert.Equal("cdn-store", config.CdnStore);
 			Assert.Equal("127.0.0.1", config.CdnListenAddress);
 			Assert.Equal(7081, config.CdnListenPort);
 
-			// The two that are OPTIONAL rather than defaulted, and stay null on purpose - one names a game install,
-			// the other a deployment's public address (#552). Their readers handle the null; nothing else may.
-			// (Login:PublicKey is the third, and DhKeys rather than an accessor here reads it.)
+			// The one that is OPTIONAL rather than defaulted, and stays null on purpose - it names a game install.
+			// Its readers handle the null; nothing else may. (The two Login: keys are optional too, but their
+			// accessors hand back a parsed BigInteger?, so they are checked with the rest of the keypair rather
+			// than here.)
 			Assert.Null(config.RdbDir);
-			Assert.Null(config.CdnPublicAddress);
-			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress); // ...derived from the mirror's own port
+			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress); // the loopback mirror, at its own port
 		}
 
-		// The chat bridge dials the endpoint the SERVER hosts, so moving the server's port has to move the bridge with
-		// it. `Mcp:Url` used to be a second key holding a second copy of the port: `Mcp:Port 7098` left the bridge on
-		// 7099 - a bridge that connects to nothing, with the port written correctly in the config that broke it. An
-		// explicit `ChatBridge:Url` still wins, for the case a port cannot express (a server on another host).
+		// The MCP endpoint's URL is DERIVED from Mcp:Port and is not a setting, so moving the port moves every reader
+		// of it (the chat bridge, Faolan.Web's live-session probe) with it. It used to be one - `Mcp:Url`, then
+		// `ChatBridge:Url` - holding a second copy of the port: `Mcp:Port 7098` left its readers dialling 7099, which
+		// is a bridge that connects to nothing with the port written correctly in the config that broke it. There is
+		// no override, because the endpoint binds loopback: an address a port cannot express is one nothing can reach.
 		[Theory]
-		[InlineData(null, null, "http://127.0.0.1:7099/mcp")]
-		[InlineData("7098", null, "http://127.0.0.1:7098/mcp")]
-		[InlineData("7098", "http://gameserver.lan:7099/mcp", "http://gameserver.lan:7099/mcp")]
-		public void TheChatBridgesTarget_FollowsTheServersMcpPort(string? port, string? url, string expected)
+		[InlineData(null, "http://127.0.0.1:7099/mcp")]
+		[InlineData("7098", "http://127.0.0.1:7098/mcp")]
+		public void TheMcpEndpointsUrl_FollowsTheServersMcpPort(string? port, string expected)
 		{
 			// A null here means the key is ABSENT, not present-and-null: an in-memory null would override the defaults
 			// layer with nothing, which is a state no config file can produce.
 			var over = new List<KeyValuePair<string, string?>>();
 			if (port != null)
-				over.Add(new("Mcp:Port", port));
-			if (url != null)
-				over.Add(new("ChatBridge:Url", url));
+				over.Add(new(Keys.McpPort, port));
 
 			var config = new ConfigurationBuilder()
 				.AddInMemoryCollection(FaolanSettings.Defaults)
 				.AddInMemoryCollection(over)
 				.Build();
 
-			Assert.Equal(expected, config.ChatBridgeUrl);
+			Assert.Equal(expected, config.McpUrl);
 		}
 
 		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
 		// to mean 10 - a setting that reads as applied and is not - because the fallback and the parse were the same
 		// expression. The message has to name the key, or the operator is hunting a value they cannot see.
 		[Theory]
-		[InlineData("Account:PremiumCharSlots", "ten")]
-		[InlineData("Mcp:Port", "not-a-port")]
-		[InlineData("Log:PacketBytes", "yes")]
-		[InlineData("ChatBridge:PollMs", "soon")]
+		[InlineData(Keys.AccountPremiumCharSlots, "ten")]
+		[InlineData(Keys.McpPort, "not-a-port")]
+		[InlineData(Keys.LogPacketBytes, "yes")]
+		[InlineData(Keys.ChatBridgePollMs, "soon")]
 		public void AMalformedValue_ThrowsNamingTheKey(string key, string value)
 		{
 			var config = new ConfigurationBuilder()
@@ -106,13 +107,37 @@ namespace Faolan.Tests
 			Assert.Contains(value, error.Message);
 		}
 
+		// A key is spelled ONCE, as a const in FaolanSettings.Keys, and both halves of the class read it from there -
+		// the catalog entry and the accessor. So the two cannot name different keys, and the failure that used to be
+		// possible (an accessor indexing a key nothing declares, resolving to null and failing at whatever startup
+		// first needed the value) is a compile error.
+		//
+		// This pins the other direction, which the compiler cannot: the consts and the catalog are the SAME set. A
+		// const with no entry is a key that has no default and no --help line; an entry whose key is not a const is a
+		// literal that got past the extraction.
+		[Fact]
+		public void TheKeyConstants_AreExactlyTheCatalog()
+		{
+			var consts = typeof(FaolanSettings.Keys)
+				.GetFields(BindingFlags.Public | BindingFlags.Static)
+				.Where(f => f.IsLiteral)
+				.ToDictionary(f => f.Name, f => (string)f.GetRawConstantValue()!);
+
+			Assert.Equal(FaolanSettings.All.Select(s => s.Key).Order(), consts.Values.Order());
+
+			// And the const is NAMED for its key, so `Keys.LogFile` sits beside the `config.LogFile` that reads it and
+			// a grep for either finds both. Without this the set can match while the names drift apart.
+			foreach (var (name, key) in consts)
+				Assert.Equal(name, key.Replace(":", ""));
+		}
+
 		// The catalog is also the only place a key is spelled, so a *Command asking for one that is not there is a
 		// typo - and it must fail at the declaration rather than resolve to nothing at runtime.
 		[Fact]
 		public void AnUncataloguedKey_IsARejectedDeclaration()
 		{
 			Assert.Throws<ArgumentException>(() => FaolanSettings.Options("Database:ConnectionStrings"));
-			Assert.NotEmpty(FaolanSettings.Options("Database:ConnectionString"));
+			Assert.NotEmpty(FaolanSettings.Options(Keys.DatabaseConnectionString));
 		}
 
 		// --help shows the default it will actually use. It cannot do otherwise now - the text is built from the same
@@ -120,7 +145,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void AnOptionsHelpText_CarriesTheCatalogsDefault()
 		{
-			var option = FaolanSettings.Options("Log:File")[0];
+			var option = FaolanSettings.Options(Keys.LogFile)[0];
 
 			Assert.Equal("--Log:File", option.Name);
 			Assert.Contains("(default: faolan.log)", option.Description);
@@ -141,14 +166,17 @@ namespace Faolan.Tests
 				// Case-insensitive because a JSON `true` comes back through the reader as "True", which is the same
 				// value to every parser that reads it - the catalog spells it lower-case because JSON does.
 				//
-				// A Hidden setting reads back as null on purpose: its default applies (it is in the defaults layer)
-				// but is not WRITTEN here, because it is key material and a config file full of key literals invites
-				// someone to edit half of a pair. The optional ones are null for the plainer reason.
+				// An OPTIONAL setting reads back as null: it is written as a commented-out line, so the file names it
+				// without setting it.
 				foreach (var setting in FaolanSettings.All)
-					Assert.Equal(setting.Hidden ? null : setting.Default, config[setting.Key], StringComparer.OrdinalIgnoreCase);
+					Assert.Equal(setting.DefaultText, config[setting.Key], StringComparer.OrdinalIgnoreCase);
 
-				// ...and Hidden really does mean "applies anyway", or it would just be a missing default.
-				Assert.Equal(FaolanSettings.Get("Login:PrivateKey").Default, new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build()["Login:PrivateKey"]);
+				// The login keypair is the case that motivates all of this: it has NO default, so a server that
+				// configures nothing has no key and checks no passwords. It must not acquire one from the defaults
+				// layer - a built-in key is a key everybody has.
+				var defaults = new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build();
+				Assert.Null(defaults[Keys.LoginPrivateKey]);
+				Assert.Null(defaults[Keys.LoginPublicKey]);
 			}
 			finally
 			{
@@ -177,10 +205,10 @@ namespace Faolan.Tests
 		{
 			return key switch
 			{
-				"Account:PremiumCharSlots" => config.AccountPremiumCharSlots,
-				"Mcp:Port" => config.McpPort,
-				"Log:PacketBytes" => config.LogPacketBytes,
-				"ChatBridge:PollMs" => config.ChatBridgePollMs,
+				Keys.AccountPremiumCharSlots => config.AccountPremiumCharSlots,
+				Keys.McpPort => config.McpPort,
+				Keys.LogPacketBytes => config.LogPacketBytes,
+				Keys.ChatBridgePollMs => config.ChatBridgePoll,
 				_ => throw new ArgumentException($"No accessor wired for '{key}' in this test.", nameof(key))
 			};
 		}

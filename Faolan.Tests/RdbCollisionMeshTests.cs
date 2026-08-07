@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using Faolan.Core.Cli;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Xunit;
@@ -24,10 +25,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void RealBeachCollision_MatchesPythonValidation()
 		{
-			// Non-hermetic: only runs where the client RDB is present (set RdbDir to the client's RDB folder).
-			// Locks the C# parser to the Python decode (beach 4010 = 666 actors / 116,178 triangles) so a
-			// real-data regression is caught, not just the synthetic.
-			var rdbDir = Environment.GetEnvironmentVariable("RdbDir");
+			// Non-hermetic: only runs where the client RDB is present (Content:RdbDir - faolan.user.json, or
+			// Content__RdbDir in the environment). Locks the C# parser to the Python decode (beach 4010 = 666
+			// actors / 116,178 triangles) so a real-data regression is caught, not just the synthetic.
+			//
+			// It resolves through the shared configuration stack rather than reading one env var, because the key
+			// is sectioned: `Content:RdbDir` is not a legal environment-variable name (the provider spells it
+			// `Content__RdbDir`), so a raw GetEnvironmentVariable would find nothing and this would skip forever.
+			var rdbDir = FaolanCommandLine.Build().RdbDir;
 			if (string.IsNullOrEmpty(rdbDir) || !File.Exists(Path.Combine(rdbDir, "le.idx")))
 				return; // client RDB unavailable (CI) - skip
 

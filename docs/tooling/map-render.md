@@ -10,9 +10,9 @@ It needs no C# beyond the importer's existing `rdb-dump` report:
 ```zsh
 # the map image (RDB 1010209) and the playfield extent (RDB 1070003 <tilemap>)
 dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1010209:2070 \
-    --out <dir> --RdbDir <rdb-dir> --captures <data-repo>/Captures
+    --out <dir> --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1070003:2070 \
-    --out <dir> --RdbDir <rdb-dir> --captures <data-repo>/Captures
+    --out <dir> --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 
 python3 tools/maps/render_spawn_map.py --map 2070 --db faolan.db \
     --map-image <dir>/1010209_2070.bin --playfield <dir>/1070003_2070.bin \

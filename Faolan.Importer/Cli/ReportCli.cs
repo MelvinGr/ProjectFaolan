@@ -28,6 +28,7 @@ using Faolan.Importer.Extractors;
 using Faolan.Importer.Modules;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
@@ -3872,7 +3873,7 @@ namespace Faolan.Importer.Cli
 		// that cannot run without it and wrong for one that degrades.
 		private static string? RdbDirOrNull()
 		{
-			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"];
+			return CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentRdbDir];
 		}
 
 		// Every report opens the RDB THROUGH the CDN mirror. A reader built without a proxy base silently degrades to
@@ -3886,9 +3887,9 @@ namespace Faolan.Importer.Cli
 
 		private static string RdbDir()
 		{
-			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"] ??
+			return CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentRdbDir] ??
 				throw new InvalidOperationException(
-					"The client's RDB folder is not configured - set RdbDir in faolan.json, the RdbDir environment variable, or pass --RdbDir <dir>.");
+					"The client's RDB folder is not configured - set Content:RdbDir in faolan.json, the Content__RdbDir environment variable, or pass --Content:RdbDir <dir>.");
 		}
 
 		// List all entries of a TYPE (--report-arg <type>) and dump each decompressed payload to --out as
@@ -4791,7 +4792,7 @@ namespace Faolan.Importer.Cli
 						for (var i = 0; i + 1 < located.Count; i++)
 						{
 							var w = located[i + 1].Offset - located[i].Offset;
-							tiled.TryAdd(located[i].Kind, new Dictionary<int, (int, uint, uint[])>());
+							tiled.TryAdd(located[i].Kind, []);
 							var seenSoFar = tiled[located[i].Kind];
 							var prior = seenSoFar.GetValueOrDefault(w);
 
@@ -5939,7 +5940,7 @@ namespace Faolan.Importer.Cli
 		// test (#491) and which are deliberately not stored in the DB. Running without them would silently apply
 		// WEAKER rules than the importer and produce a different faolan.db, so the RDB is required rather than
 		// optional. Run:
-		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas --RdbDir <dir>
+		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas --Content:RdbDir <dir>
 		private static async Task ResolveSpawnAreas(string rdbDir)
 		{
 			await using var db = OpenDb();

@@ -1,5 +1,6 @@
 using Faolan.ClientLauncher;
 using Xunit;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Tests
 {
@@ -80,8 +81,8 @@ namespace Faolan.Tests
 
 			Assert.NotNull(options);
 			Assert.True(options.PatchLogin);
-			Assert.Equal("AABB", Assert.Contains("Login:PrivateKey", options.LoginKeys));
-			Assert.DoesNotContain("Login:PublicKey", options.LoginKeys);
+			Assert.Equal("AABB", Assert.Contains(Keys.LoginPrivateKey, options.LoginKeys));
+			Assert.DoesNotContain(Keys.LoginPublicKey, options.LoginKeys);
 		}
 
 		// A --launcher-notes URL the client cannot use is a typo in the flag, so it is refused during the PARSE -

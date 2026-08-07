@@ -71,7 +71,7 @@ if "%RDB_DIR%"=="" set "RDB_DIR=C:\games\Age of Conan\RDB"
 dotnet run --project .\Faolan.Importer\Faolan.Importer.csproj -- ^
     --report timeline ^
     --report-arg "%DUMP%" ^
-    --RdbDir "%RDB_DIR%"
+    --Content:RdbDir "%RDB_DIR%"
 goto end
 
 :timeline_usage

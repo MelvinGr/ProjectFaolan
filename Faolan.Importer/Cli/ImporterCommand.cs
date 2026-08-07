@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {
@@ -20,9 +21,9 @@ namespace Faolan.Importer.Cli
 	{
 		// Config keys: the option name IS the configuration path, and its description + default come from the one
 		// catalog (FaolanSettings).
-		private static readonly Option<string> ConnectionString = FaolanCommandLine.ConfigOption("Database:ConnectionString");
-		private static readonly Option<string> Provider = FaolanCommandLine.ConfigOption("Database:Provider");
-		private static readonly Option<string> RdbDir = FaolanCommandLine.ConfigOption("RdbDir");
+		private static readonly Option<string> ConnectionString = FaolanCommandLine.ConfigOption(Keys.DatabaseConnectionString);
+		private static readonly Option<string> Provider = FaolanCommandLine.ConfigOption(Keys.DatabaseProvider);
+		private static readonly Option<string> RdbDir = FaolanCommandLine.ConfigOption(Keys.ContentRdbDir);
 
 		// Command options.
 		private static readonly Option<string> Captures = new("--captures") { Description = "The capture corpus directory (the private ProjectFaolan-Data repo's Captures/)." };

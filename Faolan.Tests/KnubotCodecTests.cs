@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -11,7 +12,7 @@ namespace Faolan.Tests
 	// (player = carrier handle, NPC in the KnubotBase header) reconstructs byte-exact.
 	//
 	// ⚠️ The captured oracles are the whole carrier payload, which BEGINS with the [u32 len]. That word belongs to
-	// the sender now (#530 rule 2), so every assertion here is against `Record(...)` - the capture minus its first
+	// the sender now (#530 rule 2), so every assertion here is against `CapturedRecord.Bytes(...)` - the capture minus its first
 	// four bytes. Nothing on the wire moved: ConversationService writes the same length back on.
 	public class KnubotCodecTests
 	{
@@ -25,23 +26,23 @@ namespace Faolan.Tests
 		[Fact]
 		public void AnswerList_BuildsByteExact()
 		{
-			var p = (KnubotAnswerListIIR)KnubotCodec.Parse(Record(KnubotCodecTestData.AnswerListBody));
+			var p = (KnubotAnswerListIIR)KnubotCodec.Parse(CapturedRecord.Bytes(KnubotCodecTestData.AnswerListBody));
 
 			Assert.Equal(0x0802E5D4u, p.PlayerInstance);
 			Assert.Equal(0x00031815u, p.NpcHandle);
 			Assert.Single(p.Strings);
-			Assert.Equal(RecordHex(KnubotCodecTestData.AnswerListBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+			Assert.Equal(CapturedRecord.Hex(KnubotCodecTestData.AnswerListBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
 		[Fact]
 		public void AppendText_BuildsByteExact()
 		{
-			var p = (KnubotAppendTextIIR)KnubotCodec.Parse(Record(KnubotCodecTestData.AppendTextBody));
+			var p = (KnubotAppendTextIIR)KnubotCodec.Parse(CapturedRecord.Bytes(KnubotCodecTestData.AppendTextBody));
 
 			Assert.Equal(0x110099BDu, p.PlayerInstance);
 			Assert.Equal(0x00042194u, p.NpcHandle);
 			Assert.StartsWith("<remoteformat", Encoding.ASCII.GetString(p.Xml));
-			Assert.Equal(RecordHex(KnubotCodecTestData.AppendTextBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+			Assert.Equal(CapturedRecord.Hex(KnubotCodecTestData.AppendTextBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
 		// The captured greeting's XML (#188 construct path): building it for the captured endpoints must reproduce the
@@ -52,27 +53,27 @@ namespace Faolan.Tests
 		{
 			var rebuilt = KnubotCodec.Build(new KnubotAppendTextIIR(0x110099BDu, 0x00042194u, 0x00, 1, KnubotCodecTestData.RemoteFormatXml, 1));
 
-			Assert.Equal(RecordHex(KnubotCodecTestData.AppendTextBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(CapturedRecord.Hex(KnubotCodecTestData.AppendTextBody), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
 		public void CloseChatWindow_BuildsByteExact()
 		{
-			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(Record(CloseChatWindowBody));
+			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(CapturedRecord.Bytes(CloseChatWindowBody));
 
 			Assert.Single(p.Strings);
 			Assert.StartsWith("<remoteformat id=\"0\"", Encoding.ASCII.GetString(p.Strings[0]));
-			Assert.Equal(RecordHex(CloseChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+			Assert.Equal(CapturedRecord.Hex(CloseChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
 		[Fact]
 		public void OpenChatWindow_BuildsByteExact()
 		{
-			var p = (KnubotOpenChatWindowIIR)KnubotCodec.Parse(Record(OpenChatWindowBody));
+			var p = (KnubotOpenChatWindowIIR)KnubotCodec.Parse(CapturedRecord.Bytes(OpenChatWindowBody));
 
 			Assert.Equal(0x01316E71u, p.PlayerInstance);
 			Assert.Equal(0x00017E03u, p.NpcHandle);
-			Assert.Equal(RecordHex(OpenChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+			Assert.Equal(CapturedRecord.Hex(OpenChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
 		// The c2s answer pick, from the corpus (#534). This is the shape ALL 586 captured picks have: 31 bytes, the
@@ -83,24 +84,13 @@ namespace Faolan.Tests
 		{
 			const string answerBody = "0000001b4d7d91230000c35001316e710000010000c35000017ed000000000";
 
-			var p = (KnubotAnswerIIR)KnubotCodec.Parse(Record(answerBody));
+			var p = (KnubotAnswerIIR)KnubotCodec.Parse(CapturedRecord.Bytes(answerBody));
 
 			Assert.Equal(0x01316E71u, p.PlayerInstance);
 			Assert.Equal(0x00017ED0u, p.NpcHandle);
 			Assert.Equal(0x00, p.Env);
 			Assert.Equal(0u, p.Index);
-			Assert.Equal(RecordHex(answerBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
-		}
-
-		// The captured payload minus the carrier's [u32 len], which is the sender's (#530 rule 2).
-		internal static byte[] Record(string capturedHex)
-		{
-			return Convert.FromHexString(RecordHex(capturedHex));
-		}
-
-		internal static string RecordHex(string capturedHex)
-		{
-			return capturedHex[8..];
+			Assert.Equal(CapturedRecord.Hex(answerBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 	}
 }

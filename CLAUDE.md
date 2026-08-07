@@ -35,11 +35,11 @@ dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1
 dotnet run --project Faolan.Importer -- --skip characters     # idempotent EXCEPT characters; skip on a populated DB
 dotnet run --project Faolan.Importer -- --list                # catalog every module (+ which are opt-in)
 dotnet run --project Faolan.Importer -- --only npcs --mode overwrite   # one module; overwrite = the old --reseed-npcs
-dotnet run --project Faolan.Importer -- --only rdb-maps --RdbDir <dir> # rdb-* + mounts are OPT-IN (not in the default run)
+dotnet run --project Faolan.Importer -- --only rdb-maps --Content:RdbDir <dir> # rdb-* + mounts are OPT-IN (not in the default run)
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
 dotnet run --project Faolan.Importer -- --report sql-seed             # (re)write faolan.sql + the counter sidecars from the DB
 dotnet run --project Faolan.Importer -- --report apply-seed --dry-run # upgrade an EXISTING db's content FROM faolan.sql (#412)
-dotnet run --project Faolan.Importer -- --report timeline --report-arg <capture>.tshark.json --RdbDir <dir>
+dotnet run --project Faolan.Importer -- --report timeline --report-arg <capture>.tshark.json --Content:RdbDir <dir>
 # ^ ONE capture as a flat chronological story, ids resolved + LDB text decrypted inline (`./run.sh --timeline <dump>`;
 #   see the `capture-timeline` skill). Decode lives in the CODECS - add one there, never inline in the report.
 # Modes: --mode insert|upsert(default)|overwrite (per-module: --mode npcs=overwrite,items=insert). NO old-flag
@@ -348,7 +348,7 @@ assuming a command exists; several older ones were removed, and any MCP tools wr
 The 349 MB of retail traces, the Ghidra project and the baked terrain live in a separate PRIVATE repo,
 **ProjectFaolan-Data** on the same Gitea host, so this repo stays small
 (and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
-`Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--RdbDir` likewise).
+`Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--Content:RdbDir` likewise).
 
 **The test suite does NOT need it.** Every test runs from a plain clone, off ONE committed file —
 `Faolan.Tests/Assets/fixtures.bin` (15 MB, `FixtureArchive`), which holds every byte of capture-derived data the
@@ -372,7 +372,7 @@ suite reads. It has two halves, and the difference decides which one a new gate 
 dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures
 ```
 
-`--captures` is how every importer command takes it (`--RdbDir` likewise). The importer's DB comes from faolan.json
+`--captures` is how every importer command takes it (`--Content:RdbDir` likewise). The importer's DB comes from faolan.json
 (the `Database` section: `Database:Provider` + `Database:ConnectionString`), the same as the server; override the connection with `--Database:ConnectionString "<conn string>"`
 
 ⚠️ The corpus half is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
@@ -386,7 +386,7 @@ instead, and `Captures/…` paths in docs are not linted at all. Don't reintrodu
 still name the capture it came from, for failure provenance.)
 
 You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
-`Terrain/` needs no symlink - it is the `TerrainDir` key in `faolan.json`; if it is missing the server logs
+`Terrain/` needs no symlink - it is the `Content:TerrainDir` key in `faolan.json`; if it is missing the server logs
 that ground-snap and line-of-sight are DISABLED and carries on, so check that line rather than assuming.
 
 ## Conventions
@@ -412,7 +412,7 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
   go public and must stay machine-agnostic; a local path is wrong on every other clone and leaks the layout.
   Instead:
   - **Runtime code / config:** take the location from a CLI flag or env var, falling back to a clear error —
-    the client RDB dir is the `RdbDir` key (`--RdbDir` / `RdbDir` env / faolan.json), blank in `Faolan.Web`'s
+    the client RDB dir is the `Content:RdbDir` key (`--Content:RdbDir` / `Content:RdbDir` env / faolan.json), blank in `Faolan.Web`'s
     committed `appsettings.json` and set in the gitignored `appsettings.Development.json` or the env.
   - **RE / tool scripts:** write outputs to an env-var dir falling back to the system temp dir, never a
     hardcoded scratchpad path and never a repo dir. Every `tools/ghidra/*.java` script resolves
@@ -424,8 +424,8 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
     paths belong in agent memory only (under `~/.claude`), not the repo. See the `no_local_paths_in_repo` memory.
   - **This checkout's own values:** `faolan.user.json` at the repo root — **gitignored**, layered on top of
     `faolan.json` by the shared config builder (`Global.UserConfigPath`; `FAOLAN_USER_CONFIG` overrides). Same keys,
-    same shapes, it simply wins. It is where `RdbDir` and a LAN `Cdn:PublicAddress` live, so no importer
-    command needs `--RdbDir` / `--rdb-proxy` and the committed `faolan.json` stays machine-agnostic.
+    same shapes, it simply wins. It is where `Content:RdbDir` and a LAN `Cdn:PublicAddress` live, so no importer
+    command needs `--Content:RdbDir` / `--rdb-proxy` and the committed `faolan.json` stays machine-agnostic.
   - `run.sh` is the one deliberate exception (personal dev launcher, kept local); its Windows twin `run.bat`
     takes `FAOLAN_CDN_STORE` / `AOC_EXE2` instead.
 - **Docs carry CONFIRMED info only — progress/TODOs live in Gitea, not `docs/`.** No "Remaining / Next steps /

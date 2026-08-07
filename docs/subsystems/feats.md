@@ -431,7 +431,7 @@ Resolving those tokens needs no live client — an LDB string id is the 28-bit E
 (`LdbStringIndex.TokenId`), so any `FUN_0061f640(<cat>, "<Token>")` in the exe resolves statically:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report ldb-resolve --RdbDir <rdb-dir> \
+dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <rdb-dir> \
   --report-arg YouCanNotUseYet,CriteriaMissingFeat,Criteria_IsRequiredToBeAtLeast
 ```
 

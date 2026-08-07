@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(ClientExePatcher.Result.Patched, ClientExePatcher.PatchPublicKey(_exe, Key('a')));
 
 			Assert.Equal(Key('a'), KeyInFile());
-			Assert.Equal(DhKeys.PrimeHex, PrimeInFile()); // ...the run that must never be touched
+			Assert.Equal(ClientLoginEncryption.PrimeHex, PrimeInFile()); // ...the run that must never be touched
 			Assert.DoesNotContain(Encoding.ASCII.GetString(retail), File.ReadAllText(_exe));
 		}
 
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 			Assert.Equal(ClientExePatcher.Result.Patched, ClientExePatcher.PatchPublicKey(_exe, Key('b')));
 
 			Assert.Equal(Key('b'), KeyInFile());
-			Assert.Equal(DhKeys.PrimeHex, PrimeInFile());
+			Assert.Equal(ClientLoginEncryption.PrimeHex, PrimeInFile());
 		}
 
 		// The same key twice is not a patch - the launcher reports it so, rather than rewriting the file for nothing.
@@ -72,10 +72,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void AFileWithOnlyThePrime_IsNotAKeySlot()
 		{
-			File.WriteAllBytes(_exe, [.. Nul(Encoding.ASCII.GetBytes(DhKeys.PrimeHex))]);
+			File.WriteAllBytes(_exe, [.. Nul(Encoding.ASCII.GetBytes(ClientLoginEncryption.PrimeHex))]);
 
 			Assert.Equal(ClientExePatcher.Result.NotFound, ClientExePatcher.PatchPublicKey(_exe, Key('a')));
-			Assert.Equal(DhKeys.PrimeHex, File.ReadAllText(_exe).Trim('\0'));
+			Assert.Equal(ClientLoginEncryption.PrimeHex, File.ReadAllText(_exe).Trim('\0'));
 		}
 
 		// Hex is not enough on its own: the exe is full of hex-looking bytes, and only a NUL-delimited run of exactly
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 		// NUL-terminated string, as they sit in the client's string table.
 		private void Write(byte[] key)
 		{
-			File.WriteAllBytes(_exe, [.. Nul(key), .. "some other string"u8.ToArray(), 0, .. Nul(Encoding.ASCII.GetBytes(DhKeys.PrimeHex))]);
+			File.WriteAllBytes(_exe, [.. Nul(key), .. "some other string"u8.ToArray(), 0, .. Nul(Encoding.ASCII.GetBytes(ClientLoginEncryption.PrimeHex))]);
 		}
 
 		private static byte[] Nul(byte[] value)
@@ -104,18 +104,18 @@ namespace Faolan.Tests
 
 		private static byte[] Key(char c)
 		{
-			return Encoding.ASCII.GetBytes(new string(c, DhKeys.PublicHexLength));
+			return Encoding.ASCII.GetBytes(new string(c, ClientLoginEncryption.PublicHexLength));
 		}
 
 		private byte[] KeyInFile()
 		{
-			return File.ReadAllBytes(_exe).Skip(1).Take(DhKeys.PublicHexLength).ToArray();
+			return File.ReadAllBytes(_exe).Skip(1).Take(ClientLoginEncryption.PublicHexLength).ToArray();
 		}
 
 		private string PrimeInFile()
 		{
 			var bytes = File.ReadAllBytes(_exe);
-			return Encoding.ASCII.GetString(bytes, bytes.Length - DhKeys.PublicHexLength - 1, DhKeys.PublicHexLength);
+			return Encoding.ASCII.GetString(bytes, bytes.Length - ClientLoginEncryption.PublicHexLength - 1, ClientLoginEncryption.PublicHexLength);
 		}
 	}
 }

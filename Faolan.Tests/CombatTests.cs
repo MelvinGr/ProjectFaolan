@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.GameServer.Combat;
 using Xunit;
@@ -202,7 +203,7 @@ namespace Faolan.Tests
 			// .Set order (current then max per vital; ids in-client verified, see CharacterStatId):
 			// count(06) + HealthCurrent(001B) + HealthMax(0001) + StaminaCurrent(01F8) + StaminaMax(01F9)
 			//           + ManaCurrent(01FA) + ManaMax(01FB), each = 0x189C.
-			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(CharacterStatBlockCodec.Build(v.ToVitalsBlock())));
+			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(v.ToVitalsBlock())));
 		}
 
 		// #586: the CURRENTS-only form, which is what retail sends when a pool MOVES (a hit, a cast, the regen tick).
@@ -216,20 +217,7 @@ namespace Faolan.Tests
 			// count(03) + HealthCurrent(001B) + StaminaCurrent(01F8) + ManaCurrent(01FA), each 6300 = 0x189C. No max
 			// id: sending one here would be three fabricated records per entity per swing, and for an NPC - which has
 			// no class curve - the max slot would carry our ceiling rather than the class base that slot holds.
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(CharacterStatBlockCodec.Build(v.ToCurrentsBlock())));
-		}
-
-		private static string ToHex(byte[] bytes)
-		{
-			var chars = new char[bytes.Length * 2];
-			const string hex = "0123456789abcdef";
-			for (var i = 0; i < bytes.Length; i++)
-			{
-				chars[i * 2] = hex[bytes[i] >> 4];
-				chars[i * 2 + 1] = hex[bytes[i] & 0xF];
-			}
-
-			return new string(chars);
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(v.ToCurrentsBlock())));
 		}
 	}
 }

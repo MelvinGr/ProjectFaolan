@@ -69,7 +69,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The tooltip description, from LDB category 50201 keyed by the item template id (#414) - e.g. 8757
 		// "Animated Dagger" -> "Deals piercing damage over time.". NULL when the LDB has none for this template, or
-		// when the RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --RdbDir).
+		// when the RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --Content:RdbDir).
 		[MaxLength(2048)]
 		public string? Description { get; set; }
 

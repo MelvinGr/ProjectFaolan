@@ -222,7 +222,7 @@ namespace Faolan.Importer.Cli
 			if (rdbDir == null || !Directory.Exists(rdbDir))
 			{
 				foreach (var r in usable)
-					Console.WriteLine($"   LDB[{r.Id}][{r.Name}] - pass --RdbDir to decrypt (or: --report ldb-decrypt --report-arg {r.Id}:{r.Name}:{r.Extra})");
+					Console.WriteLine($"   LDB[{r.Id}][{r.Name}] - pass --Content:RdbDir to decrypt (or: --report ldb-decrypt --report-arg {r.Id}:{r.Name}:{r.Extra})");
 
 				return;
 			}

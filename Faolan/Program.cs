@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Faolan.ChatServer;
 using Faolan.Core;
 using Faolan.Core.Cli;
-using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
@@ -75,21 +74,35 @@ namespace Faolan
 			builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 			builder.Logging.AddFilter("ModelContextProtocol.Server.McpServer", LogLevel.Warning);
 
-			builder.Logging.AddSimpleConsole(options =>
+			builder.Logging.AddSimpleConsole(o =>
 			{
-				options.IncludeScopes = true;
-				options.SingleLine = true;
+				o.IncludeScopes = true;
+				o.SingleLine = true;
 			});
 
 			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
 
-			// The login DH private key (Login:PrivateKey). Applied BEFORE any listener starts, since the public key the
-			// launcher patches into a client is derived from it. Unset = the built-in default; a bad value throws here
-			// rather than silently degrading every login to accept-any.
-			DhKeys.Configure(builder.Configuration);
+			// The login DH private key (Login:PrivateKey). Read BEFORE any listener starts so a bad value throws here
+			// rather than mid-login, where it would silently degrade every login to accept-any.
+			var serverPrivateKey = builder.Configuration.LoginPrivateKey;
 
-			if (DhKeys.IsConfigured)
-				Console.WriteLine("[login] Using the configured Login:PrivateKey - patch clients with the matching public key (Faolan.ClientLauncher --patch-login).");
+			// All three states get a line, because the one that matters most is the one that used to print NOTHING:
+			// a server that checks no passwords looked identical at startup to one that does. "Unset" is no longer a
+			// built-in key either - there is no key at all - so say what that means for logins rather than for config.
+			if (serverPrivateKey == null)
+			{
+				Console.WriteLine(
+					"[login] No Login:PrivateKey - passwords are NOT checked; every client is accepted on its account name alone. Run --generate-login-key and patch clients (Faolan.ClientLauncher --patch-login) to enable password validation.");
+			}
+			else if (builder.Configuration.LoginAllowUnpatchedClients)
+			{
+				Console.WriteLine(
+					"[login] Using the configured Login:PrivateKey - a PATCHED client's password is validated, but an unpatched one is still accepted on its account name (Login:AllowUnpatchedClients). Patch clients with Faolan.ClientLauncher --patch-login.");
+			}
+			else
+			{
+				Console.WriteLine("[login] Using the configured Login:PrivateKey - every client must be patched (Faolan.ClientLauncher --patch-login) and its password is validated.");
+			}
 
 			Realm? hostRealm = null;
 			try

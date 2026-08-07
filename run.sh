@@ -58,7 +58,7 @@ case "$command" in
         dotnet run --project ./Faolan.Importer/Faolan.Importer.csproj -- \
             --report timeline \
             --report-arg "${1:?usage: $0 --timeline <capture>.tshark.json}" \
-            --RdbDir "${RDB_DIR:-/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB}"
+            --Content:RdbDir "${RDB_DIR:-/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB}"
         ;;
 
     --claude)

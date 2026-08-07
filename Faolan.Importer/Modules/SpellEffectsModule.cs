@@ -86,7 +86,7 @@ namespace Faolan.Importer.Modules
 			// - which would silently drop every pet summon, the exact failure this ticket replaced a hand-typed list
 			// to avoid. Say so instead.
 			if (summonSpells.Count == 0)
-				throw new InvalidOperationException("spell-effects: no spell in the catalog carries summon params - run `rdb-spells` (with --RdbDir) first, or the pet roster would come out empty.");
+				throw new InvalidOperationException("spell-effects: no spell in the catalog carries summon params - run `rdb-spells` (with --Content:RdbDir) first, or the pet roster would come out empty.");
 
 			var rows = summons.Concat(BuildRows()).ToList();
 			var mode = ctx.ModeOverrides.GetValueOrDefault(Name, ctx.Mode);

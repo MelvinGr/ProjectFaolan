@@ -8,7 +8,7 @@
 			"applicationUrl": "http://localhost:7080",
 			"environmentVariables": {
 				"ASPNETCORE_ENVIRONMENT": "Development",
-				"RdbDir": "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB"
+				"Content__RdbDir": "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB"
 			},
 			"workingDirectory": ".."
 		}

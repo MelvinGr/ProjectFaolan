@@ -123,8 +123,8 @@ The table is **generated**, not maintained by hand — `BoundedAreaClassifier` i
 re-run:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report bounded-areas --RdbDir <rdb-dir>
-dotnet run --project Faolan.Importer -- --report bounded-areas --report-arg spawn-camp --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report bounded-areas --Content:RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report bounded-areas --report-arg spawn-camp --Content:RdbDir <rdb-dir>
 ```
 
 **8,917 regions over 393 playfield records**, excluding the 85 records in the variant (`0x40000000`-based) id
@@ -688,7 +688,7 @@ numbering, which is not a `Map.Id`.
 Both are gated by `BoundedAreaCollectionTests`.
 
 ```zsh
-dotnet run --project Faolan.Importer -- --only rdb-regions --mode overwrite --RdbDir <rdb-dir> --captures <data-repo>/Captures
-dotnet run --project Faolan.Importer -- --report area-banner-names --RdbDir <rdb-dir> --captures <data-repo>/Captures
-dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1000053:1090 --out <dir> --RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --only rdb-regions --mode overwrite --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --report area-banner-names --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1000053:1090 --out <dir> --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 ```

@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.CommandLine;
-using System.IO;
+using System.Text;
 using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
-using Microsoft.Extensions.Configuration;
+using Faolan.Core.Extensions;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan
 {
@@ -32,9 +33,10 @@ namespace Faolan
 		// executables. They still get their defaults here, because the defaults layer is built from the catalog
 		// rather than from this list.
 		private static readonly Option<string>[] ConfigOptions = FaolanSettings.Options(
-			"Database:Provider", "Database:ConnectionString", "ServerIpAddress", "UniverseAgentPort", "PlayerAgentPort", "WelcomeString", "TerrainDir",
-			"ClientVersion", "Login:PrivateKey", "Login:AllowUnpatchedClients", "Mcp:Enabled", "Mcp:Port", "Log:File", "Log:PacketBytes",
-			"Account:Premium", "Account:PremiumCharSlots", "Account:FreeCharSlots");
+			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
+			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.LoginPrivateKey, Keys.LoginAllowUnpatchedClients,
+			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
+			Keys.AccountPremium, Keys.AccountPremiumCharSlots, Keys.AccountFreeCharSlots);
 
 		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as a file you can
 		// edit. It OVERWRITES what is there, which is why it is an explicit flag and nothing calls it on startup.
@@ -44,21 +46,24 @@ namespace Faolan
 			Arity = ArgumentArity.ZeroOrOne
 		};
 
-		// Generates a fresh login DH private key and writes it to faolan.user.json - the GITIGNORED half of the config,
-		// because a key is per-deployment and faolan.json is committed.
-		private static readonly Option<string> GenerateLoginKey = new("--generate-login-key")
+		// Generates a fresh login DH keypair and PRINTS it - it writes nothing. The key belongs in faolan.user.json,
+		// the GITIGNORED half of the config (a keypair is per-deployment and faolan.json is committed), and the
+		// operator pastes it there.
+		//
+		// It used to write that file itself, which cost a 140-line JSON-with-comments text editor: a JsonNode
+		// round-trip would have dropped every comment in the user file, so the writer edited it with regexes and then
+		// re-read the result to prove the edit was valid. That is a lot of machinery, and a lot of ways to damage a
+		// file, for one key going into a file the operator already has open.
+		private static readonly Option<bool> GenerateLoginKey = new("--generate-login-key")
 		{
-			Description = "Generate a new login DH private key into faolan.user.json (or the given path) and exit. Every client must then be re-patched (Faolan.ClientLauncher --patch-login).",
-			Arity = ArgumentArity.ZeroOrOne
+			Description = "Print a new login DH keypair to paste into faolan.user.json, and exit. Every client must then be re-patched (Faolan.ClientLauncher --patch-login)."
 		};
-
-		private static readonly Option<bool> Force = new("--force") { Description = "Let --generate-login-key replace a Login:PrivateKey that is already set." };
 
 		// Returns null when the parser handled the invocation itself (--help, --write-default-config,
 		// --generate-login-key, or it reported a parse error); the caller should exit with `exitCode`.
 		public static ServerOptions? Parse(string[] args, out int exitCode)
 		{
-			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role, WriteDefaultConfig, GenerateLoginKey, Force };
+			var command = new RootCommand("Project Faolan - Age of Conan server protocol emulator.") { Role, WriteDefaultConfig, GenerateLoginKey };
 			foreach (var option in ConfigOptions)
 				command.Options.Add(option);
 
@@ -76,7 +81,7 @@ namespace Faolan
 
 			if (result.GetResult(GenerateLoginKey) != null)
 			{
-				exitCode = GenerateKey(result.GetValue(GenerateLoginKey), result.GetValue(Force));
+				GenerateKey();
 
 				return null;
 			}
@@ -84,72 +89,29 @@ namespace Faolan
 			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Overrides(result, ConfigOptions));
 		}
 
-		// The private key is written, never PRINTED - it is the one value in this config that is a secret, and a
-		// terminal scrollback is not where it belongs. The derived public half is printed instead, because that is
-		// what has to end up in every client and what tells you the write took effect.
+		// BOTH halves are printed, the private one included. That reverses the old rule here ("a secret does not
+		// belong in a terminal scrollback"), and it has to: nothing writes the key any more, so the operator cannot
+		// paste a value they are not shown. What the old rule was protecting is also smaller than it sounds - the
+		// value is one deployment's DH exponent for a private emulator, and the pair it belongs to is regenerated by
+		// running this again.
 		//
-		// ⚠️ Printing the public key is not decoration: it is the pair's only visible half. `ServerPublicHex` is
-		// `g^ServerPrivate mod N` computed per access rather than a stored value, so the two cannot drift - but two
-		// things CAN leave the effective pair disagreeing with the file just written, and both are checked below.
-		private static int GenerateKey(string? given, bool force)
+		// The public half is DERIVED, not stored: `ClientLoginEncryption.PublicHexFor` computes `g^serverPrivate mod N`
+		// from the private key it is handed, so the two cannot drift. Printing it is not decoration - it is the value
+		// every client has to be patched with.
+		private static void GenerateKey()
 		{
-			// Default to the user config, because that is where a per-deployment secret belongs; a path is accepted for
-			// the deployment that keeps its config somewhere else, the same as --write-default-config.
-			var path = given is { Length: > 0 } ? given : Global.UserConfigPath;
-			string hex;
-			IConfiguration config;
-			try
-			{
-				hex = DhKeys.GeneratePrivateHex();
-				UserConfigWriter.Set(path, "Login:PrivateKey", hex, force);
+			var hex = ClientLoginEncryption.GeneratePrivate().ToString("x").TrimStart('0');;
+			var text = new StringBuilder()
+				.AppendLine($"A new login DH keypair. NOTHING was written - paste the private half into {Global.UserConfigPath} (gitignored):")
+				.AppendLine()
+				.AppendLine("\t\"Login\": {")
+				.AppendLine($"\t\t\"PrivateKey\": \"{hex}\"")
+				.AppendLine("\t}")
+				.AppendLine()
+				.AppendLine($"Its public key is {ClientLoginEncryption.PublicHexFor(HexExtensions.ToBigInteger(hex))} - derived from the private one, so the pair cannot drift.")
+				.Append("⚠️  Every client must then be re-patched (Faolan.ClientLauncher --patch-login) - one that still carries the old key cannot be decrypted, and that fails SILENTLY back to accept-any.");
 
-				// Re-read the WHOLE stack rather than applying the generated hex directly, so the public key printed
-				// below is the one clients will actually have to carry - which is not the generated one if something
-				// above the user config shadows it. Shadowed() then says so.
-				config = FaolanCommandLine.Build();
-				DhKeys.Configure(config);
-			}
-			catch (Exception e) when (e is InvalidOperationException or ArgumentException or IOException)
-			{
-				Console.Error.WriteLine(e.Message);
-
-				return 1;
-			}
-
-			Console.WriteLine($"Wrote a new Login:PrivateKey to {path}");
-			Console.WriteLine($"Its public key is {DhKeys.ServerPublicHex}");
-			Console.WriteLine("⚠️  Every client must now be re-patched (Faolan.ClientLauncher --patch-login) - one that still carries the old key cannot be decrypted, and that fails SILENTLY back to accept-any.");
-
-			return Shadowed(config, hex, given is not { Length: > 0 }) ? 1 : 0;
-		}
-
-		// Whether the key just written is NOT the one the server will use, in either of the two ways that can happen.
-		// Both are silent otherwise, and both produce the same symptom as no key at all: accept-any logins.
-		// `intoTheUserConfig` is false when a path was given: the file then sits nowhere in particular in the stack, so
-		// "does it resolve to this?" has no answer and only the second check applies.
-		private static bool Shadowed(IConfiguration config, string hex, bool intoTheUserConfig)
-		{
-			var shadowed = false;
-
-			// 1. A LAYER ABOVE the file we wrote also sets it. The user file beats faolan.json, so the normal case is
-			//    fine - but an environment variable and a --Login:PrivateKey on the command line both beat the user
-			//    file, and would leave the generated key written down and unused.
-			if (intoTheUserConfig && !string.Equals(config["Login:PrivateKey"], hex, StringComparison.OrdinalIgnoreCase))
-			{
-				Console.Error.WriteLine("⚠️  Login:PrivateKey resolves to a DIFFERENT value than the one just written - something above the user config (an environment variable, or a --Login:PrivateKey argument) is setting it. The generated key will not be used until that is removed.");
-				shadowed = true;
-			}
-
-			// 2. Login:PublicKey is set. That is the launcher's "patch THIS key in" override, for talking to somebody
-			//    else's server - so the launcher would keep patching a public key that has nothing to do with the new
-			//    private one, and every login would fall back to accept-any.
-			if (config["Login:PublicKey"] is { Length: > 0 })
-			{
-				Console.Error.WriteLine("⚠️  Login:PublicKey is set, so Faolan.ClientLauncher patches THAT key into clients rather than the one derived above. Clear it, or the new private key cannot decrypt anything they send.");
-				shadowed = true;
-			}
-
-			return shadowed;
+			Console.WriteLine(text.ToString());
 		}
 	}
 

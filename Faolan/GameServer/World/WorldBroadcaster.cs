@@ -2537,29 +2537,39 @@ namespace Faolan.GameServer.World
 			switch (step)
 			{
 				case DynelVisualStep.HarvestClearMesh:
+				{
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.ChangeMesh(typeTag, node.Handle, 0, row.GeometryAssetType));
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeIn(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
 					break;
+				}
 
 				case DynelVisualStep.HarvestClearCollision:
+				{
 					await BroadcastToViewers(zone, node, carsGroup);
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.SetKdTree(typeTag, node.Handle, 0));
 					break;
+				}
 
 				case DynelVisualStep.RespawnFadeOut:
+				{
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeOut(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
 					break;
+				}
 
 				case DynelVisualStep.RespawnMesh:
+				{
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.ChangeMesh(typeTag, node.Handle, row.GeometryAssetId, row.GeometryAssetType));
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.FadeIn(typeTag, node.Handle, DynelVisualSequence.FadeSeconds));
 					break;
+				}
 
 				case DynelVisualStep.RespawnCollision:
+				{
 					await BroadcastToViewers(zone, node, carsGroup);
 					await BroadcastDynelVisual(zone, node, SimpleDynelVisualChanges.SetKdTree(typeTag, node.Handle, row.Kdtree));
 					_logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} has grown back.", row.Name, node.Handle);
 					break;
+				}
 			}
 		}
 

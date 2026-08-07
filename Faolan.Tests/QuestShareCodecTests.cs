@@ -26,7 +26,7 @@ namespace Faolan.Tests
 			var body = QuestShareRequestCodec.Build(0x01000001, 13479, "The Scavenger");
 
 			// [0000c350][01000001] [000034a7] [000d "The Scavenger"] - 8 + 4 + 2 + 13.
-			Assert.Equal("0000c35001000001000034a7000d5468652053636176656e676572", Hex(body));
+			Assert.Equal("0000c35001000001000034a7000d5468652053636176656e676572", Convert.ToHexStringLower(body));
 			Assert.Equal(27, body.Length);
 		}
 
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		{
 			var body = QuestShareGlobalFeedbackCodec.Build(QuestShareFeedback.LegitTargets, 3);
 
-			Assert.Equal("0000000500000003", Hex(body));
+			Assert.Equal("0000000500000003", Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			var body = QuestShareIndividualFeedbackCodec.Build(QuestShareFeedback.QuestDeclined, "Conan");
 
 			// [00000008][0005 "Conan"] - 4 + 2 + 5. An ID32 would be a fixed 8 bytes with no length prefix.
-			Assert.Equal("000000080005436f6e616e", Hex(body));
+			Assert.Equal("000000080005436f6e616e", Convert.ToHexStringLower(body));
 		}
 
 		[Theory]
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 		{
 			var body = CancelTeamQuestListCodec.Build(CancelTeamQuestListCodec.RetailNoList);
 
-			Assert.Equal("00000002", Hex(body));
+			Assert.Equal("00000002", Convert.ToHexStringLower(body));
 			Assert.Equal(4, body.Length);
 		}
 
@@ -104,11 +104,6 @@ namespace Faolan.Tests
 			var body = QuestShareGlobalFeedbackCodec.Build(QuestShareFeedback.NoLegitTargets);
 
 			Assert.Throws<CodecParseException>(() => QuestShareGlobalFeedbackCodec.Parse([.. body, 0x00]));
-		}
-
-		private static string Hex(byte[] bytes)
-		{
-			return Convert.ToHexString(bytes).ToLowerInvariant();
 		}
 	}
 }

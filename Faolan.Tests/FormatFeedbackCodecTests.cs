@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -11,7 +12,7 @@ namespace Faolan.Tests
 	// captured bytes from the parsed fields (construct-don't-replay) and that Parse is its faithful inverse.
 	//
 	// ⚠️ Every captured oracle below is the whole carrier payload, which BEGINS with the [u32 len]. That word is the
-	// SENDER's (#530 rule 2), so the assertions are against `Record(...)` - the capture minus its first four bytes.
+	// SENDER's (#530 rule 2), so the assertions are against `CapturedRecord.Bytes(...)` - the capture minus its first four bytes.
 	// No wire byte moved: GameServerListener.SendFeedback writes the same length back on via WorldIir.Send.
 	public class FormatFeedbackCodecTests
 	{
@@ -43,13 +44,13 @@ namespace Faolan.Tests
 		{
 			// The area-name banner is fully reconstructable from just its localized-text id (#348): rebuild the whole
 			// captured AreaNameBody from BuildAreaNameXml(3474586) + the captured instance/typeFlags/footer.
-			var captured = Record(AreaNameBody);
+			var captured = CapturedRecord.Bytes(AreaNameBody);
 			var p = FormatFeedbackCodec.Parse(captured);
 
 			var xml = AreaNameBannerCodec.Build(3474586);
 			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
 
-			Assert.Equal(RecordHex(AreaNameBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(CapturedRecord.Hex(AreaNameBody), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
@@ -58,13 +59,13 @@ namespace Faolan.Tests
 			// The "lost the grace" line (shown when the Shield of the Risen is lost to an aggressive action) is a fixed
 			// token+key string - rebuild the whole captured LostGraceBody from BuildLostGraceEffectXml() + the captured
 			// instance/typeFlags/footer. Proves the key is a constant, not a per-send nonce (same bytes in two captures).
-			var captured = Record(LostGraceBody);
+			var captured = CapturedRecord.Bytes(LostGraceBody);
 			var p = FormatFeedbackCodec.Parse(captured);
 
 			var xml = FeedbackXml.LostGraceEffect;
 			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
 
-			Assert.Equal(RecordHex(LostGraceBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(CapturedRecord.Hex(LostGraceBody), Convert.ToHexStringLower(rebuilt));
 			Assert.Equal(FormatFeedbackCodec.EffectLineTypeFlags, p.TypeFlags);
 		}
 
@@ -77,24 +78,24 @@ namespace Faolan.Tests
 		 InlineData(784238u, "S5&amp;quot;)&amp;#39;V?hVlF&amp;#39;_oR4]Lu.", DiscoveredPoint784238Body)]
 		public void BuildRespawnPointDiscoveredXml_MatchesCapture(uint pointId, string nameKey, string capturedBody)
 		{
-			var p = FormatFeedbackCodec.Parse(Record(capturedBody));
+			var p = FormatFeedbackCodec.Parse(CapturedRecord.Bytes(capturedBody));
 
 			var xml = RespawnPointDiscoveredCodec.Build(pointId, nameKey);
 			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, xml);
 
-			Assert.Equal(RecordHex(capturedBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(CapturedRecord.Hex(capturedBody), Convert.ToHexStringLower(rebuilt));
 			Assert.Equal(FormatFeedbackCodec.FifoBannerTypeFlags, p.TypeFlags); // a FIFO banner, like the area name
 		}
 
 		[Theory, InlineData(AreaNameBody), InlineData(LostGraceBody)]
 		public void Build_FromParsedFields_MatchesCapture(string capturedHex)
 		{
-			var captured = Record(capturedHex);
+			var captured = CapturedRecord.Bytes(capturedHex);
 			var p = FormatFeedbackCodec.Parse(captured);
 
 			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, p.Xml);
 
-			Assert.Equal(RecordHex(capturedHex), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(CapturedRecord.Hex(capturedHex), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
@@ -109,20 +110,10 @@ namespace Faolan.Tests
 			Assert.Equal(xml, p.Xml);
 		}
 
-		internal static byte[] Record(string capturedHex)
-		{
-			return Convert.FromHexString(RecordHex(capturedHex));
-		}
-
-		internal static string RecordHex(string capturedHex)
-		{
-			return capturedHex[8..];
-		}
-
 		[Fact]
 		public void Parse_DecodesTheFifoBanner()
 		{
-			var p = FormatFeedbackCodec.Parse(Record(AreaNameBody));
+			var p = FormatFeedbackCodec.Parse(CapturedRecord.Bytes(AreaNameBody));
 
 			Assert.Equal(0x0802e5d4u, p.Instance); // the player's GameInterface object
 			Assert.Equal(FormatFeedbackCodec.FifoBannerTypeFlags, p.TypeFlags);

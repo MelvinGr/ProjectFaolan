@@ -415,8 +415,8 @@ The join â€” ciphertext from the client's LDB pages, keys from our own tables â€
 than a scratch script:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report ldb-quest-text --RdbDir <rdb-dir>
-dotnet run --project Faolan.Importer -- --report ldb-quest-text --report-arg 3497,5792 --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report ldb-quest-text --Content:RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report ldb-quest-text --report-arg 3497,5792 --Content:RdbDir <rdb-dir>
 ```
 
 It prints every goal's **kind tag beside its decrypted objective text**, which is the cross-check that matters:
@@ -478,7 +478,7 @@ resolved **per page**, English first, because every category is shipped once per
 lookup answers in whichever language happened to be parsed last:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report ldb-resolve --RdbDir <rdb-dir> \
+dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <rdb-dir> \
   --report-arg SkywalkingCommand_Name,YouCanNotUseYet
 #   SkywalkingCommand_Name -> 47110773  cat 10002 page 4312046 [English]: 'luke'
 #   YouCanNotUseYet -> 5372612  cat 130 page 222116 [English]: 'Your class cannot use this item until level %d '

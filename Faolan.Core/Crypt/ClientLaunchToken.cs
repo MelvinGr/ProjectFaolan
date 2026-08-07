@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Crypt
 {
@@ -9,7 +10,7 @@ namespace Faolan.Core.Crypt
 	// {t, t} (equal halves) and the timestamp must be recent. AgeOfConan.exe bounces to ConanPatcher.exe when
 	// launched without a valid fresh -key (the no-flags case). Validated: the captured `495cd3b8c7047b47` decrypts
 	// to t = 1781038901 (= the launch time), and re-encrypting reproduces it exactly.
-	public static class ConanLaunchToken
+	public static class ClientLaunchToken
 	{
 		// k0..k3, the TEA key baked into the patcher (the magic constants in sub_439140).
 		private static readonly uint[] PatcherKey = [0x5BCE568E, 0xFB2E8CBC, 0xA324E6D8, 0xF22BF865];
@@ -19,7 +20,7 @@ namespace Faolan.Core.Crypt
 		{
 			uint v0 = unixSeconds, v1 = unixSeconds;
 			Tea.EncryptBlock(ref v0, ref v1, PatcherKey);
-			return $"{v0:x8}{v1:x8}";
+			return HexExtensions.FromU32Be(v0) + HexExtensions.FromU32Be(v1);
 		}
 
 		/// <summary>
@@ -33,8 +34,8 @@ namespace Faolan.Core.Crypt
 
 			try
 			{
-				var v0 = Convert.ToUInt32(token[..8], 16);
-				var v1 = Convert.ToUInt32(token[8..], 16);
+				var v0 = HexExtensions.ToU32Be(token.AsSpan(0, 8));
+				var v1 = HexExtensions.ToU32Be(token.AsSpan(8));
 				Tea.DecryptBlock(ref v0, ref v1, PatcherKey);
 				return v0 == v1
 					? v0

@@ -250,14 +250,22 @@ namespace Faolan.GameServer.Combat
 				switch (Classify(row))
 				{
 					case Gate.UnhandledKind:
+					{
 						kindSkipped++;
 						continue;
+					}
+
 					case Gate.PercentOnUnmodelledStat:
+					{
 						percentSkipped++;
 						continue;
+					}
+
 					case Gate.UnmodelledStat:
+					{
 						statSkipped++;
 						continue;
+					}
 				}
 
 				var isPercent = row.EffectKind == PercentKind;

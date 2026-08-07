@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Web
 {
@@ -15,7 +16,7 @@ namespace Faolan.Web
 		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
 		// `--help` here cannot describe a default the code does not use.
 		private static readonly Option<string>[] Options =
-			FaolanSettings.Options("RdbDir", "Database:Provider", "Database:ConnectionString", "Cdn:PublicAddress");
+			FaolanSettings.Options(Keys.ContentRdbDir, Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.CdnPublicAddress);
 
 		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the
 		// caller should exit with `exitCode`. ASP.NET's own host arguments (--urls, --environment) are passed

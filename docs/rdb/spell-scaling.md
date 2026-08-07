@@ -106,11 +106,11 @@ world entry (`IDatabaseRepository.GetCharacterSpellScalingAttributes`) and appli
 
 ```zsh
 # the field itself, and cross-tabulated against anything else on the same record
-dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:847 --RdbDir <rdb-dir>
-dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:348,551x847 --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:847 --Content:RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:348,551x847 --Content:RdbDir <rdb-dir>
 
 # the tweak values
-dotnet run --project Faolan.Importer -- --report rdb-tweaks --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-tweaks --Content:RdbDir <rdb-dir>
 
 # the client side
 FAOLAN_GHIDRA_OUT=<dir> /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \

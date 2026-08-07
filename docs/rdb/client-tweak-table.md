@@ -7,8 +7,8 @@ combat chances — and for a set of spell/buff ids the server is expected to cas
 Dump it with:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report rdb-tweaks --RdbDir <rdb-dir>
-dotnet run --project Faolan.Importer -- --report rdb-tweaks --report-arg regen --RdbDir <rdb-dir>   # name filter
+dotnet run --project Faolan.Importer -- --report rdb-tweaks --Content:RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-tweaks --report-arg regen --Content:RdbDir <rdb-dir>   # name filter
 ```
 
 ## Grammar

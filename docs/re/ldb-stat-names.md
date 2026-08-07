@@ -8,7 +8,7 @@ sheet, the item `[2][9]` modifier region and the spell stat effects. It is what 
 Regenerate (and re-run the cross-check against `CharacterStatId`) with:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report ldb-stat-names --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report ldb-stat-names --Content:RdbDir <rdb-dir>
 ```
 
 ## Reading it

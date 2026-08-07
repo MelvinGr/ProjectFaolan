@@ -59,8 +59,8 @@ the one mount a capture pins is the *tierless* Fading Black Horse, and it is alr
 Reproduce the comparison with:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report spell-fields --report-arg 4076785 --RdbDir <rdb-dir>
-dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:186x499 --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report spell-fields --report-arg 4076785 --Content:RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:186x499 --Content:RdbDir <rdb-dir>
 ```
 
 ## The wire sequence

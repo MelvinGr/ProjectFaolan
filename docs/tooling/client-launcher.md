@@ -122,7 +122,7 @@ By default any password is accepted. To enforce the real password, the client mu
   dead hardcoded launcher-notes URL (keep the two `%s`; **http:// only** — the exe's statically-linked
   libcurl 7.19.7 has no SSL backend, so an https URL fails in-client with cURL error 1
   `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
-- Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
+- Server side: `Faolan.Core/Crypt/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
 - **`Login:AllowUnpatchedClients`** (server config, default `true`) decides whether that fallback exists at all.
   Set it `false` and an unpatched client — one whose block the server cannot decrypt, so it proved only the
@@ -203,6 +203,6 @@ the `UniverseAddr` redirect — all with **no manual interaction**.
 - `Faolan.ClientLauncher/Program.cs`, `ClientExePatcher.cs` — the launcher.
 - `Faolan.ClientLauncher/LauncherCommand.cs` — its command line (System.CommandLine), and the `--help` text.
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
-- `Faolan.Core.Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
+- `Faolan.Core/Crypt/LoginEncryption.cs` — server-side DH+TEA login decrypt.
 - `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.
 - `Faolan.ClientLauncher/SteamPaths.cs` — Steam auto-detection of the exe / compat-data / Proton build; `run.sh --client` is the convenience wrapper.

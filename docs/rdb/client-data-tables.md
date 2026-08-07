@@ -534,7 +534,7 @@ Nothing imports it, deliberately: a table whose effective contents are one const
 would be a column nothing could act on. Reproduce with:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1065103 --out <dir> --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1065103 --out <dir> --Content:RdbDir <rdb-dir>
 ```
 
 ## ⚠️ ARMOR_MITIGATION is empty

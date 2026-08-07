@@ -145,7 +145,7 @@ namespace Faolan.Core.Database.Tables
 		// The tooltip description, from LDB category 50211 keyed by the SPELL id - the same text the client shows in a
 		// spell/buff tooltip ("When you or your group perform a fatality and this buff is active, the Frozen Hatred pet
 		// appears…"). NULL when the LDB has none for this spell (only ~3.6k of the 20k spells carry one), or when the
-		// RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --RdbDir).
+		// RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --Content:RdbDir).
 		//
 		// This is the one source that states an effect in WORDS, which is why it is worth storing: the spell record
 		// itself carries magnitudes but not their meaning, so the description is how an effect gets identified (it is

@@ -38,22 +38,18 @@ namespace Faolan.UniverseAgent
 					if (gameId != 1)
 						Logger.LogWarning("UniverseAgent login: unexpected nGameID {GameId} for '{Account}' (retail always sends 1).", gameId, accountName);
 
-					client.Session.Account = (await Database.GetAccount(accountName))!;
-					if (client.Session.Account == null)
+					if (await Database.GetAccount(accountName) is {} account)
 					{
-						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);
-						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
+						client.Session.Account = account;
+						client.Session.Account.AuthChallenge = Guid.NewGuid();
+
+						await Database.SetAccountAuthChallenge(client.Session.Account.Id, client.Session.Account.AuthChallenge);
+						await InitAuth(client);
 					}
 					else
 					{
-						// Rotate the nonce BEFORE it goes out. It used to be a constant (every account shipped with an
-						// empty AuthChallenge and nothing ever wrote one), so the challenge proved nothing: the same
-						// encrypted login block replayed off a capture authenticated forever. A fresh Guid per attempt
-						// makes the block single-use. Persisted because AnswerChallenge re-reads the account.
-						client.Session.Account.AuthChallenge = Guid.NewGuid();
-						await Database.SetAccountAuthChallenge(client.Session.Account.Id, client.Session.Account.AuthChallenge);
-
-						await InitAuth(client);
+						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);
+						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 					}
 
 					break;
@@ -65,27 +61,37 @@ namespace Faolan.UniverseAgent
 					var account = client.Session.Account;
 
 					bool authenticated;
-					if (LoginEncryption.Decrypt(loginKey) is { } credentials)
+					switch (Configuration.LoginPrivateKey)
 					{
-						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge.ToString("N") &&
-						                PasswordHashing.Verify(credentials.Password, account.Password);
+						case {} privateKey when ClientLoginEncryption.Decrypt(loginKey, privateKey) is { } credentials:
+						{
+							authenticated = credentials.Username == account.UserName &&
+							                credentials.Challenge == account.AuthChallenge.ToString("N") &&
+							                PasswordHashing.Verify(credentials.Password, account.Password);
 
-						if (authenticated)
-							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
-						else
-							Logger.LogWarning("UniverseAgent login: WRONG PASSWORD for {UserName} (patched client).", account.UserName);
-					}
-					else if (Configuration.LoginAllowUnpatchedClients)
-					{
-						authenticated = true;
+							if (authenticated)
+								Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
+							else
+								Logger.LogWarning("UniverseAgent login: WRONG PASSWORD for {UserName} (patched client).", account.UserName);
 
-						Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
-					}
-					else
-					{
-						authenticated = false;
+							break;
+						}
 
-						Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
+						case null when Configuration.LoginAllowUnpatchedClients:
+						{
+							authenticated = true;
+
+							Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
+							break;
+						}
+
+						default:
+						{
+							authenticated = false;
+
+							Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
+							break;
+						}
 					}
 
 					if (!authenticated)

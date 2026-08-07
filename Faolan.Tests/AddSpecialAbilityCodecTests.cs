@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
@@ -39,7 +40,7 @@ namespace Faolan.Tests
 
 			var body = AddSpecialAbilityCodec.Build(ability);
 
-			Assert.Equal(expectedHex, ToHex(body));
+			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 
 		// The per-login SILENT re-grant clears the announce byte (the final 0x01 -> 0x00), so the client doesn't pop
@@ -62,8 +63,8 @@ namespace Faolan.Tests
 				}
 			};
 
-			var announced = ToHex(AddSpecialAbilityCodec.Build(ability));
-			var silent = ToHex(AddSpecialAbilityCodec.Build(ability, false));
+			var announced = Convert.ToHexStringLower(AddSpecialAbilityCodec.Build(ability));
+			var silent = Convert.ToHexStringLower(AddSpecialAbilityCodec.Build(ability, false));
 
 			Assert.EndsWith("0000000001", announced);
 			Assert.EndsWith("0000000000", silent);
@@ -129,19 +130,6 @@ namespace Faolan.Tests
 			Assert.Equal(original.Key.Key3, parsed.Key.Key3);
 			Assert.Equal(original.Key.Key4, parsed.Key.Key4);
 			Assert.Equal(body, AddSpecialAbilityCodec.Build(parsed));
-		}
-
-		private static string ToHex(byte[] bytes)
-		{
-			var chars = new char[bytes.Length * 2];
-			for (var i = 0; i < bytes.Length; i++)
-			{
-				const string hex = "0123456789abcdef";
-				chars[i * 2] = hex[bytes[i] >> 4];
-				chars[i * 2 + 1] = hex[bytes[i] & 0xF];
-			}
-
-			return new string(chars);
 		}
 	}
 }

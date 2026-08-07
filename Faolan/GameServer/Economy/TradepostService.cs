@@ -152,7 +152,9 @@ namespace Faolan.GameServer.Economy
 				}
 
 				default:
+				{
 					return false;
+				}
 			}
 
 			return true;

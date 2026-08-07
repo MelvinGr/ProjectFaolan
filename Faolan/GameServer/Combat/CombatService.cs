@@ -488,19 +488,25 @@ namespace Faolan.GameServer.Combat
 			switch (CombatTargeting.ResolveSwingReach(_sim.World, attacker, targetHandle, out var distance))
 			{
 				case MeleeReach.InReach:
+				{
 					return true;
+				}
 
 				case MeleeReach.TooFar:
+				{
 					_logger.LogInformation("Combat: {Player}'s swing at 0x{Target:X8} misses - {Distance:F1}u away, reach is {Reach}u (#696).",
 						name, targetHandle, distance, CombatTargeting.SwingReach);
 
 					return false;
+				}
 
 				default:
+				{
 					_logger.LogWarning("Combat: {Player} swung at 0x{Target:X8}, which is not in their zone - refusing the swing. " +
-						"The client is attacking something the server cannot place, which is a targeting/interest bug, not a combat one (#695/#696).", name, targetHandle);
+					                   "The client is attacking something the server cannot place, which is a targeting/interest bug, not a combat one (#695/#696).", name, targetHandle);
 
 					return false;
+				}
 			}
 		}
 

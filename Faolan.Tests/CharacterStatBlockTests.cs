@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, 4);
 			var body = StatUpdateCodec.Build(0x00002C56u, stats);
 
-			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
+			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, block.Count);
 
 			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(CharacterStatBlockCodec.Build(block)));
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			var block = new CharacterStatBlock().SetRaw(CharacterStatId.Level, 25);
 
 			// count(01) + Level(0036) = 25 (0x19), unscaled
-			Assert.Equal("010000003600000019", ToHex(CharacterStatBlockCodec.Build(block)));
+			Assert.Equal("010000003600000019", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 		{
 			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
 			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63);
-			Assert.Equal("010000001b0000189c", ToHex(CharacterStatBlockCodec.Build(block)));
+			Assert.Equal("010000001b0000189c", Convert.ToHexStringLower(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -81,14 +81,14 @@ namespace Faolan.Tests
 			var parsed = StatUpdateCodec.Parse(body);
 			var (parsedHandle, parsedStats) = (parsed.EntityHandle, parsed.Stats);
 			Assert.Equal(handle, parsedHandle);
-			Assert.Equal(ToHex(statBytes), ToHex(CharacterStatBlockCodec.Build(parsedStats)));
+			Assert.Equal(Convert.ToHexStringLower(statBytes), Convert.ToHexStringLower(CharacterStatBlockCodec.Build(parsedStats)));
 		}
 
 		[Fact]
 		public void Parse_ReadsCapturedVitalsBlock()
 		{
 			// The exact captured block bytes from Build_VitalsBlock_MatchesCapturedBytes.
-			var bytes = FromHex("030000001b0000189c000001f80000189c000001fa0000189c");
+			var bytes = Convert.FromHexString("030000001b0000189c000001f80000189c000001fa0000189c");
 
 			var block = CharacterStatBlockCodec.Parse(bytes);
 			Assert.Equal(3, block.Count);
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 		public void Parse_ThrowsWhenTruncated()
 		{
 			// count says 2 records (needs 17 bytes) but only one is present.
-			var bytes = FromHex("020000001b0000189c");
+			var bytes = Convert.FromHexString("020000001b0000189c");
 			Assert.Throws<CodecParseException>(() => CharacterStatBlockCodec.Parse(bytes));
 		}
 
@@ -124,7 +124,7 @@ namespace Faolan.Tests
 			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).SetRaw(CharacterStatId.Level, 25);
 			var built = CharacterStatBlockCodec.Build(block);
 
-			Assert.Equal(ToHex(built), ToHex(CharacterStatBlockCodec.Build(CharacterStatBlockCodec.Parse(built))));
+			Assert.Equal(Convert.ToHexStringLower(built), Convert.ToHexStringLower(CharacterStatBlockCodec.Build(CharacterStatBlockCodec.Parse(built))));
 		}
 
 		// ApprenticeLevel (0x3C5) is the mentor system's EFFECTIVE level, not a copy of Level - but we do not model
@@ -142,27 +142,6 @@ namespace Faolan.Tests
 			// Both are scale-1 stats, so the wire values are the level itself - the client's max() of two equal
 			// numbers is the level whichever way it resolves it.
 			Assert.Equal([(CharacterStatId.Level, 10u), (CharacterStatId.ApprenticeLevel, 10u)], block.Records);
-		}
-
-		private static byte[] FromHex(string hex)
-		{
-			var bytes = new byte[hex.Length / 2];
-			for (var i = 0; i < bytes.Length; i++)
-				bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-			return bytes;
-		}
-
-		private static string ToHex(byte[] bytes)
-		{
-			var chars = new char[bytes.Length * 2];
-			const string hex = "0123456789abcdef";
-			for (var i = 0; i < bytes.Length; i++)
-			{
-				chars[i * 2] = hex[bytes[i] >> 4];
-				chars[i * 2 + 1] = hex[bytes[i] & 0xF];
-			}
-
-			return new string(chars);
 		}
 	}
 }

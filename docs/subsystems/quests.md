@@ -160,7 +160,7 @@ sentence as `QuestGoal.name`, in plaintext, and it is already a column on every 
 
 | source | goals | cost |
 |---|---:|---|
-| LDB `50304`, encrypted | 170 | a per-string TEA key only a **capture** yields, plus an `RdbDir` |
+| LDB `50304`, encrypted | 170 | a per-string TEA key only a **capture** yields, plus an `Content:RdbDir` |
 | `QuestGoal.name`, plaintext → `Name` | **7,299** | none |
 
 `RdbQuestTextImporter` had been reporting **7,147 goals "unreadable"**. They were not unreadable; they were being

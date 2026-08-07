@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -58,16 +58,8 @@ namespace Faolan.Tests.Support
 		// All sent packets concatenated, as one lowercase hex string - the golden form.
 		public string SentHex()
 		{
-			var total = 0;
-			foreach (var p in Sent)
-				total += p.Length;
-
-			var sb = new StringBuilder(total * 2);
-			foreach (var p in Sent)
-			foreach (var b in p)
-				sb.Append(b.ToString("x2"));
-
-			return sb.ToString();
+			byte[] all = [.. Sent.SelectMany(p => p)];
+			return Convert.ToHexStringLower(all);
 		}
 	}
 }

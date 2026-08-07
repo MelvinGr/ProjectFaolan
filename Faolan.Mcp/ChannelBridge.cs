@@ -61,11 +61,12 @@ namespace Faolan.Mcp
 		{
 			// Config: env > json, through the shared builder (FaolanCommandLine) - parity with the server / importer.
 			// No command-line layer: Claude Code spawns this bridge as a stdio MCP server with no arguments at all,
-			// so its settings (ChatBridge:Url / :PollMs / :BacklogGraceMs) come from faolan.json or the environment.
+			// so its settings (ChatBridge:Enabled / :PollMs / :BacklogGraceMs) come from faolan.json or the
+			// environment. The endpoint is not among them - it is the local server's Mcp:Port, derived.
 			var config = FaolanCommandLine.Build();
-			_mcpUrl = config.ChatBridgeUrl;
-			_backlogGrace = TimeSpan.FromMilliseconds(config.ChatBridgeBacklogGraceMs);
-			_pollInterval = TimeSpan.FromMilliseconds(config.ChatBridgePollMs);
+			_mcpUrl = config.McpUrl;
+			_backlogGrace = config.ChatBridgeBacklogGrace;
+			_pollInterval = config.ChatBridgePoll;
 
 			var options = new McpServerOptions
 			{
@@ -104,7 +105,13 @@ namespace Faolan.Mcp
 
 			using var cts = new CancellationTokenSource();
 			var serverRun = server.RunAsync(cts.Token);
-			var pollRun = PollLoop(server, cts.Token);
+
+			// ChatBridge:Enabled gates the PUSH only. The MCP server itself still comes up either way, so Claude Code
+			// gets a working `reply` tool rather than a session with a dead server in it - the switch is "stop
+			// interrupting me with in-game chat", not "unregister the bridge".
+			var pollRun = config.ChatBridgeEnabled
+				? PollLoop(server, cts.Token)
+				: Task.CompletedTask;
 
 			await serverRun; // returns when Claude Code closes the session
 			await cts.CancelAsync();

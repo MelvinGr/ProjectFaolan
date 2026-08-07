@@ -12,7 +12,7 @@ string pool, next to `RDBQuestGivers::ReloadData: Cannot parse protocol buffer`.
 Dump it with
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report rdb-quest-catalog --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report rdb-quest-catalog --Content:RdbDir <rdb-dir>
 dotnet run --project Faolan.Importer -- --report rdb-quest-catalog --report-arg 1054   # one line, as a tree
 ```
 

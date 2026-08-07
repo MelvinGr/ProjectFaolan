@@ -7,29 +7,24 @@ using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
 {
-	// Statically patch the AgeOfConan.exe FILE: swap the embedded Funcom DH pubkey for CELLAO_PUB (so the server can
-	// validate the real password, docs/protocol/01-crypto.md) and optionally redirect the launcher-notes URL. Plain
+	// Statically patch the AgeOfConan.exe FILE: swap the embedded Funcom DH pubkey for the one the caller hands in (so
+	// the server can validate the real password, docs/protocol/01-crypto.md) and optionally redirect the launcher-notes
+	// URL. The key is a PARAMETER of PatchPublicKey rather than something this class resolves from configuration: which
+	// key belongs in a client is the launcher's decision (derived from Login:PrivateKey, or an explicit
+	// Login:PublicKey for somebody else's server), and it is stated at the call site. Plain
 	// byte edits - no ptrace, no process memory, so it works IDENTICALLY on every platform (the old /proc/<pid>/mem
 	// in-memory patch was Linux-only). It persists on disk, so it runs BEFORE the exe launches and before the
 	// -clienthash md5 (so the hash matches the file we run); the launcher backs the exe up to .bak first, so --restore
 	// is a copy-back. Retail's ConanPatcher would re-verify/revert the exe, but we bypass it, so nothing clobbers it.
 	internal static class ClientExePatcher
 	{
-		// Both 256-char ASCII hex DH public keys (g^priv mod N over the 1024-bit prime).
-		//
-		// DERIVED from the shared keypair in Faolan.Core (DhKeys), not a literal, and the launcher loads the same
-		// Login:* config the server does. This used to be a hand-copied hex string while the private key lived in
-		// Faolan.Core.Network - two copies of one keypair, which fails silently: change the private key and every login
-		// falls back to accept-any while the patched client still carries the old public key.
-		public static byte[] NewPublicKey => Encoding.ASCII.GetBytes(DhKeys.ClientPatchPublicHex);
-
 		// The client's hardcoded launcher-notes URL - a printf FORMAT string with two %s (UniverseName + Language),
 		// null-terminated in a fixed 73-byte region (offset 0x1C4D4C0). See memory client_launcher_notes_url.
 		private static readonly byte[] OriginalNotesUrl = "http://msgs.ageofconan.com/launchernotes2.php?UniverseName=%s&Language=%s"u8.ToArray();
 
 		// The DH prime, as the exe stores it. NOT a patch target - it is the one OTHER 256-char hex string in the
 		// file, and the key slot is found by excluding it.
-		private static byte[] Prime => Encoding.ASCII.GetBytes(DhKeys.PrimeHex);
+		private static byte[] Prime => Encoding.ASCII.GetBytes(ClientLoginEncryption.PrimeHex);
 
 		public enum Result
 		{
@@ -113,7 +108,7 @@ namespace Faolan.ClientLauncher
 				while (i < bytes.Length && IsHex(bytes[i]))
 					i++;
 
-				if (i - start != DhKeys.PublicHexLength || start == 0 || bytes[start - 1] != 0 || i >= bytes.Length || bytes[i] != 0)
+				if (i - start != ClientLoginEncryption.PublicHexLength || start == 0 || bytes[start - 1] != 0 || i >= bytes.Length || bytes[i] != 0)
 					continue;
 
 				if (!bytes.AsSpan(start, prime.Length).SequenceEqual(prime))

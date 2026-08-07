@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -47,7 +48,7 @@ namespace Faolan.Tests
 
 			var body = FormatFeedbackCodec.Build(0x01316d8a, value);
 
-			Assert.Equal(FormatFeedbackCodecTests.RecordHex(Attr804Plus3), Convert.ToHexStringLower(body));
+			Assert.Equal(CapturedRecord.Hex(Attr804Plus3), Convert.ToHexStringLower(body));
 		}
 	}
 }

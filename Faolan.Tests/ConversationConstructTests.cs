@@ -1,12 +1,13 @@
-using Faolan.Core.Constants;
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Dialogue;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -82,7 +83,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_AnswerList_IsByteIdenticalToSubstitution()
 		{
-			var captured = KnubotCodecTests.Record(KnubotCodecTestData.AnswerListBody);
+			var captured = CapturedRecord.Bytes(KnubotCodecTestData.AnswerListBody);
 			const uint capturedInst = 0x0802E5D4, capturedNpc = 0x00031815;
 
 			var p = (KnubotAnswerListIIR)KnubotCodec.Parse(captured);
@@ -95,7 +96,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_AppendText_IsByteIdenticalToSubstitution()
 		{
-			var captured = KnubotCodecTests.Record(KnubotCodecTestData.AppendTextBody);
+			var captured = CapturedRecord.Bytes(KnubotCodecTestData.AppendTextBody);
 
 			// construct: parse the captured record, rebuild with the live endpoints
 			var p = (KnubotAppendTextIIR)KnubotCodec.Parse(captured);
@@ -110,7 +111,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_CloseChatWindow_IsByteIdenticalToSubstitution()
 		{
-			var captured = KnubotCodecTests.Record(KnubotCodecTestData.CloseChatWindowBody);
+			var captured = CapturedRecord.Bytes(KnubotCodecTestData.CloseChatWindowBody);
 			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
 
 			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(captured);
@@ -123,7 +124,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_OpenChatWindow_IsByteIdenticalToSubstitution()
 		{
-			var captured = KnubotCodecTests.Record(KnubotCodecTestData.OpenChatWindowBody);
+			var captured = CapturedRecord.Bytes(KnubotCodecTestData.OpenChatWindowBody);
 			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
 
 			var p = (KnubotOpenChatWindowIIR)KnubotCodec.Parse(captured);

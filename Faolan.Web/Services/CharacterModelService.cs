@@ -109,7 +109,7 @@ namespace Faolan.Web.Services
 		{
 			_dbFactory = dbFactory;
 			_cache = cache;
-			_rdbDir = config["RdbDir"] is { Length: > 0 } dir
+			_rdbDir = config.RdbDir is { Length: > 0 } dir
 				? dir
 				: throw new InvalidOperationException("RdbDir not configured - set it to the client's RDB folder in appsettings.Development.json or the RdbDir env var");
 			// The ContentMirror for on-demand (CDN-only) resources - the CDN race bodies that aren't in the local RDB.

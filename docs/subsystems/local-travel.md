@@ -191,7 +191,7 @@ So the only way to act on one is to read it at IMPORT — which is why this is a
 dialogue-VM feature:
 
 ```zsh
-dotnet run --project Faolan.Importer -- --only rdb-dialogue-teleports --RdbDir <rdb-dir> --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --only rdb-dialogue-teleports --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 ```
 
 It writes ordinary `TravelDestination` rows, keyed by the dialogue **edge** whose pick lands on the directive

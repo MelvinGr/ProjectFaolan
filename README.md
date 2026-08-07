@@ -330,7 +330,7 @@ Only the server service is enabled in `docker-compose.yml`; the process-per-real
 the web + CDN services are commented examples in the same file, each with the caveats that bite in a container.
 Two are worth knowing up front:
 
-- **`ServerIpAddress` must be an address the client can reach** — the host's IP or a resolvable name, never
+- **`Server:Address` must be an address the client can reach** — the host's IP or a resolvable name, never
   `127.0.0.1`. The login tier advertises it (and each `Realm` row's `IpAddress`) and the client connects there
   from *outside* Docker. The same goes for any bind address: a service listening on `127.0.0.1` inside a
   container is on its own loopback, and a published port reaches nothing.
@@ -354,12 +354,13 @@ cannot be silently read. The committed `faolan.json` is that catalog written out
 
 ```sh
 dotnet run --project Faolan -- --write-default-config   # every setting at its default; OVERWRITES
-dotnet run --project Faolan -- --generate-login-key     # a fresh login DH key into faolan.user.json
+dotnet run --project Faolan -- --generate-login-key     # print a fresh login DH keypair
 ```
 
-Both take an optional path. `--generate-login-key` writes the *user* file because a keypair is per-deployment,
-refuses to replace one that is already set without `--force`, and prints only the derived public half — after
-which every client has to be re-patched (`Faolan.ClientLauncher --patch-login`).
+`--write-default-config` takes an optional path. `--generate-login-key` writes nothing at all: it prints both
+halves of the pair — the private one to paste under `Login:PrivateKey` in `faolan.user.json` (a keypair is
+per-deployment, and that file is gitignored), the derived public one because that is what every client has to be
+re-patched with (`Faolan.ClientLauncher --patch-login`).
 
 **`faolan.user.json` is gitignored, and that is its whole point.** `faolan.json` is committed and has to stay
 machine-agnostic (no `/home/<user>/…` paths, no LAN addresses), so anything true only of *your* checkout goes in
@@ -369,7 +370,7 @@ simply wins. Typical contents:
 ```jsonc
 {
   // the client's RDB folder - part of the game INSTALL, so it has no committed default
-  "RdbDir": "/path/to/Age of Conan/RDB",
+  "Content": { "RdbDir": "/path/to/Age of Conan/RDB" },
   // a CDN mirror running on another box: PublicAddress is what the importer and the viewer dial.
   // A full URL - a path is appended to it, so a bare host would build a relative one
   "Cdn": { "PublicAddress": "http://192.168.1.5:7081" },
@@ -379,19 +380,18 @@ simply wins. Typical contents:
 }
 ```
 
-Related keys are grouped into sections; the remaining shared keys stay flat. The defaults below are the
+Every key lives in a section - there are no root-level keys. The defaults below are the
 catalog's — `--help` on any of the executables lists the same values for the subset it offers:
 
 | Key | Meaning |
 | --- | --- |
 | `Database` `{ Provider, ConnectionString }` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
-| `ServerIpAddress` | the address the login tier advertises to clients (must be reachable from the client) |
-| `UniverseAgentPort` / `PlayerAgentPort` | login-tier listen ports (7010 is the fixed client entry point) |
-| `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
+| `Server` `{ Address, UniverseAgentPort, PlayerAgentPort, WelcomeString }` | the address the login tier advertises to clients (must be reachable from the client - it may be a DNS name), its two listen ports (7010 is the fixed client entry point), and the login MOTD |
+| `Content` `{ TerrainDir, RdbDir, ClientVersion }` | where the game data lives: the baked-terrain dir for ground-snap and line-of-sight, the client's RDB folder (optional - part of the game INSTALL, so it has no committed default), and the client build the protocol was decoded against |
 | `Login` `{ PrivateKey, PublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port }` | the in-process MCP endpoint the game server hosts |
 | `Cdn` `{ Store, ListenAddress, ListenPort, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
-| `ChatBridge` `{ Url, PollMs, BacklogGraceMs }` | the Claude chat-bridge: which MCP endpoint it dials (default: the local `Mcp:Port`) and its poll-loop tuning |
+| `ChatBridge` `{ Enabled, PollMs, BacklogGraceMs }` | the Claude chat-bridge: whether it pushes in-game chat into the Claude session (default: yes), and its poll-loop tuning. It always dials the local `Mcp:Port` — that endpoint binds loopback, so its URL is derived rather than configured |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
 
@@ -404,8 +404,7 @@ environment and on the command line — only the separator differs:
 | environment | `__` between the parts: `Database__ConnectionString=…`, `Mcp__Port=7098`, `Cdn__Store=/data` |
 | command line | the config path itself: `--Database:ConnectionString "…"`, `--Cdn:Store /data` |
 
-Flat keys are just their own name in all three (`ServerIpAddress=…` / `--ServerIpAddress …`). There are **no
-short aliases** — `--store`, `--ip`, `--port` and `--connectionstring` were a fourth spelling to keep in step and
+There are **no short aliases** — `--store`, `--ip`, `--port` and `--connectionstring` were a fourth spelling to keep in step and
 are gone. `Faolan.ClientLauncher` is the one exception: its flags are client-launch parameters, not server
 config, so it has its own arguments (see below).
 

@@ -26,7 +26,7 @@ TCP-reassembled form and includes the compressed download packets.
 
 ```zsh
 dotnet run --project Faolan.Importer -- --report timeline \
-  --report-arg <data-repo>/Captures/<name>.tshark.json --RdbDir "<client>/RDB"
+  --report-arg <data-repo>/Captures/<name>.tshark.json --Content:RdbDir "<client>/RDB"
 ```
 
 `./run.sh --timeline <dump>` is the same thing with the local paths already filled in.
@@ -47,7 +47,7 @@ template, spell or ability that did not resolve).
 
 Dialogue, quest titles and objective lines are **encrypted in the client LDB**. The timeline already
 decrypts them INLINE using the key the wire itself carries, so conversations read as English in the
-stream — including screens our own `ConversationScreens` table has never captured. Without `--RdbDir`
+stream — including screens our own `ConversationScreens` table has never captured. Without `--Content:RdbDir`
 it degrades to printing `LDB[category][id]`.
 
 Reach for these two reports when you want a whole NPC's tree or a quest's full journal text, rather
@@ -55,8 +55,8 @@ than only the lines this session happened to use:
 
 ```zsh
 RDB="/path/to/Age of Conan/RDB"   # see the client_rdb_install_path memory for this machine
-dotnet run --project Faolan.Importer -- --report ldb-quest-text --report-arg 12369,10287 --RdbDir "$RDB"
-dotnet run --project Faolan.Importer -- --report ldb-dialogue   --report-arg Turach          --RdbDir "$RDB"
+dotnet run --project Faolan.Importer -- --report ldb-quest-text --report-arg 12369,10287 --Content:RdbDir "$RDB"
+dotnet run --project Faolan.Importer -- --report ldb-dialogue   --report-arg Turach          --Content:RdbDir "$RDB"
 ```
 
 A screen the wire used but `ldb-dialogue` does not list is a **conversation-coverage gap**: our tree was

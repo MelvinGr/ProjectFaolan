@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Faolan.Core.Cli;
 using Microsoft.Extensions.Configuration;
 using Xunit;
+using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Tests
 {
@@ -32,7 +33,7 @@ namespace Faolan.Tests
 		[InlineData("https://mirror.lan/", null, "https://mirror.lan")]
 		public void ItIsAlwaysAnAbsoluteUrl(string? publicAddress, string? port, string expected)
 		{
-			var config = Config(("Cdn:PublicAddress", publicAddress), ("Cdn:ListenPort", port));
+			var config = Config((Keys.CdnPublicAddress, publicAddress), (Keys.CdnListenPort, port));
 
 			Assert.Equal(expected, config.CdnPublicAddress);
 			Assert.True(Uri.TryCreate(config.CdnPublicAddress, UriKind.Absolute, out _));
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheBindAddressIsNotUsedAsADestination()
 		{
-			var config = Config(("Cdn:ListenAddress", "0.0.0.0"));
+			var config = Config((Keys.CdnListenAddress, "0.0.0.0"));
 
 			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress);
 		}
