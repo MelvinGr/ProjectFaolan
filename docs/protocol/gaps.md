@@ -108,17 +108,26 @@ here. If it turns out to need a capture we don't have, say so here rather than d
 
 ## Teams and player trade
 
-### The team member record's 9-byte per-character opaque
-**Tracked: Gitea #101.** [V0: the team member record's 9-byte per-character opaque] The 102-byte team member
-descriptor ([`../subsystems/teams-trade-friends.md`](../subsystems/teams-trade-friends.md)) ends with nine bytes
-that DIFFER per character — `0x00000003 0x0159EA5C 0x54` and `0x00000181 0x813BC035 0xEC` for the capture's two
-captured players — while every field around them is identical in both. The value appears **nowhere else in the capture**:
-not in login, not in the character snapshot, not in the chat tier, so it is CS-tier state we cannot derive from
-anything we send, and there is no basis for computing it. We carry it (a captured member round-trips byte-exact) and
-send zero for our own members until an in-client check says what breaks. Read as `[u32][u32][u8]` because only that
-last byte varies and the three after it are zero in both records; a second capture with more characters — ideally
-one where the same character appears in two sessions — would settle both the split and whether it is per-character
-or per-session.
+### The team member record's four per-character opaque words
+**Tracked: Gitea #101.** [V0: the team member record's four per-character opaque words] The team member descriptor
+([`../subsystems/teams-trade-friends.md`](../subsystems/teams-trade-friends.md)) ends with four u32 and a flag. The
+SPLIT is settled — the client's own reader `FUN_005574d0` takes exactly that, which retired the earlier
+`[u32][u32][u8] + zeros` reading — but the MEANING is not. The first two words differ per character
+(`0x00000301 0x59EA5C54` and `0x00018181 0x3BC035EC` for the capture's two players) while every field around them
+is identical in both; the last two words and the flag are zero in both. The values appear **nowhere else in the
+capture**: not in login, not in the character snapshot, not in the chat tier, so this is CS-tier state we cannot
+derive from anything we send, and there is no basis for computing it. We carry it (a captured member round-trips
+byte-exact) and send zero for our own members until an in-client check says what breaks. A capture where the same
+character appears in two sessions would settle whether it is per-character or per-session.
+
+### The team settings block's master-looter slot and second flag
+**Tracked: Gitea #669.** [V0: the team settings block's master-looter slot and second flag] The 18 bytes that close
+a `cTeam` are five fields, not one blob: `[u32 lootMode][u8 useNeedGreed][u8 flag][ProtoID32 masterLooter]
+[u32 lootThreshold]`. Three of them are corroborated by `TeamSetLootOption`'s captured c2s body (`00000000 01
+00000002` — the same 0 / true / 2). The other two are not. The master-looter slot is read with the ID32 idiom and
+has `TeamSetMasterLooter(const ID32&)` / `DispatchTeamMasterLooterChanged` for company, but every captured roster
+carries `(0, 0)`, so nothing observed distinguishes it from two more zero words; the second flag has no c2s
+counterpart at all. A capture of a group that sets a master looter closes both at once.
 
 ### The two unnamed trade replies
 **Tracked: Gitea #101.** [V0: the two unnamed trade replies 0x206B and 0x206D] Both are EMPTY-bodied s2c replies in
@@ -127,14 +136,6 @@ the client's string table gave no name.
 Their ROLE is unambiguous from the capture — `0x206B` acks your own accept, `0x206D` lands on both sides as the
 trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay) — so the flow is implementable; it
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
-
-### Which team-member field carries the LEVEL
-**Tracked: Gitea #101.** [V0: the team member record's level] The 102-byte member descriptor's leading trailing-u32 is
-the CLASS (`0x29` Necromancer / `0x2C` Demonologist, corroborated by the chat server's friend-add reply). No field in
-it is identifiable as the level, because the two captured members share every remaining value: the candidates are the
-per-character word that reads 2 and 3, and the constants 6 / 354 / 51100 / 40016. A capture with two members of
-DIFFERENT levels settles it in one look; until then we send the level nowhere, so the client's team window may show a
-wrong or blank level even though grouping works.
 
 ### The friend/guild state stamp's ONLINE value
 **Tracked: Gitea #426.** [V0: the friend state's online stamp] The chat-tier friend state
@@ -204,6 +205,36 @@ The retail swing sequence is undecoded for the same reason: the client selects t
 class `0xC879` (`EntityClass.Destructible`) and then sends `BehaviorControlCenterIIR` swings, but how many swings
 and what cast time are not established. A capture of one player emptying a single node from full settles both this
 and the decrement in one go.
+
+---
+
+## Raids
+
+### The raid fan-out's routing
+**Tracked: Gitea #669.** [V0: the raid fan-out's routing] **No session in the corpus ever forms a raid** — a sweep
+of all 120 dumps finds zero raid traffic of any kind — so every one of the 30 messages in
+[`../subsystems/raids.md`](../subsystems/raids.md) comes from the client's own tables rather than from retail
+bytes. Their PARAMETER LISTS are the client's (`docs/re/aoc-client-rpc-methods.json`) and their BODY LAYOUTS are its
+own readers, which is as certain as static RE gets: a wrong shape desyncs the client's stream and it says so by
+name. What is NOT settled is who retail sends each one to. Ours is the team flow one level up — the whole raid
+learns a join, the joining side learns the whole raid — which is the same analogy #104 records for guilds and is
+not evidence. A retail raid on tape settles it.
+
+### The `cMatch` tail
+**Tracked: Gitea #669.** [V0: the cMatch tail] `DispatchYouJoinedRaid`'s body ends, after the member teams and the
+per-character flag map, with an ID32, a word, a flag, a second ID32 and three more words. The client's reader
+(`FUN_005584c0`) gives their ORDER and WIDTH and nothing else — it stores each straight into a field of the raid
+object. The two bools of each flag-map entry are in the same position. We send zeros, which is the same "we model
+none of this" the empty flag list states. The raid UI is what consumes them, so an in-client raid with a debugger
+on those fields would name them; a capture would too.
+
+### What a `cMatch`'s HEADER team is
+**Tracked: Gitea #669.** [V0: the cMatch header team] A `cMatch` opens with a whole `cTeam` and then lists the raid's
+member teams. Nothing says what the header one is FOR. We send it as the raid's own header — the raid id, the raid
+leader, an EMPTY member list and the raid's settings — because listing the raid's people there as well as in the
+sub-teams would duplicate them, and because the settings have to live somewhere. The alternative reading, that the
+header is the leader's team repeated, is not excluded by anything. Same for the raid id's entity CLASS: it rides
+the slot a team id rides, so we stamp `0xDEA9`.
 
 ---
 

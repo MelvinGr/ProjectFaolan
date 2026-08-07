@@ -95,6 +95,67 @@ namespace Faolan.CSPlayerAgent
 				: [];
 		}
 
+		// One online character as the wire's `cCharacter`, independent of any team - the raid messages that name a
+		// single person (DispatchRaidInvite, DispatchRaidTargetDeclinedRaidInvite, ...) carry this record for people
+		// who are not in a team yet, so it cannot be reached through a roster.
+		public TeamMemberRecord? MemberRecordOf(uint characterId)
+		{
+			return CharacterOf(characterId) is { } character
+				? MemberOf(character)
+				: null;
+		}
+
+		public uint? LeaderOf(uint teamId)
+		{
+			return _teams.TryGetValue(teamId, out var team)
+				? team.LeaderId
+				: null;
+		}
+
+		// The team a character is in, creating a one-person one if they are solo. A raid is built out of TEAMS, so a
+		// player who forms or joins one without a group needs a team to be in first (#669); a one-member team is not
+		// a state the team flow itself can reach, because Remove dissolves at one.
+		public uint EnsureTeam(uint characterId)
+		{
+			return TeamFor(characterId).Id;
+		}
+
+		// The team as the wire sees it - the client's `cTeam`, leader first. Null for a team that no longer exists or
+		// whose members are all offline. The raid service composes these; the team flow reaches the same record
+		// through BroadcastRoster.
+		public TeamRoster? RosterOf(uint teamId)
+		{
+			if (!_teams.TryGetValue(teamId, out var team))
+				return null;
+
+			var records = team.Members.OrderByDescending(id => id == team.LeaderId).Select(CharacterOf).OfType<Character>().Select(MemberOf).ToList();
+
+			return records.Count == 0
+				? null
+				: new TeamRoster(team.Id, team.LeaderId, records, team.Settings);
+		}
+
+		// Move a character between two teams that already exist - the raid's own MoveTeamMember/SwapCharacters, which
+		// have no team-tier counterpart because a team is never a member of anything. Deliberately does NOT dissolve
+		// the source team at one member the way Remove does: inside a raid a one-person team is a legitimate slot.
+		public bool MoveMember(uint characterId, uint destinationTeamId)
+		{
+			if (TeamOf(characterId) is not { } sourceId || !_teams.TryGetValue(sourceId, out var source) || !_teams.TryGetValue(destinationTeamId, out var destination))
+				return false;
+
+			if (sourceId == destinationTeamId)
+				return false;
+
+			source.Remove(characterId);
+			destination.Add(characterId);
+			_teamByCharacter[characterId] = destinationTeamId;
+
+			if (source.LeaderId == characterId && source.Members.Count > 0)
+				source.LeaderId = source.Members[0];
+
+			return true;
+		}
+
 		// c2s TeamInvite (0x2003): remember the pending invite and tell both sides. Which dispatch goes WHERE is worth
 		// stating, because the names read backwards: retail sends DispatchYouInvitedToTeam to the INVITER carrying the
 		// TARGET's record ("you invited X" - f674 -> f678, both on the inviter's connection), and DispatchTeamInvite to
@@ -234,13 +295,10 @@ namespace Faolan.CSPlayerAgent
 		// The whole roster to every member, leader's record first (the order retail uses in all six captured rosters).
 		private async Task BroadcastRoster(LiveTeam team)
 		{
-			var ordered = team.Members.OrderByDescending(id => id == team.LeaderId).ToList();
-			var records = ordered.Select(CharacterOf).OfType<Character>().Select(c => MemberOf(c)).ToList();
-			if (records.Count == 0)
+			if (RosterOf(team.Id) is not { } roster)
 				return;
 
-			var body = TeamRosterCodec.Build(team.Id, team.LeaderId, records);
-			await Broadcast(team, CSPlayerInterfaceMethods.DispatchYouJoinedTeam, body);
+			await Broadcast(team, CSPlayerInterfaceMethods.DispatchYouJoinedTeam, TeamRosterCodec.Build(roster));
 		}
 
 		// AddToGroupIIR / RemoveFromGroupIIR to every member's WORLD connection. The capture sends one record per
@@ -279,9 +337,7 @@ namespace Faolan.CSPlayerAgent
 				return false;
 			}
 
-			team.LootMode = lootMode;
-			team.UseNeedGreed = useNeedGreed;
-			team.LootThreshold = lootThreshold;
+			team.Settings = team.Settings with { LootMode = lootMode, UseNeedGreed = useNeedGreed, LootThreshold = lootThreshold };
 
 			await Broadcast(team, CSPlayerInterfaceMethods.DispatchTeamLootOptionChanged, TeamLootOptionCodec.Build(new TeamLootOption(lootMode, useNeedGreed, lootThreshold)));
 
@@ -328,10 +384,9 @@ namespace Faolan.CSPlayerAgent
 			public uint Id { get; } = id;
 			public uint LeaderId { get; set; } = leaderId;
 
-			// The group's loot settings (TeamSetLootOption). Defaults are the ones every captured roster carries.
-			public uint LootMode { get; set; }
-			public bool UseNeedGreed { get; set; } = true;
-			public uint LootThreshold { get; set; } = 2;
+			// The group's loot settings (TeamSetLootOption), as the roster's own trailing block. Defaults are the ones
+			// every captured roster carries.
+			public TeamSettings Settings { get; set; } = TeamSettings.Default;
 			public IReadOnlyList<uint> Members { get; private set; } = [leaderId];
 
 			public void Add(uint characterId)

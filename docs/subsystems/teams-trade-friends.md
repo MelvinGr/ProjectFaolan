@@ -25,26 +25,35 @@ One repeating record carries almost every team message, which is why the whole s
 once it exists (`TeamMemberRecord`):
 
 ```
-[u32 0xC350][u32 characterId][u16 len][name LATIN1]   then twenty u32 and a u16
+[ProtoID32 character][u16 len][name LATIN1]
+[u32 class][u32 level][u32 mapId][u32 perCharacterWord][u32 0][u32 6][u32 0]
+[u8 flagA][u8 flagB][u8 hasPlayfield]   [PlayfieldProxy, only when hasPlayfield]
+[u32 opaqueA][u32 opaqueB][u32 0][u32 0][u8 0]
 ```
 
 102 bytes for a 10-character name. The first trailing u32 is the **class**: the two captured members carry `0x29`
 and `0x2C`, which are exactly `Class.Necromancer` and `Class.Demonologist`, and the chat server's friend-add reply
-ends with the same byte for the same character — that is how the two corroborate each other. Then the **map id**
-(twice; the client greys out members in another playfield), one more **per-character word** (2 and 3 in the capture —
-not identifiable from two characters; sex, race and level are all candidates), and a 9-byte per-character
-**opaque**. [V0: the team member record's level] The rest are identical across both characters and every message and are carried as captured.
+ends with the same byte for the same character — that is how the two corroborate each other. Then the **level**, the
+**map id**, and one more **per-character word** (2 and 3 in the capture — not identifiable from two characters; sex
+and race are the remaining candidates).
 
-⚠️ That leading field was first read as the LEVEL, because `0x29`/`0x2C` are plausible levels *and* the friend reply
+⚠️ The class field was first read as the LEVEL, because `0x29`/`0x2C` are plausible levels *and* the friend reply
 appeared to confirm it — two independent sightings of the same wrong field. The enum match settles it, and the client
 agrees: fed a level, it accepted the invite record, answered it with `RequestTeamInvite`, and refused to raise the
-invite window, because it cannot build one for a class that does not exist. Nothing in the capture identifies which
-field carries the level, since both captured members share it.
+invite window, because it cannot build one for a class that does not exist. The real level slot then sat as a
+constant `5` because both captured members happen to be level 5; `DispatchCharacterSearchResult` carries the same
+record for several characters at once and reads 5 / 7 / 8 / 10 across its five captured bodies, which is what
+identified it (#460).
 
-The 9-byte opaque appears **nowhere else in the capture** — not in login, not in the snapshot — so it is CS-tier
-state that cannot be derived from anything we send, and computing it would be invention. It is read as
-`[u32][u32][u8]` because only that last byte differs between the two characters (`0x54` / `0xEC`) while the three
-bytes after it are zero in both. [V0: the team member record's 9-byte per-character opaque]
+The **third bool GATES the playfield proxy** — the client reads a proxy only when it is set, so a member with no
+playfield is a shorter record rather than one carrying a zeroed proxy. The two bools before it are zero in every
+captured record and name nothing on their own.
+
+The four **opaque words** after the proxy appear **nowhere else in the capture** — not in login, not in the
+snapshot — so they are CS-tier state that cannot be derived from anything we send, and computing them would be
+invention. The first two differ per character (`0x00000301 0x59EA5C54` / `0x00018181 0x3BC035EC`) and the last two
+and the trailing flag are zero in both. We carry them so a captured member round-trips byte-exact and send zero for
+our own members. [V0: the team member record's four per-character opaque words]
 
 ## Team
 
@@ -70,8 +79,26 @@ c2s 0x204D SetPassOnLootLevel           [u32 level]                (GAME tier; 0
 
 The roster's member list is **count-framed**: retail's `0x00000BD3` is `3 × 0x3F1`, i.e. two members, not a
 constant. This is the `ListFrame` rule, and this message is a fresh instance of exactly the trap that rule
-documents. The leader's own record comes first in all six captured rosters, and the trailing 18 bytes are the loot
-settings — the same shape the client sends in `TeamSetLootOption`.
+documents. The leader's own record comes first in all six captured rosters.
+
+The trailing **18 bytes are the team's settings block**, and the client's reader (`FUN_00557960`, recovered for
+the raid work) splits them into five fields rather than the one blob they were carried as:
+
+```
+[u32 lootMode][u8 useNeedGreed][u8 flag][ProtoID32 masterLooter][u32 lootThreshold]
+ 00000000      01               00       00000000 00000000       00000002
+```
+
+Three of the five are corroborated from the other end: `TeamSetLootOption(int i_eLootMode, bool i_bUseNeedGreed,
+int i_nNewLootThreshold)`'s captured c2s body is `00000000 01 00000002`, the same 0 / true / 2. The master-looter
+slot is read with the ID32 idiom and has `TeamSetMasterLooter(const ID32&)` / `DispatchTeamMasterLooterChanged`
+for company, but is `(0, 0)` in every captured roster, so that reading is structural.
+`[V0: the team settings block's master-looter slot and second flag]`
+
+The **member record's own trailing region** is split by the same pass. What was carried as `00 00 01` before the
+playfield proxy is three bools, and the third one **gates the proxy** — a member with no playfield is a shorter
+record, not one with a zeroed proxy. What was carried as two words and nine zero bytes after it is four words and
+a flag. Every captured record still round-trips byte-for-byte; the bytes did not move, they acquired names.
 
 Team ids are minted sequentially by the CS tier under class `0x0000DEA9`: the capture's three groupings are
 `0x0051DD9A`, `0x0051DD9B`, `0x0051DD9C`.

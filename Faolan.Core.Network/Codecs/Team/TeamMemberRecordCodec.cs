@@ -15,21 +15,33 @@ namespace Faolan.Core.Network.Codecs.Team
 	//
 	//   [u32 0xC350][u32 characterId][u16 len][name LATIN1] then twenty u32 and a u16.
 	//
-	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of two RPC
-	// methods - DispatchYouInvitedToTeam and DispatchYouGotKickedFromTeam send nothing but the member - which is why
-	// it declares HandledMethods rather than a single Opcode.
+	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of ten RPC
+	// methods - the two team ones plus every raid message that names a single character - which is why it declares
+	// HandledMethods rather than a single Opcode.
+	//
+	// The client calls it `cCharacter` and its reader is `FUN_005574d0` (#669), which is what turned the three
+	// carried-verbatim regions below into named fields: the record's LAST field before the playfield proxy is a
+	// BOOL that gates the proxy, and its tail is four u32 and a bool rather than "two words and nine zero bytes".
+	// Every captured record still round-trips byte-for-byte - this renames bytes, it does not move any.
 	public static class TeamMemberRecordCodec
 	{
-		// The two methods whose body is a bare member record.
-		public static readonly CSPlayerInterfaceMethods[] HandledMethods = [CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam];
+		// Every method whose whole body is a bare member record. The two team ones are capture-proven; the eight raid
+		// ones are the client's own reader - `DispatchRaid*(i_cWho)` / `(i_cCharacter)` all call `FUN_005574d0`,
+		// the same reader the team member vector uses (#669).
+		public static readonly CSPlayerInterfaceMethods[] HandledMethods =
+		[
+			CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam,
+			CSPlayerInterfaceMethods.DispatchRaidCharacterUpdate, CSPlayerInterfaceMethods.DispatchRaidNewMasterLooter, CSPlayerInterfaceMethods.DispatchRaidTargetIsBusy,
+			CSPlayerInterfaceMethods.DispatchRaidIsAlreadyInRaid, CSPlayerInterfaceMethods.DispatchRaidInvitationTimedOut,
+			CSPlayerInterfaceMethods.DispatchRaidTargetDeclinedRaidInvite, CSPlayerInterfaceMethods.DispatchRaidYouAreNoLongerInvited,
+			CSPlayerInterfaceMethods.DispatchRaidCantInviteInvalidSubscriptionFlags, CSPlayerInterfaceMethods.DispatchRaidCantCreateInvalidMemberSubscriptionFlags
+		];
 
 		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
-		// name would be a guess. Field7Head is the first THREE bytes of what used to be `Field7 = 0x00000162` - its
-		// fourth byte was the PlayfieldProxy version.
+		// name would be a guess.
 		private const uint Field4 = 0x00000000;
 		private const uint Field5 = 0x00000006;
 		private const uint Field6 = 0x00000000;
-		private static readonly byte[] Field7Head = [0x00, 0x00, 0x01];
 
 		public static byte[] Build(TeamMemberRecord value)
 		{
@@ -63,11 +75,19 @@ namespace Faolan.Core.Network.Codecs.Team
 			r.ReadU32Be(); // Field4
 			r.ReadU32Be(); // Field5
 			r.ReadU32Be(); // Field6
-			r.ReadBytes(Field7Head.Length);
-			m.Playfield = PlayfieldProxy.Read(ref r);
+			m.FlagA = r.ReadU8() != 0;
+			m.FlagB = r.ReadU8() != 0;
+
+			// The third bool GATES the proxy - the client reads one only when it is set, so a member with no
+			// playfield is a shorter record rather than a record carrying a zeroed proxy.
+			if (r.ReadU8() != 0)
+				m.Playfield = PlayfieldProxy.Read(ref r);
+
 			m.OpaqueA = r.ReadU32Be();
 			m.OpaqueB = r.ReadU32Be();
-			r.ReadBytes(9); // nine zero bytes
+			m.OpaqueC = r.ReadU32Be();
+			m.OpaqueD = r.ReadU32Be();
+			m.TrailingFlag = r.ReadU8() != 0;
 
 			return m;
 		}
@@ -75,11 +95,11 @@ namespace Faolan.Core.Network.Codecs.Team
 		internal static void Write(FaolanStream s, TeamMemberRecord v)
 		{
 			s.WriteUInt32(EntityClass.Character).WriteUInt32(v.CharacterId).WriteString(v.Name).WriteUInt32((uint)v.Class).WriteUInt32(v.Level).WriteUInt32(v.MapId)
-				.WriteUInt32(v.PerCharacterWord).WriteUInt32(Field4).WriteUInt32(Field5).WriteUInt32(Field6).WriteArray(Field7Head);
+				.WriteUInt32(v.PerCharacterWord).WriteUInt32(Field4).WriteUInt32(Field5).WriteUInt32(Field6).WriteByte(v.FlagA).WriteByte(v.FlagB).WriteByte(true);
 
 			(v.Playfield ?? PlayfieldProxy.ForInstance(v.MapId, TeamMemberRecord.CapturedPlayfieldToken)).Write(s);
 
-			s.WriteUInt32(v.OpaqueA).WriteUInt32(v.OpaqueB).WriteArray(new byte[9]);
+			s.WriteUInt32(v.OpaqueA).WriteUInt32(v.OpaqueB).WriteUInt32(v.OpaqueC).WriteUInt32(v.OpaqueD).WriteByte(v.TrailingFlag);
 		}
 	}
 
@@ -125,6 +145,12 @@ namespace Faolan.Core.Network.Codecs.Team
 		// from the captures: sex and race are still candidates. [V0]
 		public uint PerCharacterWord { get; set; }
 
+		// Two bools the client reads immediately before the playfield gate, zero in every captured record. They are
+		// the leading two bytes of what used to be carried as `Field7Head = 00 00 01`; the third byte of that run is
+		// the gate itself and is not a field. Named by position because a constant-zero flag names nothing. [V0]
+		public bool FlagA { get; set; }
+		public bool FlagB { get; set; }
+
 		// The playfield the member's client is looking at, as a PlayfieldProxy - the SAME stream the teleport records
 		// carry (client FUN_00a6a600), embedded here rather than being a run of constants (Gitea #454). It reads
 		// misaligned if you take the record as all-u32, which is how it was modelled: `Field7 = 0x00000162` had
@@ -137,17 +163,21 @@ namespace Faolan.Core.Network.Codecs.Team
 		// not been checked in-client. Gitea #454 / #426. [V0]
 		public PlayfieldProxy Playfield { get; set; } = null!;
 
-		// An 8-byte per-character opaque followed by nine zero bytes. It appears NOWHERE else in the capture - not in
-		// login, not in the snapshot - so it is CS-tier state we cannot derive from anything we send, and there is no
-		// basis for computing it. Carried so a captured member round-trips byte-exact; our own members send zero until
-		// an in-client check says otherwise.
+		// FOUR per-character opaque words and a trailing flag - the client's `FUN_005574d0` reads exactly that after
+		// the proxy, which is what split the old "[u32][u32] then nine zero bytes" (#669). C, D and the flag are zero
+		// in every captured record; A and B are not, and appear NOWHERE else in the capture - not in login, not in
+		// the snapshot - so they are CS-tier state we cannot derive from anything we send, and there is no basis for
+		// computing them. Carried so a captured member round-trips byte-exact; our own members send zero until an
+		// in-client check says otherwise.
 		//
-		// The boundary moved by one byte when the PlayfieldProxy above was framed correctly: what used to be
-		// OpaqueA's leading byte is the proxy's trailing bool. So this is now [u32][u32] where it was [u32][u32][u8],
-		// and the two captured values are (0x00000301, 0x59EA5C54) and (0x00018181, 0x3BC035EC). Still opaque, but
-		// off the right offset. [V0]
+		// The A/B boundary moved by one byte when the PlayfieldProxy above was framed correctly: what used to be
+		// OpaqueA's leading byte is the proxy's trailing bool. The two captured values are (0x00000301, 0x59EA5C54)
+		// and (0x00018181, 0x3BC035EC). Still opaque, but off the right offset. [V0]
 		public uint OpaqueA { get; set; }
 		public uint OpaqueB { get; set; }
+		public uint OpaqueC { get; set; }
+		public uint OpaqueD { get; set; }
+		public bool TrailingFlag { get; set; }
 
 		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
 		// cannot derive (see gaps.md), so we send nothing rather than something invented.

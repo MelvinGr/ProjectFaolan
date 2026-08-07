@@ -7,6 +7,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Raid;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
@@ -31,6 +32,10 @@ namespace Faolan.CSPlayerAgent
 		// Composed collaborator: owns the team roster and its dispatches - see TeamService.
 		private readonly TeamService _teams;
 
+		// Composed collaborator: raids, which are teams one level up - see RaidService. Built ON the team service
+		// rather than beside it, because a raid holds team ids and nothing else.
+		private readonly RaidService _raids;
+
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
@@ -48,6 +53,10 @@ namespace Faolan.CSPlayerAgent
 			// CHAT connection, not this one (#663 / #668).
 			_guild = new GuildService(database, logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
 			_teams = new TeamService(logger, gameServerDispatcher, chatServerDispatcher, ClientForCharacter);
+
+			// No chat dispatcher: there is deliberately NO ~Raid channel. Only ~Guild and ~Team exist anywhere in the
+			// corpus, so subscribing one would be inventing a channel retail does not have (#663 / #669).
+			_raids = new RaidService(logger, _teams, ClientForCharacter);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -191,8 +200,120 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// --- Raids (#669) -------------------------------------------------------------------------------
+				// Fifteen c2s methods, no capture anywhere in the corpus, every parameter list the client's own. The
+				// service says what each does; the codecs say why each body looks the way it does.
+				case CSPlayerAgentMethods.RaidCreate:
+				{
+					await _raids.Create(client.Session.Character.Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidLeave:
+				{
+					await _raids.Leave(client.Session.Character.Id);
+
+					break;
+				}
+
+				// RaidInviteTeam / RaidKickTeam name a TEAM; the accept/decline pair name the team that invited.
+				case CSPlayerAgentMethods.RaidInviteTeam:
+				{
+					await _raids.InviteTeam(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidKickTeam:
+				{
+					await _raids.KickTeam(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+
+					break;
+				}
+
+				// The inviter rides OUR pending-invite table rather than the echoed body, the same way
+				// AcceptTeamInvite does: a forged body must not be able to pull someone into a raid.
+				case CSPlayerAgentMethods.RaidInviteTeamAccept:
+				case CSPlayerAgentMethods.RaidAcceptInvite:
+				{
+					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
+					await _raids.AcceptInvite(client.Session.Character.Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidInviteTeamDecline:
+				case CSPlayerAgentMethods.RaidDeclineInvite:
+				{
+					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
+					await _raids.Decline(client.Session.Character.Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidKickCharacter:
+				{
+					await _raids.KickCharacter(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidMoveTeamMember:
+				{
+					var edit = RaidRosterEditCodec.Parse(body.ReadRemainingArray());
+					await _raids.MoveMember(client.Session.Character.Id, edit.Subject.Id, edit.Destination.Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidSwapCharacters:
+				{
+					var swap = RaidRosterEditCodec.Parse(body.ReadRemainingArray());
+					await _raids.Swap(client.Session.Character.Id, swap.Subject.Id, swap.Destination.Id);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidInviteCharacter:
+				{
+					var invite = RaidInviteRequestCodec.Parse(body.ReadRemainingArray());
+					if (await Database.GetCharacter(invite.Target.Id) is { } target)
+						await _raids.Invite(client.Session.Character.Id, target, invite.Message);
+					else
+						Logger.LogWarning("RaidInviteCharacter for unknown character {TargetId:X8}.", invite.Target.Id);
+
+					break;
+				}
+
+				// The one raid message that names a player the server may never have seen. A name that resolves to
+				// nobody is silently dropped: the client's own "no such character" answer belongs to the GUILD
+				// invite family (DispatchGuildInviteNoSuchName) and the raid family has no counterpart, so sending
+				// one would be inventing a message.
 				case CSPlayerAgentMethods.RaidInviteCharacterByName:
 				{
+					var byName = RaidInviteByNameRequestCodec.Parse(body.ReadRemainingArray());
+					if (await Database.GetCharacterByName(byName.CharacterName, client.Session.Character.RealmId) is { } named)
+						await _raids.Invite(client.Session.Character.Id, named, byName.Message);
+					else
+						Logger.LogInformation("RaidInviteCharacterByName for unknown character \"{Name}\".", byName.CharacterName);
+
+					break;
+				}
+
+				// The same three-field body TeamSetLootOption carries, which IS captured.
+				case CSPlayerAgentMethods.RaidSetLootOption:
+				{
+					var loot = TeamLootOptionCodec.Parse(body.ReadRemainingArray());
+					await _raids.SetLootOption(client.Session.Character.Id, loot.Mode, loot.UseNeedGreed, loot.Threshold);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.RaidSetMasterLooter:
+				{
+					await _raids.SetMasterLooter(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+
 					break;
 				}
 

@@ -18,9 +18,12 @@ namespace Faolan.Core.Network.Codecs.Team
 	// sitting in exactly the right place with exactly the right empty encoding (#459). Passing "" reproduces the
 	// captured bytes exactly, so the goldens are unaffected. [V0 on the field's identity - structural, since no
 	// capture carries a non-empty note.]
+	//
+	// s2c DispatchRaidInvite (0x9B) is the same body - the client reads it with the same cCharacter reader followed
+	// by the same string (#669) - so it is declared here rather than getting a codec of its own.
 	public static class TeamInviteCodec
 	{
-		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchTeamInvite;
+		public static readonly CSPlayerInterfaceMethods[] HandledMethods = [CSPlayerInterfaceMethods.DispatchTeamInvite, CSPlayerInterfaceMethods.DispatchRaidInvite];
 
 		public static byte[] Build(TeamInvite value)
 		{

@@ -7,7 +7,8 @@ namespace Faolan.Core.Network.Codecs.Team
 	// An ID32 as it appears on the RPC wire: `[u32 class][u32 instance]`, the stream form of the protobuf `ProtoID32`.
 	// It is the ENTIRE body of several c2s methods that name one entity and nothing else - AcceptTeamInvite (CS
 	// 0x2008), KickFromTeam (GameCharAgent 0x2009), StartTrade (0x2065), DeclineTrade (0x2066) - and the head of
-	// several longer ones.
+	// several longer ones. It is also the whole body of two s2c raid messages, DispatchRaidTeamLeft (0x95) and
+	// DispatchRaidNewRaidLeader (0x98), whose single `i_cTeamID` the client reads as exactly this pair (#669).
 	//
 	// Filed under Team because that is where it was first pulled out of the listener dispatch; it is not team-specific
 	// and belongs at the Codecs root once the root files land (#530 wave 6).
@@ -54,6 +55,13 @@ namespace Faolan.Core.Network.Codecs.Team
 		public static EntityId Character(uint characterId)
 		{
 			return new EntityId(EntityClass.Character, characterId);
+		}
+
+		// A team - and, until a capture says otherwise, a RAID: the client's raid object is a `cTeam` and the raid's
+		// own id rides in the same slot a team id does, so it goes out under the team entity class (#669). [V0]
+		public static EntityId Team(uint teamId)
+		{
+			return new EntityId(EntityClass.Team, teamId);
 		}
 	}
 }
