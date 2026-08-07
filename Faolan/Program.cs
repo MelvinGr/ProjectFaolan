@@ -96,7 +96,8 @@ namespace Faolan
 			// The login DH private key (Login:PrivateKey). Applied BEFORE any listener starts, since the public key the
 			// launcher patches into a client is derived from it. Unset = the built-in default; a bad value throws here
 			// rather than silently degrading every login to accept-any.
-			if (DhKeys.Configure(builder.Configuration["Login:PrivateKey"]))
+			DhKeys.Configure(builder.Configuration);
+			if (DhKeys.IsConfigured)
 				Console.WriteLine("[login] Using the configured Login:PrivateKey - patch clients with the matching public key (Faolan.ClientLauncher --patch-login).");
 
 			Realm? hostRealm = null;

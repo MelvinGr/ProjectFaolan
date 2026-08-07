@@ -5,6 +5,7 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
+using Microsoft.Extensions.Configuration;
 
 namespace Faolan
 {
@@ -96,11 +97,17 @@ namespace Faolan
 			// the deployment that keeps its config somewhere else, the same as --write-default-config.
 			var path = given is { Length: > 0 } ? given : Global.UserConfigPath;
 			string hex;
+			IConfiguration config;
 			try
 			{
 				hex = DhKeys.GeneratePrivateHex();
 				UserConfigWriter.Set(path, "Login:PrivateKey", hex, force);
-				DhKeys.Configure(hex);
+
+				// Re-read the WHOLE stack rather than applying the generated hex directly, so the public key printed
+				// below is the one clients will actually have to carry - which is not the generated one if something
+				// above the user config shadows it. Shadowed() then says so.
+				config = FaolanCommandLine.Build();
+				DhKeys.Configure(config);
 			}
 			catch (Exception e) when (e is InvalidOperationException or ArgumentException or IOException)
 			{
@@ -113,16 +120,15 @@ namespace Faolan
 			Console.WriteLine($"Its public key is {DhKeys.ServerPublicHex}");
 			Console.WriteLine("⚠️  Every client must now be re-patched (Faolan.ClientLauncher --patch-login) - one that still carries the old key cannot be decrypted, and that fails SILENTLY back to accept-any.");
 
-			return Shadowed(hex, given is not { Length: > 0 }) ? 1 : 0;
+			return Shadowed(config, hex, given is not { Length: > 0 }) ? 1 : 0;
 		}
 
 		// Whether the key just written is NOT the one the server will use, in either of the two ways that can happen.
 		// Both are silent otherwise, and both produce the same symptom as no key at all: accept-any logins.
 		// `intoTheUserConfig` is false when a path was given: the file then sits nowhere in particular in the stack, so
 		// "does it resolve to this?" has no answer and only the second check applies.
-		private static bool Shadowed(string hex, bool intoTheUserConfig)
+		private static bool Shadowed(IConfiguration config, string hex, bool intoTheUserConfig)
 		{
-			var config = FaolanCommandLine.Build();
 			var shadowed = false;
 
 			// 1. A LAYER ABOVE the file we wrote also sets it. The user file beats faolan.json, so the normal case is

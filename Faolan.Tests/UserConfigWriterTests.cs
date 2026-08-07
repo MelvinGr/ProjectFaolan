@@ -127,8 +127,8 @@ namespace Faolan.Tests
 			Assert.False(File.Exists(_path));
 		}
 
-		// The generated key: in range, hex, and different every time. `DhKeys.Configure` is the same bound the
-		// configured path enforces, so a generated key can never be one the server would then refuse.
+		// The generated key: in range, hex, and different every time. The bound is the one the CONFIGURED path
+		// enforces, so a generated key can never be one the server would then refuse.
 		[Fact]
 		public void AGeneratedKey_IsAUsableExponent()
 		{
@@ -142,13 +142,14 @@ namespace Faolan.Tests
 
 			try
 			{
-				Assert.True(DhKeys.Configure(first));
+				DhKeys.ConfigurePrivate(first);
+				Assert.True(DhKeys.IsConfigured);
 				Assert.Equal(DhKeys.PublicHexLength, DhKeys.ServerPublicHex.Length);
 				Assert.Equal(BigInteger.ModPow(DhKeys.G, parsed, DhKeys.N), DhKeys.ServerPublic);
 			}
 			finally
 			{
-				DhKeys.Configure(null); // static: restore so test order cannot matter
+				DhKeys.ConfigurePrivate(null); // static: restore so test order cannot matter
 			}
 		}
 

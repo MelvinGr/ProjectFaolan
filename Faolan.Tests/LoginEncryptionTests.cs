@@ -130,17 +130,19 @@ namespace Faolan.Tests
 			var original = DhKeys.ServerPublicHex;
 			try
 			{
-				Assert.False(DhKeys.Configure(null)); // unset -> built-in default, reported as "not configured"
+				DhKeys.ConfigurePrivate(null); // unset -> the built-in default, reported as "not configured"
+				Assert.False(DhKeys.IsConfigured);
 				Assert.Equal(original, DhKeys.ServerPublicHex);
-				Assert.Throws<ArgumentException>(() => DhKeys.Configure("not-hex"));
-				Assert.Throws<ArgumentException>(() => DhKeys.Configure("1")); // <= 1 is not a usable exponent
+				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePrivate("not-hex"));
+				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePrivate("1")); // <= 1 is not a usable exponent
 
-				Assert.True(DhKeys.Configure("a3f1c2")); // a different key changes the public half
+				DhKeys.ConfigurePrivate("a3f1c2"); // a different key changes the public half
+				Assert.True(DhKeys.IsConfigured);
 				Assert.NotEqual(original, DhKeys.ServerPublicHex);
 			}
 			finally
 			{
-				DhKeys.Configure(null); // static: restore so test order cannot matter
+				DhKeys.ConfigurePrivate(null); // static: restore so test order cannot matter
 			}
 		}
 
@@ -153,10 +155,12 @@ namespace Faolan.Tests
 			var derived = DhKeys.ServerPublicHex;
 			try
 			{
-				Assert.False(DhKeys.ConfigurePublic(null)); // unset -> patch our own derived key
+				DhKeys.ConfigurePublic(null); // unset -> patch our own derived key
+				Assert.False(DhKeys.IsPublicOverridden);
 				Assert.Equal(derived, DhKeys.ClientPatchPublicHex);
 
-				Assert.True(DhKeys.ConfigurePublic("a3f1c2"));
+				DhKeys.ConfigurePublic("a3f1c2");
+				Assert.True(DhKeys.IsPublicOverridden);
 				Assert.Equal(derived, DhKeys.ServerPublicHex); // the server's own key is untouched…
 				Assert.NotEqual(derived, DhKeys.ClientPatchPublicHex); // …but the exe gets the configured one
 				Assert.Equal(DhKeys.PublicHexLength, DhKeys.ClientPatchPublicHex.Length); // left-padded to the exe's field
