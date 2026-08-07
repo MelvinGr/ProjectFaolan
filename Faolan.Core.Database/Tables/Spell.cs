@@ -183,6 +183,34 @@ namespace Faolan.Core.Database.Tables
 		// (CombatService.ChannelGroundAoe, #349) spreads the spell's damage across `channel / this` ticks.
 		public uint ChannelingIntervalMs { get; set; }
 
+		/// <summary>
+		///     The spell's OWN critical chance and critical-damage bonus, both in HUNDREDTHS of a percent (#633).
+		///     RDB fields 147 <c>SpellCriticalChance</c> and 129 <c>SpellCriticalDamage</c>; 1,224 and 1,228 of the
+		///     21,502 records carry one. 0 = the record does not state it, and the caster's own ratings decide.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The unit is the client's, not a fit: both stat ids sit in its tooltip renderer's first
+		///         percent-divisor set (<c>StatDisplayScale.Percent1</c>), so it draws each as <c>value / 100</c>.
+		///         250 is 2.50% chance; 5000 is +50.00% damage.
+		///     </para>
+		///     <para>
+		///         ⭐ The damage column CORROBORATES a constant that was provisional: 5000 is its modal value on 607
+		///         of 1,228 records, i.e. a crit for +50% - exactly the <c>CombatResolver.BaseCritDamagePercent</c>
+		///         of 150 that had been written down as "waiting on an in-client combat log". The client's own spell
+		///         table says 1.5x.
+		///     </para>
+		///     <para>
+		///         ⚠️ Roughly half the carriers hold a bare <c>1</c> (0.01%) on one or both. That is not a sentinel to
+		///         special-case: read literally it is a spell that essentially never crits, and if it did the bonus
+		///         would be nothing - which is self-consistent and is what heals and utility spells should look like.
+		///     </para>
+		/// </remarks>
+		public uint CriticalChanceHundredths { get; set; }
+
+		/// <inheritdoc cref="CriticalChanceHundredths" />
+		public uint CriticalDamageHundredths { get; set; }
+
 		// The blast radius of an AREA spell, in metres. NOT a property field - it is a GameAction ELEMENT key
 		// (`Radius`, key 11 = stat 0x2DD) on the kinds that select targets in an area, read by key out of the same
 		// [2][9] region as the recast (GameActionTypes.AreaTargetKinds). Which is why the "no per-spell AoE radius

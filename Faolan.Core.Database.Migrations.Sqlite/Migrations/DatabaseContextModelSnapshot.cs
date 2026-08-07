@@ -3490,6 +3490,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ChannelingIntervalMs")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("CriticalChanceHundredths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("CriticalDamageHundredths")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");

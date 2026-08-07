@@ -184,6 +184,36 @@ namespace Faolan.GameServer.Combat
 			return Math.Max(1, damage * (BaseCritDamagePercent + (int)criticalDamageRating) / 100);
 		}
 
+		// #633: a SPELL's own critical chance, in hundredths of a percent, plus what the caster's Critical Rating adds
+		// on the same curve a swing uses. RDB field 147 `SpellCriticalChance` - 250 is 2.50%, which is its modal value.
+		//
+		// ⚠️ A spell whose record states NO chance does not crit at all, rather than falling back to the melee base.
+		// The melee base exists because "everyone crits sometimes" with a weapon; extending it to the 20,278 spell
+		// records that state nothing would be giving every one of them a 5% crit on no evidence, where the 1,224 that
+		// DO state one are the client saying which spells crit and how often.
+		public static int SpellCritChanceHundredths(uint spellCriticalChanceHundredths, uint criticalRating)
+		{
+			return spellCriticalChanceHundredths == 0
+				? 0
+				: Math.Min(MaxCritChancePercent * 100, (int)spellCriticalChanceHundredths + ((int)criticalRating * 10));
+		}
+
+		// The critical damage of a spell hit: the spell's own bonus over 100%, plus the caster's Critical Damage
+		// Rating at a point per percent (the melee rule).
+		//
+		// RDB field 129 `SpellCriticalDamage` is that bonus in hundredths of a percent, and its modal value - 5000 on
+		// 607 of the 1,228 records that carry it - is +50%, i.e. the 1.5x <see cref="BaseCritDamagePercent" /> already
+		// assumed. So the client's own spell table corroborates a constant this file had written down as provisional
+		// and "waiting on an in-client combat log". A record stating none takes that base.
+		public static int ApplySpellCritDamage(int damage, uint spellCriticalDamageHundredths, uint criticalDamageRating)
+		{
+			var bonusHundredths = spellCriticalDamageHundredths > 0
+				? (int)spellCriticalDamageHundredths
+				: (BaseCritDamagePercent - 100) * 100;
+
+			return Math.Max(1, (int)((long)damage * (PercentScale + bonusHundredths + ((int)criticalDamageRating * 100)) / PercentScale));
+		}
+
 		// Reduces incoming MAGIC damage by the defender's aggregated Protection rating - the magical mirror of armor
 		// mitigation (same diminishing-returns curve, its own half-point).
 		public static int ApplyMagicMitigation(int rawDamage, uint protection, uint level = 0, uint attribute = 0)

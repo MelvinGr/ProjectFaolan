@@ -212,6 +212,17 @@ namespace Faolan.GameServer.Combat
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, (caster?.SpellBoost(spellId) ?? 0) + extraPercentHundredths);
+
+			// #633: a spell can CRIT, which it could not before - the client's own catalog states a per-spell chance
+			// and a per-spell damage bonus (RDB 147/129) on ~1,225 records each, and the caster's Critical Rating adds
+			// to both on the melee curve. A spell whose record states no chance does not crit; nothing is invented for
+			// the 20,278 that say nothing. Like a melee crit this is NOT a distinct wire flag - retail conveys it by
+			// the larger number alone.
+			var spell = await _database.GetSpell(spellId);
+			var critChanceHundredths = CombatResolver.SpellCritChanceHundredths(spell?.CriticalChanceHundredths ?? 0, caster?.CriticalRating ?? 0);
+			if (critChanceHundredths > 0 && Random.Shared.Next(SpellCritRollScale) < critChanceHundredths)
+				damage = CombatResolver.ApplySpellCritDamage(damage, spell?.CriticalDamageHundredths ?? 0, caster?.CriticalDamageRating ?? 0);
+
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}
@@ -334,6 +345,10 @@ namespace Faolan.GameServer.Combat
 
 			return true;
 		}
+
+		// A spell crit rolls in HUNDREDTHS of a percent, not whole percents like a swing: the modal per-spell chance
+		// is 2.50%, which a 0..99 roll cannot express.
+		private const int SpellCritRollScale = 10000;
 
 		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
 		// tail). Retail's complete reply to an air swing is the plain echo-ack - no result block (combat capture

@@ -3894,7 +3894,8 @@ namespace Faolan.Importer.Cli
 					[132] = "mana cost, mode from the flags word (#629/#630)", [186] = "mount creature (#627)",
 					[287] = "range", [294] = "cast time", [447] = "channeling interval (#349)",
 					[347] = "splash radius (#626)", [348] = "splash damage (#626)", [349] = "splash max targets",
-					[499] = "mount quality (#627)", [847] = "scaling attribute (#592)"
+					[499] = "mount quality (#627)", [847] = "scaling attribute (#592)",
+					[129] = "spell critical damage (#633)", [147] = "spell critical chance (#633)"
 				}
 				: new Dictionary<uint, string> { [74] = "value", [104] = "bag", [499] = "quality", [972] = "primary attribute", [1331] = "resource bag" };
 
@@ -5641,15 +5642,23 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// TEMP (#274): discover the spell DURATION field in the RDB spell-data records (type 1040005). Dumps either a
-		// specific spell's full increasing field table (--report-arg <decimal id>) or, with no arg, a histogram of how
-		// often each field id appears across all named spell records (so a duration field stands out as near-universal
-		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
+		// The spell records' (type 1040005) property table, three ways:
+		//   --report-arg <decimal id>     one spell's whole field table
+		//   --report-arg field:<n>        every spell CARRYING field n, with its name and the value - the view that
+		//                                 says whether an unread field is worth importing (#633)
+		//   (no arg)                      a histogram of how often each field id appears, with samples
+		//
+		// Written for #274 (find the DURATION field) and kept because every later field decode has needed one of the
+		// three - a field is only decodable once you can see WHICH spells carry it, which the histogram cannot say.
 		private static void SpellFields(string rdbDir, string? arg)
 		{
 			using var rdb = OpenRdb(rdbDir);
 			var counts = new Dictionary<uint, int>();
 			var samples = new Dictionary<uint, List<uint>>();
+			uint? byField = arg != null && arg.StartsWith("field:", StringComparison.OrdinalIgnoreCase) && uint.TryParse(arg[6..], out var f)
+				? f
+				: null;
+			var carriers = new List<(uint Id, string Name, uint Value)>();
 			uint? wanted = uint.TryParse(arg, out var w)
 				? w
 				: null;
@@ -5684,6 +5693,9 @@ namespace Faolan.Importer.Cli
 					return;
 				}
 
+				if (byField is { } want && fields.TryGetValue(want, out var value))
+					carriers.Add((e.Id, name, value));
+
 				foreach (var kv in fields)
 				{
 					counts[kv.Key] = counts.GetValueOrDefault(kv.Key) + 1;
@@ -5692,6 +5704,19 @@ namespace Faolan.Importer.Cli
 					if (l.Count < 8)
 						l.Add(kv.Value);
 				}
+			}
+
+			if (byField is { } field)
+			{
+				var fieldName = Enum.GetName(typeof(CharacterStatId), field) ?? "(unnamed)";
+				Console.WriteLine($"field {field} (0x{field:X3}) {fieldName}: {carriers.Count} spell record(s)");
+				foreach (var c in carriers.OrderBy(c => c.Value).ThenBy(c => c.Name, StringComparer.Ordinal))
+					Console.WriteLine($"  {c.Value,10}  {c.Id,9}  {c.Name}");
+
+				foreach (var g in carriers.GroupBy(c => c.Value).OrderByDescending(g => g.Count()).Take(15))
+					Console.WriteLine($"  value {g.Key,10} x{g.Count()}");
+
+				return;
 			}
 
 			if (wanted != null)

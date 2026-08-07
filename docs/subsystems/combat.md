@@ -1124,6 +1124,37 @@ sit in that same ~2.15 s cluster, but its median is 2.365 s — only 10% high, y
 midpoint, so the half-second snap turned a 10% bias into a reported **2500 ms**. It is the one spell in the corpus
 where the two rules disagree.
 
+### A spell can CRIT, and the client's own catalog says which and how hard (#633)
+
+The spell path had no critical hit at all: `ResolveOffensiveCast` computed a number and applied it. Two RDB spell
+fields answer both halves of that, and both are stats the client's tooltip renderer divides by 100
+(`StatDisplayScale.Percent1`), so both are **hundredths of a percent**:
+
+| field | client's name | records | modal value |
+| --- | --- | ---: | --- |
+| `147` | `SpellCriticalChance` | 1,224 | **250** = 2.50% |
+| `129` | `SpellCriticalDamage` | 1,228 | **5000** = +50.00% |
+
+⭐ **That damage figure corroborates a constant this server had already assumed on its own authority.**
+`CombatResolver.BaseCritDamagePercent` is 150 — a crit hits for 1.5× — and the file says outright that it is
+provisional and "waiting on an in-client combat log". The client's own spell table states +50% on 607 of the 1,228
+records that state anything at all. Two independent directions, the same number.
+[V3: SpellAreaAndChannelTests.TheModalSpellCritDamage_IsTheBaseCritThisServerAlreadyAssumed]
+
+The caster's own Critical Rating adds to both on the same curve a swing uses, and the chance takes the same
+`MaxCritChancePercent` ceiling. Like a melee crit it is **not** a distinct wire flag — retail conveys a crit by the
+larger number alone (the `type` field is the attacker's damage school), so nothing new goes out.
+
+⚠️ **A spell whose record states no chance does not crit**, rather than falling back to the melee base. That base
+exists because everyone crits sometimes with a weapon; extending it to the 20,278 records that state nothing would
+give every one of them a 5% crit on no evidence, when the whole value of the field is the client saying WHICH
+spells crit. `Fires of Gehenna` and `Shockstrike` do; most of the catalog does not.
+
+⚠️ Roughly half the carriers hold a bare `1` on one or both columns, and it is deliberately **not** special-cased.
+Read literally, a 1 is a 0.01% chance of a crit worth +0.01% — a spell that does not meaningfully crit, which is
+self-consistent and is what a heal or a utility spell should look like. Special-casing it would be inventing a
+sentinel the client does not have.
+
 ⚠️ **The school NUMBERING was wrong until #487, so any pre-#487 census output names the wrong elements.** Cold
 sat at 5 with everything after it one too high, which made a necromancer's unholy nukes read as *Holy* and their
 frost as *Siege*. The real order appends Cold after the nine — `Slashing 1 · Piercing 2 · Crushing 3 · Fire 4 ·

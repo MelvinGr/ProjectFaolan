@@ -94,6 +94,67 @@ namespace Faolan.Tests
 			Assert.Equal(1, CombatResolver.ApplyPercentBonus(100, -50000));
 		}
 
+		// #633: a SPELL states its own crit chance, in hundredths of a percent - 250 is 2.50%, the modal value, and
+		// what `Fires of Gehenna` and `Shockstrike` carry. The caster's Critical Rating adds on the melee curve
+		// (rating/10 percent = rating x 10 hundredths).
+		[Theory]
+		[InlineData(250u, 0u, 250)]
+		[InlineData(250u, 30u, 550)]
+		[InlineData(1500u, 0u, 1500)]
+		public void SpellCritChance_IsTheSpellsOwnPlusTheCastersRating(uint spellChance, uint rating, int expected)
+		{
+			Assert.Equal(expected, CombatResolver.SpellCritChanceHundredths(spellChance, rating));
+		}
+
+		// ⚠️ The load-bearing negative. A spell whose record states NO chance does not crit at all - it does NOT fall
+		// back to the melee base. That base exists because everyone crits sometimes with a weapon; extending it here
+		// would give the 20,278 spell records that say nothing a 5% crit on no evidence, and the whole value of the
+		// field is that the client is saying WHICH spells crit.
+		[Fact]
+		public void SpellCritChance_IsZeroWhenTheRecordStatesNone()
+		{
+			Assert.Equal(0, CombatResolver.SpellCritChanceHundredths(0, 0));
+			Assert.Equal(0, CombatResolver.SpellCritChanceHundredths(0, 500)); // even for a heavily crit-geared caster
+		}
+
+		// The chance is capped by the same ceiling a swing's is, so a rating stack cannot make every cast a crit.
+		[Fact]
+		public void SpellCritChance_IsCapped()
+		{
+			Assert.Equal(CombatResolver.MaxCritChancePercent * 100, CombatResolver.SpellCritChanceHundredths(250, 100_000));
+		}
+
+		// The spell's own bonus is over 100%, so 5000 = +50% = the 1.5x this file already assumed - which is what
+		// makes the field a corroboration of `BaseCritDamagePercent` rather than a replacement for it.
+		[Fact]
+		public void SpellCritDamage_ModalValueReproducesTheBaseCrit()
+		{
+			Assert.Equal(CombatResolver.ApplyCritDamage(200, 0), CombatResolver.ApplySpellCritDamage(200, 5000, 0));
+			Assert.Equal(300, CombatResolver.ApplySpellCritDamage(200, 5000, 0));
+		}
+
+		// A record stating none takes that base; a bigger bonus hits harder; and the caster's Critical Damage Rating
+		// adds a point per percent either way.
+		[Theory]
+		[InlineData(200, 0u, 0u, 300)] // no field -> the 1.5x base
+		[InlineData(200, 10000u, 0u, 400)] // +100%
+		[InlineData(200, 5000u, 50u, 400)] // +50% plus 50 rating
+		public void SpellCritDamage_ScalesTheHit(int damage, uint spellCritDamage, uint rating, int expected)
+		{
+			Assert.Equal(expected, CombatResolver.ApplySpellCritDamage(damage, spellCritDamage, rating));
+		}
+
+		// ⚠️ Roughly half the carriers hold a bare `1` on one or both columns. It is NOT special-cased, and this is
+		// the gate that says it does not need to be: read literally, a 1 is a 0.01% chance of a crit worth +0.01%,
+		// which is a spell that does not meaningfully crit - self-consistent, and never a crit that hits for LESS
+		// than a normal hit.
+		[Fact]
+		public void SpellCrit_TheBareOneSentinelIsHarmlessReadLiterally()
+		{
+			Assert.Equal(1, CombatResolver.SpellCritChanceHundredths(1, 0));
+			Assert.Equal(200, CombatResolver.ApplySpellCritDamage(200, 1, 0));
+		}
+
 		// The client's own rule, recovered from FUN_01118ce0 and confirmed independently by RDB field 847 -
 		// docs/rdb/spell-scaling.md. Wisdom for every caster; Intelligence for the three classes the client
 		// special-cases; and the rate is TKW_MagicalDpsAbilityModifier = 0.6, truncated (the client's CVTTSS2SI).

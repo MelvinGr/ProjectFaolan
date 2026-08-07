@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Rdb;
+using Faolan.GameServer.Combat;
 using Faolan.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -74,6 +75,33 @@ namespace Faolan.Tests
 			// Every one of them really does carry the key it is selected for.
 			foreach (var kind in GameActionTypes.AreaTargetKinds)
 				Assert.Contains(GameActionTypes.KeyRadius, GameActionTypes.Get(kind)!.Keys);
+		}
+
+		// #633: the per-spell CRIT columns, against the shipped catalog. The point of gating them is that the data
+		// makes a claim the code had been making on its own authority - see the modal-value assertion below.
+		[Fact]
+		public void SpellCritFields_AreImportedForTheSpellsThatCarryThem()
+		{
+			Assert.Equal(1219u, Scalar("SELECT COUNT(*) FROM Spells WHERE CriticalChanceHundredths > 0"));
+			Assert.Equal(1229u, Scalar("SELECT COUNT(*) FROM Spells WHERE CriticalDamageHundredths > 0"));
+
+			// Two of the Demonologist's own nukes, at the modal 2.50% chance for +50% damage.
+			Assert.Equal(250u, Scalar("SELECT CriticalChanceHundredths FROM Spells WHERE Name = 'Shockstrike (Rank 3)'"));
+			Assert.Equal(5000u, Scalar("SELECT CriticalDamageHundredths FROM Spells WHERE Name = 'Shockstrike (Rank 3)'"));
+		}
+
+		// ⭐ The independent corroboration. `CombatResolver.BaseCritDamagePercent` is 150 - a crit hits for 1.5x -
+		// and that file says outright that the constant is provisional and "waiting on an in-client combat log".
+		// The client's own spell table states +50.00% on 607 of the 1,228 records that state anything, which is the
+		// same number arrived at from a different direction entirely.
+		[Fact]
+		public void TheModalSpellCritDamage_IsTheBaseCritThisServerAlreadyAssumed()
+		{
+			var modal = Scalar("SELECT CriticalDamageHundredths FROM Spells WHERE CriticalDamageHundredths > 0 " +
+				"GROUP BY CriticalDamageHundredths ORDER BY COUNT(*) DESC LIMIT 1");
+
+			Assert.Equal(5000u, modal);
+			Assert.Equal((uint)(CombatResolver.BaseCritDamagePercent - 100) * 100, modal);
 		}
 
 		private static uint Scalar(string sql)

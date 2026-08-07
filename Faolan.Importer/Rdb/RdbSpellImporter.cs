@@ -87,6 +87,12 @@ namespace Faolan.Importer.Rdb
 		// time and duration fields. The client names it `ChannelingInterval`; 521 records carry it, one of which is
 		// the developers' "Oysteins Channeltest".
 		private const uint ChannelingIntervalField = 0x1BF;
+
+		// 129 / 147 - the spell's OWN critical chance and critical-damage bonus (#633). Both are stats the client's
+		// tooltip renderer divides by 100 (`StatDisplayScale.Percent1`), so both are hundredths of a percent: 250 =
+		// 2.50% chance, 5000 = +50.00% damage. 1,228 and 1,224 records carry them.
+		private const uint SpellCriticalDamageField = 0x081;
+		private const uint SpellCriticalChanceField = 0x093;
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
 		// How far into a leading number the shared ARCHETYPE block runs (#581/#296). The archetype combo lines are
@@ -278,6 +284,11 @@ namespace Faolan.Importer.Rdb
 				var channelingIntervalMs = fields.TryGetValue(ChannelingIntervalField, out var ci)
 					? ci * 10
 					: 0u; // centiseconds -> ms
+				// #633: hundredths of a percent, carried raw. NOT clamped or defaulted - the modal chance is 250
+				// (2.5%) and the modal damage bonus 5000 (+50%), and the ~half of the records carrying a bare `1` are
+				// spells that essentially never crit, which is a fact about them rather than a missing value.
+				var criticalChanceHundredths = fields.GetValueOrDefault(SpellCriticalChanceField);
+				var criticalDamageHundredths = fields.GetValueOrDefault(SpellCriticalDamageField);
 				var areaRadius = 0u; // metres, filled from the area-targeting elements below (#349)
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
@@ -392,6 +403,8 @@ namespace Faolan.Importer.Rdb
 						SplashDamage = splashDamage,
 						SplashMaxTargets = splashMaxTargets,
 						ChannelingIntervalMs = channelingIntervalMs,
+						CriticalChanceHundredths = criticalChanceHundredths,
+						CriticalDamageHundredths = criticalDamageHundredths,
 						AreaRadius = areaRadius,
 						DurationMs = durationMs,
 						Level = level,
@@ -436,6 +449,8 @@ namespace Faolan.Importer.Rdb
 				spell.SplashDamage = splashDamage;
 				spell.SplashMaxTargets = splashMaxTargets;
 				spell.ChannelingIntervalMs = channelingIntervalMs;
+				spell.CriticalChanceHundredths = criticalChanceHundredths;
+				spell.CriticalDamageHundredths = criticalDamageHundredths;
 				spell.AreaRadius = areaRadius;
 				spell.DurationMs = durationMs;
 
