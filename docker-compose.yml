@@ -157,10 +157,10 @@ services:
 #    safe to share between runs - and worth persisting: a full patcher run is many GB.
 # ⚠️ `CdnMirror__Ip` MUST be 0.0.0.0 here (the image defaults it): the code's own default is 127.0.0.1, which
 #    inside a container is loopback the published port cannot reach.
-# ⚠️ The LocalConfig.xml the mirror serves back rewrites the patch addresses to point at the mirror. That address is
-#    taken from the Host header of the request that asked for the file - i.e. whatever the client dialled - so a
-#    client on another machine gets its own address with no configuration. Set `CdnMirror__PublicAddress` only if
-#    something in front of the mirror rewrites Host.
+# ⚠️ `CdnMirror__PublicAddress` is REQUIRED - the mirror exits at startup without it. The LocalConfig.xml it serves
+#    back rewrites the patch addresses to point at the mirror, and only you know what a client can dial: NOT the bind
+#    address (0.0.0.0 here) and not the published port's container side, but the host address the port maps to. The
+#    client keeps that value in its own config, so a guess would be a wrong patch address that looks like it worked.
 # ---------------------------------------------------------------------------------------------------------------
 #  cdn:
 #    build:
@@ -171,7 +171,7 @@ services:
 #      CdnMirror__Ip: "0.0.0.0"       # bind all interfaces IN the container (the code default, 127.0.0.1, is unreachable)
 #      CdnMirror__Port: 7081
 #      CdnMirror__Store: "/app/store"
-#      # CdnMirror__PublicAddress: "gameserver.example.com:7081"   # only when a proxy in front rewrites Host
+#      CdnMirror__PublicAddress: "gameserver.example.com:7081"   # REQUIRED: what a CLIENT dials, written into LocalConfig.xml
 #    ports:
 #      - "7081:7081"                  # what --mirror and CdnUrl point at
 #    volumes:

@@ -28,6 +28,11 @@ COPY --from=build /app/publish ./
 # ⚠️ The mirror binds CdnMirror:Ip, which defaults to 127.0.0.1 - LOOPBACK INSIDE THE CONTAINER, i.e. a published
 # port would connect to nothing. So the container default is 0.0.0.0; the port mapping is what limits exposure.
 # Config comes from env vars (faolan.json is optional and not baked in) - see docker-compose.yml.
+#
+# ⚠️ CdnMirror__PublicAddress is REQUIRED and deliberately NOT set here: it is the address a CLIENT dials, which for a
+# published port is the HOST's address, so only the deployment knows it. Baking a value would ship a wrong one - the
+# mirror writes it into the LocalConfig.xml the client then patches itself from. The container exits at startup
+# without it, naming the key.
 ENV CdnMirror__Ip=0.0.0.0 \
     CdnMirror__Port=7081 \
     CdnMirror__Store=/app/store
