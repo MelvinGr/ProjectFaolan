@@ -60,10 +60,25 @@ namespace Faolan.GameServer.Combat
 		// 53067 is: a percentage is not an addition.
 		private static readonly HashSet<uint> FlatKinds = [53045, 53189, 53220, 53221];
 
-		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. A stat is here
-		// only if its wire scale is verified (see the type comment). The apply is null for the ones the server does not
-		// model yet, which are still pushed so the character sheet reflects the buff; when it returns a value, that value
-		// is pushed instead of the buffed total (the max pools, where the wire wants the whole pool, not the bonus).
+		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. The apply is
+		// null for the ones the server does not model yet, which are still pushed so the character sheet reflects the
+		// buff; when it returns a value, that value is pushed instead of the buffed total (the max pools, where the
+		// wire wants the whole pool, not the bonus).
+		//
+		// ⚠️ THE ADMISSION TEST IS NOT "IS THE SCALE VERIFIED" ANY MORE, and reading it that way is what let entries
+		// rot on the wrong side of this list. That was the test when a scale could only come from a hand-read tooltip;
+		// `StatDisplayScale` now transcribes the CLIENT'S OWN divisor rule and covers every id, so the scale of every
+		// stat in the catalog is known and that gate admits everything.
+		//
+		// What still keeps a stat out is the SECOND, unstated criterion, and it is the load-bearing one:
+		// `Recompute` computes `gear + sum(buffs)`, so a stat is only admissible if its baseline is ZERO. A
+		// MULTIPLIER stat is not: `MovementMultiplier` (0x0F0) has a baseline of 100 and `Turtle Formation` carries
+		// −50 on it, so summing from zero would tell the client "movement 50%" for what the buff means as "−50%"
+		// - and `MagicDamageModifier` (0x218) is worse, with a baseline of 10000 that a live read shows moving to
+		// 12000 for +20%. Those need a model that knows the baseline (#700), not a place on this list.
+		//
+		// So: add a stat here when its records ADD to zero, whatever their scale. Leave it off when they scale a
+		// total.
 		private static readonly Dictionary<CharacterStatId, Func<WorldEntity, uint, uint>?> HonoredStats = new()
 		{
 			// Gear-consumed ratings (#3/#399/#401) - scales proven against in-client item tooltips.
@@ -104,6 +119,35 @@ namespace Faolan.GameServer.Combat
 			[CharacterStatId.KnockbackResistance] = null,
 			[CharacterStatId.DamageDeflection] = null,
 			[CharacterStatId.StaggeringChance] = null,
+
+			// The DAMAGE-SCHOOL invulnerability ratings, all eleven (#699). Additive from a zero baseline, at the
+			// client's ×100: `Magic Shield` +10000 is +100% cold, `Crom` +20000, `Fire Pit` −20000. Nothing consumes
+			// them yet - the mitigation model is per-armour/protection, not per school - but they are the largest
+			// single family the gate was dropping (~700 rows) and the sheet should show them.
+			[CharacterStatId.ColdInvulnerability] = null,
+			[CharacterStatId.SlashingInvulnerability] = null,
+			[CharacterStatId.PiercingInvulnerability] = null,
+			[CharacterStatId.CrushingInvulnerability] = null,
+			[CharacterStatId.FireInvulnerability] = null,
+			[CharacterStatId.ElectricalInvulnerability] = null,
+			[CharacterStatId.HolyInvulnerability] = null,
+			[CharacterStatId.UnholyInvulnerability] = null,
+			[CharacterStatId.PoisonInvulnerability] = null,
+			[CharacterStatId.SiegeInvulnerabilityRating] = null,
+			[CharacterStatId.GenericInvulnerabilityRating] = null,
+
+			// The OUT-OF-COMBAT regen trio, and the natural-health regen whose two siblings (mana and stamina) were
+			// already honored above - a plain oversight, since 0x383/0x384/0x385 are one run and only the middle two
+			// were listed. `Hearty Meal` carries a 264…2640 rank ladder on the health one.
+			[CharacterStatId.NaturalHealthRegen] = null,
+			[CharacterStatId.NonCombatHealthRegen] = null,
+			[CharacterStatId.NonCombatManaRegen] = null,
+			[CharacterStatId.NonCombatStaminaRegen] = null,
+
+			// Additive ratings with no consumer yet: `Heightened Sense` +2500 evade (+25%), `Broken Bones` −5000.
+			[CharacterStatId.EvadeChance] = null,
+			[CharacterStatId.BaseSpellDamage] = null,
+			[CharacterStatId.HealthTapAmount] = null,
 
 			// The five attributes: display-unit amounts (see SpellScale), pushed for the sheet. No server model reads
 			// them yet - the attribute-driven formulas (armor from Strength, …) are still client-side.

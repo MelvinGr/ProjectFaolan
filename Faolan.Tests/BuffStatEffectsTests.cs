@@ -220,6 +220,29 @@ namespace Faolan.Tests
 			Assert.Equal(100u, entity.BuffedStats[CharacterStatId.KnockbackResistance]);
 		}
 
+		// ⚠️ The admission test for `HonoredStats`. A stat belongs there when its records ADD to a ZERO baseline,
+		// whatever their scale - which is why the whole invulnerability family and the out-of-combat regens went in,
+		// and why the MULTIPLIER stats did not: `Recompute` computes `gear + sum(buffs)`, and `Turtle Formation`'s
+		// -50 `MovementMultiplier` summed from zero says "movement 50%" for a buff that means "-50%".
+		//
+		// The gate's ORIGINAL test - "is the wire scale verified" - no longer excludes anything, because
+		// `StatDisplayScale` transcribes the client's own divisor rule and covers every id. Reading it as the live
+		// test is how entries rot on the wrong side of the list.
+		[Fact]
+		public void AdditiveFamilies_AreHonoredWhileMultiplierStatsStayOut()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(4239530, CharacterStatId.ColdInvulnerability, FlatKind, 10000), // Magic Shield: +100% cold
+				Row(4239531, CharacterStatId.NonCombatHealthRegen, FlatKind, 2640), // Hearty Meal, top rank
+				Row(4239532, CharacterStatId.EvadeChance, FlatKind, 2500), // Heightened Sense: +25%
+				Row(4292427, CharacterStatId.MovementMultiplier, FlatKind, -50) // Turtle Formation - baseline is 100
+			]);
+
+			Assert.Equal(3, catalog.BySpellBase.Count);
+			Assert.Equal(1, catalog.StatSkipped);
+			Assert.DoesNotContain(4292427u, catalog.BySpellBase.Keys);
+		}
+
 		// The whole point: a buff raises the live stat, and losing the buff puts it back to the gear baseline.
 		[Fact]
 		public void BuffRaisesTheLiveStat_AndEndingItRestoresTheGearBaseline()

@@ -67,6 +67,38 @@ Consequences worth knowing:
   (`KnockbackService` reads it off `BuffedStats`), so a resisting BUFF now resists where only a resisting ITEM
   did before; the other two are sheet-only, because nothing server-side reads them — there is no stagger
   mechanic at all (Gitea #699).
+
+### What `BuffStatEffects` honors, and the test that decides it (#699/#700)
+
+Of the **6,133** imported `SpellStatEffect` rows, **2,229 (36%)** are applied. The rest split into two very
+different piles, and conflating them is the mistake to avoid:
+
+| dropped by | rows | what they are |
+| --- | ---: | --- |
+| **KIND** | 2,015 over 48 kinds | not stat deltas at all — `StartParticleEffect`/`StopParticleEffect` (490), `Hit`/`InterpolatedHit`/`MagicHit`/`DPSHit` (321), `TempChangeSkill` (364), `NanoResistance` (359), `RemoveBuff`, `AreaKnockback`, `SetSpellLineRecastTime`… These belong to a general spell-effect dispatcher, which this class deliberately is not |
+| **STAT** | ~1,900 over ~145 stats | real flat deltas on stats not on the allowlist |
+
+⚠️ **The allowlist's original test — "is the wire scale verified" — no longer excludes anything**, because
+`StatDisplayScale` transcribes the client's own divisor rule and covers every id. Reading it as the live test is
+exactly how entries rot on the wrong side of the list, which is what happened to Knockback Resistance, Damage
+Deflection and Chance of Being Staggered.
+
+**The test that still does work is the BASELINE.** `Recompute` computes `gear + sum(buffs)`, so a stat is
+admissible only if its baseline is **zero**. A multiplier stat is not:
+
+- `MovementMultiplier` (`0x0F0`) has a baseline of 100 and `Turtle Formation` carries **−50** on it. Summed from
+  zero that tells the client "movement 50%" for a buff that means "−50%".
+- `MagicDamageModifier` (`0x218`) is worse: baseline 10000, and a live read shows it moving 10000 → 12000 for a
+  +20% effect.
+
+So the rule is **add a stat when its records add to zero, whatever their scale; leave it off when they scale a
+total.** The multiplier family needs a model that knows the baseline (Gitea #700), not a place on the list.
+[V3: BuffStatEffectsTests.AdditiveFamilies_AreHonoredWhileMultiplierStatsStayOut]
+
+The families admitted on that rule: all eleven damage-school **invulnerability ratings** (~700 rows — `Magic
+Shield` +10000 cold is +100%, `Crom` +20000, `Fire Pit` −20000), the three **out-of-combat regens** plus
+`NaturalHealthRegen` (whose mana and stamina siblings were already in — `0x383`/`0x384`/`0x385` are one run and
+only the middle two were listed), `EvadeChance`, `BaseSpellDamage` and `HealthTapAmount`.
 - **×10000 is real.** Five ids sit in BOTH predicate sets and the client multiplies the divisors (an explicit
   `MULSS` against the same `100.0` constant): `0x00FF` Evade Level Growth, `0x013C` Variance, `0x013D`,
   `0x0140` Magic Variance, `0x0397` Critical Blast Chance.
