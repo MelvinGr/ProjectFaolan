@@ -10,6 +10,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
+using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -325,6 +326,44 @@ namespace Faolan.Tests
 				.ToListAsync(ct);
 
 			Assert.True(wrongSpace.Count == 0, $"Kill goals whose target reference is not an NPC: {string.Join(", ", wrongSpace)}");
+		}
+
+		// A goal's own SENTENCE outranks its map marker (#522).
+		//
+		// The marker is the weakest evidence a goal carries, and `TypeLocationGoalsFromTrailingCategory` was reading it
+		// first: a location reference plus a pin became `ReachArea`. But *"Speak to Chulainn"* has a pin at Chulainn's
+		// feet and *"Escort Casilda to the city"* has one where Casilda is STANDING when the escort is granted, so a
+		// reach completes both by walking up to the NPC - seven talk goals without their conversation ever playing, and
+		// the escort the instant it began.
+		//
+		// It was invisible because those rows had been wired by a favourable ORDERING in some earlier run and the
+		// bootstrap guard then hid the rule; only rebuilding the wiring from scratch showed it. So this gate reads the
+		// shipped rows rather than the rule - it is the state a clean rebuild has to keep reproducing.
+		[Fact]
+		public async Task GoalsWhoseObjectiveIsATalkOrEscort_AreNotTypedFromTheirMarker()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var reaches = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.ReachArea && g.Name != null)
+				.Select(g => new { g.GoalId, Name = g.Name! })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(reaches);
+
+			// Two deliberate exceptions, both hand-seeded with their reason in the seed (SeedShipwreckedCityChain):
+			// 1352 "Talk to Nadini" - Nadini has no imported conversation, so a greeting cannot fire; her spawn is
+			// exactly on the marker. 3492 "Unlock the Acheronian gate" - the gate object stands on the marker.
+			var seededExceptions = new uint[] { 1352 };
+
+			var fromMarker = reaches
+				.Where(g => !seededExceptions.Contains(g.GoalId) && QuestObjectiveText.NeedsMoreThanReachingItsMarker(g.Name))
+				.Select(g => $"goal {g.GoalId} '{g.Name}'")
+				.ToList();
+
+			Assert.True(fromMarker.Count == 0,
+				$"goals typed ReachArea whose own objective asks for a talk or an escort: {string.Join(", ", fromMarker)}");
 		}
 
 		// The kind tag agrees with the wiring wherever a human established the goal's semantics from a capture. This is

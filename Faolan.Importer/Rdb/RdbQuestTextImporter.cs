@@ -36,7 +36,10 @@ namespace Faolan.Importer.Rdb
 		// A goal whose text ASKS the player to go and speak to someone - the same TalkToNpc trigger a delivery uses,
 		// just without an item changing hands. "Speak with Kern Wolfeye", "Report to Mei-zhu", "Talk to King Conan of
 		// Aquilonia".
-		private static readonly Regex TalkObjective = new(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		//
+		// The two objective SHAPES live on QuestObjectiveText, because the capture-driven wiring has to ask the same
+		// question of the PLAINTEXT catalog name (see that class) and cannot reach in here for it.
+		private static readonly Regex TalkObjective = QuestObjectiveText.TalkObjective;
 
 		// The other shape of the same objective: "ASK <someone> ABOUT <something>". It is a talk goal - the player
 		// opens a greeting and nothing changes hands - but the name follows the VERB rather than a to/with, so
@@ -53,7 +56,7 @@ namespace Faolan.Importer.Rdb
 		//                                                                       withoutNpc count rather than silently
 		// `for` is accepted beside `about` for that third one: the verb is what makes it a talk goal, and refusing the
 		// preposition would only hide the one case worth counting.
-		private static readonly Regex AskObjective = new(@"^\s*Ask\s+(?:an?\s+)?([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)\s+(?:about|for)\s", RegexOptions.Compiled);
+		private static readonly Regex AskObjective = QuestObjectiveText.AskObjective;
 
 		// The two PRECONDITION shapes the client states in a goal's text. They are RECORDED, not used to refuse the
 		// wiring: the goal is typed normally and QuestProgress.PreconditionMet enforces it at the trigger, where the

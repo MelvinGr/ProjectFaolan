@@ -16,6 +16,7 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Extractors;
+using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
@@ -1733,10 +1734,28 @@ namespace Faolan.Importer.Captures
 
 			var typed = 0;
 			var noMarker = 0;
+			var otherVerb = 0;
 			foreach (var goal in goals)
 			{
 				if (IsWired(goal))
 					continue;
+
+				// ⚠️ The goal's own SENTENCE outranks its marker, and this guard is what makes that true on a
+				// from-scratch import. A marker is the weakest evidence a goal carries: "Speak to Chulainn" has a pin
+				// at Chulainn's feet, and "Escort Casilda to the city" has one where Casilda is STANDING when the
+				// escort is granted. Eight goals came out of a clean rebuild typed ReachArea for that reason - seven
+				// talks that would close without their conversation ever playing, and the escort, which would close the
+				// instant it began. They only looked correct in the shipped DB because a favourable ORDERING had wired
+				// them first and the bootstrap guard then hid the rule.
+				//
+				// The sentence is read from `Name` - the PLAINTEXT `QuestGoal.name` of the client's quest catalog,
+				// already a column here. The decrypted LDB 50304 text says the same thing (RdbQuestTextImporter) but
+				// needs a per-string key and an RdbDir, and this module deliberately runs without one.
+				if (QuestObjectiveText.NeedsMoreThanReachingItsMarker(goal.Name))
+				{
+					otherVerb++;
+					continue;
+				}
 
 				// ⚠️ The marker columns are NULLABLE and null is the common case here, so this must test for a value
 				// rather than for zero: `goal.MapId == 0` on a `uint?` is FALSE when the column is null, which let 23
@@ -1756,7 +1775,8 @@ namespace Faolan.Importer.Captures
 				await db.SaveChangesAsync();
 
 			Console.WriteLine($"Typed {typed} location goal(s) ReachArea from TrailingCategory 100"
-			                  + (noMarker > 0 ? $"; {noMarker} carry no map marker and stay inert" : "") + " (#641).");
+			                  + (noMarker > 0 ? $"; {noMarker} carry no map marker and stay inert" : "")
+			                  + (otherVerb > 0 ? $"; {otherVerb} state a talk/escort objective and are left for their own verb (#522)" : "") + " (#641).");
 		}
 
 		// The quest INDEX fields, derived from the quest's own LINE instead of hand-typed per quest (#641).
