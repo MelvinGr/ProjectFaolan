@@ -13,8 +13,9 @@ namespace Faolan.Tests
 	//
 	// It is not a second setting: it is `CdnMirrorPublicAddress` plus a DEFAULT. The raw key cannot simply carry
 	// that default, because the two sides read "unset" differently and both readings are right - to the MIRROR it
-	// means "answer with the Host header the client just dialled" (#552, the only correct answer behind a published
-	// container port), to a client it means "the usual local one".
+	// means "refuse to start", since it would otherwise write a guess into the LocalConfig.xml a patch run pins
+	// itself to, and to a client it means "the usual local one", because a client that guesses wrong merely fails
+	// to connect.
 	//
 	// The invariant worth gating is that the result is an absolute URL: its consumers concatenate onto it
 	// (`RdbReader` appends the mirror route and then `/res/<md5>`), so a relative string would fail at the HTTP

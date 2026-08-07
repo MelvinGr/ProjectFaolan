@@ -60,9 +60,26 @@ namespace Faolan.Web.Content
 
 			var ip = builder.Configuration.CdnMirrorIp;
 			var port = builder.Configuration.CdnMirrorPort;
-			var publicAddress = builder.Configuration.CdnMirrorPublicAddress;
 			var storeDir = Path.GetFullPath(builder.Configuration.CdnMirrorStore);
 			Directory.CreateDirectory(storeDir);
+
+			// The address the CLIENT dials, from configuration and nowhere else. It used to fall back to the inbound
+			// request's Host header, which reads as "by definition what the client dialled" and is a GUESS: it is
+			// whatever the last hop put there, so a proxy, a container port mapping or a plain `curl -H Host:` writes
+			// that value into the LocalConfig.xml a patch run then pins itself to - a wrong patch address that looks
+			// like it worked. Only the operator knows the answer, so an unset key is an error, not a derivation.
+			var publicBase = builder.Configuration.CdnMirrorPublicAddress;
+			if (string.IsNullOrWhiteSpace(publicBase))
+			{
+				Console.Error.WriteLine(
+					"Missing required configuration 'CdnMirror:PublicAddress' - the address a CLIENT reaches this mirror on " +
+					$"(e.g. http://192.168.1.5:{port}), written into the patch addresses of every LocalConfig.xml served. " +
+					"Set it in faolan.json / faolan.user.json, in the environment as CdnMirror__PublicAddress, or on the " +
+					"command line as --CdnMirror:PublicAddress.");
+				return 1;
+			}
+
+			publicBase = PublicBase(publicBase);
 
 			builder.WebHost.UseUrls($"http://{ip}:{port}");
 			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
@@ -99,10 +116,7 @@ namespace Faolan.Web.Content
 				// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
 				// sticky across a patch run.
 				if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
-				{
-					var publicBase = PublicBase(publicAddress, ctx.Request.Host, ctx.Request.Scheme, port);
 					return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), publicBase), "application/octet-stream");
-				}
 
 				if (query.Length == 0 && File.Exists(localPath))
 				{
@@ -185,7 +199,7 @@ namespace Faolan.Web.Content
 			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store} ({Files} files, {MB:F1} MB: {ByTag}) patch-addr={PatchAddr}",
 				ip, port, storeDir, store.Values.Sum(t => t.Files), store.Values.Sum(t => t.Bytes) / 1024f / 1024f,
 				string.Join(", ", store.OrderBy(s => s.Key, StringComparer.Ordinal).Select(s => $"{s.Key}={s.Value.Files}/{s.Value.Bytes / 1024f / 1024f:F1}MB")),
-				publicAddress is { Length: > 0 } ? PublicBase(publicAddress, default, "http", port) : "<per-request Host header>");
+				publicBase);
 			app.Run();
 			return 0;
 		}
@@ -219,20 +233,14 @@ namespace Faolan.Web.Content
 			return Encoding.UTF8.GetBytes(text);
 		}
 
-		// The base URL the CLIENT reaches this mirror on. It cannot be derived from the bind address: in a container
-		// CdnMirror:Ip is 0.0.0.0, and a client on the Docker host dials a published port on the host's address. So:
-		// the configured CdnMirror:PublicAddress if there is one, otherwise the Host header of the request that asked
-		// for LocalConfig.xml - which IS, by definition, the address the client just dialled. The old hardcoded
-		// 127.0.0.1:<port> survives only as the last resort for an HTTP/1.0 request with no Host at all (#552).
-		internal static string PublicBase(string? configured, HostString host, string scheme, int port)
+		// The configured CdnMirror:PublicAddress, normalized to a base URL to concatenate onto. It cannot be derived
+		// from the bind address (in a container CdnMirror:Ip is 0.0.0.0 and a client on the Docker host dials a
+		// published port) nor from the request (see the caller), so this only tidies what the operator wrote: a bare
+		// `host` or `host:port` gets the scheme it omitted, and a trailing slash comes off because a path follows.
+		internal static string PublicBase(string configured)
 		{
-			if (!string.IsNullOrWhiteSpace(configured))
-			{
-				var value = configured.Trim().TrimEnd('/');
-				return value.Contains("://", StringComparison.Ordinal) ? value : $"http://{value}";
-			}
-
-			return host.HasValue ? $"{scheme}://{host.Value}" : $"http://127.0.0.1:{port}";
+			var value = configured.Trim().TrimEnd('/');
+			return value.Contains("://", StringComparison.Ordinal) ? value : $"http://{value}";
 		}
 	}
 }

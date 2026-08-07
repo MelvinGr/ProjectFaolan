@@ -390,7 +390,7 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
 | `Login` `{ PrivateKey, PublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
-| `CdnMirror` `{ Store, Ip, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + bind address; `PublicAddress` is the address written into the patch config it serves back (default: the request's `Host`) **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
+| `CdnMirror` `{ Store, Ip, Port, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + bind address; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |

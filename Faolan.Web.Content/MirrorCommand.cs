@@ -12,7 +12,7 @@ namespace Faolan.Web.Content
 	{
 		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
 		// `--help` here cannot describe a default the code does not use - and the mirror's `CdnMirror:PublicAddress`
-		// keeps its deliberate lack of one (unset means "answer with the Host header the client dialled", #552).
+		// keeps its deliberate lack of one, because to the mirror unset means "refuse to start" (Program.Main).
 		private static readonly Option<string>[] Options =
 			FaolanSettings.Options("CdnMirror:Store", "CdnMirror:Ip", "CdnMirror:Port", "CdnMirror:PublicAddress");
 

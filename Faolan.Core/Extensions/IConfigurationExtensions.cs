@@ -65,19 +65,20 @@ namespace Faolan.Core.Extensions
 
 			// The address the CLIENT reaches the mirror on, used to rewrite LocalConfig.xml's three patch-addr keys.
 			// It is NOT the bind address: in a container CdnMirror:Ip is 0.0.0.0 by design, and on the Docker host the
-			// client dials a published port. Unset (the default) means "derive it from the inbound request's Host
-			// header", which is by definition what the client dialled; set it only when the mirror sits behind
-			// something that rewrites Host. A bare `host` or `host:port` is fine - the scheme is filled in.
+			// client dials a published port. So only the operator knows it, and the mirror REFUSES TO START without
+			// it - it used to derive one from the inbound Host header, which is not "what the client dialled" but
+			// whatever the last hop put there. A bare `host` or `host:port` is fine - the scheme is filled in.
 			public string? CdnMirrorPublicAddress => config["CdnMirror:PublicAddress"];
 
 			// Where a CLIENT of the mirror dials it: the importer's RDB proxy and Faolan.Web's viewer. Same key, with
 			// the ONE thing those two need that the mirror does not - a value when it is unset.
 			//
 			// `CdnMirrorPublicAddress` cannot simply be defaulted, because the two sides read "unset" differently and
-			// both readings are right: to the MIRROR it means "answer with the Host header the client just dialled"
-			// (#552), which is the only correct answer behind a published container port; to a CLIENT of the mirror it
-			// means "the usual local one". So the raw key keeps the mirror's nullable semantics and this is the
-			// client's reading of it - a default, not a second setting.
+			// both readings are right: to the MIRROR it means "I cannot know what a client would dial - refuse to
+			// start", the only honest answer behind a published container port; to a CLIENT of the mirror it means
+			// "the usual local one", because a client that guesses wrong just fails to connect, in front of the
+			// operator. So the raw key stays nullable, which is what lets the mirror SEE that it is unset, and this
+			// is the client's reading of it - a default, not a second setting.
 			//
 			// ⚠️ The value is an absolute URL, in the config too. Its consumers CONCATENATE onto it (`RdbReader`
 			// appends the mirror route and then `/res/<md5>`), so a bare host would build a relative string that fails
