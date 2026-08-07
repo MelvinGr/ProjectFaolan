@@ -213,6 +213,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "dynel-effects":
+				{
+					using var effectsDb = OpenDb();
+					DynelEffects(NamedCapture.LoadAll(capturesDir), effectsDb);
+					return 0;
+				}
+
 				case "dot-trains":
 				{
 					DotTrains(NamedCapture.LoadAll(capturesDir), arg, _options.Out);
@@ -1303,6 +1310,103 @@ namespace Faolan.Importer.Cli
 		//
 		// Bursts, not individual events, because that is the unit of the phenomenon: an interest pass moves a whole
 		// group at once, and a single spawn is just a mob walking into view.
+		// --report dynel-effects
+		//
+		// Every `SimpleDynelVisualChangeIIR` PARTICLE record in the corpus, attributed to the object it played on and
+		// crossed against the effect that object's own geometry declares (#698/#687). Written because the two
+		// questions this family raises cannot be answered from a count: whether a record is a standing decoration or
+		// a one-off puff (the ATTRACTOR says), and whether we already hold its effect (the geometry node says).
+		//
+		// ⚠️ Handles are RECYCLED - the same handle is a `Location Object - Walls` early in a capture and an Oak Tree
+		// later - so a record is attributed through the SPAWN that most recently minted its handle, within one
+		// capture. Keying on the handle alone merges unrelated objects and was worth an hour on #494.
+		private static void DynelEffects(IReadOnlyList<NamedCapture> captures, DatabaseContext db)
+		{
+			// What the objects' own geometry declares: effect id -> how many nodes carry it (#687).
+			var declared = db.WorldObjectWords
+				.Where(w => w.Kind == WorldObjectWordKind.GeometryNode && w.Ordinal % 6 == 0)
+				.AsEnumerable()
+				.GroupBy(w => w.Value)
+				.ToDictionary(g => g.Key, g => g.Count());
+
+			var starts = new List<(string Capture, uint Handle, string Name, uint Effect, uint Attractor, bool AfterSpawn)>();
+			var stopped = new List<(string Capture, uint Handle, string Name, uint TypeTag, uint Word, bool HadStart)>();
+			foreach (var capture in captures)
+			{
+				var namesByHandle = new Dictionary<uint, string>();
+				var spawnedInThisCapture = new HashSet<uint>();
+				foreach (var p in capture.Packets)
+				{
+					if (!p.IsIirCarrier)
+						continue;
+
+					// The spawn that minted the handle - and it re-mints, so the LAST one before a record wins. Every
+					// class of the dynel family carries the same identity message in the same place, which is why one
+					// codec read plus WorldObjectColumns covers all of them.
+					if (WorldObjectClasses.Placed.Contains(p.SubOpcode) && p.TryParse(WorldObjectCodec.Parse, out var obj))
+					{
+						namesByHandle[obj.Handle] = WorldObjectColumns.TryReadIdentity(p.Record, out var identity) ? identity.Name ?? "" : "";
+						spawnedInThisCapture.Add(obj.Handle);
+						continue;
+					}
+
+					if (p.SubOpcode != SimpleDynelVisualChangeCodec.Opcode || !p.TryParse(SimpleDynelVisualChangeCodec.Parse, out var change))
+						continue;
+
+					if (change.Kind == (uint)DynelVisualChange.StopParticleEffect)
+					{
+						stopped.Add((capture.Name, change.Handle, namesByHandle.GetValueOrDefault(change.Handle, "<no spawn seen>"), change.TypeTag,
+							change.Words.Count > 0 ? change.Words[0] : 0, starts.Any(x => x.Handle == change.Handle && x.Capture == capture.Name)));
+					}
+
+					if (change.Kind != (uint)DynelVisualChange.StartParticleEffect || change.Words.Count < 2)
+						continue;
+
+					starts.Add((capture.Name, change.Handle, namesByHandle.GetValueOrDefault(change.Handle, "<no spawn seen>"),
+						change.Words[0], change.Words[1], spawnedInThisCapture.Contains(change.Handle)));
+				}
+			}
+
+			Console.WriteLine($"{starts.Count} StartParticleEffect record(s), {stopped.Count} Stop, over {captures.Count} capture(s)");
+			Console.WriteLine();
+			Console.WriteLine("  attractor 0 = FREE-STANDING at the given position (the harvest puff); 34/35 = bolted to a bone (a standing decoration).");
+			foreach (var g in starts.GroupBy(s => s.Attractor).OrderByDescending(g => g.Count()))
+				Console.WriteLine($"    attractor {g.Key,3}: {g.Count(),4} record(s), {g.Select(s => s.Effect).Distinct().Count()} distinct effect(s)");
+
+			Console.WriteLine();
+			Console.WriteLine("  effect        records  attractor  in a geometry node?  played on");
+			foreach (var g in starts.GroupBy(s => s.Effect).OrderByDescending(g => g.Count()))
+			{
+				var held = declared.TryGetValue(g.Key, out var nodes) ? $"YES ({nodes} node(s))" : "no";
+				var on = string.Join(", ", g.Select(s => s.Name).Distinct().Take(3));
+				Console.WriteLine($"  {g.Key,-10} {g.Count(),8}  {string.Join("/", g.Select(s => s.Attractor).Distinct()),9}  {held,-19}  {on}");
+			}
+
+			// The STOPs, with what they played on. A Stop that never had a Start in the same capture is retail
+			// clearing an effect the object brought with it - which is the shape a loot bag's sparkle would have.
+			Console.WriteLine();
+			Console.WriteLine("  StopParticleEffect, by the object it was sent to:");
+			foreach (var g in stopped.GroupBy(x => (x.TypeTag, x.Name)).OrderByDescending(g => g.Count()))
+				Console.WriteLine($"    class 0x{g.Key.TypeTag:X4}  {g.Key.Name,-40} {g.Count(),3} record(s), {g.Count(x => x.HadStart)} of them after a Start in the same capture");
+
+			// ⭐ The cross-tab that says what an effect IS. A decoration is started and left running; a STATE marker
+			// is started and later stopped on the same handle. Crossed against whether the object's own geometry
+			// declares the effect, the two populations separate.
+			Console.WriteLine();
+			Console.WriteLine("  effect      starts  stopped-on-the-same-handle  declared-in-geometry");
+			foreach (var g in starts.GroupBy(x => x.Effect).OrderByDescending(g => g.Count()))
+			{
+				var handles = g.Select(x => (x.Capture, x.Handle)).ToHashSet();
+				var alsoStopped = stopped.Count(x => handles.Contains((x.Capture, x.Handle)));
+				Console.WriteLine($"  {g.Key,-10} {g.Count(),6}  {alsoStopped,26}  {(declared.ContainsKey(g.Key) ? "yes" : "NO"),20}");
+			}
+
+			var missing = starts.Where(s => s.Attractor != 0 && !declared.ContainsKey(s.Effect)).ToList();
+			Console.WriteLine();
+			Console.WriteLine($"  STANDING effects with no geometry node of ours: {missing.Select(s => s.Effect).Distinct().Count()} distinct over {missing.Count} record(s) (#698)");
+			Console.WriteLine($"  of those records, {missing.Count(s => s.AfterSpawn)} played on an object whose SPAWN is in the same capture");
+		}
+
 		private static void DynelCycle(IReadOnlyList<NamedCapture> captures, string? arg)
 		{
 			var minimumBurst = int.TryParse(arg, out var m) && m > 0 ? m : 4;

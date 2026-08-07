@@ -360,8 +360,11 @@ namespace Faolan.GameServer.World
 				b => b.WriteUInt32(EntityClass.LootBag).WriteUInt32(bag.Handle)));
 			await WorldIir.Send(client, NewLooterCodec.Build(NewLooters.Current(bag.Handle, 0)));
 			await WorldIir.Send(client, NewLooterCodec.Build(NewLooters.Allowed(bag.Handle, 0)));
-			await WorldIir.Send(client, N3ToClientFadeCodec.Build(EntityClass.LootBag, bag.Handle));
-			await WorldIir.Send(client, UpdateSimpleDynelCodec.Build(bag.Handle));
+			// ⚠️ The FADE and the consumed visual go to EVERYONE in range, not just the looter. The three messages
+			// above are the looter's - their window closes, their looter rights reset - but the bag leaving the world
+			// is a world event. Sent only to the looter, the bag stayed on every other player's screen, and with it
+			// whatever the client draws on a lootable: the object is still there, so its effect is too.
+			await BroadcastEntityFade(bag);
 
 			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
@@ -424,16 +427,25 @@ namespace Faolan.GameServer.World
 
 		// Fade an entity out for every player in range (n3ToClientFadeIIR_t) - the graceful despawn used for loot bags
 		// (consumed or expired). Loot bags carry the 0xC87A typetag.
+		//
+		// ⚠️ The fade is HALF of retail's sequence, and sending it alone is what leaves a bag on screen. The captured
+		// completion is `… -> n3ToClientFade -> UpdateSimpleDynel`, and the second message is the CONSUMED visual: a
+		// fade makes the object go away gracefully, the update states that it is spent. The expiry path used to send
+		// only the fade, so an expired bag differed from a looted one for no reason - and a client that keeps the
+		// object keeps everything hanging off it, including whatever it draws on a lootable.
 		public async Task BroadcastEntityFade(WorldEntity entity)
 		{
-			var body = N3ToClientFadeCodec.Build(EntityClass.LootBag, entity.Handle);
+			var fade = N3ToClientFadeCodec.Build(EntityClass.LootBag, entity.Handle);
+			var consumed = UpdateSimpleDynelCodec.Build(entity.Handle);
 			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
 					continue;
 
 				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-					s => s.WriteArrayUInt32Length(body)));
+					s => s.WriteArrayUInt32Length(fade)));
+				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(consumed)));
 			}
 		}
 
