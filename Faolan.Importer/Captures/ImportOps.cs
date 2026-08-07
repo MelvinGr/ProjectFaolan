@@ -2332,21 +2332,23 @@ namespace Faolan.Importer.Captures
 			// (ResequenceGoalsByPhase): the client's phase says 7134 is played first, and the corpus agrees - 7134 is
 			// the goal that takes the `Advanced` hand-off, which only a NON-last goal gets.
 			//
-			// 3492 = ReachArea at the gate itself, the same pattern as III's goal 3498 below - the gate object sits on
-			// its marker, and arriving there with the key is what "unlock" amounts to for us until a use-the-object
-			// goal type exists. III's goal 3498 = enter the city (ReachArea @4020). III is chain-final for now.
+			// 3492 = ReachArea at the gate itself - the gate object sits on its marker, and arriving there with the key
+			// is what "unlock" amounts to for us until a use-the-object goal type exists. III is chain-final for now.
+			//
+			// ⚠️ It STAYS a seed while its sibling 3498 "Enter the City of Tortage" went (#705): 3498 carries a
+			// TrailingCategory 100 location reference, so TypeLocationGoalsFromTrailingCategory types it from the
+			// marker, and 3492 carries NO typed reference at all (category 0). Nothing but the verb "Unlock" can place
+			// it, and one goal is not a shape.
 			await Chain(db, 12369, 12373);
 			await CorrectAcheronianGateGoals(db);
 			await SeedGoal(db, 12369, 7134, QuestGoalType.LootFromNpc, "Saddur", 193186, 1);
 			await SeedGoal(db, 12369, 3492, QuestGoalType.ReachArea);
-			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
 
 			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
 			// here. goal 3495 "get 3 stone bricks" = CollectItem of item 193400 (its TrailingRefId), picked up from the 12
 			// "Stone Brick" QuestItemEffect dynels at the quarry (4020). goal 3497 "deliver 3 to Turach" = TalkToNpc Turach
 			// (his spawn 824/722 == the marker); the captured count 3 is kept (byte-exact @609) and the talk SOLVES it.
 			// Decoded from Hoxxling gameplay2 (pickups fr4310/4367/4447 = DispatchAddItem+SimpleDynelPickup; deliver fr5102).
-			await SeedGoal(db, 12371, 3495, QuestGoalType.CollectItem);
 			await SeedGoal(db, 12371, 3497, QuestGoalType.TalkToNpc, "Turach");
 
 			// The city TALK stages (#358), progressed by each NPC's conversation GrantQuestId (already imported) - so no
@@ -2355,7 +2357,6 @@ namespace Faolan.Importer.Captures
 			// fr9738. 10320 "talk Turach" (granted by the entry guard Laranga; talking to Turach completes it + his
 			// dialogue grants the quarry 12371) is the pre-quarry "The Blacksmith" stage - inferred from the grant graph
 			// + wiki, its dump proof is the quarry grant that predates gameplay2.
-			await SeedGoal(db, 10320, 436, QuestGoalType.TalkToNpc, "Turach"); // IV The Blacksmith - talk Turach (pre-quarry)
 			await SeedGoal(db, 10286, 399, QuestGoalType.TalkToNpc, "Laranga"); // VI The Guard - talk the city guard
 			await SeedGoal(db, 10287, 400, QuestGoalType.TalkToNpc, "Tina"); // VII The Barmaid - talk Tina
 
