@@ -74,6 +74,11 @@ namespace Faolan.Importer.Cli
 			// than only that one exists.
 			var interesting = new List<(string Capture, int Frame, uint[] Middle, int Targets, int Results)>();
 			var joint = new Dictionary<(uint W4, uint W5), int>();
+			// #661: word 2's flag bits are the only middle slot left that could carry a per-hit OUTCOME - a crit, a
+			// block, an evade - which is what that ticket says the block is worth decoding for. Cross-tab it against
+			// everything the tail already knows about the swing, because a flag that is a function of one of those is
+			// not an outcome at all.
+			var word2Versus = new Dictionary<(string Field, string Value, uint Flags), int>();
 			var versusResult = new Dictionary<(uint W4, uint ResultType), int>();
 			var versusDirection = new Dictionary<(uint W5, uint ResultType), int>();
 			// #673: the CombatShieldRose comment said an NPC's swing carries no direction word. Word 5 is an ability id and a
@@ -166,11 +171,43 @@ namespace Faolan.Importer.Cli
 					versusDirection[dkey] = versusDirection.GetValueOrDefault(dkey) + 1;
 				}
 
+				// #661: word 2 against the swing's own shape. `middle[2]` is the flags word in both forms - the extra
+				// word the selector inserts sits at wire position 2 and pushes the rest along, so read it from the END
+				// like the word4/word5 keys above do.
+				var flags = middle[^6];
+				void W2(string field, string value)
+				{
+					var k = (field, value, flags);
+					word2Versus[k] = word2Versus.GetValueOrDefault(k) + 1;
+				}
+
+				W2("actor", playerActor ? "player" : "npc");
+				W2("results", results == 0 ? "none" : results == 1 ? "one" : "many");
+				W2("targets", targets == 0 ? "none" : targets == 1 ? "one" : "many");
+				W2("charge", middle[^8] == 0 ? "zero" : "non-zero");
+				W2("direction", middle[^3] == 0 ? "absent" : "present");
+				foreach (var rt in resultTypes)
+					W2("result type", $"0x{rt:X2}");
+
 				if (middle.Skip(2).Any(w => w != 0))
 					interesting.Add((c.Name, p.Frame, middle, targets, results));
 			}
 			}
 
+			Console.WriteLine();
+			Console.WriteLine("word 2 (the flag bits) against everything else the tail states (#661):");
+			foreach (var field in word2Versus.Keys.Select(k => k.Field).Distinct())
+			{
+				Console.WriteLine($"  by {field}:");
+				foreach (var g in word2Versus.Where(kv => kv.Key.Field == field).GroupBy(kv => kv.Key.Value).OrderBy(g => g.Key))
+				{
+					var total = g.Sum(kv => kv.Value);
+					var parts = g.OrderByDescending(kv => kv.Value).Select(kv => $"0x{kv.Key.Flags:X2}={kv.Value}");
+					Console.WriteLine($"    {g.Key,-14} n={total,-6} {string.Join("  ", parts)}");
+				}
+			}
+
+			Console.WriteLine();
 			Console.WriteLine($"{tails} s2c attack tails (Combat:Melee / :Ranged / :Unarmed) across {captures.Count} captures");
 			Console.WriteLine($"{extended} carry the NINE-word form (selector > 1); {unexplained} did not fit the grammar at all");
 			Console.WriteLine();

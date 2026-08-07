@@ -173,7 +173,7 @@ the Command object, and `--report bcc-attack-tail` prints what 3,313 captured s2
 |---:|---|---|
 | 0 | `+0x164` | a **float**, 0.02–0.93, 322 distinct values, zero on 2,899 — the swing's charge |
 | 1 | `+0x144` | the **selector**: `1` ×3285, `2` ×19, `3` ×9. `> 1` inserts one extra word → `+0x148` |
-| 2 | bits → `+0x1A0` (b4), `+0x1A1` (b5), `+0x198` (b6) | `0x00` ×2692, `0x20` ×602, `0x30` ×18, `0x70` ×1 — **no other bit is ever set**, which is what confirms the split |
+| 2 | bits → `+0x1A0` (b4), `+0x1A1` (b5), `+0x198` (b6) | `0x00` ×2692, `0x20` ×602, `0x30` ×18, `0x70` ×1 — **no other bit is ever set**, which is what confirms the split. **Bit 5 tracks the swing's ARC** — see below |
 | 3 | `+0x19C` | zero on 3,312 of 3,313; one sighting of `0x6BE` |
 | 4 | `+0x44` | `0xC9`/`0xCA`/`0xCB` on 292 tails — the alphabet below, but **independent** of both word 5 and the result type (all nine combinations occur) |
 | 5 | `+0xD0` | ⭐ the swing's **DIRECTION**, as an `Abilities` id |
@@ -181,6 +181,33 @@ the Command object, and `--report bcc-attack-tail` prints what 3,313 captured s2
 
 The bit split is not inferred from the values: the c2s WRITER (`FUN_01151030`) builds the same word as
 `+0x198 ? 0x40 : 0`, and `FUN_011516a0` (the copy) moves `+0x1A0`/`+0x1A1`/`+0x198` as three **bytes**.
+
+#### ⭐ Word 2's bit 5 fires only on the three UPPER arcs (#661)
+
+Cross-tabbed against everything else the tail states, bit 5 (`0x20`) is near-independent of the actor, the
+target count, the result count, the charge float and whether a direction *ability* is present — all of those
+sit in a flat 15–27 % band. Against the **result type**, which is the swing's arc, it is not:
+
+| result type | swings | bit 5 set | rate |
+|---|---:|---:|---:|
+| `0xC9` Upper Left | 712 | 195 | **27.4 %** |
+| `0xCA` Upper Right | 656 | 169 | **25.8 %** |
+| `0xCB` Overhead | 1,171 | 234 | **20.0 %** |
+| `0xCC` Lower Left | 373 | **1** | **0.3 %** |
+| `0xCD` Lower Right | 384 | **3** | **0.8 %** |
+
+Four sightings in 757 lower-arc swings against 598 in 2,539 upper-arc ones — a **30× split** on the one axis
+that is not flat. So whatever bit 5 marks, it is something only an upper-arc swing can produce.
+
+⚠️ **What it IS remains unnamed.** The shape fits a defender-side outcome — a guard meeting the swing — because
+the rose has three guards and the two lower codes are the two arcs the captured players never had unlocked; a
+block flag could then only ever fire where a guard could be. That is a hypothesis the corpus is consistent with,
+not a decode: nothing here separates "blocked" from "critical", "glancing", or any other per-hit outcome, and
+the 1-in-3 rate does not by itself pick one. #661 wanted this block decoded precisely because it is where a
+crit/block/evade distinction would live; this narrows *where* to look without closing it.
+
+Reproduce with `--report bcc-attack-tail`, whose *"word 2 against everything else the tail states"* block prints
+the whole cross-tab over all 3,313 captured tails.
 
 ### ⭐ The result's "result type" is the swing's DIRECTION
 
