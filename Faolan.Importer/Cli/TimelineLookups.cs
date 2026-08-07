@@ -11,7 +11,6 @@ using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;

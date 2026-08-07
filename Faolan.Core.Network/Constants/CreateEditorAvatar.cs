@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.Quest;

@@ -1,4 +1,3 @@
-using Faolan.Core.Constants;
 using System;
 using System.IO;
 using System.Net;

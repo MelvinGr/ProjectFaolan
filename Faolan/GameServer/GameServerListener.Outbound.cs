@@ -26,7 +26,6 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
-using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Apprentice;
 using Faolan.GameServer.Combat;

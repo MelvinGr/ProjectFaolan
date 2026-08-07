@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
 {

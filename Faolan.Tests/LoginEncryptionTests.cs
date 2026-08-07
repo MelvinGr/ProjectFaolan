@@ -6,7 +6,6 @@ using System.Text;
 using Faolan.ClientLauncher;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Configuration;
 using Xunit;

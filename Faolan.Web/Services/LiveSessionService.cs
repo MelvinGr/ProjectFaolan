@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Extensions;
+using Faolan.Core.Cli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
@@ -42,7 +42,7 @@ namespace Faolan.Web.Services
 		{
 			_logger = logger;
 			// The game server's MCP port. Always local - Faolan.Web talks to the server process on this machine.
-			_endpoint = new Uri($"http://127.0.0.1:{config.McpPort}/mcp");
+			_endpoint = new Uri(config.ChatBridgeUrl);
 		}
 
 		// A connected character's LIVE map + position (from get_character's Live block), or null if not connected /

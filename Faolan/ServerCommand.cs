@@ -33,7 +33,7 @@ namespace Faolan
 		// rather than from this list.
 		private static readonly Option<string>[] ConfigOptions = FaolanSettings.Options(
 			"Database:Provider", "Database:ConnectionString", "ServerIpAddress", "UniverseAgentPort", "PlayerAgentPort", "WelcomeString", "TerrainDir",
-			"ClientVersion", "Login:PrivateKey", "Login:AllowUnpatchedClients", "Mcp:Enabled", "Mcp:Port", "Mcp:Url", "Log:File", "Log:PacketBytes",
+			"ClientVersion", "Login:PrivateKey", "Login:AllowUnpatchedClients", "Mcp:Enabled", "Mcp:Port", "Log:File", "Log:PacketBytes",
 			"Account:Premium", "Account:PremiumCharSlots", "Account:FreeCharSlots");
 
 		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as a file you can

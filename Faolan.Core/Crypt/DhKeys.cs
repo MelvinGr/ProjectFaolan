@@ -32,10 +32,14 @@ namespace Faolan.Core.Crypt
 	///         (<c>ClientExePatcher.PatchPublicKey</c>).
 	///     </para>
 	///     <para>
-	///         ⚠️ The built-in private key is the historical CellAO one, and it is NOT a secret - it is in this repo's
-	///         history and in every client ever patched with it. It is a default, which is why it lives in the settings
-	///         catalog with every other default rather than as a literal here. A deployment that wants its own runs
-	///         <c>--generate-login-key</c> and re-patches its clients; the two halves must move together.
+	///         ⚠️ <b>There is no built-in keypair, and the private key is OPTIONAL.</b> Unset means this deployment has
+	///         no server identity: no login block can be decrypted, so every client is "unpatched" and authenticates on
+	///         its account NAME alone - which is why an unset key FORCES <c>Login:AllowUnpatchedClients</c> on
+	///         (<c>FaolanSettings.LoginAllowUnpatchedClients</c>). It used to default to the historical CellAO key, a
+	///         value published in this repo's history and baked into every client ever patched with it, so the "secure"
+	///         configuration and the shipped one were the same keypair and nobody could tell which they were running.
+	///         A deployment that wants password checking runs <c>--generate-login-key</c> and re-patches its clients;
+	///         the two halves must move together.
 	///     </para>
 	/// </remarks>
 	public static class DhKeys
@@ -50,29 +54,30 @@ namespace Faolan.Core.Crypt
 
 		public static readonly BigInteger G = 5;
 
-		// ⚠️ Declared BEFORE _private, and both by field initializer: static initializers run in textual order, so
-		// moving this below its use would leave _private at zero. (ParseHex touches neither N nor G, so this pair is
-		// independent of the two above - what it must not do is float below the field it seeds.)
-		private static readonly BigInteger DefaultPrivate = ParseHex(FaolanSettings.Get("Login:PrivateKey").Default!);
-
-		private static BigInteger _private = DefaultPrivate;
+		// Null until Configure() applies a Login:PrivateKey - and null is a RUNNING state, not a half-initialised one:
+		// a server with no key serves logins, it just cannot check a password. Everything derived from it is nullable
+		// for that reason, so a caller that needs the key has to say what it does without one.
+		private static BigInteger? _private;
 		private static string? _publicOverride;
 
-		/// <summary>Our DH private key. Server-side only; never patched into a client.</summary>
-		public static BigInteger ServerPrivate => _private;
+		/// <summary>Our DH private key, or null when <c>Login:PrivateKey</c> is unset. Server-side only; never patched into a client.</summary>
+		public static BigInteger? ServerPrivate => _private;
 
-		/// <summary>Our DH public key (<c>g^ServerPrivate mod N</c>).</summary>
+		/// <summary>Whether a <c>Login:PrivateKey</c> is in force - i.e. whether this server can decrypt a login block at all.</summary>
+		public static bool HasPrivateKey => _private != null;
+
+		/// <summary>Our DH public key (<c>g^ServerPrivate mod N</c>), or null with no private key to derive it from.</summary>
 		// Computed per access, NOT a `{ get; } =` initializer: static initializers run in textual order, so one placed
-		// above N/G/_private would see N = 0 and ModPow throws DivideByZeroException. That broke every login once,
-		// when a formatting pass reordered the members.
-		public static BigInteger ServerPublic => BigInteger.ModPow(G, ServerPrivate, N);
+		// above N/G would see N = 0 and ModPow throws DivideByZeroException. That broke every login once, when a
+		// formatting pass reordered the members.
+		public static BigInteger? ServerPublic => _private is { } priv ? BigInteger.ModPow(G, priv, N) : null;
 
 		/// <summary>
 		///     <see cref="ServerPublic" /> as the <see cref="PublicHexLength" />-char lowercase ASCII hex the exe stores
-		///     it in. Always the DERIVED value, so nothing on the server side can be confused by a configured
-		///     <see cref="ClientPatchPublicHex" />.
+		///     it in, or null with no private key. Always the DERIVED value, so nothing on the server side can be
+		///     confused by a configured <see cref="ClientPatchPublicHex" />.
 		/// </summary>
-		public static string ServerPublicHex => ToPublicHex(ServerPublic);
+		public static string? ServerPublicHex => ServerPublic is { } pub ? ToPublicHex(pub) : null;
 
 		/// <summary>
 		///     The public key the launcher writes INTO a client exe. Normally <see cref="ServerPublicHex" /> - the client
@@ -115,8 +120,8 @@ namespace Faolan.Core.Crypt
 		/// <exception cref="ArgumentException">Either key is unparseable or out of range - fail loudly.</exception>
 		public static void Configure(IConfiguration config)
 		{
-			ConfigurePrivate(config["Login:PrivateKey"]);
-			ConfigurePublic(config["Login:PublicKey"]);
+			ConfigurePrivate(config.LoginPrivateKey);
+			ConfigurePublic(config.LoginPublicKey);
 		}
 
 		/// <summary>

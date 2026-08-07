@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Protobuf;
-using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {

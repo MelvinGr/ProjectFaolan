@@ -1,6 +1,6 @@
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
+using Faolan.Core.Cli;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 
@@ -19,7 +19,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite
 		public DatabaseContext CreateDbContext(string[] args)
 		{
 			var config = new ConfigurationBuilder().AddJsonFile(Global.ConfigPath, true).AddEnvironmentVariables().Build();
-			return DatabaseExtensions.CreateContext(FaolanDbProvider.Sqlite, config.DatabaseConnection);
+			return DatabaseExtensions.CreateContext(FaolanDbProvider.Sqlite, config.DatabaseConnectionString);
 		}
 	}
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,7 +12,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Extensions;
 using Faolan.Core.Helpers;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Server.ChatServer;
@@ -35,14 +33,6 @@ namespace Faolan
 {
 	public static class Program
 	{
-		public static byte[] LoadEmbeddedResource(string name)
-		{
-			using var stream = typeof(Program).Assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException($"embedded resource '{name}' not found");
-			using var buffer = new MemoryStream();
-			stream.CopyTo(buffer);
-			return buffer.ToArray();
-		}
-
 		[STAThread]
 		public static async Task Main(string[] args)
 		{
@@ -97,18 +87,20 @@ namespace Faolan
 			// launcher patches into a client is derived from it. Unset = the built-in default; a bad value throws here
 			// rather than silently degrading every login to accept-any.
 			DhKeys.Configure(builder.Configuration);
+
 			if (DhKeys.IsConfigured)
 				Console.WriteLine("[login] Using the configured Login:PrivateKey - patch clients with the matching public key (Faolan.ClientLauncher --patch-login).");
 
 			Realm? hostRealm = null;
 			try
 			{
-				await using var db = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
+				await using var db = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnectionString);
 
 				// The shared migrate + load-the-data + seed sequence (DatabaseInitializer), logged Console-style because
 				// the host - and with it any ILogger - does not exist yet. A database with no content gets faolan.sql
 				// loaded into it here, which is what lets a clone run without the committed binary (#412).
 				var seeded = await DatabaseInitializer.InitializeAsync(db);
+
 				if (seeded.DataSeeded)
 					Console.WriteLine($"[db] Empty database - loaded the game data from {Global.SeedPath}.");
 				if (seeded.RealmCreated)
@@ -121,6 +113,7 @@ namespace Faolan
 					hostRealm = realmId.HasValue
 						? db.Realms.FirstOrDefault(r => r.Id == realmId.Value)
 						: db.Realms.OrderBy(r => r.Id).FirstOrDefault();
+
 					// Only reachable for an explicit id - the no-id branch always finds a realm, since the seed above
 					// inserts the default one when the table is empty.
 					if (hostRealm == null)
@@ -269,6 +262,7 @@ namespace Faolan
 			// read from a throwaway config; the builder's own configuration is set up identically just below.
 			var preConfig = new ConfigurationBuilder();
 			AddConfigSources(preConfig, options.ConfigOverrides);
+
 			var runMcp = runRealm && preConfig.Build().McpEnabled;
 			return (selectedRealmId, runLogin, runRealm, runMcp);
 		}

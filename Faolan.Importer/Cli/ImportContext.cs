@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Faolan.Core.Cli;
 using Faolan.Core.Database;
-using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Microsoft.Extensions.Configuration;
 
@@ -22,7 +22,7 @@ namespace Faolan.Importer.Cli
 		// See [[aoc_content_cdn_mirror]].
 		public static string DefaultProxyBase(IConfiguration config)
 		{
-			return config.CdnAddress;
+			return config.CdnPublicAddress;
 		}
 
 		public required DatabaseContext Db { get; init; }

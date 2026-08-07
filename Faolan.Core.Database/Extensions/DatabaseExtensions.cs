@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
+using Faolan.Core.Cli;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -32,7 +32,7 @@ namespace Faolan.Core.Database.Extensions
 			// NpcTemplate load = Spells + Equipment + Morphs) all have SMALL collections and run per-quest-check /
 			// per-NPC-at-zone-load, so one query (a tiny cartesian, ONE round-trip) beats split (a round-trip per
 			// collection). Stating it also silences EF's QuerySplittingBehavior warning (which fires when it's unset).
-			services.AddPooledDbContextFactory<DatabaseContext>(options => { options.UseFaolanDatabase(configuration.DatabaseProvider, configuration.DatabaseConnection); });
+			services.AddPooledDbContextFactory<DatabaseContext>(options => { options.UseFaolanDatabase(configuration.DatabaseProvider, configuration.DatabaseConnectionString); });
 
 			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
 

@@ -7,7 +7,7 @@
 // The commented-out keys are the OPTIONAL ones - they name something outside this repo (a game install, a keypair,
 // a deployment's public address), so there is nothing it could default them to.
 //
-// ⚠️ Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them
+// Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them
 // in faolan.user.json (gitignored, same keys, it simply wins).
 {
 	"Database": {
@@ -19,23 +19,23 @@
 
 	// The address the login tier advertises to clients - must be reachable FROM the client.
 	"ServerIpAddress": "127.0.0.1",
-	// Login-tier entry port (7010 is the client's fixed entry point).
+	// UniverseAgent port. (Main entry point).
 	"UniverseAgentPort": 7010,
-	// Login-tier player-agent port.
+	// PlayerAgent port.
 	"PlayerAgentPort": 7011,
 	// Login MOTD.
 	"WelcomeString": "Welcome to Project Faolan!",
 	// Baked terrain directory; without it ground-snap and line-of-sight are disabled.
-	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
-	// The client's RDB folder. Part of the game INSTALL, so it has no default.
+	"TerrainDir": "./terrain",
+	// The client's RDB folder. Usually not needed.
 	//"RdbDir": ""
 	// The client build the protocol was decoded against. A client reporting anything else is not refused.
 	"ClientVersion": "v5.01.0@602248",
 
 	"Login": {
-		// The login DH private key (default: the built-in one, which is public - generate your own with --generate-login-key). Patch clients with the matching public key: Faolan.ClientLauncher --patch-login.
+		// The server private key (Generate with --generate-login-key)
 		//"PrivateKey": ""
-		// Patch THIS public key into the exe instead of our derived one - for a client that should talk to somebody else's server.
+		// Patch clients with Faolan.ClientLauncher --patch-login.
 		//"PublicKey": ""
 		// Let a client whose login block we cannot decrypt in on its account NAME alone. False requires a patched client, so the password is actually checked.
 		"AllowUnpatchedClients": true
@@ -61,12 +61,12 @@
 		// Host the in-process MCP endpoint.
 		"Enabled": false,
 		// MCP endpoint port.
-		"Port": 7099,
-		// MCP endpoint URL the chat bridge connects to.
-		"Url": "http://127.0.0.1:7099/mcp"
+		"Port": 7099
 	},
 
 	"ChatBridge": {
+		// MCP endpoint the chat bridge DIALS. Defaults to the local server's own Mcp:Port, so set it only for a bridge on another host.
+		//"Url": ""
 		// How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.
 		"BacklogGraceMs": 120000,
 		// Chat-bridge poll interval, in milliseconds.
@@ -80,8 +80,7 @@
 		"ListenAddress": "127.0.0.1",
 		// Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.
 		"ListenPort": 7081
-		// Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. REQUIRED by the mirror - it is not the bind address and cannot be derived.
+		// Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. Full URL, including scheme and port.
 		//"PublicAddress": ""
 	}
 }
-

@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Core.Cli
 {
@@ -29,130 +33,95 @@ namespace Faolan.Core.Cli
 	///         (<see cref="FaolanCommandLine.Build" />) and a command's option list is a VIEW of it.
 	///     </para>
 	///     <para>
-	///         The layering that results: <b>defaults &lt; faolan.json &lt; faolan.user.json &lt; command line &lt;
-	///         environment</b>. Because the bottom layer always supplies a value, a consumer reads
+	///         The layering that results:
+	///         <b>
+	///             defaults &lt; faolan.json &lt; faolan.user.json &lt; command line &lt;
+	///             environment
+	///         </b>
+	///         . Because the bottom layer always supplies a value, a consumer reads
 	///         <c>config["Log:File"]</c> and gets <c>faolan.log</c> - the <c>?? "faolan.log"</c> that used to sit at
 	///         the read site is gone, and with it the chance of two read sites defaulting differently.
 	///     </para>
 	/// </remarks>
 	public static class FaolanSettings
 	{
-		/// <summary>
-		///     One setting. A null <paramref name="Default" /> means the setting is genuinely OPTIONAL - there is
-		///     nothing this repo could put there, because the value names something outside it (a game install, a
-		///     keypair, a deployment's public address). Everything else has one, so the server runs with no
-		///     configuration file at all.
-		/// </summary>
-		/// <param name="Hidden">
-		///     The default APPLIES but is not written into the generated config file, nor spelled out in
-		///     <c>--help</c>. For the two key literals: a config file carrying key material invites someone to edit
-		///     half of a pair, and a 256-char hex line in a `--help` listing is noise. The description says what the
-		///     default is in words instead.
-		/// </param>
-		public sealed record Setting(string Key, string Description, string? Default = null, bool Hidden = false);
-
-		// ⚠️ `Cdn:PublicAddress` looks like it wants a default and must NOT have one: the mirror and its clients
-		// read "unset" differently and both readings are right - to the MIRROR it means "refuse to start, only the
-		// operator knows what a client dials", to a CLIENT of the mirror it means "the usual local one". A default
-		// here would erase the mirror's reading, which is the whole point of it: a mirror that guesses writes the
-		// guess into the LocalConfig.xml a patch run pins itself to. The client's reading stays where it belongs, on
-		// `IConfigurationExtensions.CdnAddress`.
-		//
-		// ⚠️ The two Hidden key literals below are the built-in keypair's private half and the key retail's exe ships.
-		// They are DEFAULTS, so they live here with every other default rather than in `DhKeys`, which reads them from
-		// this list - one home, and no chance of `--help` naming a different key from the one the code uses.
-		public static readonly Setting[] All =
+		public static readonly ImmutableArray<Setting> All =
 		[
-			new("Database:Provider", "Sqlite or Postgres.", "Sqlite"),
-			new("Database:ConnectionString", "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
-			new("ServerIpAddress", "The address the login tier advertises to clients - must be reachable FROM the client.", "127.0.0.1"),
-			new("UniverseAgentPort", "Login-tier entry port (7010 is the client's fixed entry point).", "7010"),
-			new("PlayerAgentPort", "Login-tier player-agent port.", "7011"),
-			new("WelcomeString", "Login MOTD.", "Welcome to Project Faolan!"),
-			new("TerrainDir", "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "../../ProjectFaolan-Data/Terrain"),
-			new("RdbDir", "The client's RDB folder. Part of the game INSTALL, so it has no default."),
-			new("ClientVersion", "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
-
-			// The historical CellAO key. NOT a secret - it is in this repo's history and in every client ever patched
-			// with it - which is exactly why a deployment that wants a real one runs `--generate-login-key`.
-			new("Login:PrivateKey", "The login DH private key (default: the built-in one, which is public - generate your own with --generate-login-key). Patch clients with the matching public key: Faolan.ClientLauncher --patch-login.",
-				"7ad852c6494f664e8df21446285ecd6f400cf20e1d872ee96136d7744887424b", true),
-			new("Login:PublicKey", "Patch THIS public key into the exe instead of our derived one - for a client that should talk to somebody else's server."),
-			new("Login:AllowUnpatchedClients",
+			new Setting("Database:Provider", "Sqlite or Postgres.", "Sqlite"),
+			new Setting("Database:ConnectionString", "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
+			new Setting("ServerIpAddress", "The address the login tier advertises to clients - must be reachable FROM the client.", "127.0.0.1"),
+			new Setting("UniverseAgentPort", "UniverseAgent port. (Main entry point).", "7010"), new Setting("PlayerAgentPort", "PlayerAgent port.", "7011"),
+			new Setting("WelcomeString", "Login MOTD.", "Welcome to Project Faolan!"),
+			new Setting("TerrainDir", "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
+			new Setting("RdbDir", "The client's RDB folder. Usually not needed."),
+			new Setting("ClientVersion", "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
+			new Setting("Login:PrivateKey", "The server private key (Generate with --generate-login-key)"),
+			new Setting("Login:PublicKey", "Patch clients with Faolan.ClientLauncher --patch-login."),
+			new Setting("Login:AllowUnpatchedClients",
 				"Let a client whose login block we cannot decrypt in on its account NAME alone. False requires a patched client, so the password is actually checked.", "true"),
-
-			new("Account:Premium", "Advertise every account as subscribed.", "true"),
-			new("Account:PremiumCharSlots", "Character slots advertised when premium.", "10"),
-			new("Account:FreeCharSlots", "Character slots advertised when not premium.", "4"),
-
-			new("Log:File", "Log file path.", "faolan.log"),
-			new("Log:PacketBytes", "Include the raw byte dump in packet log lines.", "false"),
-
-			new("Mcp:Enabled", "Host the in-process MCP endpoint.", "false"),
-			new("Mcp:Port", "MCP endpoint port.", "7099"),
-			new("Mcp:Url", "MCP endpoint URL the chat bridge connects to.", "http://127.0.0.1:7099/mcp"),
-
-			new("ChatBridge:BacklogGraceMs", "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", "120000"),
-			new("ChatBridge:PollMs", "Chat-bridge poll interval, in milliseconds.", "1500"),
-
-			new("Cdn:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
-			new("Cdn:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
-			new("Cdn:ListenPort", "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", "7081"),
-			new("Cdn:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. Full URL, including scheme and port.")
+			new Setting("Account:Premium", "Advertise every account as subscribed.", "true"), new Setting("Account:PremiumCharSlots", "Character slots advertised when premium.", "10"),
+			new Setting("Account:FreeCharSlots", "Character slots advertised when not premium.", "4"), new Setting("Log:File", "Log file path.", "faolan.log"),
+			new Setting("Log:PacketBytes", "Include the raw byte dump in packet log lines.", "false"), new Setting("Mcp:Enabled", "Host the in-process MCP endpoint.", "false"),
+			new Setting("Mcp:Port", "MCP endpoint port.", "7099"),
+			new Setting("ChatBridge:Url", "MCP endpoint the chat bridge DIALS. Defaults to the local server's own Mcp:Port, so set it only for a bridge on another host."),
+			new Setting("ChatBridge:BacklogGraceMs", "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", "120000"),
+			new Setting("ChatBridge:PollMs", "Chat-bridge poll interval, in milliseconds.", "1500"), new Setting("Cdn:Store", "Directory the mirror stores fetched CDN blobs in.", "mirror-store"),
+			new Setting("Cdn:ListenAddress", "Address the mirror BINDS - an interface, not the address a client dials.", "127.0.0.1"),
+			new Setting("Cdn:ListenPort", "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", "7081"),
+			new Setting("Cdn:PublicAddress", "Address the CLIENT reaches the mirror on, written into LocalConfig.xml's patch addresses. Full URL, including scheme and port.")
 		];
+
+		/// <summary>
+		///     The DEFAULTS configuration layer: every setting that has one. The bottom of
+		///     <see cref="FaolanCommandLine.Build" />'s stack.
+		/// </summary>
+		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Where(s => s.Default != null).Select(s => new KeyValuePair<string, string?>(s.Key, s.Default));
 
 		private static readonly Dictionary<string, Setting> ByKey = All.ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
 
-		/// <summary>The DEFAULTS configuration layer: every setting that has one. The bottom of <see cref="FaolanCommandLine.Build" />'s stack.</summary>
-		public static IEnumerable<KeyValuePair<string, string?>> Defaults =>
-			All.Where(s => s.Default != null).Select(s => new KeyValuePair<string, string?>(s.Key, s.Default));
-
-		/// <summary>The catalog entry for <paramref name="key" />.</summary>
-		/// <exception cref="ArgumentException">No such setting - a typo here is a build-time mistake, not a runtime one.</exception>
-		public static Setting Get(string key)
+		extension(IConfiguration config)
 		{
-			return ByKey.TryGetValue(key, out var setting)
-				? setting
-				: throw new ArgumentException($"'{key}' is not a Faolan setting. Add it to FaolanSettings.All - that is the only list.", nameof(key));
-		}
+			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(config["Database:Provider"], true);
 
-		/// <summary>
-		///     The command-line options for <paramref name="keys" />, in the order given: a <c>*Command</c>'s VIEW of
-		///     the catalog. The description and the default come from the entry, so <c>--help</c> cannot describe a
-		///     default the code does not use.
-		/// </summary>
-		public static Option<string>[] Options(params string[] keys)
-		{
-			return [.. keys.Select(Get).Select(Option)];
-		}
+			public bool AccountPremium => config["Account:Premium"].To<bool>();
 
-		private static Option<string> Option(Setting setting)
-		{
-			// The default is SHOWN, not applied by the parser: applying it here would make every option "passed" and
-			// so shadow faolan.json with the default, which is precisely the bug FaolanCommandLine.Overrides avoids by
-			// dropping options the user did not pass.
-			var description = setting switch
-			{
-				{ Hidden: true } => setting.Description, // ...which says what its default is in words
-				{ Default: { } value } => $"{setting.Description} (default: {value})",
-				_ => $"{setting.Description} (optional)"
-			};
+			public bool LogPacketBytes => config["Log:PacketBytes"].To<bool>();
 
-			return new Option<string>($"--{setting.Key}") { Description = description };
-		}
+			public bool LoginAllowUnpatchedClients => config["Login:AllowUnpatchedClients"].To<bool>();
+			public bool McpEnabled => config["Mcp:Enabled"].To<bool>();
 
-		/// <summary>
-		///     Writes <see cref="DefaultJson" /> to <paramref name="path" /> - a faolan.json holding every setting at
-		///     its default.
-		/// </summary>
-		/// <remarks>
-		///     ⚠️ It OVERWRITES. The generated file is a starting point, not a hook output: this repo's committed
-		///     faolan.json is exactly this with a couple of values flipped for the dev run, and regenerating drops
-		///     those (and anything else a deployment changed). Nothing calls it automatically for that reason.
-		/// </remarks>
-		public static void WriteDefaultJson(string path)
-		{
-			File.WriteAllText(path, DefaultJson());
+			public float ChatBridgeBacklogGraceMs => config["ChatBridge:BacklogGraceMs"].To<float>();
+			public float ChatBridgePollMs => config["ChatBridge:PollMs"].To<float>();
+
+			public string CdnListenAddress => config["Cdn:ListenAddress"];
+
+			public string CdnStore => config["Cdn:Store"];
+
+			public string ChatBridgeUrl => config["ChatBridge:Url"];
+
+			public string ClientVersion => config["ClientVersion"];
+
+			public string DatabaseConnectionString => config["Database:ConnectionString"];
+
+			public string LogFile => config["Log:File"];
+			public string ServerIpAddress => config["ServerIpAddress"];
+			public string WelcomeString => config["WelcomeString"];
+
+			public string? CdnPublicAddress => config["Cdn:PublicAddress"];
+
+			public string? LoginPrivateKey => config["Login:PrivateKey"];
+			public string? LoginPublicKey => config["Login:PublicKey"];
+
+			public string? RdbDir => config["RdbDir"];
+			public uint AccountFreeCharSlots => config["Account:FreeCharSlots"].To<uint>();
+
+			public uint AccountPremiumCharSlots => config["Account:PremiumCharSlots"].To<uint>();
+
+			public ushort CdnListenPort => config["Cdn:ListenPort"].To<ushort>();
+
+			public ushort McpPort => config["Mcp:Port"].To<ushort>();
+			public ushort PlayerAgentPort => config["PlayerAgentPort"].To<ushort>();
+			public ushort UniverseAgentPort => config["UniverseAgentPort"].To<ushort>();
 		}
 
 		/// <summary>
@@ -177,7 +146,7 @@ namespace Faolan.Core.Cli
 				.AppendLine("// The commented-out keys are the OPTIONAL ones - they name something outside this repo (a game install, a keypair,")
 				.AppendLine("// a deployment's public address), so there is nothing it could default them to.")
 				.AppendLine("//")
-				.AppendLine("// ⚠️ Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them")
+				.AppendLine("// Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them")
 				.AppendLine("// in faolan.user.json (gitignored, same keys, it simply wins).")
 				.AppendLine("{");
 
@@ -217,10 +186,82 @@ namespace Faolan.Core.Cli
 			return text.AppendLine("}").ToString();
 		}
 
-		private static string? Section(Setting setting)
+		/// <summary>The catalog entry for <paramref name="key" />.</summary>
+		/// <exception cref="ArgumentException">No such setting - a typo here is a build-time mistake, not a runtime one.</exception>
+		public static Setting Get(string key)
 		{
-			var colon = setting.Key.IndexOf(':');
-			return colon < 0 ? null : setting.Key[..colon];
+			return ByKey.TryGetValue(key, out var setting)
+				? setting
+				: throw new ArgumentException($"'{key}' is not a Faolan setting. Add it to FaolanSettings.All - that is the only list.", nameof(key));
+		}
+
+		/// <summary>
+		///     The command-line options for <paramref name="keys" />, in the order given: a <c>*Command</c>'s VIEW of
+		///     the catalog. The description and the default come from the entry, so <c>--help</c> cannot describe a
+		///     default the code does not use.
+		/// </summary>
+		public static Option<string>[] Options(params string[] keys)
+		{
+			return [.. keys.Select(Get).Select(Option)];
+		}
+
+		/// <summary>
+		///     Writes <see cref="DefaultJson" /> to <paramref name="path" /> - a faolan.json holding every setting at
+		///     its default.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ It OVERWRITES. The generated file is a starting point, not a hook output: this repo's committed
+		///     faolan.json is exactly this with a couple of values flipped for the dev run, and regenerating drops
+		///     those (and anything else a deployment changed). Nothing calls it automatically for that reason.
+		/// </remarks>
+		public static void WriteDefaultJson(string path)
+		{
+			File.WriteAllText(path, DefaultJson());
+		}
+
+		private static string Comment(string line)
+		{
+			var content = line.TrimStart('\t');
+			return $"{line[..^content.Length]}//{content}";
+		}
+
+		private static Block Entry(Setting setting, int depth)
+		{
+			var indent = new string('\t', depth);
+			var name = depth == 1
+				? setting.Key
+				: Name(setting);
+			var written = setting is { Default: not null, Hidden: false };
+			var line = $"{indent}\"{name}\": {Literal(written ? setting.Default! : "")}";
+
+			return new Block([
+				$"{indent}// {setting.Description}", written
+					? line
+					: Comment(line)
+			], written);
+		}
+
+		// The comma goes after every LIVE entry but the last one, and the commented-out entries in between are skipped
+		// - a comma on the last live line before a run of comments would close the object on a dangling separator.
+		private static void Join(List<Block> blocks)
+		{
+			var last = blocks.FindLastIndex(b => b.Live);
+			for (var i = 0; i < last; i++)
+			{
+				if (blocks[i].Live)
+					blocks[i].Lines[^1] += ",";
+			}
+		}
+
+		// A default is stored as TEXT (it is a configuration value), so the JSON it renders as follows its shape:
+		// true/false and whole numbers unquoted, everything else a string. Getting this wrong would be invisible here
+		// and load fine either way - the configuration binder reads every value back as text - but the file is read by
+		// people too, and a quoted port reads as a typo.
+		private static string Literal(string value)
+		{
+			return value is "true" or "false" || (value.Length > 0 && value.All(char.IsAsciiDigit))
+				? value
+				: JsonSerializer.Serialize(value);
 		}
 
 		private static string Name(Setting setting)
@@ -235,7 +276,10 @@ namespace Faolan.Core.Cli
 			var entries = settings.Select(s => Entry(s, 2)).ToList();
 			Join(entries);
 
-			var lines = new List<string> { $"\t\"{section}\": {{" };
+			var lines = new List<string>
+			{
+				$"\t\"{section}\": {{"
+			};
 			lines.AddRange(entries.SelectMany(e => e.Lines));
 			lines.Add("\t}");
 
@@ -244,42 +288,45 @@ namespace Faolan.Core.Cli
 				: new Block([.. lines.Select(Comment)], false, true);
 		}
 
-		private static Block Entry(Setting setting, int depth)
+		private static Option<string> Option(Setting setting)
 		{
-			var indent = new string('\t', depth);
-			var name = depth == 1 ? setting.Key : Name(setting);
-			var written = setting is { Default: not null, Hidden: false };
-			var line = $"{indent}\"{name}\": {Literal(written ? setting.Default! : "")}";
+			// The default is SHOWN, not applied by the parser: applying it here would make every option "passed" and
+			// so shadow faolan.json with the default, which is precisely the bug FaolanCommandLine.Overrides avoids by
+			// dropping options the user did not pass.
+			var description = setting switch
+			{
+				{ Hidden: true }       => setting.Description, // ...which says what its default is in words
+				{ Default: { } value } => $"{setting.Description} (default: {value})",
+				_                      => $"{setting.Description} (optional)"
+			};
 
-			return new Block([$"{indent}// {setting.Description}", written ? line : Comment(line)], written);
+			return new Option<string>($"--{setting.Key}")
+			{
+				Description = description
+			};
 		}
 
-		// The comma goes after every LIVE entry but the last one, and the commented-out entries in between are skipped
-		// - a comma on the last live line before a run of comments would close the object on a dangling separator.
-		private static void Join(List<Block> blocks)
+		private static string? Section(Setting setting)
 		{
-			var last = blocks.FindLastIndex(b => b.Live);
-			for (var i = 0; i < last; i++)
-				if (blocks[i].Live)
-					blocks[i].Lines[^1] += ",";
+			var colon = setting.Key.IndexOf(':');
+			return colon < 0
+				? null
+				: setting.Key[..colon];
 		}
 
-		private static string Comment(string line)
-		{
-			var content = line.TrimStart('\t');
-			return $"{line[..^content.Length]}//{content}";
-		}
-
-		// A default is stored as TEXT (it is a configuration value), so the JSON it renders as follows its shape:
-		// true/false and whole numbers unquoted, everything else a string. Getting this wrong would be invisible here
-		// and load fine either way - the configuration binder reads every value back as text - but the file is read by
-		// people too, and a quoted port reads as a typo.
-		private static string Literal(string value)
-		{
-			return value is "true" or "false" || (value.Length > 0 && value.All(char.IsAsciiDigit))
-				? value
-				: JsonSerializer.Serialize(value);
-		}
+		/// <summary>
+		///     One setting. A null <paramref name="Default" /> means the setting is genuinely OPTIONAL - there is
+		///     nothing this repo could put there, because the value names something outside it (a game install, a
+		///     keypair, a deployment's public address). Everything else has one, so the server runs with no
+		///     configuration file at all.
+		/// </summary>
+		/// <param name="Hidden">
+		///     The default APPLIES but is not written into the generated config file, nor spelled out in
+		///     <c>--help</c>. For the two key literals: a config file carrying key material invites someone to edit
+		///     half of a pair, and a 256-char hex line in a `--help` listing is noise. The description says what the
+		///     default is in words instead.
+		/// </param>
+		public sealed record Setting(string Key, string Description, string? Default = null, bool Hidden = false);
 
 		private sealed record Block(List<string> Lines, bool Live, bool Section = false);
 	}

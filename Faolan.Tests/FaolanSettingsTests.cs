@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Cli;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Tests.Support;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			var config = new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build();
 
 			Assert.Equal(FaolanDbProvider.Sqlite, config.DatabaseProvider);
-			Assert.Equal("Data Source=faolan.db", config.DatabaseConnection);
+			Assert.Equal("Data Source=faolan.db", config.DatabaseConnectionString);
 			Assert.Equal("127.0.0.1", config.ServerIpAddress);
 			Assert.Equal(7010, config.UniverseAgentPort);
 			Assert.Equal(7011, config.PlayerAgentPort);
@@ -45,9 +45,9 @@ namespace Faolan.Tests
 			Assert.False(config.LogPacketBytes);
 			Assert.False(config.McpEnabled);
 			Assert.Equal(7099, config.McpPort);
-			Assert.Equal("http://127.0.0.1:7099/mcp", config.McpUrl);
-			Assert.Equal(120_000, config.ChannelBacklogGraceMs);
-			Assert.Equal(1500, config.ChannelPollMs);
+			Assert.Equal("http://127.0.0.1:7099/mcp", config.ChatBridgeUrl); // ...derived from that port, not a second literal
+			Assert.Equal(120_000, config.ChatBridgeBacklogGraceMs);
+			Assert.Equal(1500, config.ChatBridgePollMs);
 			Assert.Equal("mirror-store", config.CdnStore);
 			Assert.Equal("127.0.0.1", config.CdnListenAddress);
 			Assert.Equal(7081, config.CdnListenPort);
@@ -57,7 +57,33 @@ namespace Faolan.Tests
 			// (Login:PublicKey is the third, and DhKeys rather than an accessor here reads it.)
 			Assert.Null(config.RdbDir);
 			Assert.Null(config.CdnPublicAddress);
-			Assert.Equal("http://127.0.0.1:7081", config.CdnAddress); // ...derived from the mirror's own port
+			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress); // ...derived from the mirror's own port
+		}
+
+		// The chat bridge dials the endpoint the SERVER hosts, so moving the server's port has to move the bridge with
+		// it. `Mcp:Url` used to be a second key holding a second copy of the port: `Mcp:Port 7098` left the bridge on
+		// 7099 - a bridge that connects to nothing, with the port written correctly in the config that broke it. An
+		// explicit `ChatBridge:Url` still wins, for the case a port cannot express (a server on another host).
+		[Theory]
+		[InlineData(null, null, "http://127.0.0.1:7099/mcp")]
+		[InlineData("7098", null, "http://127.0.0.1:7098/mcp")]
+		[InlineData("7098", "http://gameserver.lan:7099/mcp", "http://gameserver.lan:7099/mcp")]
+		public void TheChatBridgesTarget_FollowsTheServersMcpPort(string? port, string? url, string expected)
+		{
+			// A null here means the key is ABSENT, not present-and-null: an in-memory null would override the defaults
+			// layer with nothing, which is a state no config file can produce.
+			var over = new List<KeyValuePair<string, string?>>();
+			if (port != null)
+				over.Add(new("Mcp:Port", port));
+			if (url != null)
+				over.Add(new("ChatBridge:Url", url));
+
+			var config = new ConfigurationBuilder()
+				.AddInMemoryCollection(FaolanSettings.Defaults)
+				.AddInMemoryCollection(over)
+				.Build();
+
+			Assert.Equal(expected, config.ChatBridgeUrl);
 		}
 
 		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
@@ -154,7 +180,7 @@ namespace Faolan.Tests
 				"Account:PremiumCharSlots" => config.AccountPremiumCharSlots,
 				"Mcp:Port" => config.McpPort,
 				"Log:PacketBytes" => config.LogPacketBytes,
-				"ChatBridge:PollMs" => config.ChannelPollMs,
+				"ChatBridge:PollMs" => config.ChatBridgePollMs,
 				_ => throw new ArgumentException($"No accessor wired for '{key}' in this test.", nameof(key))
 			};
 		}

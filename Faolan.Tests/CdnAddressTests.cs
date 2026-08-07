@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Cli;
-using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -35,8 +34,8 @@ namespace Faolan.Tests
 		{
 			var config = Config(("Cdn:PublicAddress", publicAddress), ("Cdn:ListenPort", port));
 
-			Assert.Equal(expected, config.CdnAddress);
-			Assert.True(Uri.TryCreate(config.CdnAddress, UriKind.Absolute, out _));
+			Assert.Equal(expected, config.CdnPublicAddress);
+			Assert.True(Uri.TryCreate(config.CdnPublicAddress, UriKind.Absolute, out _));
 		}
 
 		// The BIND address is deliberately not a fallback: `Cdn:ListenAddress` is 0.0.0.0 in a container by
@@ -47,7 +46,7 @@ namespace Faolan.Tests
 		{
 			var config = Config(("Cdn:ListenAddress", "0.0.0.0"));
 
-			Assert.Equal("http://127.0.0.1:7081", config.CdnAddress);
+			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress);
 		}
 
 		// The catalog's defaults UNDER the values named here - the same stack FaolanCommandLine.Build makes, so

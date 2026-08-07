@@ -9,7 +9,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using Faolan.Core.Cli;
-using Faolan.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

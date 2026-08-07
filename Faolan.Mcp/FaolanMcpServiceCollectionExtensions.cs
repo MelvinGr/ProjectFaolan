@@ -1,4 +1,4 @@
-using Faolan.Core.Extensions;
+using Faolan.Core.Cli;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Mcp.Tools;
 using Microsoft.AspNetCore.Builder;

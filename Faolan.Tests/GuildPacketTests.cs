@@ -5,7 +5,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Guild;
-using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests

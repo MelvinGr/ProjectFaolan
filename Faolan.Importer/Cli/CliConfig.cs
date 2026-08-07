@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Cli;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
@@ -22,7 +21,7 @@ namespace Faolan.Importer.Cli
 		public static (FaolanDbProvider Provider, string Connection) ResolveDatabase(IDictionary<string, string?> commandLine)
 		{
 			var config = Resolve(commandLine);
-			return (config.DatabaseProvider, config.DatabaseConnection);
+			return (config.DatabaseProvider, config.DatabaseConnectionString);
 		}
 	}
 }

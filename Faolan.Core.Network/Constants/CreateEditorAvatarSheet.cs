@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 
 namespace Faolan.Core.Network.Constants

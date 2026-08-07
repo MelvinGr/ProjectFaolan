@@ -6,7 +6,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Captures;
 
