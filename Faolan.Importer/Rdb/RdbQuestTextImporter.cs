@@ -78,7 +78,7 @@ namespace Faolan.Importer.Rdb
 			// one needs the map's spawns, the other needs a capture of the dialogue.
 			var withDialogue = (await db.ConversationNodes.Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-			int wired = 0, unreadable = 0, gated = 0, noName = 0, notOurShape = 0, alreadyWired = 0, withoutNpc = 0, withoutDialogue = 0;
+			int wired = 0, unreadable = 0, gated = 0, noName = 0, notOurShape = 0, alreadyWired = 0, withoutNpc = 0, withoutDialogue = 0, reconciled = 0;
 			foreach (var goal in goals)
 			{
 				// Bootstrap-only, like every other wiring step: a Quest-editor edit or a hand seed survives a re-import.
@@ -144,6 +144,26 @@ namespace Faolan.Importer.Rdb
 
 				var recipient = (ask.Success ? ask : match!).Groups[1].Value.Trim();
 
+				// ⚠️ RECONCILE the sentence's name against the catalog before storing it. `TargetName` is a MATCH KEY,
+				// compared for EQUALITY against the live entity's name - and prose uses the short form where the world
+				// uses the full one. Two goals shipped dead on exactly that: *"Talk to Bronwith in Conarch Village"*
+				// stored `Bronwith`, which can never equal the live **Battlemaster Bronwith**, and *"Speak to Chael"*
+				// stored `Chael` against **Tanner Chael**. Both read as wired and neither could ever fire.
+				//
+				// It is the same rule `RdbQuestGoalTargetImporter` already applies to the 51000 half - the CATALOG wins
+				// wherever it exists, because the catalog is what the runtime compares against. Only an UNAMBIGUOUS
+				// single template may claim the name (measured: no goal in the shipped data has two), so a title that
+				// several NPCs share leaves the short form alone rather than picking one.
+				if (!npcNames.Contains(recipient))
+				{
+					var titled = npcNames.Where(n => n.EndsWith(' ' + recipient, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+					if (titled.Count == 1)
+					{
+						recipient = titled[0];
+						reconciled++;
+					}
+				}
+
 				// The name is wired whether or not we hold that NPC. It is the client's own statement of who the goal
 				// is about, so recording it is right regardless of spawn coverage - and the goal then works the moment
 				// its map is imported, with no second pass through here. It is inert either way until then.
@@ -170,7 +190,7 @@ namespace Faolan.Importer.Rdb
 			if (wired > 0)
 				await db.SaveChangesAsync();
 
-			return new Result(goals.Count, wired, unreadable, gated, noName, notOurShape, alreadyWired, withoutNpc, withoutDialogue);
+			return new Result(goals.Count, wired, unreadable, gated, noName, notOurShape, alreadyWired, withoutNpc, withoutDialogue, reconciled);
 		}
 
 		// (category, id) -> ciphertext over the ENGLISH pages of the ENCRYPTED categories. The language comes from the
@@ -209,6 +229,7 @@ namespace Faolan.Importer.Rdb
 
 		// Every goal is accounted for by REASON - wired, or one of the five ways it was not. A silent skip here would be
 		// indistinguishable from a decode regression, so the counts are expected to sum to DeliverGoals.
-		public readonly record struct Result(int Goals, int Wired, int Unreadable, int PreconditionGated, int NoNameInText, int NotOurShape, int AlreadyWired, int WiredWithoutNpc, int WiredWithoutDialogue);
+		public readonly record struct Result(int Goals, int Wired, int Unreadable, int PreconditionGated, int NoNameInText, int NotOurShape, int AlreadyWired, int WiredWithoutNpc, int WiredWithoutDialogue,
+			int ReconciledToTheCatalogName);
 	}
 }

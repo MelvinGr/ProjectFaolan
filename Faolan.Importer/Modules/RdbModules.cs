@@ -354,7 +354,8 @@ namespace Faolan.Importer.Modules
 				$"{r.Wired} goal(s) typed from their objective text ({r.WiredWithoutNpc} of them naming an NPC we do not hold yet, " +
 				$"so inert until its map is imported, {r.WiredWithoutDialogue} held but with no dialogue captured so the talk " +
 				$"cannot fire yet); {r.AlreadyWired} already wired, {r.PreconditionGated} carrying a recorded rank/level precondition, " +
-				$"{r.NotOurShape} not a deliver/talk shape, {r.NoNameInText} no name in the text, {r.Unreadable} unreadable, of {r.Goals} goals. " +
+				$"{r.NotOurShape} not a deliver/talk shape, {r.NoNameInText} no name in the text, {r.Unreadable} unreadable, of {r.Goals} goals; " +
+				$"{r.ReconciledToTheCatalogName} short name(s) reconciled to the NpcTemplate's full name (a match key must EQUAL the live name). " +
 				$"Targets: {t.FromCatalog} named from the NpcTemplate the reference points at ({t.PlaceholderKept} of those a shared " +
 				$"placeholder name the LDB disagrees with), {t.FromLdb} from LDB[51000] for a template we do not hold, " +
 				$"{t.AlreadyWired} already wired, {t.Unresolved} with no English LDB entry, of {t.Goals} npc-referencing goals.");

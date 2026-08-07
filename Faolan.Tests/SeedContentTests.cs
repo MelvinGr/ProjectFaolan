@@ -328,6 +328,42 @@ namespace Faolan.Tests
 			Assert.True(wrongSpace.Count == 0, $"Kill goals whose target reference is not an NPC: {string.Join(", ", wrongSpace)}");
 		}
 
+		// A `TargetName` is a MATCH KEY - it is compared for EQUALITY against the live entity's name - so a name we hold
+		// must be stored the way the CATALOG spells it (#704).
+		//
+		// Prose uses the short form where the world uses the full one, and the objective-text rule stored the prose:
+		// *"Talk to Bronwith in Conarch Village"* shipped `Bronwith`, which can never equal the live **Battlemaster
+		// Bronwith**, and *"Speak to Chael"* shipped `Chael` against **Tanner Chael**. Both goals read as wired and
+		// neither could ever fire - the exact failure `RdbQuestGoalTargetImporter`'s "the catalog wins wherever it
+		// exists" rule already avoids on the 51000 half.
+		//
+		// A target we do NOT hold is fine and expected (33 of 57): the name is the client's own statement of who the
+		// goal is about, and the goal starts working the day its map is imported. What must never happen is a target
+		// that is *nearly* a held NPC.
+		[Fact]
+		public async Task ATargetName_IsSpeltTheWayTheCatalogSpellsIt()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var targets = await db
+				.QuestGoalDefinitions.Where(g => g.TargetName != null && g.TargetName != "")
+				.Select(g => new { g.GoalId, Target = g.TargetName! })
+				.ToListAsync(ct);
+			var npcs = await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).Distinct().ToListAsync(ct);
+
+			Assert.NotEmpty(targets);
+
+			var shortForms = targets
+				.Where(g => !npcs.Contains(g.Target, StringComparer.OrdinalIgnoreCase)
+				            && npcs.Any(n => n.EndsWith(' ' + g.Target, StringComparison.OrdinalIgnoreCase)))
+				.Select(g => $"goal {g.GoalId} '{g.Target}' vs live '{npcs.First(n => n.EndsWith(' ' + g.Target, StringComparison.OrdinalIgnoreCase))}'")
+				.ToList();
+
+			Assert.True(shortForms.Count == 0,
+				$"TargetNames that are a SHORT FORM of an NPC we hold, so the equality match can never fire: {string.Join(", ", shortForms)}");
+		}
+
 		// A goal's own SENTENCE outranks its map marker (#522).
 		//
 		// The marker is the weakest evidence a goal carries, and `TypeLocationGoalsFromTrailingCategory` was reading it
