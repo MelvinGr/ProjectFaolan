@@ -81,9 +81,13 @@ namespace Faolan.Core.Database.Tables
 		//   LootFromNpc- looting the corpse bag of the NPC named TargetName (LootService); the actual quest item is a
 		//                quest-specific RDB item we don't materialise, so the bag's SOURCE NPC name is the match key.
 		//   TalkToNpc  - opening the greeting of the NPC named TargetName (ConversationService).
-		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).
-		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
-		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
+		//   Escort     - escorting the NPC in TrailingRefId to a destination (#646).
+		//
+		// The default is `None` - NO trigger - and that is load-bearing (#522). It used to be `Kill`, so an un-typed row
+		// claimed to be a kill goal: 7,148 catalog goals with no verb and no target sat there, and every guard in
+		// QuestProgress.MatchingKillGoal was added to stop one of them false-firing. A goal becomes a kill goal by
+		// carrying the CLIENT's kill verb (`Separator` = QuestGoalKind.Kill), not by nobody having typed it.
+		public QuestGoalType GoalType { get; set; } = QuestGoalType.None;
 
 		// TRUE when this row came from MID-SESSION traffic (a QuestFullUpdate) instead of a login snapshot's Quest_c
 		// record. So the row exists to be DISPLAYED, and must not be EVALUATED: it has no TARGET.

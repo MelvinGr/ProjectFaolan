@@ -79,7 +79,9 @@ namespace Faolan.Importer.Rdb
 			foreach (var goal in goals)
 			{
 				// Bootstrap-only, like every other wiring step: a Quest-editor edit or a hand seed survives a re-import.
-				if (goal.GoalType != QuestGoalType.Kill || goal.TargetName != null)
+				// `None` is the un-typed state (#522) - it used to be `Kill`, which is why this also had to test the
+				// TargetName to tell a real kill goal from a row nobody had typed.
+				if (goal.GoalType != QuestGoalType.None)
 				{
 					alreadyWired++;
 					continue;

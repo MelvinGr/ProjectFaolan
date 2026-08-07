@@ -285,9 +285,12 @@ The corpus agrees on every one of its 4742 snapshot goal readings: the word neve
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 
-The largest slice of the trailing references is `item.name`, and it describes a whole family of quests we do not
-run: **72 of the 74 sit at `GoalType.Kill` with no `QuestItemId` and no `TargetName`** — the fresh-harvest
-default, i.e. never wired. Only the Quarry Stonebrick pair (`CollectItem` + a `TalkToNpc` hand-in) is live.
+The largest slice of the trailing references is `item.name`, and it described a whole family of quests we did not
+run: when this was written, **72 of the 74 sat at the fresh-harvest default with no `QuestItemId` and no
+`TargetName`**, i.e. never wired, and only the Quarry Stonebrick pair (`CollectItem` + a `TalkToNpc` hand-in) was
+live. Most are wired now — 42 `CollectItem`, 12 `TalkToNpc` hand-ins, 1 `ReachArea` — and the remaining **19 are
+`GoalType.None`**: the `Craft` / `Use` / `DestroyObject` verbs, which have no trigger (see
+[`../subsystems/quests.md`](../subsystems/quests.md)).
 
 They are unmistakably gather objectives once named, and `RequiredCount` is real and varied (1, 3, 4, 7, 8, 10,
 20): *Stolen Goods* ×8, *Poisonous Gland* ×20, *Shadeleaf* ×10, *Grey Wolf Pelt* ×7, *Vanir Weapons* ×4,
@@ -307,15 +310,17 @@ Two facts bound what could be wired even with the type known:
   i.e. TEA-encrypted with a per-item key that only a capture yields. So the catalog gap is a KEY gap, not a data
   gap, and it is the same one that leaves 76,546 LDB-named templates against 3,245 catalog rows.
 
-✅ **Inert, but harmless.** These goals sit in the kill-matching pool (`GoalType.Kill`), and `MatchingKillGoal`
-matches `TrailingRefId == templateId` before falling back to a name — so an item ref there could in principle be
-advanced by killing an NPC whose template id collided. It cannot: NPC template ids span **38–22,982** and these
-item refs span **110,891–4,675,657**, disjoint. Fixing them is a feature gap, not a bug.
+✅ **Inert, and no longer in the kill-matching pool at all.** They used to sit at `GoalType.Kill` — because that
+was enum value `0`, the un-typed default — where `MatchingKillGoal` matches `TrailingRefId == templateId` before
+falling back to a name, so an item ref there could in principle have been advanced by killing an NPC whose
+template id collided. It could not in practice: NPC template ids span **38–22,982** and these item refs
+**110,891–4,675,657**, disjoint. The default is `GoalType.None` now, so the collision is impossible rather than
+merely unobserved. Fixing the remaining 19 is a feature gap, not a bug.
 
 ### …and the 24 NPC goals (`51000`) already work
 
-Worth recording so nobody "fixes" them: all 24 are `GoalType.Kill` referencing an `npc_template`, and
-`MatchingKillGoal` resolves by `TrailingRefId` first. So the kill matches on the template id the goal already
+Worth recording so nobody "fixes" them: all 24 are `GoalType.Kill` referencing an `npc_template` — typed from the
+client's own kill verb, not inherited from a default — and `MatchingKillGoal` resolves by `TrailingRefId` first. So the kill matches on the template id the goal already
 carries, and writing `TargetName` from the LDB would be **cosmetic**, not enabling. (It does validate the decode:
 on the two goals where a human did set it — Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for
 that exact ref.)

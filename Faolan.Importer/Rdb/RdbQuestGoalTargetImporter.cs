@@ -33,7 +33,8 @@ namespace Faolan.Importer.Rdb
 	// resolves to editor GROUP names (`Watch`, `Undeads`, `Posha's men`) that match no NPC at all; and 51200 is a region,
 	// whose geometry already lives in `QuestGoalDefinition.RegionId`.
 	//
-	// BOOTSTRAP-ONLY: an already-wired goal is skipped, so a Quest-editor edit or a hand seed survives a re-import.
+	// BOOTSTRAP-ONLY: a goal that already names a target is skipped, so a Quest-editor edit or a hand seed survives a
+	// re-import.
 	public static class RdbQuestGoalTargetImporter
 	{
 		private const uint NpcTemplateNameCategory = 51000;
@@ -53,9 +54,16 @@ namespace Faolan.Importer.Rdb
 			int fromCatalog = 0, fromLdb = 0, alreadyWired = 0, unresolved = 0, placeholderKept = 0;
 			foreach (var goal in goals)
 			{
-				// Same guard every wiring step uses: anything but the bare fresh-harvest default is a decision someone
-				// already made.
-				if (goal.GoalType != QuestGoalType.Kill || goal.TargetName != null || goal.QuestItemId != null)
+				// The bootstrap guard, narrowed to what this rule actually writes - the goal's TargetName. A goal that
+				// already names a target was configured by hand or by a prior run, and a goal typed something other
+				// than a kill is not this rule's business.
+				//
+				// ⚠️ It cannot be the usual "is it still at the default" test any more (#522). A 51000 goal carrying
+				// the client's kill verb is typed `Kill` before this runs (ImportOps.TypeKillGoalsFromKind), so a
+				// not-yet-typed test would skip all 24 and the column would never be filled: `Kill` is a decision now
+				// rather than the default. The TargetName test is what protects the two hand-seeded story kills, whose
+				// GatesTargetVisibility this would otherwise clear.
+				if (goal.TargetName != null || goal.QuestItemId != null || goal.GoalType is not (QuestGoalType.None or QuestGoalType.Kill))
 				{
 					alreadyWired++;
 					continue;

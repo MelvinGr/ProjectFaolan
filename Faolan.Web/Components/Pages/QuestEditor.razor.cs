@@ -111,7 +111,9 @@ namespace Faolan.Web.Components.Pages
 				QuestDefinitionId = _quest.QuestId,
 				GoalId = nextGoalId,
 				Sequence = nextSeq,
-				GoalType = QuestGoalType.Kill,
+				// `None` - no trigger - rather than a guess: the editor's whole job is to say what advances this goal, and
+				// defaulting to a real trigger is how a goal ends up wired to something nobody chose (#522).
+				GoalType = QuestGoalType.None,
 				RequiredCount = 1
 			});
 			Set("Added goal (unsaved — press Save)");

@@ -1530,6 +1530,9 @@ namespace Faolan.Importer.Captures
 			await SeedShipwreckedCityChain(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
+			// LAST of the typing rules, and after the Seed* steps on purpose: a hand-seeded kill already carries its
+			// editorial extras (Scavenger Tuut's GatesTargetVisibility), and typing it first would make the seed skip it.
+			await TypeKillGoalsFromKind(db);
 			await DeriveQuestIndexFromLine(db);
 			await SeedQuestWorldEffects(db);
 		}
@@ -1567,14 +1570,16 @@ namespace Faolan.Importer.Captures
 				// ⚠️ CORRECTIVE, and it has to run BEFORE the bootstrap guard: nineteen rows were already typed
 				// CollectItem by the older version of this rule, which only excluded `Deliver`. A goal typed
 				// CollectItem IS wired, so the guard below would skip it forever and the mistyping would outlive the
-				// fix. Reset to the un-wired shape (`Kill` with no target - what `IsWired` reads as not wired) so the
-				// quest is VISIBLY stuck rather than silently completing on a pickup.
+				// fix. Reset to `None` - NO trigger - so the quest is VISIBLY stuck rather than silently completing on a
+				// pickup. (That reset was itself `Kill` until #522 made "no trigger" a value: it moved the twenty rows
+				// off a wrong trigger onto a *different* wrong one, safe only while no NPC template id collided with an
+				// item id.)
 				//
 				// Narrow on purpose: only a row this rule itself could have produced (CollectItem with no TargetName
 				// and no QuestItemId). A hand-seeded or Quest-editor row carries one of those and is left alone.
 				if (UntypedByArrival.Contains(goal.Separator ?? 0) && goal is { GoalType: QuestGoalType.CollectItem, TargetName: null, QuestItemId: null })
 				{
-					goal.GoalType = QuestGoalType.Kill;
+					goal.GoalType = QuestGoalType.None;
 					untyped++;
 					continue;
 				}
@@ -1640,6 +1645,44 @@ namespace Faolan.Importer.Captures
 		{
 			(uint)QuestGoalKind.Deliver, (uint)QuestGoalKind.Craft, (uint)QuestGoalKind.Use, (uint)QuestGoalKind.DestroyObject, (uint)QuestGoalKind.Investigate
 		}.ToFrozenSet();
+
+		// A goal is a KILL goal because the client's own VERB says so (`Separator` = QuestGoalKind.Kill), and for no other
+		// reason (#522).
+		//
+		// This rule exists because `Kill` used to be enum value 0 - the un-typed default - so a kill goal never needed
+		// typing at all: it just inherited the trigger. That made "kill" the answer for 7,148 catalog goals with no verb
+		// and no target, and every guard in QuestProgress.MatchingKillGoal is a patch over one way that misfired. With
+		// the default now `None`, the 30 goals that really do ask for a kill have to say so, and this is where they do.
+		//
+		// The 30 split two ways, and BOTH are typed - the verb decides, not whether we can resolve the target:
+		//   24 name an NPC template (TrailingCategory 51000), which is what MatchingKillGoal matches by id;
+		//    6 name a monster CATEGORY (51100 `categorytree.description` - "Kill Atzel's Watch", "Kill Undeads in
+		//      Xibaluku"), which resolves to an editor GROUP name matching no NPC, so they are typed and inert until
+		//      that group can be expanded. Typing them anything else would be a lie about a goal we read correctly, and
+		//      leaving them at `None` would lose the one thing the client did tell us.
+		//
+		// BOOTSTRAP-ONLY like every wiring step, and it runs after the Seed* steps so a hand-seeded kill keeps the
+		// editorial fields (GatesTargetVisibility) that only a seed sets.
+		private static async Task TypeKillGoalsFromKind(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Separator == (uint)QuestGoalKind.Kill).ToListAsync();
+
+			var typed = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal))
+					continue;
+
+				goal.GoalType = QuestGoalType.Kill;
+				typed++;
+			}
+
+			if (typed > 0)
+			{
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Typed {typed} goal(s) Kill from the client's own kill verb (#522).");
+			}
+		}
 
 		// #522: an INVESTIGATE goal is a place you go and look at, so it is a reach - the same shape
 		// TypeLocationGoalsFromTrailingCategory types, reached from the VERB rather than from a location reference.
@@ -1946,12 +1989,16 @@ namespace Faolan.Importer.Captures
 			return result;
 		}
 
-		// A goal is "wired" once its server-trigger fields diverge from the fresh-harvest default (GoalType Kill, no
-		// TargetName/QuestItemId) - i.e. a Seed* or the Quest editor has configured it. Bootstrap-only seeds skip a wired
-		// goal so a re-import never reverts a hand edit.
+		// A goal is "wired" once something has given it a server TRIGGER - i.e. a Type* rule, a Seed* or the Quest editor
+		// has configured it. Bootstrap-only seeds skip a wired goal so a re-import never reverts a hand edit.
+		//
+		// This is now a single field test, because the un-typed default is a real value: `GoalType.None` means "no
+		// trigger" and nothing else (#522). It used to read `GoalType != Kill || TargetName != null || QuestItemId !=
+		// null` - three clauses to work around `Kill` doubling as the default, where a hand-seeded KILL goal was only
+		// distinguishable from an un-typed row by whether someone had also filled its TargetName.
 		private static bool IsWired(QuestGoalDefinition goal)
 		{
-			return goal.GoalType != QuestGoalType.Kill || goal.TargetName != null || goal.QuestItemId != null;
+			return goal.GoalType != QuestGoalType.None;
 		}
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). Idempotent.
@@ -2132,9 +2179,9 @@ namespace Faolan.Importer.Captures
 		// ReachArea by marker). All the WIRE/@609 display fields (markers, keys, counts) are left as harvested. `required`
 		// is set ONLY when given - pass it for a hand-authored chain goal, omit it to PRESERVE the captured RequiredCount
 		// (which is in the byte-exact objective region). Chain the quest separately with Chain().
-		// BOOTSTRAP-ONLY (#262): only configures an UN-WIRED goal (still the fresh-harvest default: GoalType Kill, no
-		// TargetName/QuestItemId), so a re-import never clobbers trigger fields set by hand (the Quest editor) or a prior
-		// run. A newly-created goal is un-wired, so a fresh import still bootstraps.
+		// BOOTSTRAP-ONLY (#262): only configures an UN-WIRED goal (still the fresh-harvest default, GoalType `None`), so a
+		// re-import never clobbers trigger fields set by hand (the Quest editor) or a prior run. A newly-created goal is
+		// un-wired, so a fresh import still bootstraps.
 		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null,
 			uint? required = null, bool gatesVisibility = false)
 		{
@@ -2267,7 +2314,7 @@ namespace Faolan.Importer.Captures
 			var unlock = goals.Find(g => g.GoalId == 3492);
 			if (unlock is { GoalType: QuestGoalType.LootFromNpc, TargetName: "Saddur", QuestItemId: 193186 })
 			{
-				unlock.GoalType = QuestGoalType.Kill; // the un-wired shape IsWired reads as "not wired"
+				unlock.GoalType = QuestGoalType.None; // the un-wired shape IsWired reads as "not wired"
 				unlock.TargetName = null;
 				unlock.QuestItemId = null;
 				Console.WriteLine("Corrected quest 12369: goal 3492 'Unlock the Acheronian gate' was carrying goal 7134's key loot (#527).");

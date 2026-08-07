@@ -462,13 +462,15 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingKillGoal(byName, null, "Nobody")); // no id, wrong name
 		}
 
-		// ⚠️ A template id of ZERO means "no type id known", not "the goal whose TrailingRefId is 0". The shipped
-		// catalog has **7,170** non-partial `Kill` goals sitting at `TrailingRefId 0` - the untyped rump - so a 0
-		// matched the first of them in every active quest, and 0 is reachable: the one caller passes
-		// `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for anything with no template behind it.
+		// ⚠️ A template id of ZERO means "no type id known", not "the goal whose TrailingRefId is 0". When this was
+		// found, **7,170** non-partial goals sat at `GoalType.Kill` with `TrailingRefId 0` - the untyped rump of the
+		// catalog, which was typed Kill only because `Kill` was enum value 0 - so a 0 matched the first of them in
+		// every active quest. And 0 is reachable: the one caller passes `WorldEntity.NpcTemplateId`, a non-nullable
+		// uint that is 0 for anything with no template behind it.
 		//
 		// The three sibling matchers guard 0 on entry; this one did not, so killing such a creature advanced an
-		// arbitrary goal of EVERY quest the player had open.
+		// arbitrary goal of EVERY quest the player had open. #522 removed the rump as well (the un-typed default is
+		// `None` now), but the guard stands on its own: a caller with no id must not match a goal by id.
 		[Fact]
 		public void MatchingKillGoal_TreatsAZeroTemplateIdAsUnknown_NotAsAMatch()
 		{
@@ -482,6 +484,40 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingKillGoal(untyped, 0, "Nobody At All"));
 			Assert.Null(QuestProgress.MatchingKillGoal(untyped, 0, null!));
 			Assert.Equal(4243u, QuestProgress.MatchingKillGoal(untyped, 0, "Scavenger Lackey")?.GoalId);
+		}
+
+		// ⚠️ A Kill goal's `TrailingRefId` is only a template id when the goal's own TYPED reference says so (#522).
+		// Six shipped kill goals name a monster CATEGORY instead - `TrailingCategory` 51100
+		// `categorytree.description`, "Kill Atzel's Watch", "Kill Undeads in Xibaluku" - whose ids (246,944 ..
+		// 10,367,287) are a different space entirely. Comparing one to a killed entity's template id is a category
+		// error that is safe only until an id collides, which is a matter of NPC coverage rather than design.
+		[Fact]
+		public void MatchingKillGoal_MatchesByIdOnlyWhenTheReferenceIsAnNpcTemplate()
+		{
+			var goals = new[]
+			{
+				// The real shape of goal 6340 "Kill Atzel's Watch": a kill goal whose target is an editor GROUP.
+				new QuestGoalDefinition
+				{
+					Sequence = 1, GoalId = 6340, GoalType = QuestGoalType.Kill,
+					TrailingCategory = 51100, TrailingRefId = 10173329
+				},
+				// ...and goal 3490's, which does name a template.
+				new QuestGoalDefinition
+				{
+					Sequence = 2, GoalId = 3490, GoalType = QuestGoalType.Kill,
+					TrailingCategory = QuestProgress.NpcTemplateNameCategory, TrailingRefId = 9500, TargetName = "Saddur"
+				}
+			};
+
+			// Were an NPC template ever to carry the category's id, the goal must NOT advance on killing it.
+			Assert.Null(QuestProgress.MatchingKillGoal(goals, 10173329, "Atzel Watchman"));
+			// The 51000 sibling matches as before...
+			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, null!)?.GoalId);
+			// ...and so does a hand-authored goal with no typed reference at all, where TrailingRefId means what the
+			// person who set it meant.
+			var handAuthored = new[] { new QuestGoalDefinition { Sequence = 1, GoalId = 900, GoalType = QuestGoalType.Kill, TrailingRefId = 9500 } };
+			Assert.Equal(900u, QuestProgress.MatchingKillGoal(handAuthored, 9500, null!)?.GoalId);
 		}
 
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back

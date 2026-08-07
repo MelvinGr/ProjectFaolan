@@ -351,14 +351,32 @@ namespace Faolan.Core.Database.Tables
 		DestroyObject = 25
 	}
 
+	// OUR server-trigger wiring for a goal - which live event advances it. Distinct from QuestGoalKind above, which is
+	// the CLIENT's verb; this is what we can actually fire on, and the two only line up where a trigger exists.
 	public enum QuestGoalType
 	{
-		Kill = 0, // kill the TargetName NPC
+		// NO SERVER TRIGGER: the goal is stored, rendered and counted, and nothing advances it.
+		//
+		// ⚠️ 0 USED TO BE `Kill`, and that was the same trap #548 removed from `Separator` - a real value doubling as
+		// the un-harvested default. It read as "kill the TargetName NPC" while actually meaning "nobody has typed this
+		// goal yet", and 7,148 catalog goals sat on it: no verb, no target, no trigger, all of them nominally kill
+		// goals. Every guard in `QuestProgress.MatchingKillGoal` exists because of that - the PARTIAL exclusion, then
+		// the zero-template-id guard (#522), each one catching another way a default-typed row false-fired on a kill.
+		//
+		// Renaming 0 changes no stored value: it states what 0 always meant. The rows that genuinely ARE kill goals get
+		// there from their own verb (ImportOps.TypeKillGoalsFromKind, `QuestGoalKind.Kill`), which is why `Kill` is now
+		// 6 - it costs one column on ~30 rows instead of rewriting 7,148 that were never kills.
+		//
+		// It is also the honest type for a goal whose verb we cannot yet trigger: Craft (#148 tradeskills), Use
+		// (item-use-on-target) and DestroyObject (a destructible world object we do not hold) all land here rather than
+		// being bent into the nearest trigger that would fire early (#522).
+		None = 0,
 		LootFromNpc = 1, // loot the TargetName NPC's corpse bag (the quest item is RDB content; the bag source is the key)
 		TalkToNpc = 2, // talk to (open the greeting of) the TargetName NPC
-		Escort = 3, // escort the TargetName NPC to a destination (not yet wired)
+		Escort = 3, // escort the TargetName NPC to a destination
 		ReachArea = 4, // reach a map location - solved when the player moves within range of the goal's (MapId, MarkerX, MarkerY) point (no TargetName; e.g. Shipwrecked's "Enter the jungle", #262)
-		CollectItem = 5 // collect N of the item in TrailingRefId, one per interaction with a quest-pickup world object (QuestItemEffect); e.g. Shipwrecked V's "get 3 stone bricks" (item 193400), #262
+		CollectItem = 5, // collect N of the item in TrailingRefId, one per interaction with a quest-pickup world object (QuestItemEffect); e.g. Shipwrecked V's "get 3 stone bricks" (item 193400), #262
+		Kill = 6 // kill the NPC in TrailingRefId (a 51000 npc_template reference), or the TargetName NPC
 	}
 
 	public enum QuestTextSlot

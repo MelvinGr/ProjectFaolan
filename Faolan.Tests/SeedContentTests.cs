@@ -229,11 +229,13 @@ namespace Faolan.Tests
 			});
 		}
 
-		// No GATHER objective is left at the fresh-harvest `Kill` default (#521). A goal whose trailing reference is an
-		// item (LDB category 50200) and whose kind tag says it acquires one is a collect objective; they shipped as
-		// `Kill` with no target, which is a quest that can never complete - the kill matcher looking for an NPC whose
-		// template id equals an item id. `TypeItemGoalsFromTrailingCategory` types them, and this stops a re-harvest
-		// reintroducing the inert form: the row count never moves, only the GoalType does.
+		// No GATHER objective is left at the fresh-harvest default (#521). A goal whose trailing reference is an
+		// item (LDB category 50200) and whose kind tag says it acquires one is a collect objective; they shipped
+		// un-typed, which is a quest that can never complete. `TypeItemGoalsFromTrailingCategory` types them, and this
+		// stops a re-harvest reintroducing the inert form: the row count never moves, only the GoalType does.
+		//
+		// ⚠️ That default was `Kill` until #522, so "un-typed" and "kill the NPC whose template id equals this item id"
+		// were the same row. This half of the gate reads `None` now for exactly that reason.
 		//
 		// ⚠️ The verbs where OBTAINING the item is not DOING the objective are EXCLUDED on purpose and must stay
 		// excluded - `Deliver` hands it over, `Craft` makes it, `Use` uses it on something, `DestroyObject` destroys a
@@ -258,12 +260,12 @@ namespace Faolan.Tests
 
 			var inert = await db
 				.QuestGoalDefinitions.Where(g => g.TrailingCategory == 50200 && g.TrailingRefId > 0
-				                                 && g.GoalType == QuestGoalType.Kill
+				                                 && g.GoalType == QuestGoalType.None
 				                                 && !NotSatisfiedByArrival.Contains(g.Separator ?? 0))
 				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
 				.ToListAsync(ct);
 
-			Assert.True(inert.Count == 0, $"acquire-kind item goals still typed as Kill: {string.Join(", ", inert)}");
+			Assert.True(inert.Count == 0, $"acquire-kind item goals still un-typed: {string.Join(", ", inert)}");
 
 			// ...and the typing actually happened rather than the category vanishing from the harvest. 42, not the 62
 			// this asserted before #522: nineteen of that 62 were the mistyped rows above, and the twentieth is
@@ -278,6 +280,51 @@ namespace Faolan.Tests
 				.ToListAsync(ct);
 
 			Assert.True(mistyped.Count == 0, $"goals whose verb is not satisfied by the item arriving are typed CollectItem: {string.Join(", ", mistyped)}");
+		}
+
+		// A goal is typed `Kill` because the CLIENT called it a kill, and for no other reason (#522).
+		//
+		// This is the gate on `QuestGoalType.Kill` no longer being enum value 0. It was, so it was also the un-typed
+		// default: 7,148 catalog goals with no verb and no target claimed to be kill goals, and every guard in
+		// `QuestProgress.MatchingKillGoal` is a patch over one way that misfired - the PARTIAL exclusion, then the
+		// zero-template-id guard. Reverting the default (or adding a rule that types a goal Kill for any reason but its
+		// verb) puts that whole class of false-fire back, silently, so it is worth a gate rather than a comment.
+		//
+		// The escape hatch is deliberate and narrow: a goal with a `TargetName` was configured BY HAND (a Seed* or the
+		// Quest editor), and a human naming the NPC to kill is evidence in its own right - it is how the beach and
+		// Casilda chains are wired. A goal with neither the verb nor a hand-set target has no evidence at all.
+		[Fact]
+		public async Task KillGoals_AreTypedFromTheClientsOwnVerb()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var unevidenced = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.Separator != (uint)QuestGoalKind.Kill && g.TargetName == null)
+				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
+				.ToListAsync(ct);
+
+			Assert.True(unevidenced.Count == 0,
+				$"goals typed Kill with neither the client's kill verb nor a hand-set target: {string.Join(", ", unevidenced)}");
+
+			// ...and the typing ran, rather than the verb vanishing from the harvest. All 30 kill-verb goals are typed:
+			// the 24 naming an NPC template (51000) and the 6 naming a monster CATEGORY (51100), which are typed and
+			// inert because the group resolves to no NPC we hold.
+			var byVerb = await db.QuestGoalDefinitions.CountAsync(g => g.Separator == (uint)QuestGoalKind.Kill && g.GoalType == QuestGoalType.Kill, ct);
+			Assert.True(byVerb >= 30, $"only {byVerb} kill-verb goals are typed Kill; the harvest carries 30.");
+
+			// The other half of the same rule, on the runtime side: MatchingKillGoal only matches TrailingRefId against a
+			// killed entity's template id when the goal's own TYPED reference says it holds one. Nothing may be typed
+			// Kill while pointing at an item or a bounded area - those ids are different spaces, and comparing them is
+			// safe only until one collides.
+			var wrongSpace = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TrailingRefId > 0
+				                                 && g.TrailingCategory != 0 && g.TrailingCategory != QuestProgress.NpcTemplateNameCategory
+				                                 && g.TrailingCategory != 51100)
+				.Select(g => $"goal {g.GoalId} (category {g.TrailingCategory})")
+				.ToListAsync(ct);
+
+			Assert.True(wrongSpace.Count == 0, $"Kill goals whose target reference is not an NPC: {string.Join(", ", wrongSpace)}");
 		}
 
 		// The kind tag agrees with the wiring wherever a human established the goal's semantics from a capture. This is

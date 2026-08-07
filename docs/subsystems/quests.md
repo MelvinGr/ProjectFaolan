@@ -194,6 +194,41 @@ completing on something a player cannot do without going there. `Craft`, `Use` a
 trigger: `DestroyObject`'s nine goals sit on maps 3034/3044/3045/6130, for which we hold **no world objects at
 all**, so it is blocked on coverage rather than on the trigger.
 
+### "No trigger" is a value — `QuestGoalType.None`, and `Kill` is not the default
+
+⚠️ **`QuestGoalType.Kill` used to be enum value `0`, so it was also the un-typed default.** A goal nobody had
+wired claimed to be a kill goal, and **7,148** catalog goals — no verb, no target, no trigger — sat there. Every
+guard in `QuestProgress.MatchingKillGoal` is a patch over one way that misfired:
+
+- **`Partial` goals excluded** — half-filled rows at the default matched by id on `TrailingRefId 0`;
+- **a template id of `0` is "unknown"** — the one caller passes `WorldEntity.NpcTemplateId`, a non-nullable
+  `uint` that is `0` for anything with no template, so killing such a creature advanced an arbitrary goal of
+  **every** open quest;
+- **and the twenty above**, which the fix for the mistyping had to park *somewhere* — and "somewhere" was `Kill`.
+
+So the default is now **`None`** — no server trigger, the goal is stored, rendered and counted and nothing
+advances it. That is the same correction #548 made to `Separator`'s kind `0`, and it is a rename rather than a
+re-typing: `0` always meant "nobody has typed this". `Kill` moved to `6`, which costs one column on ~30 rows
+instead of rewriting 7,148 that were never kills.
+
+A goal is a kill goal because the **client's verb** says so (`Separator` = `QuestGoalKind.Kill`), which
+`ImportOps.TypeKillGoalsFromKind` is what applies. All 30 are typed, and they split two ways — the verb decides,
+not whether the target resolves:
+
+| target reference | goals | matched by |
+|---|---:|---|
+| `51000` `npc_template.name` | 24 | `TrailingRefId` against the killed entity's template id |
+| `51100` `categorytree.description` | 6 | nothing yet — the id is an editor **group** (*"Kill Atzel's Watch"*, *"Kill Undeads in Xibaluku"*) resolving to no NPC we hold |
+
+⚠️ Those six are also why `MatchingKillGoal` matches by id **only when the goal's own typed reference is an NPC
+template** (category `51000`, or `0` for a hand-authored goal with no typed reference). A category id runs
+246,944 .. 10,367,287 — a different id space — and comparing one to a template id is safe only until an id
+collides, which is a matter of NPC coverage rather than design. `SeedContentTests
+.KillGoals_AreTypedFromTheClientsOwnVerb` gates both halves.
+
+`None` is also the honest type for a verb we cannot yet trigger. `Craft` (9), `Use` (1) and `DestroyObject` (9)
+land there rather than being bent into the nearest trigger that would fire early.
+
 ### Goal ORDER is `Phase`, not `Sequence`
 
 ⚠️ A goal row carries two numbers that both look like an index, and only one of them orders anything.

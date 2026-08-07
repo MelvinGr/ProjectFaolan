@@ -48,6 +48,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// TrailingRefId (docs/rdb/ldb-string-index.md).
 		public const uint ItemNameCategory = 50200;
 
+		// LDB category 51000 is `npc_template.name`, so a goal whose TrailingCategory is 51000 has an NPC TEMPLATE ID in
+		// its TrailingRefId - and only then. The other three categories a goal's target reference can carry (50200
+		// `item.name`, 51100 `categorytree.description`, 51200 `bounded_areas`) are different id spaces entirely.
+		public const uint NpcTemplateNameCategory = 51000;
+
 		// Whether a goal is a DELIVERY - a hand-in that takes something OUT of the player's hands, rather than an
 		// objective that puts something in them. Identified by the goal's own captured data: the client's kind tag
 		// (`Separator`) says `Deliver`, and the trailing reference types the thing being handed over as an item.
@@ -168,21 +173,27 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (goals == null)
 				return null;
 
-			// PARTIAL goals are excluded. They are untyped rows that DEFAULT to Kill with TrailingRefId 0, so the by-id
-			// branch below would match any kill whose template id is 0 - a spurious advance on a goal the server has no
-			// definition for. The name branch already cannot match one (their TargetName is null).
+			// PARTIAL goals are excluded: they have no verb, target or count, so nothing about them says "kill this".
+			// (They no longer DEFAULT to Kill either - the un-typed default is `None` since #522 - but a partial row can
+			// still be typed by a later harvest, and it must not match while it is half-filled.)
 			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill && !g.Partial).OrderBy(g => g.Sequence).ToList();
 
-			// ⚠️ ...and `Partial` was only HALF of that argument. **7,170** non-partial goals also sit at
-			// `GoalType.Kill` with `TrailingRefId 0` - the untyped rump of the catalog - so a template id of 0 matches
-			// the first of them in every active quest. And 0 is reachable: the one caller passes
-			// `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for anything with no template behind it, so
-			// killing such a creature advanced an arbitrary goal of EVERY quest the player had open.
+			// ⚠️ Both guards below are the same mistake caught twice: a goal that never named an NPC still reached the
+			// by-id branch, where its TrailingRefId was compared against a template id it is not.
 			//
-			// A 0 means "no type id known", which is what this method's own contract says - so it takes the NAME
-			// branch, exactly as a null does. The three sibling matchers (`MatchingCollectGoal`, `MatchingLootGoal`,
-			// `MatchingEscortGoal`) all guard 0 on entry already; this was the one that did not.
-			if (templateId is > 0 and { } id && kills.FirstOrDefault(g => g.TrailingRefId == id) is { } byId)
+			//   templateId 0 - the one caller passes `WorldEntity.NpcTemplateId`, a non-nullable uint that is 0 for
+			//     anything with no template behind it, while this method's contract says a null/0 means "no type id
+			//     known". Before the guard, killing such a creature advanced an arbitrary kill goal of EVERY open quest.
+			//
+			//   a non-NPC target reference - a Kill goal's TrailingRefId is only a template id when the goal's own
+			//     TYPED reference says so (`TrailingCategory` 51000 `npc_template.name`). Six shipped kill goals point
+			//     at a monster CATEGORY instead (51100 `categorytree.description` - "Kill Atzel's Watch", "Kill Undeads
+			//     in Xibaluku"), whose ids run 246,944..10,367,287 in an id space of their own. Comparing one to a
+			//     template id is a category error that happens to be safe only while no template id collides with it.
+			//     Category 0 is allowed through: that is a hand-authored or editor goal with no typed reference at all,
+			//     where TrailingRefId means what the person who set it meant.
+			if (templateId is > 0 and { } id
+			    && kills.FirstOrDefault(g => g.TrailingRefId == id && g.TrailingCategory is 0 or NpcTemplateNameCategory) is { } byId)
 				return byId;
 
 			return string.IsNullOrEmpty(name)
