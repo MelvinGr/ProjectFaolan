@@ -68,16 +68,37 @@ namespace Faolan.Core.Network
 		// which flips mid-connection) and stays.
 		WorldEntryMode EntryMode { get; set; }
 
-		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
-		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
-		bool AwaitingEnterWorld { get; set; }
+		// The enter-world handoff is a THREE-state machine per connection - Idle -> Armed -> Sent - and `Sent` is
+		// TERMINAL (#706). A second 0x2002 re-redirects a client that is already reconnecting, so the whole point is
+		// that one connection hands off at most once.
+		//
+		// ⚠️ It was two states, and that was only half the property. The claim below was made an atomic compare-and-swap
+		// to stop two armed tasks both sending - but arming itself wrote `true` unconditionally, so
+		// arm -> claim -> send -> arm again -> claim -> send again sailed straight through it. That is what kept
+		// `EnterWorldHandoffTriggerTests.TheHandoffIsSingleShot` intermittently failing after the "fix".
+		//
+		// Terminal is safe because a session is PER CONNECTION and the world entry uses a NEW one: the client reconnects
+		// in answer to the handoff (GameServerListener.Inbound - "this is the SECOND GameServer connection"). So there is
+		// no legitimate second handoff on a given session, and a second ARM means the creation-finished path ran twice -
+		// a retried or duplicated message, exactly the case that must not produce a second redirect.
 
-		// Atomically claim the enter-world handoff: true for exactly ONE caller, false for every other, and clears the
-		// latch in the same step. The handoff is armed on a background task and can legitimately be armed twice (an
-		// AddShortcut path left armed, a retry, a re-entered flow), so "read the flag then clear it" is not enough -
-		// two tasks can both pass the read before either writes, and a second 0x2002 re-redirects a client that is
-		// already reconnecting. This is that compare-and-swap.
+		// True while this connection is armed and has not yet sent. Read-only: arming and clearing are the explicit
+		// methods below, so no caller can re-open a terminal state by assigning to a property.
+		bool AwaitingEnterWorld { get; }
+
+		// Arm the handoff: true for the FIRST caller on this connection, false once it is armed or already sent. A
+		// refusal is a duplicate creation-finish and the caller says so out loud rather than scheduling a second send.
+		bool TryArmEnterWorldHandoff();
+
+		// Atomically claim the armed handoff: true for exactly ONE caller, false for every other, and moves the state
+		// to the terminal `Sent` in the same step. Several tasks can be in flight (the arm schedules one each), so
+		// "read the flag then clear it" is not enough - two can both pass the read before either writes.
 		bool TryClaimEnterWorldHandoff();
+
+		// Put the connection back to Idle. The world-entry path calls it while resetting the rest of the per-connection
+		// handshake state; on the world connection it is a no-op (that session never armed), and it is what a genuine
+		// re-entry of the create flow would need if one ever exists.
+		void ResetEnterWorldHandoff();
 		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
 
 		bool HasPendingPost205FFollowUp { get; set; }
@@ -270,17 +291,21 @@ namespace Faolan.Core.Network
 		public Vector3? SeatedPosition { get; set; }
 		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
 
-		// Backed by an int so the claim below can be a real Interlocked compare-and-swap; the bool property keeps the
-		// call sites (and the "is it armed?" reads) unchanged.
-		private int _awaitingEnterWorld;
+		// Idle -> Armed -> Sent, backed by an int so both transitions are real Interlocked compare-and-swaps. `Sent` is
+		// terminal for this connection: see INetworkClientSession.AwaitingEnterWorld for why (#706).
+		private const int HandoffIdle = 0;
+		private const int HandoffArmed = 1;
+		private const int HandoffSent = 2;
 
-		public bool AwaitingEnterWorld
-		{
-			get => Volatile.Read(ref _awaitingEnterWorld) != 0;
-			set => Volatile.Write(ref _awaitingEnterWorld, value ? 1 : 0);
-		}
+		private int _enterWorldHandoff = HandoffIdle;
 
-		public bool TryClaimEnterWorldHandoff() => Interlocked.CompareExchange(ref _awaitingEnterWorld, 0, 1) == 1;
+		public bool AwaitingEnterWorld => Volatile.Read(ref _enterWorldHandoff) == HandoffArmed;
+
+		public bool TryArmEnterWorldHandoff() => Interlocked.CompareExchange(ref _enterWorldHandoff, HandoffArmed, HandoffIdle) == HandoffIdle;
+
+		public bool TryClaimEnterWorldHandoff() => Interlocked.CompareExchange(ref _enterWorldHandoff, HandoffSent, HandoffArmed) == HandoffArmed;
+
+		public void ResetEnterWorldHandoff() => Volatile.Write(ref _enterWorldHandoff, HandoffIdle);
 
 		public bool EnergyLoopActive { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }

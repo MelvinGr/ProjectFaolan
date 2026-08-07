@@ -770,7 +770,19 @@ namespace Faolan.GameServer.CreateFlow
 		// EnterWorldHandoffDelay above.
 		internal void ScheduleEnterWorldHandoff(INetworkClient client, TimeSpan delay)
 		{
-			client.Session.AwaitingEnterWorld = true;
+			// ARMING is a claim too (#706). It used to write the latch unconditionally, which meant the atomic claim
+			// below only stopped two tasks sharing ONE arm: arm -> claim -> send -> arm again -> claim -> send again
+			// walked straight past it, and a second 0x2002 re-redirects a client that is already reconnecting.
+			//
+			// A refusal here means the creation-finished path ran TWICE on one connection - a retried or duplicated
+			// message - so it is logged rather than swallowed. Not an error: refusing is the correct outcome, and the
+			// client is already on its way to the world.
+			if (!client.Session.TryArmEnterWorldHandoff())
+			{
+				_logger.LogInformation("Create-editor: enter-world handoff already {State} for this connection - not arming a second one.",
+					client.Session.AwaitingEnterWorld ? "armed" : "sent");
+				return;
+			}
 
 			_ = Task.Run(async () =>
 			{
@@ -778,11 +790,10 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					await Task.Delay(delay);
 
-					// Single-shot, and it has to be ATOMIC: this used to read the latch and then clear it as two steps,
-					// which is not single-shot at all - two armed tasks both passed the read before either wrote, and
-					// both sent. That surfaced as EnterWorldHandoffTriggerTests.TheHandoffIsSingleShot failing only
-					// under full-suite CPU load (the "undiagnosable" suite flake), and in production as a second 0x2002
-					// re-redirecting a client that is already reconnecting.
+					// The other half of the same property: several tasks could still be in flight if arming ever
+					// becomes legitimate more than once, and "read the flag then clear it" is not single-shot at all -
+					// two can both pass the read before either writes. This is the compare-and-swap that settles it,
+					// and it moves the connection to the TERMINAL `Sent` state.
 					if (!client.Session.TryClaimEnterWorldHandoff())
 						return;
 

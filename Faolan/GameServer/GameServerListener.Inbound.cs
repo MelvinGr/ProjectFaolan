@@ -689,7 +689,7 @@ namespace Faolan.GameServer
 					client.Session.MorphAckCounter = 0;
 					client.Session.MorphActivitySequence = 0;
 					client.Session.PostMorphBurstSent = false;
-					client.Session.AwaitingEnterWorld = false;
+					client.Session.ResetEnterWorldHandoff();
 					client.Session.CreateWorldChunkIndex = 0;
 					// EntryMode is set above and is what every later handshake signal routes on (#432).
 

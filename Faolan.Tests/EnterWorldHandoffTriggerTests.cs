@@ -47,9 +47,13 @@ namespace Faolan.Tests
 			//
 			// Deliberately MANY arms, not two. With two, the losing interleaving is rare enough that this passed on its
 			// own and failed only inside the full suite under CPU load - which read as an undiagnosable flake for a
-			// while. The claim used to be a non-atomic "read the latch, then clear it", so every arm that got through
-			// the read before anyone wrote also sent. Widening the race makes the bug deterministic instead of load-
-			// dependent, and the fix is the Interlocked claim in TryClaimEnterWorldHandoff.
+			// while. Widening the race makes the bug deterministic instead of load-dependent.
+			//
+			// ⚠️ It took TWO fixes, and this test kept failing intermittently between them. The first made the CLAIM an
+			// Interlocked compare-and-swap, which stops two tasks sharing one arm. But arming still wrote the latch
+			// unconditionally, so the surviving interleaving was arm -> claim -> send -> arm again -> claim -> send
+			// again - and in a tight arming loop that happens whenever a task completes before the loop finishes, i.e.
+			// exactly under load. #706 made ARMING a claim as well, onto a terminal `Sent` state.
 			for (var i = 0; i < 64; i++)
 				service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
 
@@ -64,6 +68,10 @@ namespace Faolan.Tests
 		{
 			// The send throwing must not leave the session armed-but-silent; it is logged (see the handler) and the
 			// flow does not spin. This is the failure whose symptom is indistinguishable from the bug being fixed.
+			//
+			// NB since #706 the connection ends TERMINAL rather than back at Idle - the claim moves it to `Sent`
+			// before the send is attempted, so a throw leaves it Sent. That loses nothing: there is exactly one arming
+			// site (creation-finished) and it has already run, so there was never a retry to preserve.
 			var service = Service(() => throw new InvalidOperationException("connection gone"));
 			var client = new RecordingNetworkClient(0x0802E5D4);
 
@@ -91,7 +99,7 @@ namespace Faolan.Tests
 			for (var attempt = 0; attempt < 50; attempt++)
 			{
 				var session = new RecordingNetworkClient(0x0802E5D4).Session;
-				session.AwaitingEnterWorld = true;
+				Assert.True(session.TryArmEnterWorldHandoff());
 
 				var winners = 0;
 				var threads = new Thread[Math.Max(4, Environment.ProcessorCount)];
@@ -126,6 +134,31 @@ namespace Faolan.Tests
 
 			Assert.False(session.AwaitingEnterWorld);
 			Assert.False(session.TryClaimEnterWorldHandoff());
+		}
+
+		// `Sent` is TERMINAL for a connection (#706), and this is the half the first fix missed: re-arming after a
+		// handoff has gone out must be REFUSED, not silently allowed to open a second one.
+		//
+		// It is safe to be terminal because a session is per CONNECTION and the world entry uses a NEW one - the client
+		// reconnects in answer to the handoff. So a second arm means the creation-finished path ran twice on one
+		// connection (a retried or duplicated message), which is exactly the case that must not re-redirect a client
+		// that is already on its way.
+		[Fact]
+		public void OnceSent_TheHandoffCannotBeReArmed()
+		{
+			var session = new RecordingNetworkClient(0x0802E5D4).Session;
+
+			Assert.True(session.TryArmEnterWorldHandoff());
+			Assert.False(session.TryArmEnterWorldHandoff()); // already armed
+			Assert.True(session.TryClaimEnterWorldHandoff()); // -> Sent
+
+			Assert.False(session.AwaitingEnterWorld);
+			Assert.False(session.TryArmEnterWorldHandoff()); // terminal: no second handoff on this connection
+			Assert.False(session.TryClaimEnterWorldHandoff());
+
+			// ...and the world-entry path's reset is the one way back, for the session that legitimately needs it.
+			session.ResetEnterWorldHandoff();
+			Assert.True(session.TryArmEnterWorldHandoff());
 		}
 
 		private static CreateFlowService Service(Action onHandoff)
