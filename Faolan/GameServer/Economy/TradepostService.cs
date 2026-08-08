@@ -596,19 +596,32 @@ namespace Faolan.GameServer.Economy
 			var qty = attachment.Quantity == 0
 				? 1u
 				: attachment.Quantity;
+			// The attachment's template always HAS an Items row - `MailAttachments.Template` is an FK to `Items` with
+			// ON DELETE RESTRICT - so what decides persistence is the HASH, not whether we hold the item.
 			var item = await _database.GetItem(attachment.Template);
 			if (item is { Hash: not 0 })
-				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
-				// holds), letting the bought item persist.
 				await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
 			else
-				// ⚠️ Live-only, deliberately. A row whose item has no hash is dropped by the world-entry snapshot
-				// (it renders Hash != 0 only), so persisting it would leave an invisible item occupying a bag slot -
-				// the #719 state retail never reaches. Better to deliver it for this session and say so than to
-				// persist something that cannot be rendered. The hash is harvestable from a live add; once the
-				// importer has it, this path persists normally.
-				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY ({Reason}; won't persist across relog).",
-					attachment.Template, character.Name, item == null ? "no Items row" : "no item hash");
+				// ⚠️ Live-only, deliberately - and for an AH purchase this is the ORDINARY case, not an edge.
+				//
+				// Retail reveals an item's hash only when it ENTERS AN INVENTORY. Traced end to end through the buy
+				// capture (`AssassinL23_..._buy_from_autionhouse_get_mail...`) for template 163118 (Feywater):
+				//
+				//   AH listing      hash 0
+				//   mail attachment hash 0   (twice)
+				//   live AddItem    hash 909133648   <- first appearance, as it is taken from the mailbox
+				//   snapshot        hash 909133648   <- stable from then on
+				//
+				// Corpus-wide that is the rule, not one sample: 0 of 328 captured search-result rows and 0 of 2 mail
+				// attachments carry a hash, while 8,479 of 8,479 world-entry snapshot entries do. So for a bought item
+				// whose template no capture has ever shown being TAKEN, we genuinely cannot know the hash.
+				//
+				// Persisting it anyway would write a row the snapshot DROPS (it renders Hash != 0 only), leaving an
+				// invisible item holding a bag slot - the #719 state retail never reaches. Delivering it for the
+				// session and saying so is the honest outcome; the item leaves this branch the moment any capture
+				// shows that template entering an inventory (ItemHashHarvester's live-add source).
+				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no item hash - retail sends none in a listing or a mailbox; won't persist across relog).",
+					attachment.Template, character.Name);
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
