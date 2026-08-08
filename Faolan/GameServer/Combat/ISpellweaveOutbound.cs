@@ -32,6 +32,12 @@ namespace Faolan.GameServer.Combat
 		// An on-screen system message to the caster.
 		Task SendFeedback(INetworkClient client, string message);
 
+		// Retail's own refusal for a weave attempted from the saddle (#744): the ChatTextIIR carrying LDB 100/562
+		// `'%s must not have %s running.'`, parameterised with "You" and the mount buff. Separate from SendFeedback
+		// because it is a DIFFERENT CHANNEL - the world chat line retail sends, not our ChatServer system message -
+		// and because it is a captured literal rather than a string we compose.
+		Task SendMountedRefusal(INetworkClient client);
+
 		// DispatchUpdateSprintbar (0x200E) - the yellow energy bar that drains during the trance.
 		Task SendSprintBar(INetworkClient client, uint energy);
 	}

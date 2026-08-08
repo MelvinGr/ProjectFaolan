@@ -259,10 +259,15 @@ namespace Faolan.GameServer.Combat
 			// GameAction types carry it - `Charge` and `ChargeSpecialAbility`, the lance charge
 			// (docs/re/gameactionlist-grammar.md). No general "usable while mounted" property exists, so the client
 			// asks the question only of a charge and never of a cast. Don't go looking for data behind this check.
+			//
+			// The refusal is RETAIL'S OWN, not our English line (#744): a ChatTextIIR carrying LDB 100/562
+			// `'%s must not have %s running.'` with "You" and the mount buff substituted in. Note what that phrasing
+			// settles - retail states the gate against an ACTIVE BUFF, so the check below is the right shape (the
+			// mount is a buff) even though we ask it of the session.
 			if (_out.IsMounted(client))
 			{
 				_logger.LogInformation("Spellweave START refused for '{Name}': mounted.", session.Character.Name);
-				await Feedback(client, "You cannot weave spells while mounted.");
+				await _out.SendMountedRefusal(client);
 				return;
 			}
 

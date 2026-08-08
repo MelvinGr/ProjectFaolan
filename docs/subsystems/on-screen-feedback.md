@@ -96,3 +96,41 @@ from the session** — not just a verbatim replay.
   23). #372 scanned for `token=` only, found nothing for discovery, concluded *retail sends no discovery toast*, and
   shipped a theory built on that absence — the message was there the whole time under `id=`. Match `<remoteformat `
   and read whichever attribute is present. A negative search result is not evidence until the search is verified.
+
+## The chat-window twin: `ChatTextIIR` refusals (#744)
+
+Not every server-driven message is a FIFO overlay. A **cast refusal** arrives on `ChatTextIIR` (`0xE0B51102`) and
+lands in the chat window, carrying the same `remoteformat` grammar with `<parameter>` substitutions. The one the
+corpus records is the mounted-spellweave refusal:
+
+```
+LDB 100/562  '%s must not have %s running.'
+  parameter 1  <localized token="CriteriaYou" category="130">   -> "You"
+  parameter 2  <localized id="700" category="55200">            -> the mount buff
+```
+
+⭐ **The phrasing settles the shape of the gate**: retail states it against an **active buff**, not against "being
+mounted". The message names the buff that blocks the action. `SpellweaveService` refuses the trance from the
+saddle and now sends this exact record instead of an English `SendSystemMessage` on the ChatServer — a different
+channel from the one retail uses. Byte-exact in `ChatTextCodecTests.MustNotHaveMountRunning_RebuildsTheCapturedRefusal`.
+
+⚠️ **A parameterised message can only be reproduced for the parameters a capture recorded.** Every `key` is the
+string's LDB decryption key, which cannot be derived or invented — so "must not have *X* running" for some other
+blocking buff means an LDB id we hold no key for, and a wrong key renders blank. Reproduce captured refusals;
+do not compose new ones.
+
+## Scripted FIFO messages are content, not a gate
+
+The other family in the same captures is **world-script output**, addressed to a script rather than to a string:
+
+```
+token="showfifomessagefromserver(25)|onevent(2)|Border Kingdom Pyre Script"  category="50018"
+token="showfifomessagefromserver(24)|balists(19)|PvPMonthlyFestivalJuggernaught"
+token="showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName"
+```
+
+The third is the area-name banner we already build. The first two are a Lua script on retail's server emitting a
+line — the "You do not possess an item required to make a sacrifice!" case is the Pyre script refusing an
+interaction, and the Juggernaught ones are a PvP festival announcing regions. They are **not** refusals we can
+wire from a gate: producing them means running the content script that decides to send them, which is the
+scripting subsystem, not this channel. The channel itself is already built.

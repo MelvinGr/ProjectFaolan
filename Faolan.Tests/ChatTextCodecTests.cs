@@ -48,6 +48,21 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedRecord.Hex(CriteriaLineBody), Convert.ToHexStringLower(rebuilt));
 		}
 
+		// ⭐ The oracle above is not a generic "system line" - it is the mounted-spellweave REFUSAL (#744). The same
+		// 431-byte body answers a `PerformSpecialAction` from the saddle twice in
+		// demol80-demonologist_login_gameplay_annotated_2 (frames 2652 / 2704), seconds before the maintainer noted
+		// "spellweaving while mounted shows a message". LDB 100/562 is `'%s must not have %s running.'`, and the two
+		// parameters are `CriteriaYou` (130) = "You" and 55200/700 = the mount buff.
+		//
+		// So this gate is byte-exact against retail: the constant the server sends rebuilds the captured frame.
+		[Fact]
+		public void MustNotHaveMountRunning_RebuildsTheCapturedRefusal()
+		{
+			var body = ChatTextCodec.Build(0x110099bdu, Encoding.Latin1.GetBytes(ChatTextXml.MustNotHaveMountRunning));
+
+			Assert.Equal(CapturedRecord.Hex(CriteriaLineBody), Convert.ToHexStringLower(body));
+		}
+
 		[Fact]
 		public void Parse_DecodesTheSystemLine()
 		{

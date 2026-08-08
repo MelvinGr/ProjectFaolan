@@ -734,6 +734,11 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, message);
 		}
 
+		Task ISpellweaveOutbound.SendMountedRefusal(INetworkClient client)
+		{
+			return SendWorldChat(client, ChatTextXml.MustNotHaveMountRunning);
+		}
+
 		Task ISpellweaveOutbound.SendSprintBar(INetworkClient client, uint energy)
 		{
 			return SendSprintBar(client, energy);
