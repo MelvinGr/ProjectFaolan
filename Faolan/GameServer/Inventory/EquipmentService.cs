@@ -133,14 +133,14 @@ namespace Faolan.GameServer.Inventory
 			var rows = await _database.GetCharacterInventory(character.Id);
 			var equipment = await _database.GetCharacterEquipment(character.Id);
 
-			var (srcId, srcCount, srcIsFirst) = Resolve(sKind, sPos);
+			var (srcId, srcCount, srcIsFirst, srcCreator) = Resolve(sKind, sPos);
 			if (srcId == null)
 			{
 				_logger.LogInformation("Inventory move not persisted: no DB item at {Kind}[{Pos}] (captured-only or empty).", sKind, sPos);
 				return;
 			}
 
-			var (dstId, dstCount, dstIsFirst) = Resolve(dKind, dPos);
+			var (dstId, dstCount, dstIsFirst, dstCreator) = Resolve(dKind, dPos);
 
 			// Materialize the legacy FirstPosBag into real rows when it is the moved item or the displaced one,
 			// so it no longer auto-renders at slot 1 and the new positions stick.
@@ -151,25 +151,28 @@ namespace Faolan.GameServer.Inventory
 			}
 
 			// Apply: item -> destination; the destination's previous occupant (if any) -> source (swap). A null
-			// dstId means the destination was empty, which clears the source row.
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)dKind, dPos, srcId, srcCount);
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)sKind, sPos, dstId, dstCount);
+			// dstId means the destination was empty, which clears the source row. Each stack carries its CRAFTER with
+			// it (#727) - the creator belongs to the item, not to the cell, so a swap must cross them over exactly
+			// like the ids and counts do.
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)dKind, dPos, srcId, srcCount, srcCreator);
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)sKind, sPos, dstId, dstCount, dstCreator);
 
 			_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.", srcId, sKind, sPos, dKind, dPos, dstId.HasValue
 				? $" (swap with {dstId})"
 				: string.Empty, character.Id);
 			return;
 
-			// Resolve the DB item id + count at a (kind, pos), counting the legacy FirstPosBag at bag slot 1.
-			(uint? Id, uint Count, bool IsFirstBag) Resolve(int kind, int pos)
+			// Resolve the DB item id + count + crafter at a (kind, pos), counting the legacy FirstPosBag at bag slot 1
+			// (a seeded starter item, so never player-made).
+			(uint? Id, uint Count, bool IsFirstBag, string? CreatorName) Resolve(int kind, int pos)
 			{
 				var row = rows.FirstOrDefault(r => r.Container == (ContainerKind)kind && r.Slot == pos);
 				if (row?.ItemId != null)
-					return (row.ItemId, row.Count, false);
+					return (row.ItemId, row.Count, false, row.CreatorName);
 				if (kind == bag && pos == firstBagPos && equipment?.FirstPosBag != null)
-					return (equipment.FirstPosBag.Id, 1, true);
+					return (equipment.FirstPosBag.Id, 1, true, null);
 
-				return (null, 1, false);
+				return (null, 1, false, null);
 			}
 		}
 
@@ -190,8 +193,9 @@ namespace Faolan.GameServer.Inventory
 				return;
 			}
 
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, sourceSlot, src.ItemId, src.Count - splitSize);
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, targetSlot, src.ItemId, splitSize);
+			// Both halves are the same stack, so both keep its crafter (#727).
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, sourceSlot, src.ItemId, src.Count - splitSize, src.CreatorName);
+			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)bag, targetSlot, src.ItemId, splitSize, src.CreatorName);
 			_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, sourceSlot,
 				src.Count - splitSize, targetSlot, splitSize, character.Id);
 		}

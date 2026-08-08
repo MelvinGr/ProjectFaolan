@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
 		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
-		public static ProtoInventoryGameEntry InventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1)
+		public static ProtoInventoryGameEntry InventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1, string? creatorName = null)
 		{
 			var key = item.Key;
 
@@ -50,6 +50,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				});
 			}
 
+			// `creator_name` (field 5) is the client's "Created by <name>" tooltip line, and it is the ONLY thing that
+			// feeds it: it is a string on the entry, not a stat. It is PRESENT only on player-crafted items, so an
+			// empty name must leave the field absent rather than emit "" - ProtoAcgItem's presence rules apply
+			// (`ShouldSerializeCreatorName`), and a captured non-crafted entry ends at the item block with no `2a`
+			// tag at all.
+			if (!string.IsNullOrEmpty(creatorName))
+				entry.CreatorName = creatorName;
+
 			return entry;
 		}
 
@@ -60,12 +68,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// entries, 100% carry StaticInstance(0x17), 95% Flags(0x00) and 93% StackSize(0x1A), and the rest of the
 		// stats are sparse (Duration on 16%, ItemSource on 5 entries total). The LIVE add is a different shape -
 		// see LiveAddEntry (#722).
-		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
+		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1,
+			string? creatorName = null)
 		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], f7)
+				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], f7, creatorName)
 			};
 		}
 
@@ -97,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// (1,2,5,7,13,15,16,19) and guessing is worse than omitting - a wrong provenance is a false claim, a missing
 		// one is a gap. Decoding it needs each add correlated with the c2s action that produced it; grouping by
 		// capture is too coarse, since values 2, 7 and 15 all appear within the same sessions. Tracked separately.
-		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong level = 1, ulong flags = 1)
+		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong level = 1, ulong flags = 1, string? creatorName = null)
 		{
 			return InventoryEntry(itemId, item, hash,
 			[
@@ -105,7 +114,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				new ItemStat((uint)CharacterStatId.Duration, NoExpiry),
 				new ItemStat(23, (uint)recordId),
 				new ItemStat(26, (uint)count)
-			], level);
+			], level, creatorName);
 		}
 
 		// The value retail puts in Duration on an item that does not expire: 1,497 of 1,528 captured sightings.

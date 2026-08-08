@@ -61,7 +61,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash)));
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash),
+					creatorName: row.CreatorName));
 			}
 
 			return container;
@@ -107,7 +108,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash)));
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash),
+					creatorName: row.CreatorName));
 				if ((ContainerKind)container.InventoryId.Type == ContainerKind.Bag)
 					bagSlotsTaken.Add(slot);
 			}

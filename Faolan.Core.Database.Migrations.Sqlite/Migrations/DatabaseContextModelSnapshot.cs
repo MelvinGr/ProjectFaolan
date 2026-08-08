@@ -752,6 +752,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Count")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CreatorName")
+                        .HasColumnType("TEXT");
+
                     b.Property<uint?>("ItemId")
                         .HasColumnType("INTEGER");
 

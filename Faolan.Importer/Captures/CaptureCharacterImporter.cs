@@ -549,7 +549,15 @@ namespace Faolan.Importer.Captures
 						Container = (ContainerKind)container.InventoryId.Type,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
+						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1,
+
+						// Player-crafted stacks carry their crafter in creator_name (field 5); everything else omits
+						// the field. Harvesting it is what makes the imported character's snapshot render retail's
+						// "Created by <name>" tooltip line after a relog, exactly as the capture did (#727).
+						// ShouldSerializeCreatorName means an ABSENT field reads back as "", so normalize to null.
+						CreatorName = string.IsNullOrEmpty(entry.Item!.CreatorName)
+							? null
+							: entry.Item!.CreatorName
 					});
 					stored++;
 				}

@@ -98,7 +98,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
-		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1);
+		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1, string? creatorName = null);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths);
 
@@ -970,7 +970,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.GuildId, guildId).SetProperty(c => c.GuildRank, rank)) == 1;
 		}
 
-		public async Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1)
+		// `creatorName` is the crafter of the stack being written (#727), and it is assigned on BOTH the insert and the
+		// overwrite. Defaulting it to null is what makes an ordinary grant safe: an item arriving in a cell that a
+		// crafted item used to occupy is not itself player-made, and leaving the column untouched on overwrite would
+		// glue the old crafter to the new item - the same insert-only-writer shape that froze stale Hash (#719) and
+		// Level (#725) values. A caller that MOVES a stack (PersistInventoryMove, PersistSplitStack) therefore has to
+		// pass the source row's creator through explicitly.
+		public async Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1, string? creatorName = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
@@ -990,13 +996,15 @@ namespace Faolan.Core.Database.Repositories
 					Container = container,
 					Slot = slot,
 					ItemId = itemId,
-					Count = count
+					Count = count,
+					CreatorName = creatorName
 				});
 			}
 			else
 			{
 				row.ItemId = itemId;
 				row.Count = count;
+				row.CreatorName = creatorName;
 			}
 
 			await ctx.SaveChangesAsync();

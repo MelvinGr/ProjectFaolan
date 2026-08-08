@@ -60,7 +60,13 @@ namespace Faolan.Importer.Captures
 						Container = kind,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
+						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1,
+
+						// The banked stack keeps its crafter, same as a carried one (#727) - the BankIIR is the same
+						// ProtoInventoryGame shape, so creator_name rides it too.
+						CreatorName = string.IsNullOrEmpty(entry.Item!.CreatorName)
+							? null
+							: entry.Item!.CreatorName
 					});
 					stored++;
 				}
