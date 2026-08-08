@@ -44,6 +44,28 @@ capture ever showed entering an inventory or a shop window. The snapshot used to
 `Hash != 0` only), which is what made claims undeliverable and AH purchases live-only; `AcgHash` mints a
 token for them instead. See [item-claims.md](item-claims.md) and `Faolan.Core/Crypt/AcgHash.cs`.
 
+### The crafter — `creator_name`, not a stat
+
+A player-crafted item shows the client's "Created by &lt;name&gt;" tooltip line, and the only thing that feeds it
+is **`ProtoInventoryGameEntry.creator_name` (field 5, a plain Latin1 string on the entry itself)**. No stat is
+involved — in particular it is NOT the `ItemOrigin` stat (0x554), which is why the whole crafting stat block
+(0x552–0x55E) is absent from every captured entry. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5
+fr17401]
+
+It is present ONLY on player-made items: 619 captured inventory entries carry one (5 distinct crafters), and
+every other entry ends at the item block with no field-5 tag at all. So an empty name must emit **nothing**
+rather than an empty string. It rides both shapes — the world-entry snapshot (348 sightings in `Bag`, 271 in
+`Equipped`) and the live `DispatchAddItem`.
+
+Persisted as `CharacterInventory.CreatorName`: it is a per-INSTANCE fact, so it cannot live on `Item`.
+`SetCharacterInventorySlot` assigns it on insert *and* overwrite (defaulting to null), and a move or split
+carries the source row's value across — leaving the column untouched would glue an old crafter to whatever
+item next occupies the cell.
+
+⚠️ The `Equipped` sightings are **not** persisted yet: `CharacterEquipment` is one wide row of 26 per-slot item
+FKs with nowhere to hang a per-slot creator, so equipping a crafted item currently drops its crafter. Tracked
+in Gitea.
+
 ## Delivery model (the hard-won facts)
 
 1. **The world-entry snapshot is THE inventory delivery** - it feeds both the bag window and the equipment
