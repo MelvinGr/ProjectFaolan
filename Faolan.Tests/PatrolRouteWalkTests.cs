@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			var reachedFarEnd = false;
 			var cameBack = false;
 			var turnedRound = false;
-			for (var i = 0; i < 400; i++)
+			for (var i = 0; i < 1200; i++) // 120s: 160u of beat at RouteWalkSpeed, plus the turnaround dwell
 			{
 				world.Tick(0.1);
 				Assert.True(OnPolyline(street, npc.Position) <= 1f, $"left the route at {npc.Position}");
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			var (world, npc) = Walker(corner);
 
 			var reachedCorner = false;
-			for (var i = 0; i < 300; i++)
+			for (var i = 0; i < 600; i++) // 60s: the corner is 60u along at RouteWalkSpeed
 			{
 				world.Tick(0.1);
 				Assert.True(OnPolyline(corner, npc.Position) <= 1f, $"cut the corner at {npc.Position}");
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 			var (world, npc) = Walker(stairs);
 
 			var climbed = false;
-			for (var i = 0; i < 100; i++)
+			for (var i = 0; i < 250; i++) // 25s: 30u of staircase at RouteWalkSpeed
 			{
 				world.Tick(0.1);
 				// The height gap closes in step with the horizontal one, so the NPC is on the STAIRS the whole way up.
@@ -119,14 +119,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void RouteWalker_WalksContinuously_RatherThanDriftingOnTheWanderClock()
 		{
-			// The wander moved once every 25-60s. A patrol walks: after a couple of seconds the NPC has covered ground.
+			// The wander moved once every 25-60s. A patrol WALKS, so ground is covered steadily: ten seconds in, a
+			// wanderer would still be standing on its spawn (its first move is not even due yet), while a walker is
+			// 22u down the street at RouteWalkSpeed. The gap between those two is the whole point of #703.
 			var street = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 200) };
 			var (world, npc) = Walker(street);
 
-			for (var i = 0; i < 30; i++) // 3 seconds
+			for (var i = 0; i < 100; i++) // 10 seconds
 				world.Tick(0.1);
 
-			Assert.True(npc.Position.Z > 15f, $"barely moved in 3s: {npc.Position}");
+			Assert.True(npc.Position.Z > 15f, $"barely moved in 10s: {npc.Position}");
 		}
 
 		// The distance from `point` to the nearest SEGMENT of the polyline - how far off its own route the NPC is.

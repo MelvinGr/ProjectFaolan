@@ -41,11 +41,27 @@ namespace Faolan.GameServer.World
 		// How close a player must be for a hostile NPC to aggro + attack (world units).
 		public const float NpcAggroRange = 20f;
 
-		// #714: the speed an idle route walk falls back to when its captured PathMoveTask carries none. OURS, not
-		// measured - the captured speeds it stands in for run median 6.75 u/s over 759 multi-point patrol nodes (p10
-		// 2.57, p90 14.37), so this sits at the middle of a wide real spread rather than claiming to be the right
-		// number for any given beat. A route that HAS a speed always uses its own; see PatrolRoute.Speed.
-		public const float RouteWalkSpeedFallback = 6f;
+		// #714: the speed an NPC walks its idle beat at. CAPTURE-MEASURED, and measured the only way that answers the
+		// question - by watching where retail's patrollers actually WERE over time, not by reading a field.
+		//
+		// Retail re-issues a patrol anchored at the NPC's then-current position, so consecutive re-issues of one handle
+		// give ground speed directly (anchor delta / elapsed). Over 9,944 such pairs, bucketed by how far apart the two
+		// re-issues were - a longer window contains more of the NPC's dwell, which drags the average below its walking
+		// speed, so the CEILING of the short windows is the number wanted:
+		//
+		//   6-10s apart   n=1308   p50 1.34   p90 1.99   p99 2.69
+		//   10-20s apart  n=3579   p50 1.09   p90 2.14   p99 2.23
+		//
+		// Both bands cap out at ~2.2 u/s however the window is cut, which is what a walking speed looks like when it is
+		// being averaged with pauses. Hence 2.2.
+		//
+		// ⚠️ This deliberately does NOT come from the patrol's own trailer scalar, which `MoveTaskNodes.Path` describes
+		// as "the patrol SPEED inside a patrol list". Read as a ground speed that field is simply wrong: it runs median
+		// 6.75 u/s over 759 captured multi-point patrol nodes (p10 2.57, p90 14.37, max 159), 3-15x the speed the same
+		// NPCs are OBSERVED moving at, and driving the model from it is what made Old Tarantia's Watchmen (scalar 31.73)
+		// and Gingers (20.12) sprint their beats while the Scholar's Spirit (2.02) and Phocas (3.50) looked right. It is
+		// a real per-route number that means something - it is just not u/s over the ground. Open on #714.
+		public const float RouteWalkSpeed = 2.2f;
 
 		// #703: how close a route walker must get to a waypoint to count as having reached it and take the next one.
 		// Small relative to the 5.8u median gap between waypoints, so the walk stays ON the harvested polyline rather

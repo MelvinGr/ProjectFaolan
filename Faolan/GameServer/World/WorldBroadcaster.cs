@@ -64,10 +64,10 @@ namespace Faolan.GameServer.World
 		// death Y wins. Outdoor kills sit ~1m off; the cave kill that exposed this was 28m.
 		private const float MaxLootGroundSnap = 5f;
 
-		// (#266's PatrolWalkSpeed estimate lived here. It is now WorldState.RouteWalkSpeedFallback, because the same
-		// number has to time the re-issue cadence AND advance the model, and having two copies is how they drifted -
-		// the comment here still claimed "NpcMoveSpeed (12) is the RUN speed" long after NpcMoveSpeed became 7. A route
-		// that carries its own captured speed uses that instead; see PatrolRoute.Speed and #714.)
+		// (#266's PatrolWalkSpeed estimate lived here. It is now WorldState.RouteWalkSpeed, because the same number has
+		// to time the re-issue cadence AND advance the model, and having two copies is how they drifted - the comment
+		// here still claimed "NpcMoveSpeed (12) is the RUN speed" long after NpcMoveSpeed became 7. It is also no longer
+		// an estimate: it is measured off retail's own patrollers, see #714.)
 
 		// How far a seated player must move from their seat before they stand up. While seated the client keeps
 		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
@@ -1142,9 +1142,10 @@ namespace Faolan.GameServer.World
 						entity.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
 						entity.RejoinRouteAtNearest();
 						entity.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
-						// #714: walk the beat at the speed the CAPTURE says, not the chase speed. The fallback is our own
-						// estimate, so it is the last resort - a route that carries a speed always uses its own.
-						entity.RouteSpeed = PatrolRoute.Speed(patrol) ?? WorldState.RouteWalkSpeedFallback;
+						// #714: a beat is WALKED, at the speed retail's own patrollers are observed moving at - not at the
+						// chase speed, and not at the route's trailer scalar (which is not a ground speed; see
+						// WorldState.RouteWalkSpeed for the measurement that rules it out).
+						entity.RouteSpeed = WorldState.RouteWalkSpeed;
 						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / entity.RouteSpeed + PatrolDwellSeconds;
 						entity.ArmPatrolCycle();
 					}
@@ -2849,9 +2850,9 @@ namespace Faolan.GameServer.World
 		// teleporting back to the start. Rebuilding from the live position removes the jump.
 		//
 		// Rebuilding was tried before (#266) and reverted because it "lost the speed and run-crawled": the trailer slot
-		// is the patrol SPEED inside a patrol list, and a rebuild that did not supply it left the client pacing off
-		// something else. It is supplied here, off the route's own captured value (PatrolRoute.Speed, #714), which is
-		// what makes the rebuild safe now.
+		// paces the walk, and a rebuild that did not supply it left the client pacing off something else. It is supplied
+		// here as the WALK speed (WorldState.RouteWalkSpeed) rather than the captured scalar - the scalar is not a ground
+		// speed, and feeding it back made the fast-scalar beats sprint. See #714 for the measurement.
 		private static byte[] BuildRouteBody(WorldEntity npc)
 		{
 			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);

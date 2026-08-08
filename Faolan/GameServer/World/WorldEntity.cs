@@ -593,10 +593,10 @@ namespace Faolan.GameServer.World
 		// NPC off its beat (a chase, a leash home). Set true at spawn so the first lap is issued.
 		public bool RouteReissueDue { get; set; } = true;
 
-		// #714: the speed the captured route is walked at (u/s), off the PathMoveTask's own trailer slot - see
-		// PatrolRoute.Speed. The MODEL is advanced at this same value so the server's idea of where the NPC is tracks
-		// what the client renders; the two drifting apart is what put a killed patroller's corpse in the wrong place.
-		public float RouteSpeed { get; set; } = WorldState.RouteWalkSpeedFallback;
+		// #714: the speed this NPC walks its beat at (u/s). Both the MODEL and the patrol body we hand the client use
+		// it, so the server's idea of where the NPC is tracks what is rendered - the two drifting apart is what put a
+		// killed patroller's corpse in the wrong place. Capture-measured; see WorldState.RouteWalkSpeed.
+		public float RouteSpeed { get; set; } = WorldState.RouteWalkSpeed;
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
 		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns

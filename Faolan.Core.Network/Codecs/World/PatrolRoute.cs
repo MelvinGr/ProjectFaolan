@@ -72,34 +72,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return ahead;
 		}
 
-		// The captured patrol SPEED, in world units per second - the `trailerScalar` slot of the route's PathMoveTask,
-		// which carries the path LENGTH for a one-way path and the SPEED inside a patrol list (see MoveTaskNodes.Path).
-		// Null when the route carries none, which is the caller's cue to fall back rather than invent a number.
-		//
-		// This is what an idle beat must be walked at. Of the 759 captured multi-point patrol path nodes, the speeds
-		// run median 6.75 u/s (p10 2.57, p90 14.37) - a per-route value, not one constant, which is why it is read off
-		// the row rather than named as one.
-		public static float? Speed(ICollection<PatrolNode> nodes)
-		{
-			ArgumentNullException.ThrowIfNull(nodes);
-			var root = nodes.FirstOrDefault(n => n.ParentPath == null);
-			return root == null ? null : FirstPathSpeed(root);
-		}
-
-		private static float? FirstPathSpeed(PatrolNode node)
-		{
-			if (node is { Mode: 1, Waypoints.Count: > 2, Speed: { } speed and > 0f })
-				return speed;
-
-			foreach (var child in node.Children.OrderBy(c => c.Ordinal))
-			{
-				if (FirstPathSpeed(child) is { } found)
-					return found;
-			}
-
-			return null;
-		}
-
 		private static void Collect(PatrolNode node, List<Vector3> waypoints)
 		{
 			if (node.Mode == 1)
