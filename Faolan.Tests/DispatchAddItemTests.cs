@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -7,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
 using Xunit;
@@ -81,6 +83,29 @@ namespace Faolan.Tests
 			{
 				TestDb.Delete(dbPath);
 			}
+		}
+
+		// The live-add factory must produce retail's stat list, in retail's ORDER (#722). The captured entry above
+		// is the oracle: its stats run 0x00, 0x08, 0x17, 0x2E - ascending by id, Duration second. Before this the
+		// live add reused the SNAPSHOT's triple (0x00, 0x17, 0x1A) and sent no Duration at all.
+		[Fact]
+		public void LiveAddEntry_CarriesDurationInStatIdOrder()
+		{
+			var item = new Item
+			{
+				Id = SlaveManaclesId,
+				Key = new ProtoDecryptionKey { Key1 = 1, Key2 = 2, Key3 = 3, Key4 = 4 },
+				Hash = 0x35505543
+			};
+
+			var entry = SnapshotItems.LiveAddEntry(ItemId, (ulong)RecordId, 1, item, item.Hash);
+
+			Assert.Equal([0u, 8u, 23u, 26u], entry.StatLists.Select(s => s.Stat));
+			Assert.Equal(uint.MaxValue, entry.StatLists.Single(s => s.Stat == 8).Value);
+
+			// The snapshot form is deliberately DIFFERENT - three stats, no Duration.
+			var snapshot = SnapshotItems.ListEntry(0, ItemId, (ulong)RecordId, 1, item, item.Hash).Item;
+			Assert.Equal([0u, 23u, 26u], snapshot.StatLists.Select(s => s.Stat));
 		}
 
 		private static DatabaseContext NewContext(string path)

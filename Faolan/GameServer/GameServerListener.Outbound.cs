@@ -249,13 +249,10 @@ namespace Faolan.GameServer
 			if (ClientForCharacter(characterId) is not { } client)
 				return Task.CompletedTask;
 
-			// Carries the token for the same reason SendTradeItem does: this IS a DispatchAddItem body, and every
-			// captured one of those describes a real instance and carries one (#723).
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot), item, AcgHash.ForWire(item.Id, item.Hash),
-			[
-				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(characterId, ContainerKind.Bag, slot)),
-				new SnapshotItems.ItemStat(26, count)
-			], item.Level);
+			// This IS a DispatchAddItem body, so it takes the live-add stat list (#722) - and the token for the same
+			// reason SendTradeItem does: every captured add describes a real instance and carries one (#723).
+			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot),
+				FullCharacterRoots.RecordId(characterId, ContainerKind.Bag, slot), count, item, AcgHash.ForWire(item.Id, item.Hash), item.Level);
 
 			return SendAddItem(client, ContainerKind.Bag, slot, entry);
 		}
@@ -410,9 +407,9 @@ namespace Faolan.GameServer
 			var containerType = isQuestItem
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
-			var entry = SnapshotItems.ListEntry((ulong)slot.Value, FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
-					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), f7: level)
-				.Item;
+			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
+			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
+				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), level);
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
 			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got
