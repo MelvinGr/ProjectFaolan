@@ -996,7 +996,8 @@ namespace Faolan.GameServer.World
 
 		// Why a class-specific destination may not be enterable yet, or null when it is.
 		//
-		// A class-specific playfield (Map.ClassSpecific - the city armories) holds a different NPC set per class, and we
+		// A class-specific playfield (Map.ClassSpecific - the city armories, and The Reliquary) holds a different NPC
+		// set per class, and we
 		// only have the classes some capture actually walked into. Teleporting a class we hold no set for would drop the
 		// player into an empty room - and on a map with no captured world objects either, one with no door back out. So
 		// the zone-line reports the gap in-game instead of teleporting, the same rule as an un-imported vendor.
@@ -1025,7 +1026,8 @@ namespace Faolan.GameServer.World
 		// render them from the burst for now, so this is model bookkeeping (no wire change).
 		//
 		// `forClass` is the class of the character this copy is being populated for. It only matters on a
-		// class-specific map (Map.ClassSpecific - the city armories), where the playfield holds a different NPC set per
+		// class-specific map (Map.ClassSpecific - the city armories and The Reliquary), where the playfield holds a
+		// different NPC set per
 		// class; such a map is necessarily Solo, so the copy has exactly one owner and one class. Everywhere else every
 		// spawn is class-agnostic and this is ignored.
 		public async Task EnsureZoneNpcs(uint mapId, uint instanceId, ConanClass forClass)
