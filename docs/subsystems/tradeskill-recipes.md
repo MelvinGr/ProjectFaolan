@@ -111,6 +111,19 @@ would close the client's window on an item it never received.
   **whole** to every character that asks, recipes carry no profession/tier attribution, and no character row
   records a learned profession (`CharacterSkills` is the combat scaffold, every row rank 0). So nothing stops a
   level-1 character crafting a master-tier recipe. Tracked in Gitea; deliberately not guessed at.
+
+  What the client settles statically, short of a capture:
+  - **Learning a recipe is a GameAction**, not an RPC — `53198` / `e_Type_GC_GameAction_LearnRecipe`, one
+    argument at key 39 (`Faolan.Core.Rdb/GameActionTypes.cs`). So it is fired by RDB content (a trainer, a quest,
+    an item), which is why the c2s table has a `CraftUntrain` and no `CraftTrain`.
+  - **A craft has its own id space**: `CraftUntrain(int nCraftID)` and `DispatchCraftUntrainMessageBox(nCraftID)`,
+    distinct from a recipe id.
+  - **The group→recipe mapping is server-side data.** `DispatchRemoveRecipesByGroupClient` is named for a group
+    but takes `i_cRecipeList` — an explicit list — so the client never sees a group id.
+  - ⚠️ `TradeskillFlags` (stat `0xCE`) is **NOT** the character's learned set, despite the name: it rides NPCs
+    (a *Dockworker* carries 99), while the player's own instance carries `Craftmanship` / `MaxCraftmanship`.
+    Those two do move (0 → 1 and 0 → 2 → 3 in early play) and look like slots-used / slots-allowed, but an L80
+    who actually crafts reads max 2, so nothing is built on them. [V0: what records a learned tradeskill]
 - `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
   gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.

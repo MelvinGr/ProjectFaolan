@@ -193,6 +193,21 @@ rather than inventing a value the client would display as authoritative.
 none contains 154, 402, 642 or 1892 in either endianness. The cheap source is captures, not RE — one login
 snapshot per level fills a row with no decoding at all.
 
+### What records a learned tradeskill
+**Tracked: Gitea #735.** [V0: what records a learned tradeskill] A character must LEARN a tradeskill profession,
+which comes in ranks, and that is what gates the recipe book. Nothing we hold records one. The static pass rules
+out the obvious candidate and names the learn primitive, but not the state:
+
+- `TradeskillFlags` (stat `0xCE`) is **not** it — it rides NPCs (a *Dockworker* carries 99), not the player.
+- `Craftmanship` / `MaxCraftmanship` (`0x88` / `0x89`) DO ride the player and move (0 → 1, 0 → 2 → 3 in early
+  play), which fits slots-used / slots-allowed — but an L80 who actually crafts reads max 2, so it is unproven.
+- Learning is GameAction `53198 LearnRecipe` (one argument, key 39), fired from RDB content rather than an RPC;
+  untraining is `CraftUntrain(int nCraftID)`, a separate id space.
+
+No capture teaches a profession, so the character-side state is unobserved. The bounded next step is an RDB sweep
+for `53198` instances: each is a recipe taught by a specific piece of content, and grouping them by source should
+recover the professions without a capture.
+
 ### Whether a harvest node under one swing's worth can still be harvested
 **Tracked: Gitea #732.** [V0: whether a node under 100 health can still be harvested] The decrement itself is no
 longer a gap — a swing costs exactly **100** of the 1000 max and grants exactly **1** unit, so a full node is ten
