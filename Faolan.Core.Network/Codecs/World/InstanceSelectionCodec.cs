@@ -21,8 +21,12 @@ namespace Faolan.Core.Network.Codecs.World
 	// owner (nobody / a character / a team) and its difficulty mode in exactly the slots those do. The client's own
 	// name for the parameter is `i_cInstanceList`.
 	//
-	// Golden: the single captured reply, a one-element list naming the live instance of Ymir's Pass (map 1090) the
-	// player was standing in. [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json frame 10726]
+	// Goldens: TWO captured replies, each a one-element list naming the live instance the player was standing in -
+	// Ymir's Pass (map 1090) and Poitain (map 2070). Both are 38 bytes, and the second is annotated "tried to
+	// 'select instace', no others where available", which is what a one-element list means. Two different maps and
+	// two different tokens pin the layout by independent observation rather than by one sample.
+	// [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json frame 10726]
+	// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_6.tshark.json frame 4059]
 	public static class InstanceSelectionCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchInstanceSelectionForCurrentPlayfield;
