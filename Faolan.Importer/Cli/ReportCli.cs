@@ -246,6 +246,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "buff-on-spawn":
+				{
+					BuffOnSpawn(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());

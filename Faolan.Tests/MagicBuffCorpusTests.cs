@@ -295,6 +295,34 @@ namespace Faolan.Tests
 			Assert.True(AgreementRate(other) < 0.5, $"non-self applies should mostly disagree, got {AgreementRate(other):P0}");
 		}
 
+		// #677: the STREAM-IN re-assert. Retail tells a newly-arrived observer about an entity's already-running buff
+		// with an ordinary apply carrying a NULL caster and the REMAINING time - and the corpus holds exactly one,
+		// which is what `WorldBroadcaster.SendActiveBuffsOnStreamIn` is built from.
+		//
+		// It is one sighting, so what earns it a golden is that it is unique in three independent ways at once: it is
+		// the only casterless apply in all 2,929, its `descriptor[3]` is 0 where every caster-bearing apply carries a
+		// level, and its duration is 6.8% of the row's. Asserted as a byte-exact rebuild from `ApplyNoCaster`, so the
+		// builder cannot drift from the one record that defines the shape.
+		[Fact]
+		public void TheCasterlessStreamInApply_RebuildsByteExact()
+		{
+			// ⚠️ NOT `is null or 0`. A null ApplyFrom is the class-0 "no caster reference at all" form (11 in the
+			// corpus - the Racer buff and friends); this is the other one, a CHARACTER reference whose handle is
+			// zero. Same 54-byte data region, different carrier, and only this one appears at a spawn.
+			var one = Assert.Single(CapturedApplies(), a => a.Buff.ApplyFrom == 0);
+
+			var payload = MagicBuffDataCodec.Parse(one.Buff.Data);
+			Assert.Equal(0u, payload.Descriptor[3]); // no caster, so no caster level...
+			Assert.Equal(80u, payload.CastingLevel); // ...while the TARGET's level still rides in CastingLevel
+
+			var rebuilt = MagicBuffDataCodec.Build(MagicBuffDatas.ApplyNoCaster(one.Buff.SpellBaseId, payload.Duration, payload.ExpiryStamp, payload.CastingLevel));
+			Assert.Equal(one.Buff.Data, rebuilt);
+
+			// And the whole carrier, which is what pins the zero-handle caster reference rather than the class-0 one.
+			Assert.Equal(MagicBuffCodec.Build(new MagicBuffIIR(one.Buff.ApplyTo, one.Buff.Env, one.Buff.SpellBaseId, one.Buff.Form, 0, rebuilt)),
+				MagicBuffCodec.Build(one.Buff));
+		}
+
 		private static string Capture(string source)
 		{
 			return source[..source.IndexOf('#')];

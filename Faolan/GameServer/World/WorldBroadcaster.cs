@@ -2184,6 +2184,67 @@ namespace Faolan.GameServer.World
 			// live `.togglenpcgroup` toggle, so it never touches retail parity.
 			if (_debugAreaLabels && subject.OverheadNameOverride is { } overrideName)
 				await SendSetName(recipient, subject.Handle, overrideName);
+
+			await SendActiveBuffsOnStreamIn(recipient, subject);
+		}
+
+		// #677: an entity STREAMING INTO VIEW mid-buff. The observer arrived after the cast, so they have no apply
+		// event to count from and see no icon - and re-sending the apply is exactly what retail's absolute expiry
+		// stamp is FOR.
+		//
+		// ⭐ The shape is measured, not invented (`--report buff-on-spawn`). Over 17,717 captured spawn bodies and
+		// 2,929 applies there is exactly ONE such record, and it is unique in three independent ways at once, which
+		// is what makes one sighting enough to build from:
+		//
+		//   NecroL80_..._login_spellweaving +135.5s   to 0x0215E80C (a CHARACTER), spawned 0.00s earlier
+		//   `Slayer of the Leviathus Spawn`  18,735,004 cs of 276,480,000 cs (6.8%)
+		//   ApplyFrom = 0        <- a CHARACTER reference whose handle is zero: "a caster, unspecified"
+		//   descriptor[3] = 0    <- no caster named, so no caster level
+		//   CastingLevel = 80    <- the TARGET's level, which is the #658 decode falling out for free
+		//
+		// ⚠️ That zero-handle caster is NOT the same thing as the 11 casterless applies `ApplyNoCaster` was written
+		// for. Those write a zero CLASS word and no reference at all (the Racer buff, #636); this one writes the
+		// Character class and a zero instance behind it. The 54-byte data region is identical between the two forms -
+		// which is why the payload factory is shared - but the carrier is not, so `ApplyFrom` is `0u` here and `null`
+		// there. Passing `null` would build a record retail does not send.
+		//
+		// So it is a separate `MagicBuffIIR` right at the spawn, NOT a field of the spawn body - 0 of those 17,717
+		// bodies carries a buff list. `MagicBuffDatas.ApplyNowNoCaster` is already that form (#636's Racer buff uses
+		// it), so nothing new goes on the wire.
+		//
+		// ⚠️ It carries the REMAINING time, not the base duration, and NOT via the stamp: `ApplyNowNoCaster` computes
+		// the stamp from the remaining time it is given, so both agree. Sending the full duration and letting the
+		// stamp shorten it is the shape #601 was closed for proposing - it appears nowhere in the corpus.
+		//
+		// ⚠️ What one sighting does NOT settle is WHICH buffs qualify. 1 of 2,929 says it is not every buff on every
+		// stream-in, and the one we have is a 32-day title buff. We send every TIMED buff the entity holds, which is
+		// the narrowest thing we can do that is still useful - our own `ActiveBuffs` only ever holds self-buffs, so
+		// this is another player's own buffs and nothing else. Open work tracked in Gitea #677.
+		private async Task SendActiveBuffsOnStreamIn(INetworkClient recipient, WorldEntity subject)
+		{
+			const uint UnspecifiedCaster = 0;
+
+			if (subject.ActiveBuffs.IsEmpty)
+				return;
+
+			var now = DateTimeOffset.UtcNow;
+			foreach (var (wireId, buff) in subject.ActiveBuffs.ToArray())
+			{
+				// An untimed buff has no remaining time to state, and a nearly-expired one would arrive as a 0 the
+				// client renders as a stuck icon. Both are skipped rather than rounded.
+				if (buff.ExpiresAt is not { } expiresAt)
+					continue;
+
+				var remainingCs = (uint)Math.Max(0, (expiresAt - now).TotalSeconds * 100);
+				if (remainingCs == 0)
+					continue;
+
+				var record = MagicBuffCodec.Build(subject.Handle, UnspecifiedCaster, wireId,
+					MagicBuffDatas.ApplyNowNoCaster(MagicBuffIds.BaseOf(wireId), remainingCs, subject.Level));
+
+				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType),
+					GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
+			}
 		}
 
 		// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and

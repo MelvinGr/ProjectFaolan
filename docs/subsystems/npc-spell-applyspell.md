@@ -122,9 +122,35 @@ packet on the wire retail never sends. The stamp is still sourced from the same 
 side-effect keeps the restore correct before the client has learned our clock at all: it learns that only from a
 `DispatchPong`, and world entry can precede the first `LatencyCheck`.
 
-What retail's absolute stamp is genuinely *for* is a different case we do not cover yet — a buffed entity
-STREAMING INTO VIEW mid-buff, where the observer has no apply event to count from. Nothing emits another entity's
-active buffs at spawn today; tracked separately.
+### The STREAM-IN re-assert (#677)
+
+What retail's absolute stamp is genuinely *for* is the case an observer arriving mid-buff has: no apply event to
+count from. **Retail does send it, and `--report buff-on-spawn` is what settled the shape.**
+
+Over 17,717 captured spawn bodies and 2,929 applies the corpus holds **exactly one**, and it is unique in three
+independent ways at once — which is what makes one sighting enough to build from rather than a lone data point:
+
+```
+NecroL80_..._login_spellweaving  +135.5s   to 0x0215E80C (a CHARACTER), spawned 0.00s earlier
+Slayer of the Leviathus Spawn  18,735,004 cs of 276,480,000 cs (6.8%)
+ApplyFrom     = 0    <- a CHARACTER reference whose handle is zero, the ONLY one in the corpus
+descriptor[3] = 0    <- no caster named, so no caster level
+CastingLevel  = 80   <- the TARGET's level
+```
+
+So it is a **separate `MagicBuffIIR` right at the spawn, not a field of the spawn body** — 0 of those 17,717
+bodies carries a buff list — carrying the **remaining** time, exactly like the login restore.
+
+⚠️ **The zero-handle caster is not the class-0 "no caster" form.** `ApplyNoCaster` was written for the 11 applies
+that write a zero CLASS word and no reference at all (retail's Racer buff, #636); this one writes the Character
+class and a zero instance behind it. The 54-byte data region is identical between the two — same `Bool2 = 0`, same
+`descriptor[3] = 0` — so they share the payload factory, but the carrier differs and `ApplyFrom` must be `0u`
+rather than `null`.
+
+`WorldBroadcaster.SendActiveBuffsOnStreamIn` emits this after every spawn, for every TIMED buff the entity holds.
+⚠️ **What one sighting does NOT settle is which buffs qualify** — 1 of 2,929 says it is not every buff on every
+stream-in, and the one we have is a 32-day title buff. Open work tracked in Gitea #677.
+[V1: Faolan.Tests/MagicBuffCorpusTests.cs — `TheCasterlessStreamInApply_RebuildsByteExact`]
 
 **`@26` is the CASTER's level and `@42` is the TARGET's** — the "second input" the earlier note suspected. SCOPE
 separates them without having to resolve a handle to a level: grouped by `(capture, caster)` `@26` varies on 20 of
