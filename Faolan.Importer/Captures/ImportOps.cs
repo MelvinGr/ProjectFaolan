@@ -917,7 +917,21 @@ namespace Faolan.Importer.Captures
 			foreach (var (spawn, task) in bySpawn.Values)
 				AddNodeTree(spawn, PatrolNodeMapper.ToNode(task));
 
+			// #713: the beat identifies the PLACEMENT, so stamp it now that every route is attached. Rows that come out
+			// with the same key are sightings of ONE patroller in different capture sessions - this extraction keys
+			// spawns on MapId + exact XYZ, and a patroller stands somewhere different every time it is seen, so each
+			// sighting minted a placement (231 of 857 route-carrying spawns repo-wide are redundant that way).
+			//
+			// Nothing is deleted: the redundant rows are the placement's VARIANT POOL. What differs between them is
+			// exactly what retail re-rolls per spawn - level, morphs and all 7 equipment slots - so the world draws one
+			// at spawn rather than standing them all up at once.
+			foreach (var (spawn, _) in bySpawn.Values)
+				spawn.PlacementId = PatrolRoute.PlacementKey(spawn.PatrolNodes, spawn.NpcTemplateId);
+
 			await db.SaveChangesAsync();
+
+			var pools = bySpawn.Values.Select(v => v.Spawn.PlacementId).Where(p => p != null).Distinct().Count();
+			Console.WriteLine($"Patrol placements: {bySpawn.Count} route-carrying spawn(s) -> {pools} placement(s) (#713).");
 		}
 
 		// How much of a route an observation carries: total nodes, then total waypoints as the tiebreak. Used only to

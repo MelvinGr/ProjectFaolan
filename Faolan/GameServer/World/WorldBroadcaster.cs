@@ -1070,15 +1070,26 @@ namespace Faolan.GameServer.World
 			// this loop needed a collision dance to stop one row silently overwriting another in the handle-keyed zone.
 			// The zone's counter is unique by construction and shared with the static objects, which the two separate
 			// captured ranges never guaranteed against each other.
+			// #713: rows sharing a PlacementId are SIGHTINGS of one patroller, not separate NPCs - the importer says
+			// so, having identified them by their harvested beat. One entity per placement, and the row it renders as
+			// is drawn from the others: they differ in exactly what retail re-rolls per spawn (level, morphs, all 7
+			// equipment slots), so the pool is what makes two spawns of one placement look different.
+			//
+			// This is NOT the runtime dedup the note above forbids. That rule is about this layer inventing a collapse
+			// (the old name/cell heuristic, which silently dropped legitimately distinct NPCs); this renders a
+			// relationship the DATA declares. A row with no PlacementId stands for itself and is rendered verbatim;
+			// each pool contributes ONE row, drawn at random, so the beat gets one NPC wearing one of its rolls.
+			var spawnRows = npcs
+				.Where(n => n.PlacementId == null)
+				.Concat(npcs.Where(n => n.PlacementId != null)
+					.GroupBy(n => n.PlacementId!.Value)
+					.Select(pool => pool.ElementAt(Random.Shared.Next(pool.Count()))))
+				.ToList();
+
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
 			string? labelSample = null;
-			foreach (var npc in npcs)
+			foreach (var npc in spawnRows)
 			{
-				// The type identity (name/community) lives on the NpcTemplate type now (#244); a spawn with no type is a phantom
-				// capture artifact (no real creature) - skip it.
-				if (npc.NpcTemplate == null)
-					continue;
-
 				// #528/#501: this type only exists inside a triggered spawn, so a row for it is not a creature standing
 				// in the world.
 				if (triggerSpawned.Contains(npc.NpcTemplateId))

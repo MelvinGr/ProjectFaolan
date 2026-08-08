@@ -72,6 +72,43 @@ namespace Faolan.Core.Network.Codecs.World
 			return ahead;
 		}
 
+		// #713: a stable id for the PLACEMENT a route belongs to - equal for two sightings of one patroller, different
+		// for two genuinely different beats. Null when the spawn carries no route, which is the caller's cue that this
+		// placement cannot be identified this way (a stationary NPC needs a different key entirely).
+		//
+		// Over the whole polyline rather than a summary: grouping the 857 stored routes by (length, segments, first
+		// waypoint) and by the full polyline both give 626 groups, so the cheap key happens to be exact here - but it
+		// is the polyline that MEANS "this beat", and a summary that collides would silently merge two placements.
+		// Coordinates are rounded to a millimetre so a float that differs in its last bit cannot split one route in two.
+		//
+		// FNV-1a rather than string hashing: this value is PERSISTED, so it has to be identical across processes and
+		// runs, which `string.GetHashCode` explicitly is not.
+		public static uint? PlacementKey(ICollection<PatrolNode> nodes, uint templateId)
+		{
+			ArgumentNullException.ThrowIfNull(nodes);
+
+			var waypoints = Waypoints(nodes);
+			if (waypoints.Count == 0)
+				return null;
+
+			var hash = 2166136261u;
+			Mix(ref hash, templateId);
+			foreach (var w in waypoints)
+			{
+				Mix(ref hash, unchecked((uint)MathF.Round(w.X * 1000f)));
+				Mix(ref hash, unchecked((uint)MathF.Round(w.Y * 1000f)));
+				Mix(ref hash, unchecked((uint)MathF.Round(w.Z * 1000f)));
+			}
+
+			return hash;
+
+			static void Mix(ref uint hash, uint value)
+			{
+				for (var i = 0; i < 4; i++)
+					hash = unchecked((hash ^ (byte)(value >> (i * 8))) * 16777619u);
+			}
+		}
+
 		private static void Collect(PatrolNode node, List<Vector3> waypoints)
 		{
 			if (node.Mode == 1)

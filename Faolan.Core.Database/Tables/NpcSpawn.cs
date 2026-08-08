@@ -94,6 +94,30 @@ namespace Faolan.Core.Database.Tables
 		// own. Cascade-deletes with the spawn.
 		public virtual ICollection<PatrolNode> PatrolNodes { get; set; } = [];
 
+		// #713: the PLACEMENT this row is a sighting of - rows sharing one are the SAME NPC seen in different capture
+		// sessions, not different NPCs. Null for a spawn that carries no route (a placement we cannot yet identify).
+		//
+		// The importer keys captured spawns on MapId + exact XYZ, which is the one key guaranteed to fail for a
+		// PATROLLER: it stands somewhere different every time it is observed, so each sighting minted a placement. Old
+		// Tarantia ended up with two Noblemen walking one beat a few units apart, and repo-wide 231 of 857 route-
+		// carrying spawns are redundant.
+		//
+		// The beat identifies the placement, so this is derived from the harvested route (plus the type - two creatures
+		// of different types could in principle be given the same path). Measured before relying on it: grouping the 857
+		// route-carrying spawns by (length, segment count, first waypoint) and by the FULL polyline both yield 626
+		// groups, and the cheap key never collapses more than the exact one.
+		//
+		// ⚠️ The redundant rows are NOT deleted, because what differs between them is exactly what retail re-rolls per
+		// spawn: level, the morph table and all 7 equipment slots (two Old Tarantia Noblemen share a beat but differ in
+		// 23 of 27 morphs and every worn garment). They are this placement's VARIANT POOL, and the world picks one at
+		// spawn - which is what makes a re-spawned NPC look different, as retail's do.
+		//
+		// Safe because retail never runs two NPCs on one beat: across 116 captures and 640 distinct stored routes there
+		// is not ONE case of two concurrent same-name NPCs both standing on the same polyline (3u tolerance). Note that
+		// PROXIMITY proves nothing here - retail routinely places same-name NPCs 1.4u apart - which is why the test is
+		// route occupancy rather than distance.
+		public uint? PlacementId { get; set; }
+
 		public bool HasEquipment { get; set; }
 		public uint ApprenticeLevel { get; set; }
 

@@ -2322,6 +2322,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("PlacementId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<float>("PositionX")
                         .HasColumnType("REAL");
 
