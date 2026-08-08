@@ -99,6 +99,22 @@ evidence, not as a citation, until the id is used.
   `LastKillNumber`, "a per-kill sequence number, semantics unknown", and it is in the captured snapshot at `0x14`
   — a full session of 20. That reframes Gitea #656: the live observation of stat 106 counting 20/19/18 DOWN while
   `DailyPvPKills` counts 0/1/2 UP is a **power session being spent by kills**, not a second kill counter.
+
+  ⭐ **The game's own documentation names the player-facing concept and settles what the 20 is a quota OF.** The
+  official quickstart guide calls them **Fresh Kills**: *"You get 20 Fresh Kills every day. The number displayed at
+  the end of the bar are 'Fresh Kills', which grant extra XP when killing worthy monsters."*
+  ([ageofconan.com/quickstart](https://www.ageofconan.com/quickstart)) So `PowerSessionRemaining` is the number the
+  client draws at the end of the XP bar, `NextPowersessionReset` is when it refills, and `0x0C3`
+  `PowerSessionBonusesCounter` is the third member of the trio. A **daily** refill is stated outright, which was one
+  of #656's open questions.
+
+  The corpus agrees from the other side: **every captured character's login snapshot carries `0x06A`**, at `20` for
+  Hakotep / DemoL80 / AssassinL23 and at **`17` for NecroL80** — who is exactly the character the live observation caught
+  three kills into her session. Nothing else in the trio is in the snapshot, so the reset instant and the bonus
+  counter arrive (if at all) as stat updates.
+
+  ⚠️ Still open, and it is what any implementation turns on: **how much extra XP a Fresh Kill grants, and what makes
+  a monster "worthy"**. Neither the client's names nor the guide says, and no capture measures it.
 - **`0x292` is `PvPTotalDeaths`, not `Deaths`**, sitting in a coherent run — `656 PvPTotalKills`,
   `657 PvPFinishingBlows`, `658 PvPTotalDeaths`, `659 PvPMatchesWon`, `660 PvPMatchesLost`. So the client does NOT
   use `Deaths` twice, and the belief that it did was the old sweep mispairing `0x542`'s name onto a neighbour.
