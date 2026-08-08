@@ -106,11 +106,27 @@ would close the client's window on an item it never received.
 
 ## Open / follow-ups
 
-- ⚠️ **Professions and ranks are not modelled at all.** In retail a character must LEARN a tradeskill profession,
-  which comes in ranks, and that is what gates the book — a fresh character has none. We serve the catalog
-  **whole** to every character that asks, recipes carry no profession/tier attribution, and no character row
-  records a learned profession (`CharacterSkills` is the combat scaffold, every row rank 0). So nothing stops a
-  level-1 character crafting a master-tier recipe. Tracked in Gitea; deliberately not guessed at.
+- ⚠️ **Nothing GATES crafting on a profession.** In retail a character must LEARN a tradeskill profession, which
+  comes in ranks, and that is what gates the book — a fresh character has none. We serve the catalog **whole** to
+  every character that asks, recipes carry no profession/tier attribution, and `TradeskillService.Craft` checks
+  only the catalog and the materials. So nothing stops a level-1 character crafting a master-tier recipe.
+
+  The professions themselves **are** persisted and **are** sent correctly. They ride the **spawn scaffold's
+  feat/ability list** — `CharacterSkills`, the `[u8 rank][u32 id]` groups after the entry table — imported per
+  character from that character's own capture and replayed verbatim, which is why an imported character's
+  professions match retail exactly. So the gap is the MEANING, not the data: which ids are professions, what the
+  rank byte counts, and which recipes each profession covers.
+
+  The **`1.4M` id band** is the standing candidate. Across the shipped characters it is small and rank-uniform:
+
+  | character | `1.4M` entries |
+  |---|---|
+  | DemoL80 (L80) | `1410900` r0, then `1411300` `1440000` `1440400` `1440500` `1440700` `1441902` `1445000` all at **r3** |
+  | NecroL80 (L80) | `1440500` r0, `1445000` **r3** |
+  | AssassinL23, Hakotep, Adada | none |
+
+  Seven at rank 3 versus one is exactly the shape "professions learned" would have, but it is unconfirmed and
+  nothing is gated on it. Tracked in Gitea; deliberately not guessed at.
 
   What the client settles statically, short of a capture:
   - **Learning a recipe is a GameAction**, not an RPC — `53198` / `e_Type_GC_GameAction_LearnRecipe`, one

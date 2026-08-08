@@ -37,15 +37,19 @@ namespace Faolan.GameServer.Economy
 	// immediately, which cuts the animation short but delivers the same items in the same order. Timing it needs a
 	// scheduled completion, which is its own change.
 	//
-	// ⚠️ THERE IS NO PROFESSION AND NO RANK. In retail a character must LEARN a tradeskill profession, which comes in
-	// ranks, and that is what gates the recipe book - a fresh character has no book at all. We model none of it:
-	// `SendCraftingRecipeBook` hands the WHOLE 603-row `Recipes` table to any character whose client asks, recipes are
-	// not attributed to a profession or tier in the schema, and no character row records a learned profession
-	// (`CharacterSkills` is the combat scaffold - every row is rank 0). So the only thing standing between a level-1
-	// character and a master-tier recipe is whether the client asks.
+	// ⚠️ NOTHING GATES THIS ON A PROFESSION. In retail a character must LEARN a tradeskill profession, which comes in
+	// ranks, and that is what gates the recipe book - a fresh character has no book at all. `SendCraftingRecipeBook`
+	// hands the WHOLE 603-row `Recipes` table to any character whose client asks, and this method checks only the
+	// catalog and the materials. So the only thing standing between a level-1 character and a master-tier recipe is
+	// whether the client asks.
 	//
-	// Nothing here invents a gate, because a guessed profession/rank rule would be worse than an open book and would
-	// have to be unpicked once the real one is decoded. It is a real gap and it is tracked in Gitea.
+	// The professions themselves ARE persisted and ARE sent correctly: they ride the spawn scaffold's feat/ability
+	// list (`CharacterSkills`, the `[u8 rank][u32 id]` groups), imported per character from that character's own
+	// capture and replayed verbatim - which is why an imported character's professions match retail exactly. What is
+	// missing is the MEANING, not the data: nothing here knows which of those ids is a profession, what the rank byte
+	// counts, or which recipes a given profession covers. The `1.4M` band is the standing candidate (DemoL80 carries 7
+	// of them at rank 3, NecroL80 1), but it is not confirmed, so nothing is gated on it - a guessed rule would be worse
+	// than an open book and would have to be unpicked. Tracked in Gitea.
 	public sealed class TradeskillService
 	{
 		private readonly IDatabaseRepository _database;

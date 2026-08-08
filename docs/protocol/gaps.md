@@ -195,8 +195,11 @@ snapshot per level fills a row with no decoding at all.
 
 ### What records a learned tradeskill
 **Tracked: Gitea #735.** [V0: what records a learned tradeskill] A character must LEARN a tradeskill profession,
-which comes in ranks, and that is what gates the recipe book. Nothing we hold records one. The static pass rules
-out the obvious candidate and names the learn primitive, but not the state:
+which comes in ranks, and that is what gates the recipe book. We DO carry the state and DO send it correctly — it
+rides the spawn scaffold's feat/ability list (`CharacterSkills`, `[u8 rank][u32 id]`), imported per character and
+replayed verbatim, which is why an imported character's professions match retail. What is unknown is which of
+those ids is a profession and what the rank byte counts. The `1.4M` band is the standing candidate (DemoL80 carries
+seven at rank 3, NecroL80 one), unconfirmed. Around it:
 
 - `TradeskillFlags` (stat `0xCE`) is **not** it — it rides NPCs (a *Dockworker* carries 99), not the player.
 - `Craftmanship` / `MaxCraftmanship` (`0x88` / `0x89`) DO ride the player and move (0 → 1, 0 → 2 → 3 in early
