@@ -21,7 +21,7 @@ namespace Faolan.Core.Cli
 		[
 			Setting(Keys.DatabaseProvider, "The database engine to serve from.", FaolanDbProvider.Sqlite),
 			Setting(Keys.DatabaseConnectionString, "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
-			Setting(Keys.ServerAddress, "The address the login tier advertises to clients - must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
+			Setting(Keys.ServerPublicAddress, "The address the login tier advertises to clients, Just address (no port), must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
 			Setting(Keys.ServerListenAddress, "Address the server BINDS - an interface, not the address a client dials.", "0.0.0.0"),
 			Setting<ushort>(Keys.ServerUniverseAgentPort, "UniverseAgent port. (Main entry point).", 7010),
 			Setting<ushort>(Keys.ServerPlayerAgentPort, "PlayerAgent port.", 7011),
@@ -92,13 +92,13 @@ namespace Faolan.Core.Cli
 
 			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
 
-			public string ServerAddress => config[Keys.ServerAddress] ?? throw new InvalidOperationException($"{Keys.ServerAddress} is required");
+			public string ServerPublicAddress => config[Keys.ServerPublicAddress] ?? throw new InvalidOperationException($"{Keys.ServerPublicAddress} is required");
 
 			// Where a CLIENT dials to log in - the ADVERTISED address (never Server:ListenAddress, which is an
 			// interface: 0.0.0.0 is by design unreachable as a destination) and the UniverseAgent port, which is the
 			// pair the client's LocalConfig.xml <UniverseAddr> holds. Derived rather than a setting of its own, like
 			// McpUrl: a second copy of either half is a copy that can disagree with the port the server binds.
-			public string UniverseAddress => $"{config.ServerAddress}:{config.UniverseAgentPort}";
+			public string UniverseAddress => $"{config.ServerPublicAddress}:{config.UniverseAgentPort}";
 
 			public string WelcomeString => config[Keys.ServerWelcomeString] ?? "";
 
@@ -204,9 +204,9 @@ namespace Faolan.Core.Cli
 			public const string LoginPublicKey = "Login:PublicKey";
 			public const string McpEnabled = "Mcp:Enabled";
 			public const string McpPort = "Mcp:Port";
-			public const string ServerAddress = "Server:Address";
 			public const string ServerListenAddress = "Server:ListenAddress";
 			public const string ServerPlayerAgentPort = "Server:PlayerAgentPort";
+			public const string ServerPublicAddress = "Server:PublicAddress";
 			public const string ServerUniverseAgentPort = "Server:UniverseAgentPort";
 			public const string ServerWelcomeString = "Server:WelcomeString";
 		}

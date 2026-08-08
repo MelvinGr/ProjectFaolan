@@ -16,7 +16,7 @@ namespace Faolan.ClientLauncher
 	// `--username`, ... no longer read a value past the end of argv and crash with an IndexOutOfRangeException.
 	//
 	// Two kinds of option live here, as everywhere else in the repo:
-	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey, Server:Address, Server:UniverseAgentPort,
+	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey, Server:PublicAddress, Server:UniverseAgentPort,
 	//     Cdn:PublicAddress) name a setting that also lives in
 	//     faolan.json and the environment, so the option's NAME is the configuration path and its value is resolved
 	//     through the shared builder (FaolanCommandLine) - the launcher patches the key the server is holding
@@ -25,7 +25,7 @@ namespace Faolan.ClientLauncher
 	//     (-u/-p/-c/-n) stay: unlike a config key, these have no second spelling in a file or the environment to
 	//     drift against, and they are what the documented test launches type.
 	// The two kinds MEET in --patch-universeaddr/--patch-cdn: each is a bare flag that says WHETHER to redirect the client, while
-	// the address it redirects to is the setting (Server:Address + Server:UniverseAgentPort, Cdn:PublicAddress). They
+	// the address it redirects to is the setting (Server:PublicAddress + Server:UniverseAgentPort, Cdn:PublicAddress). They
 	// used to carry the address themselves, which is the same endpoint spelled twice - the launch line and the
 	// faolan.json/faolan.user.json the server and the mirror read - and only the launcher's copy reaches the client.
 	public static class LauncherCommand
@@ -68,7 +68,7 @@ namespace Faolan.ClientLauncher
 
 		private static readonly Option<bool> PatchUniverseAddr = new("--patch-universeaddr")
 		{
-			Description = "Point LocalConfig.xml <UniverseAddr> (the login server) at the configured Server:Address and Server:UniverseAgentPort."
+			Description = "Point LocalConfig.xml <UniverseAddr> (the login server) at the configured Server:PublicAddress and Server:UniverseAgentPort."
 		};
 
 		private static readonly Option<string> Password = new("--password", "-p") { Description = "Auto-login password." };
@@ -90,7 +90,7 @@ namespace Faolan.ClientLauncher
 		// point the client at the login server and mirror that are actually configured, with nothing to keep in step.
 		private static readonly Option[] Settings = FaolanSettings.Options(
 			Keys.LoginPrivateKey, Keys.LoginPublicKey,
-			Keys.ServerAddress, Keys.ServerUniverseAgentPort,
+			Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort,
 			Keys.CdnPublicAddress);
 
 		private static readonly Option<string> Username = new("--username", "-u") { Description = "Auto-login account name." };

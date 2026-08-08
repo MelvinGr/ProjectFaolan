@@ -52,7 +52,7 @@ host. `--role` is repeatable (`--role login --role realm=<id>` co-hosts both), b
 ## How it works
 
 - **Realm-routed handoff + realm-scoped char list.**
-  Replace the static `Program.GameServerPort` (Inbound.cs:1264) + the `Configuration.ServerAddress` handoff sends
+  Replace the static `Program.GameServerPort` (Inbound.cs:1264) + the `Configuration.ServerPublicAddress` handoff sends
   with the *selected character's* `Realm.IpAddress:Port` — look the character's realm up at `EnterWorld` and thread
   it into the GameServer/CsPlayerAgent/ChatServer handoff addresses. Scope `SendSmallCharList` (and the char-realm
   counts) to the client's selected realm. Two realm rows pointing at the SAME process proves routing before the

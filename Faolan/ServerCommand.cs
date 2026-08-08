@@ -37,7 +37,7 @@ namespace Faolan
 		// `--Mcp:Port banana` is a parse error here rather than a crash at whatever startup first reads it - hence the
 		// non-generic Option[]: this is a list of settings, not a list of strings.
 		private static readonly Option[] ConfigOptions = FaolanSettings.Options(
-			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
+			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
 			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.LoginPrivateKey, Keys.LoginAllowUnpatchedClients,
 			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
 			Keys.AccountPremium, Keys.AccountPremiumCharSlots, Keys.AccountFreeCharSlots);

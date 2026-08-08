@@ -16,7 +16,9 @@
 
 	"Server": {
 		// The address the login tier advertises to clients - must be reachable FROM the client. (Can be a dns record)
-		"Address": "127.0.0.1",
+		"PublicAddress": "127.0.0.1",
+		// Address the server BINDS - an interface, not the address a client dials.
+		"ListenAddress": "0.0.0.0",
 		// UniverseAgent port. (Main entry point).
 		"UniverseAgentPort": 7010,
 		// PlayerAgent port.

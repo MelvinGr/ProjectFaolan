@@ -35,7 +35,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(FaolanDbProvider.Sqlite, config.DatabaseProvider);
 			Assert.Equal("Data Source=faolan.db", config.DatabaseConnectionString);
-			Assert.Equal("127.0.0.1", config.ServerAddress);
+			Assert.Equal("127.0.0.1", config.ServerPublicAddress);
 			Assert.Equal(7010, config.UniverseAgentPort);
 			Assert.Equal("127.0.0.1:7010", config.UniverseAddress); // ...derived from those two, not a third literal
 			Assert.Equal(7011, config.PlayerAgentPort);
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 		{
 			var over = new List<KeyValuePair<string, string?>>();
 			if (address != null)
-				over.Add(new(Keys.ServerAddress, address));
+				over.Add(new(Keys.ServerPublicAddress, address));
 			if (port != null)
 				over.Add(new(Keys.ServerUniverseAgentPort, port));
 

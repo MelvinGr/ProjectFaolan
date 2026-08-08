@@ -230,7 +230,7 @@ namespace Faolan.Web.Content
 			foreach (var (tag, host) in Upstreams)
 				text = text.Replace($"{host}/upm", $"{publicBase}/{tag}/upm");
 
-			// TODO: Also replace UniverseAddr with Config.ServerAddress:Config.UniverseAgentPort
+			// TODO: Also replace UniverseAddr with Config.ServerPublicAddress:Config.UniverseAgentPort
 
 			return Encoding.UTF8.GetBytes(text);
 		}

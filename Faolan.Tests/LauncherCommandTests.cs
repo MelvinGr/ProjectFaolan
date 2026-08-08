@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		}
 
 		// --patch-universeaddr and --patch-cdn are FLAGS: they say whether to redirect the client, and the address comes from the
-		// settings the server and the content mirror already read (Server:Address + Server:UniverseAgentPort,
+		// settings the server and the content mirror already read (Server:PublicAddress + Server:UniverseAgentPort,
 		// Cdn:PublicAddress). Each used to carry its own address, so a launch line pointed the client at one endpoint
 		// while faolan.json pointed the server at another, and only the client's copy could be silently wrong.
 		//
@@ -58,12 +58,12 @@ namespace Faolan.Tests
 		}
 
 		// ...and the addresses those flags apply come back on the same resolved stack the DH keys do, so a one-off
-		// `--Server:Address` / `--Cdn:PublicAddress` overrides the file for this launch and nothing else has to know.
+		// `--Server:PublicAddress` / `--Cdn:PublicAddress` overrides the file for this launch and nothing else has to know.
 		[Fact]
 		public void Parse_TheRedirectAddresses_ComeFromTheSettings()
 		{
 			var options = LauncherCommand.Parse(
-				["--patch-universeaddr", "--patch-cdn", "--Server:Address", "192.168.1.5", "--Server:UniverseAgentPort", "7000", "--Cdn:PublicAddress", "http://192.168.1.5:7081"],
+				["--patch-universeaddr", "--patch-cdn", "--Server:PublicAddress", "192.168.1.5", "--Server:UniverseAgentPort", "7000", "--Cdn:PublicAddress", "http://192.168.1.5:7081"],
 				out _);
 
 			Assert.NotNull(options);

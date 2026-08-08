@@ -330,7 +330,7 @@ Only the server service is enabled in `docker-compose.yml`; the process-per-real
 the web + CDN services are commented examples in the same file, each with the caveats that bite in a container.
 Two are worth knowing up front:
 
-- **`Server:Address` must be an address the client can reach** — the host's IP or a resolvable name, never
+- **`Server:PublicAddress` must be an address the client can reach** — the host's IP or a resolvable name, never
   `127.0.0.1`. The login tier advertises it (and each `Realm` row's `IpAddress`) and the client connects there
   from *outside* Docker. The same goes for any bind address: a service listening on `127.0.0.1` inside a
   container is on its own loopback, and a published port reaches nothing.

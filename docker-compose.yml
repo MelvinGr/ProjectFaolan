@@ -6,7 +6,7 @@
 #
 # CONFIG COMES FROM ENV VARS. The image carries NO faolan.json (it's optional; precedence is env > cmdline > json),
 # so every game process sets its config in `environment:` - shared here via the `x-faolan-config` anchor. Two caveats:
-#   - Server:Address must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT 127.0.0.1 -
+#   - Server:PublicAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT 127.0.0.1 -
 #     the login tier advertises it (and each Realm row's IpAddress) and the client connects there from OUTSIDE Docker.
 #   - The all-in-one SQLite default builds its database into the bind-mounted ./data on first start; a shared
 #     multi-realm deployment wants Postgres (no single-writer file lock) - see the commented POSTGRES section.
@@ -16,7 +16,7 @@ name: projectfaolan
 x-faolan-config: &faolan-config
   Database__Provider: Sqlite                            # nested key -> env uses the __ separator (Database:Provider)
   Database__ConnectionString: "Data Source=/app/data/faolan.db"
-  Server__Address: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
+  Server__PublicAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
   Server__UniverseAgentPort: 7010
   Server__PlayerAgentPort: 7011
   Mcp__Port: 7099                # nested key -> env uses the __ separator (Mcp:Port). NOT published: the MCP

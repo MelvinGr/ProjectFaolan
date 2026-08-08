@@ -63,7 +63,7 @@ Faolan.ClientLauncher [options]
   -u, --username <s>  auto-login account
   -p, --password <s>  auto-login password
   -c, --charname <s>  auto-enter this character
-  --patch-universeaddr  point LocalConfig.xml <UniverseAddr> (login server) at the configured Server:Address
+  --patch-universeaddr  point LocalConfig.xml <UniverseAddr> (login server) at the configured Server:PublicAddress
                       and Server:UniverseAgentPort (127.0.0.1:7010 by default). A flag, no value - the address is
                       the SETTING. Replaces an /etc/hosts override; persists (undo with --restore)
   --patch-cdn         point the three LocalConfig.xml CDN keys at the configured Cdn:PublicAddress (each ->
@@ -78,7 +78,7 @@ Faolan.ClientLauncher [options]
   --Login:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
   --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
                       talk to somebody else's server
-  --Server:Address <a> / --Server:UniverseAgentPort <p> / --Cdn:PublicAddress <url>   one-off overrides of the
+  --Server:PublicAddress <a> / --Server:UniverseAgentPort <p> / --Cdn:PublicAddress <url>   one-off overrides of the
                       addresses --patch-universeaddr / --patch-cdn write, for a launch that should not match the
                       faolan.json the server reads
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their
@@ -111,7 +111,7 @@ Behaviors:
 The client reads its login server from **`LocalConfig.xml`** → `<UniverseAddr>dm09-nj4.ageofconan.com:7010</UniverseAddr>`
 (confirmed via RE — AgeOfConan.exe references both `LocalConfig.xml` and `UniverseAddr`; it is **not** in the exe).
 So instead of an `/etc/hosts` line (`127.0.0.1 dm09-nj4.ageofconan.com`), `--patch-universeaddr` rewrites that field
-to `Server:Address`:`Server:UniverseAgentPort` — the address the login tier ADVERTISES and the port it binds, read from
+to `Server:PublicAddress`:`Server:UniverseAgentPort` — the address the login tier ADVERTISES and the port it binds, read from
 the same faolan.json the server does, so the client cannot be pointed somewhere the server is not (`Server:ListenAddress`
 is the interface and is deliberately not consulted: its default `0.0.0.0` is unreachable as a destination). It PERSISTS (LocalConfig.xml is backed up to `.bak` first; `--restore` puts it back), so nothing
 races the client's read of the config.
