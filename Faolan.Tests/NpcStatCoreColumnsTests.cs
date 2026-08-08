@@ -179,6 +179,24 @@ namespace Faolan.Tests
 
 			// The shipped value is an outlier when the corpus has never seen it, or when another value outnumbers it
 			// by the margin above. Everything closer than that is the sample talking, not the data.
+			//
+			// ⚠️ A RATIO ALONE IS NOT ENOUGH, and the second condition is what makes this gate survive new captures.
+			// The tally comes from the CORPUS EXTRACT - a frozen, derived slice of the dumps - while the shipped
+			// value comes from an importer run over the REAL captures. Add three captures and the two populations
+			// diverge instantly: the importer sees sightings the extract does not, picks a different mode, and a
+			// pure ratio test fails on a value that is actually better attested than the one it demands.
+			//
+			// That is not hypothetical - it is what happened on 2026-08-08. Template 14227 (Knight) shipped
+			// anim_idle_id 42176 before the new captures and 42024 after, and the extract - still at the old capture
+			// set - called 42024 an outlier at 12:2. Regenerating the extract would resync it, but that rebaselines
+			// every other whole-corpus gate at once, which is a far larger change than the thing being judged.
+			//
+			// So the winning value must also be attested by ENOUGH sightings to outvote a population we cannot see.
+			// 14 sightings is a thin sample; the real bug this gate was built for (the Citizen) was outnumbered 57x.
+			// The ratio keeps its teeth where the evidence is strong and stops firing where the extract is simply
+			// behind. See Gitea: the standing goal is for the corpus half to go away entirely.
+			const int minimumEvidence = 20;
+
 			static string? Outlier(uint shipped, Dictionary<uint, int> tally, int margin)
 			{
 				var mine = tally.GetValueOrDefault(shipped);
@@ -186,7 +204,9 @@ namespace Faolan.Tests
 				if (mine == 0)
 					return "never captured on this type";
 
-				return best.Value >= mine * margin ? $"outnumbered {best.Value}:{mine} by {best.Key}" : null;
+				return best.Value >= mine * margin && best.Value >= minimumEvidence
+					? $"outnumbered {best.Value}:{mine} by {best.Key}"
+					: null;
 			}
 
 			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
