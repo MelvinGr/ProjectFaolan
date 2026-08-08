@@ -94,3 +94,47 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
 - The grouped `PatrolPath` + `PatrolWaypoint` DB tables — ordered `Waypoints` by `Ordinal` — exist; the
   broadcaster emits mode-1 path moves via `BuildWalkBody` for chase steps and re-addresses the captured patrol
   body via `SendPatrol`.
+
+## What EXECUTES a path — and where the speed comes from
+
+The grammar above is the READER. The executor is its vtable sibling: `FUN_00a483b0` sits at slot 14 of the
+vtable at `01ff536c`, and slot 11 `FUN_00a47eb0` is the per-frame update (its assert string names
+`MoveTasks\PathMoveTask.cpp`). `tools/ghidra/DumpVtableAround.java` prints a class's whole vtable from any one
+known slot, which is how the two were connected.
+
+The movement line is:
+
+```c
+if (*(float *)(this + 0x60) < speed)
+    speed = *(float *)(this + 0x60);      // clamp
+FUN_00a3f0d0(spline, speed * dt);         // advance along the spline
+```
+
+`+0x60` is the record's optional `PathFlags & 0x20` float and **defaults to `0x7f7fffff` (FLT_MAX)** when the
+flag is absent. So it is a speed **cap**, not a speed — and it is absent on all 759 captured multi-point patrol
+paths (`PathFlags = 0` on every one), so retail never caps a beat.
+
+The speed itself comes from the ENTITY, via `FUN_00a2f160` -> `FUN_00a2e670`:
+
+- `FUN_00a2f160` returns the entity's **movement mode** from `+0x15c`, folding in the control mode
+  (`vehicle.cpp`): under one control mode it maps 1→2, 2→3, 4→5, and returns 6 under another.
+- `FUN_00a2e670` switches on that mode and reads a **different per-entity speed field for each**:
+
+| mode | speed field |
+|---|---|
+| 1 or 4 | `+0x13c` forward / `+0x134` backward |
+| 2 or 5 | `+0x140` / `+0x138` / `+0x12c` |
+| 3 | `+0x130` |
+| 6 | a multiplier off `+0x144` |
+
+So **the movement mode is the client's walk-vs-run selector**, and the MoveTask record does not set the pace at
+all. [V1: tools/ghidra/DumpVtableAround.java]
+
+⚠️ Two readings of this record that look right and are NOT:
+
+- The path trailer scalar is **not a ground speed**. `MoveTaskNodes.Path` describes the slot as "the patrol SPEED
+  inside a patrol list", and it does occupy that slot — but read as u/s it runs median 6.75 (max 159) against an
+  observed ~2.2 u/s for the same NPCs.
+- `[duration]` is **not the time to walk the path**. Retail's own duration/length ratios come out at ~30 u/s.
+
+Neither changes how fast the client moves an NPC; only the entity's mode does. See Gitea #714.
