@@ -41,7 +41,6 @@ namespace Faolan.Tests
 			Assert.Equal(7011, config.ServerPlayerAgentPort);
 			Assert.Equal("Welcome to Project Faolan!\n$BUILDSTRING", config.ServerWelcomeString);
 			Assert.Equal("v5.01.0@602248", config.ContentClientVersion);
-			Assert.True(config.LoginAllowUnpatchedClients);
 			Assert.True(config.AccountPremium);
 			Assert.Equal(10u, config.AccountPremiumCharSlots);
 			Assert.Equal(4u, config.AccountFreeCharSlots);
@@ -204,9 +203,9 @@ namespace Faolan.Tests
 			var option = FaolanSettings.Get(Keys.LogFile);
 
 			Assert.Equal("--Log:File", option.Name);
-			Assert.Equal("Log file path.", option.Description);
+			Assert.Equal("Where the server writes its log, alongside the console.", option.Description);
 			Assert.Equal("faolan.log", option.GetDefaultValue());
-			Assert.Contains("--Log:File <Log:File>  Log file path. [default: faolan.log]", Help(option));
+			Assert.Contains("--Log:File <Log:File>  Where the server writes its log, alongside the console. [default: faolan.log]", Help(option));
 		}
 
 		// The type is the point of the catalog entry being an Option<T>. A value the setting cannot hold is refused by
@@ -307,8 +306,8 @@ namespace Faolan.Tests
 				// configures nothing has no key and checks no passwords. It must not acquire one from the defaults
 				// layer - a built-in key is a key everybody has.
 				var defaults = new ConfigurationBuilder().AddInMemoryCollection(FaolanSettings.Defaults).Build();
-				Assert.Null(defaults[Keys.LoginPrivateKey]);
-				Assert.Null(defaults[Keys.LoginPublicKey]);
+				Assert.Null(defaults[Keys.ServerPrivateKey]);
+				Assert.Null(defaults[Keys.ServerPublicKey]);
 			}
 			finally
 			{

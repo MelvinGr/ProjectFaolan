@@ -28,7 +28,7 @@ namespace Faolan
 		// and (with __) in the environment. The description and the DEFAULT come from FaolanSettings, the one catalog,
 		// so `--help` cannot describe a default the code does not use.
 		//
-		// This is a VIEW of that catalog, not the whole of it: Login:PublicKey is launcher-side and stays off the
+		// This is a VIEW of that catalog, not the whole of it: Server:PublicKey is launcher-side and stays off the
 		// server's line, and the Cdn / ChatBridge keys belong to other
 		// executables. They still get their defaults here, because the defaults layer is built from the catalog
 		// rather than from this list.
@@ -38,7 +38,7 @@ namespace Faolan
 		// non-generic Option[]: this is a list of settings, not a list of strings.
 		private static readonly Option[] ConfigOptions = FaolanSettings.Options(
 			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
-			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.LoginPrivateKey, Keys.LoginAllowUnpatchedClients,
+			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.ServerPrivateKey,
 			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
 			Keys.AccountPremium, Keys.AccountPremiumCharSlots, Keys.AccountFreeCharSlots);
 
@@ -50,10 +50,6 @@ namespace Faolan
 			Arity = ArgumentArity.ZeroOrOne
 		};
 
-		// Generates a fresh login DH keypair and PRINTS it - it writes nothing. The key belongs in faolan.user.json,
-		// the GITIGNORED half of the config (a keypair is per-deployment and faolan.json is committed), and the
-		// operator pastes it there.
-		//
 		// It used to write that file itself, which cost a 140-line JSON-with-comments text editor: a JsonNode
 		// round-trip would have dropped every comment in the user file, so the writer edited it with regexes and then
 		// re-read the result to prove the edit was valid. That is a lot of machinery, and a lot of ways to damage a
@@ -109,11 +105,14 @@ namespace Faolan
 		// every client has to be patched with.
 		private static void GenerateKey()
 		{
-			var hex = ClientLoginEncryption.GeneratePrivate().ToString("x").TrimStart('0');;
+			// Left-padded to the width the accessor requires: ToHex trims leading zeros, so roughly one generated key
+			// in 16 renders shorter than 64 characters and Server:PrivateKey would refuse the value this command just
+			// told the operator to paste. Padding does not change it - ToBigInteger reads leading zeros as nothing.
+			var hex = ClientLoginEncryption.GeneratePrivate().ToHex(ClientLoginEncryption.PrivateHexLength);
 			var text = new StringBuilder()
 				.AppendLine($"A new login DH keypair. NOTHING was written - paste the private half into {Global.UserConfigPath} (gitignored):")
 				.AppendLine()
-				.AppendLine("\t\"Login\": {")
+				.AppendLine("\t\"Server\": {")
 				.AppendLine($"\t\t\"PrivateKey\": \"{hex}\"")
 				.AppendLine("\t}")
 				.AppendLine()

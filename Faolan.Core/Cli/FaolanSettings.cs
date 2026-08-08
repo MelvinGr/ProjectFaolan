@@ -9,6 +9,7 @@ using System.Net;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Crypt;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using JetBrains.Annotations;
@@ -27,33 +28,34 @@ namespace Faolan.Core.Cli
 	{
 		public static readonly ImmutableArray<Option> All =
 		[
-			Setting(Keys.AccountFreeCharSlots, "Character slots advertised when not premium.", 4u),
-			Setting(Keys.AccountPremium, "Advertise every account as subscribed.", true),
-			Setting(Keys.AccountPremiumCharSlots, "Character slots advertised when premium.", 10u),
-			Setting(Keys.CdnListenAddress, "Address the mirror BINDS - an interface, not the address a client dials.", "0.0.0.0"),
-			Setting<ushort>(Keys.CdnListenPort, "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", 7081),
-			Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (http ONLY)", "http://127.0.0.1:7081"),
-			Setting(Keys.CdnStore, "Directory the mirror stores fetched CDN blobs in.", "./cdn-store"),
-			Setting(Keys.ChatBridgeBacklogGraceMs, "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", 120_000),
-			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)", false),
-			Setting(Keys.ChatBridgePollMs, "Chat-bridge poll interval, in milliseconds.", 1500),
-			Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
-			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder. Usually not needed."),
-			Setting(Keys.ContentTerrainDir, "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
-			Setting(Keys.DatabaseConnectionString, "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
-			Setting(Keys.DatabaseProvider, "The database engine to serve from.", FaolanDbProvider.Sqlite),
-			Setting(Keys.LogFile, "Log file path.", "faolan.log"),
-			Setting(Keys.LogPacketBytes, "Include the raw byte dump in packet log lines.", false),
-			Setting(Keys.LoginAllowUnpatchedClients, "Let a unpatched client login with its account NAME alone. False requires a patched client & Login:PrivateKey filed.", true),
-			Optional<string>(Keys.LoginPrivateKey, "The server private key. Generate one with --generate-login-key."),
-			Optional<string>(Keys.LoginPublicKey, "Patch clients with Faolan.ClientLauncher --patch-login. (Only used by Faolan.ClientLauncher)"),
-			Setting(Keys.McpEnabled, "Host the in-process MCP endpoint.", false),
-			Setting<ushort>(Keys.McpPort, "MCP endpoint port.", 7099),
-			Setting(Keys.ServerListenAddress, "Address the server BINDS - an interface, not the address a client dials.", "0.0.0.0"),
-			Setting<ushort>(Keys.ServerPlayerAgentPort, "PlayerAgent port.", 7011),
-			Setting(Keys.ServerPublicAddress, "The address the login tier advertises to clients, Just address (no port), must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
-			Setting<ushort>(Keys.ServerUniverseAgentPort, "UniverseAgent port. (Main entry point).", 7010),
-			Setting(Keys.ServerWelcomeString, "Login MOTD.", "Welcome to Project Faolan!\n$BUILDSTRING")
+			Setting(Keys.AccountFreeCharSlots, "How many character slots an account gets when it is not premium.", 4u),
+			Setting(Keys.AccountPremium, "Tell every client its account is subscribed, so nothing is gated behind a subscription.", true),
+			Setting(Keys.AccountPremiumCharSlots, "How many character slots an account gets when it is premium.", 10u),
+			Setting(Keys.CdnListenAddress, "The interface the CDN mirror BINDS. Not an address to dial - that is Cdn:PublicAddress.", "0.0.0.0"),
+			Setting<ushort>(Keys.CdnListenPort, "The port the CDN mirror BINDS, on Cdn:ListenAddress. Not a port to dial - that is Cdn:PublicAddress.", 7081),
+			Setting(Keys.CdnPublicAddress, "The full URL every mirror CLIENT dials, scheme and port included. http ONLY - the game client's libcurl has no SSL.", "http://127.0.0.1:7081"),
+			Setting(Keys.CdnStore, "Where the CDN mirror keeps the blobs it has fetched.", "./cdn-store"),
+			Setting(Keys.ChatBridgeBacklogGraceMs, "How far back a channel's history still counts as backlog rather than new traffic, in milliseconds.", 120_000),
+			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Requires Mcp:Enabled; off still leaves the reply tool working.", false),
+			Setting(Keys.ChatBridgePollMs, "How often the chat bridge looks for new messages, in milliseconds.", 1500),
+			Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. Another build is WARNED about, never refused.", "v5.01.0@602248"),
+			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it."),
+			Setting(Keys.ContentTerrainDir, "Where the baked terrain lives. Without it the server still runs, with ground-snap and line-of-sight disabled.", "./terrain"),
+			Setting(Keys.DatabaseConnectionString, "The database to serve from. One with no game content in it is filled from faolan.sql on first run.", "Data Source=faolan.db"),
+			Setting(Keys.DatabaseProvider, $"The engine that database runs on. [{FaolanDbProvider.Sqlite}, {FaolanDbProvider.Postgres}]", FaolanDbProvider.Sqlite),
+			Setting(Keys.LogFile, "Where the server writes its log, alongside the console.", "faolan.log"),
+			Setting(Keys.LogPacketBytes, "Add the raw byte dump to every packet log line. Verbose - for protocol work.", false),
+			Setting(Keys.McpEnabled, "Host the in-process MCP endpoint: database queries, live-session inspection and GM commands.", false),
+			Setting<ushort>(Keys.McpPort, "The port that MCP endpoint binds. Loopback only, so there is no address to configure.", 7099),
+			Setting(Keys.ServerListenAddress, "The interface the server BINDS. Not an address to dial - that is Server:PublicAddress.", "0.0.0.0"),
+			Setting<ushort>(Keys.ServerPlayerAgentPort, "The port the PlayerAgent binds - the tier the UniverseAgent hands a client on to.", 7011),
+			Optional<string>(Keys.ServerPrivateKey,
+				$"The login DH private key, {ClientLoginEncryption.PrivateHexLength} hex characters - generate one with --generate-login-key. Unset, no password is ever checked; set, every client must be patched (Faolan.ClientLauncher --patch-login) or it is refused."),
+			Setting(Keys.ServerPublicAddress, "The address the login tier ADVERTISES to clients - no port, and it must be reachable FROM the client. A DNS name is fine.", "127.0.0.1"),
+			Optional<string>(Keys.ServerPublicKey,
+				$"Patch THIS public key into clients, {ClientLoginEncryption.PublicHexLength} hex characters, instead of the one derived from Server:PrivateKey - for a client that talks to somebody ELSE's server. Only Faolan.ClientLauncher reads it."),
+			Setting<ushort>(Keys.ServerUniverseAgentPort, "The port the UniverseAgent binds - where a client enters, and the only port it has to be told about.", 7010),
+			Setting(Keys.ServerWelcomeString, "The message a client is greeted with at login. $BUILDSTRING expands to this server's build.", "Welcome to Project Faolan!\n$BUILDSTRING")
 		];
 
 		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(setting => new KeyValuePair<string, string?>(setting.Key(), DefaultText(setting)));
@@ -96,23 +98,29 @@ namespace Faolan.Core.Cli
 			public string LogFile => config[Keys.LogFile]!;
 			public bool LogPacketBytes => Value<bool>(config, Keys.LogPacketBytes);
 
-			public bool LoginAllowUnpatchedClients => Value<bool>(config, Keys.LoginAllowUnpatchedClients) || config.LoginPrivateKey == null;
-
-			public BigInteger? LoginPrivateKey => config[Keys.LoginPrivateKey] is { Length: > 0 } pk
-				? HexExtensions.ToBigInteger(pk)
-				: null;
-
-			public BigInteger? LoginPublicKey => config[Keys.LoginPublicKey] is { Length: > 0 } pk
-				? HexExtensions.ToBigInteger(pk)
-				: null;
-
 			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 			public ushort McpPort => Value<ushort>(config, Keys.McpPort);
 			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
 
 			public IPAddress ServerListenAddress => IPAddress.Parse(config[Keys.ServerListenAddress]!);
 			public ushort ServerPlayerAgentPort => Value<ushort>(config, Keys.ServerPlayerAgentPort);
+
+			public BigInteger? ServerPrivateKey => config[Keys.ServerPrivateKey] is {} pk
+				? pk.Length == ClientLoginEncryption.PrivateHexLength
+					? HexExtensions.ToBigInteger(pk)
+					: throw new InvalidOperationException($"{Keys.ServerPrivateKey} must be {ClientLoginEncryption.PrivateHexLength} characters long")
+				: null;
+
 			public string ServerPublicAddress => config[Keys.ServerPublicAddress] ?? throw new InvalidOperationException($"{Keys.ServerPublicAddress} is required");
+
+			// 256, not the private key's 64: a DH public key is a value mod the 1024-bit prime, and 256 hex chars is
+			// the fixed ASCII field the exe stores one in - the width the launcher patches and the width somebody
+			// else's server would hand you.
+			public BigInteger? ServerPublicKey => config[Keys.ServerPublicKey] is {} pk
+				? pk.Length == ClientLoginEncryption.PublicHexLength
+					? HexExtensions.ToBigInteger(pk)
+					: throw new InvalidOperationException($"{Keys.ServerPublicKey} must be {ClientLoginEncryption.PublicHexLength} characters long")
+				: null;
 
 			// Where a CLIENT dials to log in - the ADVERTISED address (never Server:ListenAddress, which is an
 			// interface: 0.0.0.0 is by design unreachable as a destination) and the UniverseAgent port, which is the
@@ -205,14 +213,13 @@ namespace Faolan.Core.Cli
 			public const string DatabaseProvider = "Database:Provider";
 			public const string LogFile = "Log:File";
 			public const string LogPacketBytes = "Log:PacketBytes";
-			public const string LoginAllowUnpatchedClients = "Login:AllowUnpatchedClients";
-			public const string LoginPrivateKey = "Login:PrivateKey";
-			public const string LoginPublicKey = "Login:PublicKey";
 			public const string McpEnabled = "Mcp:Enabled";
 			public const string McpPort = "Mcp:Port";
 			public const string ServerListenAddress = "Server:ListenAddress";
 			public const string ServerPlayerAgentPort = "Server:PlayerAgentPort";
+			public const string ServerPrivateKey = "Server:PrivateKey";
 			public const string ServerPublicAddress = "Server:PublicAddress";
+			public const string ServerPublicKey = "Server:PublicKey";
 			public const string ServerUniverseAgentPort = "Server:UniverseAgentPort";
 			public const string ServerWelcomeString = "Server:WelcomeString";
 		}
@@ -253,50 +260,42 @@ namespace Faolan.Core.Cli
 					$"'{key}' is set to '{text}', which is not one of {Enum.GetValues<T>().JoinAsString(", ")}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
-		private static string Comment(string line)
-		{
-			var content = line.TrimStart('\t');
-			return $"{line[..^content.Length]}//{content}";
-		}
-
+		// An OPTIONAL setting is written as JSON `null`, not as a commented-out line and not as "": the file then NAMES
+		// every key the catalog holds, which is the point of generating it, and null is what an unset setting resolves
+		// to anyway (the configuration provider reads a JSON null back as no value, so the accessor sees exactly the
+		// state it would if the line were absent). An empty string would not be that state - it is a VALUE, and a key
+		// that parses its text has to reject it.
 		private static Block Entry(Option setting, int depth)
 		{
 			var indent = new string('\t', depth);
 			var name = depth == 1
 				? setting.Key()
 				: Name(setting);
-			var written = setting.HasDefaultValue;
-			var line = $"{indent}\"{name}\": {Literal(setting)}";
 
 			return new Block([
-				$"{indent}// {setting.Description}", written
-					? line
-					: Comment(line)
-			], written);
+				$"{indent}// {setting.Description}",
+				$"{indent}\"{name}\": {Literal(setting)}"
+			]);
 		}
 
 		private static void Join(List<Block> blocks)
 		{
-			var last = blocks.FindLastIndex(b => b.Live);
-			for (var i = 0; i < last; i++)
-			{
-				if (blocks[i].Live)
-					blocks[i].Lines[^1] += ",";
-			}
+			for (var i = 0; i < blocks.Count - 1; i++)
+				blocks[i].Lines[^1] += ",";
 		}
 
 		private static string Literal(Option setting)
 		{
 			return setting.HasDefaultValue
 				? Literal(setting.GetDefaultValue())
-				: "\"\"";
+				: "null";
 		}
 
 		private static string Literal(object? value)
 		{
 			return value switch
 			{
-				null => "\"\"",
+				null => "null",
 				bool b => b
 					? "true"
 					: "false",
@@ -325,10 +324,9 @@ namespace Faolan.Core.Cli
 			lines.AddRange(entries.SelectMany(e => e.Lines));
 			lines.Add("\t}");
 
-			return entries.Any(e => e.Live)
-				? new Block(lines, true, true)
-				: new Block([.. lines.Select(Comment)], false, true);
+			return new Block(lines, true);
 		}
+
 
 		private static Option<T> Optional<T>(string key, string description)
 		{
@@ -367,6 +365,6 @@ namespace Faolan.Core.Cli
 				: throw new InvalidOperationException($"'{key}' is set to '{text}', which is not a {typeof(T).Name}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
-		private sealed record Block(List<string> Lines, bool Live, bool Section = false);
+		private sealed record Block(List<string> Lines, bool Section = false);
 	}
 }

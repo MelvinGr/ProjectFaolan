@@ -14,7 +14,7 @@ namespace Faolan.Core.Crypt
 	// server reproduces the secret with its OWN private key - which only works if the client used OUR public key, i.e.
 	// a patched/launched client (see docs/protocol/01-crypto.md + Faolan.ClientLauncher/ClientExePatcher.cs).
 	// An unpatched retail client uses Funcom's public key, so Decrypt returns garbage that fails the challenge check
-	// -> the caller falls back to accept-any. A server with no Login:PrivateKey at all reaches that same fallback for
+	// -> the caller falls back to accept-any. A server with no Server:PrivateKey at all reaches that same fallback for
 	// every client, by design. Algorithm validated by round-trip (docs plan, 2026-06-08).
 	//
 	// The DH parameters and the key handling used to be a separate DhKeys class holding the configured private key in
@@ -29,6 +29,12 @@ namespace Faolan.Core.Crypt
 	// key). Here the public half is DERIVED from the private one, so they cannot drift.
 	public static class ClientLoginEncryption
 	{
+		/// <summary>
+		///     The hex length a private key is written at - <see cref="GeneratePrivate" /> samples 256 BITS, so its
+		///     value is 32 bytes and its hex is 64 characters, left-padded where a leading nibble is zero.
+		/// </summary>
+		public const int PrivateHexLength = 64;
+
 		/// <summary>The hex length the exe stores a DH public key at - a fixed 256-char ASCII field.</summary>
 		public const int PublicHexLength = 256;
 
@@ -52,14 +58,15 @@ namespace Faolan.Core.Crypt
 		/// </summary>
 		/// <param name="loginKey">The client's <c>AnswerChallenge</c> body.</param>
 		/// <param name="privateKey">
-		///     This deployment's <c>Login:PrivateKey</c>, or null when it has none. A PARAMETER rather than the static
+		///     This deployment's <c>Server:PrivateKey</c>, or null when it has none. A PARAMETER rather than the static
 		///     state it used to be: a keyless server is a legitimate configuration, so "we cannot decrypt" has to be
 		///     something the caller states rather than something it can forget to set up.
 		/// </param>
 		/// <remarks>
-		///     With no <c>Login:PrivateKey</c> there is nothing to decrypt WITH, so every block reads as undecryptable.
-		///     That is the same null a genuinely unpatched client produces, and it takes the same path - which is why
-		///     an unset key forces <c>Login:AllowUnpatchedClients</c> on, or a keyless server would refuse everyone.
+		///     With no <c>Server:PrivateKey</c> there is nothing to decrypt WITH, so every block reads as undecryptable.
+		///     That is the same null a genuinely unpatched client produces - which is why the caller decides what to
+		///     do about an unpatched client on the KEY rather than on this null: a keyless server that denied them
+		///     would refuse everyone.
 		/// </remarks>
 		public static LoginCredentials? Decrypt(string loginKey, BigInteger privateKey)
 		{
@@ -142,7 +149,7 @@ namespace Faolan.Core.Crypt
 		}
 
 		/// <summary>
-		///     A fresh random private key, as the hex <c>Login:PrivateKey</c> takes. 256 bits - the exponent's size is
+		///     A fresh random private key, as the hex <c>Server:PrivateKey</c> takes. 256 bits - the exponent's size is
 		///     what a brute-force costs, and 256 bits is past reach.
 		/// </summary>
 		/// <remarks>

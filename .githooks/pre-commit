@@ -19,10 +19,6 @@
 #     boolean storage class and hands back 0/1, which Postgres rejects for a `boolean` column
 #   - tables emitted in foreign-key dependency order, so it loads with constraints ENFORCED instead of needing
 #     the least portable statement of all (`PRAGMA foreign_keys=OFF` vs `SET session_replication_role = replica`)
-# It is ONE file, with no per-dialect part left: the counter resync after inserting explicit ids used to live in
-# faolan.seq.{sqlite,postgres}.sql sidecars, and those are gone - no game-content table has a store-generated key
-# any more (every one is keyed by its identity), so both were empty. SqlSeedWriter throws rather than emit a seed
-# that would need one.
 #
 # Restoring: create the schema (`dotnet ef database update`), then run faolan.sql. Verified at 0 errors with full
 # row parity into a fresh SQLite AND a fresh Postgres, values compared bit-exact.

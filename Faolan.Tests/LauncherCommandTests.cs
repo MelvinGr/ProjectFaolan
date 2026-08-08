@@ -122,23 +122,23 @@ namespace Faolan.Tests
 		//
 		// It asserts the LAYER rather than options.Configuration (which is that layer already resolved against the
 		// stack) because "the key was not passed" is only visible before the file layers answer for it: on a machine
-		// whose faolan.user.json holds a Login:PublicKey, the resolved config has one whatever the command line said.
+		// whose faolan.user.json holds a Server:PublicKey, the resolved config has one whatever the command line said.
 		[Fact]
 		public void Parse_LoginKeys_ComeBackAsAConfigOverrideLayer()
 		{
-			var command = new RootCommand("test") { FaolanSettings.Get(Keys.LoginPrivateKey), FaolanSettings.Get(Keys.LoginPublicKey) };
-			var layer = FaolanCommandLine.Overrides(command.Parse(["--Login:PrivateKey", "AABB"]), [.. command.Options]);
+			var command = new RootCommand("test") { FaolanSettings.Get(Keys.ServerPrivateKey), FaolanSettings.Get(Keys.ServerPublicKey) };
+			var layer = FaolanCommandLine.Overrides(command.Parse(["--Server:PrivateKey", "AABB"]), [.. command.Options]);
 
-			Assert.Equal("AABB", Assert.Contains(Keys.LoginPrivateKey, layer));
-			Assert.DoesNotContain(Keys.LoginPublicKey, layer);
+			Assert.Equal("AABB", Assert.Contains(Keys.ServerPrivateKey, layer));
+			Assert.DoesNotContain(Keys.ServerPublicKey, layer);
 
 			// ...and the launcher hands on that layer resolved, so the patcher reads the key from the same stack the
 			// server does rather than from the flag alone.
-			var options = LauncherCommand.Parse(["--patch-login", "--Login:PrivateKey", "AABB"], out _);
+			var options = LauncherCommand.Parse(["--patch-login", "--Server:PrivateKey", "AABB"], out _);
 
 			Assert.NotNull(options);
 			Assert.True(options.PatchLogin);
-			Assert.Equal("AABB", options.Configuration[Keys.LoginPrivateKey]);
+			Assert.Equal("AABB", options.Configuration[Keys.ServerPrivateKey]);
 		}
 
 		// A --launcher-notes URL the client cannot use is a typo in the flag, so it is refused during the PARSE -

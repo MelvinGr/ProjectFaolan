@@ -16,7 +16,7 @@ namespace Faolan.ClientLauncher
 	// `--username`, ... no longer read a value past the end of argv and crash with an IndexOutOfRangeException.
 	//
 	// Two kinds of option live here, as everywhere else in the repo:
-	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey, Server:PublicAddress, Server:UniverseAgentPort,
+	//   - CONFIG KEYS (Server:PrivateKey, Server:PublicKey, Server:PublicAddress, Server:UniverseAgentPort,
 	//     Cdn:PublicAddress) name a setting that also lives in
 	//     faolan.json and the environment, so the option's NAME is the configuration path and its value is resolved
 	//     through the shared builder (FaolanCommandLine) - the launcher patches the key the server is holding
@@ -63,7 +63,7 @@ namespace Faolan.ClientLauncher
 
 		private static readonly Option<bool> PatchLogin = new("--patch-login")
 		{
-			Description = "Patch the client's DH key ON DISK before launch so the server can validate the real password. The key comes from the SAME faolan.json/environment the server reads, so overriding Login:PrivateKey there patches the matching public key automatically."
+			Description = "Patch the client's DH key ON DISK before launch so the server can validate the real password. The key comes from the SAME faolan.json/environment the server reads, so overriding Server:PrivateKey there patches the matching public key automatically."
 		};
 
 		private static readonly Option<bool> PatchUniverseAddr = new("--patch-universeaddr")
@@ -86,10 +86,10 @@ namespace Faolan.ClientLauncher
 		// The settings the launcher reads, named EXACTLY as they are in faolan.json and the environment (the
 		// one-name-per-setting rule - see Faolan.Core/Cli/FaolanCommandLine.cs). Passing one here is only for a one-off
 		// run; the normal path is that the launcher reads the same faolan.json the server and the content mirror do, so
-		// a configured Login:PrivateKey automatically patches its own matching public key, and --patch-universeaddr/--patch-cdn
+		// a configured Server:PrivateKey automatically patches its own matching public key, and --patch-universeaddr/--patch-cdn
 		// point the client at the login server and mirror that are actually configured, with nothing to keep in step.
 		private static readonly Option[] Settings = FaolanSettings.Options(
-			Keys.LoginPrivateKey, Keys.LoginPublicKey,
+			Keys.ServerPrivateKey, Keys.ServerPublicKey,
 			Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort,
 			Keys.CdnPublicAddress);
 

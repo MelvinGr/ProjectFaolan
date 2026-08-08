@@ -60,10 +60,18 @@ namespace Faolan.UniverseAgent
 					var loginKey = body.ReadString();
 					var account = client.Session.Account;
 
+					// THREE outcomes, and Server:PrivateKey alone decides which two are reachable: with a key, we either
+					// decrypted the block (validate the password) or we did not (REFUSE - the client is unpatched, and
+					// a server that holds a key holds it to make the password required); with no key, there is nothing
+					// to decrypt with, so every client takes the accept-any path on its account name alone.
+					//
+					// ⚠️ "We could not decrypt" is NOT the same as "we hold no key" - it is also every unpatched client
+					// on a server that DOES hold one, which is the common case. Keep the two apart: the key is read
+					// FIRST, and the decrypt failure below it can then only mean an unpatched client.
 					bool authenticated;
-					switch (Configuration.LoginPrivateKey)
+					if (Configuration.ServerPrivateKey is { } privateKey)
 					{
-						case {} privateKey when ClientLoginEncryption.Decrypt(loginKey, privateKey) is { } credentials:
+						if (ClientLoginEncryption.Decrypt(loginKey, privateKey) is { } credentials)
 						{
 							authenticated = credentials.Username == account.UserName &&
 							                credentials.Challenge == account.AuthChallenge.ToString("N") &&
@@ -73,25 +81,19 @@ namespace Faolan.UniverseAgent
 								Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
 							else
 								Logger.LogWarning("UniverseAgent login: WRONG PASSWORD for {UserName} (patched client).", account.UserName);
-
-							break;
 						}
-
-						case null when Configuration.LoginAllowUnpatchedClients:
-						{
-							authenticated = true;
-
-							Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
-							break;
-						}
-
-						default:
+						else
 						{
 							authenticated = false;
 
-							Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
-							break;
+							Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and this server has a Server:PrivateKey (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
 						}
+					}
+					else
+					{
+						authenticated = true;
+
+						Logger.LogDebug("UniverseAgent login: no Server:PrivateKey; accepting {UserName} without password check.", account.UserName);
 					}
 
 					if (!authenticated)

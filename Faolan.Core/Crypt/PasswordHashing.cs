@@ -16,9 +16,9 @@ namespace Faolan.Core.Crypt
 	///         string — see <c>DatabaseInitializer.EnsureDefaultAccountAsync</c>.
 	///     </para>
 	///     <para>
-	///         An UNPATCHED game client is a separate matter and still bypasses this entirely, gated by
-	///         <c>Login:AllowUnpatchedClients</c> — its login block cannot be decrypted, so there is no password to
-	///         check in the first place.
+	///         An UNPATCHED game client is a separate matter and bypasses this entirely on a server with no
+	///         <c>Server:PrivateKey</c> — its login block cannot be decrypted, so there is no password to check in the
+	///         first place. A server that HAS a key refuses it instead.
 	///     </para>
 	/// </summary>
 	public static class PasswordHashing

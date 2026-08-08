@@ -49,7 +49,7 @@ COPY --from=build /app/publish ./
 # ⚠️ Not optional: with no seed beside the exe, a container on an empty volume FAILS at startup rather than coming
 # up with an empty world (DatabaseInitializer.EnsureGameDataAsync throws) - which is what makes leaving this out a
 # deploy-time break, not a smaller image.
-COPY faolan.sql faolan.seq.sqlite.sql faolan.seq.postgres.sql ./
+COPY faolan.sql ./
 
 # Ports for the all-in-one default run: the login tier is UniverseAgent 7010 (the only fixed client entry port) +
 # PlayerAgent 7011 (from the config); the realm-local services - GameServer 7014, AgentServer/chat 7012,

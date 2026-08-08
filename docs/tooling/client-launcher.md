@@ -75,8 +75,8 @@ Faolan.ClientLauncher [options]
   --patch-login       patch the DH key (retail's -> ours) on disk before launch so the server can validate the
                       real password. Cross-platform; the exe is backed up to .bak. The key comes from the same
                       faolan.json/environment the server reads (see below)
-  --Login:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
-  --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
+  --Server:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
+  --Server:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
                       talk to somebody else's server
   --Server:PublicAddress <a> / --Server:UniverseAgentPort <p> / --Cdn:PublicAddress <url>   one-off overrides of the
                       addresses --patch-universeaddr / --patch-cdn write, for a launch that should not match the
@@ -130,14 +130,15 @@ By default any password is accepted. To enforce the real password, the client mu
   libcurl 7.19.7 has no SSL backend, so an https URL fails in-client with cURL error 1
   `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
 - Server side: `Faolan.Core/Crypt/ClientLoginEncryption.cs` decrypts the block and, for a patched client, enforces
-  `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
-- **`Login:AllowUnpatchedClients`** (server config, default `true`) decides whether that fallback exists at all.
-  Set it `false` and an unpatched client — one whose block the server cannot decrypt, so it proved only the
-  account name — is refused instead of accepted. That makes `--patch-login` mandatory for every client that
-  connects, so flip it only once your clients are patched.
+  `password == Account.Password`. Set a real `Account.Password` to test rejection.
+- **`Server:PrivateKey` (server config) decides whether that fallback exists at all**, and there is no second
+  setting: with no key the server cannot decrypt anything, so every client is accepted on its account name; set
+  one and an unpatched client — whose block the server cannot decrypt, so it proved only the account name — is
+  refused instead. That makes `--patch-login` mandatory for every client that connects, so configure the key only
+  once your clients are patched.
 - **The launcher reads the same `faolan.json` (and the same environment) the server does**, so a deployment that
-  overrides `Login:PrivateKey` gets the matching public key patched in by derivation — there is no second setting
-  to keep in step. `Login:PublicKey` covers the one case where the launcher's key is not ours;
+  overrides `Server:PrivateKey` gets the matching public key patched in by derivation — there is no second setting
+  to keep in step. `Server:PublicKey` covers the one case where the launcher's key is not ours;
   see [01-crypto.md](../protocol/01-crypto.md#configuring-the-keypair).
 - **The key SLOT is found by shape, not by retail's value**, so an exe that is already patched can be patched
   again — which is what rotating the server key needs. The slot is the NUL-delimited run of exactly 256 ASCII hex

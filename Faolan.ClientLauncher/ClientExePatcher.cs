@@ -10,8 +10,8 @@ namespace Faolan.ClientLauncher
 	// Statically patch the AgeOfConan.exe FILE: swap the embedded Funcom DH pubkey for the one the caller hands in (so
 	// the server can validate the real password, docs/protocol/01-crypto.md) and optionally redirect the launcher-notes
 	// URL. The key is a PARAMETER of PatchPublicKey rather than something this class resolves from configuration: which
-	// key belongs in a client is the launcher's decision (derived from Login:PrivateKey, or an explicit
-	// Login:PublicKey for somebody else's server), and it is stated at the call site. Plain
+	// key belongs in a client is the launcher's decision (derived from Server:PrivateKey, or an explicit
+	// Server:PublicKey for somebody else's server), and it is stated at the call site. Plain
 	// byte edits - no ptrace, no process memory, so it works IDENTICALLY on every platform (the old /proc/<pid>/mem
 	// in-memory patch was Linux-only). It persists on disk, so it runs BEFORE the exe launches and before the
 	// -clienthash md5 (so the hash matches the file we run); the launcher backs the exe up to .bak first, so --restore

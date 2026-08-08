@@ -8,83 +8,78 @@
 // in faolan.user.json for example.
 {
 	"Account": {
-		// Character slots advertised when not premium.
+		// How many character slots an account gets when it is not premium.
 		"FreeCharSlots": 4,
-		// Advertise every account as subscribed.
+		// Tell every client its account is subscribed, so nothing is gated behind a subscription.
 		"Premium": true,
-		// Character slots advertised when premium.
+		// How many character slots an account gets when it is premium.
 		"PremiumCharSlots": 10
 	},
 
 	"Cdn": {
-		// Address the mirror BINDS - an interface, not the address a client dials.
+		// The interface the CDN mirror BINDS. Not an address to dial - that is Cdn:PublicAddress.
 		"ListenAddress": "0.0.0.0",
-		// Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.
+		// The port the CDN mirror BINDS, on Cdn:ListenAddress. Not a port to dial - that is Cdn:PublicAddress.
 		"ListenPort": 7081,
-		// Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (Only used by Faolan.ClientLauncher)
+		// The full URL every mirror CLIENT dials, scheme and port included. http ONLY - the game client's libcurl has no SSL.
 		"PublicAddress": "http://127.0.0.1:7081",
-		// Directory the mirror stores fetched CDN blobs in.
+		// Where the CDN mirror keeps the blobs it has fetched.
 		"Store": "./cdn-store"
 	},
 
 	"ChatBridge": {
-		// How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.
+		// How far back a channel's history still counts as backlog rather than new traffic, in milliseconds.
 		"BacklogGraceMs": 120000,
-		// Push in-game "Claude" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)
+		// Push in-game "Claude" channel chat into the Claude Code session. Requires Mcp:Enabled; off still leaves the reply tool working.
 		"Enabled": false,
-		// Chat-bridge poll interval, in milliseconds.
+		// How often the chat bridge looks for new messages, in milliseconds.
 		"PollMs": 1500
 	},
 
 	"Content": {
-		// The client build the protocol was decoded against. A client reporting anything else is not refused.
+		// The client build the protocol was decoded against. Another build is WARNED about, never refused.
 		"ClientVersion": "v5.01.0@602248",
-		// The client's RDB folder. Usually not needed.
-		//"RdbDir": ""
-		// Baked terrain directory; without it ground-snap and line-of-sight are disabled.
+		// The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it.
+		"RdbDir": null,
+		// Where the baked terrain lives. Without it the server still runs, with ground-snap and line-of-sight disabled.
 		"TerrainDir": "./terrain"
 	},
 
 	"Database": {
-		// The database to serve from; built from faolan.sql on first run if it has no content.
+		// The database to serve from. One with no game content in it is filled from faolan.sql on first run.
 		"ConnectionString": "Data Source=faolan.db",
-		// The database engine to serve from.
+		// The engine that database runs on. [Sqlite, Postgres]
 		"Provider": "Sqlite"
 	},
 
 	"Log": {
-		// Log file path.
+		// Where the server writes its log, alongside the console.
 		"File": "faolan.log",
-		// Include the raw byte dump in packet log lines.
+		// Add the raw byte dump to every packet log line. Verbose - for protocol work.
 		"PacketBytes": false
 	},
 
-	"Login": {
-		// Let a unpatched client login with its account NAME alone. False requires a patched client & Login:PrivateKey filed.
-		"AllowUnpatchedClients": true
-		// The server private key. Generate one with --generate-login-key.
-		//"PrivateKey": ""
-		// Patch clients with Faolan.ClientLauncher --patch-login. (Only used by Faolan.ClientLauncher)
-		//"PublicKey": ""
-	},
-
 	"Mcp": {
-		// Host the in-process MCP endpoint.
+		// Host the in-process MCP endpoint: database queries, live-session inspection and GM commands.
 		"Enabled": false,
-		// MCP endpoint port.
+		// The port that MCP endpoint binds. Loopback only, so there is no address to configure.
 		"Port": 7099
 	},
 
 	"Server": {
-		// Address the server BINDS - an interface, not the address a client dials.
+		// The interface the server BINDS. Not an address to dial - that is Server:PublicAddress.
 		"ListenAddress": "0.0.0.0",
-		// PlayerAgent port.
+		// The port the PlayerAgent binds - the tier the UniverseAgent hands a client on to.
 		"PlayerAgentPort": 7011,
-		// The address the login tier advertises to clients, Just address (no port), must be reachable FROM the client. (Can be a dns record)
+		// The login DH private key, 64 hex characters - generate one with --generate-login-key. Unset, no password is ever checked; set, every client must be patched (Faolan.ClientLauncher --patch-login) or it is refused.
+		"PrivateKey": null,
+		// The address the login tier ADVERTISES to clients - no port, and it must be reachable FROM the client. A DNS name is fine.
 		"PublicAddress": "127.0.0.1",
-		// UniverseAgent port. (Main entry point).
+		// Patch THIS public key into clients, 256 hex characters, instead of the one derived from Server:PrivateKey - for a client that talks to somebody ELSE's server. Only Faolan.ClientLauncher reads it.
+		"PublicKey": null,
+		// The port the UniverseAgent binds - where a client enters, and the only port it has to be told about.
 		"UniverseAgentPort": 7010,
-		// Login MOTD.
+		// The message a client is greeted with at login. $BUILDSTRING expands to this server's build.
 		"WelcomeString": "Welcome to Project Faolan!\n$BUILDSTRING"
 	}
 }

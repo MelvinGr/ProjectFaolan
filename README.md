@@ -364,7 +364,7 @@ dotnet run --project Faolan -- --generate-login-key     # print a fresh login DH
 ```
 
 `--write-default-config` takes an optional path. `--generate-login-key` writes nothing at all: it prints both
-halves of the pair — the private one to paste under `Login:PrivateKey` in `faolan.user.json` (a keypair is
+halves of the pair — the private one to paste under `Server:PrivateKey` in `faolan.user.json` (a keypair is
 per-deployment, and that file is gitignored), the derived public one because that is what every client has to be
 re-patched with (`Faolan.ClientLauncher --patch-login`).
 
@@ -394,7 +394,7 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | `Database` `{ Provider, ConnectionString }` | `Sqlite` (default; `Data Source=faolan.db`) or `Postgres` + its connection string |
 | `Server` `{ Address, UniverseAgentPort, PlayerAgentPort, WelcomeString }` | the address the login tier advertises to clients (must be reachable from the client - it may be a DNS name), its two listen ports (7010 is the fixed client entry point), and the login MOTD |
 | `Content` `{ TerrainDir, RdbDir, ClientVersion }` | where the game data lives: the baked-terrain dir for ground-snap and line-of-sight, the client's RDB folder (optional - part of the game INSTALL, so it has no committed default), and the client build the protocol was decoded against |
-| `Login` `{ PrivateKey, PublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
+| `Login` `{ PrivateKey, PublicKey }` | the login DH keypair. Unset (the default) means no password is ever checked and every client is accepted on its account name; setting `PrivateKey` requires every client to be patched (`Faolan.ClientLauncher --patch-login`), since a client the server cannot decrypt has proved only that name |
 | `Mcp` `{ Enabled, Port }` | the in-process MCP endpoint the game server hosts |
 | `Cdn` `{ Store, ListenAddress, ListenPort, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
 | `ChatBridge` `{ Enabled, PollMs, BacklogGraceMs }` | the Claude chat-bridge: whether it pushes in-game chat into the Claude session (default: yes), and its poll-loop tuning. It always dials the local `Mcp:Port` — that endpoint binds loopback, so its URL is derived rather than configured |
