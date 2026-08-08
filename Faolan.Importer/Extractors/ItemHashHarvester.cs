@@ -132,14 +132,24 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var (template, item) in found)
 			{
-				if (into.TryGetValue(template, out var existing))
+				// ⚠️ This used to `continue` on any existing entry, so the FIRST packet to mention a template won
+				// outright - and a template's first sighting is often a source that carries no hash. The Claims/Redeem
+				// list is exactly that (identity quad, hash 0), so nine claim items shipped at Hash 0 even though the
+				// SAME capture delivers them seconds later via a live 0x2020 add that DOES carry the hash: the good
+				// record arrived second and was dropped, and logged as a "conflict" for good measure (#719).
+				if (into.TryGetValue(template, out var existing) && !existing.Equals(item))
 				{
-					if (!existing.Equals(item))
+					// Filling in a MISSING hash is not a disagreement - it is the reason there are several sources.
+					// A real conflict is a different identity quad, or two different NON-ZERO hashes.
+					var oneIsJustMissingTheHash =
+						(existing.Hash == 0 && item.Hash != 0 && (existing with { Hash = item.Hash }).Equals(item))
+						|| (item.Hash == 0 && existing.Hash != 0 && (item with { Hash = existing.Hash }).Equals(existing));
+
+					if (!oneIsJustMissingTheHash)
 						conflicts?.Add($"template {template}: {existing} vs {item}");
-					continue;
 				}
 
-				into[template] = item;
+				Record(into, template, item);
 			}
 		}
 
@@ -177,7 +187,7 @@ namespace Faolan.Importer.Extractors
 			if (acg?.Key1 == null || acg.Template1 == 0)
 				return;
 
-			into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+			Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
 
 			// Only record the specific kinds (Quest/Resource); Normal items are left to the DB default so this never
 			// downgrades an item another source already classified.
@@ -221,7 +231,7 @@ namespace Faolan.Importer.Extractors
 				var quad = SnapshotRoot.IdentityQuadOf(entry);
 				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
-					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
+					Record(into, template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
 			}
 		}
 
@@ -261,7 +271,7 @@ namespace Faolan.Importer.Extractors
 				if ((d1 | d2 | d3 | d4) == 0)
 					continue;
 
-				into.TryAdd(claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
+				Record(into, claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
 			}
 		}
 
@@ -285,7 +295,7 @@ namespace Faolan.Importer.Extractors
 				if (acg?.Key1 == null || acg.Template1 == 0)
 					continue;
 
-				into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+				Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
 			}
 		}
 
@@ -306,7 +316,7 @@ namespace Faolan.Importer.Extractors
 				var item = a.Entry.ItemData;
 				var key = item?.Key1;
 				if (item is { Template1: not 0 } && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
-					into.TryAdd(item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash));
+					Record(into, item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash));
 			}
 		}
 
@@ -359,7 +369,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)
-				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash));
+				Record(into, e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash));
 		}
 
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
@@ -393,6 +403,30 @@ namespace Faolan.Importer.Extractors
 
 				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, hash);
 			}
+		}
+
+		// Records an item, UPGRADING an entry that arrived without a hash.
+		//
+		// ⚠️ This was `into.TryAdd`, and first-record-wins silently cost us the hash for every item whose FIRST
+		// sighting was a hash-less source. The Claims/Redeem list is exactly that: it carries the identity quad but
+		// sends hash 0 (retail does not put one in a claim row), so nine of Melvin's claim items sat at Hash 0 in the
+		// shipped DB even though the SAME capture delivers them again seconds later via a live 0x2020 add that DOES
+		// carry the hash. `TryAdd` threw the good record away because the claim row got there first (#719).
+		//
+		// The identity quad is never overwritten - only a MISSING hash is filled - so a source that legitimately has
+		// no hash cannot clobber one that does, whichever order they appear in. Cross-checked before relying on it:
+		// over the 75 templates the live-add source carries a hash for, our DB already agreed on 64 and DISAGREED on
+		// ZERO, so the hash is the same per-template value whichever source it comes from.
+		private static void Record(IDictionary<uint, CapturedItem> into, uint template, CapturedItem captured)
+		{
+			if (!into.TryGetValue(template, out var existing))
+			{
+				into[template] = captured;
+				return;
+			}
+
+			if (existing.Hash == 0 && captured.Hash != 0)
+				into[template] = existing with { Hash = captured.Hash };
 		}
 
 		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoFullCharacterIIR root)
