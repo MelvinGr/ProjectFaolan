@@ -198,13 +198,13 @@ snapshot per level fills a row with no decoding at all.
 which comes in ranks, and that is what gates the recipe book. We DO carry the state and DO send it correctly — it
 rides the spawn scaffold's feat/ability list (`CharacterSkills`, `[u8 rank][u32 id]`), imported per character and
 replayed verbatim, which is why an imported character's professions match retail. What is unknown is which of
-those ids is a profession and what the rank byte counts. What IS pinned: a profession is a row whose `Rank` byte
-is 65–75, and **one profession is one row** — a single-profession control (AssassinL23 the assassin: *Miner,
-Apprentice*, one row) against an eight-profession one (NecroL80: eight rows). What that byte MEANS is not settled;
-an earlier "slots 70–75 are the Gathering six" reading was fitted to two near-identical mages and the assassin
-refutes it (his slot-75 base is `3287`, theirs `3234`; base `3232` is slot 66 on one character and 67 on the
-other). The TIER is unlocated too, and the id's trailing `base*100 + rank` digits are not it — NecroL80's two
-Grandmaster crafts read tails `02` and `05`. Around it:
+the tier is recorded in. The profession itself is settled: a profession is a `CharacterSkills` row whose
+`Rank` byte is 65–75, and that byte IS the profession id — 5 crafting + 6 gathering is exactly 11 slots, with
+70–75 the gathering six in the client's list order (fixed at the end by a single-profession control: the
+assassin's only profession is Miner and his only row is slot 75) and 65–69 the crafting five. What is NOT in
+the table is the TIER: slot 72 (Skinner) carries the identical `SkillId` `328908` at Master on one character
+and Novice on another, and slot 73 (Stonecutter) `326000` at Master and Apprentice. So neither the rank byte
+nor the id encodes Novice…Grandmaster. Around it:
 
 - `TradeskillFlags` (stat `0xCE`) is **not** it — it rides NPCs (a *Dockworker* carries 99), not the player.
 - `Craftmanship` / `MaxCraftmanship` (`0x88` / `0x89`) DO ride the player and move (0 → 1, 0 → 2 → 3 in early

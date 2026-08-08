@@ -118,24 +118,34 @@ would close the client's window on an item it never received.
   rank byte counts, and which recipes each profession covers.
 
   **The professions are the `CharacterSkills` rows whose `Rank` byte is 65–75 (`0x41`–`0x4B`)** — the spawn
-  scaffold's feat/ability list, imported per character and replayed verbatim. **One profession = one row**,
-  which is pinned by a single-profession control: AssassinL23 (assassin) has exactly one profession in-client
-  (*Miner, Apprentice*, no Crafting) and exactly one row in that band, while NecroL80 has eight and eight.
+  scaffold's feat/ability list, imported per character and replayed verbatim. That byte is the **profession
+  id**: AoC has 5 crafting + 6 gathering professions, and 65–75 is exactly 11 slots.
 
-  ⚠️ **What that byte MEANS is not settled, and an earlier reading here was wrong.** It looked like a stable
-  per-profession slot, because the two level-80 mages share bases across slots 70–75. The assassin breaks it:
+  Pinned against three in-client sheets, including a single-profession control:
 
-  | character | slot | `SkillId` | base |
-  |---|---|---|---|
-  | AssassinL23 | 75 | `328703` | 3287 |
-  | NecroL80 | 75 | `323405` | 3234 |
-  | DemoL80 | 75 | `323402` | 3234 |
+  | character | professions in-client | rows |
+  |---|---|---|
+  | AssassinL23 (assassin) | Miner only | one row, **slot 75** |
+  | NecroL80 (necro) | 2 crafting + all 6 gathering | slots **65, 66** + **70–75** |
+  | DemoL80 (demo) | 2 *different* crafting + all 6 gathering | slots **67, 68** + **70–75** |
 
-  A fixed profession would keep its base; AssassinL23's does not. And base `3232` is slot **66** for NecroL80 but
-  **67** for DemoL80. So neither the byte nor the base names a profession on its own.
+  Slots **70–75 are the gathering six in the client's own list order** — Prospector, Weaver, Skinner,
+  Stonecutter, Woodcutter, Miner — which the control fixes at the end: AssassinL23's only profession is Miner and
+  his only row is slot 75. Slots **65–69 are the five crafting professions**, one slot each: NecroL80's
+  Weaponsmith + Armorsmith occupy `{65, 66}` and DemoL80's Alchemist + Gemcutter `{67, 68}`, so the slot is the
+  profession rather than a per-character sequence number. (Which of each pair is which is not resolved, and 69
+  has not been seen.)
 
-  ⚠️ The **tier** (Apprentice … Grandmaster) is also unlocated, and the id's trailing `base*100 + rank` digits
-  are not it: NecroL80's two Grandmaster crafts read tails `02` and `05`, so equal tiers do not share a tail.
+  ⚠️ **The TIER is NOT in this table.** Two professions carry a byte-identical `SkillId` at different tiers:
+
+  | slot | profession | `SkillId` | NecroL80 | DemoL80 |
+  |---|---|---|---|---|
+  | 72 | Skinner | `328908` | Master | **Novice** |
+  | 73 | Stonecutter | `326000` | Master | **Apprentice** |
+
+  So neither the `Rank` byte (it is the slot) nor the `SkillId` encodes Novice…Grandmaster, and the id's
+  trailing `base*100 + rank` digits are not it either — NecroL80's two Grandmaster crafts read tails `02` and
+  `05`. The tier is recorded somewhere else entirely and is still unlocated.
   [V0: what records a learned tradeskill]
 
 - `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
