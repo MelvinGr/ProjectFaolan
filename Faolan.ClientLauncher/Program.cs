@@ -306,15 +306,33 @@ namespace Faolan.ClientLauncher
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 
-			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours. The redirect PERSISTS after
-			// this run - it is NOT reverted on exit and no backup/sidecar file is written. Run `--restore` to undo it.
-			if (options.UniverseAddr is { } universeAddr && SetUniverseAddr(gameDir, universeAddr) != null)
-				Console.WriteLine($"redirected UniverseAddr -> {universeAddr}");
+			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours - the ADVERTISED address and the
+			// UniverseAgent port the server itself is configured with, so the client dials what the server binds. The
+			// redirect PERSISTS after this run - it is NOT reverted on exit and no backup/sidecar file is written. Run
+			// `--restore` to undo it.
+			if (options.PatchUniverseAddr)
+			{
+				var universeAddr = options.Configuration.UniverseAddress;
+				if (SetUniverseAddr(gameDir, universeAddr) != null)
+					Console.WriteLine($"redirected UniverseAddr -> {universeAddr}");
+			}
 
-			// Point the three LocalConfig.xml CDN keys at the local ContentMirror. Same deal: persists, no revert,
-			// no backup file; `--restore` undoes it.
-			if (options.Cdn is { } murl && SetCdnConfig(gameDir, murl))
-				Console.WriteLine($"redirected CDN keys -> {murl}");
+			// Point the three LocalConfig.xml CDN keys at the local ContentMirror, at the address the mirror is
+			// configured to be reachable ON (Cdn:PublicAddress - NOT Cdn:ListenAddress, which is an interface). Same
+			// deal: persists, no revert, no backup file; `--restore` undoes it.
+			if (options.PatchCdn)
+			{
+				// The one way this can be blank is an explicitly emptied key. Say so rather than silently launching a
+				// client still pointed at Funcom's dead CDN, which is a --patch-cdn that reads as if it worked.
+				if (options.Configuration.CdnPublicAddress is not { Length: > 0 } murl)
+				{
+					Console.Error.WriteLine(
+						"--patch-cdn : Cdn:PublicAddress is not set - there is no mirror address to redirect to. Set it in faolan.json / faolan.user.json, " +
+						"in the environment as Cdn__PublicAddress, or on the command line as --Cdn:PublicAddress.");
+				}
+				else if (SetCdnConfig(gameDir, murl))
+					Console.WriteLine($"redirected CDN keys -> {murl}");
+			}
 
 			// Open the client's own debug channels by writing its logger config (dbDebug.conf). BEFORE the launch: the
 			// client reads that file once, during startup, so the channels are live from its first line - and it needs
@@ -437,7 +455,7 @@ namespace Faolan.ClientLauncher
 			var b = baseUrl.TrimEnd('/');
 			var changed = false;
 			// The three LocalConfig.xml CDN keys and the mirror path tag that routes each (the request path carries
-			// the tag, so a key -> <base>/<tag>/upm). UniverseAddr (the login server) is separate - see --universeaddr.
+			// the tag, so a key -> <base>/<tag>/upm). UniverseAddr (the login server) is separate - see --patch-universeaddr.
 			foreach (var (key, tag) in new[] { ("HttpPatchAddr", "update"), ("ClientHttpPatchAddr", "gameupdate"), ("ControlHttpPatchAddr", "control") })
 			{
 				if (SetConfigTag(gameDir, key, $"{b}/{tag}/upm") != null)

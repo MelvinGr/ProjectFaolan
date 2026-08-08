@@ -28,7 +28,7 @@ dotnet test Faolan.Tests --filter "FullyQualifiedName~Shop" # by substring
 dotnet run --project Faolan
 
 # Drive the retail client unattended against the local server (auto-login -> world)
-dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
+dotnet run --project Faolan.ClientLauncher -- --console --patch-universeaddr -u faolan -p any -c <char>
 
 # Rebuild DB content from captures. The importer is MODULE-BASED (docs/tooling/importer.md): each subsystem
 # is a selectable module; `--dry-run` writes nothing (runs in a rolled-back txn, prints the per-table delta).

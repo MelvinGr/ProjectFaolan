@@ -429,7 +429,7 @@ dotnet test Faolan.Tests --filter GuildPacketTests        # a single class
 launch token, auto-logs-in, and can drive straight to the world):
 
 ```sh
-dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>
+dotnet run --project Faolan.ClientLauncher -- --console --patch-universeaddr -u faolan -p any -c <char>
 ```
 
 See `docs/tooling/client-launcher.md` for the full flag set and the loopback-capture testing workflow.

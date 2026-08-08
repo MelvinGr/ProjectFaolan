@@ -40,16 +40,14 @@ goto end
 :cdn
 dotnet run --project .\Faolan.Web.Content\Faolan.Web.Content.csproj -- ^
     --Cdn:Store "C:\games\mirror-archive" ^
-    --Cdn:ListenAddress 127.0.0.1 ^
-    --Cdn:ListenPort 7081 ^
     %ARGS%
 goto end
 
 :client
 dotnet run --project .\Faolan.ClientLauncher\Faolan.ClientLauncher.csproj --no-build -- ^
     --console ^
-    --universeaddr 127.0.0.1:7010 ^
-    --cdn http://127.0.0.1:7081 ^
+    --patch-universeaddr ^
+    --patch-cdn ^
     --launcher-notes "http://127.0.0.1:7081/_stats?UniverseName=%%s&Language=%%s" ^
     %ARGS%
 goto end
@@ -58,8 +56,8 @@ goto end
 dotnet run --project .\Faolan.ClientLauncher\Faolan.ClientLauncher.csproj --no-build -- ^
     --exe "C:\Games\Age of Conan 2\AgeOfConan.exe" ^
     --console ^
-    --universeaddr 127.0.0.1:7010 ^
-    --cdn http://127.0.0.1:7081 ^
+    --patch-universeaddr ^
+    --patch-cdn ^
     --launcher-notes "http://127.0.0.1:7081/_stats?UniverseName=%%s&Language=%%s" ^
     %ARGS%
 goto end

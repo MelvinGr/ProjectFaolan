@@ -16,16 +16,59 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_ReadsTheDocumentedTestLaunch()
 		{
-			var options = LauncherCommand.Parse(["--console", "--universeaddr", "127.0.0.1:7010", "-u", "faolan", "-p", "any", "-c", "tester"], out var exitCode);
+			var options = LauncherCommand.Parse(["--console", "--patch-universeaddr", "-u", "faolan", "-p", "any", "-c", "tester"], out var exitCode);
 
 			Assert.NotNull(options);
 			Assert.Equal(0, exitCode);
 			Assert.True(options.Console);
-			Assert.Equal("127.0.0.1:7010", options.UniverseAddr);
+			Assert.True(options.PatchUniverseAddr);
 			Assert.Equal("faolan", options.Username);
 			Assert.Equal("any", options.Password);
 			Assert.Equal("tester", options.Charname);
 			Assert.Empty(options.DebugChannels);
+		}
+
+		// --patch-universeaddr and --patch-cdn are FLAGS: they say whether to redirect the client, and the address comes from the
+		// settings the server and the content mirror already read (Server:Address + Server:UniverseAgentPort,
+		// Cdn:PublicAddress). Each used to carry its own address, so a launch line pointed the client at one endpoint
+		// while faolan.json pointed the server at another, and only the client's copy could be silently wrong.
+		//
+		// Bare is therefore a complete invocation - it is what `run.sh --client` passes - and the following token is
+		// the next flag, not the address.
+		[Fact]
+		public void Parse_RedirectFlags_TakeNoAddressAndDoNotEatTheNextFlag()
+		{
+			var options = LauncherCommand.Parse(["--patch-universeaddr", "--patch-cdn", "--dry-run"], out var exitCode);
+
+			Assert.NotNull(options);
+			Assert.Equal(0, exitCode);
+			Assert.True(options.PatchUniverseAddr);
+			Assert.True(options.PatchCdn);
+			Assert.True(options.DryRun);
+		}
+
+		[Fact]
+		public void Parse_WithoutTheRedirectFlags_LeavesTheClientPointedWhereItIs()
+		{
+			var options = LauncherCommand.Parse(["--dry-run"], out _);
+
+			Assert.NotNull(options);
+			Assert.False(options.PatchUniverseAddr);
+			Assert.False(options.PatchCdn);
+		}
+
+		// ...and the addresses those flags apply come back on the same resolved stack the DH keys do, so a one-off
+		// `--Server:Address` / `--Cdn:PublicAddress` overrides the file for this launch and nothing else has to know.
+		[Fact]
+		public void Parse_TheRedirectAddresses_ComeFromTheSettings()
+		{
+			var options = LauncherCommand.Parse(
+				["--patch-universeaddr", "--patch-cdn", "--Server:Address", "192.168.1.5", "--Server:UniverseAgentPort", "7000", "--Cdn:PublicAddress", "http://192.168.1.5:7081"],
+				out _);
+
+			Assert.NotNull(options);
+			Assert.Equal("192.168.1.5:7000", options.Configuration.UniverseAddress);
+			Assert.Equal("http://192.168.1.5:7081", options.Configuration.CdnPublicAddress);
 		}
 
 		// --debug-channels carries an OPTIONAL value: bare it means the default set, with a list it means that list.
@@ -122,9 +165,10 @@ namespace Faolan.Tests
 		// of argv is one too - the old scan indexed args[++i] and threw.
 		[Theory]
 		[InlineData("--dryrun")]
+		[InlineData("--universeaddr")] // the old address-carrying spelling; it is --patch-universeaddr now
 		[InlineData("--universe-addr")]
 		[InlineData("--exe")]
-		[InlineData("--universeaddr")]
+		[InlineData("--charname")]
 		public void Parse_RejectsWhatItDoesNotUnderstand(string bad)
 		{
 			Assert.Null(LauncherCommand.Parse([bad], out var exitCode));

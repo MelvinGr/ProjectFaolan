@@ -92,6 +92,13 @@ namespace Faolan.Core.Cli
 
 			public string ServerAddress => config[Keys.ServerAddress]!;
 			public IPAddress ServerListenAddress => IPAddress.Parse(config[Keys.ServerListenAddress]!);
+
+			// Where a CLIENT dials to log in - the ADVERTISED address (never Server:ListenAddress, which is an
+			// interface: 0.0.0.0 is by design unreachable as a destination) and the UniverseAgent port, which is the
+			// pair the client's LocalConfig.xml <UniverseAddr> holds. Derived rather than a setting of its own, like
+			// McpUrl: a second copy of either half is a copy that can disagree with the port the server binds.
+			public string UniverseAddress => $"{config.ServerAddress}:{config.UniverseAgentPort}";
+
 			public string WelcomeString => config[Keys.ServerWelcomeString]!;
 
 			public string? CdnPublicAddress => config[Keys.CdnPublicAddress];

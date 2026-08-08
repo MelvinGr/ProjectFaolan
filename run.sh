@@ -23,9 +23,6 @@ case "$command" in
     --cdn)
         shift
         dotnet run --project ./Faolan.Web.Content/Faolan.Web.Content.csproj -- \
-            --Cdn:Store "/mnt/btrfs/@games/mirror-archive" \
-            --Cdn:ListenAddress 127.0.0.1 \
-            --Cdn:ListenPort 7081 \
             "$@"
         ;;
 
@@ -33,8 +30,8 @@ case "$command" in
         shift
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --console \
-            --universeaddr 127.0.0.1:7010 \
-            --cdn http://192.168.178.12:7081 \
+            --patch-universeaddr \
+            --patch-cdn \
             --launcher-notes 'http://192.168.178.12:7081/_stats?UniverseName=%s&Language=%s' \
             "$@"
         ;;
@@ -44,8 +41,8 @@ case "$command" in
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan 2/AgeOfConan.exe' \
             --console \
-            --universeaddr 127.0.0.1:7010 \
-            --cdn http://192.168.178.12:7081 \
+            --patch-universeaddr \
+            --patch-cdn \
             --launcher-notes 'http://192.168.178.12:7081/_stats?UniverseName=%s&Language=%s' \
             --debug-channels \
             "$@"

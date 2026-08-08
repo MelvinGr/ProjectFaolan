@@ -63,10 +63,12 @@ Faolan.ClientLauncher [options]
   -u, --username <s>  auto-login account
   -p, --password <s>  auto-login password
   -c, --charname <s>  auto-enter this character
-  --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (login server) at `a`, e.g. 127.0.0.1:7010 (host:port).
-                      Required value. Replaces an /etc/hosts override; persists (undo with --restore)
-  --cdn <url>         point the three LocalConfig.xml CDN keys at <url> (each -> <url>/<tag>/upm), e.g.
-                      http://127.0.0.1:7081 (the local Faolan.Web.Content). Required value; persists
+  --patch-universeaddr  point LocalConfig.xml <UniverseAddr> (login server) at the configured Server:Address
+                      and Server:UniverseAgentPort (127.0.0.1:7010 by default). A flag, no value - the address is
+                      the SETTING. Replaces an /etc/hosts override; persists (undo with --restore)
+  --patch-cdn         point the three LocalConfig.xml CDN keys at the configured Cdn:PublicAddress (each ->
+                      <url>/<tag>/upm; http://127.0.0.1:7081, the local Faolan.Web.Content, by default). Also a
+                      flag; persists
   --launcher-notes <url>  redirect the client's dead hardcoded launcher-notes URL to <url> (keep the two %s;
                       http:// only - the client's libcurl has no SSL). Required value; on-disk exe patch,
                       covered by the .bak
@@ -76,6 +78,9 @@ Faolan.ClientLauncher [options]
   --Login:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
   --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
                       talk to somebody else's server
+  --Server:Address <a> / --Server:UniverseAgentPort <p> / --Cdn:PublicAddress <url>   one-off overrides of the
+                      addresses --patch-universeaddr / --patch-cdn write, for a launch that should not match the
+                      faolan.json the server reads
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their
                       .bak, then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
@@ -105,8 +110,10 @@ Behaviors:
 
 The client reads its login server from **`LocalConfig.xml`** → `<UniverseAddr>dm09-nj4.ageofconan.com:7010</UniverseAddr>`
 (confirmed via RE — AgeOfConan.exe references both `LocalConfig.xml` and `UniverseAddr`; it is **not** in the exe).
-So instead of an `/etc/hosts` line (`127.0.0.1 dm09-nj4.ageofconan.com`), `--universeaddr` rewrites that field to
-`127.0.0.1:7010`. It PERSISTS (LocalConfig.xml is backed up to `.bak` first; `--restore` puts it back), so nothing
+So instead of an `/etc/hosts` line (`127.0.0.1 dm09-nj4.ageofconan.com`), `--patch-universeaddr` rewrites that field
+to `Server:Address`:`Server:UniverseAgentPort` — the address the login tier ADVERTISES and the port it binds, read from
+the same faolan.json the server does, so the client cannot be pointed somewhere the server is not (`Server:ListenAddress`
+is the interface and is deliberately not consulted: its default `0.0.0.0` is unreachable as a destination). It PERSISTS (LocalConfig.xml is backed up to `.bak` first; `--restore` puts it back), so nothing
 races the client's read of the config.
 
 ---
@@ -161,9 +168,9 @@ against a retail capture for regressions, or `--dump` it.
 
 ### Launch + drive the client
 ```
-Faolan.ClientLauncher --universeaddr 127.0.0.1:7010 --cdn http://127.0.0.1:7081 -u faolan -p aa -c tester [--patch-login]
+Faolan.ClientLauncher --patch-universeaddr --patch-cdn -u faolan -p aa -c tester [--patch-login]
 # or foreground with live log:
-Faolan.ClientLauncher --universeaddr 127.0.0.1:7010 --console -u faolan -p aa -c tester
+Faolan.ClientLauncher --patch-universeaddr --console -u faolan -p aa -c tester
 ```
 
 ### Watch for success markers
@@ -174,7 +181,7 @@ Faolan.ClientLauncher --universeaddr 127.0.0.1:7010 --console -u faolan -p aa -c
   `does not exist in any RDB` is benign.)
 
 ### Teardown
-Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; `--universeaddr` reverts
+Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; `--patch-universeaddr` reverts
 `LocalConfig.xml` automatically on the launcher's exit.
 
 ### Harness (a local `client-smoke-test.sh` — not committed to the repo)

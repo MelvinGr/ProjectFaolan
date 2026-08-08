@@ -16,20 +16,20 @@ namespace Faolan.ClientLauncher
 	// `--username`, ... no longer read a value past the end of argv and crash with an IndexOutOfRangeException.
 	//
 	// Two kinds of option live here, as everywhere else in the repo:
-	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey) name a setting that also lives in
+	//   - CONFIG KEYS (Login:PrivateKey, Login:PublicKey, Server:Address, Server:UniverseAgentPort,
+	//     Cdn:PublicAddress) name a setting that also lives in
 	//     faolan.json and the environment, so the option's NAME is the configuration path and its value is resolved
 	//     through the shared builder (FaolanCommandLine) - the launcher patches the key the server is holding
 	//     without a second setting to keep in step.
 	//   - COMMAND options (--exe, --console, --restore, ...) belong to this invocation alone. Their short aliases
 	//     (-u/-p/-c/-n) stay: unlike a config key, these have no second spelling in a file or the environment to
 	//     drift against, and they are what the documented test launches type.
+	// The two kinds MEET in --patch-universeaddr/--patch-cdn: each is a bare flag that says WHETHER to redirect the client, while
+	// the address it redirects to is the setting (Server:Address + Server:UniverseAgentPort, Cdn:PublicAddress). They
+	// used to carry the address themselves, which is the same endpoint spelled twice - the launch line and the
+	// faolan.json/faolan.user.json the server and the mirror read - and only the launcher's copy reaches the client.
 	public static class LauncherCommand
 	{
-		private static readonly Option<string> Cdn = new("--cdn")
-		{
-			Description = "Point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/ControlHttpPatchAddr) at this base URL - each becomes <url>/<tag>/upm."
-		};
-
 		private static readonly Option<string> Charname = new("--charname", "-c") { Description = "Auto-enter this character." };
 
 		private static readonly Option<bool> ConsoleOption = new("--console")
@@ -56,15 +56,19 @@ namespace Faolan.ClientLauncher
 			Description = "Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead) to this one - keep the two %s (UniverseName, Language)."
 		};
 
-		// The DH keys, named EXACTLY as they are in faolan.json and the environment (the one-name-per-setting rule -
-		// see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the normal path is
-		// that the launcher reads the same faolan.json the server does, so a configured Login:PrivateKey automatically
-		// patches its own matching public key and the pair cannot drift.
-		private static readonly Option[] LoginKeys = FaolanSettings.Options(Keys.LoginPrivateKey, Keys.LoginPublicKey);
+		private static readonly Option<bool> PatchCdn = new("--patch-cdn")
+		{
+			Description = "Point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/ControlHttpPatchAddr) at the configured Cdn:PublicAddress - each becomes <url>/<tag>/upm."
+		};
 
 		private static readonly Option<bool> PatchLogin = new("--patch-login")
 		{
 			Description = "Patch the client's DH key ON DISK before launch so the server can validate the real password. The key comes from the SAME faolan.json/environment the server reads, so overriding Login:PrivateKey there patches the matching public key automatically."
+		};
+
+		private static readonly Option<bool> PatchUniverseAddr = new("--patch-universeaddr")
+		{
+			Description = "Point LocalConfig.xml <UniverseAddr> (the login server) at the configured Server:Address and Server:UniverseAgentPort."
 		};
 
 		private static readonly Option<string> Password = new("--password", "-p") { Description = "Auto-login password." };
@@ -79,7 +83,16 @@ namespace Faolan.ClientLauncher
 			Description = "Restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr redirects and the debug channels) and exit."
 		};
 
-		private static readonly Option<string> UniverseAddr = new("--universeaddr") { Description = "Point LocalConfig.xml <UniverseAddr> (the login server) at this host:port." };
+		// The settings the launcher reads, named EXACTLY as they are in faolan.json and the environment (the
+		// one-name-per-setting rule - see Faolan.Core/Cli/FaolanCommandLine.cs). Passing one here is only for a one-off
+		// run; the normal path is that the launcher reads the same faolan.json the server and the content mirror do, so
+		// a configured Login:PrivateKey automatically patches its own matching public key, and --patch-universeaddr/--patch-cdn
+		// point the client at the login server and mirror that are actually configured, with nothing to keep in step.
+		private static readonly Option[] Settings = FaolanSettings.Options(
+			Keys.LoginPrivateKey, Keys.LoginPublicKey,
+			Keys.ServerAddress, Keys.ServerUniverseAgentPort,
+			Keys.CdnPublicAddress);
+
 		private static readonly Option<string> Username = new("--username", "-u") { Description = "Auto-login account name." };
 		private static readonly Option<string> Wine = new("--wine") { Description = "(Linux only) use this runner instead of Proton (e.g. 'wine'). Ignored on Windows." };
 
@@ -107,12 +120,12 @@ namespace Faolan.ClientLauncher
 				"LocalConfig.xml/exe redirect it applies PERSISTS after the run; --restore undoes them.")
 			{
 				Exe, Dx10, Username, Password, Charname,
-				UniverseAddr, Cdn, LauncherNotes, PatchLogin,
+				PatchUniverseAddr, PatchCdn, LauncherNotes, PatchLogin,
 				Restore, ConsoleOption, DebugChannels, Proton, Wine, DryRun
 			};
 
-			foreach (var key in LoginKeys)
-				command.Options.Add(key);
+			foreach (var setting in Settings)
+				command.Options.Add(setting);
 
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
@@ -123,11 +136,11 @@ namespace Faolan.ClientLauncher
 			return new LauncherOptions(
 				result.GetValue(Exe), result.GetValue(Dx10),
 				result.GetValue(Username), result.GetValue(Password), result.GetValue(Charname),
-				result.GetValue(UniverseAddr), result.GetValue(Cdn), result.GetValue(LauncherNotes),
+				result.GetValue(PatchUniverseAddr), result.GetValue(PatchCdn), result.GetValue(LauncherNotes),
 				result.GetValue(PatchLogin), result.GetValue(Restore),
 				result.GetValue(ConsoleOption) || channels.Length > 0, channels,
 				result.GetValue(Proton), result.GetValue(Wine), result.GetValue(DryRun),
-				FaolanCommandLine.Build(result, LoginKeys));
+				FaolanCommandLine.Build(result, Settings));
 		}
 
 		// Empty when --debug-channels was not given; the default set when it was given bare; the listed channels when
@@ -143,13 +156,14 @@ namespace Faolan.ClientLauncher
 		}
 	}
 
-	// Everything the launcher was scraping out of argv, parsed once - plus the shared CONFIGURATION the two Login: keys
-	// contributed to, so the patcher reads the keypair from the same stack the server does (faolan.json included) rather
-	// than from the flags alone.
+	// Everything the launcher was scraping out of argv, parsed once - plus the shared CONFIGURATION the setting options
+	// contributed to, so the patcher reads the keypair, and the redirects read the login/mirror addresses, from the same
+	// stack the server does (faolan.json included) rather than from the flags alone. PatchUniverseAddr/PatchCdn are therefore
+	// WHETHER to redirect; Configuration holds where to.
 	public sealed record LauncherOptions(
 		string? Exe, bool Dx10,
 		string? Username, string? Password, string? Charname,
-		string? UniverseAddr, string? Cdn, string? LauncherNotes,
+		bool PatchUniverseAddr, bool PatchCdn, string? LauncherNotes,
 		bool PatchLogin, bool Restore, bool Console, ImmutableArray<string> DebugChannels,
 		string? Proton, string? Wine, bool DryRun,
 		IConfiguration Configuration);

@@ -37,6 +37,7 @@ namespace Faolan.Tests
 			Assert.Equal("Data Source=faolan.db", config.DatabaseConnectionString);
 			Assert.Equal("127.0.0.1", config.ServerAddress);
 			Assert.Equal(7010, config.UniverseAgentPort);
+			Assert.Equal("127.0.0.1:7010", config.UniverseAddress); // ...derived from those two, not a third literal
 			Assert.Equal(7011, config.PlayerAgentPort);
 			Assert.Equal("Welcome to Project Faolan!", config.WelcomeString);
 			Assert.Equal("v5.01.0@602248", config.ClientVersion);
@@ -86,6 +87,41 @@ namespace Faolan.Tests
 				.Build();
 
 			Assert.Equal(expected, config.McpUrl);
+		}
+
+		// The login endpoint a CLIENT dials is DERIVED the same way, from the address the login tier ADVERTISES and the
+		// port the UniverseAgent binds - so `Faolan.ClientLauncher --universeaddr`, which writes it into the client's
+		// LocalConfig.xml, points at the server this configuration describes instead of at a host:port typed on the
+		// launch line, which is the same endpoint spelled twice with only the client's copy able to be wrong.
+		//
+		// Server:ListenAddress is deliberately NOT the source: it is the interface the server BINDS, and its default
+		// 0.0.0.0 is unreachable as a destination - so it would be wrong in exactly the deployment that sets it.
+		[Theory]
+		[InlineData(null, null, "127.0.0.1:7010")]
+		[InlineData(null, "7000", "127.0.0.1:7000")]
+		[InlineData("aoc.example.com", null, "aoc.example.com:7010")]
+		public void TheUniverseAddress_IsTheAdvertisedAddressAndTheUniverseAgentPort(string? address, string? port, string expected)
+		{
+			var over = new List<KeyValuePair<string, string?>>();
+			if (address != null)
+				over.Add(new(Keys.ServerAddress, address));
+			if (port != null)
+				over.Add(new(Keys.ServerUniverseAgentPort, port));
+
+			var config = new ConfigurationBuilder()
+				.AddInMemoryCollection(FaolanSettings.Defaults)
+				.AddInMemoryCollection(over)
+				.Build();
+
+			Assert.Equal(expected, config.UniverseAddress);
+
+			// The bind address is not consulted, whatever it is set to.
+			Assert.Equal(expected, new ConfigurationBuilder()
+				.AddInMemoryCollection(FaolanSettings.Defaults)
+				.AddInMemoryCollection(over)
+				.AddInMemoryCollection([new(Keys.ServerListenAddress, "0.0.0.0")])
+				.Build()
+				.UniverseAddress);
 		}
 
 		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
