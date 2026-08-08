@@ -91,11 +91,19 @@ namespace Faolan.Core.Database.Tables
 		// the message includes key1..3 and template3 with no stat), so "the only unmatched pair" is an artifact of
 		// listing a subset. Whether `hash` IS the ACG seed is open - Gitea #723.
 		//
-		// It can only be HARVESTED, and only from a capture where the item ENTERED AN INVENTORY - which is where
-		// retail first reveals it. Traced through the AH buy capture for template 163118 (Feywater): the listing
-		// carries 0, the mail attachment carries 0 (twice), the live 0x2020 add that delivers it carries 909133648,
-		// and every later snapshot carries the same. Corpus-wide, 0 of 328 search-result rows and 0 of 2 mail
-		// attachments have one, against 8,479 of 8,479 world-entry snapshot entries that do.
+		// It can only be HARVESTED, never computed - and it rides the messages that describe a real item INSTANCE,
+		// not the ones that merely advertise a template:
+		//
+		//   world-entry snapshot   8,479 / 8,479  carry it
+		//   NPC shop window        2,734 / 2,734  carry it   <- browsing a vendor is enough, no purchase needed
+		//   live 0x2020 AddItem    carries it
+		//   AH search listings         0 / 328    carry it
+		//   mail attachments           0 / 2      carry it
+		//   Claims/Redeem list         0          carries it
+		//
+		// So the cheapest way to fill a missing one is to open a VENDOR that stocks the item. Traced end to end for
+		// template 163118 (Feywater) through the AH buy capture: listing 0, mail attachment 0 (twice), then the live
+		// add that delivers it carries 909133648 and every later snapshot carries the same.
 		//
 		// An item is renderable by the world-entry snapshot iff Hash != 0 AND it has a Data quad; the snapshot drops
 		// the rest, which is why nothing hash-less may be placed in an inventory (InventoryItemHashTests, #719).
