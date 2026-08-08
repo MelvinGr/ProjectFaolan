@@ -328,3 +328,13 @@ capture we could go and find.
 nothing in the corpus, the client's method table or RDB 1000518 (the rank-name ladder) says which rung they hang
 off. We allow the LEADER only — the narrowest rule that cannot be abused — and refuse everyone else, rather than
 guessing a threshold that would quietly let the wrong members drain the bank.
+
+### What sets the MagicBuff apply payload's hostile flag
+**Tracked: Gitea #658.** [V0: what separates the 134 from those 554] `descriptor[4]` of the 54-byte
+`MagicBuffIIR` apply payload is a boolean — its only non-zero value is `1` — and it is clear on every one of the
+2,241 captured SELF-applies, so "the caster is not the target" is a necessary condition for it. It is not a
+sufficient one: 554 of the 688 non-self applies leave it clear. The ten spells that do carry it are hostile
+debuffs and DoTs (`Pestilential Blast (Rank 6)`, `Flesh to Worms (Rank 5)`, `Mark of the Devourer`, `Repenting`,
+`Poisoned`, `Ice Shackle`), which is a lead and not a rule — nothing we hold marks a spell hostile, and the
+sweep of the spell's own RDB 1040005 record (every head word, every property field, and every bit of both) finds
+nothing that separates the two populations. `--report buff-descriptor` prints the cross-tab.

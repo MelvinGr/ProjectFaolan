@@ -180,8 +180,51 @@ namespace Faolan.Tests
 			Assert.Equal(134, applies.Count(a => a.Buff.Data.ReadU32Be(Descriptor4Offset) != 0));
 		}
 
+		// ⭐ descriptor[0] is an ARITY tag, not a flag (#658). The two applies where it is `3` are EXACTLY the two
+		// where descriptor[1] is non-zero - 2 of 2 in both directions - and both carry 3165331, which is a
+		// `Combos.Id`: `combo_npc_guardian_shield_70_decisive_opening`, on the buff `Decisive Opening`. So the word
+		// says how the rest of the descriptor is populated, and its `3` form names the COMBO that applied the buff.
+		//
+		// Asserted as an equivalence rather than as two counts, because the equivalence is the finding: a builder
+		// that writes a constant there is not merely writing a wrong number, it is writing the wrong SHAPE.
+		[Fact]
+		public void DescriptorZeroIsThree_ExactlyWhenDescriptorOneNamesACombo()
+		{
+			var applies = CapturedApplies();
+			var arityThree = applies.Where(a => a.Buff.Data.ReadU32Be(Descriptor0Offset) == 3).ToList();
+			var withSlotOne = applies.Where(a => a.Buff.Data.ReadU32Be(Descriptor1Offset) != 0).ToList();
+
+			Assert.NotEmpty(arityThree);
+			Assert.Equal(arityThree.Count, withSlotOne.Count);
+			Assert.All(arityThree, a => Assert.NotEqual(0u, a.Buff.Data.ReadU32Be(Descriptor1Offset)));
+
+			// The id really is in the combo catalog, which is what makes it a decode rather than a correlation.
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var referenced = withSlotOne.Select(a => a.Buff.Data.ReadU32Be(Descriptor1Offset)).Distinct().ToList();
+			Assert.All(referenced, id => Assert.True(db.Combos.Any(c => c.Id == id), $"descriptor[1] = {id} is not a Combos.Id"));
+		}
+
+		// descriptor[4] is a BOOLEAN in a u32 slot (#658): its only non-zero value is 1, and it is clear on every
+		// self-apply. The ten spells that carry it are hostile debuffs and DoTs, so it reads as a hostile marker on
+		// a cast at someone else - but 554 of the 688 non-self applies leave it clear, so "not self" is a necessary
+		// condition and not the whole rule. Pinned at both ends: the value set, and the self-apply exclusion.
+		[Fact]
+		public void DescriptorFour_IsAFlagAndNeverSetOnASelfApply()
+		{
+			var applies = CapturedApplies();
+			var set = applies.Where(a => a.Buff.Data.ReadU32Be(Descriptor4Offset) != 0).ToList();
+
+			Assert.Equal(134, set.Count);
+			Assert.Equal([1u], set.Select(a => a.Buff.Data.ReadU32Be(Descriptor4Offset)).Distinct().ToList());
+			Assert.DoesNotContain(set, a => a.Buff.ApplyFrom == a.Buff.ApplyTo);
+		}
+
 		// Both are nearly a property of the SPELL rather than of the cast, which is the shape that says the decode
 		// should look at the spell's own record. Pinned so that reading stays true.
+		//
+		// ⚠️ That reading has since been TESTED and did not pay out: `--report buff-descriptor --report-arg rdb`
+		// sweeps every word and every bit of the spell's 1040005 record - head, property run and the common prefix -
+		// and nothing coarse beats the baseline. See docs/subsystems/npc-spell-applyspell.md.
 		[Fact]
 		public void DescriptorZeroAndBool2_AreNearlyPerSpell()
 		{

@@ -240,6 +240,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "buff-descriptor":
+				{
+					BuffDescriptor(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());

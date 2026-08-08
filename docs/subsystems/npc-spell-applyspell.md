@@ -126,9 +126,55 @@ What retail's absolute stamp is genuinely *for* is a different case we do not co
 STREAMING INTO VIEW mid-buff, where the observer has no apply event to count from. Nothing emits another entity's
 active buffs at spawn today; tracked separately.
 
-**`@26` stays open [V0].** It sits in the descriptor beside the spell id and tracks `CastingLevel` closely but not
-exactly across the captures (1563 equal, 283 below, 92 above), so a second input exists. What the read DOES settle
-is that neither `@26` nor `@42` is a rendered magnitude or a stack count — the question #438 was opened to answer.
+**`@26` is the CASTER's level and `@42` is the TARGET's** — the "second input" the earlier note suspected. SCOPE
+separates them without having to resolve a handle to a level: grouped by `(capture, caster)` `@26` varies on 20 of
+1075 and `@42` on 36; grouped by `(capture, target)` `@26` varies on 48 of 1183 and `@42` on **6**. `@42` is six
+times more stable per target than per caster and `@26` the other way round. The corroboration is that 2,241 of the
+2,929 applies are SELF-applies, where the two are one number by construction, and the agreement rate splits exactly
+on that line (>80% self, <50% other) — which a caster/target pair predicts and a caster/spell pair would not.
+⚠️ 281 self-applies still disagree, 238 of them on one spell (3911037), so the fields are not renamed yet.
+[V1: Faolan.Tests/MagicBuffCorpusTests.cs — `TheTwoLevelSlots_AreTheCastersAndTheTargets`]
+
+### The descriptor's own words: what `--report buff-descriptor` settles (#658)
+
+The seven-word sub-struct at `@14` is `[descriptor0, descriptor1, spellBaseId, casterLevel, descriptor4, 0, 0]`
+in wire order, and three of those had no reading at all. Measured over all 2,929 captured applies:
+
+**⭐ `descriptor[0]` is an ARITY/VARIANT tag, and `descriptor[1]` is the COMBO that applied the buff.**
+`descriptor[0] == 3` and `descriptor[1] != 0` are the *same two applies* — 2 of 2 in both directions, no
+exceptions. Both carry `descriptor[1] = 3165331`, which is a `Combos.Id`:
+`combo_npc_guardian_shield_70_decisive_opening`, on the buff `Decisive Opening` (3315223). So the first word is
+not a flag whose value happens to vary; it says how the rest of the descriptor is populated, and the `3` form
+names its source combo. That reframes the whole field: a builder must not write a constant there.
+
+**`descriptor[4]` is a BOOLEAN, not a value.** Its only non-zero value is `1`, on 134 applies — and on **0 of the
+2,241 self-applies**. The ten spells that carry it are hostile debuffs and DoTs (`Pestilential Blast (Rank 6)`,
+`Flesh to Worms (Rank 5)`, `Mark of the Devourer`, `Repenting`, `Poisoned`, `Ice Shackle`), so it reads as a
+hostile/debuff marker on a cast at someone else. It is not merely "not self": 554 of the 688 non-self applies
+leave it clear. [V0: what separates the 134 from those 554]
+
+**⚠️ `descriptor[0]`'s 1-vs-2 split and `bool2` are NOT in the spell's RDB record, and that is now measured
+rather than assumed.** Both are nearly per-spell (varying within a spell on 7 and 3 of 256), which is what pointed
+at the record in the first place — but `--report buff-descriptor --report-arg rdb` sweeps, over the 248 unsplit
+spells with a readable 1040005 record:
+
+| swept | best purity | baseline |
+|---|---|---|
+| the 20-word fixed head, by value | 93.5% at word 13 (80 distinct values) | 83.5% |
+| the fixed head, **bit by bit** | 83.5% — nothing above the baseline | 83.5% |
+| every property field, by value | 100% only on fields carrying ≤16 records | 83.5% |
+| every property field, bit by bit | same, all on tiny populations | 83.5% |
+| every word of the common 36-word prefix | 97.2% at word 23, 119 distinct values | 83.5% |
+
+Nothing coarse separates them. The same sweep answered #630's mana-mode question at a single bit, so the shape
+does work when the answer is there — its absence here says the source is not a single field of the spell record.
+Neither is it any `Spells` column we hold (16 candidates, all at baseline) nor catalog MEMBERSHIP
+(`ClassSpells`, `Combos.GameActionId`, `SpellEffects`, `SpellStatEffects`, `NpcSpells`, `FeatSpellGrants` — all at
+baseline). The `descriptor[0] == 2` set is characterised only by its names so far, and they are all combo- or
+proc-applied: `Wrath` (21 ranks), `Spiritual Torment`, `Furious Inspiration`, `Mutilation`, `Chill`, `Momentum`,
+`Blessed Blade`, `Renewal`, `Ripping Revenge`, `Sacrarial Guard`, `Covenant of Vengeance`, `Stunned`. With the
+`3` form now known to name a combo, "`2` = applied by a proc/combo that is not named" is the reading to test next.
+Open work tracked in Gitea #658.
 
 ## The EMPIRICAL map, and how it lines up
 Before the client's reader was walked, the payload was recovered by diffing same-spell instances (per-cast
