@@ -92,7 +92,7 @@ the 46 captured lists until #545.
 
 | sub | type | reader | delegate |
 |---|---|---|---|
-| `0xD558FF16` | `SkillIIR_t` | `7a9a40` | `FUN_004d5900` (skill-list reader) |
+| `0xD558FF16` | `SkillIIR_t` | `7a9a40` | `FUN_004d5900` (skill-list reader) — **SHIPPED**: the reader is the whole body, `[ListFrame(n)]( [u32 statId][i32 delta] )xn` after the base record, and it is the skillpoint SPEND. See [`../subsystems/skillpoints.md`](../subsystems/skillpoints.md) |
 | `0xF7BF33DC` | `ClonedFeatsIIR_c` | `79c4d0` | `FUN_0079cfd0` |
 | `0x6AC7B325` | `LootDeleteItemsIIR` | `7a5c90` | `FUN_004d4ef0` + `[string]` |
 | `0x51BEF2CB` | `LootUpdateAllowedLootersIIR` | `7a4c70` | `FUN_007a4df0` (looter-list reader) |

@@ -705,6 +705,7 @@ namespace Faolan.Core.Enums
 		SimpleCharKilledByUpdateIIR = 0xB066AFC2, // SimpleCharKilledByUpdateIIR_t  (x2) - kill/death
 		SimpleDynelFullUpdateIIR = 0x66AEDD50, // SimpleDynelFullUpdateIIR_c  (x1575) - world object spawn ("SpawnObject")
 		SimpleDynelVisualChangeIIR = 0xE7F4F8F8, // SimpleDynelVisualChangeIIR_c  (x548)
+		SkillIIR = 0xD558FF16, // SkillIIR_t  (x4) - c2s skillpoint spend: a (statId, delta) list (#739)
 		SpellBookIIR = 0x6BA10936, // SpellBookIIR_t  (x1)
 		StatDamageIIR = 0xE9F24184, // StatDamageIIR_t  (x450)
 		StatIIR = 0xF98E10B3, // StatIIR_t  (x8167)
@@ -730,7 +731,7 @@ namespace Faolan.Core.Enums
 		// [unverified] = reader not dumped yet: both candidate BKDR-31 forms (bare / name+"_c") shown - extend
 		// DumpVtableReaders.java to resolve. Add the authoritative one to the enum once dumped or seen on the wire.
 		//
-		// GAMEPLAY (41) - the real backlog of unseen record types:
+		// GAMEPLAY (40) - the real backlog of unseen record types:
 		//   AutoToggleCombatIIR          0x107E921F  [auth: AutoToggleCombatIIR_c]
 		//   BccIIR                       [alias] = BehaviorControlCenterIIR 0x642CD3D6 (Bcc), already emitted
 		//   ClonedFeatsIIR               0xF7BF33DC  [auth: ClonedFeatsIIR_c]  (candidate: full feat set at login, #251)
@@ -763,7 +764,6 @@ namespace Faolan.Core.Enums
 		//   QuestRewardSelectionIIR      0x80138D7B  [auth: QuestRewardSelectionIIR_c]
 		//   ScriptTextIIR                0xE6C3CCEF  [auth: ScriptTextIIR_t]
 		//   ScryLuaIIR                   0x55ACD7D1  [auth: ScryLuaIIR]
-		//   SkillIIR                     0xD558FF16  [auth: SkillIIR_t]  (candidate: the SKILL record, #251)
 		//   SprintRegenIIR               [alias] stamina/sprint regen; we emit RegenIIR 0x28D0AC99
 		//   StringStatIIR                0xC415E6ED  [auth: StringStatIIR]
 		//   TeleportFailedIIR            0x78BB8C2E  [auth: TeleportFailedIIR_c]

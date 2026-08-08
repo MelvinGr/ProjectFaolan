@@ -28,6 +28,7 @@ using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Feats;
 using Faolan.GameServer.Inventory;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
@@ -217,6 +218,10 @@ namespace Faolan.GameServer
 		private readonly TravelService _travel;
 		private readonly FeatService _feats;
 
+		// Composed collaborator: skillpoint spends - the c2s SkillIIR transfer out of the SkillPoints pool (#739).
+		// See Progression/SkillPointService.cs.
+		private readonly SkillPointService _skillPoints;
+
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
@@ -343,6 +348,7 @@ namespace Faolan.GameServer
 			_tradeskill = new TradeskillService(database, this, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
+			_skillPoints = new SkillPointService(database, logger);
 			// #495/#504: "the world damaged you" - fall damage and the scripted hazard volumes. Driven from the move
 			// handler (both triggers are edges on the player's own position stream), reaching the wire through
 			// IEnvironmentOutbound, which this listener implements (GameServerListener.Combat.cs).

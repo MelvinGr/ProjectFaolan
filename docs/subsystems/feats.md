@@ -358,6 +358,8 @@ sets recovered:
 - **`FeatIIR` appears ONLY on train ACTIONS**, never on a plain login. Swept all captures for `FeatIIR` and for the
   candidate login-delivery records `ClonedFeatsIIR` (`0xF7BF33DC`) and `SkillIIR` (`0xD558FF16`): **zero occurrences.**
   The full-set login delivery we hunted for is not a separate record — it is folded into the player spawn (above).
+  ⚠️ `SkillIIR` has since turned up in an annotated capture and is **not** a feat record at all — it is the
+  skillpoint spend, see [`skillpoints.md`](skillpoints.md).
 - Across all captures the only other feat traffic is a single untrain **confirm dialog** (`DispatchFeatUntrainMessageBox`
   → `FeatUntrainAnswer`), carrying no feat data.
 
@@ -384,7 +386,9 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
     `FeatPrereq`, satisfied by the same BASE at an equal-or-higher rank — see the rank note above).
   - GM command `.feat list | train <id>... | reset` is the test bootstrap (the retail trigger is the client's Feats
     window + its point economy, which the server can't drive).
-- `DoSkillSellback` (`0x205C`) is a debug-log stub.
+- `AdjustSkill` (`0x202E`) and `DoSkillSellback` (`0x205C`) belong to the SKILLPOINT pool, not to feats: the spend
+  arrives as the `SkillIIR` record rather than the RPC, and is implemented — see [`skillpoints.md`](skillpoints.md).
+  `DoSkillSellback` remains a debug-log stub because its refund amount is unrecoverable without a capture.
 - The skills scaffold (`CharacterSkill`) is imported per captured char by `CaptureCharacterImporter` (via
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so

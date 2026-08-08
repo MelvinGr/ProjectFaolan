@@ -92,6 +92,15 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterBind(uint characterId, uint respawnPointId);
 		Task SaveCharacterBuffs(uint characterId, IReadOnlyCollection<CharacterBuff> buffs);
 		Task SaveCharacterDeadState(uint characterId, bool isDead);
+
+		/// <summary>
+		///     Sets the given stat sheet slots to new values (#739 - the skillpoint spend). A stat id may occupy more
+		///     than one ordinal (StatList#1 mirrors displayed stats that StatList#2 also carries), so EVERY row
+		///     holding the id is written - the sheet must not disagree with itself. Ids with no row are ignored: the
+		///     sheet is what the snapshot is authored from, and inventing an ordinal would put a stat on the wire in
+		///     a position no capture has.
+		/// </summary>
+		Task SaveCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
 		Task SaveCharacterScaffold(Character character);
@@ -807,6 +816,21 @@ namespace Faolan.Core.Database.Repositories
 				buff.Character = null!;
 				ctx.CharacterBuffs.Add(buff);
 			}
+
+			await ctx.SaveChangesAsync();
+		}
+
+		public async Task SaveCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values)
+		{
+			if (values.Count == 0)
+				return;
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var ids = values.Keys.ToArray();
+			var rows = await ctx.CharacterStats.Where(s => s.CharacterId == characterId && ids.Contains(s.StatId)).ToArrayAsync();
+			foreach (var row in rows)
+				row.Value = values[row.StatId];
 
 			await ctx.SaveChangesAsync();
 		}

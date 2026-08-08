@@ -440,6 +440,16 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case IirTypes.SkillIIR:
+				{
+					// Skillpoint SPEND (#739): a (statId, delta) list moving points out of the SkillPoints pool into
+					// a skill. Answered with the two ordinary StatIIR records retail sends - see
+					// Progression/SkillPointService.cs.
+					await _skillPoints.HandleAdjustSkill(client, SkillCodec.Parse(rawPayload.AsSpan(sizeof(uint))));
+
+					break;
+				}
+
 				case IirTypes.TradeskillRequestIIR:
 				{
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
@@ -1190,6 +1200,10 @@ namespace Faolan.GameServer
 
 				case GameCharAgentMethods.DoSkillSellback:
 				{
+					// The inverse of a skillpoint spend (#739), and the one half of the feature that stays
+					// unimplemented: there is ZERO sellback traffic in the corpus and `DoSkillSellback(int i_eStat)`
+					// carries no amount, so the refund is unrecoverable. Guessing "refund everything" would let a
+					// client cash out the base value every character starts with. Logged until a capture settles it.
 					LogPacketBodyDebug("GameServer 0x205C body", body.ToArray());
 
 					break;

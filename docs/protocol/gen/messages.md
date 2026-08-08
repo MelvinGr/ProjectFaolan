@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **69 V3** (69 with an auto-cited golden). The
+**81** IIR carrier types · **70 V3** (70 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -77,6 +77,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `SimpleCharKilledByUpdateCodec` | [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact] |
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: SimpleDynelVisualChangeCodecTests.TheHarvestParticleEffect_MatchesTheCapturedRecord] |
+| V3 | `SkillIIR` | `0xD558FF16` | `SkillCodec` | [V3: SkillPointTests.CapturedSpendBodies_AreAListFrameNotTwoConstants] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `StatDamageCodec` | [V3: CombatDamageCodecTests.EnvironmentalDamage_IsByteIdentical] |
 | V3 | `StatIIR` | `0xF98E10B3` | `StatCodec` | [V3: CreateEditorRecordTests.StatIir_FlagOne_MatchesCapturedBytes] |
 | V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame] |
