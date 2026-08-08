@@ -589,6 +589,17 @@ namespace Faolan.GameServer.World
 		// the 2-point chase form re-sent every ~6u.
 		public byte[] PatrolBody { get; set; } = null!;
 
+		// #714: seconds still to wait before a freshly-streamed-in viewer is told the beat. Retail does NOT send the
+		// patrol with the spawn - over 2,519 captured NPCs whose spawn AND first patrol were both seen, the gap runs
+		// p10 1.54s / p50 4.02s / p90 32.05s, and only 3% arrive within 0.1s of the spawn. We sent it in the same
+		// instant, which handed the client a TIMED walk for an entity it had not yet settled; it reconciled by dashing,
+		// which is the catch-up run seen on a fresh spawn's first laps. Counts down in the tick; 0 = nothing pending.
+		public double RoutePatrolDelayRemaining { get; set; }
+
+		// #714 probe: seconds the MODEL has spent walking since its beat was last issued to the client. Compared against
+		// the duration we STATE in that body - if the two disagree the desync is ours, if they agree it is the client's.
+		public double RouteLapSeconds { get; set; }
+
 		// #716: the client needs (re-)telling what walk it is on - at the start of a lap, and after anything took the
 		// NPC off its beat (a chase, a leash home). Set true at spawn so the first lap is issued.
 		public bool RouteReissueDue { get; set; } = true;

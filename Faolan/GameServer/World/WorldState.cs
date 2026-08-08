@@ -68,6 +68,10 @@ namespace Faolan.GameServer.World
 		// than cutting each corner - the corners are what keep it in the street.
 		public const float RouteWaypointReached = 0.75f;
 
+		// #714: how long after a viewer streams an NPC in before its beat is issued. Retail's median gap between a
+		// creature's spawn record and its first patrol (p50 4.02s over 2,519 captured NPCs; only 3% inside 0.1s).
+		public const double RoutePatrolDelaySeconds = 4.0;
+
 		// #703: how long a route walker stands at the end of its beat before turning round. Retail patrols pause at
 		// the ends rather than pivoting on the spot; the number is ours (no capture pins it), same as PatrolDwellSeconds.
 		public const double RouteTurnaroundDwellSeconds = 3.0;
@@ -666,6 +670,20 @@ namespace Faolan.GameServer.World
 				{
 					e.RouteReissueDue = false;
 					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcPatrol));
+				}
+
+				e.RouteLapSeconds += deltaSeconds; // #714 probe: how long the model's lap ACTUALLY takes
+
+				// #714: a viewer that just streamed this NPC in is told the beat a few seconds LATER, as retail does -
+				// see RoutePatrolDelaySeconds. Sending it with the spawn made the client dash to reconcile.
+				if (e.RoutePatrolDelayRemaining > 0)
+				{
+					e.RoutePatrolDelayRemaining -= deltaSeconds;
+					if (e.RoutePatrolDelayRemaining <= 0)
+					{
+						e.RoutePatrolDelayRemaining = 0;
+						e.RouteReissueDue = true;
+					}
 				}
 
 				var waypoint = e.RouteWaypoint;

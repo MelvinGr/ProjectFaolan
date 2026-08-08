@@ -2015,8 +2015,12 @@ namespace Faolan.GameServer.World
 						// start the walk from the beginning. Retail's own form carries [duration][remaining] (535 of 759
 						// captured multi-point patrol nodes do), which is presumably how it hands a late viewer the REST of
 						// the beat; reproducing that is the rest of #716.
+						// ⚠️ ARMED, not sent. Retail lets the client settle the spawn before handing it a timed walk (p50
+						// 4.02s between the two over 2,519 captured NPCs; only 3% inside 0.1s). Sending both in the same
+						// instant is what made a freshly-spawned NPC dash its first laps. The tick fires the beat to
+						// everyone in range once the delay elapses - see WorldState.RoutePatrolDelaySeconds.
 						if (ev.Subject is { IsPlayer: false, WalksRoute: true })
-							await SendPatrol(recipient, ev.Subject);
+							ev.Subject.RoutePatrolDelayRemaining = WorldState.RoutePatrolDelaySeconds;
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
 						if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null &&
@@ -2834,7 +2838,7 @@ namespace Faolan.GameServer.World
 		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
 		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
 		// the spawn it was just sent); the waypoints are the absolute captured world coords.
-		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
+		private Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
 			if (!npc.Patrols)
 				return Task.CompletedTask;
@@ -2853,7 +2857,7 @@ namespace Faolan.GameServer.World
 		// paces the walk, and a rebuild that did not supply it left the client pacing off something else. It is supplied
 		// here as the WALK speed (WorldState.RouteWalkSpeed) rather than the captured scalar - the scalar is not a ground
 		// speed, and feeding it back made the fast-scalar beats sprint. See #714 for the measurement.
-		private static byte[] BuildRouteBody(WorldEntity npc)
+		private byte[] BuildRouteBody(WorldEntity npc)
 		{
 			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);
 			if (ahead.Count == 0)
@@ -2875,6 +2879,15 @@ namespace Faolan.GameServer.World
 			// attribute - which for an NPC is its RUN speed, and is what made the beat get sprinted and then stood
 			// through.
 			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.RouteSpeed;
+
+			// #714 probe: the model's ACTUAL lap time beside the duration we state. If they disagree the desync is
+			// ours; if they agree, whatever makes a fresh spawn run its first laps is on the client side.
+			_logger.LogInformation(
+				"Patrol probe: {Name} 0x{Handle:X8} idx {Index}{Dir}{Loop} pts {Pts} len {Len:F1}u stated {Stated:F1}s modelLap {Lap:F1}s at ({X:F1},{Z:F1})",
+				npc.Name, npc.Handle, npc.RouteIndex, npc.RouteBackwards ? " back" : " fwd", npc.RouteLoops ? " loop" : " open",
+				path.Count, PatrolRoute.TotalLength(npc.Position, ahead), seconds, npc.RouteLapSeconds, npc.Position.X, npc.Position.Z);
+			npc.RouteLapSeconds = 0;
+
 			return MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position,
 				MoveTaskNodes.PatrolTimed(path, npc.RouteSpeed, npc.Position, seconds, seconds)));
 		}
