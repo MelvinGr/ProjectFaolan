@@ -157,6 +157,9 @@ namespace Faolan.Core.Network.Codecs.Text
 		//       name states the delivery: a TELL, i.e. one recipient. Its `DetectedChar.name` slot names the player
 		//       the NPC has DETECTED, so it fires on a player arriving and goes to that player alone. Firing it on a
 		//       clock is what made the crier greet an empty street.
+		//   broadcastcycle                -> AMBIENT, and the channel name says so outright: a BROADCAST on a CYCLE.
+		//       The Chronicler of Deeds' `AchievementsPetHeraldOfDeeds` lines - an achievements herald announcing to
+		//       nobody in particular, on a clock. Same cue as the conversation channels, different publisher.
 		//   event                         -> ENCOUNTER SCRIPT. The Damsel's `RnBLadyInDistressBrainScript` cry for
 		//       help, driven by the encounter's own proximity trigger (#502), never by this tier. It was ALSO in the
 		//       ambient pool, so it double-fired on the timer as well as on the trigger.
@@ -168,7 +171,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// tell). A tell still has exactly one recipient, so it is still said on detection. The channel states the CUE;
 		// the slot only decides whether the body has to be built per-recipient (see Addressed).
 		//
-		// ⚠️ The corpus holds only these four channel values (22 rows / 6 NPC types). An unknown channel falls to
+		// ⚠️ The corpus holds only these five channel values (24 rows / 7 NPC types). An unknown channel falls to
 		// Ambient deliberately: a bark on a clock is a cosmetic line at the wrong moment, while a bark wired to a cue
 		// we have not decoded would be a line that never fires at all.
 		public static BarkTrigger TriggerOf(NpcChatterBark bark)
@@ -179,6 +182,8 @@ namespace Faolan.Core.Network.Codecs.Text
 			{
 				"sendtell" => BarkTrigger.Detection,
 				"event" => BarkTrigger.EncounterScript,
+				"broadcastcycle" => BarkTrigger.Ambient, // explicit, not the default: the name states the cue
+
 				_ => BarkTrigger.Ambient
 			};
 		}
