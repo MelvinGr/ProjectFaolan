@@ -14,12 +14,14 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// The "mode" byte selects the form (decoded from the captures, #53): 0x00 = a bare position, 0x01 = a
 	// multi-waypoint path, 0x02 = the stationary from/to/facing form, 0x04 = a list of tasks, 0x05 = a forced move
-	// (knockback, #496), 0x06 = an animated (stationary) task, 0x08 = approach/face a target.
+	// (knockback, #496), 0x06 = an animated (stationary) task, 0x07 = formation-follow another entity (#741),
+	// 0x08 = approach/face a target.
 	public static class MoveTaskNodes
 	{
 		public const byte ModeApproachTarget = 0x08;
 		public const byte ModeBarePosition = 0x00;
 		public const byte ModeForcedMove = 0x05;
+		public const byte ModeFormation = 0x07;
 		public const byte ModeList = 0x04;
 		public const byte ModePath = 0x01;
 		public const byte ModeRotate = 0x02;
@@ -40,6 +42,30 @@ namespace Faolan.Core.Network.Codecs.World
 				ApproachType = EntityClass.Character,
 				ApproachTarget = targetHandle,
 				ApproachTail = tail
+			};
+		}
+
+		// mode-07: FORMATION-FOLLOW another entity - one NPC's movement target IS another NPC, held at a fixed offset
+		// and re-sent as the leader's own path is re-sent (#741).
+		//
+		// This is what the maintainer's "giner & scruffy should be chasing each other" annotation names: in
+		// NecroL80_..._annotated_1, `Ginger` 0x31C7A gets a 694-byte mode-04 patrol with 52 waypoints, and 0x31CFD gets
+		// a 55-byte mode-07 naming 0x31C7A as its target with an offset of -4.5 - re-issued together every ~15 s. So
+		// the ambient NPC-vs-NPC chase is NOT a scripted behaviour: it is an ordinary MoveTask retargeted at the
+		// other NPC's handle, which is the cheap half of that ticket.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_1.tshark.json frames 1349 / 1521 / 2500 / 2836]
+		//
+		// ⚠️ The offset is ONE captured value on ONE pair, so it is a parameter here rather than a constant. What
+		// remains unmodelled is the DATA - which NPC follows which - not the wire.
+		public static MoveTaskNode Formation(uint targetHandle, float offset)
+		{
+			return new MoveTaskNode
+			{
+				Mode = ModeFormation,
+				Formation6 =
+				[
+					EntityClass.Character, targetHandle, 0, 0, BitConverter.SingleToUInt32Bits(offset), 0
+				]
 			};
 		}
 

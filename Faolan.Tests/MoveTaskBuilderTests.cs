@@ -26,6 +26,31 @@ namespace Faolan.Tests
 		private const string CapturedPatrolSha256 = "2e659474d4b316fd50b6978ad9f7436540a63957875b09bef45c07b12edd174c";
 		private const string CapturedStationarySha256 = "46654fd27c528366b102b2895147fc97ef4d0964be4820f15e50da46b3602f0a";
 
+		// ⭐ FORMATION-FOLLOW (mode 0x07), the wire form of the ambient NPC-vs-NPC chase (#741). In
+		// NecroL80_..._annotated_1 the maintainer annotates "giner & scruffy should be chasing each other", and the two
+		// NPCs he means are `Ginger` 0x31C7A - which gets a 694-byte mode-04 patrol with 52 waypoints - and 0x31CFD,
+		// which gets THIS: a 55-byte mode-07 naming 0x31C7A as its target at an offset of -4.5. The pair is re-issued
+		// together every ~15 s.
+		//
+		// So the chase is an ordinary MoveTask retargeted at the other NPC's handle, not a scripted behaviour. The
+		// codec already PARSED mode 7 (it round-trips over the corpus); what it had no way to do was build one.
+		[Fact]
+		public void BuildFormation_IsByteIdenticalToTheCapturedChase()
+		{
+			// subop, class, follower, u16 0, its position | mode 0x07 | the LEADER's class + handle | [0][0][-4.5f][0]
+			const string captured = "96c467400000c35000031cfd000044548e5b42cafa5f43fe15c9" +
+			                        "07" +
+			                        "0000c35000031c7a" +
+			                        "0000000000000000c090000000000000";
+
+			// The position words verbatim, rather than decimal literals - a float printed to 7 digits and re-parsed
+			// does not always land on the same bits, and this gate is about the bits.
+			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x00031CFD, 0x44548E5B, 0x42CAFA5F, 0x43FE15C9,
+				MoveTaskNodes.Formation(0x00031C7A, -4.5f)));
+
+			Assert.Equal(captured, Convert.ToHexStringLower(built));
+		}
+
 		[Fact]
 		public void BuildPatrol_FromCapturedWaypoints_IsByteIdentical()
 		{
