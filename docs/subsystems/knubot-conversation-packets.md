@@ -81,7 +81,7 @@ the dialogue branch that IS its primary key. `NpcName` is a **label** — logs, 
 and is empty where a capture never named the NPC.
 
 ⚠️ It was the other way round until #646: the name was the KEY and the template a nullable GATE beside it. That is
-backwards, because a display name is ambiguous in the world — **`Halen van Dummy` is the internal name of 27
+backwards, because a display name is ambiguous in the world — **`Halen van Dummy` is the internal name of 38
 templates**, `Conarch Village Guard` and `Smuggler` of 5 each — while a template is exactly one kind of NPC. It
 worked only because the corpus happens to hold one dialogue per name; a second `Smuggler` with its own tree could
 not be told apart by the key, and the gate that had to do it was nullable. `Shop` already keyed by template and was

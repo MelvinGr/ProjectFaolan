@@ -582,13 +582,18 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			// Harvest (npc name -> cCategory votes) across all captures.
-			var nameVotes = new Dictionary<string, Dictionary<uint, int>>(StringComparer.OrdinalIgnoreCase);
+			// Harvest (npc TEMPLATE -> cCategory votes) across all captures.
+			//
+			// ⚠️ Keyed by template, not by name (#731). 37 templates ship as "Halen van Dummy" - the training-dummy
+			// placeholder winning over the real name - so a name -> community step silently funnelled every vote for
+			// any of them into whichever faction the LAST one written happened to belong to. The template is what the
+			// stat core is keyed by anyway, so the name was never anything but a lossy detour.
+			var templateVotes = new Dictionary<uint, Dictionary<uint, int>>();
 			foreach (var cap in ctx.Captures)
-			foreach (var (name, category) in NpcDispositionExtractor.Extract(cap.Packets))
+			foreach (var (templateId, category) in NpcDispositionExtractor.Extract(cap.Packets))
 			{
-				if (!nameVotes.TryGetValue(name, out var byCat))
-					nameVotes[name] = byCat = [];
+				if (!templateVotes.TryGetValue(templateId, out var byCat))
+					templateVotes[templateId] = byCat = [];
 				byCat[category] = byCat.GetValueOrDefault(category) + 1;
 			}
 
@@ -599,22 +604,12 @@ namespace Faolan.Importer.Modules
 			// hostile MOB faction (poachers/picts/pirates/...) comes out hostile. NULL-community NPCs (unique story
 			// NPCs like Casilda/Kalanthes) share one bucket -> friendly/neutral. #256/aggro.
 			var cores = await ctx.Db.NpcStatCores.ToListAsync();
-			var nameById = await ctx.Db.NpcTemplates.ToDictionaryAsync(n => n.TemplateId, n => n.Name);
-			var commByName = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-			foreach (var core in cores)
-			{
-				if (nameById.TryGetValue(core.NpcTemplateId, out var nm) && nm != null)
-				{
-					commByName[nm] = core.Community.HasValue
-						? core.Community.Value
-						: NullCommunity;
-				}
-			}
+			var commByTemplate = cores.ToDictionary(c => c.NpcTemplateId, c => c.Community ?? NullCommunity);
 
 			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
-			foreach (var (name, votes) in nameVotes)
+			foreach (var (templateId, votes) in templateVotes)
 			{
-				var comm = commByName.TryGetValue(name, out var c)
+				var comm = commByTemplate.TryGetValue(templateId, out var c)
 					? c
 					: NullCommunity;
 				if (!commVotes.TryGetValue(comm, out var byCat))

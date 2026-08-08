@@ -93,7 +93,7 @@ template id and only fall back to the name.
 
 `QuestGoalDefinition.TargetTemplateId` is the id half of the target, resolved at import
 (`ImportOps.ResolveGoalTargetTemplates`) so that the talk and loot paths match the way the kill path always has.
-A display name is **ambiguous in the world** — `Saddur` is two templates and `Halen van Dummy` is 27 — and that
+A display name is **ambiguous in the world** — `Saddur` is two templates and `Halen van Dummy` is 38 — and that
 was a live defect, not a theoretical one: the quest-gate map keyed on the string, so flagging the Tortage Island
 Saddur (9500) also stamped `GateQuestIds` + `NoRespawn` onto the **Stygian Galley** Saddur (2993), hiding an NPC
 on the intro playfield from every player not carrying a Tortage Island quest they cannot have yet.

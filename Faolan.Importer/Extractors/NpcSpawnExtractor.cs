@@ -14,6 +14,13 @@ namespace Faolan.Importer.Extractors
 	{
 		public uint TemplateId { get; init; }
 
+		// Where in the capture this spawn arrived (the index into the packet list `Extract` was given). ⚠️ Needed
+		// because HANDLES ARE RECYCLED: 91 handles in the corpus carry two different templates over one capture, so
+		// "what was spawned on handle H" is only answerable AT A POINT IN TIME. A consumer correlating a later packet
+		// to an NPC must take the most recent spawn BEFORE it, not the first or the last one overall (#731).
+		// Left 0 by the extractors that do not walk the whole packet list.
+		public int SourceIndex { get; init; }
+
 		// The CLASS this placement belongs to, on a class-specific map (Map.ClassSpecific - the city armories).
 		// Stamped by BuildBurstTruthSpawns from the class of the capture's own played character; null everywhere else.
 		public ConanClass? ClassId { get; init; }
@@ -73,8 +80,9 @@ namespace Faolan.Importer.Extractors
 			var entries = new List<NpcSpawnEntry>();
 			uint currentMap = 0;
 
-			foreach (var p in packets)
+			for (var i = 0; i < packets.Count; i++)
 			{
+				var p = packets[i];
 				if (!p.IsIirCarrier)
 					continue;
 
@@ -89,7 +97,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				if (TryBuildEntry(p.Body, p.Bytes, currentMap, out var entry))
-					entries.Add(entry);
+					entries.Add(entry with { SourceIndex = i });
 			}
 
 			return entries;
