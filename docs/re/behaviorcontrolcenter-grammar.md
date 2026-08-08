@@ -327,8 +327,25 @@ direction) as the control**, and word 5 comes out just as unstable per attacker 
 refuted: both words are rolled **per SWING**, not held as a property of an entity, which is the shape scope
 stability cannot see. The populations are also far too small for it either way.
 
-The route left is the client, not more corpus arithmetic: word 4 lands in Command slot `+0x44`, so whatever reads
-`Command + 0x44` names it. Open work tracked in Gitea #661.
+**The client route was then run, and it narrows rather than answers.** `FindOffAccess` (`OFF=44 MODE=r`) over the
+whole image gives 14,961 hits — `+0x44` is a ubiquitous struct offset — but restricted to the Command class's own
+address neighbourhood (`0x0114xxxx`–`0x0115xxxx`) and to REGISTER-relative accesses (a stack local at `[ESP+0x44]`
+is not this field), the only three functions that touch it on this object are:
+
+| function | what it does with `+0x44` |
+|---|---|
+| `FUN_01151170` | the s2c tail READER — `MOV [ECX+0x44],EAX`, i.e. the only writer |
+| `FUN_01151030` | the c2s WRITER — reads it back and puts it on the wire, third of four, between `+0x19c` and `+0xd0` |
+| `FUN_011516a0` | the copy — `MOV EAX,[EDI+0x44]; MOV [ESI+0x44],EAX`, a plain dword |
+
+So the field is **stored, transported both ways and copied, and nothing in the Command's own module reads it for
+behaviour.** (The other `[reg+0x44]` hits in range belong to unrelated objects — `FUN_01150340` and `FUN_0115277x`
+show the `MOV EDX,[EDX+0x44]` / `LEA ECX,[ESI+0x44]` pair that is a string or container member, not this.)
+
+Two readings survive, and offset-granularity RE cannot separate them: the consumer is reached indirectly (a
+virtual call the offset scan cannot follow), or the client genuinely only echoes the word. **The next step is to
+name the CLASS** — its RTTI or vtable — and then find its consumers by class rather than by offset, which is what
+`DumpClassVtable.java` / `DumpVirtualSlotAcrossClasses.java` are for. Open work tracked in Gitea #661.
 
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into
