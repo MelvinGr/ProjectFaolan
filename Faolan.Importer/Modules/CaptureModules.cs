@@ -584,7 +584,7 @@ namespace Faolan.Importer.Modules
 		{
 			// Harvest (npc TEMPLATE -> cCategory votes) across all captures.
 			//
-			// ⚠️ Keyed by template, not by name (#731). 37 templates ship as "Halen van Dummy" - the training-dummy
+			// ⚠️ Keyed by template, not by name (#731). 38 templates ship as "Halen van Dummy" - the training-dummy
 			// placeholder winning over the real name - so a name -> community step silently funnelled every vote for
 			// any of them into whichever faction the LAST one written happened to belong to. The template is what the
 			// stat core is keyed by anyway, so the name was never anything but a lossy detour.
@@ -597,12 +597,24 @@ namespace Faolan.Importer.Modules
 				byCat[category] = byCat.GetValueOrDefault(category) + 1;
 			}
 
-			// Aggregate per FACTION (NpcStats.community), NOT per NPC. Hostility toward the player is a faction
-			// standing, and per-NPC cCategory is noisy: some passive court NPCs (Chancellor Publius, Ambassador Nidas,
-			// ...) consistently poll cCategory 1 yet never attack and read green in-client, while the faction-level
-			// majority is rock-solid (community 1 = civilians: 2649 friendly votes vs 12 hostile). Only a genuinely
-			// hostile MOB faction (poachers/picts/pirates/...) comes out hostile. NULL-community NPCs (unique story
-			// NPCs like Casilda/Kalanthes) share one bucket -> friendly/neutral. #256/aggro.
+			// A TEMPLATE that was polled gets its OWN answer; a template that was never polled falls back to its
+			// FACTION's majority, and one whose faction was never polled either stays NULL (#715).
+			//
+			// ⚠️ This used to be faction-first for everything, on the reasoning that "per-NPC cCategory is noisy".
+			// It is not noisy - that was the name collision #731 removed. With the votes correctly attributed,
+			// **406 of the 414 polled templates vote UNANIMOUSLY**, and the 8 that do not are guards splitting
+			// friendly/neutral. The per-template signal also lines up exactly with the client's own colour table:
+			// traders/villagers/citizens green, mobs red, GUARDS yellow - a split a faction roll-up cannot express,
+			// because guards and the citizens they protect share a community.
+			//
+			// The roll-up was also demonstrably WRONG where a faction holds two populations: community 346 polls
+			// 4 templates unanimously neutral and 2 unanimously hostile, so a majority paints all six the same. That
+			// is the "a record count can conflate two phenomena" shape, and it is why the vote is no longer taken at
+			// the faction level when the template itself was seen.
+			//
+			// The faction fallback stays for reach: it is what fills a template no capture ever targeted, from its
+			// faction-mates that were. NULL-community NPCs (unique story NPCs like Casilda/Kalanthes) share one
+			// bucket. #256/aggro.
 			var cores = await ctx.Db.NpcStatCores.ToListAsync();
 			var commByTemplate = cores.ToDictionary(c => c.NpcTemplateId, c => c.Community ?? NullCommunity);
 
@@ -618,17 +630,28 @@ namespace Faolan.Importer.Modules
 					byCat[cat] = byCat.GetValueOrDefault(cat) + n;
 			}
 
-			var commDisposition = commVotes.ToDictionary(kv => kv.Key, kv => kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key);
+			var commDisposition = commVotes.ToDictionary(kv => kv.Key, kv => Majority(kv.Value));
+			var templateDisposition = templateVotes.ToDictionary(kv => kv.Key, kv => Majority(kv.Value));
 
 			var updated = 0;
 			var hostile = 0;
+			var fromOwnVotes = 0;
 			foreach (var core in cores)
 			{
 				var comm = core.Community.HasValue
 					? core.Community.Value
 					: NullCommunity;
-				if (!commDisposition.TryGetValue(comm, out var disposition))
-					continue; // this faction was never polled -> leave NULL (treated as non-hostile in the sim)
+
+				uint disposition;
+				if (templateDisposition.TryGetValue(core.NpcTemplateId, out var own))
+				{
+					disposition = own;
+					fromOwnVotes++;
+				}
+				else if (!commDisposition.TryGetValue(comm, out disposition))
+				{
+					continue; // neither this template nor its faction was ever polled -> leave NULL (non-hostile in the sim)
+				}
 
 				if (core.Disposition != disposition)
 				{
@@ -641,7 +664,16 @@ namespace Faolan.Importer.Modules
 			}
 
 			await ctx.Db.SaveChangesAsync();
-			return new ImportResult($"{commDisposition.Count} factions dispositioned; {updated} stat cores set ({hostile} hostile).");
+			return new ImportResult(
+				$"{templateDisposition.Count} templates polled directly, {commDisposition.Count} factions dispositioned; " +
+				$"{updated} stat cores set ({fromOwnVotes} from their own votes, {hostile} hostile).");
+		}
+
+		// The winning category of a vote tally. Ties break to the LOWEST category, so a 50/50 lands on the more
+		// permissive reading rather than on whichever key the dictionary happened to enumerate first.
+		private static uint Majority(Dictionary<uint, int> byCategory)
+		{
+			return byCategory.OrderByDescending(x => x.Value).ThenBy(x => x.Key).First().Key;
 		}
 	}
 

@@ -475,6 +475,38 @@ Decode: `CombatDamageCodecTests` (98/98 frames of the strickenbla capture). Buil
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
 semantically decoded - capture-typical defaults for the live send.
 
+## Where an NPC's hostility comes from (#256/#715/#731)
+
+`NpcStatCore.Disposition` is retail's own `cCategory` — the third word of the `DispatchUpdateAggroStatus` reply,
+`0` friendly (green) / `1` hostile (red) / `2` neutral (yellow). It drives both the overhead name colour and, in
+our sim, whether the NPC aggros on sight (`WorldEntity.Hostile` is `Disposition == 1`).
+
+**It is server-authored: there is no client-side table to mine.** The client ASKS, per target, at runtime — a
+client that could derive hostility from its own RDB would not need to. (`data/FactionRelations.xml`, RDB
+1010701/1, was chased for this and is player REPUTATION in a different id space; and retail's own spawns omit
+`NpcStats.faction_id` entirely.) So the only way to learn a template's disposition is to capture retail
+answering for it, and **targeting the NPC is enough** — no combat, no kill, no quest state.
+
+The importer harvests it in `NpcDispositionModule`, and how it aggregates matters:
+
+1. **A template that was polled gets its own answer.** 406 of the 414 polled templates vote **unanimously**, and
+   the answers line up with the client's colour table exactly — traders/villagers/citizens green, mobs red,
+   **guards yellow**.
+2. **A template never polled falls back to its FACTION's majority** (`NpcStats.community`), which is what gives
+   the harvest reach beyond the NPCs actually targeted.
+3. **Neither polled → NULL**, which the sim treats as friendly, the client's own default for an NPC it was never
+   told about.
+
+⚠️ It was faction-first for everything until #715, on the reasoning that per-NPC `cCategory` is "noisy". It is
+not — the noise was the name collision of #731 (38 templates share `Halen van Dummy`, spanning four factions, and
+votes were routed faction-ward *through the name*). A faction roll-up also cannot express the guard/citizen split,
+since guards share a community with the citizens they protect, and it is outright wrong where a faction holds two
+populations: community 346 polls four templates unanimously neutral and two unanimously hostile.
+
+⚠️ **Handles are recycled** — 91 of them carry two different templates within one capture — so the extractor
+replays `handle -> template` as it walks the packets and attributes each poll to the most recent spawn *before*
+it. Collapsing that into one map first silently gave four `Crocodile Pict` templates another mob's votes.
+
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
 A hostile NPC aggros a player two ways: proximity — a player inside `NpcAggroRange` (20u) — or **being hit**,
