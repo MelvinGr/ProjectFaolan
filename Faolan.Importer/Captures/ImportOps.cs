@@ -1574,11 +1574,19 @@ namespace Faolan.Importer.Captures
 		//      needs it: it names `Saddur`, carries no reference, and both Saddurs are candidates until its `MapId`
 		//      4010 picks the Tortage Island one (9500) over the Stygian Galley one (2993). Its sibling goal 3490
 		//      resolves by rule 1 to the SAME template, which is the cross-check that says the map reading is right.
+		//   4. for a TALK goal only: the name plus the CONVERSATION catalog, when exactly one candidate has a
+		//      conversation at all (#707). A `TalkToNpc` goal is completed by greeting the target, and greeting is
+		//      driven by `ConversationEntries` - so a candidate with no conversation row cannot complete the goal on
+		//      any evidence we hold, whatever retail meant. Where that leaves exactly one candidate standing, the
+		//      choice is forced rather than guessed. Goal 4771 "Talk to Alyssa" is the case: two Alyssas (13457 City
+		//      of Tortage, 19616 Old Tarantia), no reference and no map on the goal, and only 13457 is ever greeted
+		//      in the corpus. It agrees with the quest's own placement - 12994 sits in questline 1308 "[NPE] Horror
+		//      Beneath the Surface", whose map is 4569 Tortage Underhalls Day, i.e. the Tortage newbie chain, which
+		//      the Old Tarantia Alyssa is nowhere near. ⚠️ Scoped to TALK goals on purpose: a KILL target has no
+		//      reason to own a conversation, so the same test there would be an absence-of-evidence coin flip.
 		//
 		// Anything still ambiguous is left NULL and REPORTED, never guessed: a wrong template is worse than no template,
-		// because the name fallback still works and a wrong id silently matches the wrong creature. One goal is in that
-		// state today - 4771 "Talk to Alyssa", two Alyssas (13457 City of Tortage, 19616 Old Tarantia) and no map on the
-		// goal to separate them.
+		// because the name fallback still works and a wrong id silently matches the wrong creature.
 		//
 		// ⚠️ A template we do not hold cannot be stored: `TargetTemplateId` is an FK, and an id with no row fails the
 		// constraint. That is what caps the fill at 278 of 864 - the remaining goals name NPCs on maps that have not
@@ -1606,7 +1614,10 @@ namespace Faolan.Importer.Captures
 				.GroupBy(s => s.NpcTemplateId)
 				.ToDictionary(g => g.Key, g => g.Select(s => s.MapId).ToHashSet());
 
-			int byReference = 0, byUniqueName = 0, byMap = 0, ambiguous = 0, notHeld = 0, unknownName = 0;
+			// Rule 4's discriminator: the templates the conversation catalog can actually greet.
+			var conversational = (await db.ConversationEntries.Select(e => e.NpcTemplateId).Distinct().ToListAsync()).ToHashSet();
+
+			int byReference = 0, byUniqueName = 0, byMap = 0, byConversation = 0, ambiguous = 0, notHeld = 0, unknownName = 0;
 			var unresolved = new List<string>();
 			foreach (var goal in goals)
 			{
@@ -1652,15 +1663,28 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
+				// 4. a TALK goal, and exactly one candidate is greetable.
+				if (goal.GoalType == QuestGoalType.TalkToNpc)
+				{
+					var greetable = candidates.Where(conversational.Contains).ToList();
+					if (greetable.Count == 1)
+					{
+						goal.TargetTemplateId = greetable[0];
+						byConversation++;
+						continue;
+					}
+				}
+
 				ambiguous++;
 				unresolved.Add($"goal {goal.GoalId} '{goal.TargetName}' -> {candidates.Count} templates ({string.Join("/", candidates)})");
 			}
 
-			if (byReference + byUniqueName + byMap > 0)
+			if (byReference + byUniqueName + byMap + byConversation > 0)
 				await db.SaveChangesAsync();
 
-			Console.WriteLine($"Resolved {byReference + byUniqueName + byMap} quest goal target template(s): {byReference} from the goal's own 51000 "
-			                  + $"reference, {byUniqueName} from a uniquely-named catalog row, {byMap} from the name + the goal's own map (#521).");
+			Console.WriteLine($"Resolved {byReference + byUniqueName + byMap + byConversation} quest goal target template(s): {byReference} from the goal's own 51000 "
+			                  + $"reference, {byUniqueName} from a uniquely-named catalog row, {byMap} from the name + the goal's own map, "
+			                  + $"{byConversation} from the name + the conversation catalog on a talk goal (#521, #707).");
 			Console.WriteLine($"  Left by NAME only: {notHeld} whose stated template no imported map holds, {unknownName} whose name matches no "
 			                  + $"catalog row, {ambiguous} genuinely ambiguous. These still match on TargetName.");
 			foreach (var line in unresolved)
