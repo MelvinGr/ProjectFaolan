@@ -252,7 +252,7 @@ namespace Faolan.Tests
 		{
 			return message.GetType()
 				.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				.Where(p => p.CanRead && p.CanWrite && p.GetCustomAttribute<ProtoMemberAttribute>() != null)
+				.Where(p => p is { CanRead: true, CanWrite: true } && p.GetCustomAttribute<ProtoMemberAttribute>() != null)
 				.Where(p => p.PropertyType.IsPrimitive || p.PropertyType == typeof(string));
 		}
 

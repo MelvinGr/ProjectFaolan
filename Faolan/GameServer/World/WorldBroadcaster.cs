@@ -101,7 +101,7 @@ namespace Faolan.GameServer.World
 
 		// #363 ambient spawn-group pools per loaded zone (built in LoadAmbientSpawns on the entry thread, iterated by
 		// MaintainAmbientPools on the tick thread - concurrent so the tick doesn't throw mid-load).
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>> _ambientPools = new();
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>> _ambientPools = new ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>>();
 
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).

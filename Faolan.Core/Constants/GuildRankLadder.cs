@@ -20,7 +20,7 @@ namespace Faolan.Core.Constants
 	public static class GuildRankLadder
 	{
 		// Rung names in rank order, indexed by governing form.
-		private static readonly Dictionary<GuildGoverningForm, string[]> Ladders = new()
+		private static readonly Dictionary<GuildGoverningForm, string[]> Ladders = new Dictionary<GuildGoverningForm, string[]>
 		{
 			[GuildGoverningForm.Cimmerian] = ["Comrade", "Kinsman", "Elder", "War Chief", "Chieftain"],
 			[GuildGoverningForm.Acheron] = ["Blood Initiate", "Sacrificer Apprentice", "Ritualist Acolyte", "Infernal Adept", "Deathbringer Envoy", "Chaos-lord"],

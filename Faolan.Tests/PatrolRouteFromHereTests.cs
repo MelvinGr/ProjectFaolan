@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	{
 		private static readonly Vector3[] Street =
 		[
-			new(0, 0, 0), new(0, 0, 10), new(0, 0, 20), new(0, 0, 30)
+			new Vector3(0, 0, 0), new Vector3(0, 0, 10), new Vector3(0, 0, 20), new Vector3(0, 0, 30)
 		];
 
 		[Fact]

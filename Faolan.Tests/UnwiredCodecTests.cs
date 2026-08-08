@@ -27,7 +27,7 @@ namespace Faolan.Tests
 	{
 		// A codec is UNWIRED when nothing outside `Codecs/` and the test project names it. Each entry needs a reason,
 		// and the reason is the point: most of these are correct, not gaps.
-		private static readonly Dictionary<string, string> Unwired = new(StringComparer.Ordinal)
+		private static readonly Dictionary<string, string> Unwired = new Dictionary<string, string>(StringComparer.Ordinal)
 		{
 			["SpellBookCodec"] = "the spell book rides the login snapshot instead, so the standalone message has no caller",
 			["AreaFormulaCodec"] = "area/cone target selection - unblocked by Spell.AreaRadius (#349) but the selection itself is not implemented",

@@ -22,7 +22,7 @@ namespace Faolan.Tests.Support
 		public static IReadOnlyDictionary<ushort, string> RefsByTag => Loaded.Value.RefsByTag;
 
 		private static readonly Lazy<(IReadOnlyDictionary<string, MorphTarget> ByName, IReadOnlyDictionary<ushort, string> RefsByTag)> Loaded =
-			new(Load, LazyThreadSafetyMode.ExecutionAndPublication);
+			new Lazy<(IReadOnlyDictionary<string, MorphTarget> ByName, IReadOnlyDictionary<ushort, string> RefsByTag)>(Load, LazyThreadSafetyMode.ExecutionAndPublication);
 
 		private static (IReadOnlyDictionary<string, MorphTarget> ByName, IReadOnlyDictionary<ushort, string> RefsByTag) Load()
 		{

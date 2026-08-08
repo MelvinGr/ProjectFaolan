@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Combat
 	// performed by a directional key sequence (spellweaving / reactive procs); TryParse returns false for those.
 	public static class ComboActionParser
 	{
-		private static readonly Dictionary<string, ComboInput> Map = new(StringComparer.OrdinalIgnoreCase)
+		private static readonly Dictionary<string, ComboInput> Map = new Dictionary<string, ComboInput>(StringComparer.OrdinalIgnoreCase)
 		{
 			["UL"] = ComboInput.UpperLeft,
 			["CombatUpperLeft"] = ComboInput.UpperLeft,
@@ -40,7 +40,7 @@ namespace Faolan.GameServer.Combat
 
 		// Non-directional Action tokens: the combo is triggered by a mechanic other than a key sequence (a reactive
 		// proc, or a spellweaving magic combo), so it has no directional grammar to match.
-		private static readonly Dictionary<string, ComboTrigger> Markers = new(StringComparer.OrdinalIgnoreCase)
+		private static readonly Dictionary<string, ComboTrigger> Markers = new Dictionary<string, ComboTrigger>(StringComparer.OrdinalIgnoreCase)
 		{
 			["action"] = ComboTrigger.NpcCombo,
 			["MagicCombo"] = ComboTrigger.MagicCombo,

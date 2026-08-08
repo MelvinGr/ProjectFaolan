@@ -154,9 +154,9 @@ namespace Faolan.Importer.Cli
 		// A selector's sightings: how often, in which captures, and what the server answered with.
 		private sealed class Selector
 		{
-			public readonly Dictionary<(uint Id, uint ArgsLength, uint TailLength), int> Behaviors = new();
+			public readonly Dictionary<(uint Id, uint ArgsLength, uint TailLength), int> Behaviors = new Dictionary<(uint Id, uint ArgsLength, uint TailLength), int>();
 			public readonly SortedSet<string> Captures = [];
-			public readonly Dictionary<uint, int> OtherIirs = new();
+			public readonly Dictionary<uint, int> OtherIirs = new Dictionary<uint, int>();
 			public readonly List<(string Capture, int Frame, BehaviorControlCenterIIR Bcc)> Records = [];
 			public int Count;
 		}

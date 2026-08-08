@@ -43,11 +43,11 @@ namespace Faolan.Importer.Cli
 			}
 
 			var pool = verdicts.Count(v => v.Pool);
-			var flat = verdicts.Count(v => !v.Pool && v.Stat == BuffStatEffects.Gate.Flat);
-			var percent = verdicts.Count(v => !v.Pool && v.Stat == BuffStatEffects.Gate.Percent);
-			var byKind = verdicts.Where(v => !v.Pool && v.Stat == BuffStatEffects.Gate.UnhandledKind).ToList();
+			var flat = verdicts.Count(v => v is { Pool: false, Stat: BuffStatEffects.Gate.Flat });
+			var percent = verdicts.Count(v => v is { Pool: false, Stat: BuffStatEffects.Gate.Percent });
+			var byKind = verdicts.Where(v => v is { Pool: false, Stat: BuffStatEffects.Gate.UnhandledKind }).ToList();
 			var byStat = verdicts
-				.Where(v => !v.Pool && v.Stat is BuffStatEffects.Gate.UnmodelledStat or BuffStatEffects.Gate.PercentOnUnmodelledStat)
+				.Where(v => v is { Pool: false, Stat: BuffStatEffects.Gate.UnmodelledStat or BuffStatEffects.Gate.PercentOnUnmodelledStat })
 				.ToList();
 
 			Console.WriteLine($"SpellStatEffects: {rows.Count} imported rows over {rows.Select(r => r.SpellId).Distinct().Count()} spells");

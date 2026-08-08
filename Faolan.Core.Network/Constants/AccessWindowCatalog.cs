@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Constants
 	{
 		public static readonly IReadOnlyList<PfAccessWindowEntry> Entries =
 		[
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1000,
 				SectionOrTier = 1,
@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Constants
 					]
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1010,
 				SectionOrTier = 1,
@@ -57,7 +57,7 @@ namespace Faolan.Core.Network.Constants
 					Unknown = 0
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1020,
 				SectionOrTier = 1,
@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Constants
 					]
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1022,
 				SectionOrTier = 0,
@@ -95,7 +95,7 @@ namespace Faolan.Core.Network.Constants
 				UnknownBeforeChildMode = 0,
 				ChildMode = 0
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1024,
 				SectionOrTier = 0,
@@ -105,7 +105,7 @@ namespace Faolan.Core.Network.Constants
 				UnknownBeforeChildMode = 0,
 				ChildMode = 0
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1026,
 				SectionOrTier = 1,
@@ -131,7 +131,7 @@ namespace Faolan.Core.Network.Constants
 					]
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1050,
 				SectionOrTier = 1,
@@ -159,7 +159,7 @@ namespace Faolan.Core.Network.Constants
 					]
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1052,
 				SectionOrTier = 0,
@@ -169,7 +169,7 @@ namespace Faolan.Core.Network.Constants
 				UnknownBeforeChildMode = 0,
 				ChildMode = 0
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1070,
 				SectionOrTier = 1,
@@ -195,7 +195,7 @@ namespace Faolan.Core.Network.Constants
 					]
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1071,
 				SectionOrTier = 0,
@@ -205,7 +205,7 @@ namespace Faolan.Core.Network.Constants
 				UnknownBeforeChildMode = 0,
 				ChildMode = 0
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1080,
 				SectionOrTier = 1,
@@ -221,7 +221,7 @@ namespace Faolan.Core.Network.Constants
 					Unknown = 0
 				}
 			},
-			new()
+			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1082,
 				SectionOrTier = 1,

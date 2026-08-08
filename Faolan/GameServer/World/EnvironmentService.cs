@@ -30,8 +30,8 @@ namespace Faolan.GameServer.World
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly ConcurrentDictionary<uint, MapHazard[]> _mapHazards = new();
-		private readonly ConcurrentDictionary<uint, MapRegion[]> _noMountRegions = new();
+		private readonly ConcurrentDictionary<uint, MapHazard[]> _mapHazards = new ConcurrentDictionary<uint, MapHazard[]>();
+		private readonly ConcurrentDictionary<uint, MapRegion[]> _noMountRegions = new ConcurrentDictionary<uint, MapRegion[]>();
 		private readonly IEnvironmentOutbound _output;
 
 		public EnvironmentService(IDatabaseRepository database, IEnvironmentOutbound output, ILogger logger)

@@ -30,7 +30,7 @@ namespace Faolan.Web.Services
 	// (server offline) so the page can distinguish "offline" from "online, nobody connected".
 	public sealed class LiveSessionService
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			PropertyNameCaseInsensitive = true
 		};

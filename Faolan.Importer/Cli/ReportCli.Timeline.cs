@@ -37,7 +37,7 @@ namespace Faolan.Importer.Cli
 	{
 		// The service tier each port belongs to. 7010 is the only fixed one (UniverseAgent); the rest are handed to
 		// the client in the preceding tier's payload, so these are the ports the corpus actually used.
-		private static readonly Dictionary<int, string> TimelineTiers = new()
+		private static readonly Dictionary<int, string> TimelineTiers = new Dictionary<int, string>
 		{
 			[7010] = "universe", [7011] = "playeragent", [7012] = "cs", [7001] = "chat", [7017] = "game"
 		};
@@ -52,8 +52,8 @@ namespace Faolan.Importer.Cli
 			"UpdateQuestMarkerNPC", "DispatchSetQuestMarker"
 		];
 
-		private static readonly Regex RemoteFormat = new("<(remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
-		private static readonly Regex XmlAttr = new("(\\w+)=\"?([^\"\\s>]*)\"?", RegexOptions.Compiled);
+		private static readonly Regex RemoteFormat = new Regex("<(remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
+		private static readonly Regex XmlAttr = new Regex("(\\w+)=\"?([^\"\\s>]*)\"?", RegexOptions.Compiled);
 
 		private static async Task Timeline(string dumpPath, string rdbDir)
 		{

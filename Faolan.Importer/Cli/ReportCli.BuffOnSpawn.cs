@@ -68,8 +68,7 @@ namespace Faolan.Importer.Cli
 
 					if (p is { IsIirCarrier: true, SubOpcode: MagicBuffCodec.Opcode }
 					    && p.TryParse(MagicBuffCodec.Parse, out var buff)
-					    && buff.Form == MagicBuffIds.FormApply
-					    && buff.Data.Length == MagicBuffDataCodec.Length)
+					    && buff is { Form: MagicBuffIds.FormApply, Data.Length: MagicBuffDataCodec.Length })
 						applies.Add((at, buff));
 				}
 

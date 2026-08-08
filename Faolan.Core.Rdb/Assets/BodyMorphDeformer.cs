@@ -30,7 +30,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Captured Aquilonian-female deform-joint data: per morph the CHARACTERCREATOR min/max scale + the
 		// weighted joints (world position, influence weight) the slider drives.
-		private static readonly Dictionary<string, MorphDef> Defs = new()
+		private static readonly Dictionary<string, MorphDef> Defs = new Dictionary<string, MorphDef>
 		{
 			["arm"] = new MorphDef(-0.0500f, 0.0500f,
 			[

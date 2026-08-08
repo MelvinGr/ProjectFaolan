@@ -18,14 +18,14 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class GameServerTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true
 		};
 
 		// The full-session dump (list_world_sessions) walks the live INetworkClientSession, whose Account/Character are
 		// EF entities with navigation cycles - IgnoreCycles keeps the serializer from throwing on those back-references.
-		private static readonly JsonSerializerOptions SessionJsonOptions = new()
+		private static readonly JsonSerializerOptions SessionJsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			ReferenceHandler = ReferenceHandler.IgnoreCycles

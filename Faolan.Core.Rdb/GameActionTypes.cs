@@ -238,7 +238,7 @@ namespace Faolan.Core.Rdb
 			53149, 53151, 53156, 53157, 53158, 53161, 53181, 53186, 53216, 53248, 53258, 53279, 53280
 		};
 
-		private static readonly Dictionary<uint, GameActionType> ById = new()
+		private static readonly Dictionary<uint, GameActionType> ById = new Dictionary<uint, GameActionType>
 		{
 			[53002] = new GameActionType(53002, "Hit", [0, 2, 37, 71]),  // 0=Stat
 			[53003] = new GameActionType(53003, "AddLayeredSkinnedMesh", [194, 39]),

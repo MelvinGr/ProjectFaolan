@@ -27,11 +27,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	public sealed class SubClassPostAccessBlock
 	{
 		// StatList#1 - the 17 DISPLAYED stats (Level 0x36 / XP 0x34 / MaxXP 0x15E / HP 0x1B / ...).
-		public StatList Displayed { get; init; } = new();
+		public StatList Displayed { get; init; } = new StatList();
 
 		// StatList#2 - the full sheet, 74 unique pairs written TWICE (base + current copy = 148 pairs). Both copies
 		// are held, because both are on the wire and a stat is only consistent when both carry the same value.
-		public StatList Sheet { get; init; } = new();
+		public StatList Sheet { get; init; } = new StatList();
 
 		// The spellbook list (#74). NULL in the 21 create-editor snapshots, which end at Sheet - an EMPTY list is a
 		// different thing on the wire (its 0x3F1 frame word) and every login snapshot carries one.

@@ -100,7 +100,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	public sealed record TeamSettings(uint LootMode, bool UseNeedGreed, bool Flag, EntityId MasterLooter, uint LootThreshold)
 	{
 		// What every captured roster carries: free-for-all, need/greed on, no master looter, threshold 2.
-		public static TeamSettings Default { get; } = new(0, true, false, new EntityId(0, 0), 2);
+		public static TeamSettings Default { get; } = new TeamSettings(0, true, false, new EntityId(0, 0), 2);
 	}
 
 	public sealed record TeamRoster(uint TeamId, uint LeaderId, IReadOnlyList<TeamMemberRecord> Members, TeamSettings Settings);

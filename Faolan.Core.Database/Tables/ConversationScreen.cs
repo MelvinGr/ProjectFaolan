@@ -37,7 +37,7 @@ namespace Faolan.Core.Database.Tables
 		// ⚠️ Long described here as a "client-validated content hash" carried as raw attribute text. It is neither: the
 		// client is not validating anything, it is DECRYPTING - eleven LDB categories are encrypted and this is the key
 		// (#520). Text that came out blank was the client failing to decrypt, not failing a checksum.
-		public virtual ProtoDecryptionKey Key { get; set; } = new(); // @key
+		public virtual ProtoDecryptionKey Key { get; set; } = new ProtoDecryptionKey(); // @key
 
 		public uint Category { get; set; } // @category
 

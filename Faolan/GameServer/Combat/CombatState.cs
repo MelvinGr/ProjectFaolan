@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Combat
 	/// </summary>
 	public sealed class CombatState
 	{
-		private readonly ConcurrentDictionary<uint, EntityVitals> _vitals = new();
+		private readonly ConcurrentDictionary<uint, EntityVitals> _vitals = new ConcurrentDictionary<uint, EntityVitals>();
 
 		public EntityVitals GetOrAdd(uint handle, Func<EntityVitals> factory)
 		{

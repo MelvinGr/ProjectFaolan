@@ -357,7 +357,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, plan.Count);
 			Assert.Equal(3u, InventoryTake.Total(plan));
 			Assert.All(plan, s => Assert.Equal(1u, s.Taken));
-			Assert.DoesNotContain(plan, s => s.Container == ContainerKind.Bag && s.Slot == 4); // never the other item
+			Assert.DoesNotContain(plan, s => s is { Container: ContainerKind.Bag, Slot: 4 }); // never the other item
 
 			plan = InventoryTake.Plan(split, 193400, 2);
 			Assert.Equal(2u, InventoryTake.Total(plan));
@@ -373,7 +373,8 @@ namespace Faolan.Tests
 			Assert.Empty(InventoryTake.Plan(split, 0, 3));
 			Assert.Empty(InventoryTake.Plan(split, 12345, 3));
 
-			static CharacterInventory Row(ContainerKind container, int slot, uint itemId, uint count = 1) => new()
+			static CharacterInventory Row(ContainerKind container, int slot, uint itemId, uint count = 1) =>
+				new CharacterInventory
 			{
 				Container = container,
 				Slot = slot,

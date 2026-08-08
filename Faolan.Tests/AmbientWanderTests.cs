@@ -9,9 +9,9 @@ namespace Faolan.Tests
 	// predicate), so a pool spreads across its area's points instead of piling up - while still always moving.
 	public class AmbientWanderTests
 	{
-		private static readonly Vector3 A = new(0, 0, 0);
-		private static readonly Vector3 B = new(10, 0, 0);
-		private static readonly Vector3 C = new(20, 0, 0);
+		private static readonly Vector3 A = new Vector3(0, 0, 0);
+		private static readonly Vector3 B = new Vector3(10, 0, 0);
+		private static readonly Vector3 C = new Vector3(20, 0, 0);
 
 		[Fact]
 		public void FallsBackToAnchor_WhenEveryFreeSpotIsTaken()

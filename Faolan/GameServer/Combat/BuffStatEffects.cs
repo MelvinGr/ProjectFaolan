@@ -101,7 +101,7 @@ namespace Faolan.GameServer.Combat
 		//
 		// So: add a stat here when its records ADD to zero, whatever their scale. Leave it off when they scale a
 		// total.
-		private static readonly Dictionary<CharacterStatId, Func<WorldEntity, uint, uint>?> HonoredStats = new()
+		private static readonly Dictionary<CharacterStatId, Func<WorldEntity, uint, uint>?> HonoredStats = new Dictionary<CharacterStatId, Func<WorldEntity, uint, uint>?>
 		{
 			// Gear-consumed ratings (#3/#399/#401) - scales proven against in-client item tooltips.
 			[CharacterStatId.Armor] = (e, v) => e.ArmorRating = v,
@@ -181,7 +181,7 @@ namespace Faolan.GameServer.Combat
 		};
 
 		private readonly IDatabaseRepository _database;
-		private readonly SemaphoreSlim _loadLock = new(1, 1);
+		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 
 		// The honored flat + percent deltas per spell BASE id. Loaded once (1.7k rows) on first use.

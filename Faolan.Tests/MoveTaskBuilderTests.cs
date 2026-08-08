@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			var waypoints = new List<Vector3>
 			{
 				curPos,
-				new(324.76794f, 145.43733f, 705.13867f)
+				new Vector3(324.76794f, 145.43733f, 705.13867f)
 			};
 
 			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x00017E03u, curPos, MoveTaskNodes.Patrol(waypoints, 8.522063f, curPos)));

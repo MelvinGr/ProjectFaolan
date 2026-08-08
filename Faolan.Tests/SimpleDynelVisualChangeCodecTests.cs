@@ -25,8 +25,7 @@ namespace Faolan.Tests
 	public class SimpleDynelVisualChangeCodecTests
 	{
 		// (kind, captured body INCLUDING its carrier length word, source)
-		public static TheoryData<uint, string> CapturedBodies =>
-			new()
+		public static TheoryData<uint, string> CapturedBodies => new TheoryData<uint, string>
 			{
 				{ 0, "00000020e7f4f8f80000c878000139660000000000000d6f626a6563745f636c6f736564" }, // Barbarian-create #261
 				{ 2, "00000029e7f4f8f80000c8780002c1ce0000000002004c46220000002200000000000000000000000000000000" }, // Hakotep_hox_login_gameplay0 #76

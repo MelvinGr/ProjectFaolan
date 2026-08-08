@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		private const uint Instance = 0x021663DD; // the captured character
 
 		// The captured Broken Oar (item 23246) identity quad, as carried by the equip ack (= Items.Data1..4).
-		private static readonly Item Oar = new()
+		private static readonly Item Oar = new Item
 		{
 			Id = 23246,
 			Key = new ProtoDecryptionKey

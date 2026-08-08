@@ -131,7 +131,7 @@ namespace Faolan.Core.Database.Tables
 		// string is a pure base-85 rendering of these four words and regenerates from them exactly (LdbKey.ToWire),
 		// so nothing is lost; it is never a key or a lookup here, only payload written into the outgoing attribute.
 		// An all-zero key means the capture carried none - see ProtoDecryptionKey.IsEmpty.
-		public virtual ProtoDecryptionKey ObjectiveKey { get; set; } = new();
+		public virtual ProtoDecryptionKey ObjectiveKey { get; set; } = new ProtoDecryptionKey();
 
 		// A text record addresses its string by numeric id OR by a name TOKEN (`token="Noname"`). Non-null selects the
 		// token form; the RefId is then unused. Modelling only the id form rendered `id="0"` where the wire had a
@@ -219,7 +219,7 @@ namespace Faolan.Core.Database.Tables
 		public string? TrailingFlags { get; set; }
 
 		// The trailing text record's LDB decryption key; see ObjectiveKey.
-		public virtual ProtoDecryptionKey TrailingKey { get; set; } = new();
+		public virtual ProtoDecryptionKey TrailingKey { get; set; } = new ProtoDecryptionKey();
 
 		[MaxLength(128)]
 		public string? TrailingToken { get; set; }

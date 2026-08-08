@@ -64,8 +64,8 @@ namespace Faolan.Tests
 			Assert.True(summonSpells.Count >= 300, $"only {summonSpells.Count} spells carry summon params - has rdb-spells been run?");
 
 			// Both param spellings are present, and the combat/companion split follows them.
-			Assert.Contains(summonSpells, s => !s.SummonIsCompanion && s.SummonSpawnHash == "YU86"); // Deathless Acolyte: Arcanist
-			Assert.Contains(summonSpells, s => s.SummonIsCompanion && s.Id == 4261353u); // Companion: Pleasurable Company
+			Assert.Contains(summonSpells, s => s is { SummonIsCompanion: false, SummonSpawnHash: "YU86" }); // Deathless Acolyte: Arcanist
+			Assert.Contains(summonSpells, s => s is { SummonIsCompanion: true, Id: 4261353u }); // Companion: Pleasurable Company
 
 			// Spells sharing a pet share a hash - the corroboration that makes a wrong naming rule visible.
 			var mutilator = summonSpells.Where(s => s.SummonSpawnHash == "GGDI").ToList();

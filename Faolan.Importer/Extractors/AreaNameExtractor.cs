@@ -41,7 +41,7 @@ namespace Faolan.Importer.Extractors
 	// West Gate"); MapArea replaces it.
 	public static class AreaNameExtractor
 	{
-		private static readonly Regex AreaId = new("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
+		private static readonly Regex AreaId = new Regex("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
 
 		public static List<MapAreaName> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

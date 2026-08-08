@@ -15,6 +15,7 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
@@ -28,13 +29,13 @@ namespace Faolan.Importer.Captures
 		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
 		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
 		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
-		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new()
+		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new Dictionary<string, Quaternion>
 		{
 			["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f)
 		};
 
 		// Unique quest-NPC home positions (they move during their quest, so dedup must not strand them). #266
-		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new()
+		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new Dictionary<string, Vector3>
 		{
 			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f)
 		};
@@ -789,11 +790,11 @@ namespace Faolan.Importer.Captures
 					row.Extra6 = g.Extra6;
 					row.ObjectiveRefId = g.Objective.RefId;
 					row.ObjectiveCategory = g.Objective.Category;
-					row.ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new();
+					row.ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new ProtoDecryptionKey();
 					row.ObjectiveToken = g.Objective.Token;
 					row.TrailingRefId = g.Trailing?.RefId ?? 0;
 					row.TrailingCategory = g.Trailing?.Category ?? 0;
-					row.TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new();
+					row.TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new ProtoDecryptionKey();
 					row.TrailingFlags = g.Trailing?.Flags;
 					row.TrailingToken = g.Trailing?.Token;
 					row.TrailingLocalized = g.Trailing?.IsLocalized ?? false;
@@ -838,12 +839,12 @@ namespace Faolan.Importer.Captures
 					RequiredCount = g.RequiredCount,
 					ObjectiveRefId = g.Objective.RefId,
 					ObjectiveCategory = g.Objective.Category,
-					ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new(),
+					ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new ProtoDecryptionKey(),
 					ObjectiveToken = g.Objective.Token,
 					TrailingToken = g.Trailing?.Token,
 					TrailingRefId = g.Trailing?.RefId ?? 0,
 					TrailingCategory = g.Trailing?.Category ?? 0,
-					TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new(),
+					TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new ProtoDecryptionKey(),
 					TrailingFlags = g.Trailing?.Flags,
 					TrailingLocalized = g.Trailing?.IsLocalized ?? false
 				});
@@ -980,13 +981,13 @@ namespace Faolan.Importer.Captures
 					TableField1 = wire?.TableField1 ?? 0,
 					TitleRefId = wire?.TitleRefId ?? 0,
 					TitleCategory = wire?.TitleCategory ?? 0,
-					TitleKey = wire?.TitleKey ?? new(),
+					TitleKey = wire?.TitleKey ?? new ProtoDecryptionKey(),
 					MapRefId = wire?.MapRefId ?? 0,
 					MapCategory = wire?.MapCategory ?? 0,
-					MapKey = wire?.MapKey ?? new(),
+					MapKey = wire?.MapKey ?? new ProtoDecryptionKey(),
 					RegionRefId = wire?.RegionRefId ?? 0,
 					RegionCategory = wire?.RegionCategory ?? 0,
-					RegionKey = wire?.RegionKey ?? new()
+					RegionKey = wire?.RegionKey ?? new ProtoDecryptionKey()
 				});
 				added++;
 			}
@@ -1622,7 +1623,7 @@ namespace Faolan.Importer.Captures
 			foreach (var goal in goals)
 			{
 				// 1. the goal's own typed reference.
-				if (goal.TrailingCategory == QuestProgress.NpcTemplateNameCategory && goal.TrailingRefId > 0)
+				if (goal is { TrailingCategory: QuestProgress.NpcTemplateNameCategory, TrailingRefId: > 0 })
 				{
 					if (held.Contains(goal.TrailingRefId))
 					{
@@ -2335,7 +2336,7 @@ namespace Faolan.Importer.Captures
 				Slot = slot,
 				RefId = text.RefId,
 				Category = text.Category,
-				KeyText = LdbKey.Decode(text.Key) ?? new(),
+				KeyText = LdbKey.Decode(text.Key) ?? new ProtoDecryptionKey(),
 				Flags = text.Flags,
 				IsLocalized = text.IsLocalized
 			});

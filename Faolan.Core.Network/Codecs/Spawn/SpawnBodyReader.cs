@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// player-only codec, which is how they came to read as protocol constants - an NPC carries 5 and 1/2/3.
 		public static bool IsPlayer(SimpleCharFullUpdateIIR spawn)
 		{
-			return spawn.Post is { HasMoveTaskSlot: false, MovementMode: SpawnPostIirs.PlayerMovementMode } && spawn.Post.Slot is PlayerEntrySlot;
+			return spawn.Post is { HasMoveTaskSlot: false, MovementMode: SpawnPostIirs.PlayerMovementMode, Slot: PlayerEntrySlot };
 		}
 
 		public static bool TryReadCharacterMessage(byte[] body, out Result result)

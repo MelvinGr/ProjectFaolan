@@ -13,7 +13,7 @@ namespace Faolan.Core.Extensions
 	{
 		// The packed repeated members of a type, cached: `Length == 0` for almost every message, which is what keeps
 		// the re-pack below a single dictionary lookup on the common path.
-		private static readonly ConcurrentDictionary<Type, ValueMember[]> PackedMembers = new();
+		private static readonly ConcurrentDictionary<Type, ValueMember[]> PackedMembers = new ConcurrentDictionary<Type, ValueMember[]>();
 
 		public static T FromProtobuf<T>(this Span<byte> data) where T : IExtensible
 		{

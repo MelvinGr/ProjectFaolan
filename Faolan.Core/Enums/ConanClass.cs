@@ -32,7 +32,7 @@ namespace Faolan.Core.Enums
 	// substring of nothing useful but "Priest" is a substring of "Priest of Mitra".
 	public static class ConanClasses
 	{
-		private static readonly Dictionary<ConanClass, string> Names = new()
+		private static readonly Dictionary<ConanClass, string> Names = new Dictionary<ConanClass, string>
 		{
 			[ConanClass.Barbarian] = "Barbarian",
 			[ConanClass.Guardian] = "Guardian",

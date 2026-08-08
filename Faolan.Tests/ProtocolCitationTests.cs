@@ -24,7 +24,7 @@ namespace Faolan.Tests
 	// Placeholders (`[V3: …]`) in prose that DESCRIBES the format are skipped, not linted.
 	public class ProtocolCitationTests
 	{
-		private static readonly Regex Citation = new(@"\[V([0-3]):\s*([^\]]+)\]");
+		private static readonly Regex Citation = new Regex(@"\[V([0-3]):\s*([^\]]+)\]");
 
 		// Guards the linter itself: if the regex or the docs path breaks, the three tests above pass vacuously.
 		[Fact]

@@ -133,7 +133,7 @@ namespace Faolan.Importer.Rdb
 				// starts counting. `Partial` is what `AllGoalsComplete`, `MatchingKillGoal` and
 				// `QuestObjectiveRegion.Build` skip on, so leaving it set would wire the goal and still render the
 				// quest as if it had one fewer objective (#527). Only cleared here, where the row is actually filled.
-				if (goal.Partial && goal.RequiredCount > 0)
+				if (goal is { Partial: true, RequiredCount: > 0 })
 					goal.Partial = false;
 
 				wired++;

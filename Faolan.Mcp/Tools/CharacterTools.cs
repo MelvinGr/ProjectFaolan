@@ -17,7 +17,7 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class CharacterTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull

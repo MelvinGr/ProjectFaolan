@@ -31,7 +31,7 @@ namespace Faolan.GameServer.Combat
 	public sealed class SpellEffectService
 	{
 		private readonly IDatabaseRepository _database;
-		private readonly SemaphoreSlim _loadLock = new(1, 1);
+		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 		private readonly ISpellEffectOutbound _outbound;
 

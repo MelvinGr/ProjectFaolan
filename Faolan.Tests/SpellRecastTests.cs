@@ -20,8 +20,7 @@ namespace Faolan.Tests
 	public class SpellRecastTests
 	{
 		// (spell id, display name, the recast its retail tooltip shows, in seconds)
-		public static TheoryData<uint, string, double> ObservedTooltips =>
-			new()
+		public static TheoryData<uint, string, double> ObservedTooltips => new TheoryData<uint, string, double>
 			{
 				{ 3666380, "Chill (Rank 5)", 4 },
 				{ 3666339, "Lifestrike (Rank 5)", 12 },

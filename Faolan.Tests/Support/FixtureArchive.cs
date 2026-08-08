@@ -24,8 +24,8 @@ namespace Faolan.Tests.Support
 	{
 		public const string Magic = "FCX2";
 
-		private static readonly Lazy<Archive> Loaded = new(Load);
-		private static readonly Lazy<Dictionary<string, string>> Materialized = new(Materialize);
+		private static readonly Lazy<Archive> Loaded = new Lazy<Archive>(Load);
+		private static readonly Lazy<Dictionary<string, string>> Materialized = new Lazy<Dictionary<string, string>>(Materialize);
 
 		public static string Path => TestPaths.Repo("Faolan.Tests", "Assets", "fixtures.bin");
 

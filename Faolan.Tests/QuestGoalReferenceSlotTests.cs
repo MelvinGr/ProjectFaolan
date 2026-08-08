@@ -132,7 +132,7 @@ namespace Faolan.Tests
 			var missing = npcGoals.Where(g => g.Extra5 != AcgHashMarker).Select(g => $"goal {g.GoalId}").ToList();
 			Assert.True(missing.Count == 0, "every NPC goal names its NPC in slot [5..6]: " + string.Join(", ", missing));
 
-			var itemGoalsWithNpc = goals.Where(g => g.TrailingCategory == ItemCategory && g.Extra5 == AcgHashMarker).ToList();
+			var itemGoalsWithNpc = goals.Where(g => g is { TrailingCategory: ItemCategory, Extra5: AcgHashMarker }).ToList();
 			Assert.NotEmpty(itemGoalsWithNpc);
 			var notDeliver = itemGoalsWithNpc.Where(g => g.Separator != DeliverSeparator).Select(g => $"goal {g.GoalId} (separator {g.Separator})").ToList();
 			Assert.True(notDeliver.Count == 0, "only a Deliver item goal carries an NPC - it is the recipient: " + string.Join(", ", notDeliver));

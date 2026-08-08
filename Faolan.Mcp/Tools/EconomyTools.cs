@@ -22,7 +22,7 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class EconomyTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull

@@ -80,6 +80,6 @@
 		// The port the UniverseAgent binds - where a client enters, and the only port it has to be told about.
 		"UniverseAgentPort": 7010,
 		// The message a client is greeted with at login. $BUILDSTRING expands to this server's build.
-		"WelcomeString": "Welcome to Project Faolan!\n$BUILDSTRING"
+		"WelcomeString": "Welcome to Project Faolan!"
 	}
 }

@@ -100,7 +100,7 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	// One IOBuffer: the payload exactly as it went over the wire, plus the files it inflates to.
 	public sealed record ClientSettingsBuffer(byte[] Payload, IReadOnlyList<ClientFile> Files)
 	{
-		public static readonly ClientSettingsBuffer Empty = new([], []);
+		public static readonly ClientSettingsBuffer Empty = new ClientSettingsBuffer([], []);
 
 		public bool IsEmpty => Payload.Length == 0;
 

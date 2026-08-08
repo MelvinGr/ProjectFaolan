@@ -69,11 +69,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// corpse bag must hold), and a loot goal is emphatically not a hand-in. TalkToNpc + a quest item IS one.
 		public static bool IsDelivery(QuestGoalDefinition goal)
 		{
-			if (goal == null)
-				return false;
-
-			return goal.Separator == (uint)QuestGoalKind.Deliver && goal.TrailingCategory == ItemNameCategory && goal.TrailingRefId != 0
-			       || goal.GoalType == QuestGoalType.TalkToNpc && goal.QuestItemId is > 0;
+			return (goal is { Separator: (uint)QuestGoalKind.Deliver, TrailingCategory: ItemNameCategory } && goal.TrailingRefId != 0)
+			       || goal is { GoalType: QuestGoalType.TalkToNpc, QuestItemId: > 0 };
 		}
 
 		// The item a delivery hands over - what must be HELD to complete it and what is taken when it completes. The
@@ -112,9 +109,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// no re-wiring.
 		public static bool PreconditionMet(QuestGoalDefinition goal, uint playerLevel, Func<string, uint?>? factionRank = null)
 		{
-			if (goal == null)
-				return true;
-
 			if (goal.RequiredLevel is { } level && playerLevel < level)
 				return false;
 
@@ -130,10 +124,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
 		public static QuestGoalDefinition? MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
 		{
-			if (goals == null || itemId == 0)
-				return null;
-
-			return InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)).FirstOrDefault();
+			return itemId == 0
+				? null
+				: InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)).FirstOrDefault();
 		}
 
 		// The NPC TEMPLATE a goal targets, or null when it has not been resolved to one (#521). Two sources, and they
@@ -150,12 +143,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// comparing one to a template id is a category error that is safe only while the two spaces do not collide.
 		public static uint? TargetTemplateOf(QuestGoalDefinition goal)
 		{
-			if (goal.TargetTemplateId is > 0 and { } resolved)
-				return resolved;
-
-			return goal.TrailingRefId > 0 && goal.TrailingCategory is 0 or NpcTemplateNameCategory
-				? goal.TrailingRefId
-				: null;
+			return goal.TargetTemplateId > 0
+				? goal.TargetTemplateId
+				: goal is { TrailingRefId: > 0, TrailingCategory: 0 or NpcTemplateNameCategory }
+					? goal.TrailingRefId
+					: null;
 		}
 
 		// Whether `goal` targets the live NPC identified by (`templateId`, `name`) - the id-first/name-second pair the
@@ -195,7 +187,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public static QuestGoalDefinition? MatchingLootGoal(IEnumerable<QuestGoalDefinition> goals, string sourceNpcName, uint grantedItemId,
 			uint? sourceTemplateId = null)
 		{
-			if (goals == null || grantedItemId == 0 || string.IsNullOrEmpty(sourceNpcName) && sourceTemplateId is not > 0)
+			if (grantedItemId == 0 || (string.IsNullOrEmpty(sourceNpcName) && sourceTemplateId is not > 0))
 				return null;
 
 			return InPlayOrder(goals)
@@ -209,7 +201,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// escort has exactly one escortee, and a goal without the id names an NPC we could not resolve anyway.
 		public static QuestGoalDefinition? MatchingEscortGoal(IEnumerable<QuestGoalDefinition> goals, uint templateId)
 		{
-			if (goals == null || templateId == 0)
+			if (templateId == 0)
 				return null;
 
 			return goals
@@ -220,7 +212,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName,
 			uint? targetTemplateId = null)
 		{
-			if (goals == null || string.IsNullOrEmpty(targetName) && targetTemplateId is not > 0)
+			if (string.IsNullOrEmpty(targetName) && targetTemplateId is not > 0)
 				return null;
 
 			return goals
@@ -236,13 +228,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// template), where the shared name is the only key that catches every variant. Kill-typed goals only.
 		public static QuestGoalDefinition? MatchingKillGoal(IEnumerable<QuestGoalDefinition> goals, uint? templateId, string name)
 		{
-			if (goals == null)
-				return null;
-
 			// PARTIAL goals are excluded: they have no verb, target or count, so nothing about them says "kill this".
 			// (They no longer DEFAULT to Kill either - the un-typed default is `None` since #522 - but a partial row can
 			// still be typed by a later harvest, and it must not match while it is half-filled.)
-			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill && !g.Partial).OrderBy(g => g.Sequence).ToList();
+			var kills = goals.Where(g => g is { GoalType: QuestGoalType.Kill, Partial: false }).OrderBy(g => g.Sequence).ToList();
 
 			// ⚠️ Both guards below are the same mistake caught twice: a goal that never named an NPC still reached the
 			// by-id branch, where its TrailingRefId was compared against a template id it is not. Both now live in

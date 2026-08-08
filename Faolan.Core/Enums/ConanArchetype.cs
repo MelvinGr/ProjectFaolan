@@ -32,7 +32,7 @@ namespace Faolan.Core.Enums
 	// Rogue. Nothing in the corpus contradicts any of the twelve placements.
 	public static class ConanArchetypes
 	{
-		private static readonly Dictionary<ConanArchetype, ConanClass[]> Members = new()
+		private static readonly Dictionary<ConanArchetype, ConanClass[]> Members = new Dictionary<ConanArchetype, ConanClass[]>
 		{
 			[ConanArchetype.Soldier] = [ConanClass.Guardian, ConanClass.DarkTemplar, ConanClass.Conqueror],
 			[ConanArchetype.Priest] = [ConanClass.PriestOfMitra, ConanClass.TempestOfSet, ConanClass.BearShaman],

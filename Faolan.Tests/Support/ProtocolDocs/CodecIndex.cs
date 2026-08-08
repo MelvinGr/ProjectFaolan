@@ -15,22 +15,22 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	// Opcode/HandledTypes declarations, enforced by CodecConventionTests - not from name-guessing.
 	public sealed class CodecIndex
 	{
-		private static readonly Regex TestClass = new(@"\bpublic\s+(?:sealed\s+)?(?:partial\s+)?class\s+(\w+)", RegexOptions.Compiled);
+		private static readonly Regex TestClass = new Regex(@"\bpublic\s+(?:sealed\s+)?(?:partial\s+)?class\s+(\w+)", RegexOptions.Compiled);
 
 		// A [Fact]/[Theory] method: the attribute(s), then a public (async) returntype Name(.
-		private static readonly Regex TestMethod = new(@"\[(?:Fact|Theory)\b[^\]]*\]\s*(?:\[[^\]]*\]\s*)*public\s+(?:async\s+)?[\w<>?\[\]]+\s+(\w+)\s*\(", RegexOptions.Compiled);
+		private static readonly Regex TestMethod = new Regex(@"\[(?:Fact|Theory)\b[^\]]*\]\s*(?:\[[^\]]*\]\s*)*public\s+(?:async\s+)?[\w<>?\[\]]+\s+(\w+)\s*\(", RegexOptions.Compiled);
 
 		// byte-exact test signals: golden loads + hex/byte asserts. "ToHex" covers both Convert.ToHexString and the
 		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
 		private static readonly string[] ByteExactMarkers = ["Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual"];
 
-		public Dictionary<string, HashSet<string>> CodecToIir { get; } = new(StringComparer.Ordinal); // codec class -> IIR type names
-		public Dictionary<string, SortedSet<string>> IirToCodecs { get; } = new(StringComparer.Ordinal); // IIR type -> codec classes
-		public Dictionary<string, bool> CodecGolden { get; } = new(StringComparer.Ordinal); // codec -> has a byte-exact test
-		public Dictionary<string, string> BuiltIn { get; } = new(StringComparer.Ordinal); // IIR type -> representative file (inline builders)
-		public Dictionary<string, string> CodecGoldenMethod { get; } = new(StringComparer.Ordinal); // codec -> "TestClass.Method" (byte-exact), when found
+		public Dictionary<string, HashSet<string>> CodecToIir { get; } = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal); // codec class -> IIR type names
+		public Dictionary<string, SortedSet<string>> IirToCodecs { get; } = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal); // IIR type -> codec classes
+		public Dictionary<string, bool> CodecGolden { get; } = new Dictionary<string, bool>(StringComparer.Ordinal); // codec -> has a byte-exact test
+		public Dictionary<string, string> BuiltIn { get; } = new Dictionary<string, string>(StringComparer.Ordinal); // IIR type -> representative file (inline builders)
+		public Dictionary<string, string> CodecGoldenMethod { get; } = new Dictionary<string, string>(StringComparer.Ordinal); // codec -> "TestClass.Method" (byte-exact), when found
 		public Dictionary<uint, string> NameByValue { get; } = [];
-		public HashSet<string> BuiltSomewhere { get; } = new(StringComparer.Ordinal); // IIR types built anywhere
+		public HashSet<string> BuiltSomewhere { get; } = new HashSet<string>(StringComparer.Ordinal); // IIR types built anywhere
 		public List<(string Name, uint Value)> IirTypes { get; } = []; // the 32-bit carrier types (value >= 0x10000)
 		public int CodecsWithGolden => CodecGolden.Count(kv => kv.Value);
 		public int Dissectors { get; private set; }

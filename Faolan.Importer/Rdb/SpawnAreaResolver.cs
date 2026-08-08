@@ -36,15 +36,15 @@ namespace Faolan.Importer.Rdb
 		// The 1010506 group `category` whose id is a creature race (RDB 1000508). Named once - tier 4 keys on it.
 		private const string RaceCategory = "Race";
 
-		private static readonly Regex FourCharTag = new(@"\s*\([0-9A-Za-z]{4}\)\s*$", RegexOptions.Compiled);
+		private static readonly Regex FourCharTag = new Regex(@"\s*\([0-9A-Za-z]{4}\)\s*$", RegexOptions.Compiled);
 
 		// Name families that carry no creature claim - a group so named may take a propagated creature even if its name
 		// doesn't match (it's a location/role label, not a species). Keeps the guard from blocking legitimate propagation.
-		private static readonly Regex TerritoryLabel = new(
+		private static readonly Regex TerritoryLabel = new Regex(
 			@"territory|area|mound|burial|captives|boss|library|treasury|infirmary|scout|party|trash|point|patrol|roaming|citizen|spawngroup|zone|region|wave|node|camp", RegexOptions.Compiled);
 
-		private static readonly Regex TrailingIndex = new(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
-		private static readonly Regex Word = new(@"[a-z]+", RegexOptions.Compiled);
+		private static readonly Regex TrailingIndex = new Regex(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
+		private static readonly Regex Word = new Regex(@"[a-z]+", RegexOptions.Compiled);
 
 		// The client's creature race table (RDB 1000508), or null when the RDB has no such entry. Tier 4's guard needs
 		// the race NAMES, not just the ids, so both callers load it here rather than each rolling their own.

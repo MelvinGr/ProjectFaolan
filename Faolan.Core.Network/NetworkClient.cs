@@ -54,7 +54,7 @@ namespace Faolan.Core.Network
 		protected readonly Socket Socket;
 		private readonly IMessageFramer _messageFramer;
 		private readonly IPacketTracer _tracer;
-		private readonly SemaphoreSlim _sendLock = new(1, 1);
+		private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
 		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
 

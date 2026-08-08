@@ -30,9 +30,9 @@ namespace Faolan.ClientLauncher
 	// faolan.json/faolan.user.json the server and the mirror read - and only the launcher's copy reaches the client.
 	public static class LauncherCommand
 	{
-		private static readonly Option<string> Charname = new("--charname", "-c") { Description = "Auto-enter this character." };
+		private static readonly Option<string> Charname = new Option<string>("--charname", "-c") { Description = "Auto-enter this character." };
 
-		private static readonly Option<bool> ConsoleOption = new("--console")
+		private static readonly Option<bool> ConsoleOption = new Option<bool>("--console")
 		{
 			Description = "Run in the foreground and tail AgeOfConan.log into THIS terminal (the same content as the client console, no separate wineconsole window); also drops -noconsole."
 		};
@@ -40,45 +40,45 @@ namespace Faolan.ClientLauncher
 		// Optional value: `--debug-channels a,b` takes that list, a bare `--debug-channels` takes the default set.
 		// Zero-or-one arity is what tells the two apart - a bare flag is PRESENT with no value, which is why the
 		// reader below asks whether the option was GIVEN rather than whether its value is null.
-		private static readonly Option<string> DebugChannels = new("--debug-channels")
+		private static readonly Option<string> DebugChannels = new Option<string>("--debug-channels")
 		{
 			Description = "Enable the client's OWN debug channels by writing its logger config file dbDebug.conf (no exe change, no process memory): a comma-separated list, or the default low-noise set if given bare. Implies --console. Full list: strings AgeOfConan.exe | grep '^GameCode/'",
 			Arity = ArgumentArity.ZeroOrOne,
 			HelpName = "a,b"
 		};
 
-		private static readonly Option<bool> DryRun = new("--dry-run", "-n") { Description = "Print the computed clienthash/key/args without launching." };
-		private static readonly Option<bool> Dx10 = new("--dx10") { Description = "Launch AgeOfConanDX10.exe instead." };
-		private static readonly Option<string> Exe = new("--exe") { Description = "Path to AgeOfConan.exe (default: auto-detected from your Steam install, app 217750)." };
+		private static readonly Option<bool> DryRun = new Option<bool>("--dry-run", "-n") { Description = "Print the computed clienthash/key/args without launching." };
+		private static readonly Option<bool> Dx10 = new Option<bool>("--dx10") { Description = "Launch AgeOfConanDX10.exe instead." };
+		private static readonly Option<string> Exe = new Option<string>("--exe") { Description = "Path to AgeOfConan.exe (default: auto-detected from your Steam install, app 217750)." };
 
-		private static readonly Option<string> LauncherNotes = new("--launcher-notes")
+		private static readonly Option<string> LauncherNotes = new Option<string>("--launcher-notes")
 		{
 			Description = "Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead) to this one - keep the two %s (UniverseName, Language)."
 		};
 
-		private static readonly Option<bool> PatchCdn = new("--patch-cdn")
+		private static readonly Option<bool> PatchCdn = new Option<bool>("--patch-cdn")
 		{
 			Description = "Point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/ControlHttpPatchAddr) at the configured Cdn:PublicAddress - each becomes <url>/<tag>/upm."
 		};
 
-		private static readonly Option<bool> PatchLogin = new("--patch-login")
+		private static readonly Option<bool> PatchLogin = new Option<bool>("--patch-login")
 		{
 			Description = "Patch the client's DH key ON DISK before launch so the server can validate the real password. The key comes from the SAME faolan.json/environment the server reads, so overriding Server:PrivateKey there patches the matching public key automatically."
 		};
 
-		private static readonly Option<bool> PatchUniverseAddr = new("--patch-universeaddr")
+		private static readonly Option<bool> PatchUniverseAddr = new Option<bool>("--patch-universeaddr")
 		{
 			Description = "Point LocalConfig.xml <UniverseAddr> (the login server) at the configured Server:PublicAddress and Server:UniverseAgentPort."
 		};
 
-		private static readonly Option<string> Password = new("--password", "-p") { Description = "Auto-login password." };
+		private static readonly Option<string> Password = new Option<string>("--password", "-p") { Description = "Auto-login password." };
 
-		private static readonly Option<string> Proton = new("--proton")
+		private static readonly Option<string> Proton = new Option<string>("--proton")
 		{
 			Description = "(Linux only) Proton 'proton' script, or set PROTON (default: auto-detected - the build Steam runs AoC with). Ignored on Windows, which runs the exe directly."
 		};
 
-		private static readonly Option<bool> Restore = new("--restore")
+		private static readonly Option<bool> Restore = new Option<bool>("--restore")
 		{
 			Description = "Restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr redirects and the debug channels) and exit."
 		};
@@ -93,8 +93,8 @@ namespace Faolan.ClientLauncher
 			Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort,
 			Keys.CdnPublicAddress);
 
-		private static readonly Option<string> Username = new("--username", "-u") { Description = "Auto-login account name." };
-		private static readonly Option<string> Wine = new("--wine") { Description = "(Linux only) use this runner instead of Proton (e.g. 'wine'). Ignored on Windows." };
+		private static readonly Option<string> Username = new Option<string>("--username", "-u") { Description = "Auto-login account name." };
+		private static readonly Option<string> Wine = new Option<string>("--wine") { Description = "(Linux only) use this runner instead of Proton (e.g. 'wine'). Ignored on Windows." };
 
 		// The --launcher-notes URL has to satisfy the client's fixed buffer and its SSL-less libcurl, and a URL that
 		// does not is a typo in the flag rather than a runtime condition - so it is refused HERE, worded by the same

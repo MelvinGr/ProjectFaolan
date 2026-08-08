@@ -57,7 +57,7 @@ namespace Faolan.Core.Database.Tables
 		//
 		// ⚠️ Previously described as a "client-validated per-line content hash". It is the DECRYPTION key: eleven LDB
 		// categories are encrypted and this unlocks them (#520).
-		public virtual ProtoDecryptionKey FormatKey { get; set; } = new();
+		public virtual ProtoDecryptionKey FormatKey { get; set; } = new ProtoDecryptionKey();
 
 		// The bark's `<parameter>` slots in render order, empty for most lines (#493). Was a single name-only column
 		// on the assumption that a bark carries at most one - the Damsel in Distress line carries two, one of them

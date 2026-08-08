@@ -101,7 +101,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (p.IsDownload && p.IsIirCarrier && p.TryParse(KnubotCodec.Parse, out _))
+				if (p is { IsDownload: true, IsIirCarrier: true } && p.TryParse(KnubotCodec.Parse, out _))
 				{
 					screen.Add(p.Bytes);
 					continue;

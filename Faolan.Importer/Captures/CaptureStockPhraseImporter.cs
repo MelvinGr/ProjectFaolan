@@ -9,6 +9,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Importer.Captures
 {
@@ -88,7 +89,7 @@ namespace Faolan.Importer.Captures
 				row.RemoteFormatId = uint.Parse(screen.Id);
 				row.Category = uint.Parse(screen.Category);
 				row.Knubot = uint.Parse(screen.Knubot);
-				row.FormatKey = LdbKey.Decode(screen.Key) ?? new();
+				row.FormatKey = LdbKey.Decode(screen.Key) ?? new ProtoDecryptionKey();
 
 				if (existing == null)
 				{

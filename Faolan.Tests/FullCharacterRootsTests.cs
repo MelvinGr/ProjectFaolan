@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	// and are unique per item.
 	public class FullCharacterRootsTests
 	{
-		private static readonly Item Manacles = new()
+		private static readonly Item Manacles = new Item
 		{
 			Id = 3361557,
 			Key = new ProtoDecryptionKey
@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Hash = 0x43555035
 		};
 
-		private static readonly Item Signet = new()
+		private static readonly Item Signet = new Item
 		{
 			Id = 3774542,
 			Key = new ProtoDecryptionKey

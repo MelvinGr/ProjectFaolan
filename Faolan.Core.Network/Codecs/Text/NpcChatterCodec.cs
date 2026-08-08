@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
@@ -123,7 +124,7 @@ namespace Faolan.Core.Network.Codecs.Text
 				ChannelCount = bark.ChannelCount,
 				Group = bark.Group,
 				Category = bark.Category,
-				FormatKey = LdbKey.Decode(bark.Key) ?? new(),
+				FormatKey = LdbKey.Decode(bark.Key) ?? new ProtoDecryptionKey(),
 				Knubot = bark.Knubot
 			};
 

@@ -25,7 +25,7 @@ namespace Faolan.Tests
 	{
 		// References intentionally kept for the HISTORICAL record, each with its reason. A doc that documents removed
 		// code (a before/after narrative) legitimately names symbols/paths that no longer exist.
-		private static readonly HashSet<string> Allowlist = new(StringComparer.Ordinal)
+		private static readonly HashSet<string> Allowlist = new HashSet<string>(StringComparer.Ordinal)
 		{
 			// docs/re/spawn-dissection.md documents the RETIRED Faolan.PacketAnalyzer approach (#82) as the
 			// before-state of the construct-don't-replay work - these name that removed project's types/paths on purpose.
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			"tools/capture/extract_conversations.py"
 		};
 
-		private static readonly Regex TypeDef = new(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);
+		private static readonly Regex TypeDef = new Regex(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);
 
 		// A backtick `XxxSuffix` that is not a defined type is almost always a stale rename, not prose. Kept narrow
 		// on purpose - a suffix here should read as "this is a class", not a common English word.

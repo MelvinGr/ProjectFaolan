@@ -156,11 +156,11 @@ namespace Faolan.Importer.Rdb
 				yield return depossessed;
 		}
 
-		private static readonly Regex WidgetPrefix = new(@"^(BA[_-])?(FIFO[_-])?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-		private static readonly Regex LeadingArticle = new(@"^the\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-		private static readonly Regex Parenthetical = new(@"\(([^)]+)\)", RegexOptions.Compiled);
-		private static readonly Regex PoiPrefix = new(@"^POI\s+\S+\s*-\s*", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-		private static readonly Regex Possessive = new(@"(?<=\w)'s\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex WidgetPrefix = new Regex(@"^(BA[_-])?(FIFO[_-])?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex LeadingArticle = new Regex(@"^the\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex Parenthetical = new Regex(@"\(([^)]+)\)", RegexOptions.Compiled);
+		private static readonly Regex PoiPrefix = new Regex(@"^POI\s+\S+\s*-\s*", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex Possessive = new Regex(@"(?<=\w)'s\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// Binds recovered banners to the client's crossing-notifier regions, per playfield.
 		//
@@ -211,7 +211,7 @@ namespace Faolan.Importer.Rdb
 			foreach (var (mapId, areas) in areasByMap.OrderBy(kv => kv.Key))
 			{
 				var notifiers = areas
-					.Where(a => a.IsPolygon && a.ScryId == BoundedAreaClassifier.CrossingNotifierScryId)
+					.Where(a => a is { IsPolygon: true, ScryId: BoundedAreaClassifier.CrossingNotifierScryId })
 					.ToList();
 				if (notifiers.Count == 0)
 					continue;
@@ -371,8 +371,8 @@ namespace Faolan.Importer.Rdb
 				.ToList();
 		}
 
-		private static readonly Regex CamelBoundary = new(@"(?<=[a-z0-9])([A-Z])|(?<=[A-Z])([A-Z][a-z])", RegexOptions.Compiled);
-		private static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase) { "the", "of", "a", "an", "and", "s" };
+		private static readonly Regex CamelBoundary = new Regex(@"(?<=[a-z0-9])([A-Z])|(?<=[A-Z])([A-Z][a-z])", RegexOptions.Compiled);
+		private static readonly HashSet<string> Stopwords = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "the", "of", "a", "an", "and", "s" };
 
 		// The playfield's id blocks: anchors clustered by BlockGap, widened by BlockMargin.
 		//

@@ -516,7 +516,7 @@ namespace Faolan.Tests
 				.ToListAsync(ct);
 
 			var missing = named
-				.Where(g => QuestObjectiveText.StatedCount(g.Name) is { } n && n > 1 && g.RequiredCount < n)
+				.Where(g => QuestObjectiveText.StatedCount(g.Name) is { } n and > 1 && g.RequiredCount < n)
 				.Select(g => $"goal {g.GoalId} '{g.Name}' asks for {QuestObjectiveText.StatedCount(g.Name)} but stores {g.RequiredCount}")
 				.ToList();
 

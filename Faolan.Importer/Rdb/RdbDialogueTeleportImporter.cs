@@ -46,12 +46,11 @@ namespace Faolan.Importer.Rdb
 	public static class RdbDialogueTeleportImporter
 	{
 		// `{teleportplayer <x> <z> [y <y>] <map>}`. The coordinates are decimals (`55.7`), the map an integer.
-		private static readonly Regex Teleport = new(
-			@"\{teleportplayer\s+(?<x>-?[\d.]+)\s+(?<z>-?[\d.]+)(?:\s+y\s+(?<y>-?[\d.]+))?\s+(?<map>\d+)\s*\}",
+		private static readonly Regex Teleport = new Regex(@"\{teleportplayer\s+(?<x>-?[\d.]+)\s+(?<z>-?[\d.]+)(?:\s+y\s+(?<y>-?[\d.]+))?\s+(?<map>\d+)\s*\}",
 			RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// `{delay <seconds>}` - how long the line stays up before the trip runs. Absent on Sigurd.
-		private static readonly Regex Delay = new(@"\{delay\s+(?<s>[\d.]+)\s*\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex Delay = new Regex(@"\{delay\s+(?<s>[\d.]+)\s*\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{

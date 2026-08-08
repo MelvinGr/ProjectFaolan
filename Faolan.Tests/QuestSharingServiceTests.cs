@@ -349,7 +349,7 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new(options);
+			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
 			public Task<DatabaseContext> CreateDbContextAsync(System.Threading.CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
 		}
 	}

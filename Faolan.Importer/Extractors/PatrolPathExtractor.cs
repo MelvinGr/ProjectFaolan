@@ -128,7 +128,7 @@ namespace Faolan.Importer.Extractors
 		// patrol, whatever shape its path happens to have.
 		private static bool ApproachesACharacter(MoveTaskNode node)
 		{
-			if (node.Mode == MoveTaskNodes.ModeApproachTarget && node.ApproachType == EntityClass.Character)
+			if (node is { Mode: MoveTaskNodes.ModeApproachTarget, ApproachType: EntityClass.Character })
 				return true;
 
 			foreach (var child in node.Children)
@@ -203,7 +203,7 @@ namespace Faolan.Importer.Extractors
 		// so it can neither break continuity nor be measured, and is left alone.
 		private static void CollectPathLegs(MoveTaskNode node, MoveTaskNode parent, List<(MoveTaskNode Parent, MoveTaskNode Leg)> legs)
 		{
-			if (node.Mode == 1 && node.Waypoints.Count >= 3)
+			if (node is { Mode: 1, Waypoints.Count: >= 3 })
 				legs.Add((parent, node));
 
 			foreach (var child in node.Children)

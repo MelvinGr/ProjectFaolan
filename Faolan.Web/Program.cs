@@ -379,8 +379,8 @@ namespace Faolan.Web
 		{
 			var claims = new List<Claim>
 			{
-				new(ClaimTypes.NameIdentifier, account.Id.ToString()),
-				new(ClaimTypes.Name, account.UserName)
+				new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
+				new Claim(ClaimTypes.Name, account.UserName)
 			};
 			if (account.Type >= AccountType.GameMaster)
 				claims.Add(new Claim(ClaimTypes.Role, "Admin"));

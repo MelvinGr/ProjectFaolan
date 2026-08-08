@@ -102,6 +102,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// quest so that any combination round-trips, which is what a strict Parse needs.
 	public sealed record QuestJournalCurrent(uint Flag, uint QuestId, IReadOnlyList<string> Text, uint Ordinal)
 	{
-		public static QuestJournalCurrent None { get; } = new(0, 0, [], 0);
+		public static QuestJournalCurrent None { get; } = new QuestJournalCurrent(0, 0, [], 0);
 	}
 }

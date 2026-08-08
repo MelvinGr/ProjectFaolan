@@ -44,9 +44,9 @@ namespace Faolan.Core.Database.Tables
 		// The three header text records' LDB DECRYPTION KEYS, stored as 128-bit TEA keys (LdbKey) rather than as the
 		// 20-character wire strings - the same ProtoDecryptionKey an item template carries. The string regenerates
 		// from the words exactly (LdbKey.ToWire), and it is payload here, never a key or a lookup.
-		public virtual ProtoDecryptionKey TitleKey { get; set; } = new();
-		public virtual ProtoDecryptionKey MapKey { get; set; } = new();
-		public virtual ProtoDecryptionKey RegionKey { get; set; } = new();
+		public virtual ProtoDecryptionKey TitleKey { get; set; } = new ProtoDecryptionKey();
+		public virtual ProtoDecryptionKey MapKey { get; set; } = new ProtoDecryptionKey();
+		public virtual ProtoDecryptionKey RegionKey { get; set; } = new ProtoDecryptionKey();
 
 		public uint TitleCategory { get; set; }
 

@@ -215,7 +215,7 @@ namespace Faolan.Tests
 
 			private sealed class NullScope : IDisposable
 			{
-				public static readonly NullScope Instance = new();
+				public static readonly NullScope Instance = new NullScope();
 
 				public void Dispose()
 				{

@@ -57,21 +57,20 @@ namespace Faolan.Importer.Rdb
 		// respawn point of the same name ("Frost Fields", "Field of the Dead"). A containment test alone happily links
 		// them and widens those points' discovery from a 30-unit radius to a box 25x the size. That is a different
 		// mechanic wearing a matching name, so the size gate below is what keeps it out, not the vocabulary.
-		private static readonly Regex DiscoveryName =
-			new(@"resurrect|rezz|re[zs]pad|(?<![a-z])rez|(?<![a-z])res$|_res(?![a-z])|(?<![a-z])res(pawn|point|spot)",
-				RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex DiscoveryName = new Regex(@"resurrect|rezz|re[zs]pad|(?<![a-z])rez|(?<![a-z])res$|_res(?![a-z])|(?<![a-z])res(pawn|point|spot)",
+			RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// The footprint above which a resurrection-named volume is AREA discovery rather than a respawn pad. The pads
 		// are 10x11 to 56x50; the two area regions are 157x185 and 114x74, so nothing sits near this line.
 		private const double DiscoveryPadFootprint = 3000;
 
 		// Lava by name. Anchored on the word so `LavaDamage-3` / `BA_lava_dmg1` / `LavaArea2` / `HazardLava` all match.
-		private static readonly Regex LavaName = new(@"lava", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex LavaName = new Regex(@"lava", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// Names that mention lava but are NOT a damage volume: the ambient audio/music companion regions. These also
 		// carry a non-zero scryid (a CLIENT script), which is the independent check applied below - the name test is
 		// belt-and-braces for an export that forgot the scryid.
-		private static readonly Regex NotALavaVolume = new(@"music|sfx|reverb|reveb|ambient|^camp\s*\d", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex NotALavaVolume = new Regex(@"music|sfx|reverb|reveb|ambient|^camp\s*\d", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// Lava's decoded behaviour, from chat-annotated-4's death on Ymir's Pass: apply Incineration (3773837, 3 s) and
 		// kill. Lethal rather than a damage number because retail sends NO StatDamage at all for that death.
@@ -85,7 +84,7 @@ namespace Faolan.Importer.Rdb
 		// ⚠️ The anchor is `(?<![a-z])`, NOT `\b`: `_` is a WORD character, so `\bnomount` does not match
 		// `BA_NoMount_Fengdu` - it silently found 11 of the 14 volumes and dropped all three of Kara Korum's. This is
 		// the exact trap BoundedAreaClassifier's resurrection rule already carries a comment about.
-		private static readonly Regex NoMountName = new(@"dismount|(?<![a-z])no.?mount", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex NoMountName = new Regex(@"dismount|(?<![a-z])no.?mount", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBaseUrl, IReadOnlyList<CapturedBanner> captured)
 		{

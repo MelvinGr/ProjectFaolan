@@ -34,7 +34,7 @@ namespace Faolan.Core.Database.Tables
 		// ⚠️ This was long described as "the deterministic content hash; the client validates it, a wrong key yields
 		// blank text". It is not a hash and nothing is validating it: eleven LDB categories are ENCRYPTED, and this is
 		// the key that decrypts them (#520). "Blank text" was the client failing to decrypt.
-		public virtual ProtoDecryptionKey KeyText { get; set; } = new();
+		public virtual ProtoDecryptionKey KeyText { get; set; } = new ProtoDecryptionKey();
 
 		// <localized flags="...">; null/empty for remoteformat slots.
 		[MaxLength(64)]

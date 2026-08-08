@@ -28,21 +28,21 @@ namespace Faolan.Importer.Cli
 		private static readonly Option RdbDir = FaolanSettings.Get(Keys.ContentRdbDir);
 
 		// Command options.
-		private static readonly Option<string> Captures = new("--captures") { Description = "The capture corpus directory (the private ProjectFaolan-Data repo's Captures/)." };
-		private static readonly Option<string> Only = new("--only") { Description = "Run ONLY these modules (comma-separated). Default: every module in the default set." };
-		private static readonly Option<string> Skip = new("--skip") { Description = "Skip these modules (comma-separated)." };
-		private static readonly Option<string> Mode = new("--mode") { Description = "insert | upsert (default) | overwrite, globally or per module (npcs=overwrite,items=insert)." };
-		private static readonly Option<bool> DryRun = new("--dry-run") { Description = "Write nothing: run in a rolled-back transaction and print the per-table delta." };
-		private static readonly Option<bool> Force = new("--force") { Description = "Run modules that are otherwise suppressed (out-of-DB side effects)." };
-		private static readonly Option<bool> List = new("--list") { Description = "List every module (and which are opt-in) and exit." };
-		private static readonly Option<string> Report = new("--report") { Description = "Run a read-only diagnostic instead of importing." };
-		private static readonly Option<string> ReportArg = new("--report-arg") { Description = "The report's argument (its meaning is per report)." };
-		private static readonly Option<string> Out = new("--out") { Description = "Output directory for reports that write files." };
-		private static readonly Option<string> Skeleton = new("--skeleton") { Description = "Skeleton id for the rdb-rig report." };
-		private static readonly Option<string> TerrainOut = new("--terrain-out") { Description = "Output directory for the terrain-export report (default: ./Terrain)." };
-		private static readonly Option<bool> DumpMesh = new("--dump-mesh") { Description = "Dump mesh payloads in the rdb-assets report." };
-		private static readonly Option<string> DumpTemplates = new("--dump-templates") { Description = "Dump decrypted item templates to this directory." };
-		private static readonly Option<string> RdbProxy = new("--rdb-proxy") { Description = "Faolan.Web.Content mirror address for on-demand RDB fetches, e.g. http://127.0.0.1:7081 (the /gameupdate/upm/rdb route is appended)." };
+		private static readonly Option<string> Captures = new Option<string>("--captures") { Description = "The capture corpus directory (the private ProjectFaolan-Data repo's Captures/)." };
+		private static readonly Option<string> Only = new Option<string>("--only") { Description = "Run ONLY these modules (comma-separated). Default: every module in the default set." };
+		private static readonly Option<string> Skip = new Option<string>("--skip") { Description = "Skip these modules (comma-separated)." };
+		private static readonly Option<string> Mode = new Option<string>("--mode") { Description = "insert | upsert (default) | overwrite, globally or per module (npcs=overwrite,items=insert)." };
+		private static readonly Option<bool> DryRun = new Option<bool>("--dry-run") { Description = "Write nothing: run in a rolled-back transaction and print the per-table delta." };
+		private static readonly Option<bool> Force = new Option<bool>("--force") { Description = "Run modules that are otherwise suppressed (out-of-DB side effects)." };
+		private static readonly Option<bool> List = new Option<bool>("--list") { Description = "List every module (and which are opt-in) and exit." };
+		private static readonly Option<string> Report = new Option<string>("--report") { Description = "Run a read-only diagnostic instead of importing." };
+		private static readonly Option<string> ReportArg = new Option<string>("--report-arg") { Description = "The report's argument (its meaning is per report)." };
+		private static readonly Option<string> Out = new Option<string>("--out") { Description = "Output directory for reports that write files." };
+		private static readonly Option<string> Skeleton = new Option<string>("--skeleton") { Description = "Skeleton id for the rdb-rig report." };
+		private static readonly Option<string> TerrainOut = new Option<string>("--terrain-out") { Description = "Output directory for the terrain-export report (default: ./Terrain)." };
+		private static readonly Option<bool> DumpMesh = new Option<bool>("--dump-mesh") { Description = "Dump mesh payloads in the rdb-assets report." };
+		private static readonly Option<string> DumpTemplates = new Option<string>("--dump-templates") { Description = "Dump decrypted item templates to this directory." };
+		private static readonly Option<string> RdbProxy = new Option<string>("--rdb-proxy") { Description = "Faolan.Web.Content mirror address for on-demand RDB fetches, e.g. http://127.0.0.1:7081 (the /gameupdate/upm/rdb route is appended)." };
 
 		// Parses argv. Returns null when the parser handled the invocation itself (--help, or a parse error, which it
 		// reports); the exit code is then in `exitCode`.

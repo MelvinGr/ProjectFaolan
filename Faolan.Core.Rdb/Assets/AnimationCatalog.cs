@@ -26,7 +26,7 @@ namespace Faolan.Core.Rdb.Assets
 		private const uint MasterId = 1; // the 3.6MB master catalog
 
 		// Per-skeleton clip lists are stable for the process; the master parse is ~3.6MB so cache it.
-		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new();
+		private static readonly ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>> _clipsBySkeleton = new ConcurrentDictionary<uint, IReadOnlyList<ClipInfo>>();
 
 		// Decode one clip's keyframe curves (type 1010003, by rdbname), or null if unavailable / a variant layout.
 		public static ClipData? DecodeClip(RdbReader rdb, uint rdbname)

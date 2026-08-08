@@ -9,8 +9,8 @@ namespace Faolan.Tests.Support.ProtocolDocs
 	// affects a generated page's correctness (the regeneration test still pins the whole page against reflection).
 	public static class OpcodesSource
 	{
-		private static readonly Regex EnumRe = new(@"public enum (\w+)\s*:");
-		private static readonly Regex MemberRe = new(@"^\s*(\w+)\s*=\s*0x[0-9A-Fa-f]+\s*,?\s*//\s*(.+?)\s*$");
+		private static readonly Regex EnumRe = new Regex(@"public enum (\w+)\s*:");
+		private static readonly Regex MemberRe = new Regex(@"^\s*(\w+)\s*=\s*0x[0-9A-Fa-f]+\s*,?\s*//\s*(.+?)\s*$");
 
 		// (enumName, memberName) -> trailing comment, for every commented member in Opcodes.cs.
 		public static Dictionary<(string Enum, string Member), string> AllNotes()

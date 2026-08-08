@@ -155,7 +155,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public ulong Playfield { get; set; }
 
 		// The client's own SimpleCharFullUpdateIIR scaffold between the transform and the embedded CoreCharacter.
-		public SpawnPreIir PreIir { get; set; } = new();
+		public SpawnPreIir PreIir { get; set; } = new SpawnPreIir();
 
 		// The head of the embedded CoreCharacterFullUpdateIIR: its version byte and the type-stable
 		// field-presence/shape word that follows it. Every captured player frame carries 0x8208 (one carries
@@ -165,9 +165,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The embedded character message - identity, appearance, equipment. TYPED, not bytes: its re-encode is
 		// byte-identical on every captured spawn (ProtobufCorpusRoundTripTests).
-		public ProtoCoreCharacterIIR Character { get; set; } = new();
+		public ProtoCoreCharacterIIR Character { get; set; } = new ProtoCoreCharacterIIR();
 
-		public SpawnPostIir Post { get; set; } = new();
+		public SpawnPostIir Post { get; set; } = new SpawnPostIir();
 
 		public const uint DefaultCoreCharIirHeader = 0x8208;
 	}

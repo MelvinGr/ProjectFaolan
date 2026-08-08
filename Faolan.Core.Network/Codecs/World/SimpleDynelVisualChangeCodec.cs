@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.World
 		private const byte BaseTail = 0x00;
 
 		// How many u32 each non-named kind's payload carries, straight off the client's switch.
-		private static readonly Dictionary<uint, int> PayloadWords = new()
+		private static readonly Dictionary<uint, int> PayloadWords = new Dictionary<uint, int>
 		{
 			[(uint)DynelVisualChange.StartParticleEffect] = 6,
 			[(uint)DynelVisualChange.StopParticleEffect] = 1,

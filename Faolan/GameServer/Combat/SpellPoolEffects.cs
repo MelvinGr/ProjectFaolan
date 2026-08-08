@@ -56,7 +56,7 @@ namespace Faolan.GameServer.Combat
 		private const int VitalsScale = 100;
 
 		private readonly IDatabaseRepository _database;
-		private readonly SemaphoreSlim _loadLock = new(1, 1);
+		private readonly SemaphoreSlim _loadLock = new SemaphoreSlim(1, 1);
 		private readonly ILogger _logger;
 		private IReadOnlyDictionary<uint, PoolEffect[]>? _catalog;
 

@@ -34,8 +34,8 @@ namespace Faolan.Tests
 		// Files that may declare a fluent foreign key, with the reason. NOT a place to silence the test - if you are
 		// adding an entry, first check whether [ForeignKey] with a comma-separated column list does the job.
 		// Currently EMPTY: every relationship in the model is attribute-declared.
-		private static readonly Dictionary<string, string> FluentForeignKeyAllowlist = new(StringComparer.Ordinal);
-		private static readonly Regex FluentForeignKey = new(@"\.Has(Foreign|Principal)Key\s*[(<]");
+		private static readonly Dictionary<string, string> FluentForeignKeyAllowlist = new Dictionary<string, string>(StringComparer.Ordinal);
+		private static readonly Regex FluentForeignKey = new Regex(@"\.Has(Foreign|Principal)Key\s*[(<]");
 
 		// ⚠️ Timestamps are DateTimeOffset, never DateTime (the maintainer's standing rule). A DateTime carries no offset, so
 		// the instant it records is ambiguous the moment the process, host or deployment changes timezone - and it

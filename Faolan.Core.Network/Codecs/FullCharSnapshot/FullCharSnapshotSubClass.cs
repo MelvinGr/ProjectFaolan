@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
 		// the recovered FullPlayerCharacterIIR grammar (docs/re/fullplayer-snapshot-reader.md) instead of an opaque
 		// header+string blob.
-		public QuestcRegion Quests { get; init; } = new();
+		public QuestcRegion Quests { get; init; } = new QuestcRegion();
 
 		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
 		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly

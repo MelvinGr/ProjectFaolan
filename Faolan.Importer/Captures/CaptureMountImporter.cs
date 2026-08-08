@@ -139,7 +139,7 @@ namespace Faolan.Importer.Captures
 				.ToDictionaryAsync(n => n.TemplateId, n => n.StatCore!);
 			var corrected = modes.CorrectObservedTypes(observedCores);
 			if (corrected > 0)
-				System.Console.WriteLine($"[mounts] corrected the per-spawn-event pose on {corrected} type(s) the byName dedup shadows (#689).");
+				Console.WriteLine($"[mounts] corrected the per-spawn-event pose on {corrected} type(s) the byName dedup shadows (#689).");
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureMountImporter: lifted {Seeded} mount creature type(s) ({Names}).", seeded, string.Join(", ", byName.Keys));

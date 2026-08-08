@@ -69,7 +69,7 @@ namespace Faolan.CSPlayerAgent
 			if (!_pendingGuildInvites.TryRemove(characterId, out var declined))
 				return null;
 
-			if (_clientForCharacter(declined.InviterId) is { Session.Character: not null } inviterClient)
+			if (_clientForCharacter(declined.InviterId) is { } inviterClient)
 				await SendInviteReplyToInviter(inviterClient, declinerName ?? "", false);
 
 			return declined.GuildName;
@@ -104,7 +104,7 @@ namespace Faolan.CSPlayerAgent
 			_logger.LogInformation("{Character} joined guild \"{Guild}\" (invited by {Inviter}).", character.Name, guild.Name, invite.InviterName);
 			await SendGuildFullUpdate(client, ReplySender(packet.Receiver), packet.Sender, guild, character);
 			await BroadcastGuildMemberJoined(guild, character); // includes the joiner, matching retail order
-			if (_clientForCharacter(invite.InviterId) is { Session.Character: not null } inviterClient)
+			if (_clientForCharacter(invite.InviterId) is { } inviterClient)
 				await SendInviteReplyToInviter(inviterClient, character.Name ?? "", true);
 
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
@@ -314,7 +314,7 @@ namespace Faolan.CSPlayerAgent
 			// Three pushes, each to a different audience - see docs/subsystems/guilds.md for why the client needs all
 			// three: the mover's confirmation, the moved member's own notification, and everyone's roster row.
 			await SendRankFeedback(client, guild.GovernmentForm, oldRank, newRank, target.Name ?? "", promote);
-			if (_clientForCharacter(target.Id) is { Session.Character: not null } targetClient)
+			if (_clientForCharacter(target.Id) is { } targetClient)
 				await SendRankChanged(targetClient, newRank, oldRank);
 
 			await BroadcastMemberUpdate(guild, target);
@@ -381,7 +381,7 @@ namespace Faolan.CSPlayerAgent
 			// guild window.
 			foreach (var member in guild.Members)
 			{
-				if (_clientForCharacter(member.Id) is { Session.Character: not null } memberClient)
+				if (_clientForCharacter(member.Id) is { } memberClient)
 					await SendMemberLeft(memberClient, character);
 			}
 		}
@@ -392,7 +392,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			foreach (var recipient in guild.Members)
 			{
-				if (_clientForCharacter(recipient.Id) is { Session.Character: not null } recipientClient)
+				if (_clientForCharacter(recipient.Id) is { } recipientClient)
 					await SendMemberUpdate(recipientClient, member);
 			}
 		}
@@ -455,11 +455,11 @@ namespace Faolan.CSPlayerAgent
 
 		// Everyone who can see the guild window sees the new balance. Shared by both directions of the bank, because
 		// a deposit and a withdrawal are the same event as far as the window is concerned.
-		private async Task BroadcastGuildCash(Core.Database.Tables.Guild guild)
+		private async Task BroadcastGuildCash(Guild guild)
 		{
 			foreach (var member in guild.Members)
 			{
-				if (_clientForCharacter(member.Id) is { } memberClient && memberClient.Session.Character != null)
+				if (_clientForCharacter(member.Id) is { } memberClient)
 					await memberClient.SendAsync(new Rpc(PushSender, PushReceiver, GuildUpdateCashCodec.Method, GuildUpdateCashCodec.Build(guild.Cash)));
 			}
 		}

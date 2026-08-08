@@ -18,7 +18,7 @@ namespace Faolan
 	// LAST value of a repeated key.
 	public static class ServerCommand
 	{
-		private static readonly Option<string[]> Role = new("--role")
+		private static readonly Option<string[]> Role = new Option<string[]>("--role")
 		{
 			Description = "login | realm | realm=<id>. Repeatable: `--role login --role realm=2`. Omitted = all-in-one (login + the first realm).",
 			AllowMultipleArgumentsPerToken = false
@@ -44,7 +44,7 @@ namespace Faolan
 
 		// Writes a faolan.json holding every setting at its default, then exits - the `--help` list as a file you can
 		// edit. It OVERWRITES what is there, which is why it is an explicit flag and nothing calls it on startup.
-		private static readonly Option<string> WriteDefaultConfig = new("--write-default-config")
+		private static readonly Option<string> WriteDefaultConfig = new Option<string>("--write-default-config")
 		{
 			Description = "Write a faolan.json containing every setting at its default (to the given path, or the one in use) and exit. OVERWRITES.",
 			Arity = ArgumentArity.ZeroOrOne
@@ -54,7 +54,7 @@ namespace Faolan
 		// round-trip would have dropped every comment in the user file, so the writer edited it with regexes and then
 		// re-read the result to prove the edit was valid. That is a lot of machinery, and a lot of ways to damage a
 		// file, for one key going into a file the operator already has open.
-		private static readonly Option<bool> GenerateLoginKey = new("--generate-login-key")
+		private static readonly Option<bool> GenerateLoginKey = new Option<bool>("--generate-login-key")
 		{
 			Description = "Print a new login DH keypair to paste into faolan.user.json, and exit. Every client must then be re-patched (Faolan.ClientLauncher --patch-login)."
 		};

@@ -394,7 +394,7 @@ namespace Faolan.Importer.Rdb
 			return new Parsed(tree, group, tail.Length > 0 ? tail : name.Trim(), rank);
 		}
 
-		private static readonly Regex RankSuffix = new(@"\s+(\((?<n>\d{1,3})\)|(?<n>\d{1,3}))$", RegexOptions.Compiled);
+		private static readonly Regex RankSuffix = new Regex(@"\s+(\((?<n>\d{1,3})\)|(?<n>\d{1,3}))$", RegexOptions.Compiled);
 
 		// The record's NAME and DESCRIPTION. TWO shapes exist, and knowing only the first is what left 3,633 plaintext
 		// records looking nameless - including every feat the three captured characters hold:

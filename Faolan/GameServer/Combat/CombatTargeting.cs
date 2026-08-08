@@ -64,7 +64,7 @@ namespace Faolan.GameServer.Combat
 			return zone
 				.EntitiesInRange(attacker.Position, reach, attacker.Handle)
 				.Where(e => e.Handle != primary?.Handle)
-				.Where(e => e is { IsPlayer: false, Hostile: true, Vitals: not null, IsDead: false })
+				.Where(e => e is { IsPlayer: false, Hostile: true, IsDead: false })
 				.Where(e => IsInFrontOf(attacker.Position, facing, e.Position, halfAngleDegrees))
 				.OrderBy(e => Vector3.Distance(e.Position, attacker.Position))
 				.Take(max)

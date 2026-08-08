@@ -122,7 +122,7 @@ namespace Faolan.Importer.Cli
 			// The candidate columns, each as a coarse KEY over the spell. Deliberately coarse: a key with as many
 			// values as there are spells scores 100% for free and says nothing (the `field-predictors` report's
 			// "(fine)" trap).
-			var candidates = new (string Name, Func<Faolan.Core.Database.Tables.Spell, string> Key)[]
+			var candidates = new (string Name, Func<Core.Database.Tables.Spell, string> Key)[]
 			{
 				("DurationMs == 0", s => (s.DurationMs == 0).ToString()),
 				("DotType", s => s.DotType.ToString()),
@@ -224,7 +224,7 @@ namespace Faolan.Importer.Cli
 				if (body.Length < 48 || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(body) != SpellTemplateType)
 					continue;
 
-				records.Add((e.Id, body, Faolan.Importer.Rdb.RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12))));
+				records.Add((e.Id, body, Rdb.RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12))));
 			}
 
 			Console.WriteLine($"{classOf.Count} spells with an unsplit value; {records.Count} of them have a readable 1040005 record.");

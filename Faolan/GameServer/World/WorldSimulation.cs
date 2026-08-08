@@ -100,7 +100,7 @@ namespace Faolan.GameServer.World
 		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new ConcurrentDictionary<uint, HashSet<uint>>();
 
 		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
-		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new(); // #348: per-map banner volumes, read every tick
+		private readonly ConcurrentDictionary<uint, MapRegion[]> _mapAreas = new ConcurrentDictionary<uint, MapRegion[]>(); // #348: per-map banner volumes, read every tick
 
 		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
 		private readonly ConcurrentDictionary<uint, RespawnPoint[]> _respawnPointsByMap = new ConcurrentDictionary<uint, RespawnPoint[]>();
@@ -749,7 +749,7 @@ namespace Faolan.GameServer.World
 			{
 				var nearest = zone
 					.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
-					.Where(e => e is { Hostile: true, IsDead: false, Vitals: not null })
+					.Where(e => e is { Hostile: true, IsDead: false })
 					.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
 					.FirstOrDefault();
 				if (nearest != null)

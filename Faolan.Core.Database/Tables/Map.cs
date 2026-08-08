@@ -21,7 +21,7 @@ namespace Faolan.Core.Database.Tables
 		// defines no real RespawnPoint. A TRANSIENT carrier (never persisted; Id 0 = no DB point, not a real spawn id)
 		// positioned at the Tortage Beach new-player spawn. Maps with their own RespawnPoints advertise their real
 		// RespawnPoint.Id instead (the id RespawnMe echoes back).
-		public static readonly RespawnPoint NewPlayerSpawnSpawnPoint = new()
+		public static readonly RespawnPoint NewPlayerSpawnSpawnPoint = new RespawnPoint
 		{
 			Id = 0,
 			MapId = TortageBeachId,
@@ -89,7 +89,7 @@ namespace Faolan.Core.Database.Tables
 		// The box's other two fields are re-derivable and so are not columns: its `id` is this map's Id and its
 		// category is always 520, the client's map-name category. 520 is PLAINTEXT, so the client never decrypts with
 		// this key - it is carried to reproduce retail's bytes, not because the text needs it.
-		public virtual ProtoDecryptionKey TravelConfirmKey { get; set; } = new();
+		public virtual ProtoDecryptionKey TravelConfirmKey { get; set; } = new ProtoDecryptionKey();
 
 		// The per-map PlayfieldFIIR (0x5D85BFC7 MapChange) rule fields (#308). This packet is the playfield the client
 		// enters, and the client keys per-area rules on it (mount permission FIXED via PlayfieldFlags). The values are

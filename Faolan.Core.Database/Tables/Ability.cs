@@ -12,7 +12,7 @@ namespace Faolan.Core.Database.Tables
 	{
 		// The ability template's 128-bit TEA DecryptionKey (owned -> flat columns Key1..Key4). virtual for the
 		// lazy-loading-proxy test context (owned types are eager; virtual only satisfies the all-navigations-virtual rule).
-		public virtual ProtoDecryptionKey Key { get; set; } = new();
+		public virtual ProtoDecryptionKey Key { get; set; } = new ProtoDecryptionKey();
 
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;

@@ -18,11 +18,11 @@ namespace Faolan.Importer.Rdb
 	{
 		// A goal that ASKS the player to go and speak to someone: "Speak with Kern Wolfeye", "Report to Mei-zhu",
 		// "Talk to King Conan of Aquilonia". The trigger is a greeting (TalkToNpc), never proximity.
-		public static readonly Regex TalkObjective = new(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex TalkObjective = new Regex(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// The other shape of the same objective: "ASK <someone> ABOUT <something>", where the name follows the VERB
 		// instead of a to/with. `for` is accepted beside `about` - the verb is what makes it a talk goal.
-		public static readonly Regex AskObjective = new(@"^\s*Ask\s+(?:an?\s+)?([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)\s+(?:about|for)\s", RegexOptions.Compiled);
+		public static readonly Regex AskObjective = new Regex(@"^\s*Ask\s+(?:an?\s+)?([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)\s+(?:about|for)\s", RegexOptions.Compiled);
 
 		// An ESCORT: the objective is to walk the NPC somewhere, so it is emphatically not solved by standing at the
 		// start marker - which is exactly where the escortee is when the goal is granted.
@@ -32,7 +32,7 @@ namespace Faolan.Importer.Rdb
 		// Atzel", "Lead the Corrupted into the Field of Stones and Observe") and of the 14 `Follow …` several are
 		// plain reaches ("Follow the Tracks Into the Forest", "Follow the Trail of Clues"). Widening the verb costs a
 		// correctly-typed reach for every escort it might catch, and `Guide` matches nothing at all.
-		public static readonly Regex EscortObjective = new(@"^\s*Escort\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex EscortObjective = new Regex(@"^\s*Escort\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// The NPC in an objective line: the LAST "to <Name>" / "with <Name>" in it. LAST, not first, because the item
 		// can contain one ("Deliver the Head of Athyr-Bast to Hashima") and the person always closes the phrase. A name
@@ -43,16 +43,16 @@ namespace Faolan.Importer.Rdb
 		// ⚠️ It requires a Capitalised word, so a sentence naming a ROLE yields nothing - "Talk to the city guard",
 		// "Talk to the Red Hand Sergeant". That is deliberate: those need the goal's MARKER to say which NPC is meant,
 		// and 868 of 7,317 goals carry no marker at all.
-		public static readonly Regex Recipient = new(@"\b(?:to|with)\s+([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)", RegexOptions.Compiled);
+		public static readonly Regex Recipient = new Regex(@"\b(?:to|with)\s+([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)", RegexOptions.Compiled);
 
 		// The two PRECONDITION shapes the client states in a goal's text. They are RECORDED, not used to refuse the
 		// wiring: the goal is typed normally and QuestProgress.PreconditionMet enforces it at the trigger, where the
 		// live player is known. See QuestGoalDefinition.RequiredLevel.
 		//   "Talk to Sharak (level 30)"
-		public static readonly Regex LevelPrecondition = new(@"\(\s*level\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex LevelPrecondition = new Regex(@"\(\s*level\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		//   "…to Itsing When You Have Become an Acolyte (Rank 1)"  -> title "Acolyte", rank 1
-		public static readonly Regex RankPrecondition = new(@"When You Have Become (?:an?\s+)?([A-Za-z][\w \-']*?)\s*\(\s*Rank\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex RankPrecondition = new Regex(@"When You Have Become (?:an?\s+)?([A-Za-z][\w \-']*?)\s*\(\s*Rank\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// Everything one objective sentence states. `Recipient` is null when the sentence names nobody the pattern can
 		// take - a role rather than a name - which is a different outcome from "not a talk objective at all", so both
@@ -91,7 +91,7 @@ namespace Faolan.Importer.Rdb
 		// A HAND-IN: the player carries something to someone. Distinct from the pure talk shapes above because an item
 		// changes hands, which is the whole difficulty - the trigger is still the talk, but it must be gated on
 		// actually holding the goods (QuestProgress.CanHandIn).
-		public static readonly Regex HandInObjective = new(@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex HandInObjective = new Regex(@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// What a hand-in sentence hands over: the noun phrase between the verb and the "to <recipient>" that closes it.
 		//
@@ -118,15 +118,15 @@ namespace Faolan.Importer.Rdb
 			return LeadingArticle.Replace(phrase, "") is { Length: > 0 } stripped ? stripped : null;
 		}
 
-		private static readonly Regex LeadingArticle = new(@"^(?:the|a|an|some)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex LeadingArticle = new Regex(@"^(?:the|a|an|some)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// A KILL: the thing to kill is the noun phrase after the verb. "Kill Vanir Lookouts", "Slay Dogs",
 		// "Kill guards in Villa Paetus".
-		public static readonly Regex KillObjective = new(@"^\s*(?:Kill|Slay|Slaughter|Defeat|Vanquish|Destroy)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		public static readonly Regex KillObjective = new Regex(@"^\s*(?:Kill|Slay|Slaughter|Defeat|Vanquish|Destroy)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// A trailing prepositional clause - "…in Villa Paetus", "…from the battlefield". Trimmed as a SECOND attempt,
 		// never the first, so a target whose own name contains one ("Lurker in the Dark") is tried whole first.
-		private static readonly Regex TrailingClause = new(@"\s+(?:from|in|at|on|near|inside|around|within|for)\s+.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex TrailingClause = new Regex(@"\s+(?:from|in|at|on|near|inside|around|within|for)\s+.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// What a kill objective names, most specific first: the phrase whole, then with a trailing clause trimmed, then
 		// each of those de-pluralised. The caller matches them against the NPC catalog IN THIS ORDER and takes the first
@@ -151,7 +151,7 @@ namespace Faolan.Importer.Rdb
 			}
 		}
 
-		private static readonly Regex LeadingCount = new(@"^(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex LeadingCount = new Regex(@"^(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		// The AMOUNT an objective asks for, stated right after its verb: "Hand in 20 Yew", "Collect ten Frost Serpent
 		// Skins", "Deliver 3 stone bricks to Turach". Null when the sentence states none.
@@ -162,9 +162,9 @@ namespace Faolan.Importer.Rdb
 		// exactly that state.
 		//
 		// Both spellings, because the client uses both: a numeral, or the words one..ten.
-		private static readonly Regex CountedObjective = new(
-			@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring|Get|Collect|Gather|Obtain|Recover|Kill|Slay|Destroy)\s+"
-			+ @"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		private static readonly Regex CountedObjective = new Regex(
+			@"^\s*(?:Give|Hand(?:\s+in)?|Deliver|Return|Bring|Get|Collect|Gather|Obtain|Recover|Kill|Slay|Destroy)\s+" + @"(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s",
+			RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		private static readonly string[] NumberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 

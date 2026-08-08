@@ -42,20 +42,18 @@ namespace Faolan.Core.Cli
 			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it."),
 			Setting(Keys.ContentTerrainDir, "Where the baked terrain lives. Without it the server still runs, with ground-snap and line-of-sight disabled.", "./terrain"),
 			Setting(Keys.DatabaseConnectionString, "The database to serve from. One with no game content in it is filled from faolan.sql on first run.", "Data Source=faolan.db"),
-			Setting(Keys.DatabaseProvider, $"The engine that database runs on. [{FaolanDbProvider.Sqlite}, {FaolanDbProvider.Postgres}]", FaolanDbProvider.Sqlite),
+			Setting(Keys.DatabaseProvider, $"The engine that database runs on. [{Enum.GetValues<FaolanDbProvider>().JoinAsString(", ")}]", FaolanDbProvider.Sqlite),
 			Setting(Keys.LogFile, "Where the server writes its log, alongside the console.", "faolan.log"),
 			Setting(Keys.LogPacketBytes, "Add the raw byte dump to every packet log line. Verbose - for protocol work.", false),
 			Setting(Keys.McpEnabled, "Host the in-process MCP endpoint: database queries, live-session inspection and GM commands.", false),
 			Setting<ushort>(Keys.McpPort, "The port that MCP endpoint binds. Loopback only, so there is no address to configure.", 7099),
 			Setting(Keys.ServerListenAddress, "The interface the server BINDS. Not an address to dial - that is Server:PublicAddress.", "0.0.0.0"),
 			Setting<ushort>(Keys.ServerPlayerAgentPort, "The port the PlayerAgent binds - the tier the UniverseAgent hands a client on to.", 7011),
-			Optional<string>(Keys.ServerPrivateKey,
-				$"The login DH private key, {ClientLoginEncryption.PrivateHexLength} hex characters - generate one with --generate-login-key. Unset, no password is ever checked; set, every client must be patched (Faolan.ClientLauncher --patch-login) or it is refused."),
+			Optional<string>(Keys.ServerPrivateKey, $"The login DH private key, {ClientLoginEncryption.PrivateHexLength} hex characters - generate one with --generate-login-key. Unset, no password is ever checked; set, every client must be patched (Faolan.ClientLauncher --patch-login) or it is refused."),
 			Setting(Keys.ServerPublicAddress, "The address the login tier ADVERTISES to clients - no port, and it must be reachable FROM the client. A DNS name is fine.", "127.0.0.1"),
-			Optional<string>(Keys.ServerPublicKey,
-				$"Patch THIS public key into clients, {ClientLoginEncryption.PublicHexLength} hex characters, instead of the one derived from Server:PrivateKey - for a client that talks to somebody ELSE's server. Only Faolan.ClientLauncher reads it."),
+			Optional<string>(Keys.ServerPublicKey, $"Patch THIS public key into clients, {ClientLoginEncryption.PublicHexLength} hex characters, instead of the one derived from Server:PrivateKey - for a client that talks to somebody ELSE's server. Only Faolan.ClientLauncher reads it."),
 			Setting<ushort>(Keys.ServerUniverseAgentPort, "The port the UniverseAgent binds - where a client enters, and the only port it has to be told about.", 7010),
-			Setting(Keys.ServerWelcomeString, "The message a client is greeted with at login. $BUILDSTRING expands to this server's build.", "Welcome to Project Faolan!\n$BUILDSTRING")
+			Setting(Keys.ServerWelcomeString, "The message a client is greeted with at login. $BUILDSTRING expands to this server's build.", "Welcome to Project Faolan!")
 		];
 
 		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(setting => new KeyValuePair<string, string?>(setting.Key(), DefaultText(setting)));

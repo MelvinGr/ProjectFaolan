@@ -33,7 +33,7 @@ namespace Faolan.Tests
 		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
 		// write one - ZERO compare it to a constant (tools/ghidra/DumpListFraming.java). Every "0x7E2 constant"
 		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
-		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal)
+		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new Dictionary<string, string>(StringComparer.Ordinal)
 		{
 			// The one genuine COLLISION rather than a mistaken constant, surfaced when Faolan.Core joined the scan
 			// roots (#530): CharacterStatId is a dense catalog enum and stat 1009 - CombatRatingHoly - is written
@@ -43,27 +43,27 @@ namespace Faolan.Tests
 			// allowlist entry and not a reason to narrow the scan.
 			["CharacterStatId.cs"] = "stat id 1009 (CombatRatingHoly) numerically collides with 0x3F1; it is not a list frame"
 		};
-		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
+		private static readonly Regex BlockComment = new Regex(@"/\*.*?\*/", RegexOptions.Singleline);
 
 		// The tail of a `WriteArray(` whose arguments are ONLY hex byte literals - a verbatim capture blob.
-		private static readonly Regex ByteLiteralsOnly = new(@"^\s*0x[0-9A-Fa-f]{2}\s*(,\s*0x[0-9A-Fa-f]{2}\s*)*\)");
+		private static readonly Regex ByteLiteralsOnly = new Regex(@"^\s*0x[0-9A-Fa-f]{2}\s*(,\s*0x[0-9A-Fa-f]{2}\s*)*\)");
 
 		// 8-hex-digit literals; IIR opcodes are 32-bit BKDR-31 hashes so they always appear in this form.
-		private static readonly Regex HexLiteral = new(@"0x[0-9A-Fa-f]{8}\b");
-		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
+		private static readonly Regex HexLiteral = new Regex(@"0x[0-9A-Fa-f]{8}\b");
+		private static readonly Regex LineComment = new Regex(@"//.*$", RegexOptions.Multiline);
 
 		// The count-framing word in any spelling it has been written in: 0x3F1 (the unit), 0x7E2 (a 1-element list -
 		// the value that keeps passing for a constant), and decimal 1009, which two snapshot codecs used.
-		private static readonly Regex ListWordLiteral = new(@"\b(0x0*3F1|0x0*7E2|1009)\b", RegexOptions.IgnoreCase);
+		private static readonly Regex ListWordLiteral = new Regex(@"\b(0x0*3F1|0x0*7E2|1009)\b", RegexOptions.IgnoreCase);
 
 		// String literals are prose (exception messages naming the word) - stripped like comments before scanning.
-		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
+		private static readonly Regex StringLiteral = new Regex("\"(?:[^\"\\\\]|\\\\.)*\"");
 
 		// The entity object-class ids, in the 4- and 8-digit spellings both have been written in.
-		private static readonly Regex EntityClassLiteral = new(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D|DEB7)\b", RegexOptions.IgnoreCase);
+		private static readonly Regex EntityClassLiteral = new Regex(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D|DEB7)\b", RegexOptions.IgnoreCase);
 
 		// The RPC endpoint class ids - BKDR-31 hashes of the client class names, all 32-bit, all in Endpoints.cs.
-		private static readonly Regex EndpointClassLiteral = new(
+		private static readonly Regex EndpointClassLiteral = new Regex(
 			@"\b0x(0C384054|1D359116|28377648|3D744981|5B9756FC|604DDBA0|6C67C147|6DD55614|7D155738|82F20484|8B87F791|A9ECB95D|B171CE13|BBD560C8|F2C2D5B5)\b", RegexOptions.IgnoreCase);
 
 		// Anchored on Endpoints (Faolan.Core.Network/Constants): the old anchor was `ICodec<>`, deleted in #530 wave 9.
@@ -302,7 +302,7 @@ namespace Faolan.Tests
 		{
 			// Send sites whose body is ALREADY `[u32 len][record]` when it arrives, with the reason. Not a place to
 			// silence the test: if a codec stopped prefixing its own length, the fix is at the call site, not here.
-			Dictionary<string, string> allowlist = new(StringComparer.Ordinal)
+			var allowlist = new Dictionary<string, string>(StringComparer.Ordinal)
 			{
 				["GameServerListener.Outbound.cs"] = "FrameWorldEntryRecord takes a body that already carries its [u32 bodyLen] - its parameter is named bodyWithLenPrefix, and its one caller writes that prefix itself",
 				["CreateFlowService.cs"] = "the create-editor 12-byte [entityClass][handle][0] body on the GameCharInterfaceProject receiver is not an IIR record at all, so it carries no record length"

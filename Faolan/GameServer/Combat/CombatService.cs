@@ -51,7 +51,7 @@ namespace Faolan.GameServer.Combat
 
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
-		private readonly CombatState _combat = new();
+		private readonly CombatState _combat = new CombatState();
 
 		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
 		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
@@ -801,7 +801,7 @@ namespace Faolan.GameServer.Combat
 		private EntityVitals? ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity? npcEntity)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && npcEntity is { IsPlayer: false, Vitals: not null })
+			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && npcEntity is { IsPlayer: false })
 				return npcEntity.Vitals;
 
 			npcEntity = null;

@@ -4,6 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -65,7 +66,7 @@ namespace Faolan.Core.Network.Codecs.World
 			row.DisplayToken = element.Token;
 			row.DisplayCategory = element.Category;
 			row.DisplayFlags = element.Flags;
-			row.DisplayKey = LdbKey.Decode(element.Key) ?? new();
+			row.DisplayKey = LdbKey.Decode(element.Key) ?? new ProtoDecryptionKey();
 			row.DisplayKnubot = element.Knubot;
 			return true;
 		}
@@ -78,7 +79,7 @@ namespace Faolan.Core.Network.Codecs.World
 			row.DisplayToken = null;
 			row.DisplayCategory = null;
 			row.DisplayFlags = null;
-			row.DisplayKey = new();
+			row.DisplayKey = new ProtoDecryptionKey();
 			row.DisplayKnubot = null;
 		}
 	}

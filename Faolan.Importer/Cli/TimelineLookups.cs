@@ -71,8 +71,8 @@ namespace Faolan.Importer.Cli
 	// `Method` column can), the game-data tables, and the client's encrypted LDB pages.
 	public sealed class TimelineLookups
 	{
-		private static readonly Regex RemoteFormatTag = new("<(?:remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
-		private static readonly Regex Attribute = new("(\\w+)=\"?([^\"\\s>]*)\"?", RegexOptions.Compiled);
+		private static readonly Regex RemoteFormatTag = new Regex("<(?:remoteformat|localized)([^>]*)>", RegexOptions.Compiled);
+		private static readonly Regex Attribute = new Regex("(\\w+)=\"?([^\"\\s>]*)\"?", RegexOptions.Compiled);
 
 		private Dictionary<(uint Category, uint Id), byte[]> _ciphertext = [];
 
@@ -148,7 +148,7 @@ namespace Faolan.Importer.Cli
 		// directions. Verified over the whole corpus: all 404k Conan packets are a clean A<->B swap of one of these
 		// pairs, and the receiver's enum contains the opcode in every case bar three mis-framed packets in one lossy
 		// capture (their "bodies" are the first bytes of an RpcHeader).
-		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new()
+		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new Dictionary<uint, Type>
 		{
 			[RpcInterfaces.UniverseAgentType] = typeof(UniverseAgentMethods),
 			[RpcInterfaces.UniverseInterfaceType] = typeof(UniverseInterfaceMethods),
@@ -180,7 +180,7 @@ namespace Faolan.Importer.Cli
 		// the bug.
 		// The two classes that register by 32-bit HASH, so their frames are named from the method constant rather than
 		// from an opcode that cannot tell two of them apart (#608/#613).
-		private static readonly Dictionary<uint, Type> MethodsByReceiver = new()
+		private static readonly Dictionary<uint, Type> MethodsByReceiver = new Dictionary<uint, Type>
 		{
 			[RpcInterfaces.PlayerAgentType] = typeof(PlayerAgentMethods),
 			[RpcInterfaces.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)

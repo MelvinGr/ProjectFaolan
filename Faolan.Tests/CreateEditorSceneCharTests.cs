@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		public void EverySceneChar_BuildsFromTypedData_ByteExact()
 		{
 			var captured = ExtractBurstCharRecords();
-			var scene = Faolan.Core.Network.Constants.CreateEditorScene.All;
+			var scene = Core.Network.Constants.CreateEditorScene.All;
 			Assert.Equal(captured.Count, scene.Count);
 
 			for (var i = 0; i < captured.Count; i++)
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 			var captured = ExtractBurstCharRecords()[0].Record;
 			const uint liveToken = 0x004FE1A8;
 
-			var scene = Faolan.Core.Network.Constants.CreateEditorScene.Pedestals[0]();
+			var scene = Core.Network.Constants.CreateEditorScene.Pedestals[0]();
 			scene.Playfield = liveToken;
 			var rebuilt = SimpleCharFullUpdateCodec.Build(scene);
 

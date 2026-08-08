@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	//   * escalations (2 -> 3) all land inside that window, at 1.36-7.83s.
 	public class KillChainTests
 	{
-		private static readonly DateTimeOffset T0 = new(2026, 8, 5, 12, 0, 0, TimeSpan.Zero);
+		private static readonly DateTimeOffset T0 = new DateTimeOffset(2026, 8, 5, 12, 0, 0, TimeSpan.Zero);
 
 		[Fact]
 		public void TheFirstKillOfAChainIsSilent()

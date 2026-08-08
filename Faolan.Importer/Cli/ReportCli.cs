@@ -1957,7 +1957,7 @@ namespace Faolan.Importer.Cli
 
 					// `Body` is already past the packet prologue+header, so it IS the IIR body the reader wants -
 					// unlike NpcSpawnEntry.Data above, which is the whole packet and has to be sliced.
-					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > 0)
+					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { Level: > 0 } pst)
 						playerLevels[sb.ReadU32Be(12)] = pst.Level;
 				}
 
@@ -2386,7 +2386,7 @@ namespace Faolan.Importer.Cli
 					// while the importer's own lift found a THIRD carrying spawn (Valkyrie Skalla) that the dedup had
 					// dropped. A census that silently answers a narrower question than it states is the failure mode
 					// this whole field's history is made of.
-					if (captured.Post?.Slot is NpcEntrySlot census && census.Morphs.Count > 0)
+					if (captured.Post?.Slot is NpcEntrySlot { Morphs.Count: > 0 } census)
 					{
 						word2Tables++;
 						var nonZero = census.Morphs.FindAll(m => m.Word2 != 0);
@@ -2791,8 +2791,8 @@ namespace Faolan.Importer.Cli
 				//     not a uniformly-sampled clock. A real clock would be roughly uniform across the range.
 				//
 				// So the test is the FREQUENCY share of the strictly-interior values, never their distinct count.
-				var interior = values.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
-				var interiorDistinct = distinct.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
+				var interior = values.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f is > 0 and < 1);
+				var interiorDistinct = distinct.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f is > 0 and < 1);
 				if (interiorDistinct > distinct.Count / 2)
 				{
 					var share = 100.0 * interior / values.Count;
@@ -2955,7 +2955,7 @@ namespace Faolan.Importer.Cli
 					// most obvious hypothesis about a field like `npc_stats.SpawnAnimation` UNTESTABLE by
 					// construction: "play the spawn-in animation" is a property of the spawn EVENT, i.e. of whether
 					// the NPC is APPEARING or was already standing there, and every row here is the second case.
-					if (captured.Handle < EntityHandles.CharacterInstanceBase && captured.Character?.player_stats == null)
+					if (captured is { Handle: < EntityHandles.CharacterInstanceBase, Character.player_stats: null })
 					{
 						var pv = FieldValues(captured.Character).ToDictionary(v => v.Field, v => v.Value, StringComparer.Ordinal);
 						var phase = sawPoll ? "mid-session" : "login burst";
@@ -3066,7 +3066,7 @@ namespace Faolan.Importer.Cli
 			// every disagreeing sighting rather than its tally (the #549 lesson: a report has to let you re-cut an
 			// anomaly by a field you did not think to print).
 			var best = scored.Where(s => s.Cardinality <= fineThreshold).OrderByDescending(s => s.Purity).FirstOrDefault();
-			if (best.Name != null && best.Purity is > 90.0 and < 100.0)
+			if (best is { Name: not null, Purity: > 90.0 and < 100.0 })
 			{
 				Console.WriteLine();
 				Console.WriteLine($"--- every sighting that disagrees with `{best.Name}` ({best.Purity:F2}%) ---");
@@ -3168,7 +3168,7 @@ namespace Faolan.Importer.Cli
 			// A mode-4 ListMoveTask wraps the real plan, so read the leaf: the wrapper's own mode says nothing about
 			// what the entity is doing, and every list in the corpus is a plan plus its modifiers.
 			var leaf = task;
-			while (leaf.Mode == 4 && leaf.Children.Count > 0)
+			while (leaf is { Mode: 4, Children.Count: > 0 })
 				leaf = leaf.Children[0];
 
 			yield return ("[movetask].LeafMode", leaf.Mode.ToString());

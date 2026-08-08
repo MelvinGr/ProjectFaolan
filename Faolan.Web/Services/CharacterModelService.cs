@@ -47,7 +47,7 @@ namespace Faolan.Web.Services
 		private const uint FemaleHead = 4502887;
 		private const uint MaleHead = 4821637;
 
-		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>(), new Dictionary<string, int[]>());
+		private static readonly AppearanceOptions EmptyOptions = new AppearanceOptions([], [], [], [], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>(), new Dictionary<string, int[]>());
 
 		// (race, sex) -> the body's CHARACTERCREATOR monsterdata id (RDB type 1010700 <body monsterdataid>, the
 		// authoritative per-race/sex body). The MonsterData in turn names the body's skinned RenderMesh, resolved via
@@ -91,15 +91,15 @@ namespace Faolan.Web.Services
 
 		// A map's world extent (tilemap Width/Height in world units) from the RDB playfield description (1070003),
 		// used to scale the live radar. Null when the RDB is unavailable or the playfield is CDN-gated. Cached.
-		private readonly ConcurrentDictionary<uint, (int W, int H)?> _mapBounds = new();
+		private readonly ConcurrentDictionary<uint, (int W, int H)?> _mapBounds = new ConcurrentDictionary<uint, (int W, int H)?>();
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 		private readonly IMemoryCache _cache;
-		private readonly Lock _gate = new();
+		private readonly Lock _gate = new Lock();
 		private readonly string _rdbDir;
 		private readonly string? _cdnUrl;
 
 		// Linked to every cached render so ClearRenderCache can evict them all at once.
-		private CancellationTokenSource _cacheReset = new();
+		private CancellationTokenSource _cacheReset = new CancellationTokenSource();
 		private IReadOnlyList<ArmorSetCatalog.ArmorSet>? _armorSets;
 		private RdbReader? _rdb;
 

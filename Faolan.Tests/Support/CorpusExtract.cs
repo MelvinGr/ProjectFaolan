@@ -50,7 +50,7 @@ namespace Faolan.Tests.Support
 			((uint)IirTypes.MagicBuffIIR, 4666)
 		];
 
-		private static readonly Lazy<List<Entry>> Entries = new(Load);
+		private static readonly Lazy<List<Entry>> Entries = new Lazy<List<Entry>>(Load);
 
 		public static string Path => FixtureArchive.Path;
 

@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			Assert.Equal(7010, config.ServerUniverseAgentPort);
 			Assert.Equal("127.0.0.1:7010", config.ServerUniverseAddress); // ...derived from those two, not a third literal
 			Assert.Equal(7011, config.ServerPlayerAgentPort);
-			Assert.Equal("Welcome to Project Faolan!\n$BUILDSTRING", config.ServerWelcomeString);
+			Assert.Equal("Welcome to Project Faolan!", config.ServerWelcomeString);
 			Assert.Equal("v5.01.0@602248", config.ContentClientVersion);
 			Assert.True(config.AccountPremium);
 			Assert.Equal(10u, config.AccountPremiumCharSlots);
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			// layer with nothing, which is a state no config file can produce.
 			var over = new List<KeyValuePair<string, string?>>();
 			if (port != null)
-				over.Add(new(Keys.McpPort, port));
+				over.Add(new KeyValuePair<string, string?>(Keys.McpPort, port));
 
 			var config = new ConfigurationBuilder()
 				.AddInMemoryCollection(FaolanSettings.Defaults)
@@ -103,9 +103,9 @@ namespace Faolan.Tests
 		{
 			var over = new List<KeyValuePair<string, string?>>();
 			if (address != null)
-				over.Add(new(Keys.ServerPublicAddress, address));
+				over.Add(new KeyValuePair<string, string?>(Keys.ServerPublicAddress, address));
 			if (port != null)
-				over.Add(new(Keys.ServerUniverseAgentPort, port));
+				over.Add(new KeyValuePair<string, string?>(Keys.ServerUniverseAgentPort, port));
 
 			var config = new ConfigurationBuilder()
 				.AddInMemoryCollection(FaolanSettings.Defaults)
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, new ConfigurationBuilder()
 				.AddInMemoryCollection(FaolanSettings.Defaults)
 				.AddInMemoryCollection(over)
-				.AddInMemoryCollection([new(Keys.ServerListenAddress, "0.0.0.0")])
+				.AddInMemoryCollection([new KeyValuePair<string, string?>(Keys.ServerListenAddress, "0.0.0.0")])
 				.Build()
 				.ServerUniverseAddress);
 		}
@@ -139,7 +139,7 @@ namespace Faolan.Tests
 		{
 			var config = new ConfigurationBuilder()
 				.AddInMemoryCollection(FaolanSettings.Defaults)
-				.AddInMemoryCollection([new(key, value)])
+				.AddInMemoryCollection([new KeyValuePair<string, string?>(key, value)])
 				.Build();
 
 			var error = Assert.Throws<InvalidOperationException>(() => Read(config, key));
@@ -158,7 +158,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheKeyConstants_AreExactlyTheCatalog()
 		{
-			var consts = typeof(FaolanSettings.Keys)
+			var consts = typeof(Keys)
 				.GetFields(BindingFlags.Public | BindingFlags.Static)
 				.Where(f => f.IsLiteral)
 				.ToDictionary(f => f.Name, f => (string)f.GetRawConstantValue()!);

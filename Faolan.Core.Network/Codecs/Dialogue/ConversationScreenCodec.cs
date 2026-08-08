@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -32,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			{
 				ScreenId = uint.Parse(s.Id, CultureInfo.InvariantCulture),
 				Category = uint.Parse(s.Category, CultureInfo.InvariantCulture),
-				Key = LdbKey.Decode(s.Key) ?? new(),
+				Key = LdbKey.Decode(s.Key) ?? new ProtoDecryptionKey(),
 				Knubot = uint.Parse(s.Knubot, CultureInfo.InvariantCulture),
 				Antitag = s.Antitag == null
 					? null
@@ -124,7 +125,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			row.LocalizedToken = element.Token;
 			row.Category = element.Category;
 			row.Flags = element.Flags;
-			row.ContentKey = LdbKey.Decode(element.Key) ?? new();
+			row.ContentKey = LdbKey.Decode(element.Key) ?? new ProtoDecryptionKey();
 			row.Text = element.Text;
 		}
 	}

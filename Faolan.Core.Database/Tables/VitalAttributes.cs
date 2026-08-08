@@ -16,7 +16,7 @@ namespace Faolan.Core.Database.Tables
 		///     that row. It is what reproduces every captured level-1 sheet exactly (Assassin 98 health = the class
 		///     base 90 + 8 x this Constitution).
 		/// </summary>
-		public static VitalAttributes LevelOneBase { get; } = new(1, 1, 1, 1, 1);
+		public static VitalAttributes LevelOneBase { get; } = new VitalAttributes(1, 1, 1, 1, 1);
 
 		/// <summary>
 		///     A character's totals from the two sources the world model carries: the class/level base (#444,

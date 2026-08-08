@@ -17,7 +17,7 @@ namespace Faolan.Mcp.Tools
 	{
 		// EF entities carry navigation properties (populated via Include; the context does not enable lazy-loading
 		// proxies), so guard against reference cycles and cap depth. Tools return detached/no-tracking results.
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			ReferenceHandler = ReferenceHandler.IgnoreCycles,

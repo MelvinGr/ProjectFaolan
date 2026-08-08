@@ -56,7 +56,7 @@ namespace Faolan.Core.Database.Tables
 		// ⚠️ Long described here as a "client-validated content hash" carried as raw attribute text. It is neither: the
 		// client is not validating anything, it is DECRYPTING - eleven LDB categories are encrypted and this is the key
 		// (#520). Text that came out blank was the client failing to decrypt, not failing a checksum.
-		public virtual ProtoDecryptionKey ContentKey { get; set; } = new();
+		public virtual ProtoDecryptionKey ContentKey { get; set; } = new ProtoDecryptionKey();
 
 		// A `<stringentry>` literal. EMPTY for the session slots (player name, guild, npc guild): those are
 		// regenerated per send from live values and must never carry the capturing player's real name (#417).

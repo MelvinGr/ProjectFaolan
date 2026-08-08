@@ -84,7 +84,7 @@ namespace Faolan.Importer.Extractors
 
 		// The speaker's template id inside a screen's `npcname` parameter - see NpcTemplateFromText.
 		private static readonly Regex NpcNameParameter =
-			new(@"<parameter\s+value=""[^""]*?id=&quot;(\d+)&quot;[^""]*?category=&quot;51000&quot;[^""]*""\s+name=""npcname""", RegexOptions.Compiled);
+			new Regex(@"<parameter\s+value=""[^""]*?id=&quot;(\d+)&quot;[^""]*?category=&quot;51000&quot;[^""]*""\s+name=""npcname""", RegexOptions.Compiled);
 
 		// The Knubot conversation-display response sub-opcodes - the family KnubotCodec parses (642CD3D6 echo excluded:
 		// it is a generic interact ack, not a screen).

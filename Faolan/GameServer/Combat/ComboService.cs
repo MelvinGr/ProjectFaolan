@@ -106,7 +106,7 @@ namespace Faolan.GameServer.Combat
 			// direction ability rather than from the catalog (#673's first source, present on 408 of the 515 captured
 			// player swings). On the minority that carry no ability word the ack falls back to Overhead - a fidelity
 			// loss confined to a case retail's own client does not produce.
-			if (step == 0 && RemainingCooldownMs(session, message.ComboId) is var remaining && remaining > 0)
+			if (step == 0 && RemainingCooldownMs(session, message.ComboId) is var remaining and > 0)
 			{
 				_logger.LogInformation("Combo {Combo} ({Name}) REFUSED: {Remaining} ms of its {Cooldown} s reuse time left.",
 					message.ComboId, entry.Combo.Name, remaining, entry.Combo.Cooldown);

@@ -14,7 +14,7 @@ namespace Faolan.Mcp.Tools
 	[McpServerToolType]
 	public sealed class SessionTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new()
+		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
 		{
 			WriteIndented = true
 		};

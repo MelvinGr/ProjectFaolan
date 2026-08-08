@@ -34,8 +34,8 @@ namespace Faolan.Importer.Captures
 	{
 		// `Halberdier_50_…` is gated by `Guardian Class Feat 041`; the trailing number is the feat's own index within
 		// its class tree and says nothing about the combo, so it is matched and discarded.
-		private static readonly Regex ClassFeat = new(@"^(?<class>.+?)\s+Class Feat\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-		private static readonly Regex ArchetypeFeat = new(@"^(?<archetype>.+?):\s*Class Specific\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+		private static readonly Regex ClassFeat = new Regex(@"^(?<class>.+?)\s+Class Feat\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+		private static readonly Regex ArchetypeFeat = new Regex(@"^(?<archetype>.+?):\s*Class Specific\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 		private readonly Dictionary<uint, ConanClass[]> _classes = [];
 		private readonly Dictionary<uint, byte> _levels = [];

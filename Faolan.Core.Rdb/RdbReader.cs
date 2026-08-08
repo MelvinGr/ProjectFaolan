@@ -15,7 +15,7 @@ namespace Faolan.Core.Rdb
 	// Validated end-to-end against a real client (TextStrings 1030002 -> TDC2 strings).
 	public sealed class RdbReader : IDisposable
 	{
-		private static readonly HttpClient Http = new()
+		private static readonly HttpClient Http = new HttpClient
 		{
 			Timeout = TimeSpan.FromSeconds(40)
 		};

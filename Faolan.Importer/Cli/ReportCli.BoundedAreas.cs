@@ -103,7 +103,7 @@ namespace Faolan.Importer.Cli
 					// script: a region that does not tell the server the player entered it cannot be what fires a
 					// server-sent banner, and that is the client's own statement rather than a guess about the name.
 					var holding = regions
-						.Where(r => r.IsPolygon && r.ScryId == BoundedAreaClassifier.CrossingNotifierScryId && r.Contains(cx, cz))
+						.Where(r => r is { IsPolygon: true, ScryId: BoundedAreaClassifier.CrossingNotifierScryId } && r.Contains(cx, cz))
 						.Select(r => (Region: r, Footprint: Footprint(r)))
 						.OrderBy(r => r.Footprint)
 						.ToList();

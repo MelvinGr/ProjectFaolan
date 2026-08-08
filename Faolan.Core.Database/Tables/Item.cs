@@ -30,7 +30,7 @@ namespace Faolan.Core.Database.Tables
 		// Sourced from the old C++ `p_items` (Archive/), real captured inventories, and AH listings. Stored as an EF
 		// owned type -> flat columns Key1..Key4. virtual for the lazy-loading-proxy test context (owned types load
 		// eagerly regardless; virtual only satisfies the proxy's all-navigations-virtual rule). See docs/re/spawn-dissection.md Phase 5.
-		public virtual ProtoDecryptionKey Key { get; set; } = new();
+		public virtual ProtoDecryptionKey Key { get; set; } = new ProtoDecryptionKey();
 
 		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
 		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse

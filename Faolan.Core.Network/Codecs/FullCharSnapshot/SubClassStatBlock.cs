@@ -73,7 +73,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes
 		// used to be carried here as six opaque words plus a spare byte - which is what a 17-byte record looks like
 		// through a u32 view. The PAIR tail is empty for a fresh character.
-		private static readonly SnapshotTailWideEntry FreshWideTail = new(0x01, 0, 0);
+		private static readonly SnapshotTailWideEntry FreshWideTail = new SnapshotTailWideEntry(0x01, 0, 0);
 
 		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
 		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the

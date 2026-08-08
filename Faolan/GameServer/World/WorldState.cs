@@ -173,8 +173,8 @@ namespace Faolan.GameServer.World
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService? _terrain;
-		private readonly TickAccumulator _chatter = new(ChatterCheckSeconds);
-		private readonly TickAccumulator _heartbeat = new(HeartbeatIntervalSeconds);
+		private readonly TickAccumulator _chatter = new TickAccumulator(ChatterCheckSeconds);
+		private readonly TickAccumulator _heartbeat = new TickAccumulator(HeartbeatIntervalSeconds);
 
 		private uint _nextPlayfieldToken = 0x00A00000;
 

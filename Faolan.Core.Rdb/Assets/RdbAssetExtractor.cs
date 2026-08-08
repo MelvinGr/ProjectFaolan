@@ -28,7 +28,7 @@ namespace Faolan.Core.Rdb.Assets
 		// id -> the skeleton's bone names (built once from every local 1010002), to find rigs covering a mesh palette.
 		private static Dictionary<uint, HashSet<string>>? _skeletonNames;
 
-		private static readonly JsonSerializerOptions JsonOpts = new()
+		private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull

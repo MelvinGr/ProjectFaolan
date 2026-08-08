@@ -27,7 +27,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// Kept as a name the two doc generators already call; the hash itself is Faolan.Core.Crypt.Bkdr31.
 		public static uint Bkdr31(string name)
 		{
-			return Faolan.Core.Crypt.Bkdr31.Of(name);
+			return Core.Crypt.Bkdr31.Of(name);
 		}
 
 		public static string Render()

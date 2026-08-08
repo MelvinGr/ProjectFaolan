@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		// Stats the CORPUS shows varying between captured characters, which we nonetheless carry at a fixed value.
 		// Each needs a reason, and the reason may not be "we did not get to it" without an issue behind it - a stat
 		// that varies in retail and is constant in our emit is a character wearing someone else's number.
-		private static readonly Dictionary<CharacterStatId, string> NotModelledYet = new()
+		private static readonly Dictionary<CharacterStatId, string> NotModelledYet = new Dictionary<CharacterStatId, string>
 		{
 			// Progression/statistics we do not track yet: play time, money, the PvP and kill/death counters, the
 			// skill ratings. All read as character state we simply have no source for, not as protocol unknowns.

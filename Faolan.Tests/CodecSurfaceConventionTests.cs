@@ -69,22 +69,22 @@ namespace Faolan.Tests
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
 		private const string RootFolder = ".";
 
-		private static readonly ConcurrentDictionary<MethodInfo, Func<byte[], object?>> Parsers = new();
+		private static readonly ConcurrentDictionary<MethodInfo, Func<byte[], object?>> Parsers = new ConcurrentDictionary<MethodInfo, Func<byte[], object?>>();
 
-		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
-		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
+		private static readonly Regex BlockComment = new Regex(@"/\*.*?\*/", RegexOptions.Singleline);
+		private static readonly Regex ConstOffset = new Regex(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
 
 		// One `case IirTypes.X:` of the listener's routing switch - §6's dispatch exemption, keyed on
 		// the label rather than on a file name (see IirOpcodesAreOnlyNamedInsideCodecs).
-		private static readonly Regex DispatchCaseLabel = new(@"^\s*case\s+IirTypes\.\w+\s*:");
-		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
-		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
+		private static readonly Regex DispatchCaseLabel = new Regex(@"^\s*case\s+IirTypes\.\w+\s*:");
+		private static readonly Regex LineComment = new Regex(@"//.*$", RegexOptions.Multiline);
+		private static readonly Regex StringLiteral = new Regex("\"(?:[^\"\\\\]|\\\\.)*\"");
 
 		// A `new FaolanStream()` that is not introduced by `using` - the leak rule 6 exists for. The lookbehind is
 		// VARIABLE-LENGTH (a .NET regex extension) because the declaration between `using` and the `new` is:
 		// `using var s = `, `using (var s = `, `using FaolanStream s = ` - a fixed-width lookbehind matched none of
 		// them and flagged every correct call site.
-		private static readonly Regex UndisposedStream = new(@"(?<!\busing\b[^;]{0,60})new FaolanStream\(");
+		private static readonly Regex UndisposedStream = new Regex(@"(?<!\busing\b[^;]{0,60})new FaolanStream\(");
 
 		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: codec names are being
 		// rewritten by this very refactor, and ListFrame - the obvious anchor - lives in Faolan.Core now.

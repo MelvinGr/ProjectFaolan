@@ -38,7 +38,7 @@ namespace Faolan.Core.Database
 		int FinishingCriticalRating,
 		int SpellDamagePercentHundredths)
 	{
-		public static ComboFeatBonus None { get; } = new(0, 0, 0, 0, 0);
+		public static ComboFeatBonus None { get; } = new ComboFeatBonus(0, 0, 0, 0, 0);
 
 		/// <summary>The swing-damage bonus for one step of the combo, in hundredths of a percent.</summary>
 		public int SwingDamagePercentHundredths(bool isOpener, bool isFinisher)

@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
@@ -270,7 +271,7 @@ namespace Faolan.Importer.Extractors
 
 			existing.RefId = rec.Id;
 			existing.Category = rec.Category;
-			existing.KeyText = LdbKey.Decode(rec.Key) ?? new();
+			existing.KeyText = LdbKey.Decode(rec.Key) ?? new ProtoDecryptionKey();
 			existing.IsLocalized = rec.Tag == "localized";
 			existing.Flags = rec.Flags;
 		}
@@ -321,7 +322,7 @@ namespace Faolan.Importer.Extractors
 
 			goal.ObjectiveRefId = objective.Id;
 			goal.ObjectiveCategory = objective.Category;
-			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
+			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new ProtoDecryptionKey();
 
 			// The goal's KIND TAG and its required amount (#548). The full-update carries both for EVERY goal, not
 			// just the primary - measured against the snapshot journal, which is the source that was thought to hold

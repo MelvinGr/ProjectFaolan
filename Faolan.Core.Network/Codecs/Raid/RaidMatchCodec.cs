@@ -95,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Raid
 	// which is the same "we model none of this" the empty flag list states. [V0]
 	public sealed record RaidMatchTail(EntityId Ref1, uint Word1, bool Flag, EntityId Ref2, uint Word2, uint Word3, uint Word4)
 	{
-		public static RaidMatchTail Empty { get; } = new(new EntityId(0, 0), 0, false, new EntityId(0, 0), 0, 0, 0);
+		public static RaidMatchTail Empty { get; } = new RaidMatchTail(new EntityId(0, 0), 0, false, new EntityId(0, 0), 0, 0, 0);
 	}
 
 	public sealed record RaidMatch(TeamRoster Raid, IReadOnlyList<TeamRoster> Teams, IReadOnlyList<RaidMemberFlags> MemberFlags, RaidMatchTail Tail);

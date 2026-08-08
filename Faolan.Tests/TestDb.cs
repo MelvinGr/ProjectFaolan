@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		// (verified: the whole suite passes against this fixture); one that does should create its own.
 		public static string GameDatabase => Fixture.Value;
 
-		private static readonly Lazy<string> Fixture = new(BuildFixture, LazyThreadSafetyMode.ExecutionAndPublication);
+		private static readonly Lazy<string> Fixture = new Lazy<string>(BuildFixture, LazyThreadSafetyMode.ExecutionAndPublication);
 
 		private static string BuildFixture()
 		{

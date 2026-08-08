@@ -27,9 +27,8 @@ namespace Faolan.Importer.Extractors
 	{
 		// The LDB references a screen carries, in order: `<remoteformat ... category="C" ... id="I">` in any order of
 		// attributes. This is the SIGNATURE - what the screen says and what it offers.
-		private static readonly Regex Reference = new(
-			"<(?:remoteformat|localized)[^>]*?\\bcategory=\"?(\\d+)\"?[^>]*?\\bid=\"?(\\d+)\"?|" +
-			"<(?:remoteformat|localized)[^>]*?\\bid=\"?(\\d+)\"?[^>]*?\\bcategory=\"?(\\d+)\"?",
+		private static readonly Regex Reference = new Regex(
+			"<(?:remoteformat|localized)[^>]*?\\bcategory=\"?(\\d+)\"?[^>]*?\\bid=\"?(\\d+)\"?|" + "<(?:remoteformat|localized)[^>]*?\\bid=\"?(\\d+)\"?[^>]*?\\bcategory=\"?(\\d+)\"?",
 			RegexOptions.Compiled);
 
 		// Assigns a quest gate to the entries that need one, and returns the whole set for Merge.

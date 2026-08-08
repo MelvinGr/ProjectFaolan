@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// even though the server store kept the message.
 	public class ChannelBridgeBacklogTests
 	{
-		private static readonly DateTime Now = new(2026, 6, 16, 12, 0, 0, DateTimeKind.Utc);
+		private static readonly DateTime Now = new DateTime(2026, 6, 16, 12, 0, 0, DateTimeKind.Utc);
 		private static readonly TimeSpan Grace = TimeSpan.FromSeconds(120);
 
 		[Fact]

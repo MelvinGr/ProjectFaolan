@@ -16,8 +16,7 @@ namespace Faolan.Tests
 	public class StatDisplayScaleTests
 	{
 		// stat id -> the scale a human read off the screen, and how.
-		public static TheoryData<uint, uint, string> Measured =>
-			new()
+		public static TheoryData<uint, uint, string> Measured => new TheoryData<uint, uint, string>
 			{
 				// --- vitals: wire 428500 drew 4285 health, 205300 drew 2053 stamina.
 				{ (uint)CharacterStatId.HealthMax, 100, "sheet: 428500 -> 4285" },

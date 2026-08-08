@@ -25,7 +25,7 @@ namespace Faolan.Importer.Cli
 		// The four recast GameAction types (docs/re/gameaction-keylists.tsv). Two SET a recast and two ADJUST one;
 		// only the setters are a spell's own base - `ChangeRecastTime` / `ChangeLineRecastTime` are the feat/AA
 		// modifiers `FUN_007e1230` adds to a base the client already holds.
-		private static readonly Dictionary<uint, string> RecastKinds = new()
+		private static readonly Dictionary<uint, string> RecastKinds = new Dictionary<uint, string>
 		{
 			[53226] = "SetSpellRecastTime",
 			[53077] = "SetSpellLineRecastTime",
