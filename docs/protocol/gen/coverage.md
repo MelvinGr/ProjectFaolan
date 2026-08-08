@@ -8,8 +8,8 @@
 ## Headline
 
 - **860** RPC methods — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **64 V3** (byte-exact builder), **16 V2** (built, no golden), **0 V1** (no builder found).
-- **68** codec classes, **52** with a byte-exact test.
+- **80** IIR carrier types: **69 V3** (byte-exact builder), **11 V2** (built, no golden), **0 V1** (no builder found).
+- **68** codec classes, **57** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -44,6 +44,8 @@ the margins, but never invents a golden that isn't there.
 | V3 | `BankIIR` | `BankCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorControlCenterCodec` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
+| V3 | `CharInPlayIIR` | `CharInPlayCodec` |
+| V3 | `CharacterActionIIR` | `CharacterActionCodec` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
 | V3 | `ClimbingDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `CombatReactiveIIR` | `CombatReactiveCodec` |
@@ -55,6 +57,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `DoorFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `EnergyIIR` | `EnergyCodec` |
 | V3 | `FeatIIR` | `FeatCodec` |
+| V3 | `FeedbackIIR` | `FeedbackCodec` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterCodec` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
@@ -86,8 +89,10 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestGoalIIR` | `QuestGoalCodec` |
 | V3 | `QuestIIR` | `QuestCodec` |
 | V3 | `QuestJournalIIR` | `QuestJournalCodec` |
+| V3 | `RegenIIR` | `RegenCodec` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
+| V3 | `SetMorphValueIIR` | `SetMorphValueCodec` |
 | V3 | `SetNameIIR` | `SetNameCodec` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
 | V3 | `SimpleCharFullUpdateIIR` | `SimpleCharFullUpdateCodec` |
@@ -106,17 +111,12 @@ the margins, but never invents a golden that isn't there.
 | V3 | `UpdateSimpleDynelIIR` | `UpdateSimpleDynelCodec` |
 | V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
 | V2 | `ChainKillIIR` | `ChainKillCodec` |
-| V2 | `CharInPlayIIR` | `CharInPlayCodec` |
-| V2 | `CharacterActionIIR` | `CharacterActionCodec` |
 | V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIIR` | `FanaticCommandCodec` |
-| V2 | `FeedbackIIR` | `FeedbackCodec` |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
 | V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |
-| V2 | `RegenIIR` | `RegenCodec` |
-| V2 | `SetMorphValueIIR` | `SetMorphValueCodec` |
 | V2 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `TemplateActionIIR` | `TemplateActionCodec` |

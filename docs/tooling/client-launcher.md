@@ -28,7 +28,7 @@ Both gate flags were reverse-engineered from `ConanPatcher.exe` (capstone disasm
   format `%08x%08x`. It's a **launch-freshness token**: decrypting yields `{t, t}` (equal halves) and the time
   must be recent. (`ConanPatcher.exe`: `sub_4bcf93` = `time()` via GetSystemTimeAsFileTime → epoch → /10^7;
   `sub_439140` = TEA.) Verified: captured `495cd3b8c7047b47` decrypts to `t = 1781038901` and re-encrypts exactly.
-  - C#: `Faolan.Core.Crypt.ConanLaunchToken` (`ForUnixTime`/`Now`/`GetUnixTime`), on the shared
+  - C#: `Faolan.Core.Crypt.ClientLaunchToken` (`ForUnixTime`/`Now`/`GetUnixTime`), on the shared
     `Faolan.Core.Crypt.Tea` cipher. Tests in `Faolan.Tests/ConanLaunchTokenTests.cs`.
 
 ### Other launch flags (UTF-16 flag table in AgeOfConan.exe)
@@ -122,7 +122,7 @@ By default any password is accepted. To enforce the real password, the client mu
   dead hardcoded launcher-notes URL (keep the two `%s`; **http:// only** — the exe's statically-linked
   libcurl 7.19.7 has no SSL backend, so an https URL fails in-client with cURL error 1
   `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
-- Server side: `Faolan.Core/Crypt/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
+- Server side: `Faolan.Core/Crypt/ClientLoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
 - **`Login:AllowUnpatchedClients`** (server config, default `true`) decides whether that fallback exists at all.
   Set it `false` and an unpatched client — one whose block the server cannot decrypt, so it proved only the
@@ -202,7 +202,7 @@ the `UniverseAddr` redirect — all with **no manual interaction**.
 ## File map
 - `Faolan.ClientLauncher/Program.cs`, `ClientExePatcher.cs` — the launcher.
 - `Faolan.ClientLauncher/LauncherCommand.cs` — its command line (System.CommandLine), and the `--help` text.
-- `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
-- `Faolan.Core/Crypt/LoginEncryption.cs` — server-side DH+TEA login decrypt.
+- `Faolan.Core/Crypt/ClientLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
+- `Faolan.Core/Crypt/ClientLoginEncryption.cs` — server-side DH+TEA login decrypt.
 - `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.
 - `Faolan.ClientLauncher/SteamPaths.cs` — Steam auto-detection of the exe / compat-data / Proton build; `run.sh --client` is the convenience wrapper.
