@@ -41,6 +41,12 @@ namespace Faolan.GameServer.World
 		// How close a player must be for a hostile NPC to aggro + attack (world units).
 		public const float NpcAggroRange = 20f;
 
+		// #714: the speed an idle route walk falls back to when its captured PathMoveTask carries none. OURS, not
+		// measured - the captured speeds it stands in for run median 6.75 u/s over 759 multi-point patrol nodes (p10
+		// 2.57, p90 14.37), so this sits at the middle of a wide real spread rather than claiming to be the right
+		// number for any given beat. A route that HAS a speed always uses its own; see PatrolRoute.Speed.
+		public const float RouteWalkSpeedFallback = 6f;
+
 		// #703: how close a route walker must get to a waypoint to count as having reached it and take the next one.
 		// Small relative to the 5.8u median gap between waypoints, so the walk stays ON the harvested polyline rather
 		// than cutting each corner - the corners are what keep it in the street.
@@ -236,7 +242,7 @@ namespace Faolan.GameServer.World
 				// keeps an entity in the same slice from pulse to pulse - zone.Entities is a ConcurrentDictionary, whose
 				// order is not stable, so a positional round-robin would skip and repeat entities at random.
 				var heartbeatShards = heartbeatDue
-					? (uint)Math.Max(1, zone.Entities.Count(e => !e.IsLoot && !e.IsPlayer) / Math.Max(1, HeartbeatsPerSecond))
+					? (uint)Math.Max(1, zone.Entities.Count(e => e is { IsLoot: false, IsPlayer: false }) / Math.Max(1, HeartbeatsPerSecond))
 					: 1u;
 				var heartbeatShard = _heartbeatPhase % heartbeatShards;
 
@@ -627,12 +633,23 @@ namespace Faolan.GameServer.World
 			void WalkRoute(WorldEntity e)
 			{
 				if (e.RouteInterrupted)
+				{
 					e.RejoinRouteAtNearest(); // chased or leashed off the beat: pick it up where it now stands
+					e.RouteReissueDue = true; // ...and the client's copy of the walk is now wrong, so re-issue it
+				}
 
 				if (!e.TickRouteDwell(deltaSeconds))
+					return; // standing at a turnaround; the client is already holding the same pose
+
+				// #716: the beat is issued to the CLIENT as the captured multi-waypoint patrol and walked THERE - the
+				// server does not stream it. Streaming it as 2-point chase segments cost 19.3 MoveTask/s against retail's
+				// 3.09/s corpus maximum, made the NPC run (the chase form carries no duration, so the client paced it off
+				// its run attribute), and tugged it back once per segment. Retail sends this form: of the 759 captured
+				// multi-point patrol nodes, 535 carry [duration][remaining], where 423 of 425 two-point ones do not.
+				if (e.RouteReissueDue)
 				{
-					EndMove(e, true, WorldTickEffectType.NpcMove); // standing at the end of the beat: close the stream
-					return;
+					e.RouteReissueDue = false;
+					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcPatrol));
 				}
 
 				var waypoint = e.RouteWaypoint;
@@ -641,15 +658,21 @@ namespace Faolan.GameServer.World
 				var distance = MathF.Sqrt(dx * dx + dz * dz);
 				if (distance > RouteWaypointReached)
 				{
-					StepAndStream(e, dx, dz, distance, 0f, WorldTickEffectType.NpcMove, null!, waypoint.Y);
+					// The MODEL only - no broadcast. It advances at the route's own captured speed so the server's idea of
+					// where the NPC stands tracks what the client is rendering, which is what death-pose/loot/aggro need.
+					StepToward(e, dx, dz, distance, deltaSeconds, 0f, waypoint.Y, e.RouteSpeed);
 					return;
 				}
 
 				// Arrived. Land exactly on it (so the next leg starts from the polyline, not a fraction short of it) and
-				// take the next waypoint; pause only where the route turns round or a lap closes.
+				// take the next waypoint; pause only where the route turns round or a lap closes - and re-issue the beat
+				// there, since that is where the client's own copy of the walk has run out.
 				e.Position = new Vector3(waypoint.X, waypoint.Y, waypoint.Z);
 				if (e.AdvanceRoute())
+				{
 					e.ArmRouteDwell(RouteTurnaroundDwellSeconds);
+					e.RouteReissueDue = true;
+				}
 			}
 
 			// Ends `e`'s move (it reached its target / home / leader): flushes the trailing sub-segment the throttle didn't
@@ -793,15 +816,18 @@ namespace Faolan.GameServer.World
 			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
 		}
 
-		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
+		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at `speed` (keeping terrain Y),
 		// `stopShort` leaves that many units short of the point (melee range when chasing, follow range when following);
 		// 0 lands on it (returning home). The broadcast anchor (MoveOrigin) is managed by StepAndStream, not here, so a
 		// caller that wants the step broadcast must go through StepAndStream.
 		// `targetY` (#565) closes the vertical gap over the same walk instead of keeping the current Y: the return home
 		// knows the altitude it is walking to (the spawn's), so it descends smoothly rather than arriving and snapping.
-		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f, float? targetY = null)
+		// `speed` defaults to NpcMoveSpeed, the RUN a chase/return uses; an idle route walk passes its own captured
+		// speed instead (#714), because a beat is walked and the two are not the same number.
+		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f, float? targetY = null,
+			float speed = NpcMoveSpeed)
 		{
-			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
+			var travel = MathF.Min((float)(speed * deltaSeconds), distance - stopShort);
 			var y = entity.Position.Y;
 			if (targetY is { } destY)
 			{

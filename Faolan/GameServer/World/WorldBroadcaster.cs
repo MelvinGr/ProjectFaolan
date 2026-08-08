@@ -64,11 +64,10 @@ namespace Faolan.GameServer.World
 		// death Y wins. Outdoor kills sit ~1m off; the cave kill that exposed this was 28m.
 		private const float MaxLootGroundSnap = 5f;
 
-		// #266 patrol cycle: estimated client WALK speed (world units/sec) used to time how long a patrol route takes to
-		// traverse, plus a dwell pause at the end, before the route is re-issued so the NPC keeps looping. These are the
-		// re-issue cadence only (the client drives the actual walk); tune against in-client pacing if a patrol pauses or
-		// restarts mid-walk. NpcMoveSpeed (12) is the RUN speed; a walk is roughly half.
-		private const float PatrolWalkSpeed = 6f;
+		// (#266's PatrolWalkSpeed estimate lived here. It is now WorldState.RouteWalkSpeedFallback, because the same
+		// number has to time the re-issue cadence AND advance the model, and having two copies is how they drifted -
+		// the comment here still claimed "NpcMoveSpeed (12) is the RUN speed" long after NpcMoveSpeed became 7. A route
+		// that carries its own captured speed uses that instead; see PatrolRoute.Speed and #714.)
 
 		// How far a seated player must move from their seat before they stand up. While seated the client keeps
 		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
@@ -1143,7 +1142,10 @@ namespace Faolan.GameServer.World
 						entity.RouteLoops = waypoints.Count > 2 && Vector3.Distance(waypoints[0], waypoints[^1]) <= RouteClosedTolerance;
 						entity.RejoinRouteAtNearest();
 						entity.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
-						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
+						// #714: walk the beat at the speed the CAPTURE says, not the chase speed. The fallback is our own
+						// estimate, so it is the last resort - a route that carries a speed always uses its own.
+						entity.RouteSpeed = PatrolRoute.Speed(patrol) ?? WorldState.RouteWalkSpeedFallback;
+						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / entity.RouteSpeed + PatrolDwellSeconds;
 						entity.ArmPatrolCycle();
 					}
 				}
@@ -2001,12 +2003,19 @@ namespace Faolan.GameServer.World
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
 						if (ev.Subject is { IsPlayer: false, IsLoot: false })
 							await SendQuestMarkerIfGiver(recipient, ev.Subject);
-						// NOTE: we deliberately do NOT replay the captured patrol route (SendPatrol) on spawn. That route is
-						// a CLIENT-only walk the SERVER can't track - it left entity.Position pinned at spawn while the client
-						// walked the NPC around its loop, so the server placed the NPC's death-pose, loot bag, and aggro at
-						// SPAWN, not where the player saw it (a killed patroller teleported its corpse back to spawn). The NPC
-						// still moves via the server-driven wander (TickPatrolCycle, #266), which updates entity.Position so
-						// death/loot/aggro land where the client actually has it.
+						// #716: a ROUTE walker's beat is issued here so the CLIENT walks it. This was removed once, for a
+						// good reason that no longer holds: the client-walked route left entity.Position pinned at spawn,
+						// so the server put the NPC's death-pose, loot bag and aggro where it STARTED rather than where the
+						// player saw it. The model now walks the same polyline itself (WorldState.WalkRoute), at the route's
+						// own captured speed, so it tracks the render without a packet per 6u - which is what made the beat
+						// cost 19.3 MoveTask/s against retail's 3.09/s corpus maximum, and made the NPC run.
+						//
+						// ⚠️ Known gap: the body is anchored at the entity's SPAWN, so a viewer arriving MID-lap is told to
+						// start the walk from the beginning. Retail's own form carries [duration][remaining] (535 of 759
+						// captured multi-point patrol nodes do), which is presumably how it hands a late viewer the REST of
+						// the beat; reproducing that is the rest of #716.
+						if (ev.Subject is { IsPlayer: false, WalksRoute: true })
+							await SendPatrol(recipient, ev.Subject);
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
 						if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null &&
@@ -2829,9 +2838,26 @@ namespace Faolan.GameServer.World
 			if (!npc.Patrols)
 				return Task.CompletedTask;
 
-			// Replay the captured MoveTask record (already re-addressed to this NPC's handle + spawn position). Encode
-			// emits a bare 0x2000 body (no length prefix), so it rides WorldIir.Send.
-			return WorldIir.Send(recipient, npc.PatrolBody);
+			// Encode emits a bare 0x2000 body (no length prefix), so it rides WorldIir.Send.
+			return WorldIir.Send(recipient, npc.WalksRoute ? BuildRouteBody(npc) : npc.PatrolBody);
+		}
+
+		// #716: the beat as this NPC is about to walk it, anchored where it NOW stands.
+		//
+		// The captured `PatrolBody` is anchored at the entity's SPAWN, so re-issuing it at the end of a lap - or to a
+		// viewer arriving mid-beat - told the client to restart the route from the beginning, which reads as the NPC
+		// teleporting back to the start. Rebuilding from the live position removes the jump.
+		//
+		// Rebuilding was tried before (#266) and reverted because it "lost the speed and run-crawled": the trailer slot
+		// is the patrol SPEED inside a patrol list, and a rebuild that did not supply it left the client pacing off
+		// something else. It is supplied here, off the route's own captured value (PatrolRoute.Speed, #714), which is
+		// what makes the rebuild safe now.
+		private static byte[] BuildRouteBody(WorldEntity npc)
+		{
+			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);
+			return ahead.Count == 0
+				? npc.PatrolBody
+				: MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position, MoveTaskNodes.Patrol(ahead, npc.RouteSpeed, npc.Position)));
 		}
 
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch

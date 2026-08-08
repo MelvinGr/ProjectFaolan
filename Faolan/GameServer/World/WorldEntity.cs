@@ -584,9 +584,19 @@ namespace Faolan.GameServer.World
 		// camping the leash edge can't ping-pong it).
 		public bool Returning { get; set; }
 
-		// The captured MoveTask record re-addressed to THIS entity (kept as the wander-anchor source only; no longer
-		// replayed verbatim - retail does NOT walk a continuous route, see Patrols/NextWanderPoint).
+		// The captured MoveTask record re-addressed to THIS entity. For a route walker this IS what the client is sent
+		// (#716) - the real multi-waypoint patrol form, issued once per cycle so the CLIENT walks the beat, rather than
+		// the 2-point chase form re-sent every ~6u.
 		public byte[] PatrolBody { get; set; } = null!;
+
+		// #716: the client needs (re-)telling what walk it is on - at the start of a lap, and after anything took the
+		// NPC off its beat (a chase, a leash home). Set true at spawn so the first lap is issued.
+		public bool RouteReissueDue { get; set; } = true;
+
+		// #714: the speed the captured route is walked at (u/s), off the PathMoveTask's own trailer slot - see
+		// PatrolRoute.Speed. The MODEL is advanced at this same value so the server's idea of where the NPC is tracks
+		// what the client renders; the two drifting apart is what put a killed patroller's corpse in the wrong place.
+		public float RouteSpeed { get; set; } = WorldState.RouteWalkSpeedFallback;
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
 		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns
