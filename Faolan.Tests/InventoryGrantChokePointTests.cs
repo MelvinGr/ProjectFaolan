@@ -40,10 +40,10 @@ namespace Faolan.Tests
 				(2, "ESCROW only - moving a listed item out of the seller's BANK on sell, and out of the sender's bank "
 				    + "once a mail is taken. The take itself routes through GrantItemToBackpack (#720)."),
 
-			// ⚠️ A KNOWN BYPASS, tracked - see the test below.
 			["Faolan/GameServer/Economy/TradeService.cs"] =
-				(2, "player-to-player trade: clears the giver's slot and writes the receiver's DIRECTLY. The second of "
-				    + "those IS a grant that skips the choke point - the same defect as #720, tracked separately.")
+				(1, "player-to-player trade: clears the GIVER's slot. The receiver's half was the second call here and "
+				    + "was a grant skipping the choke point - the #720 defect in the other delivery path; it now goes "
+				    + "through ITradeOutbound.GrantItemToCharacter (#726).")
 		};
 
 		[Fact]

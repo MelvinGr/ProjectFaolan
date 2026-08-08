@@ -244,17 +244,14 @@ namespace Faolan.GameServer
 				: Task.CompletedTask;
 		}
 
-		Task ITradeOutbound.SendItemGranted(uint characterId, Item item, uint slot, uint count)
+		async Task<int?> ITradeOutbound.GrantItemToCharacter(uint characterId, uint itemTemplateId, uint count)
 		{
-			if (ClientForCharacter(characterId) is not { } client)
-				return Task.CompletedTask;
-
-			// This IS a DispatchAddItem body, so it takes the live-add stat list (#722) - and the token for the same
-			// reason SendTradeItem does: every captured add describes a real instance and carries one (#723).
-			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot),
-				FullCharacterRoots.RecordId(characterId, ContainerKind.Bag, slot), count, item, AcgHash.ForWire(item.Id, item.Hash), item.Level);
-
-			return SendAddItem(client, ContainerKind.Bag, slot, entry);
+			// Resolving the connection here is the whole point of the character-id form: the trade path holds only
+			// the receiver's id, and everything past this line is the shared grant - persistence, the live add, the
+			// quest-container routing and AdvanceCollectGoals (#726).
+			return ClientForCharacter(characterId) is { } client
+				? await GrantItemToBackpack(client, itemTemplateId, count)
+				: null;
 		}
 
 		// --- IQuestShareOutbound: the wire + world side of a quest share (#101). Same shape as the trade port, and for

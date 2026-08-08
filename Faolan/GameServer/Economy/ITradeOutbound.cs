@@ -51,7 +51,22 @@ namespace Faolan.GameServer.Economy
 		/// </summary>
 		Task SendItemRemoved(uint characterId, uint slot);
 
-		/// <summary>The RECEIVER's new bag slot (DispatchAddItem), the same live grant the loot and shop paths use.</summary>
-		Task SendItemGranted(uint characterId, Item item, uint slot, uint count);
+		/// <summary>
+		///     Grants an item to ANOTHER character - persist to their first free backpack cell and push the live
+		///     DispatchAddItem - returning the slot, or null when they are offline or their bag is full.
+		///     <para>
+		///         This is the character-id form of <c>GrantItemToBackpack</c>, and it exists so the trade path goes
+		///         through the SAME choke point as every other delivery. It used to be a send-only
+		///         <c>SendItemGranted</c> with the caller writing the inventory row itself, which meant an item
+		///         received in a trade never advanced a collect objective - the choke point is where
+		///         <c>AdvanceCollectGoals</c> fires (#726, the sibling of #720).
+		///     </para>
+		///     <para>
+		///         A character-id form rather than an <c>INetworkClient</c> one because in a trade the receiver is the
+		///         OTHER player, whose connection this service does not hold - the same reason every other op on this
+		///         port is keyed by character id.
+		///     </para>
+		/// </summary>
+		Task<int?> GrantItemToCharacter(uint characterId, uint itemTemplateId, uint count);
 	}
 }

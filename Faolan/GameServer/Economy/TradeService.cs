@@ -185,31 +185,38 @@ namespace Faolan.GameServer.Economy
 				session.Left.Items.Count, session.Left.Cash, session.Right.Items.Count, session.Right.Cash);
 		}
 
-		// Hands `from`'s offer to `to`: clear each offered slot on the giver, place it in the receiver's first free one,
-		// and move the cash. A full receiver keeps the item - dropping it on the floor would be worse than not trading it.
+		// Hands `from`'s offer to `to`: grant it to the receiver, then clear the giver's slot. A receiver who cannot
+		// take it keeps it with the giver - dropping it on the floor would be worse than not trading it.
+		//
+		// The receiver's half goes through the SHARED grant (#726). It used to find its own free slot, write the
+		// receiver's CharacterInventory row directly and push a send-only `SendItemGranted` - which meant an item
+		// received in a trade never advanced a collect objective, because `AdvanceCollectGoals` fires inside
+		// `GrantItemToBackpack`. Exactly the defect #720 fixed on the mail path, in the other delivery path.
+		//
+		// Two things went with it. The batched free-slot search (read the receiver's rows once, track `used` across a
+		// multi-item trade) is gone: the grant re-queries per call, which is MORE correct here since it sees the rows
+		// the previous iteration just wrote. And the explicit `SendItemGranted` is gone: the grant pushes its own
+		// live add, so keeping both would have delivered each item to the client twice.
+		//
+		// ORDER MATTERS: grant first, clear second. If the grant fails - receiver offline, or their bag is full - the
+		// giver still holds the item, which is the stated intent. Clearing first would destroy it.
 		private async Task Exchange(TradeSide from, TradeSide to)
 		{
-			var receiverRows = await _database.GetCharacterInventory(to.CharacterId, ContainerKind.Bag);
-			var used = receiverRows.Where(r => r.ItemId != null).Select(r => r.Slot).ToHashSet();
-
 			foreach (var (_, offered) in from.Items)
 			{
-				var free = Enumerable.Range(0, BackpackSlots).FirstOrDefault(s => !used.Contains(s), -1);
-				if (free < 0)
+				var slot = await _outbound.GrantItemToCharacter(to.CharacterId, offered.Item.Id, offered.Count);
+				if (slot == null)
 				{
-					_logger.LogWarning("Trade: {To:X8} has no free bag slot; {Item} stays with {From:X8}.", to.CharacterId, offered.Item.Name, from.CharacterId);
+					_logger.LogWarning("Trade: {To:X8} could not receive {Item}; it stays with {From:X8}.", to.CharacterId, offered.Item.Name, from.CharacterId);
 					continue;
 				}
 
-				used.Add(free);
 				await _database.SetCharacterInventorySlot(from.CharacterId, ContainerKind.Bag, (int)offered.ItemPos, null);
-				await _database.SetCharacterInventorySlot(to.CharacterId, ContainerKind.Bag, free, offered.Item.Id, offered.Count);
 
-				// ...and TELL both clients. Moving the rows is not enough: the client renders what it last knew, so
-				// without these the item sits visibly in the giver's bag and never appears in the receiver's until a
-				// relog - the DB was right and the game looked broken.
+				// ...and TELL the giver's client. Moving the row is not enough: the client renders what it last knew,
+				// so without this a traded-away item sits visibly in the giver's bag until relog - the DB was right
+				// and the game looked broken. (The receiver's side is the grant's own live add.)
 				await _outbound.SendItemRemoved(from.CharacterId, offered.ItemPos);
-				await _outbound.SendItemGranted(to.CharacterId, offered.Item, (uint)free, offered.Count);
 			}
 
 			if (from.Cash == 0)
@@ -258,8 +265,6 @@ namespace Faolan.GameServer.Economy
 			return false;
 		}
 
-		// The backpack's slot count, matching BaseBackpackSlots on the listener.
-		private const int BackpackSlots = 32;
 
 		// ItemPos is the giver's BAG slot; the dictionary key is the window slot it was offered into.
 		private sealed record OfferedItem(uint ItemPos, Item Item, uint Count);
