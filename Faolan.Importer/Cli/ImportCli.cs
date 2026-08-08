@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
@@ -19,7 +20,7 @@ namespace Faolan.Importer.Cli
 		public static async Task<int> RunAsync(ImporterOptions options)
 		{
 			var capturesDir = options.Captures;
-			var rdbDir = CliConfig.Resolve(options.ConfigOverrides)[Keys.ContentRdbDir];
+			var rdbDir = options.Configuration[Keys.ContentRdbDir];
 
 			// --report <name>: read-only diagnostics (no import, bypasses the runner).
 			if (options.Report != null)
@@ -46,7 +47,7 @@ namespace Faolan.Importer.Cli
 
 			// Provider + connection come from the SHARED config (the same DB the server uses); see CliConfig.
 			// `--Database:ConnectionString` overrides that key in the command-line layer (env > cmdline > json); the provider follows config.
-			var (provider, connection) = CliConfig.ResolveDatabase(options.ConfigOverrides);
+			var (provider, connection) = CliConfig.ResolveDatabase(options.Configuration);
 
 			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
 			if (provider == FaolanDbProvider.Sqlite)
@@ -148,7 +149,7 @@ namespace Faolan.Importer.Cli
 				RdbDir = rdbDir,
 				RawPackets = rawPackets,
 				CreateCaptures = createCaptures,
-				RdbProxyBase = options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(options.ConfigOverrides)),
+				RdbProxyBase = options.RdbProxy ?? options.Configuration.CdnPublicAddress,
 				DumpTemplatesDir = options.DumpTemplates,
 				Mode = mode,
 				ModeOverrides = overrides,

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.CommandLine;
 using Faolan.Core.Cli;
 using Xunit;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
@@ -23,7 +23,18 @@ namespace Faolan.Tests
 			Assert.NotNull(options); // ...not "the parser handled it itself and the process should exit"
 			Assert.Equal(0, exitCode);
 			Assert.Empty(options.Roles); // no --role = all-in-one (login + the first realm)
-			Assert.Empty(options.ConfigOverrides); // nothing passed, so nothing may shadow faolan.json
+			Assert.NotNull(options.Configuration); // the whole stack, resolved once, at the parse
+		}
+
+		// Nothing passed means the command line contributes NOTHING - it must not hand on its own copy of each default
+		// and shadow faolan.json with it. Asserted on the layer rather than on options.Configuration, because a
+		// resolved value cannot say which layer answered.
+		[Fact]
+		public void WithNoArguments_TheCommandLineContributesNothing()
+		{
+			var command = new RootCommand("test") { FaolanSettings.Get(Keys.McpPort), FaolanSettings.Get(Keys.McpEnabled), FaolanSettings.Get(Keys.LogFile) };
+
+			Assert.Empty(FaolanCommandLine.Overrides(command.Parse([]), [.. command.Options]));
 		}
 
 		// --role is repeatable, which is what co-hosts a login tier and one realm in a single process. It is also the
@@ -47,15 +58,17 @@ namespace Faolan.Tests
 			Assert.Equal(0, exitCode);
 		}
 
-		// A configuration key reaches the server as an override layer, typed by the catalog and rendered back to text
-		// the same way a default is - not as the raw token.
+		// A configuration key reaches the server through the resolved configuration - typed by the catalog on the way in,
+		// and read back through the accessor that owns it, so this covers the whole path rather than the raw token.
 		[Fact]
-		public void AConfigurationKey_BecomesAnOverride()
+		public void AConfigurationKey_ReachesTheResolvedConfiguration()
 		{
 			var options = ServerCommand.Parse(["--Mcp:Port", "7098", "--Mcp:Enabled"], out _);
 
 			Assert.NotNull(options);
-			Assert.Equal(new Dictionary<string, string?> { [Keys.McpPort] = "7098", [Keys.McpEnabled] = "true" }, options.ConfigOverrides);
+			Assert.Equal(7098, options.Configuration.McpPort);
+			Assert.True(options.Configuration.McpEnabled);
+			Assert.Equal("http://127.0.0.1:7098/mcp", options.Configuration.McpUrl); // ...and the derived value follows it
 		}
 
 		// ...and a value the setting cannot hold is refused HERE, by the parser, rather than at whatever startup first

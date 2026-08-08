@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Cli;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.ChatServer;
@@ -37,7 +38,7 @@ namespace Faolan.Core.Network
 			Logger = logger;
 			Configuration = configuration;
 			Database = database;
-			_tcpListener = new TcpListener(IPAddress.Any, port);
+			_tcpListener = new TcpListener(configuration.ServerListenAddress, port);
 		}
 
 		protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -47,7 +48,7 @@ namespace Faolan.Core.Network
 				_tcpListener.Start();
 				cancellationToken.Register(_tcpListener.Stop);
 
-				Logger.LogInformation("Listening on port {Port}.", LocalEndPoint.Port);
+				Logger.LogInformation("Listening on {Address}:{Port}.", LocalEndPoint.Address, LocalEndPoint.Port);
 			}
 			catch (Exception e)
 			{

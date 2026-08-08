@@ -9,6 +9,7 @@ using System.Threading;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
+using Microsoft.Extensions.Configuration;
 
 namespace Faolan.ClientLauncher
 {
@@ -206,14 +207,13 @@ namespace Faolan.ClientLauncher
 				// server to reproduce the shared secret - but an explicit Login:PublicKey wins, for the one case where
 				// the two genuinely differ: patching a client to talk to somebody ELSE's server, whose private key you
 				// do not have and must not need. Which is also the one way there is a key to patch without a private one.
-				var config = FaolanCommandLine.Build(options.LoginKeys);
 				string? publicHex = null;
-				if (config.LoginPublicKey is { } explicitPublic)
+				if (options.Configuration.LoginPublicKey is { } explicitPublic)
 				{
 					publicHex = explicitPublic.ToHex(ClientLoginEncryption.PublicHexLength);
 					Console.WriteLine("login-key : using the configured Login:PublicKey - this client will NOT log in to a server holding a different private key");
 				}
-				else if (config.LoginPrivateKey is { } serverPrivate)
+				else if (options.Configuration.LoginPrivateKey is { } serverPrivate)
 				{
 					publicHex = ClientLoginEncryption.PublicHexFor(serverPrivate);
 					Console.WriteLine("login-key : deriving the public key from the configured Login:PrivateKey");
@@ -224,8 +224,7 @@ namespace Faolan.ClientLauncher
 				// said out loud, because --patch-login was asked for and did not happen.
 				if (publicHex == null)
 				{
-					Console.Error.WriteLine(
-						"login-key : no Login:PrivateKey is set, so there is no public key to patch in - launching unpatched. The server accepts this client on its account name alone; run `dotnet run --project Faolan -- --generate-login-key` to enable password validation.");
+					Console.Error.WriteLine("login-key : no Login:PrivateKey is set, so there is no public key to patch in - launching unpatched. The server accepts this client on its account name alone; run `dotnet run --project Faolan -- --generate-login-key` to enable password validation.");
 				}
 				else
 				{

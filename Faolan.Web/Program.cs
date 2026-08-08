@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Faolan.Core.Cli;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -40,11 +39,12 @@ namespace Faolan.Web
 			builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true);
 
 			// Then the shared layers, in the order every Faolan executable uses: faolan.json < command line < env.
-			var overrides = WebCommand.Overrides(args, out var parseExit);
-			if (overrides == null)
+			// Resolved by the parse itself, so this file never handles an override layer.
+			var config = WebCommand.Configuration(args, out var parseExit);
+			if (config == null)
 				return parseExit;
 
-			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
+			builder.Configuration.AddConfiguration(config);
 
 			builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 

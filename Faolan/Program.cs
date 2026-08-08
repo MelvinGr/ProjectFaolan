@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -58,9 +57,8 @@ namespace Faolan
 			if (Global.IsDebug)
 				builder.Environment.EnvironmentName = "Development";
 
-			// Sources are cleared first so the precedence is exactly env > cmdline > json (no appsettings.json in the mix).
-			//builder.Configuration.Sources.Clear();
-			AddConfigSources(builder.Configuration, options.ConfigOverrides);
+			builder.Configuration.Sources.Clear();
+			builder.Configuration.AddConfiguration(options.Configuration);
 
 			// Packet trace bytes: each packet logs on a single line; set Log:PacketBytes false (faolan.json "Log": {
 			// "PacketBytes": false }, or --Log:PacketBytes false) to drop the raw headerData/body hex dump.
@@ -216,15 +214,6 @@ namespace Faolan
 			}
 		}
 
-		// Config sources (highest precedence wins): environment variables > command line > faolan.json, in the shared
-		// order every Faolan executable uses (FaolanCommandLine). faolan.json is OPTIONAL - a container can be
-		// configured entirely by env vars with no file baked in. The command-line half arrives ALREADY PARSED, so the
-		// same values shape the throwaway config below and the host builder's own.
-		private static void AddConfigSources(IConfigurationBuilder cfg, Dictionary<string, string?> commandLine)
-		{
-			cfg.AddConfiguration(FaolanCommandLine.Build(commandLine));
-		}
-
 		private static (uint? realmId, bool runLogin, bool runRealm, bool runMcp) GetRunInfo(ServerOptions options)
 		{
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
@@ -271,12 +260,10 @@ namespace Faolan
 			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
 			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so the
 			// tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain generic
-			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). McpEnabled is
-			// read from a throwaway config; the builder's own configuration is set up identically just below.
-			var preConfig = new ConfigurationBuilder();
-			AddConfigSources(preConfig, options.ConfigOverrides);
-
-			var runMcp = runRealm && preConfig.Build().McpEnabled;
+			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). Reading
+			// McpEnabled here needs no config of its own: the parse already resolved the stack, and it is the same
+			// instance the host builder gets below - it used to build a throwaway one from the override layer.
+			var runMcp = runRealm && options.Configuration.McpEnabled;
 			return (selectedRealmId, runLogin, runRealm, runMcp);
 		}
 	}

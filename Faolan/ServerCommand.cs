@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.CommandLine;
 using System.Text;
 using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
+using Microsoft.Extensions.Configuration;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan
@@ -95,7 +95,7 @@ namespace Faolan
 				return null;
 			}
 
-			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Overrides(result, ConfigOptions));
+			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Build(result, ConfigOptions));
 		}
 
 		// BOTH halves are printed, the private one included. That reverses the old rule here ("a secret does not
@@ -124,5 +124,7 @@ namespace Faolan
 		}
 	}
 
-	public sealed record ServerOptions(string[] Roles, Dictionary<string, string?> ConfigOverrides);
+	// The command line, resolved: the roles this process runs, and the CONFIGURATION its options contributed to - built
+	// once here rather than handed on as an override layer for each consumer to re-resolve.
+	public sealed record ServerOptions(string[] Roles, IConfiguration Configuration);
 }

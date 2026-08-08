@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Importer.Captures;
-using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
 {
@@ -12,19 +10,6 @@ namespace Faolan.Importer.Cli
 	// single tracked context the runner wraps in a transaction.
 	public sealed class ImportContext
 	{
-		// The Faolan.Web.Content mirror's ADDRESS, for on-demand (le.idx file==0xFF) RDB resources: RdbReader fetches
-		// each CDN entry's content-addressed blob through it (and the proxy store-and-forwards, so pulls are archived).
-		// Passed to every importer RdbReader so CDN-only records import instead of being skipped.
-		//
-		// Config-derived (`IConfiguration.CdnAddress`, the same `Cdn` section the mirror itself reads), so
-		// a mirror on another box is ONE setting in faolan.user.json rather than a flag on every command; `--rdb-proxy`
-		// still overrides per run. The `/gameupdate/upm/rdb` route is RdbReader's, not config's.
-		// See [[aoc_content_cdn_mirror]].
-		public static string DefaultProxyBase(IConfiguration config)
-		{
-			return config.CdnPublicAddress;
-		}
-
 		public required DatabaseContext Db { get; init; }
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();
 

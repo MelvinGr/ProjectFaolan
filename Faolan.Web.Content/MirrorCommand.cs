@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Microsoft.Extensions.Configuration;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Web.Content
@@ -17,16 +17,17 @@ namespace Faolan.Web.Content
 		private static readonly Option[] Options =
 			FaolanSettings.Options(Keys.CdnStore, Keys.CdnListenAddress, Keys.CdnListenPort, Keys.CdnPublicAddress);
 
-		// The parsed options as configuration overrides, or null when the parser handled the invocation itself
-		// (--help, or it reported a parse error) - the caller should then exit with `exitCode`.
-		public static Dictionary<string, string?>? Overrides(string[] args, out int exitCode)
+		// The resolved configuration (defaults < faolan.json < faolan.user.json < command line < environment), or null
+		// when the parser handled the invocation itself (--help, or it reported a parse error) - the caller should then
+		// exit with `exitCode`.
+		public static IConfiguration? Configuration(string[] args, out int exitCode)
 		{
 			var command = new RootCommand("Faolan CDN mirror - a store-and-forward mirror of Age of Conan's UPM content CDN.");
 			foreach (var option in Options)
 				command.Options.Add(option);
 
 			return FaolanCommandLine.Parse(command, args, out exitCode) is { } result
-				? FaolanCommandLine.Overrides(result, Options)
+				? FaolanCommandLine.Build(result, Options)
 				: null;
 		}
 	}

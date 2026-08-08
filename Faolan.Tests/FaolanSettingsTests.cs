@@ -53,7 +53,7 @@ namespace Faolan.Tests
 			Assert.Equal(120_000, config.ChatBridgeBacklogGrace.TotalMilliseconds);
 			Assert.Equal(1500, config.ChatBridgePoll.TotalMilliseconds);
 			Assert.Equal("./cdn-store", config.CdnStore);
-			Assert.Equal("0.0.0.0", config.CdnListenAddress); // the interface the mirror BINDS, not an address to dial
+			Assert.Equal("0.0.0.0", config.CdnListenAddress.ToString()); // the interface the mirror BINDS, not an address to dial
 			Assert.Equal(7081, config.CdnListenPort);
 
 			// The one that is OPTIONAL rather than defaulted, and stays null on purpose - it names a game install.
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 				.Where(f => f.IsLiteral)
 				.ToDictionary(f => f.Name, f => (string)f.GetRawConstantValue()!);
 
-			Assert.Equal(FaolanSettings.All.Select(FaolanSettings.KeyOf).Order(), consts.Values.Order());
+			Assert.Equal(FaolanSettings.All.Select(FaolanSettings.Key).Order(), consts.Values.Order());
 
 			// And the const is NAMED for its key, so `Keys.LogFile` sits beside the `config.LogFile` that reads it and
 			// a grep for either finds both. Without this the set can match while the names drift apart.
@@ -251,7 +251,7 @@ namespace Faolan.Tests
 				// An OPTIONAL setting reads back as null: it is written as a commented-out line, so the file names it
 				// without setting it.
 				foreach (var setting in FaolanSettings.All)
-					Assert.Equal(FaolanSettings.DefaultText(setting), config[FaolanSettings.KeyOf(setting)], StringComparer.OrdinalIgnoreCase);
+					Assert.Equal(FaolanSettings.DefaultText(setting), config[setting.Key()], StringComparer.OrdinalIgnoreCase);
 
 				// The login keypair is the case that motivates all of this: it has NO default, so a server that
 				// configures nothing has no key and checks no passwords. It must not acquire one from the defaults

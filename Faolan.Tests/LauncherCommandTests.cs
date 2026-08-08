@@ -1,4 +1,6 @@
+using System.CommandLine;
 using Faolan.ClientLauncher;
+using Faolan.Core.Cli;
 using Xunit;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
@@ -71,18 +73,29 @@ namespace Faolan.Tests
 			Assert.True(options.DryRun);
 		}
 
-		// The DH keys are CONFIG KEYS: the option name IS the configuration path, so what comes back is an override
+		// The DH keys are CONFIG KEYS: the option name IS the configuration path, so what the parse contributes is a
 		// layer keyed exactly as faolan.json spells it - and a key not passed is ABSENT rather than null, so it
 		// cannot shadow the config file with nothing.
+		//
+		// It asserts the LAYER rather than options.Configuration (which is that layer already resolved against the
+		// stack) because "the key was not passed" is only visible before the file layers answer for it: on a machine
+		// whose faolan.user.json holds a Login:PublicKey, the resolved config has one whatever the command line said.
 		[Fact]
 		public void Parse_LoginKeys_ComeBackAsAConfigOverrideLayer()
 		{
+			var command = new RootCommand("test") { FaolanSettings.Get(Keys.LoginPrivateKey), FaolanSettings.Get(Keys.LoginPublicKey) };
+			var layer = FaolanCommandLine.Overrides(command.Parse(["--Login:PrivateKey", "AABB"]), [.. command.Options]);
+
+			Assert.Equal("AABB", Assert.Contains(Keys.LoginPrivateKey, layer));
+			Assert.DoesNotContain(Keys.LoginPublicKey, layer);
+
+			// ...and the launcher hands on that layer resolved, so the patcher reads the key from the same stack the
+			// server does rather than from the flag alone.
 			var options = LauncherCommand.Parse(["--patch-login", "--Login:PrivateKey", "AABB"], out _);
 
 			Assert.NotNull(options);
 			Assert.True(options.PatchLogin);
-			Assert.Equal("AABB", Assert.Contains(Keys.LoginPrivateKey, options.LoginKeys));
-			Assert.DoesNotContain(Keys.LoginPublicKey, options.LoginKeys);
+			Assert.Equal("AABB", options.Configuration[Keys.LoginPrivateKey]);
 		}
 
 		// A --launcher-notes URL the client cannot use is a typo in the flag, so it is refused during the PARSE -

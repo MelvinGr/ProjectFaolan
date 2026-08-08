@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Cli;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,7 +32,7 @@ namespace Faolan.Importer.Cli
 	{
 		private static async Task NpcChatter(string rdbDir)
 		{
-			var catalog = BarkCatalog.Load(rdbDir, _options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(_options.ConfigOverrides)));
+			var catalog = BarkCatalog.Load(rdbDir, _options.RdbProxy ?? _options.Configuration.CdnPublicAddress);
 			if (catalog.Pages == 0)
 			{
 				Console.WriteLine($"npc-chatter: no ENGLISH category-{BarkCatalog.Category} pages found - is RdbDir pointing at the client's RDB folder?");

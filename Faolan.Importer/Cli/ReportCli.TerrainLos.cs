@@ -41,7 +41,7 @@ namespace Faolan.Importer.Cli
 			var mapId = spec.Length > 0 && uint.TryParse(spec[0], out var m) ? m : 4010u;
 			var maxRange = spec.Length == 2 && float.TryParse(spec[1], out var r) ? r : 20f;
 
-			var terrainDir = _options.TerrainOut ?? CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentTerrainDir] ?? "Terrain";
+			var terrainDir = _options.TerrainOut ?? _options.Configuration[Keys.ContentTerrainDir] ?? "Terrain";
 			var terrain = new TerrainService(terrainDir, NullLogger.Instance);
 			if (!terrain.Available)
 			{

@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Microsoft.Extensions.Configuration;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Web
@@ -18,10 +18,11 @@ namespace Faolan.Web
 		private static readonly Option[] Options =
 			FaolanSettings.Options(Keys.ContentRdbDir, Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.CdnPublicAddress);
 
-		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the
-		// caller should exit with `exitCode`. ASP.NET's own host arguments (--urls, --environment) are passed
-		// through untouched, so they are declared here too rather than being rejected as unknown.
-		public static Dictionary<string, string?>? Overrides(string[] args, out int exitCode)
+		// The resolved configuration (defaults < faolan.json < faolan.user.json < command line < environment), or null
+		// when the parser handled the invocation itself (--help, or it reported a parse error) - the caller should then
+		// exit with `exitCode`. ASP.NET's own host arguments (--urls, --environment) are passed through untouched, so
+		// they are declared here too rather than being rejected as unknown.
+		public static IConfiguration? Configuration(string[] args, out int exitCode)
 		{
 			var command = new RootCommand("Faolan.Web - character/equipment 3D viewer, armory and GM tools.");
 			foreach (var option in Options)
@@ -33,7 +34,7 @@ namespace Faolan.Web
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
 
-			return FaolanCommandLine.Overrides(result, Options);
+			return FaolanCommandLine.Build(result, Options);
 		}
 	}
 }

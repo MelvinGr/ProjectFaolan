@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			var options = ImporterCommand.Parse(args, out var exitCode);
 			Assert.NotNull(options);
 			Assert.Equal(0, exitCode);
-			Assert.Equal(Connection, CliConfig.ResolveDatabase(options.ConfigOverrides).Connection);
+			Assert.Equal(Connection, CliConfig.ResolveDatabase(options.Configuration).Connection);
 		}
 
 		// With no override on the command line the config file is what should be used - and the override must not
@@ -67,7 +67,7 @@ namespace Faolan.Tests
 		{
 			var options = ImporterCommand.Parse(["--dry-run"], out _);
 			Assert.NotNull(options);
-			Assert.Equal(Decoy, CliConfig.ResolveDatabase(options.ConfigOverrides).Connection);
+			Assert.Equal(Decoy, CliConfig.ResolveDatabase(options.Configuration).Connection);
 		}
 
 		// What the declared command line buys over the old argv scans: a misspelling is an ERROR, not a silent

@@ -50,12 +50,12 @@ namespace Faolan.Web.Content
 			// builder so it matches the server and the importer exactly. faolan.json is OPTIONAL - the mirror runs on
 			// its built-in defaults with no file. The command-line key IS the config path (`--Cdn:Store <dir>`),
 			// declared in MirrorCommand. Sources are cleared first so the order is exactly this (no appsettings.json).
-			var overrides = MirrorCommand.Overrides(args, out var parseExit);
-			if (overrides == null)
+			var config = MirrorCommand.Configuration(args, out var parseExit);
+			if (config == null)
 				return parseExit;
 
 			builder.Configuration.Sources.Clear();
-			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
+			builder.Configuration.AddConfiguration(config);
 
 			var listenAddress = builder.Configuration.CdnListenAddress;
 			var port = builder.Configuration.CdnListenPort;

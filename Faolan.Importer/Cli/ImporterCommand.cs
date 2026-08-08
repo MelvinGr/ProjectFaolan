@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Microsoft.Extensions.Configuration;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
@@ -63,20 +63,17 @@ namespace Faolan.Importer.Cli
 				result.GetValue(DryRun), result.GetValue(Force), result.GetValue(List),
 				result.GetValue(Report), result.GetValue(ReportArg), result.GetValue(Out), result.GetValue(Skeleton), result.GetValue(TerrainOut),
 				result.GetValue(DumpMesh), result.GetValue(DumpTemplates), result.GetValue(RdbProxy),
-				ConfigOverrides(result));
-		}
-
-		private static Dictionary<string, string?> ConfigOverrides(ParseResult result)
-		{
-			return FaolanCommandLine.Overrides(result, ConnectionString, Provider, RdbDir);
+				FaolanCommandLine.Build(result, ConnectionString, Provider, RdbDir));
 		}
 	}
 
-	// Everything the importer was scraping out of argv, parsed once.
+	// Everything the importer was scraping out of argv, parsed once - including the shared CONFIGURATION its three
+	// config keys contributed to, resolved once here. It used to carry the override layer instead, and every reader
+	// rebuilt the whole stack (both json files and the environment) to look one key up: eight sites did that.
 	public sealed record ImporterOptions(
 		string? Captures, string? Only, string? Skip, string? Mode,
 		bool DryRun, bool Force, bool List,
 		string? Report, string? ReportArg, string? Out, string? Skeleton, string? TerrainOut,
 		bool DumpMesh, string? DumpTemplates, string? RdbProxy,
-		Dictionary<string, string?> ConfigOverrides);
+		IConfiguration Configuration);
 }

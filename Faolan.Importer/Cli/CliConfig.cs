@@ -1,26 +1,21 @@
-using System.Collections.Generic;
 using Faolan.Core.Cli;
 using Faolan.Core.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
 {
-	// Shared config for every importer entry point (import + reports), so a setting lives in ONE place and follows
-	// the SAME precedence as the server / Faolan.Web: environment variables > command line > faolan.json (optional).
-	// A Docker seed job can therefore target Postgres purely by env vars (Database__Provider /
-	// Database__ConnectionString).
+	// The importer's DB config comes from the same shared stack as the server / Faolan.Web:
+	// defaults < faolan.json < faolan.user.json < command line < environment. A Docker seed job can therefore target
+	// Postgres purely by env vars (Database__Provider / Database__ConnectionString).
+	//
+	// The stack itself is built ONCE, by the parse (ImporterCommand -> FaolanCommandLine.Build), and travels as
+	// ImporterOptions.Configuration. This class used to take the override LAYER and re-resolve it - which meant eight
+	// call sites each re-read both json files and the environment to look up one key - so all that is left is naming
+	// the pair the DB needs.
 	public static class CliConfig
 	{
-		// faolan.json < command line < environment - the shared builder, so the importer resolves settings exactly
-		// like the server does. The command-line half arrives ALREADY PARSED (ImporterCommand).
-		public static IConfiguration Resolve(IDictionary<string, string?> commandLine)
+		public static (FaolanDbProvider Provider, string Connection) ResolveDatabase(IConfiguration config)
 		{
-			return FaolanCommandLine.Build(commandLine);
-		}
-
-		public static (FaolanDbProvider Provider, string Connection) ResolveDatabase(IDictionary<string, string?> commandLine)
-		{
-			var config = Resolve(commandLine);
 			return (config.DatabaseProvider, config.DatabaseConnectionString);
 		}
 	}

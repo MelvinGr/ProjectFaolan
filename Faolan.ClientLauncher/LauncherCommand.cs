@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.CommandLine;
 using Faolan.Core.Cli;
+using Microsoft.Extensions.Configuration;
 using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.ClientLauncher
@@ -127,7 +127,7 @@ namespace Faolan.ClientLauncher
 				result.GetValue(PatchLogin), result.GetValue(Restore),
 				result.GetValue(ConsoleOption) || channels.Length > 0, channels,
 				result.GetValue(Proton), result.GetValue(Wine), result.GetValue(DryRun),
-				FaolanCommandLine.Overrides(result, LoginKeys));
+				FaolanCommandLine.Build(result, LoginKeys));
 		}
 
 		// Empty when --debug-channels was not given; the default set when it was given bare; the listed channels when
@@ -143,12 +143,14 @@ namespace Faolan.ClientLauncher
 		}
 	}
 
-	// Everything the launcher was scraping out of argv, parsed once.
+	// Everything the launcher was scraping out of argv, parsed once - plus the shared CONFIGURATION the two Login: keys
+	// contributed to, so the patcher reads the keypair from the same stack the server does (faolan.json included) rather
+	// than from the flags alone.
 	public sealed record LauncherOptions(
 		string? Exe, bool Dx10,
 		string? Username, string? Password, string? Charname,
 		string? UniverseAddr, string? Cdn, string? LauncherNotes,
 		bool PatchLogin, bool Restore, bool Console, ImmutableArray<string> DebugChannels,
 		string? Proton, string? Wine, bool DryRun,
-		Dictionary<string, string?> LoginKeys);
+		IConfiguration Configuration);
 }

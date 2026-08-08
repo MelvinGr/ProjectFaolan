@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Cli;
 using Faolan.Core.Constants;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
@@ -3776,7 +3777,7 @@ namespace Faolan.Importer.Cli
 		// Reports read the DB from the shared config (faolan.db by default, --Database:ConnectionString to override); one short-lived context.
 		private static DatabaseContext OpenDb()
 		{
-			_db ??= CliConfig.ResolveDatabase(_options.ConfigOverrides);
+			_db ??= CliConfig.ResolveDatabase(_options.Configuration);
 			return DatabaseExtensions.CreateContext(_db.Value.Provider, _db.Value.Connection);
 		}
 
@@ -3885,7 +3886,7 @@ namespace Faolan.Importer.Cli
 		// that cannot run without it and wrong for one that degrades.
 		private static string? RdbDirOrNull()
 		{
-			return CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentRdbDir];
+			return _options.Configuration[Keys.ContentRdbDir];
 		}
 
 		// Every report opens the RDB THROUGH the CDN mirror. A reader built without a proxy base silently degrades to
@@ -3894,12 +3895,12 @@ namespace Faolan.Importer.Cli
 		// Honours `--rdb-proxy`, which the reports used to ignore in favour of the hardcoded default.
 		private static RdbReader OpenRdb(string? rdbDir = null)
 		{
-			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? ImportContext.DefaultProxyBase(CliConfig.Resolve(_options.ConfigOverrides)));
+			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? _options.Configuration.CdnPublicAddress);
 		}
 
 		private static string RdbDir()
 		{
-			return CliConfig.Resolve(_options.ConfigOverrides)[Keys.ContentRdbDir] ??
+			return _options.Configuration[Keys.ContentRdbDir] ??
 				throw new InvalidOperationException(
 					"The client's RDB folder is not configured - set Content:RdbDir in faolan.json, the Content__RdbDir environment variable, or pass --Content:RdbDir <dir>.");
 		}
