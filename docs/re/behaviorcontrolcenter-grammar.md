@@ -318,6 +318,18 @@ words are decoded too (#661) — each to the Command slot the client stores it i
 resolving to the client's directional-attack abilities. What is left there is word 4's alphabet and the
 `+0x188`/`+0x18C` pair, both of which are four sightings or fewer.
 
+⚠️ **The SCOPE test does not apply to word 4, and the control is what says so.** The obvious next move is the
+method that settled the MagicBuff payload's two level slots — *whose field is it? group the value by each
+candidate owner and see which grouping it is stable within* — with word 4 as "the defender's guard arc" against
+"a second attacker property". `--report bcc-attack-tail` runs it, **with word 5 (a known attacker-side swing
+direction) as the control**, and word 5 comes out just as unstable per attacker (68.4% of 19) as per defender
+(66.7% of 18). A control that cannot find its own answer measures nothing, so neither reading is supported or
+refuted: both words are rolled **per SWING**, not held as a property of an entity, which is the shape scope
+stability cannot see. The populations are also far too small for it either way.
+
+The route left is the client, not more corpus arithmetic: word 4 lands in Command slot `+0x44`, so whatever reads
+`Command + 0x44` names it. Open work tracked in Gitea #661.
+
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into
 `+0x28` and no commandId. `BehaviorControlCenterCodec` does not special-case them — it would throw rather than

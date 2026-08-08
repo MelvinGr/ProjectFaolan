@@ -96,6 +96,11 @@ namespace Faolan.Importer.Cli
 			// the undirected path or has to source the direction some other way (the combo catalog states one).
 			var playerUndirected = new Dictionary<(bool Directed, uint ResultType), int>();
 
+			var perActorWord4 = new Dictionary<(string, uint), List<uint>>();
+			var perTargetWord4 = new Dictionary<(string, uint), List<uint>>();
+			var perActorWord5 = new Dictionary<(string, uint), List<uint>>();
+			var perTargetWord5 = new Dictionary<(string, uint), List<uint>>();
+
 			foreach (var c in captures)
 			{
 				// Who is an NPC, per capture. A retail character id is ~0x0131xxxx, i.e. BELOW
@@ -127,7 +132,7 @@ namespace Faolan.Importer.Cli
 				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var bcc) || !attacks.Contains(bcc.BehaviorId))
 					continue;
 
-				if (!TryReadAttackTail(bcc, out var middle, out var targets, out var results, out var resultTypes))
+				if (!TryReadAttackTail(bcc, out var middle, out var targets, out var results, out var resultTypes, out var targetHandles))
 				{
 					unexplained++;
 					continue;
@@ -189,9 +194,57 @@ namespace Faolan.Importer.Cli
 				foreach (var rt in resultTypes)
 					W2("result type", $"0x{rt:X2}");
 
+				// #661 word 4: WHOSE property is it? The scope test that separated the MagicBuff level slots - group
+				// the value by attacker and by defender, and see which grouping it is stable within. A defender's
+				// guard arc is stable per DEFENDER; a second attacker property is stable per ATTACKER.
+				if (middle[^4] != 0)
+				{
+					var w4 = middle[^4];
+					perActorWord4.TryAdd((c.Name, bcc.Actor), []);
+					perActorWord4[(c.Name, bcc.Actor)].Add(w4);
+					foreach (var target in targetHandles)
+					{
+						perTargetWord4.TryAdd((c.Name, target), []);
+						perTargetWord4[(c.Name, target)].Add(w4);
+					}
+
+					// ...and the same for word 5, the KNOWN attacker-side direction, as the control. A test that
+					// cannot tell word 5 apart is measuring nothing.
+					perActorWord5.TryAdd((c.Name, bcc.Actor), []);
+					perActorWord5[(c.Name, bcc.Actor)].Add(middle[^3]);
+					foreach (var target in targetHandles)
+					{
+						perTargetWord5.TryAdd((c.Name, target), []);
+						perTargetWord5[(c.Name, target)].Add(middle[^3]);
+					}
+				}
+
 				if (middle.Skip(2).Any(w => w != 0))
 					interesting.Add((c.Name, p.Frame, middle, targets, results));
 			}
+			}
+
+			Console.WriteLine();
+			// ⚠️ MEASURED AND INAPPLICABLE - printed so the next attempt does not rebuild it (#661). The scope test
+			// that settled the MagicBuff payload's two level slots (whose field is it? group by each candidate owner
+			// and see which grouping it is stable within) does NOT work on the attack tail, and the CONTROL is what
+			// says so: word 5 is a known attacker-side direction, and it comes out just as unstable per attacker as
+			// per defender. Both words are rolled per SWING, so neither is a property of an entity at all - and the
+			// populations (19 attackers / 18 defenders) are far too small either way.
+			Console.WriteLine("word 4 SCOPE (#661) - is it the ATTACKER's or the DEFENDER's? A value is 'unstable' in a");
+			Console.WriteLine("grouping when that entity was seen with more than one of them. Word 5, the known");
+			Console.WriteLine("attacker-side direction, is the CONTROL - and it fails, so this test cannot answer word 4:");
+			Console.WriteLine($"{"word",6} {"per ATTACKER",28} {"per DEFENDER",28}");
+			foreach (var (label, scopedByActor, scopedByTarget) in new[]
+			         {
+				         ("4", perActorWord4, perTargetWord4),
+				         ("5 (control)", perActorWord5, perTargetWord5)
+			         })
+			{
+				var au = scopedByActor.Count(g => g.Value.Distinct().Count() > 1);
+				var tu = scopedByTarget.Count(g => g.Value.Distinct().Count() > 1);
+				Console.WriteLine($"{label,6} {$"{au} of {scopedByActor.Count} unstable ({(scopedByActor.Count == 0 ? 0 : 100.0 * au / scopedByActor.Count):0.0}%)",28} "
+				                  + $"{$"{tu} of {scopedByTarget.Count} unstable ({(scopedByTarget.Count == 0 ? 0 : 100.0 * tu / scopedByTarget.Count):0.0}%)",28}");
 			}
 
 			Console.WriteLine();
@@ -362,8 +415,15 @@ namespace Faolan.Importer.Cli
 		// close, which is the check that keeps this report honest rather than merely plausible.
 		private static bool TryReadAttackTail(BehaviorControlCenterIIR bcc, out uint[] middle, out int targets, out int results, out List<uint> resultTypes)
 		{
+			return TryReadAttackTail(bcc, out middle, out targets, out results, out resultTypes, out _);
+		}
+
+		private static bool TryReadAttackTail(BehaviorControlCenterIIR bcc, out uint[] middle, out int targets, out int results, out List<uint> resultTypes,
+			out List<uint> targetHandles)
+		{
 			middle = [];
 			resultTypes = [];
+			targetHandles = [];
 			targets = results = 0;
 
 			var tail = bcc.Tail;
@@ -374,6 +434,10 @@ namespace Faolan.Importer.Cli
 			var at = 4 + targets * 8;
 			if (targets < 0 || at + 8 > tail.Length)
 				return false;
+
+			// Each target is a [class][handle] pair; only the handle is wanted, for the per-DEFENDER scope test (#661).
+			for (var i = 0; i < targets; i++)
+				targetHandles.Add(tail.ReadU32Be(4 + i * 8 + 4));
 
 			// The selector is the middle's SECOND word and decides its own length - miss it and the result count
 			// lands one word out, which is what left 11 bodies unexplained before #536 found it.
