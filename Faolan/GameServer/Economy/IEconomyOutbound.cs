@@ -22,7 +22,12 @@ namespace Faolan.GameServer.Economy
 		// cannot supply it: it is 0 for 84% of sighted templates and, where populated, half of it is the wire value
 		// divided by ten (#725). So a caller that HAS the captured level passes it, and everyone else keeps the 1
 		// that every grant has always sent. Remove the parameter once #725 makes Items.Level authoritative.
-		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1);
+		//
+		// `creatorName` is the crafter, for a player-MADE item only (#727). It persists onto the inventory row and
+		// rides the live add as ProtoInventoryGameEntry.creator_name, which is what draws the client's
+		// "Created by <name>" tooltip line. Every other grant leaves it null: an item that was looted, bought or
+		// handed in is not player-made, and a name there would be a false claim.
+		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1, string? creatorName = null);
 
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See GameServerListener.Outbound.cs SendAddItem.
 		Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);

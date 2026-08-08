@@ -72,11 +72,45 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
 verified: no itemId ever carries two different non-zero hashes or keys across the 603 records), so they're
 **not** duplicated on `RecipeItem`. `ToRecord` reads them back through the `RecipeItem` → `Items` nav.
 
+## Crafting the recipe
+
+The craft itself is a **behavior**, not its own IIR: `BehaviorId.Tradeskill` (`0x27`) over
+`BehaviorControlCenterIIR`, and its trailer is `[u8 flag][u32 recipeId][u32 count]` — **not** the `[from][target]`
+pair the rest of the behavior switch reads. The whole transaction, from
+`NecroL80_mage-necromancer_login_gameplay_annotated_5`:
+
+```
+18:45:25 c2s BehaviorControlCenter  Tradeskill(0x27), trailer 01 0000000F 00000001   -> recipe 15, one of them
+18:45:26 s2c   the behavior ack
+18:45:30 s2c   DispatchSetItemStat x3      destination-cell bookkeeping
+               DispatchAddItem             the product, carrying creator_name "NecroL80"
+               DispatchRemoveItem          bag 0x68 pos 19       - Plain Hilt Piece, consumed whole
+               DispatchRemoveItem          resource 0x70 pos 13  - Copper, consumed whole
+               DispatchSetItemStat         resource 0x70 pos 10 StackSize 2 - Silver, decremented
+               DispatchTradeskillComplete  0x0000000F
+```
+
+`DispatchTradeskillComplete`'s body is the **recipe id** and nothing else, and recipe 15 in our own catalog is
+exactly `Plain Hilt Piece ×1 + Copper ×4 + Silver ×4 → Bloodsilver Khopesh`. The removals corroborate the
+quantities to the unit — his copper stack ran 4 → 0 and his silver stack 6 → 2 — so the shipped rows *are*
+retail's. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json fr17374/17376/17401/17402]
+
+`TradeskillService` runs it: check every material first (a player one silver short must keep their copper), grant
+the product before consuming (a full bag refuses the craft with the materials still in hand), then take the
+materials and send the completion. The product carries the crafter through
+`CharacterInventory.CreatorName` — see [inventory.md](inventory.md).
+
+Retail leaves ~5 s between the ack and the completion, a bar the client animates; we complete immediately.
+Refusals are **silent**, because retail has no failure form here and a completion over a craft that did not happen
+would close the client's window on an item it never received.
+
 ## Open / follow-ups
 
-- The catalog is served **whole** to every character (the one capture is an L80 necro's full book). Real
-  per-character known-recipe filtering (which recipes a char has learned) needs per-char recipe data — none
-  is captured yet. An empty catalog yields a valid empty list (book opens, no recipes).
+- ⚠️ **Professions and ranks are not modelled at all.** In retail a character must LEARN a tradeskill profession,
+  which comes in ranks, and that is what gates the book — a fresh character has none. We serve the catalog
+  **whole** to every character that asks, recipes carry no profession/tier attribution, and no character row
+  records a learned profession (`CharacterSkills` is the combat scaffold, every row rank 0). So nothing stops a
+  level-1 character crafting a master-tier recipe. Tracked in Gitea; deliberately not guessed at.
 - `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
   gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.

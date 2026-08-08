@@ -17,7 +17,11 @@ namespace Faolan.GameServer.Inventory
 	{
 		// One slot's share of the take. `Taken` is how many come out of it; `Remaining` is what is left behind, so 0
 		// means the cell is cleared and anything else means it is rewritten with the smaller stack.
-		public readonly record struct Step(ContainerKind Container, int Slot, uint Taken, uint Remaining);
+		//
+		// `CreatorName` rides along because a partial take REWRITES the cell, and the writer assigns the crafter
+		// rather than leaving it (#727) - so a decremented stack of a player-made item would otherwise lose its
+		// "Created by" line. It is the row's own value, carried through unchanged.
+		public readonly record struct Step(ContainerKind Container, int Slot, uint Taken, uint Remaining, string? CreatorName = null);
 
 		// The steps that remove `count` of `itemTemplateId`, in container-then-slot order. Takes as much as it can and
 		// stops: a short plan (its Taken summing to less than `count`) means the player does not hold enough, which is
@@ -39,7 +43,7 @@ namespace Faolan.GameServer.Inventory
 				var held = row.Count == 0 ? 1u : row.Count;
 				var taken = held < remaining ? held : remaining;
 				remaining -= taken;
-				steps.Add(new Step(row.Container, row.Slot, taken, held - taken));
+				steps.Add(new Step(row.Container, row.Slot, taken, held - taken, row.CreatorName));
 			}
 
 			return steps;

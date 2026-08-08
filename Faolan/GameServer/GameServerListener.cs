@@ -254,6 +254,10 @@ namespace Faolan.GameServer
 		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
 
+		// Crafting: turns a recipe's ingredients into its product. Reaches the wire through the same IEconomyOutbound
+		// grant/take ops the shop and bank use. See Economy/TradeskillService.cs.
+		private readonly TradeskillService _tradeskill;
+
 		private readonly SpellweaveService _spellweave;
 
 		// The cutscene stock-phrase subtitle channel (Kalanthes's beach lines): answers PlayStockphraseAsSubtitle
@@ -336,6 +340,7 @@ namespace Faolan.GameServer
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
 			_tradepost = new TradepostService(database, logger, this); // auction house + mailbox (#200)
+			_tradeskill = new TradeskillService(database, this, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 			// #495/#504: "the world damaged you" - fall damage and the scripted hazard volumes. Driven from the move

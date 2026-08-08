@@ -49,8 +49,7 @@ token for them instead. See [item-claims.md](item-claims.md) and `Faolan.Core/Cr
 A player-crafted item shows the client's "Created by &lt;name&gt;" tooltip line, and the only thing that feeds it
 is **`ProtoInventoryGameEntry.creator_name` (field 5, a plain Latin1 string on the entry itself)**. No stat is
 involved — in particular it is NOT the `ItemOrigin` stat (0x554), which is why the whole crafting stat block
-(0x552–0x55E) is absent from every captured entry. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5
-fr17401]
+(0x552–0x55E) is absent from every captured entry. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json fr17401]
 
 It is present ONLY on player-made items: 619 captured inventory entries carry one (5 distinct crafters), and
 every other entry ends at the item block with no field-5 tag at all. So an empty name must emit **nothing**

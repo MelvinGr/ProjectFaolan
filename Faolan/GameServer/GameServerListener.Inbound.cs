@@ -1797,6 +1797,31 @@ namespace Faolan.GameServer
 
 				Logger.LogInformation("SwitchWeaponsButton -> weapon set {Set}. {Args}", activeSet, args);
 			}
+			else if (actionType == BehaviorId.Tradeskill)
+			{
+				// CRAFTING. Its trailer is NOT the [from][target] pair the rest of the switch reads - it is
+				// [u8 flag][u32 recipeId][u32 count], 9 bytes, so it has to be read before that pair consumes it
+				// misaligned. Capture: c2s at 18:45:25 carries `01 0000000F 00000001` = recipe 15, one of them, and
+				// the completion 5s later echoes the same 0x0F back.
+				// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 fr17374]
+				var craftFlag = body.Length - body.Position >= 1
+					? body.ReadByte()
+					: 0;
+				var recipeId = body.Length - body.Position >= sizeof(uint)
+					? body.ReadUInt32()
+					: 0;
+				var craftCount = body.Length - body.Position >= sizeof(uint)
+					? body.ReadUInt32()
+					: 1;
+
+				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+				Logger.LogInformation("Tradeskill: craft recipe {Recipe} x{Count} (flag {Flag}). {Args}", recipeId, craftCount, craftFlag, args);
+
+				// Retail answers a SUCCESSFUL craft with DispatchTradeskillComplete and nothing at all otherwise, so a
+				// refusal is silence here too - the client keeps the window open rather than being told it worked.
+				if (await _tradeskill.Craft(client, recipeId, craftCount) is { } craftedRecipe)
+					await SendTradeskillComplete(client, craftedRecipe);
+			}
 			else
 			{
 				// Not every action carries from/target after the args (e.g. TalkToNpc only has a short

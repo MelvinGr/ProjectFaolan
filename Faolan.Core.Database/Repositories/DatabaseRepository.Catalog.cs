@@ -32,6 +32,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Mount[]> GetMounts();
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetRandomLootExcludedItems();
+		Task<Recipe?> GetRecipe(uint id);
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
 		Task<SpellEffect[]> GetSpellEffects();
@@ -215,6 +216,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Recipes.Include(r => r.Items).ThenInclude(i => i.Item).OrderBy(r => r.Id).ToArrayAsync();
+		}
+
+		// One recipe by the id the client's craft request names - the same id `DispatchTradeskillComplete` echoes back.
+		// The whole book is 603 rows with two Includes, so the craft path takes this rather than filtering GetRecipes.
+		public async Task<Recipe?> GetRecipe(uint id)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Recipes.Include(r => r.Items).ThenInclude(i => i.Item).FirstOrDefaultAsync(r => r.Id == id);
 		}
 
 		// One summonable mount by the id the client sends in its SummonMount action (#627). The summon Spell is

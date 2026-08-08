@@ -44,9 +44,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, ulong level)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, ulong level, string? creatorName)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, level);
+			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, level, creatorName);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
@@ -367,7 +367,7 @@ namespace Faolan.GameServer
 		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
 		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
 		// slot index means nothing.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1)
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1, string? creatorName = null)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -398,7 +398,7 @@ namespace Faolan.GameServer
 			if (slot == null)
 				return null;
 
-			await Database.SetCharacterInventorySlot(characterId, kind, slot.Value, itemTemplateId, count);
+			await Database.SetCharacterInventorySlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem
@@ -406,7 +406,7 @@ namespace Faolan.GameServer
 				: ContainerKind.Bag;
 			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
 			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
-				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), level);
+				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), level, creatorName: creatorName);
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
 			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got
@@ -515,7 +515,7 @@ namespace Faolan.GameServer
 				if (step.Remaining == 0)
 					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, null);
 				else
-					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, itemTemplateId, step.Remaining);
+					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, itemTemplateId, step.Remaining, step.CreatorName);
 
 				await SendRemoveItem(client, step.Container, (uint)step.Slot, step.Taken);
 			}
@@ -529,6 +529,19 @@ namespace Faolan.GameServer
 			}
 
 			return removed;
+		}
+
+		// Closes a craft: retail's last word on the transaction, after the product add and the ingredient removals.
+		// The body is the RECIPE ID and nothing else - the capture's `0000000F` is recipe 15, whose own rows are Plain
+		// Hilt Piece x1 + Copper x4 + Silver x4 -> Bloodsilver Khopesh, matching the removals that precede it.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 fr17402]
+		//
+		// Sent ONLY on success. Retail has no failure form here, and a completion over a craft that did not happen
+		// would tell the client to close its window on an item it never got.
+		private static Task SendTradeskillComplete(INetworkClient client, uint recipeId)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeskillComplete,
+				b => b.WriteUInt32(recipeId)));
 		}
 
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
@@ -730,10 +743,16 @@ namespace Faolan.GameServer
 		// Decoded from the harvesting span of the chat-annotated capture (#494), where the loot line lands beside its
 		// annotation each time - Granite 161206 x40 (`just mined`), Oak 161213 x60 (`gethering wood`), Iron 161196 x40
 		// (`mining iron`). The item id is repeated in the first two words in every observed record.
-		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint count)
+		// ⚠️ The 4th word is the item's LEVEL, not a count. The body is the same ProtoAcgItem-shaped layout the
+		// client's `itemref://` chat link carries - [template][template][0][level][hash][key1][key2][key3] - and
+		// reading it as a count is what put the bogus 40 / 60 / 40 yields into HarvestCatalog (#732): Items.Level for
+		// Granite, Oak and Iron is 40, 60 and 40 exactly. The line renders an item LINK, so the level is what its
+		// tooltip reads; how many arrived is the ADD's business, not this message's.
+		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
+		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
-				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(count).WriteArray(new byte[48])));
+				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
 		}
 
 		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on

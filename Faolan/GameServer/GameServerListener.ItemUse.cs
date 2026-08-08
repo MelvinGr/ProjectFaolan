@@ -68,7 +68,7 @@ namespace Faolan.GameServer
 			var before = node.Health ?? HarvestCatalog.NodeMaxHealth;
 			var after = before - HarvestCatalog.SwingCost;
 			node.Health = after;
-			await SendItemLootChatMessage(client, resourceId, count);
+			await SendItemLootChatMessage(client, resourceId, (uint)((await Database.GetItem(resourceId))?.Level ?? 0));
 			await _broadcaster.BroadcastNodeHealth(client, node, after);
 
 			// Exhausted only when it can no longer pay for a swing. Until then the node stays in the world with its
