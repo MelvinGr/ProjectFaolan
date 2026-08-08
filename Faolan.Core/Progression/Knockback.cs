@@ -14,17 +14,30 @@ namespace Faolan.Core.Progression
 	///         distinction matters when reading these constants.
 	///     </para>
 	///     <para>
-	///         ⚠️ <b>The whole corpus contains exactly ONE knockback.</b> It displaced the player <b>3.01 units</b>
-	///         (3.00 horizontal, −0.23 vertical), and it came with an <c>ApplySpell</c> of spell <b>4784832</b>, which
-	///         the database names <b>"Knockback immunity"</b> (10 ms) - the mechanic naming itself, and the single
-	///         strongest confirmation in that window.
+	///         The corpus now contains <b>TWO</b> knockbacks, and the second one confirms both halves of what the
+	///         first could only suggest. The original displaced the player <b>3.01 units</b> and came with an
+	///         <c>ApplySpell</c> of spell <b>4784832</b>, which the database names <b>"Knockback immunity"</b> (10 ms)
+	///         — the mechanic naming itself.
 	///     </para>
 	///     <para>
-	///         So <see cref="DefaultDistance" /> is a MEASUREMENT of one event, not a curve, and everything about how
-	///         retail chooses a distance is unknown: whether it is per-ability, per-attacker-level, or fixed. The
-	///         direction being directly away from the attacker is the obvious reading of a single sample and nothing
-	///         contradicts it, but nothing confirms it either - a knockback that pushed along the attacker's FACING
-	///         rather than the attacker→target ray would look identical in one head-on observation.
+	///         ⭐ The second, an inbound knockback on the player from a <c>Wharf Rat Cutthroat</c>
+	///         [V2: NecroL80_mage-necromancer_login_gameplay_annotated_3.tshark.json frame 7790, annotated "got
+	///         knockedback"], measures <b>3.000</b> horizontal — and the attacker→victim distance goes
+	///         <b>3.255 → 6.255</b>, i.e. exactly the displacement. So the two open questions are answered by an
+	///         independent event: the distance is a <b>constant 3.0</b> rather than something scaled per ability or
+	///         per level, and the push is <b>directly along the attacker→victim ray</b>, not along the attacker's
+	///         facing (which a single head-on sample could not separate).
+	///     </para>
+	///     <para>
+	///         The second knockback also shows the batch is bigger than the immunity buff. Retail sends, in one
+	///         instant: <c>Knockback immunity</c> and <c>Recently Impaired</c> on the victim (the latter once as a
+	///         50-byte apply and three times as a 46-byte variant), <c>DispatchAddSpellResistance</c>
+	///         <c>[0x1AB][0x64]</c>, and <c>Successful Knockback</c> (<c>0x10B1A6</c>) applied to the <b>attacker</b>
+	///         as a self-marker — then the forced-move <c>MoveTask</c>, and the <c>SetPosIIR</c> pinning the
+	///         destination ~1.7 s later. Only the immunity buff and the move pair are sent today; the rest are
+	///         decoded but unwired, because <c>Recently Impaired</c> looks like a general impair diminishing-returns
+	///         marker rather than a knockback record and wiring it here would be a guess about a system we have not
+	///         decoded.
 	///     </para>
 	///     <para>
 	///         ⚠️ <b><see cref="ResistanceDivisor" /> is an outright invention and is flagged as such.</b> The stat
@@ -44,8 +57,11 @@ namespace Faolan.Core.Progression
 		/// </summary>
 		public const uint ImmunitySpellId = 4784832;
 
-		/// <summary>The one measured displacement, in world units. See the remarks: a measurement, not a curve.</summary>
-		public const float DefaultDistance = 3.01f;
+		/// <summary>
+		///     The measured displacement, in world units. Two independent knockbacks, from different attackers in
+		///     different sessions, land on 3.01 and 3.000 — so this is a CONSTANT, not the one sample it used to be.
+		/// </summary>
+		public const float DefaultDistance = 3.0f;
 
 		/// <summary>
 		///     [V0] Resistance at which the distance is halved. Invented - see the remarks. Chosen large enough that a

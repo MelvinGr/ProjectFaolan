@@ -124,11 +124,34 @@ The batch also applies spell **4784832**, which the database names **"Knockback 
 naming itself, and the strongest single confirmation in the window.
 [V3: KnockbackTests.ForcedMove_IsByteIdenticalToTheCapturedKnockback]
 
-⚠️ **One sample, and the split matters.** The packets are decoded and reproduced byte-exact. Everything *around*
-them is a single measurement: the displacement was **3.01 units**, the direction is away from the attacker (which a
-head-on observation cannot distinguish from "along the attacker's facing"), and the three floats are deliberately
-left unnamed because duration/speed/gravity are all equally plausible. `KnockbackResistance` (0x040D) exists and is
-read, but its scaling curve is **invented** — the captured victim's value is unknown, so no curve is derivable.
+### ⭐ The second knockback settles the geometry (#742)
+
+`annotated_3` carries an INBOUND knockback on the player from a Wharf Rat, at the second the player's own
+annotation says `got knockedback` [V3: KnockbackTests.ForcedMove_IsByteIdenticalToTheSecondCapturedKnockback].
+Two independent events, different attackers, different sessions — and they agree:
+
+| | displacement | attacker→victim |
+|---|---|---|
+| first (`chat-annotated`) | 3.01 | — |
+| second (`annotated_3`) | **3.000** | **3.255 → 6.255** |
+
+So the two questions one head-on sample could not answer are answered. The distance is a **constant 3.0**, not
+something scaled per ability or per level; and the push is along the **attacker→victim ray**, because the
+attacker-to-victim distance grows by exactly the displacement — a push along the attacker's *facing* would not
+have to.
+
+The second sample also shows the batch is bigger than the immunity buff. In one instant retail sends
+`Knockback immunity` **and** `Recently Impaired` on the victim (once as a 50-byte apply, three times as a 46-byte
+variant), `DispatchAddSpellResistance [0x1AB][0x64]`, and **`Successful Knockback`** (`0x10B1A6`) applied to the
+**attacker** as a self-marker — then the forced-move `MoveTask`, then the `SetPosIIR` 1.7 s later. We send the
+immunity buff and the move pair; the rest are decoded but unwired, because `Recently Impaired` reads like a
+general impair diminishing-returns marker rather than a knockback record, and wiring it here would be a guess
+about a system nobody has decoded.
+
+⚠️ **The split still matters.** The packets are decoded and reproduced byte-exact, and the geometry now has two
+measurements — but the three floats are still deliberately unnamed (duration/speed/gravity are all equally
+plausible), and `KnockbackResistance` (0x040D) is read but its scaling curve is **invented**: both captured
+victims' values are unknown, so no curve is derivable.
 
 ⚠️ **Nothing triggers it.** The captured knockback came from an NPC ability, but the `ApplySpell` in that batch is
 the immunity guard rather than the ability that did the knocking, so the corpus does not say which attacks knock

@@ -35,6 +35,50 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
+		// ⭐ THE SECOND KNOCKBACK (#742), and it is what turns the one measurement above into a constant. An INBOUND
+		// knockback on the player in NecroL80_mage-necromancer_login_gameplay_annotated_3 frame 7790, at the second the
+		// player's own annotation says "got knockedback".
+		//
+		// It answers both of the questions one head-on sample could not:
+		//   - the horizontal displacement is 3.000, against the first sample's 3.01 - a CONSTANT, not a per-ability
+		//     or per-level curve;
+		//   - the attacker→victim distance goes 3.255 → 6.255, i.e. exactly the displacement, so the push is along
+		//     the attacker→victim RAY and not along the attacker's facing.
+		[Fact]
+		public void ForcedMove_IsByteIdenticalToTheSecondCapturedKnockback()
+		{
+			var captured = Convert.FromHexString(
+				"96c467400000c3500802e5d40000" + // subop, class, the player's handle, u16 0
+				"444c559b42922e0044475bc6" + // from (817.34, 73.09, 797.43)
+				"0500" + // mode 0x05 (forced move) + its trailing byte
+				"3f8000003f80000000000000" + // the same three undecoded floats
+				"444c559b42922e0044475bc6" + // anchor (== from again)
+				"444be65142922e004447f83b" + // to   (815.60, 73.09, 799.88)
+				"00");
+
+			var from = new Vector3(817.337585f, 73.0898438f, 797.43396f);
+			var to = new Vector3(815.598694f, 73.0898438f, 799.878601f);
+			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x0802E5D4, from, MoveTaskNodes.ForcedMove(to, from)));
+
+			Assert.Equal(captured, built);
+		}
+
+		// The geometry the second sample settles: 3.0 units, straight along the attacker→victim ray. The attacker
+		// stood at (819.224, 73.090, 794.782), 3.255 from the victim; after the shove it is 6.255.
+		[Fact]
+		public void Resolve_ReproducesTheSecondCapturedKnockback()
+		{
+			var attacker = new Vector3(819.224304f, 73.0898438f, 794.781555f);
+			var from = new Vector3(817.337585f, 73.0898438f, 797.43396f);
+
+			var to = Knockback.Resolve(attacker, from);
+
+			// Within a tenth of a unit of the position retail's own SetPosIIR pinned.
+			Assert.Equal(815.60f, to.X, 1);
+			Assert.Equal(799.88f, to.Z, 1);
+			Assert.Equal(Knockback.DefaultDistance, Vector3.Distance(new Vector3(from.X, 0f, from.Z), new Vector3(to.X, 0f, to.Z)), 2);
+		}
+
 		// The mode byte is what distinguishes this from every other MoveTask form, so it is pinned explicitly rather
 		// than only implicitly through the golden above.
 		[Fact]
