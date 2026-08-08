@@ -80,10 +80,25 @@ namespace Faolan.Importer.Captures
 			var neededIds = merged.Select(l => l.Template).Where(t => t != 0).Concat(merged.Select(l => l.ItemId).Where(i => i != 0)).Distinct();
 			foreach (var tmpl in neededIds)
 			{
-				if (await db.Items.AnyAsync(i => i.Id == tmpl))
-					continue;
-
 				var src = merged.FirstOrDefault(l => l.Template == tmpl) ?? merged.First(l => l.ItemId == tmpl);
+
+				// An EXISTING row still gets its level refreshed. It used to just `continue`, and that insert-only
+				// shape is what let 64 legacy levels sit wrong through every re-import (#725): a template already in
+				// Items was never revisited, whatever a later capture said. The #725 fix harvested the level from
+				// inventory entries, which does not reach a template that only ever appears in a LISTING - and one
+				// did, `Skysplendor Shafts`, still carrying the legacy 8 against the listing's 80.
+				//
+				// The listing is wire truth: for every template seen in both, an AH listing reports the same level as
+				// the inventory entry (10/10), so there is no source conflict to arbitrate - only a missing value to
+				// fill and a legacy one to correct. Never downgrade to 0, same rule as the hash.
+				if (await db.Items.FirstOrDefaultAsync(i => i.Id == tmpl) is { } existing)
+				{
+					if (src.ItemLevel != 0)
+						existing.Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue);
+
+					continue;
+				}
+
 				db.Items.Add(new Item
 				{
 					Id = tmpl,
