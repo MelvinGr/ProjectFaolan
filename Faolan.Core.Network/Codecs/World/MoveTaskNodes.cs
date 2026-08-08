@@ -110,6 +110,28 @@ namespace Faolan.Core.Network.Codecs.World
 			return node;
 		}
 
+		// A patrol the client walks in a STATED TIME - retail's majority form, and the one that takes the pacing out of
+		// the client's hands.
+		//
+		// With bit0 of the header SET (the `Patrol` overload below) there is no [duration][remaining] pair, and the
+		// client paces the walk off the entity's own movement-speed attribute - which for an NPC is its RUN speed, so
+		// the beat is sprinted (#714). Clearing bit0 and stating the seconds makes the walk take exactly that long
+		// whatever the entity's attribute says.
+		//
+		// This is what retail does: of the 759 captured multi-point patrol path nodes, **535 carry the pair** (header
+		// flags 0) and only 224 do not. `remaining` is the part of `seconds` still to run - equal to `seconds` for a
+		// beat starting at its beginning, and less for one handed to a client that arrives mid-lap (313 of the 1,373
+		// captured pairs have remaining < duration).
+		public static MoveTaskNode PatrolTimed(IReadOnlyList<Vector3> waypoints, float speed, Vector3 anchor, float seconds, float remaining)
+		{
+			var list = Patrol(waypoints, speed, anchor);
+			var path = list.Children[0];
+			path.HeaderFlags = 0x00; // bit0 CLEAR -> the [duration][remaining] pair follows
+			path.HeaderDuration = Bits(seconds);
+			path.HeaderRemaining = Bits(remaining);
+			return list;
+		}
+
 		// The canonical single-segment PATROL: a ListMoveTask holding the walked path plus a trailing wait.
 		// Reproduces the captured patrol body byte-for-byte (MoveTaskBuilderTests).
 		public static MoveTaskNode Patrol(IReadOnlyList<Vector3> waypoints, float speed, Vector3 anchor)

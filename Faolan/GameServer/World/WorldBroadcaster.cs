@@ -2856,9 +2856,27 @@ namespace Faolan.GameServer.World
 		private static byte[] BuildRouteBody(WorldEntity npc)
 		{
 			var ahead = PatrolRoute.FromHere(npc.PatrolWaypoints, npc.RouteIndex, npc.RouteBackwards, npc.RouteLoops);
-			return ahead.Count == 0
-				? npc.PatrolBody
-				: MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position, MoveTaskNodes.Patrol(ahead, npc.RouteSpeed, npc.Position)));
+			if (ahead.Count == 0)
+				return npc.PatrolBody;
+
+			// ⚠️ The walk STARTS where the NPC is standing, so its live position is the path's first waypoint (#714).
+			//
+			// Without it the path began at `ahead[0]` - the next waypoint - and the client had to cover the gap from
+			// wherever it had the NPC onto the route before the timed walk began, which it does at its own speed. That
+			// is the catch-up dash seen in-client, and it appeared only on the FIRST body after a spawn: every later
+			// re-issue fires at a turnaround, where the NPC is already standing on `ahead[0]` and the gap is zero.
+			//
+			// It also makes `seconds` exact rather than approximate: the duration is now the length of the path that is
+			// actually sent, not of a path plus an approach leg the client was pacing separately.
+			var path = new List<Vector3>(ahead.Count + 1) { npc.Position };
+			path.AddRange(ahead);
+
+			// State how long the walk takes, so the CLIENT is paced by time rather than by its own movement-speed
+			// attribute - which for an NPC is its RUN speed, and is what made the beat get sprinted and then stood
+			// through.
+			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.RouteSpeed;
+			return MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position,
+				MoveTaskNodes.PatrolTimed(path, npc.RouteSpeed, npc.Position, seconds, seconds)));
 		}
 
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
