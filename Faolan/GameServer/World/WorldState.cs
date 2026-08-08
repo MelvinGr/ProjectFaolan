@@ -672,8 +672,6 @@ namespace Faolan.GameServer.World
 					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcPatrol));
 				}
 
-				e.RouteLapSeconds += deltaSeconds; // #714 probe: how long the model's lap ACTUALLY takes
-
 				// #714: a viewer that just streamed this NPC in is told the beat a few seconds LATER, as retail does -
 				// see RoutePatrolDelaySeconds. Sending it with the spawn made the client dash to reconcile.
 				if (e.RoutePatrolDelayRemaining > 0)

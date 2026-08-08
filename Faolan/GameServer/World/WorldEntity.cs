@@ -596,10 +596,6 @@ namespace Faolan.GameServer.World
 		// which is the catch-up run seen on a fresh spawn's first laps. Counts down in the tick; 0 = nothing pending.
 		public double RoutePatrolDelayRemaining { get; set; }
 
-		// #714 probe: seconds the MODEL has spent walking since its beat was last issued to the client. Compared against
-		// the duration we STATE in that body - if the two disagree the desync is ours, if they agree it is the client's.
-		public double RouteLapSeconds { get; set; }
-
 		// #716: the client needs (re-)telling what walk it is on - at the start of a lap, and after anything took the
 		// NPC off its beat (a chase, a leash home). Set true at spawn so the first lap is issued.
 		public bool RouteReissueDue { get; set; } = true;

@@ -91,7 +91,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// NB the dev nameplate LABEL (#363) is NOT baked into the spawn name here: the client draws an NPC's floating
 		// name from its template_id LDB, ignoring the spawn-body Name, so the label is pushed separately as a
 		// SetNameIIR after the spawn (WorldBroadcaster.SendWorldSpawn / SetNameCodec).
-		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken)
+		// `movementMode` overrides the type's stored one. It has to be overridable because it is NOT type identity:
+		// retail sends BOTH 1 and 2 for the same creature - 387 of 834 captured NPC names carry more than one value,
+		// Nobleman alone 2x213 and 1x79, and the overall split is 9,334 / 8,016 / 50 over 17,400 spawns. It is
+		// per-spawn-event STATE (how the creature is moving right now), which #244 lifted into the TYPE core, so every
+		// spawn of a type went out locked to one value. See #714.
+		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null)
 		{
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
@@ -109,6 +114,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 
 			var message = BuildMessageFromColumns(row);
+			if (movementMode is { } mode)
+				message.MovementMode = mode;
+
 			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 		}
 

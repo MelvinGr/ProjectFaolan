@@ -1184,7 +1184,13 @@ namespace Faolan.GameServer.World
 					labelSample ??= areaLabel;
 				}
 
-				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
+				// #714: a creature that WALKS a captured beat spawns in movement mode 1, not the type's stored one.
+				// The mode is what the client picks its locomotion speed by (PathMoveTask advances by a per-mode speed
+				// field), and it is per-spawn STATE rather than type identity - retail sends 1 and 2 for the same
+				// creature. Ours were locked to whatever value the type happened to be lifted with, which for the
+				// Old Tarantia patrollers is 2, so they ran their beats.
+				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeOne : (uint?)null;
+				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, spawnMovementMode);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
@@ -1978,7 +1984,7 @@ namespace Faolan.GameServer.World
 						// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
 						// conversation/shop by the stable template key (the same map the world-burst spawns use; players
 						// are not conversation targets).
-						if (ev.Subject is { IsPlayer: false, IsLoot: false, Name: not null })
+						if (ev.Subject is { IsPlayer: false, IsLoot: false })
 						{
 							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
 							recipient.Session.SpawnedNpcTemplatesByHandle[ev.Subject.Handle] = ev.Subject.NpcTemplateId;
@@ -2879,14 +2885,6 @@ namespace Faolan.GameServer.World
 			// attribute - which for an NPC is its RUN speed, and is what made the beat get sprinted and then stood
 			// through.
 			var seconds = PatrolRoute.TotalLength(npc.Position, ahead) / npc.RouteSpeed;
-
-			// #714 probe: the model's ACTUAL lap time beside the duration we state. If they disagree the desync is
-			// ours; if they agree, whatever makes a fresh spawn run its first laps is on the client side.
-			_logger.LogInformation(
-				"Patrol probe: {Name} 0x{Handle:X8} idx {Index}{Dir}{Loop} pts {Pts} len {Len:F1}u stated {Stated:F1}s modelLap {Lap:F1}s at ({X:F1},{Z:F1})",
-				npc.Name, npc.Handle, npc.RouteIndex, npc.RouteBackwards ? " back" : " fwd", npc.RouteLoops ? " loop" : " open",
-				path.Count, PatrolRoute.TotalLength(npc.Position, ahead), seconds, npc.RouteLapSeconds, npc.Position.X, npc.Position.Z);
-			npc.RouteLapSeconds = 0;
 
 			return MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.Position,
 				MoveTaskNodes.PatrolTimed(path, npc.RouteSpeed, npc.Position, seconds, seconds)));
