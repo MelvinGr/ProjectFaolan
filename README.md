@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,058 placements · 4,225 items · 20,848 spells · 265 abilities · 19,777 feats · 515 conversation nodes · 70 shops · 5,048 quests · 2,400 world objects · 853 patrol routes · 14 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,659 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -30,9 +30,9 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-- **NPC conversations** — 74/78 greeted dialogue NPCs imported (94.9%)
-- **Vendor shops** — 48/48 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,448/77,631 decrypted, **5.7% of the total encrypted**. Keys held per category: 4,183 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **NPC conversations** — 110/117 greeted dialogue NPCs imported (94.0%)
+- **Vendor shops** — 75/75 captured vendors imported (100.0%)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,874/77,631 decrypted, **6.3% of the total encrypted**. Keys held per category: 4,609 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -57,8 +57,9 @@ we've seen_, and names the gaps). Regenerate with
   captures (#377)
 - ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy
 - ✅ **Sit on benches** — sitting down, switching seats and standing up (#355)
-- 🟡 **Resource harvesting** — mining, chopping and picking yield the matching resource across all 141 nodes; the
-  node empties and returns on zone reload. Missing: per-swing depletion, a real respawn timer, and Elm/Slate (#494)
+- 🟡 **Resource harvesting** — mining, chopping and picking on the 144 nodes the captures have shown us; one
+  swing takes 10% of the node and gives 1 unit. Missing: regrowth in place, the harvest ambush, rare
+  cross-drops, Elm/Slate (#494, #732)
 - 🟡 **Ambient wildlife & spawns** — each zone's spawn groups are decoded from the client and a live spawner keeps
   them stocked and roaming. The creature type per group is server-only, so ~21% are auto-matched and the rest are
   hand-confirmed (#332, #363)
@@ -154,6 +155,8 @@ we've seen_, and names the gaps). Regenerate with
 ### Items & economy
 
 - ✅ **Inventory** — containers, equipping, moving items, and starting gear
+- 🟡 **"Created by" on crafted items** — survives a relog, a move and a stack split; a WORN item loses it
+  (#727, #733)
 - ✅ **The full economy** — vendors (the shop window opens on use), bank storage, the auction house (list and buy),
   and mail carrying money and item attachments
 - ✅ **Item claims** — the account claim/redeem window, including infinite and multi-charge claims (#359)
@@ -167,7 +170,9 @@ we've seen_, and names the gaps). Regenerate with
   per-hit formulas are provisional pending in-client tuning (#3, #395, #401, #441)
 - 🟡 **Guild bank** — a member can withdraw money, rank-gated and balance-checked; the window itself, deposits
   and item storage are unhandled (#132, #654)
-- ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing (#311)
+- 🟡 **Crafting** — the recipe book, and making a recipe: materials consumed, product granted with its
+  crafter's name. Professions and ranks are not modelled, so nothing gates who may craft what (#148, #735)
+- ⬜ Gem socketing (#311)
 
 ### Social & guilds
 
