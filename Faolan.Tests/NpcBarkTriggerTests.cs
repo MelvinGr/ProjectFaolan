@@ -24,14 +24,15 @@ namespace Faolan.Tests
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var byChannel = db.NpcChatter.AsNoTracking().Select(c => c.Channel).Distinct().OrderBy(c => c).ToArray();
 
-			// The whole corpus: 5 channels over 24 rows / 7 NPC types. If a re-harvest adds a sixth, this fails and
+			// The whole corpus: 6 channels over 25 rows / 8 NPC types. If a re-harvest adds a seventh, this fails and
 			// the new one has to be classified deliberately rather than silently defaulting to Ambient.
 			//
-			// It has already earned its keep: the 2026-08-08 gameplay captures added `broadcastcycle` (the Chronicler
-			// of Deeds' achievement announcements) and this is what caught it. It would have defaulted to Ambient -
-			// which is the right answer here, since the name states the cue - but silently, and the next new channel
-			// might not be.
-			Assert.Equal(new[] { "broadcastcycle", "conversation1", "conversation2", "event", "sendtell" }, byChannel);
+			// It has earned its keep TWICE. The first 2026-08-08 gameplay captures added `broadcastcycle` (the
+			// Chronicler of Deeds' achievement announcements), which would have defaulted to Ambient - the right
+			// answer there, since the name states the cue. The armoury captures the same day added `eventactions`
+			// (the Cimmerian child's `CityLifeCimmerianChildReactToPlayer`), where the default would have been
+			// WRONG: it reacts to a player and carries a `PC.name` slot, so it is Detection.
+			Assert.Equal(new[] { "broadcastcycle", "conversation1", "conversation2", "event", "eventactions", "sendtell" }, byChannel);
 		}
 
 		[Theory]
@@ -40,6 +41,7 @@ namespace Faolan.Tests
 		[InlineData("sendtell", BarkTrigger.Detection)] //    RenownCrier - a TELL, addressed at the player it detected
 		[InlineData("event", BarkTrigger.EncounterScript)] // RnBLadyInDistressBrainScript - the #502 encounter's own trigger
 		[InlineData("broadcastcycle", BarkTrigger.Ambient)] // AchievementsPetHeraldOfDeeds - a broadcast, on a cycle
+		[InlineData("eventactions", BarkTrigger.Detection)] // CityLifeCimmerianChildReactToPlayer - reacts TO a player
 		public void ChannelNamesTheCue(string channel, BarkTrigger expected)
 		{
 			Assert.Equal(expected, NpcChatterBarks.TriggerOf(Bark(channel)));

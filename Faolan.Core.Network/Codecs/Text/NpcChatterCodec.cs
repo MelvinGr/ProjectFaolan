@@ -160,6 +160,11 @@ namespace Faolan.Core.Network.Codecs.Text
 		//   broadcastcycle                -> AMBIENT, and the channel name says so outright: a BROADCAST on a CYCLE.
 		//       The Chronicler of Deeds' `AchievementsPetHeraldOfDeeds` lines - an achievements herald announcing to
 		//       nobody in particular, on a clock. Same cue as the conversation channels, different publisher.
+		//   eventactions                  -> DETECTION. The Cimmerian child's `CityLifeCimmerianChildReactToPlayer`,
+		//       added by the 2026-08-08 armoury captures. Two independent things say detection and nothing says
+		//       ambient: the group name is literally *ReactToPlayer*, and the row carries a `PC.name` session slot -
+		//       which by the one-way rule below makes it non-ambient outright, since something had to pick that
+		//       player. Same cue as `sendtell`, different delivery (it is said aloud rather than told).
 		//   event                         -> ENCOUNTER SCRIPT. The Damsel's `RnBLadyInDistressBrainScript` cry for
 		//       help, driven by the encounter's own proximity trigger (#502), never by this tier. It was ALSO in the
 		//       ambient pool, so it double-fired on the timer as well as on the trigger.
@@ -171,7 +176,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// tell). A tell still has exactly one recipient, so it is still said on detection. The channel states the CUE;
 		// the slot only decides whether the body has to be built per-recipient (see Addressed).
 		//
-		// ⚠️ The corpus holds only these five channel values (24 rows / 7 NPC types). An unknown channel falls to
+		// ⚠️ The corpus holds only these six channel values (25 rows / 8 NPC types). An unknown channel falls to
 		// Ambient deliberately: a bark on a clock is a cosmetic line at the wrong moment, while a bark wired to a cue
 		// we have not decoded would be a line that never fires at all.
 		public static BarkTrigger TriggerOf(NpcChatterBark bark)
@@ -181,6 +186,7 @@ namespace Faolan.Core.Network.Codecs.Text
 			return bark.Channel switch
 			{
 				"sendtell" => BarkTrigger.Detection,
+				"eventactions" => BarkTrigger.Detection, // *ReactToPlayer*, and it carries a PC.name slot
 				"event" => BarkTrigger.EncounterScript,
 				"broadcastcycle" => BarkTrigger.Ambient, // explicit, not the default: the name states the cue
 
