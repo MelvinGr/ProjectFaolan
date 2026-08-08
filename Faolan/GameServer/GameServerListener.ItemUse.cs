@@ -43,9 +43,15 @@ namespace Faolan.GameServer
 		private async Task HarvestResourceNode(INetworkClient client, LiveWorldObject node)
 		{
 			var character = client.Session.Character;
-			var name = node.Row.Name;
-			if (HarvestCatalog.ResourceFor(name) is not { } resourceId)
+
+			// ⚠️ The node is identified by its DISPLAY id, not by Row.Name (#734). The record's name STRING is an
+			// internal name retail itself gets wrong - the silver vein ships as "Martial Ring", a copper node as
+			// "Vitalic Bronze-studded Armbands" - so keying on it left those rows silently inert. `Name` here is the
+			// LDB name the player actually sees, which is also what the messages below should say.
+			if (HarvestCatalog.NodeFor(node.Row.DisplayCategory, node.Row.DisplayId) is not { ResourceItemId: { } resourceId } harvest)
 				return;
+
+			var name = harvest.Name;
 
 			if (!node.IsHarvestable)
 			{
@@ -55,7 +61,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var count = HarvestCatalog.YieldFor(name);
+			var count = HarvestCatalog.YieldFor(node.Row.DisplayId);
 			if (await GrantItemToBackpack(client, resourceId, count) == null)
 			{
 				// Bag full: refuse the harvest ENTIRELY rather than consuming the node for nothing. The node keeps its

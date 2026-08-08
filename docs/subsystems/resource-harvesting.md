@@ -10,7 +10,7 @@ Harvest nodes reach the client as `DestructibleFullUpdateIIR` (`0x6BD56736`) wor
 (Gitea #498) and from a destructible CNPC at 70,000.
 The `(current, max)` pair sits at **body-end −20 / −16**.
 
-All 141 nodes across 20 names were already imported into `WorldObjects` by `WorldObjectExtractor` and already
+All 197 nodes across 25 node TYPES were already imported into `WorldObjects` by `WorldObjectExtractor` and already
 streamed to the client; only the interaction was missing.
 
 ⚠️ **Two traps, both of which cost real analysis time:**
@@ -132,11 +132,11 @@ regrow — so "bottoms out at 1, then despawns" is what the *earlier* captures' 
 Nobody swung at a node holding less than 100, so whether a partial pool can pay for a swing is unmeasured.
 [V0: whether a node under 100 health can still be harvested]
 
-## The node's own name string lies
+## The node's own name string lies — so the key is the DISPLAY id (#734)
 
 The `DestructibleFullUpdateIIR` carries both a name STRING and a `DisplayId`. The client shows the `DisplayId`
-resolved through **LDB category 50200**; the string is an internal name that retail itself has wrong on two of
-the ore nodes:
+resolved through **LDB category 50200**; the string is an internal name that retail itself has wrong on several
+of the nodes:
 
 | dynel | name string on the wire | LDB 50200 (what the client shows) |
 |---|---|---|
@@ -145,14 +145,24 @@ the ore nodes:
 | `0x2688` | `Gold Vein` | Gold Vein |
 | `0x269a` | `Iron Node` | Iron Node |
 
-This matters because `HarvestCatalog` keys on the NAME. `WorldObjects` mostly carries the resolved name, but one
-shipped row is `Vitalic Bronze-studded Armbands` (with `DisplayId` 3237648 = *Copper Node* sitting right beside
-it), which makes that node silently un-harvestable. Never take a dynel's display name from the string field.
+Across the shipped `WorldObjects` rows the same defect appears on **seven** node types — the two above plus an
+ash tree shipping as `Bloodsilver-studded Gloves`, a cotton shrub as `Blacksmithing Hammer TESTITEM`, and three
+carrying raw `NPC_Global_leather_…` asset names. Most rows of each node type carry the right string and a few do
+not, which is what made a name key look like it worked.
 
-The node name maps straight to the resource, and the whole family already ships (161190-161225: Ironsilk, Silk,
-Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandstone, Oak, Yew, Ash) matching the
-streamed node names one-for-one. `HarvestCatalog` therefore keys on the node **name**, the same stable key shops
-and conversations use — so no new column, no importer change, and no re-harvest of `faolan.db`.
+`HarvestCatalog` therefore keys on the **display reference** — `(DisplayCategory 50200, DisplayId)` — and carries
+the LDB name beside each entry as documentation and as the text the server logs and says. Both halves of the
+reference are required: an LDB id is only unique within its category, and the guild-city destructibles next door
+are category `50050` with ids as low as 73.
+
+That also fixed the gate. `HarvestCatalogTests` used to look for shipped nodes by NAME SUFFIX (`" Tree"`,
+`" Rock"`, `" Node"`, `" Vein"`, `" Shrub"`), which made it blind to exactly the rows the catalog was blind to —
+it passed with seven node types uncovered. It now enumerates every **destructible whose max-health trailer word
+is 1000 in category 50200**, which is the client's own definition of a harvest node, and demands a catalog entry
+for each. That raised the catalog from 13 node types to the **25** that actually ship.
+
+The node name maps straight to the resource, and most of the family already ships (161190-161225: Ironsilk, Silk,
+Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandstone, Oak, Yew, Ash).
 
 ## What is not modelled
 
@@ -170,9 +180,13 @@ and conversations use — so no new column, no importer change, and no re-harves
 - **The rare cross-drop.** A copper node paid out **tin** — a resource from a different node type — into its own
   resource slot at 18:39:57, beside the copper stack it was filling. So the yield is a roll against a table, not
   a fixed node→resource mapping, and `HarvestCatalog.Resources` models only the fixed part.
-- **`Elm Tree` and `Slate Rock`** ship as nodes but no item named Elm or Slate exists in `faolan.db`, so they are
-  deliberately absent from the catalog and inert. `HarvestCatalogTests` fails if an import ever supplies one, so
-  the gap cannot quietly become permanent.
+- **Eleven node types have no resource item in `faolan.db`** — `Elm Tree`, `Ironwood`, `Greenstone Formation`,
+  `Marble`, `Slate Rock`, `Nickel Deposit`, `Chromium Deposit`, `Pyrite Lode`, `Bismuth Lode`, `Mithrite Lode`.
+  They are listed in `HarvestCatalog.Nodes` with a **null** resource rather than omitted, so they render, deplete
+  and name themselves correctly but pay out nothing; inventing an id would hand out the wrong resource.
+  `HarvestCatalogTests` fails if an import ever supplies one, so the gap cannot quietly become permanent.
+- **`Sandstone` and `Lead Deposit`** were in the same gap until #734 and are not any more: both have a shipped
+  item (161207, 3927913) and were only missing because the name key never reached them.
 - **`Birch Tree`** yields Birch **3927910**, outside the `1611xx` band every other resource sits in. Included
   because the row is structurally identical, but it is the one entry whose id space does not corroborate it.
 

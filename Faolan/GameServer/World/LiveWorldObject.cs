@@ -43,7 +43,7 @@ namespace Faolan.GameServer.World
 
 		// True while this node still has something to give. Health bottoms out at 1 in every capture, never 0, and the
 		// node despawns there - so exhausted is <= ExhaustedHealth rather than == 0.
-		public bool IsHarvestable => HarvestCatalog.IsHarvestable(Row.Name) && (Health ?? HarvestCatalog.NodeMaxHealth) > HarvestCatalog.ExhaustedHealth;
+		public bool IsHarvestable => HarvestCatalog.IsHarvestable(Row.DisplayCategory, Row.DisplayId) && (Health ?? HarvestCatalog.NodeMaxHealth) > HarvestCatalog.ExhaustedHealth;
 
 		// The quest gate travels with the row (#262): an object no player-quest reveals is absent entirely.
 		public bool SpawnsFor(IReadOnlySet<uint> quests)

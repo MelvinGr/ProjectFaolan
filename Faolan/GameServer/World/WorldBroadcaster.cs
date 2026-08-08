@@ -245,7 +245,7 @@ namespace Faolan.GameServer.World
 					// playfield and regrow, and neither the sharing nor a respawn cadence is measured - so a fresh zone
 					// giving a full node is the closest honest model, and it means a harvested node comes back rather
 					// than being gone for good. Null for everything that is not a node.
-					Health = HarvestCatalog.IsHarvestable(row.Name)
+					Health = HarvestCatalog.IsHarvestable(row.DisplayCategory, row.DisplayId)
 						? HarvestCatalog.NodeMaxHealth
 						: null
 				})
@@ -1358,7 +1358,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 				return null;
 
-			return HarvestCatalog.IsHarvestable(live.Row.Name)
+			return HarvestCatalog.IsHarvestable(live.Row.DisplayCategory, live.Row.DisplayId)
 				? live
 				: null;
 		}

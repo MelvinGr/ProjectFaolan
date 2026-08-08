@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -13,6 +14,12 @@ namespace Faolan.Tests
 	// covered by it.
 	public class HarvestCatalogTests
 	{
+		// The destructible class every harvest node arrives as (0x6BD56736).
+		private const uint DestructibleClass = 0x6BD56736;
+
+		// The trailer word that carries a destructible's MAX health - Kind 1, ordinal 1 of WorldObjectWords.
+		private const int MaxHealthOrdinal = 1;
+
 		// The three rows a capture actually measured, each landing beside its own annotation. If the item ids drift,
 		// the identification is what broke.
 		//
@@ -21,13 +28,14 @@ namespace Faolan.Tests
 		// Iron is 40, 60 and 40, which is why the misread looked like three independent measurements. The count is on
 		// the ADD, in stat_list 26, and it is 1 on every captured harvest in both mining captures.
 		[Theory]
-		[InlineData("Granite Rock", 161206u)] // `just mined`
-		[InlineData("Oak Tree", 161213u)] // `gethering wood` - the tree the maintainer chopped down
-		[InlineData("Iron Node", 161196u)] // `mining iron`
-		public void TheMeasuredNodes_YieldOneUnitPerSwing(string node, uint itemId)
+		[InlineData(3237642u, "Granite Rock", 161206u)] // `just mined`
+		[InlineData(3237647u, "Oak Tree", 161213u)] // `gethering wood` - the tree the maintainer chopped down
+		[InlineData(3237652u, "Iron Node", 161196u)] // `mining iron`
+		public void TheMeasuredNodes_YieldOneUnitPerSwing(uint displayId, string name, uint itemId)
 		{
-			Assert.Equal(itemId, HarvestCatalog.ResourceFor(node));
-			Assert.Equal(HarvestCatalog.YieldPerSwing, HarvestCatalog.YieldFor(node));
+			Assert.Equal(name, HarvestCatalog.NameFor(HarvestCatalog.NodeDisplayCategory, displayId));
+			Assert.Equal(itemId, HarvestCatalog.ResourceFor(HarvestCatalog.NodeDisplayCategory, displayId));
+			Assert.Equal(HarvestCatalog.YieldPerSwing, HarvestCatalog.YieldFor(displayId));
 		}
 
 		// The level of each node's resource - the value the old yield table had actually captured. Kept as a gate so
@@ -49,8 +57,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void AnUnmeasuredNode_YieldsItsResourceAtTheDefaultCount()
 		{
-			Assert.Equal(161218u, HarvestCatalog.ResourceFor("Yew Tree"));
-			Assert.Equal(HarvestCatalog.DefaultYield, HarvestCatalog.YieldFor("Yew Tree"));
+			Assert.Equal(161218u, HarvestCatalog.ResourceFor(HarvestCatalog.NodeDisplayCategory, 3237646)); // Yew Tree
+			Assert.Equal(HarvestCatalog.DefaultYield, HarvestCatalog.YieldFor(3237646));
 			Assert.True(HarvestCatalog.DefaultYield > 0, "a default yield of 0 would be a harvest that grants nothing");
 		}
 
@@ -63,17 +71,19 @@ namespace Faolan.Tests
 			Assert.Equal(0u, HarvestCatalog.NodeMaxHealth % HarvestCatalog.SwingCost);
 		}
 
-		// Not everything destructible is harvestable - the guild-city pieces of #498 are the same IIR with max 1,000,000,
-		// and treating one as a node would hand out resources for hitting a wall.
+		// An LDB id is only unique WITHIN its category, so both halves of the display reference are required. The
+		// guild-city destructibles next door are category 50050 with ids as low as 73, and the PvP objectives are
+		// 55000 - matching on the id alone would eventually hand a resource out for hitting a wall.
 		[Theory]
-		[InlineData("Location Object - Walls")]
-		[InlineData("Treasure Chest")]
-		[InlineData("The Hanging Tree")] // a NAMED landmark, not a Yew/Oak/Ash resource tree
-		[InlineData(null)]
-		public void NonNodes_AreNotHarvestable(string? name)
+		[InlineData(50050u, 121u)] // "Location Object - Walls" - a guild-city piece
+		[InlineData(55000u, 4356532u)] // "Capturable Objective" - a PvP objective, and it DOES carry max health 1000
+		[InlineData(null, null)]
+		[InlineData(HarvestCatalog.NodeDisplayCategory, 3966659u)] // "Supply Crate" - right category, not a node
+		public void NonNodes_AreNotHarvestable(uint? category, uint? displayId)
 		{
-			Assert.False(HarvestCatalog.IsHarvestable(name));
-			Assert.Null(HarvestCatalog.ResourceFor(name));
+			Assert.False(HarvestCatalog.IsHarvestable(category, displayId));
+			Assert.Null(HarvestCatalog.ResourceFor(category, displayId));
+			Assert.Null(HarvestCatalog.NodeFor(category, displayId));
 		}
 
 		// Every resource the catalog points at must be a real item: a missing Items row cannot be added to a bag, so
@@ -84,63 +94,91 @@ namespace Faolan.Tests
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
-			var broken = new System.Collections.Generic.List<string>();
+			var broken = new List<string>();
 
-			foreach (var (node, itemId) in HarvestCatalog.Resources)
+			foreach (var node in HarvestCatalog.Nodes.Values.Where(n => n.ResourceItemId != null))
 			{
-				var item = await db.Items.FirstOrDefaultAsync(i => i.Id == itemId, ct);
+				var item = await db.Items.FirstOrDefaultAsync(i => i.Id == node.ResourceItemId, ct);
 				if (item == null)
-					broken.Add($"{node} -> item {itemId} has no Items row");
+					broken.Add($"{node.Name} -> item {node.ResourceItemId} has no Items row");
 			}
 
 			Assert.True(broken.Count == 0, "Harvest resources that cannot be granted: " + string.Join("; ", broken));
 		}
 
-		// The catalog is keyed by node NAME, so a node shipping under a name the catalog does not know is simply
-		// un-harvestable with nothing to say so. This is the gate that catches that - it reads the SHIPPED rows rather
-		// than a list, so a re-import that adds a new node type fails here instead of shipping an inert node.
+		// ⚠️ THE #734 GATE, and the reason this one is keyed on the DISPLAY id.
 		//
-		// Scoped to the resource-node name SHAPES (Tree/Rock/Node/Vein/Shrub) so it does not drag in landmarks like
-		// "The Hanging Tree" or "Two Trees"; those are decor that happens to share a word, and the allowlist below says
-		// so explicitly rather than letting the filter quietly skip them.
+		// It used to filter shipped rows by NAME suffix (" Tree" / " Rock" / " Node" / " Vein" / " Shrub"), which made
+		// it blind to exactly the rows the catalog was blind to: a silver vein whose name string says "Martial Ring",
+		// a copper node called "Vitalic Bronze-studded Armbands", an ash tree called "Bloodsilver-studded Gloves", a
+		// cotton shrub called "Blacksmithing Hammer TESTITEM" and three raw NPC_Global_leather_… asset names. Every one
+		// of those is a real, streamed, inert node, and the old gate passed with all seven uncovered.
+		//
+		// The discriminator here is structural instead: a DESTRUCTIBLE whose max-health trailer word is exactly
+		// NodeMaxHealth, in the node display category. That is the client's own definition of a harvest node, so a
+		// re-import that adds a node type fails here rather than shipping something inert.
 		[Fact]
 		public async Task EveryShippedResourceNode_IsInTheCatalog()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
-			// Decor whose name contains a resource word but which is NOT a harvest node.
-			string[] notResources = ["The Hanging Tree", "Two Trees", "The Rock", "Small Rock", "Moss-Covered Rock"];
+			var shipped = await db.WorldObjects
+				.Where(o => o.SubOpcode == DestructibleClass && o.DisplayCategory == HarvestCatalog.NodeDisplayCategory)
+				.Where(o => o.Words.Any(w => w.Ordinal == MaxHealthOrdinal && w.Value == HarvestCatalog.NodeMaxHealth))
+				.Select(o => o.DisplayId).Distinct().ToListAsync(ct);
 
-			// Real harvest nodes we CANNOT grant from: no item named Elm or Slate exists in faolan.db, so there is
-			// nothing to hand the player. Listed rather than silently filtered, and deliberately not guessed at - an
-			// invented id would hand out the wrong resource. Delete an entry the moment its item shows up in an import.
-			string[] noResourceItemShipped = ["Elm Tree", "Slate Rock"];
+			Assert.NotEmpty(shipped); // the gate must not go vacuous if the class word or the trailer layout moves
 
-			var names = await db.WorldObjects
-				.Where(o => o.Name != null && (o.Name.EndsWith(" Tree") || o.Name.EndsWith(" Rock") || o.Name.EndsWith(" Node") || o.Name.EndsWith(" Vein") || o.Name.EndsWith(" Shrub")))
-				.Select(o => o.Name!).Distinct().ToListAsync(ct);
-
-			var uncovered = names.Where(n => !notResources.Contains(n)).Where(n => !noResourceItemShipped.Contains(n))
-				.Where(n => !HarvestCatalog.IsHarvestable(n)).OrderBy(n => n).ToList();
-
+			var uncovered = shipped.Where(id => !HarvestCatalog.Nodes.ContainsKey(id!.Value)).OrderBy(id => id).ToList();
 			Assert.True(uncovered.Count == 0,
-				"Shipped resource nodes with no catalog entry (they would be inert): " + string.Join(", ", uncovered));
+				"Shipped harvest nodes with no catalog entry (they would be inert): " + string.Join(", ", uncovered));
+		}
 
-			// And the gap list may not rot: an entry whose item HAS since been imported should be promoted to a real
-			// catalog row rather than left sitting here looking like a permanent limitation.
-			var resolvable = new System.Collections.Generic.List<string>();
-			foreach (var node in noResourceItemShipped)
+		// The catalog's name for a node has to be the name the client shows, and the shipped rows are the only check
+		// available without the client LDB: retail's own name string is right on MOST rows of a node type and wrong on
+		// a few, so the catalog name must appear among them. A typo, or a name copied off one of the WRONG rows, fails
+		// here.
+		[Fact]
+		public async Task EveryCatalogName_AppearsOnAShippedRowOfThatNode()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var namesById = (await db.WorldObjects
+					.Where(o => o.SubOpcode == DestructibleClass && o.DisplayCategory == HarvestCatalog.NodeDisplayCategory && o.Name != null)
+					.Select(o => new { o.DisplayId, o.Name }).Distinct().ToListAsync(ct))
+				.GroupBy(r => r.DisplayId!.Value)
+				.ToDictionary(g => g.Key, g => g.Select(r => r.Name!).ToArray());
+
+			var wrong = HarvestCatalog.Nodes.Values
+				.Where(n => namesById.TryGetValue(n.DisplayId, out var names) && !names.Contains(n.Name))
+				.Select(n => $"{n.DisplayId} '{n.Name}' - shipped rows say {string.Join(" / ", namesById[n.DisplayId])}")
+				.ToList();
+
+			Assert.True(wrong.Count == 0, "Catalog names that no shipped row of that node carries:\n  " + string.Join("\n  ", wrong));
+		}
+
+		// The content gap may not rot: a node listed with no resource item whose item HAS since been imported should be
+		// promoted to a real payout rather than left inert. This is the old "gap list" check, moved off a test-local
+		// string array and onto the catalog's own null entries.
+		[Fact]
+		public async Task NodesWithNoResource_StillHaveNoMatchingItem()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var resolvable = new List<string>();
+
+			foreach (var node in HarvestCatalog.Nodes.Values.Where(n => n.ResourceItemId == null))
 			{
-				var resource = node.Replace(" Tree", "").Replace(" Rock", "");
-				// No `Hash != 0` here: since #723 an item is grantable whether or not a capture harvested its
-				// token, so the only question left is whether the resource item EXISTS.
+				// "Nickel Deposit" -> "Nickel", "Elm Tree" -> "Elm", "Marble" -> "Marble".
+				var resource = node.Name.Split(' ')[0];
 				if (await db.Items.AnyAsync(i => i.Name == resource, ct))
-					resolvable.Add($"{node} -> '{resource}'");
+					resolvable.Add($"{node.Name} -> '{resource}'");
 			}
 
 			Assert.True(resolvable.Count == 0,
-				"These nodes now HAVE a grantable resource item - add them to HarvestCatalog.Resources and drop them from the gap list: " + string.Join(", ", resolvable));
+				"These nodes now HAVE a grantable resource item - give them a ResourceItemId instead of null: " + string.Join(", ", resolvable));
 		}
 	}
 }
