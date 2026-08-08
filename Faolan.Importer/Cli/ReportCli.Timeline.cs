@@ -79,6 +79,7 @@ namespace Faolan.Importer.Cli
 			var start = new DateTimeOffset(events[0].Ticks, TimeSpan.Zero);
 			Console.WriteLine($"# {Path.GetFileName(dumpPath)}");
 			Console.WriteLine($"# {start:u}   {(events[^1].Ticks - events[0].Ticks) / (double)TimeSpan.TicksPerSecond:F1}s   {packets.Count} packets");
+			TimelineAnnotations(events, look);
 			Console.WriteLine();
 
 			var suppressed = new Dictionary<string, int>();
@@ -95,11 +96,49 @@ namespace Faolan.Importer.Cli
 				var hex = Convert.ToHexString(e.Raw).ToLowerInvariant();
 				if (hex.Length > 72)
 					hex = hex[..72] + "\u2026";
-				Console.WriteLine($"{seconds,8:F1} {e.Frame,7} {e.Tier,-11} {Dir(e.Direction)} {e.Name,-32} {detail}"
+
+				// The player's own typed lines are marked, because on an ANNOTATED capture they are the only record of
+				// intent the session has and they are otherwise one line in ten thousand.
+				var marker = IsPlayerChat(e) ? ">>" : "  ";
+				Console.WriteLine($"{marker}{seconds,8:F1} {e.Frame,7} {e.Tier,-11} {Dir(e.Direction)} {e.Name,-32} {detail}"
 				                  + (hex.Length > 0 ? $"   [{hex}]" : ""));
 			}
 
 			TimelineFooter(events, look, suppressed);
+		}
+
+		// A line the PLAYER typed, as opposed to one the server pushed at them. The c2s side is the honest test: an
+		// NPC bark and the server's echo of the player's own line are both s2c `CharacterChat` on the chat tier and
+		// look identical, while `ChatVicinity` / `ChannelChat` going UP the wire can only have been typed.
+		private static bool IsPlayerChat(TimelineEvent e)
+		{
+			return e.Direction == "c2s" && e.Name is "ChatVicinity" or "ChannelChat" or "Whisper";
+		}
+
+		// The ANNOTATION INDEX, printed under the header.
+		//
+		// The maintainer narrates what he is doing in /say as he plays, which is the only record of INTENT a capture
+		// carries - and it is scattered through ten thousand lines. Lifting it to the top turns the dump into a
+		// labelled index: "17:44:47 just put 1 skillpoint in run speed" is a pointer straight at four packets that
+		// would otherwise have to be found by hand.
+		//
+		// ⚠️ **A line describes something that already happened.** The lag is ~5 s and it runs BACKWARDS: by the time
+		// a line is typed the event is over, and the player's NEXT action can land inside the window. So an annotation
+		// names an EVENT, never "the packets nearest to it" - attribute traffic only when the message text, a named
+		// token or a matching id corroborates it.
+		private static void TimelineAnnotations(List<TimelineEvent> events, TimelineLookups look)
+		{
+			var typed = events.Where(IsPlayerChat).ToList();
+			if (typed.Count == 0)
+				return;
+
+			Console.WriteLine();
+			Console.WriteLine($"# {typed.Count} line(s) the player typed - the capture's own annotations. ⚠️ each one describes something ~5s EARLIER.");
+			foreach (var e in typed)
+			{
+				var seconds = (e.Ticks - events[0].Ticks) / (double)TimeSpan.TicksPerSecond;
+				Console.WriteLine($"#   {seconds,8:F1} {new DateTimeOffset(e.Ticks, TimeSpan.Zero):HH:mm:ss}  {look.Text(e.Content)}");
+			}
 		}
 
 		private static string Dir(string direction)

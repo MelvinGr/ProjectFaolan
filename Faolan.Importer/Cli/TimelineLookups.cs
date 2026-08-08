@@ -30,7 +30,7 @@ namespace Faolan.Importer.Cli
 			Ticks = packet.Ticks;
 			Frame = packet.Frame;
 			Direction = packet.Direction;
-			Tier = look.Tier(packet.Port);
+			Tier = look.Tier(packet);
 			Raw = packet.Body;
 			// ⚠️ The opcode alone CANNOT tell an IIR carrier from an ordinary method: opcodes are PER INTERFACE and
 			// every interface numbers its first method 0x2000, so PassBlob, InitiateAuthentication, DispatchChallenge
@@ -134,13 +134,53 @@ namespace Faolan.Importer.Cli
 			return look;
 		}
 
-		public string Tier(int port)
+		// Which service tier a packet sat on.
+		//
+		// ⚠️ **NOT a port lookup** (#730). This used to be `7010 universe / 7011 playeragent / 7012 cs / 7001 chat /
+		// 7017 game` - OUR OWN deployment's ports. Retail's are 7010 / 7011 / **7013** / **7002** / **7025**+**7031**,
+		// so on every retail capture chat, cs and game fell through to a bare port number - and a tier the report does
+		// not recognise falls back to the GAME opcode tables, which is how a chat channel subscription came out named
+		// `DispatchCloseDialogForLockedItemsInLootBag` and the maintainer's own annotations came out as
+		// `DispatchMoveInventoryItemFromGuildBank`. Every capture in the corpus is retail's, so the map named nothing
+		// but the two ports that happen to agree.
+		//
+		// The signals that ARE deployment-independent: the dump's `Protocol` column for chat (a ChatServer frame
+		// carries no RpcHeader at all), and the frame's own ENDPOINT class for everything else. The port is kept only
+		// as the last resort, for a frame whose dump row has neither.
+		public string Tier(CapturedPacket packet)
 		{
-			return port switch
+			if (packet.Protocol == "ChatServer")
+				return "chat";
+
+			var endpoint = packet.ReceiverClass != 0 ? packet.ReceiverClass : packet.SenderClass;
+			switch (endpoint)
 			{
-				7010 => "universe", 7011 => "playeragent", 7012 => "cs", 7001 => "chat", 7017 => "game",
-				0 => "?", _ => port.ToString()
-			};
+				case RpcInterfaces.UniverseAgentType:
+				case RpcInterfaces.UniverseInterfaceType:
+					return "universe";
+
+				case RpcInterfaces.PlayerAgentType:
+				case RpcInterfaces.PlayerInterfaceType:
+				case RpcInterfaces.PlayerAgentServiceConnectionType:
+					return "playeragent";
+
+				case RpcInterfaces.CSPlayerAgentType:
+				case RpcInterfaces.CSPlayerInterfaceType:
+					return "cs";
+
+				case RpcInterfaces.GameAgentType:
+				case RpcInterfaces.GameInterfaceType:
+				case RpcInterfaces.GameCharAgentType:
+				case RpcInterfaces.GameCharInterfaceType:
+				case RpcInterfaces.GameCharAgentProjectType:
+				case RpcInterfaces.GameCharInterfaceProjectType:
+				case RpcInterfaces.TradepostAgentType:
+				case RpcInterfaces.TradepostInterfaceType:
+					return "game";
+
+				default:
+					return packet.Port == 0 ? "?" : packet.Port.ToString();
+			}
 		}
 
 		// Which interface each RECEIVER endpoint class is. The receiver is the object being addressed - the server's
@@ -205,7 +245,11 @@ namespace Faolan.Importer.Cli
 			}
 			catch (Exception e) when (e is IOException or InvalidDataException)
 			{
-				return $"0x{packet.WireOpcode:x4} (unparseable header)";
+				// The DUMP already recorded the method - the Wireshark dissector read it off the real frame, before
+				// our Rebuild had a chance to lose anything - so a header we cannot re-frame is not a dead end. This
+				// is what was rendering every keep-alive as "0x2085 (unparseable header)"; the frames are fine, our
+				// reconstruction of their RpcHeader is what fails on them.
+				method = packet.MethodId;
 			}
 
 			return Enum.GetName(methods, method) ?? $"0x{method:x8}";
@@ -216,19 +260,24 @@ namespace Faolan.Importer.Cli
 			if (iir != 0)
 				return IirNames.TryGetValue(iir, out var n) ? n : $"0x{iir:x8}";
 
-			// PlayerAgent/PlayerInterface have no opcodes (#613). The dump's u16 is only the method varint's FIRST
-			// group there and collides - `0x20EC` is both ReceivedCharacterSettings and AuthenticateLoggedIn - so the
-			// frame is re-read for its whole method constant and named from that.
+			// EVERY Conan frame is named from its `method_instance`, re-read out of the header.
+			//
+			// ⚠️ It used to compare the dump's u16 against the enum directly for all but PlayerAgent/PlayerInterface,
+			// and since #615 that is comparing two different spaces: an enum member IS the method (`ChatVicinity =
+			// 0x02`) while the dump records the WIRE RENDERING of it (`0x2002`). So the compare simply never matched,
+			// and 4,136 of the 8,646 game/cs frames in one capture - nearly half - rendered as a bare `0x2020`. The
+			// same mismatch `CapturedPacket.Wire(...)` exists to bridge, one lookup over.
 			if (MethodsByReceiver.TryGetValue(packet.ReceiverClass, out var methods))
 				return NameOfMethod(packet, methods);
 
-			var opcode = (ushort)packet.WireOpcode;
 			if (InterfaceByReceiver.TryGetValue(packet.ReceiverClass, out var iface))
-				return Enum.GetName(iface, opcode) ?? $"0x{packet.WireOpcode:x4}";
+				return NameOfMethod(packet, iface);
 
 			// ChatServer frames carry NO RpcHeader, so they have no endpoint to key off and the tier is all there is
 			// (TsharkCaptureReader leaves SenderClass/ReceiverClass zero for them). Its two enums do not collide with
-			// each other, so direction alone separates them.
+			// each other, so direction alone separates them. Here the dump's u16 IS the opcode - chat has no method
+			// field to render, which is why these are the only two `*Opcodes` enums in the codebase.
+			var opcode = (ushort)packet.WireOpcode;
 			foreach (var type in InterfacesFor(tier, packet.Direction == "c2s"))
 			{
 				var name = Enum.GetName(type, opcode);

@@ -99,7 +99,7 @@ namespace Faolan.Importer.Captures
 						: "";
 					list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full,
 						p.TryGetProperty("Frame", out var fr) && fr.TryGetInt32(out var frame) ? frame : 0,
-						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass")));
+						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass"), ParseHex(p, "MethodId")));
 				}
 			}
 

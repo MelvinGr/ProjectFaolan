@@ -39,6 +39,16 @@ happened is the job, and an event and its consequence must not land under differ
 Per-frame movement/heartbeat traffic is suppressed with a printed count of what was dropped, never
 silently.
 
+**Read the ANNOTATION INDEX under the header first.** On an annotated capture the maintainer narrates
+what he is doing in `/say` as he plays, and those lines are the only record of INTENT a capture carries.
+The timeline lifts them all to the top with their timestamps, and marks each one `>>` where it falls in
+the stream.
+
+⚠️ **An annotation names an EVENT, not the packets nearest to it.** The lag is ~5 s and it runs
+BACKWARDS: by the time a line is typed the event is over, and the player's NEXT action can land inside
+the window. Attribute traffic only when the message text, a named token or a matching id corroborates
+it - adjacency is not evidence.
+
 **Read the trailing `#` lines first.** They list the IIR types and methods the capture used that
 `Opcodes.cs` does not name. Anything there is a finding — and so is an id printed raw mid-timeline (a
 template, spell or ability that did not resolve).
