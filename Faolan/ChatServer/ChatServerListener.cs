@@ -101,7 +101,7 @@ namespace Faolan.ChatServer
 
 					// The empty-bodied answer to Hello. Named HelloAck in #532 - from position, since an empty body
 					// gives nothing else to go on, but the position is invariant across all 41 captures.
-					await client.SendAsync(new ChatServerMessage((ushort)ChatServerInterfaceOpcodes.HelloAck));
+					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.HelloAck));
 
 					var character = client.Session.Character!;
 					await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(character.Id, character.Name?.Length > 0

@@ -114,10 +114,10 @@ namespace Faolan.CSPlayerAgent
 					var accountId = body.ReadUInt32();
 					var authReply = body.ReadUInt32();
 
-					client.Session.Account = (await Database.GetAccount(accountId))!;
-					if (client.Session.Account == null)
-						throw new Exception($"Account not found: {accountId:X}");
+					if (await Database.GetAccount(accountId) is not {} account)
+						throw new Exception("Account == null");
 
+					client.Session.Account = account;
 					client.Session.Account.ClientInstance = characterId;
 
 					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,

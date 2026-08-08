@@ -5,7 +5,7 @@
 // layering is: defaults < faolan.json < faolan.user.json < command line < environment.
 //
 // Machine-specific values do NOT belong here - this file is committed and must stay machine-agnostic. Put them
-// in faolan.user.json (gitignored, same keys, it simply wins).
+// in faolan.user.json for example.
 {
 	"Account": {
 		// Character slots advertised when not premium.
@@ -85,6 +85,6 @@
 		// UniverseAgent port. (Main entry point).
 		"UniverseAgentPort": 7010,
 		// Login MOTD.
-		"WelcomeString": "Welcome to Project Faolan!"
+		"WelcomeString": "Welcome to Project Faolan!\n$BUILDSTRING"
 	}
 }

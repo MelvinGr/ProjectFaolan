@@ -588,7 +588,7 @@ namespace Faolan.GameServer
 					// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
 					// above, so here the body is always the >= 12-byte Authenticate2. Guard defensively anyway: a short
 					// body would over-read and drop the client.
-					if (body.Length - body.Position < 12)
+					if (body.Length - body.Position < 12) // TODO: Check if this still happens
 					{
 						Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", body.Length - body.Position);
 						break;
@@ -598,10 +598,10 @@ namespace Faolan.GameServer
 					var accountId = body.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
 					var clientVersion = body.ReadString();
 
-					client.Session.Account = (await Database.GetAccount(accountId))!;
-					if (client.Session.Account == null)
-						throw new Exception($"Account not found: {accountId:X}");
+					if (await Database.GetAccount(accountId) is not {} account)
+						throw new Exception("Account == null");
 
+					client.Session.Account = account;
 					client.Session.Account.ClientInstance = clientInstance;
 
 					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,

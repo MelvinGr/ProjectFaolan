@@ -32,7 +32,7 @@ namespace Faolan.Core.Cli
 			Setting(Keys.AccountPremiumCharSlots, "Character slots advertised when premium.", 10u),
 			Setting(Keys.CdnListenAddress, "Address the mirror BINDS - an interface, not the address a client dials.", "0.0.0.0"),
 			Setting<ushort>(Keys.CdnListenPort, "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", 7081),
-			Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (Only used by Faolan.ClientLauncher)", "http://127.0.0.1:7081"),
+			Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (http ONLY)", "http://127.0.0.1:7081"),
 			Setting(Keys.CdnStore, "Directory the mirror stores fetched CDN blobs in.", "./cdn-store"),
 			Setting(Keys.ChatBridgeBacklogGraceMs, "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", 120_000),
 			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)", false),

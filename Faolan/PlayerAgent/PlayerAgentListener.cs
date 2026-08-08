@@ -42,10 +42,10 @@ namespace Faolan.PlayerAgent
 					var accountId = body.ReadUInt32();
 					var cookie = body.ReadUInt32();
 
-					client.Session.Account = (await Database.GetAccount(accountId))!;
-					if (client.Session.Account == null)
-						throw new Exception("client.Account == null");
+					if (await Database.GetAccount(accountId) is not {} account)
+						throw new Exception("Account == null");
 
+					client.Session.Account = account;
 					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
