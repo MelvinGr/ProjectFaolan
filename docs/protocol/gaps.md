@@ -198,11 +198,13 @@ snapshot per level fills a row with no decoding at all.
 which comes in ranks, and that is what gates the recipe book. We DO carry the state and DO send it correctly — it
 rides the spawn scaffold's feat/ability list (`CharacterSkills`, `[u8 rank][u32 id]`), imported per character and
 replayed verbatim, which is why an imported character's professions match retail. What is unknown is which of
-those ids is a profession and what the rank byte counts. The SLOT is now pinned: a profession is a row whose
-`Rank` byte is 65–75, that byte identifies WHICH profession (slots 70–75 carry the same base on every character —
-the Gathering six — while 65–69 are the character's Crafting picks), and the `SkillId` base names it. What is
-still open is the TIER: NecroL80's sheet reads 5 Master + 1 Grandmaster across slots 70–75, and neither the rank
-byte nor the id's trailing `base*100 + rank` digits (`05 05 08 00 05 05`) reproduce that split. Around it:
+those ids is a profession and what the rank byte counts. What IS pinned: a profession is a row whose `Rank` byte
+is 65–75, and **one profession is one row** — a single-profession control (AssassinL23 the assassin: *Miner,
+Apprentice*, one row) against an eight-profession one (NecroL80: eight rows). What that byte MEANS is not settled;
+an earlier "slots 70–75 are the Gathering six" reading was fitted to two near-identical mages and the assassin
+refutes it (his slot-75 base is `3287`, theirs `3234`; base `3232` is slot 66 on one character and 67 on the
+other). The TIER is unlocated too, and the id's trailing `base*100 + rank` digits are not it — NecroL80's two
+Grandmaster crafts read tails `02` and `05`. Around it:
 
 - `TradeskillFlags` (stat `0xCE`) is **not** it — it rides NPCs (a *Dockworker* carries 99), not the player.
 - `Craftmanship` / `MaxCraftmanship` (`0x88` / `0x89`) DO ride the player and move (0 → 1, 0 → 2 → 3 in early

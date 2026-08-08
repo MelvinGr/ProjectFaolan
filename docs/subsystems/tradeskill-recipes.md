@@ -117,46 +117,27 @@ would close the client's window on an item it never received.
   professions match retail exactly. So the gap is the MEANING, not the data: which ids are professions, what the
   rank byte counts, and which recipes each profession covers.
 
-  **The professions are the `CharacterSkills` rows whose `Rank` byte is 65–75 (`0x41`–`0x4B`)**, and that byte
-  is a per-profession **SLOT**, not a level. NecroL80's in-client sheet shows eight professions — Weaponsmith and
-  Armorsmith under *Crafting*, Prospector / Weaver / Skinner / Stonecutter / Woodcutter / Miner under
-  *Gathering* — and she carries exactly eight rows in that band. Lining the two level-80s up by slot:
+  **The professions are the `CharacterSkills` rows whose `Rank` byte is 65–75 (`0x41`–`0x4B`)** — the spawn
+  scaffold's feat/ability list, imported per character and replayed verbatim. **One profession = one row**,
+  which is pinned by a single-profession control: AssassinL23 (assassin) has exactly one profession in-client
+  (*Miner, Apprentice*, no Crafting) and exactly one row in that band, while NecroL80 has eight and eight.
 
-  | slot | NecroL80 | DemoL80 | base |
+  ⚠️ **What that byte MEANS is not settled, and an earlier reading here was wrong.** It looked like a stable
+  per-profession slot, because the two level-80 mages share bases across slots 70–75. The assassin breaks it:
+
+  | character | slot | `SkillId` | base |
   |---|---|---|---|
-  | 65 | `321502` | — | 3215 |
-  | 66 | `323205` | — | 3232 |
-  | 67 | — | `323201` | 3232 |
-  | 68 | — | `322402` | 3224 |
-  | **70** | `323505` | `323501` | **3235** |
-  | **71** | `327505` | `327500` | **3275** |
-  | **72** | `328908` | `328908` | **3289** |
-  | **73** | `326000` | `326000` | **3260** |
-  | **74** | `323305` | `323300` | **3233** |
-  | **75** | `323405` | `323402` | **3234** |
+  | AssassinL23 | 75 | `328703` | 3287 |
+  | NecroL80 | 75 | `323405` | 3234 |
+  | DemoL80 | 75 | `323402` | 3234 |
 
-  Slots 70–75 carry the **same base id on both characters** — six professions both have — while 65–68 are
-  character-specific. That is AoC's own split: gathering is open to everyone, crafting is chosen. So
-  **slots 70–75 are the six Gathering professions and 65–69 the Crafting picks**, with the `SkillId` base naming
-  which.
+  A fixed profession would keep its base; AssassinL23's does not. And base `3232` is slot **66** for NecroL80 but
+  **67** for DemoL80. So neither the byte nor the base names a profession on its own.
 
-  ⚠️ The **tier** (Master vs Grandmaster) is still unpinned. Only the id's trailing two digits differ between the
-  two characters on the shared slots (NecroL80 `05 05 08 00 05 05`, DemoL80 `01 00 08 00 00 02`), matching the known
-  feat-id shape `base*100 + rank` — but no simple threshold on those reproduces NecroL80's 5 Master +
-  1 Grandmaster. A second character's sheet settles it. [V0: what records a learned tradeskill]
+  ⚠️ The **tier** (Apprentice … Grandmaster) is also unlocated, and the id's trailing `base*100 + rank` digits
+  are not it: NecroL80's two Grandmaster crafts read tails `02` and `05`, so equal tiers do not share a tail.
+  [V0: what records a learned tradeskill]
 
-  What the client settles statically, short of a capture:
-  - **Learning a recipe is a GameAction**, not an RPC — `53198` / `e_Type_GC_GameAction_LearnRecipe`, one
-    argument at key 39 (`Faolan.Core.Rdb/GameActionTypes.cs`). So it is fired by RDB content (a trainer, a quest,
-    an item), which is why the c2s table has a `CraftUntrain` and no `CraftTrain`.
-  - **A craft has its own id space**: `CraftUntrain(int nCraftID)` and `DispatchCraftUntrainMessageBox(nCraftID)`,
-    distinct from a recipe id.
-  - **The group→recipe mapping is server-side data.** `DispatchRemoveRecipesByGroupClient` is named for a group
-    but takes `i_cRecipeList` — an explicit list — so the client never sees a group id.
-  - ⚠️ `TradeskillFlags` (stat `0xCE`) is **NOT** the character's learned set, despite the name: it rides NPCs
-    (a *Dockworker* carries 99), while the player's own instance carries `Craftmanship` / `MaxCraftmanship`.
-    Those two do move (0 → 1 and 0 → 2 → 3 in early play) and look like slots-used / slots-allowed, but an L80
-    who actually crafts reads max 2, so nothing is built on them. [V0: what records a learned tradeskill]
 - `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
   gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.
