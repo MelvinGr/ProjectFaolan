@@ -15,7 +15,7 @@ namespace Faolan.Web
 	{
 		// A VIEW of the one setting catalog (FaolanSettings): the description and the default live there, so
 		// `--help` here cannot describe a default the code does not use.
-		private static readonly Option<string>[] Options =
+		private static readonly Option[] Options =
 			FaolanSettings.Options(Keys.ContentRdbDir, Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.CdnPublicAddress);
 
 		// Returns null when the parser handled the invocation itself (--help, or it reported a parse error); the

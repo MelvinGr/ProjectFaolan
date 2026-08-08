@@ -19,15 +19,6 @@ namespace Faolan.Core.Cli
 	// meant a valueless flag silently swallowed the option that followed it.
 	public static class FaolanCommandLine
 	{
-		// An option whose name is a configuration path, taken from the ONE catalog (FaolanSettings) so its description
-		// and its default cannot drift from the value the code actually uses. A command declares the SUBSET it offers;
-		// the defaults themselves come from the whole catalog in Build, so an executable that reads a setting it does
-		// not declare still gets it.
-		public static Option<string> ConfigOption(string key)
-		{
-			return FaolanSettings.Options(key)[0];
-		}
-
 		// Parses argv against `command`, in the one way every executable here does it: a parse error or `--help` is
 		// handled BY THE PARSER (it prints, and `exitCode` is what the process should return) and this returns null;
 		// otherwise the caller reads its values off the result. Nothing is invoked on the success path - these commands
@@ -47,11 +38,31 @@ namespace Faolan.Core.Cli
 
 		// The values of those options, as a configuration override layer. An option the user did not pass is absent
 		// rather than null, so it cannot shadow faolan.json with nothing.
-		public static Dictionary<string, string?> Overrides(ParseResult result, params Option<string>[] options)
+		//
+		// ⚠️ "Did the user pass it?" is `Implicit: false`, NOT `GetResult(...) != null`. An option that has a default -
+		// which every catalog setting but the three optional ones does - answers GetResult with an IMPLICIT result
+		// carrying that default, so the null test would put the CLI's copy of the default into the override layer and
+		// shadow faolan.json with it on every run. (Worse for a bool, which has an implicit result whether or not it
+		// was declared with a default - see the flag reads in ServerCommand.)
+		//
+		// The value goes back to text through FaolanSettings.Text, the same renderer the defaults layer uses, so a
+		// typed value the parser produced (a ushort port, a FaolanDbProvider, a bool) lands in the configuration
+		// stack spelled exactly as its default would have been.
+		public static Dictionary<string, string?> Overrides(ParseResult result, params Option[] options)
 		{
-			return options
-				.Where(o => result.GetValue(o) is { Length: > 0 })
-				.ToDictionary(o => o.Name.TrimStart('-'), o => (string?)result.GetValue(o));
+			var overrides = new Dictionary<string, string?>();
+			foreach (var option in options)
+			{
+				if (result.GetResult(option) is not { Implicit: false } given)
+					continue;
+
+				// An explicitly EMPTY value (`--Content:RdbDir ""`) is treated as not given, for the same reason: it
+				// would otherwise shadow a configured value with nothing.
+				if (FaolanSettings.Text(given.GetValueOrDefault<object>()) is { Length: > 0 } text)
+					overrides[FaolanSettings.KeyOf(option)] = text;
+			}
+
+			return overrides;
 		}
 
 		// DEFAULTS < faolan.json (optional) < faolan.user.json (optional, gitignored) < command line < environment.

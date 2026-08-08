@@ -8,7 +8,7 @@
 // in faolan.user.json (gitignored, same keys, it simply wins).
 {
 	"Database": {
-		// Sqlite, Postgres
+		// The database engine to serve from.
 		"Provider": "Sqlite",
 		// The database to serve from; built from faolan.sql on first run if it has no content.
 		"ConnectionString": "Data Source=faolan.db"

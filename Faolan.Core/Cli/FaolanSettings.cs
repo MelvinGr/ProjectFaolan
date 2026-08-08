@@ -15,8 +15,9 @@ using Microsoft.Extensions.Configuration;
 namespace Faolan.Core.Cli
 {
 	/// <summary>
-	///     Every configuration setting this repo has, declared ONCE: its name, what <c>--help</c> says about it, and
-	///     its DEFAULT.
+	///     Every configuration setting this repo has, declared ONCE - as the <see cref="Option{T}" /> that puts it on
+	///     a command line. The option IS the catalog entry: its name (which is also its configuration path), what
+	///     <c>--help</c> says about it, its TYPE, and its DEFAULT.
 	/// </summary>
 	/// <remarks>
 	///     <para>
@@ -28,11 +29,24 @@ namespace Faolan.Core.Cli
 	///         invisible to every <c>--help</c> in the tree.
 	///     </para>
 	///     <para>
+	///         ⚠️ <b>The entry is a System.CommandLine <see cref="Option{T}" />, not a record of our own.</b> It was
+	///         one - a <c>Setting(Key, Description, object? Default)</c> that a factory turned into an
+	///         <c>Option&lt;string&gt;</c> - and that lost the one thing worth having: the TYPE. Every setting reached
+	///         the parser as a string, so <c>--Mcp:Port banana</c> and <c>--Database:Provider mysql</c> parsed fine and
+	///         then died in the accessor at whatever startup first read them, and <c>--Mcp:Enabled</c> was a flag that
+	///         demanded a value. Declared as <c>Option&lt;ushort&gt;</c> / <c>Option&lt;FaolanDbProvider&gt;</c> the
+	///         parser rejects both AT THE COMMAND LINE, naming the option and (for the enum) listing what it accepts;
+	///         <c>--help</c> prints <c>&lt;Postgres|Sqlite&gt;</c> and <c>[default: 7099]</c> from the same
+	///         declaration, so no description has to repeat them. The type is also the contract the accessor parses
+	///         (<see cref="Value{T}" />), which is why a port is declared <c>(ushort)7010</c> rather than <c>7010</c>.
+	///     </para>
+	///     <para>
 	///         ⚠️ <b>Why the catalog is shared rather than per-command.</b> A <c>*Command</c> declares only the subset
 	///         it puts on ITS command line - <c>Faolan.Web</c> does not offer <c>Account:PremiumCharSlots</c>. If the
 	///         default travelled with the declaration, an executable that reads a setting it does not declare would
 	///         silently lose it. So the DEFAULTS layer is built from the whole catalog
-	///         (<see cref="FaolanCommandLine.Build" />) and a command's option list is a VIEW of it.
+	///         (<see cref="FaolanCommandLine.Build" />) and a command's option list is a VIEW of it - the same option
+	///         instances, which a <see cref="Command" /> is happy to hold (nothing here parents a symbol).
 	///     </para>
 	///     <para>
 	///         The layering that results:
@@ -46,43 +60,45 @@ namespace Faolan.Core.Cli
 	/// </remarks>
 	public static class FaolanSettings
 	{
-		public static readonly ImmutableArray<Setting> All =
+		public static readonly ImmutableArray<Option> All =
 		[
-			new Setting(Keys.DatabaseProvider, Enum.GetValues<FaolanDbProvider>().JoinAsString(", "), FaolanDbProvider.Sqlite),
-			new Setting(Keys.DatabaseConnectionString, "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
-			new Setting(Keys.ServerAddress, "The address the login tier advertises to clients - must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
-			new Setting(Keys.ServerUniverseAgentPort, "UniverseAgent port. (Main entry point).", 7010),
-			new Setting(Keys.ServerPlayerAgentPort, "PlayerAgent port.", 7011),
-			new Setting(Keys.ServerWelcomeString, "Login MOTD.", "Welcome to Project Faolan!"),
-			new Setting(Keys.ContentTerrainDir, "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
-			new Setting(Keys.ContentRdbDir, "The client's RDB folder. Usually not needed.", null),
-			new Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
-			new Setting(Keys.LoginPrivateKey, "The server private key. Generate one with --generate-login-key.", null),
-			new Setting(Keys.LoginPublicKey, "Patch clients with Faolan.ClientLauncher --patch-login. (Only used by Faolan.ClientLauncher)", null),
-			new Setting(Keys.LoginAllowUnpatchedClients, "Let a unpatched client login with its account NAME alone. False requires a patched client & Login:PrivateKey filed.", true),
-			new Setting(Keys.AccountPremium, "Advertise every account as subscribed.", true),
-			new Setting(Keys.AccountPremiumCharSlots, "Character slots advertised when premium.", 10),
-			new Setting(Keys.AccountFreeCharSlots, "Character slots advertised when not premium.", 4),
-			new Setting(Keys.LogFile, "Log file path.", "faolan.log"),
-			new Setting(Keys.LogPacketBytes, "Include the raw byte dump in packet log lines.", false),
-			new Setting(Keys.McpEnabled, "Host the in-process MCP endpoint.", false),
-			new Setting(Keys.McpPort, "MCP endpoint port.", 7099),
-			new Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)", false),
-			new Setting(Keys.ChatBridgeBacklogGraceMs, "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", 120_000),
-			new Setting(Keys.ChatBridgePollMs, "Chat-bridge poll interval, in milliseconds.", 1500),
-			new Setting(Keys.CdnStore, "Directory the mirror stores fetched CDN blobs in.", "./cdn-store"),
-			new Setting(Keys.CdnListenAddress, "Address the mirror BINDS - an interface, not the address a client dials.", "0.0.0.0"),
-			new Setting(Keys.CdnListenPort, "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", 7081),
-			new Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (Only used by Faolan.ClientLauncher)", "http://127.0.0.1:7081")
+			Setting(Keys.DatabaseProvider, "The database engine to serve from.", FaolanDbProvider.Sqlite),
+			Setting(Keys.DatabaseConnectionString, "The database to serve from; built from faolan.sql on first run if it has no content.", "Data Source=faolan.db"),
+			Setting(Keys.ServerAddress, "The address the login tier advertises to clients - must be reachable FROM the client. (Can be a dns record)", "127.0.0.1"),
+			Setting(Keys.ServerUniverseAgentPort, "UniverseAgent port. (Main entry point).", (ushort)7010),
+			Setting(Keys.ServerPlayerAgentPort, "PlayerAgent port.", (ushort)7011),
+			Setting(Keys.ServerWelcomeString, "Login MOTD.", "Welcome to Project Faolan!"),
+			Setting(Keys.ContentTerrainDir, "Baked terrain directory; without it ground-snap and line-of-sight are disabled.", "./terrain"),
+			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder. Usually not needed."),
+			Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. A client reporting anything else is not refused.", "v5.01.0@602248"),
+			Optional<string>(Keys.LoginPrivateKey, "The server private key. Generate one with --generate-login-key."),
+			Optional<string>(Keys.LoginPublicKey, "Patch clients with Faolan.ClientLauncher --patch-login. (Only used by Faolan.ClientLauncher)"),
+			Setting(Keys.LoginAllowUnpatchedClients, "Let a unpatched client login with its account NAME alone. False requires a patched client & Login:PrivateKey filed.", true),
+			Setting(Keys.AccountPremium, "Advertise every account as subscribed.", true),
+			Setting(Keys.AccountPremiumCharSlots, "Character slots advertised when premium.", 10u),
+			Setting(Keys.AccountFreeCharSlots, "Character slots advertised when not premium.", 4u),
+			Setting(Keys.LogFile, "Log file path.", "faolan.log"),
+			Setting(Keys.LogPacketBytes, "Include the raw byte dump in packet log lines.", false),
+			Setting(Keys.McpEnabled, "Host the in-process MCP endpoint.", false),
+			Setting(Keys.McpPort, "MCP endpoint port.", (ushort)7099),
+			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Off still leaves the bridge's reply tool working. (Requires Mcp:Enabled)", false),
+			Setting(Keys.ChatBridgeBacklogGraceMs, "How long the chat bridge treats a channel's history as backlog rather than new traffic, in milliseconds.", 120_000),
+			Setting(Keys.ChatBridgePollMs, "Chat-bridge poll interval, in milliseconds.", 1500),
+			Setting(Keys.CdnStore, "Directory the mirror stores fetched CDN blobs in.", "./cdn-store"),
+			Setting(Keys.CdnListenAddress, "Address the mirror BINDS - an interface, not the address a client dials.", "0.0.0.0"),
+			Setting(Keys.CdnListenPort, "Port the mirror BINDS - paired with Cdn:ListenAddress, not the port a client dials.", (ushort)7081),
+			Setting(Keys.CdnPublicAddress, "Address the CLIENT reaches the mirror on, Full URL, including scheme and port. (Only used by Faolan.ClientLauncher)", "http://127.0.0.1:7081")
 		];
 
 		/// <summary>
 		///     The DEFAULTS configuration layer: every setting that has one. The bottom of
 		///     <see cref="FaolanCommandLine.Build" />'s stack.
 		/// </summary>
-		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(s => new KeyValuePair<string, string?>(s.Key, s.DefaultText));
+		public static IEnumerable<KeyValuePair<string, string?>> Defaults => All.Select(setting => new KeyValuePair<string, string?>(KeyOf(setting), DefaultText(setting)));
 
-		private static readonly Dictionary<string, Setting> ByKey = All.ToDictionary(s => s.Key, StringComparer.OrdinalIgnoreCase);
+		// Declared AFTER All on purpose: a static field initializer runs in textual order, so this one needs the
+		// catalog to exist already.
+		private static readonly Dictionary<string, Option> ByKey = All.ToDictionary(KeyOf, StringComparer.OrdinalIgnoreCase);
 
 		extension(IConfiguration config)
 		{
@@ -94,19 +110,19 @@ namespace Faolan.Core.Cli
 				? HexExtensions.ToBigInteger(pk)
 				: null;
 
-			public FaolanDbProvider DatabaseProvider => Enum.Parse<FaolanDbProvider>(config[Keys.DatabaseProvider]!, true);
+			public FaolanDbProvider DatabaseProvider => Choice<FaolanDbProvider>(config, Keys.DatabaseProvider);
 
-			public TimeSpan ChatBridgeBacklogGrace => TimeSpan.FromMilliseconds(config[Keys.ChatBridgeBacklogGraceMs]!.To<double>());
-			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(config[Keys.ChatBridgePollMs]!.To<double>());
+			public TimeSpan ChatBridgeBacklogGrace => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgeBacklogGraceMs));
+			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgePollMs));
 
-			public bool AccountPremium => config[Keys.AccountPremium]!.To<bool>();
+			public bool AccountPremium => Value<bool>(config, Keys.AccountPremium);
 
-			public bool ChatBridgeEnabled => config.McpEnabled && config[Keys.ChatBridgeEnabled]!.To<bool>();
+			public bool ChatBridgeEnabled => config.McpEnabled && Value<bool>(config, Keys.ChatBridgeEnabled);
 
-			public bool LogPacketBytes => config[Keys.LogPacketBytes]!.To<bool>();
+			public bool LogPacketBytes => Value<bool>(config, Keys.LogPacketBytes);
 
-			public bool LoginAllowUnpatchedClients => config[Keys.LoginAllowUnpatchedClients]!.To<bool>() || config.LoginPrivateKey == null;
-			public bool McpEnabled => config[Keys.McpEnabled]!.To<bool>();
+			public bool LoginAllowUnpatchedClients => Value<bool>(config, Keys.LoginAllowUnpatchedClients) || config.LoginPrivateKey == null;
+			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 
 			public string CdnListenAddress => config[Keys.CdnListenAddress]!;
 
@@ -127,15 +143,15 @@ namespace Faolan.Core.Cli
 
 			public string? RdbDir => config[Keys.ContentRdbDir];
 			public string? TerrainDir => config[Keys.ContentTerrainDir];
-			public uint AccountFreeCharSlots => config[Keys.AccountFreeCharSlots]!.To<uint>();
+			public uint AccountFreeCharSlots => Value<uint>(config, Keys.AccountFreeCharSlots);
 
-			public uint AccountPremiumCharSlots => config[Keys.AccountPremiumCharSlots]!.To<uint>();
+			public uint AccountPremiumCharSlots => Value<uint>(config, Keys.AccountPremiumCharSlots);
 
-			public ushort CdnListenPort => config[Keys.CdnListenPort]!.To<ushort>();
+			public ushort CdnListenPort => Value<ushort>(config, Keys.CdnListenPort);
 
-			public ushort McpPort => config[Keys.McpPort]!.To<ushort>();
-			public ushort PlayerAgentPort => config[Keys.ServerPlayerAgentPort]!.To<ushort>();
-			public ushort UniverseAgentPort => config[Keys.ServerUniverseAgentPort]!.To<ushort>();
+			public ushort McpPort => Value<ushort>(config, Keys.McpPort);
+			public ushort PlayerAgentPort => Value<ushort>(config, Keys.ServerPlayerAgentPort);
+			public ushort UniverseAgentPort => Value<ushort>(config, Keys.ServerUniverseAgentPort);
 		}
 
 		/// <summary>
@@ -171,7 +187,7 @@ namespace Faolan.Core.Cli
 					continue;
 				}
 
-				var run = new List<Setting>();
+				var run = new List<Option>();
 				while (i < All.Length && Section(All[i]) == section)
 					run.Add(All[i++]);
 				i--;
@@ -192,13 +208,33 @@ namespace Faolan.Core.Cli
 			return text.AppendLine("}").ToString();
 		}
 
+		/// <summary>
+		///     A setting's default as the configuration STACK carries it, or null when it has none: every provider is
+		///     string-keyed, so this is what lands in the defaults layer.
+		/// </summary>
+		public static string? DefaultText(Option setting)
+		{
+			return setting.HasDefaultValue
+				? Text(setting.GetDefaultValue())
+				: null;
+		}
+
 		/// <summary>The catalog entry for <paramref name="key" />.</summary>
 		/// <exception cref="ArgumentException">No such setting - a typo here is a build-time mistake, not a runtime one.</exception>
-		public static Setting Get(string key)
+		public static Option Get(string key)
 		{
 			return ByKey.TryGetValue(key, out var setting)
 				? setting
 				: throw new ArgumentException($"'{key}' is not a Faolan setting. Add it to FaolanSettings.All - that is the only list.", nameof(key));
+		}
+
+		/// <summary>
+		///     The configuration PATH an option carries. The one-name-per-setting rule as code: a setting's
+		///     command-line name IS its configuration key, with the <c>--</c> off.
+		/// </summary>
+		public static string KeyOf(Option setting)
+		{
+			return setting.Name.TrimStart('-');
 		}
 
 		/// <summary>
@@ -250,12 +286,12 @@ namespace Faolan.Core.Cli
 
 		/// <summary>
 		///     The command-line options for <paramref name="keys" />, in the order given: a <c>*Command</c>'s VIEW of
-		///     the catalog. The description and the default come from the entry, so <c>--help</c> cannot describe a
-		///     default the code does not use.
+		///     the catalog. They ARE the catalog's own options, so <c>--help</c> cannot describe a type or a default
+		///     the code does not use.
 		/// </summary>
-		public static Option<string>[] Options(params string[] keys)
+		public static Option[] Options(params string[] keys)
 		{
-			return [.. keys.Select(Get).Select(Option)];
+			return [.. keys.Select(Get)];
 		}
 
 		/// <summary>
@@ -272,20 +308,62 @@ namespace Faolan.Core.Cli
 			File.WriteAllText(path, DefaultJson());
 		}
 
+		/// <summary>
+		///     A setting's value as the configuration stack carries it: every provider is string-keyed, so a typed
+		///     value - a default from the catalog, or one the parser just read off the command line - becomes text
+		///     here.
+		/// </summary>
+		/// <remarks>
+		///     Invariant culture, and <c>true</c>/<c>false</c> lower-cased rather than .NET's <c>True</c>: the value
+		///     is read back by parsers AND by people, and a float rendered under a comma-decimal locale would not
+		///     round-trip through <c>float.Parse</c> at all. Rendering lives here, once, so the defaults layer, the
+		///     command-line override layer (<see cref="FaolanCommandLine.Overrides" />) and <see cref="Literal" />
+		///     cannot disagree about what a value looks like.
+		/// </remarks>
+		internal static string? Text(object? value)
+		{
+			return value switch
+			{
+				null => null,
+				bool b => b
+					? "true"
+					: "false",
+				string s       => s,
+				Enum e         => e.ToString(),
+				IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+				_              => value.ToString()
+			};
+		}
+
+		/// <summary>
+		///     One setting's value as one of a fixed set of NAMES - the accessor half of an
+		///     <c>Option&lt;TEnum&gt;</c>, which the parser has already constrained on the command line but a
+		///     faolan.json or an environment variable has not.
+		/// </summary>
+		private static T Choice<T>(IConfiguration config, string key) where T : struct, Enum
+		{
+			if (config[key] is not { } text)
+				throw new InvalidOperationException($"'{key}' has no value. Every setting has one - it comes from FaolanSettings.All, the bottom layer of the configuration stack.");
+
+			return Enum.TryParse<T>(text, true, out var value) && Enum.IsDefined(value)
+				? value
+				: throw new InvalidOperationException($"'{key}' is set to '{text}', which is not one of {Enum.GetValues<T>().JoinAsString(", ")}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
+		}
+
 		private static string Comment(string line)
 		{
 			var content = line.TrimStart('\t');
 			return $"{line[..^content.Length]}//{content}";
 		}
 
-		private static Block Entry(Setting setting, int depth)
+		private static Block Entry(Option setting, int depth)
 		{
 			var indent = new string('\t', depth);
 			var name = depth == 1
-				? setting.Key
+				? KeyOf(setting)
 				: Name(setting);
-			var written = setting.Default != null;
-			var line = $"{indent}\"{name}\": {Literal(setting.Default)}";
+			var written = setting.HasDefaultValue;
+			var line = $"{indent}\"{name}\": {Literal(setting)}";
 
 			return new Block([
 				$"{indent}// {setting.Description}", written
@@ -304,6 +382,13 @@ namespace Faolan.Core.Cli
 			}
 		}
 
+		private static string Literal(Option setting)
+		{
+			return setting.HasDefaultValue
+				? Literal(setting.GetDefaultValue())
+				: "\"\"";
+		}
+
 		private static string Literal(object? value)
 		{
 			return value switch
@@ -319,12 +404,13 @@ namespace Faolan.Core.Cli
 			};
 		}
 
-		private static string Name(Setting setting)
+		private static string Name(Option setting)
 		{
-			return setting.Key[(setting.Key.IndexOf(':') + 1)..];
+			var key = KeyOf(setting);
+			return key[(key.IndexOf(':') + 1)..];
 		}
 
-		private static Block Object(string section, List<Setting> settings)
+		private static Block Object(string section, List<Option> settings)
 		{
 			var entries = settings.Select(s => Entry(s, 2)).ToList();
 			Join(entries);
@@ -341,57 +427,65 @@ namespace Faolan.Core.Cli
 				: new Block([.. lines.Select(Comment)], false, true);
 		}
 
-		private static Option<string> Option(Setting setting)
+		/// <summary>
+		///     A setting with NO default: it is genuinely OPTIONAL, because there is nothing this repo could put
+		///     there - the value names something outside it (a game install, this deployment's own keypair, a public
+		///     address). Everything else has one, so the server runs with no configuration file at all.
+		/// </summary>
+		/// <remarks>
+		///     The type is written out here rather than taken from a default, because there is no default to take it
+		///     from - which is also why this is a separate factory instead of a null argument to
+		///     <see cref="Setting{T}" />.
+		/// </remarks>
+		private static Option<T> Optional<T>(string key, string description)
 		{
-			var description = setting switch
-			{
-				{ DefaultText: { } value } => $"{setting.Description} (default: {value})",
-				_                          => $"{setting.Description} (optional)"
-			};
-
-			return new Option<string>($"--{setting.Key}")
+			return new Option<T>($"--{key}")
 			{
 				Description = description
 			};
 		}
 
-		private static string? Section(Setting setting)
+		private static string? Section(Option setting)
 		{
-			var colon = setting.Key.IndexOf(':');
+			var key = KeyOf(setting);
+			var colon = key.IndexOf(':');
+
 			return colon < 0
 				? null
-				: setting.Key[..colon];
+				: key[..colon];
 		}
 
 		/// <summary>
-		///     One setting. A null <paramref name="Default" /> means the setting is genuinely OPTIONAL - there is
-		///     nothing this repo could put there, because the value names something outside it (a game install, this
-		///     deployment's own keypair, a public address). Everything else has one, so the server runs with no
-		///     configuration file at all.
+		///     One setting: the option that puts it on a command line, carrying its default. <typeparamref name="T" />
+		///     is inferred from <paramref name="default" />, so the declared type and the default cannot disagree -
+		///     which is why a port is declared <c>(ushort)7010</c>, matching the accessor that reads it.
 		/// </summary>
-		public sealed record Setting(string Key, string Description, object? Default)
+		private static Option<T> Setting<T>(string key, string description, T @default)
 		{
-			/// <summary>
-			///     The default as the configuration STACK carries it: every provider is string-keyed, so this is what
-			///     lands in the defaults layer and what <c>--help</c> prints.
-			/// </summary>
-			/// <remarks>
-			///     Invariant culture, and <c>true</c>/<c>false</c> lower-cased rather than .NET's <c>True</c>: the value
-			///     is read back by parsers AND by people, and a float rendered under a comma-decimal locale would not
-			///     round-trip through <c>float.Parse</c> at all. Rendering lives here, once, so the defaults layer and
-			///     <see cref="Literal" /> cannot disagree about what a value looks like.
-			/// </remarks>
-			public string? DefaultText => Default switch
+			return new Option<T>($"--{key}")
 			{
-				null => null, //"null",
-				bool b => b
-					? "true"
-					: "false",
-				string s       => s,
-				Enum e         => e.ToString(),
-				IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
-				_              => Default.ToString()
+				Description = description,
+				DefaultValueFactory = _ => @default
 			};
+		}
+
+		/// <summary>
+		///     One setting's value, parsed as the type its catalog entry declares. The command line is already typed
+		///     (the parser rejects a bad value there, naming the option), so this is what guards the other two layers:
+		///     a malformed faolan.json or environment value fails NAMING THE KEY.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ It throws rather than falling back. <c>Account:PremiumCharSlots = ten</c> used to mean 10 - a setting
+		///     that reads as applied and is not - because the fallback and the parse were the same expression.
+		/// </remarks>
+		private static T Value<T>(IConfiguration config, string key) where T : IParsable<T>
+		{
+			if (config[key] is not { } text)
+				throw new InvalidOperationException($"'{key}' has no value. Every setting has one - it comes from FaolanSettings.All, the bottom layer of the configuration stack.");
+
+			return T.TryParse(text, CultureInfo.InvariantCulture, out var value)
+				? value
+				: throw new InvalidOperationException($"'{key}' is set to '{text}', which is not a {typeof(T).Name}. Fix it in faolan.json, faolan.user.json, the command line or the environment.");
 		}
 
 		private sealed record Block(List<string> Lines, bool Live, bool Section = false);

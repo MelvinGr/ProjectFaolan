@@ -19,11 +19,13 @@ namespace Faolan.Importer.Cli
 	//   - COMMAND options (--only, --dry-run, --report, ...) are per-invocation and belong to the CLI alone.
 	public static class ImporterCommand
 	{
-		// Config keys: the option name IS the configuration path, and its description + default come from the one
-		// catalog (FaolanSettings).
-		private static readonly Option<string> ConnectionString = FaolanCommandLine.ConfigOption(Keys.DatabaseConnectionString);
-		private static readonly Option<string> Provider = FaolanCommandLine.ConfigOption(Keys.DatabaseProvider);
-		private static readonly Option<string> RdbDir = FaolanCommandLine.ConfigOption(Keys.ContentRdbDir);
+		// Config keys: the option name IS the configuration path, and its description, TYPE and default come from the
+		// one catalog (FaolanSettings) - these are that catalog's own options, which is why they are the non-generic
+		// Option rather than Option<string> (`--Database:Provider` is an Option<FaolanDbProvider>, so a bad engine name
+		// is a parse error listing the ones that exist).
+		private static readonly Option ConnectionString = FaolanSettings.Get(Keys.DatabaseConnectionString);
+		private static readonly Option Provider = FaolanSettings.Get(Keys.DatabaseProvider);
+		private static readonly Option RdbDir = FaolanSettings.Get(Keys.ContentRdbDir);
 
 		// Command options.
 		private static readonly Option<string> Captures = new("--captures") { Description = "The capture corpus directory (the private ProjectFaolan-Data repo's Captures/)." };

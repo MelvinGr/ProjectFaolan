@@ -32,7 +32,11 @@ namespace Faolan
 		// server's line, and the Cdn / ChatBridge keys belong to other
 		// executables. They still get their defaults here, because the defaults layer is built from the catalog
 		// rather than from this list.
-		private static readonly Option<string>[] ConfigOptions = FaolanSettings.Options(
+		//
+		// Each one is typed as the setting is (Option<ushort> for a port, Option<FaolanDbProvider> for the engine), so
+		// `--Mcp:Port banana` is a parse error here rather than a crash at whatever startup first reads it - hence the
+		// non-generic Option[]: this is a list of settings, not a list of strings.
+		private static readonly Option[] ConfigOptions = FaolanSettings.Options(
 			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
 			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.LoginPrivateKey, Keys.LoginAllowUnpatchedClients,
 			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
@@ -70,7 +74,12 @@ namespace Faolan
 			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
 
-			if (result.GetResult(WriteDefaultConfig) != null)
+			// ⚠️ Both flags ask whether they were GIVEN, and `GetResult(...) != null` is not that question: an
+			// Option<bool> the user never mentioned still has a result - an IMPLICIT one carrying false. Asking it that
+			// way meant --generate-login-key fired on EVERY run, so `dotnet run --project Faolan` printed a keypair
+			// and exited instead of starting the server. A flag reads as its VALUE; --write-default-config takes an
+			// optional value, so it asks for a non-implicit result (present, with or without a path).
+			if (result.GetResult(WriteDefaultConfig) is { Implicit: false })
 			{
 				var path = result.GetValue(WriteDefaultConfig) is { Length: > 0 } given ? given : Global.ConfigPath;
 				FaolanSettings.WriteDefaultJson(path);
@@ -79,7 +88,7 @@ namespace Faolan
 				return null;
 			}
 
-			if (result.GetResult(GenerateLoginKey) != null)
+			if (result.GetValue(GenerateLoginKey))
 			{
 				GenerateKey();
 

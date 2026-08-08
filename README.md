@@ -347,10 +347,16 @@ configured entirely by env vars, with no file baked into the image, and the serv
 at the repo root, and are found by searching up from the working directory — so a tool started from its own
 project directory still uses the repo's files (`FAOLAN_CONFIG` / `FAOLAN_USER_CONFIG` override).
 
-**Every setting is declared once**, in `FaolanSettings` (`Faolan.Core/Cli/FaolanSettings.cs`): its name, its
-`--help` description and its default. That one catalog is both the bottom layer above and the source of each
-executable's `--help`, so a documented default cannot drift from the one the code uses, and a key nothing declares
-cannot be silently read. The committed `faolan.json` is that catalog written out — regenerate it with:
+**Every setting is declared once**, in `FaolanSettings` (`Faolan.Core/Cli/FaolanSettings.cs`), as the
+System.CommandLine option that puts it on a command line: its name (which *is* its configuration path), its
+`--help` description, its **type** and its default. That one catalog is both the bottom layer above and the source
+of each executable's `--help`, so a documented default cannot drift from the one the code uses, and a key nothing
+declares cannot be silently read. Because the declaration is typed, a value the setting cannot hold is refused
+**while parsing the command line** — `--Mcp:Port banana` and `--Database:Provider mysql` are errors that name the
+option (the latter listing the engines that exist) rather than crashes at whatever startup first read them, a bool
+setting is a flag (`--Mcp:Enabled` needs no value), and `--help` prints `<Postgres|Sqlite>` and `[default: 7099]`
+from the same declaration. A malformed value in a *file* or the environment throws naming the key, since no parser
+sees those. The committed `faolan.json` is that catalog written out — regenerate it with:
 
 ```sh
 dotnet run --project Faolan -- --write-default-config   # every setting at its default; OVERWRITES
