@@ -73,13 +73,26 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(2048)]
 		public string? Description { get; set; }
 
-		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
-		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
-		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9
-		// snapshot or a 0x2020 add-item) - it is absent from sources that only describe the template abstractly (AH
-		// search-results carry Hash=0). An item is "fully buildable" (renders via the hash-gated world-entry
-		// snapshot) iff Hash != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
-		// renders an item by template even with Hash == 0 (used for AH-bought items we lack a hash for).
+		// The client needs this (alongside the Data quad) to fully realize/render the item from its RDB. On the wire
+		// it is `ProtoAcgItem.Hash` (and the FullChar snapshot tail's f8 field).
+		//
+		// ⚠️ "Hash" is OUR name and it is misleading: the client calls this the item SEED. Its stat-name table
+		// registers `ACGItemSeed` at stat id 0x2BC, immediately ahead of `ACGItemLevel` (0x2BD),
+		// `ACGItemTemplateID` (0x2BE), `ACGItemTemplateID2` (0x2BF) and `ACGItemCategoryID` (0x2C0) - and
+		// `ProtoAcgItem` carries exactly Level / Template1 / Template2 beside this field, so the one unmatched pair
+		// on each side is Hash <-> Seed. ACG is the item-GENERATION system, so this is the seed its generated
+		// properties come from, not a checksum of anything. Nothing derives it: over the 3,982 items that have one,
+		// `Id`, `crc32(name)`, `bkdr31(name)`, `Key1`, `crc32(id)`, `crc32(key quad)`, XOR and sum of the key quad
+		// all match 0. All 3,993 values are distinct, so it does not collide either. See Gitea #719.
+		//
+		// It can only be HARVESTED, and only from a capture where the item ENTERED AN INVENTORY - which is exactly
+		// where retail first reveals it. Traced through the AH buy capture for template 163118 (Feywater): the
+		// listing carries 0, the mail attachment carries 0 (twice), the live 0x2020 add that delivers it carries
+		// 909133648, and every later snapshot carries the same. Corpus-wide, 0 of 328 search-result rows and 0 of 2
+		// mail attachments have one, against 8,479 of 8,479 world-entry snapshot entries that do.
+		//
+		// An item is renderable by the world-entry snapshot iff Hash != 0 AND it has a Data quad; the snapshot drops
+		// the rest, which is why nothing hash-less may be placed in an inventory (InventoryItemHashTests, #719).
 		public uint Hash { get; set; }
 
 		// The auction-house SEARCH CATEGORY id the client queries by (e.g. 30000/30030, NOT the template id) - the
