@@ -23,6 +23,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return entry.Item?.ItemData?.Hash;
 		}
 
+		// The entry's wire LEVEL (ProtoAcgItem field 6). Per-template, not per-instance: across all 8,644 captured
+		// inventory entries, 0 templates carry two different levels (#725).
+		public static uint? LevelOf(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			return (uint?)entry.Item?.ItemData?.Level;
+		}
+
 		public static ProtoInventoryGame? ContainerOf(ProtoFullCharacterIIR root, ContainerKind kind)
 		{
 			return root.Inventories.FirstOrDefault(c => c.InventoryId.Type == (uint)kind);

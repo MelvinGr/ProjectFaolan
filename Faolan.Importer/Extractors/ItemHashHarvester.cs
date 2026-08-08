@@ -139,13 +139,14 @@ namespace Faolan.Importer.Extractors
 				// record arrived second and was dropped, and logged as a "conflict" for good measure (#719).
 				if (into.TryGetValue(template, out var existing) && !existing.Equals(item))
 				{
-					// Filling in a MISSING hash is not a disagreement - it is the reason there are several sources.
-					// A real conflict is a different identity quad, or two different NON-ZERO hashes.
-					var oneIsJustMissingTheHash =
-						(existing.Hash == 0 && item.Hash != 0 && (existing with { Hash = item.Hash }).Equals(item))
-						|| (item.Hash == 0 && existing.Hash != 0 && (item with { Hash = existing.Hash }).Equals(existing));
+					// Filling in a MISSING hash or level is not a disagreement - it is the reason there are several
+					// sources. A real conflict is a different identity quad, or two different NON-ZERO hashes/levels.
+					// Normalising BOTH nullable fields the same way is what keeps a level-only difference (a claim row
+					// carries a level but no hash; a loot bag the reverse) from reading as a conflict.
+					var reconciled = Reconcile(existing, item);
+					var oneIsJustMissingAField = reconciled.Equals(Reconcile(item, existing));
 
-					if (!oneIsJustMissingTheHash)
+					if (!oneIsJustMissingAField)
 						conflicts?.Add($"template {template}: {existing} vs {item}");
 				}
 
@@ -187,7 +188,7 @@ namespace Faolan.Importer.Extractors
 			if (acg?.Key1 == null || acg.Template1 == 0)
 				return;
 
-			Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+			Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level));
 
 			// Only record the specific kinds (Quest/Resource); Normal items are left to the DB default so this never
 			// downgrades an item another source already classified.
@@ -231,7 +232,7 @@ namespace Faolan.Importer.Extractors
 				var quad = SnapshotRoot.IdentityQuadOf(entry);
 				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
-					Record(into, template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
+					Record(into, template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0, SnapshotRoot.LevelOf(entry) ?? 0));
 			}
 		}
 
@@ -271,7 +272,9 @@ namespace Faolan.Importer.Extractors
 				if ((d1 | d2 | d3 | d4) == 0)
 					continue;
 
-				Record(into, claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0));
+				// The claim row carries no hash but DOES carry the item's level (the entry's u64, decoded by
+				// CoreClaimCodec as Level - see docs/subsystems/item-claims.md).
+				Record(into, claim.ItemTemplateId, new CapturedItem(d1, d2, d3, d4, 0, (uint)claim.Level));
 			}
 		}
 
@@ -295,7 +298,7 @@ namespace Faolan.Importer.Extractors
 				if (acg?.Key1 == null || acg.Template1 == 0)
 					continue;
 
-				Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+				Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level));
 			}
 		}
 
@@ -316,7 +319,7 @@ namespace Faolan.Importer.Extractors
 				var item = a.Entry.ItemData;
 				var key = item?.Key1;
 				if (item is { Template1: not 0 } && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
-					Record(into, item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash));
+					Record(into, item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash, (uint)item.Level));
 			}
 		}
 
@@ -340,7 +343,7 @@ namespace Faolan.Importer.Extractors
 
 					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
-						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash.Value);
+						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash.Value, SnapshotRoot.LevelOf(entry) ?? 0);
 						// Only classify from a container whose kind IS a real ItemType (Resource/Quest); the Bank (105)
 						// holds items of every kind in one container, so it must NOT stamp a type - leave the DB default.
 						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(itemType))
@@ -369,7 +372,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)
-				Record(into, e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash));
+				Record(into, e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash, e.TailLevel));
 		}
 
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
@@ -401,7 +404,7 @@ namespace Faolan.Importer.Extractors
 				if (template == 0 || hash == 0)
 					continue; // need both a template and a real hash to be buildable
 
-				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, hash);
+				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, hash, (uint)acg.Level);
 			}
 		}
 
@@ -417,6 +420,11 @@ namespace Faolan.Importer.Extractors
 		// no hash cannot clobber one that does, whichever order they appear in. Cross-checked before relying on it:
 		// over the 75 templates the live-add source carries a hash for, our DB already agreed on 64 and DISAGREED on
 		// ZERO, so the hash is the same per-template value whichever source it comes from.
+		// The LEVEL upgrades on exactly the same rule and for the same reason: several sources carry it (the snapshot
+		// entry, the live add, a shop window, an AH listing, a claim row) and several do not, so first-record-wins
+		// would lose it whenever the first sighting happened to be a source without one. They do not disagree when
+		// both have it - across the dumps, an AH listing and a shop window report the same level as the inventory
+		// entry for every template seen in both (10/10 and 19/19) - so filling a missing one is safe (#725).
 		private static void Record(IDictionary<uint, CapturedItem> into, uint template, CapturedItem captured)
 		{
 			if (!into.TryGetValue(template, out var existing))
@@ -426,7 +434,26 @@ namespace Faolan.Importer.Extractors
 			}
 
 			if (existing.Hash == 0 && captured.Hash != 0)
-				into[template] = existing with { Hash = captured.Hash };
+				existing = existing with { Hash = captured.Hash };
+
+			if (existing.Level == 0 && captured.Level != 0)
+				existing = existing with { Level = captured.Level };
+
+			into[template] = existing;
+		}
+
+		// `a` with any field it is MISSING taken from `b`. Two captures agree iff reconciling them in both
+		// directions lands on the same record - which is true exactly when they differ only in fields one of them
+		// left at 0, and false when they genuinely disagree.
+		private static CapturedItem Reconcile(CapturedItem a, CapturedItem b)
+		{
+			if (a.Hash == 0)
+				a = a with { Hash = b.Hash };
+
+			if (a.Level == 0)
+				a = a with { Level = b.Level };
+
+			return a;
 		}
 
 		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoFullCharacterIIR root)
@@ -448,6 +475,13 @@ namespace Faolan.Importer.Extractors
 			return true;
 		}
 
-		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash);
+		// `Level` is ProtoAcgItem.level - the entry's wire level. Measured over all 8,644 inventory entries in the
+		// capture dumps it is strictly PER-TEMPLATE (0 templates carry two different levels) and every source that
+		// carries it agrees: an AH listing and a shop window report the same level as the inventory entry
+		// (10/10 and 19/19 of the templates seen in both). So it belongs on the template, harvested here alongside
+		// the identity quad, rather than only being copied onto the per-instance rows (#725).
+		//
+		// 0 means the source did not carry one - like Hash, it must never DOWNGRADE a level another source set.
+		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash, uint Level = 0);
 	}
 }

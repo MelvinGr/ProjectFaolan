@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -52,6 +53,14 @@ namespace Faolan.Importer.Captures
 				// hash, and must not clobber a hash another source already set (e.g. the same item seen worn/in a bag).
 				if (ci.Hash != 0)
 					item.Hash = ci.Hash;
+
+				// The wire LEVEL, on the same never-downgrade rule as the hash: a source that carries no level must not
+				// clobber one another source supplied. This is also the only thing that CORRECTS a level - the legacy
+				// values in the shipped DB predate the visible history and 12 measurable templates disagreed with
+				// retail's wire, because the only previous writer (CaptureListingImporter.HarvestItems) sets Level on
+				// INSERT and skips any template already in Items, so a wrong one was never revisited (#725).
+				if (ci.Level != 0)
+					item.Level = (byte)Math.Min(ci.Level, byte.MaxValue);
 
 				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
 				// default Normal so a classification survives a later capture that holds the item in a bag.
