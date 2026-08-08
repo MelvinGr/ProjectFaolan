@@ -95,21 +95,20 @@ namespace Faolan.Importer.Captures
 			return entity.FindPrimaryKey()!.Properties.Select(p => p.GetColumnName(storeObject)!).ToList();
 		}
 
-		public static (int Tables, int Rows) Write(DatabaseContext db, string bodyPath, string sqliteSidecarPath, string postgresSidecarPath)
+		public static (int Tables, int Rows) Write(DatabaseContext db, string bodyPath)
 		{
 			var tables = ContentTables(db);
 
 			var body = new StringBuilder();
 			body.AppendLine("-- Faolan game data. GENERATED - see SqlSeedWriter (#411); do not hand-edit.");
 			body.AppendLine("-- Loads into SQLite and Postgres alike: create the schema first (dotnet ef database update),");
-			body.AppendLine("-- then run this, then the matching faolan.seq.<dialect>.sql sidecar.");
+			body.AppendLine("-- then run this. It is the WHOLE seed - there is nothing to run after it.");
 			body.AppendLine("-- Player and deployment state is excluded on purpose (characters, accounts, realms, guilds,");
 			body.AppendLine("-- mail, chat, auction listings, claims) - this file is GAME CONTENT.");
 			body.AppendLine("BEGIN TRANSACTION;");
 
 			var rowTotal = 0;
 			var written = 0;
-			var maxIds = new List<(string Table, string Column, long Max)>();
 			foreach (var group in tables)
 			{
 				var table = group.Key;
@@ -133,57 +132,25 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// A key the store generates needs its counter moved past the ids we just inserted explicitly.
-				var identity = entity.FindPrimaryKey()?.Properties.FirstOrDefault(p => p.ValueGenerated == ValueGenerated.OnAdd);
+				// The seed inserts every id EXPLICITLY, so a store-generated key would need its counter moved past
+				// them afterwards - which is what the faolan.seq.{sqlite,postgres}.sql sidecars used to carry. They
+				// are gone, because no game-content table may have such a key any more (every one is keyed by its
+				// identity - see the model conventions), and DatabaseConventionTests.NoGameContentTable_HasAStoreGeneratedKey
+				// is the gate. Both were empty for exactly that reason. So this is the generator's half of the same
+				// invariant: if one ever reappears, say so HERE rather than emit a seed whose next INSERT collides.
+				var identity = entity.FindPrimaryKey()?.Properties.FirstOrDefault(p => p.ValueGenerated != ValueGenerated.Never);
 				if (identity != null && rows.Count > 0)
 				{
-					var column = identity.GetColumnName(storeObject)!;
-					var index = columns.IndexOf(column);
-					var max = rows.Select(r => Convert.ToInt64(r[index], CultureInfo.InvariantCulture)).Max();
-					maxIds.Add((table, column, max));
+					throw new InvalidOperationException(
+						$"Game-content table '{table}' keys on a store-generated column ('{identity.GetColumnName(storeObject)}', {identity.ValueGenerated}), which the seed cannot " +
+						"restore: it inserts ids explicitly and there is no counter-resync file any more. Give the table a natural or derived key " +
+						"(.ValueGeneratedNever() + a migration) - see the model conventions in CLAUDE.md.");
 				}
 			}
 
 			body.AppendLine("COMMIT;");
 			File.WriteAllText(bodyPath, body.ToString());
-			File.WriteAllText(sqliteSidecarPath, SqliteSidecar(maxIds));
-			File.WriteAllText(postgresSidecarPath, PostgresSidecar(maxIds));
 			return (written, rowTotal);
-		}
-
-		// SQLite keeps AUTOINCREMENT high-water marks in sqlite_sequence; the row only exists once that table has
-		// taken an auto id, so upsert it rather than assuming either state.
-		private static string SqliteSidecar(List<(string Table, string Column, long Max)> maxIds)
-		{
-			var sb = new StringBuilder();
-			sb.AppendLine("-- GENERATED (#411): SQLite half of the seed - the AUTOINCREMENT high-water marks.");
-			sb.AppendLine("-- Run after faolan.sql. Pointless on a db with no AUTOINCREMENT tables; harmless there.");
-			sb.AppendLine("BEGIN TRANSACTION;");
-			foreach (var (table, _, max) in maxIds)
-			{
-				sb.AppendLine($"DELETE FROM sqlite_sequence WHERE name = '{table}';");
-				sb.AppendLine($"INSERT INTO sqlite_sequence (name, seq) VALUES ('{table}', {max});");
-			}
-
-			sb.AppendLine("COMMIT;");
-			return sb.ToString();
-		}
-
-		// Postgres keeps them in a sequence owned by the identity column; pg_get_serial_sequence finds it by name so
-		// this does not hard-code the sequence names EF generated.
-		private static string PostgresSidecar(List<(string Table, string Column, long Max)> maxIds)
-		{
-			var sb = new StringBuilder();
-			sb.AppendLine("-- GENERATED (#411): Postgres half of the seed - advances each identity sequence past the");
-			sb.AppendLine("-- explicit ids inserted by faolan.sql, so the next INSERT does not collide. Run after it.");
-			sb.AppendLine("BEGIN;");
-			foreach (var (table, column, max) in maxIds)
-				// The column name goes in VERBATIM: EF creates it case-preserved ("Id"), and lower-casing it makes
-				// pg_get_serial_sequence report `column "id" of relation ... does not exist`.
-				sb.AppendLine($"SELECT setval(pg_get_serial_sequence('\"{table}\"', '{column}'), {max});");
-
-			sb.AppendLine("COMMIT;");
-			return sb.ToString();
 		}
 
 		// `orderBy` (the table's primary-key columns) makes the emit DETERMINISTIC, and the seed is worthless as a

@@ -56,15 +56,18 @@ namespace Faolan.Core.Cli
 
 		extension(IConfiguration config)
 		{
-			public BigInteger? LoginPrivateKey => config[Keys.LoginPrivateKey] is { } pk
+			public BigInteger? LoginPrivateKey => config[Keys.LoginPrivateKey] is { Length: > 0 } pk
 				? HexExtensions.ToBigInteger(pk)
 				: null;
 
-			public BigInteger? LoginPublicKey => config[Keys.LoginPublicKey] is { } pk
+			public BigInteger? LoginPublicKey => config[Keys.LoginPublicKey] is { Length: > 0 } pk
 				? HexExtensions.ToBigInteger(pk)
 				: null;
 
 			public FaolanDbProvider DatabaseProvider => Choice<FaolanDbProvider>(config, Keys.DatabaseProvider);
+
+			public IPAddress CdnListenAddress => IPAddress.Parse(config[Keys.CdnListenAddress]!);
+			public IPAddress ServerListenAddress => IPAddress.Parse(config[Keys.ServerListenAddress]!);
 
 			public TimeSpan ChatBridgeBacklogGrace => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgeBacklogGraceMs));
 			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgePollMs));
@@ -76,9 +79,8 @@ namespace Faolan.Core.Cli
 			public bool LogPacketBytes => Value<bool>(config, Keys.LogPacketBytes);
 
 			public bool LoginAllowUnpatchedClients => Value<bool>(config, Keys.LoginAllowUnpatchedClients) || config.LoginPrivateKey == null;
-			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 
-			public IPAddress CdnListenAddress => IPAddress.Parse(config[Keys.CdnListenAddress]!);
+			public bool McpEnabled => Value<bool>(config, Keys.McpEnabled);
 
 			public string CdnStore => config[Keys.CdnStore]!;
 
@@ -90,8 +92,7 @@ namespace Faolan.Core.Cli
 
 			public string McpUrl => $"http://127.0.0.1:{config.McpPort}/mcp";
 
-			public string ServerAddress => config[Keys.ServerAddress]!;
-			public IPAddress ServerListenAddress => IPAddress.Parse(config[Keys.ServerListenAddress]!);
+			public string ServerAddress => config[Keys.ServerAddress] ?? throw new InvalidOperationException($"{Keys.ServerAddress} is required");
 
 			// Where a CLIENT dials to log in - the ADVERTISED address (never Server:ListenAddress, which is an
 			// interface: 0.0.0.0 is by design unreachable as a destination) and the UniverseAgent port, which is the
@@ -99,14 +100,14 @@ namespace Faolan.Core.Cli
 			// McpUrl: a second copy of either half is a copy that can disagree with the port the server binds.
 			public string UniverseAddress => $"{config.ServerAddress}:{config.UniverseAgentPort}";
 
-			public string WelcomeString => config[Keys.ServerWelcomeString]!;
+			public string WelcomeString => config[Keys.ServerWelcomeString] ?? "";
 
 			public string? CdnPublicAddress => config[Keys.CdnPublicAddress];
 
 			public string? RdbDir => config[Keys.ContentRdbDir];
 			public string? TerrainDir => config[Keys.ContentTerrainDir];
-			public uint AccountFreeCharSlots => Value<uint>(config, Keys.AccountFreeCharSlots);
 
+			public uint AccountFreeCharSlots => Value<uint>(config, Keys.AccountFreeCharSlots);
 			public uint AccountPremiumCharSlots => Value<uint>(config, Keys.AccountPremiumCharSlots);
 
 			public ushort CdnListenPort => Value<ushort>(config, Keys.CdnListenPort);

@@ -133,10 +133,12 @@ namespace Faolan.Tests
 			Assert.True(wrong.Count == 0, $"{wrong.Count} row(s) carry an id that is not derived from their identity: {string.Join("; ", wrong.Take(5))}");
 		}
 
-		// No GAME-CONTENT table may have a store-generated key. That is the invariant CLAUDE.md states when it says
-		// the `faolan.seq.*` sidecars are expected to be empty - and it was quietly false: `FeatIdMaps.WireFeatId` is
-		// harvested from RDB 1000042 and assigned explicitly by RdbFeatImporter, yet it was declared AUTOINCREMENT,
-		// so the sidecar carried a high-water mark of 2,000,500 over 6,593 rows (#646).
+		// No GAME-CONTENT table may have a store-generated key. It is what lets `faolan.sql` be the WHOLE seed: the
+		// per-dialect `faolan.seq.{sqlite,postgres}.sql` counter-resync sidecars were empty because of this gate, and
+		// are now deleted. The invariant was quietly false until #646: `FeatIdMaps.WireFeatId` is harvested from RDB
+		// 1000042 and assigned explicitly by RdbFeatImporter, yet it was declared AUTOINCREMENT, so the SQLite sidecar
+		// carried a high-water mark of 2,000,500 over 6,593 rows. SqlSeedWriter throws on the next one; this names it
+		// at the model level, before a seed is even written.
 		//
 		// A generated key on a table the importer delete+reinserts is a real defect, not cosmetics: the value is
 		// reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql` lines for zero semantic

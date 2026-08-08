@@ -6014,16 +6014,16 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// `--report sql-seed [--report-arg <dir>]` (#411): the dialect-neutral SQL seed - the game DATA as one file
-		// that loads into SQLite and Postgres alike, plus a small per-dialect sidecar for the auto-increment
-		// counters. Writes to the repo root by default, which is where faolan.sql is committed.
+		// `--report sql-seed [--report-arg <dir>]` (#411): the dialect-neutral SQL seed - the game DATA as ONE file
+		// that loads into SQLite and Postgres alike. Writes to the repo root by default, which is where faolan.sql is
+		// committed.
 		private static async Task<int> SqlSeed(string? outputDir)
 		{
 			var directory = outputDir ?? ".";
 			await using var db = OpenDb();
 			var body = Path.Combine(directory, "faolan.sql");
-			var (tables, rows) = SqlSeedWriter.Write(db, body, Path.Combine(directory, "faolan.seq.sqlite.sql"), Path.Combine(directory, "faolan.seq.postgres.sql"));
-			Console.WriteLine($"wrote {body} ({tables} tables, {rows} rows) + the sqlite/postgres counter sidecars");
+			var (tables, rows) = SqlSeedWriter.Write(db, body);
+			Console.WriteLine($"wrote {body} ({tables} tables, {rows} rows)");
 			return 0;
 		}
 

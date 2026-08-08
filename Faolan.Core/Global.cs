@@ -37,9 +37,9 @@ namespace Faolan.Core
 			? directory
 			: Directory.GetCurrentDirectory();
 
-		// The game-data seed (#412) and its per-dialect counter sidecar, found the same way as the config: beside the
-		// exe / in the CWD / up the tree, or wherever FAOLAN_SEED points. DatabaseInitializer loads these into a
-		// database that comes up with no content, which is what lets a clone run without the committed faolan.db.
+		// The game-data seed (#412), found the same way as the config: beside the exe / in the CWD / up the tree, or
+		// wherever FAOLAN_SEED points. DatabaseInitializer loads it into a database that comes up with no content,
+		// which is what lets a clone run without the committed faolan.db.
 		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? FindUpwards("faolan.sql");
 
 		// The first `name` at or above the CWD, else at or above the exe's own directory, else the CWD-relative path

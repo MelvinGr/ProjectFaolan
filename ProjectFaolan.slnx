@@ -9,8 +9,6 @@
         <File Path="docker-compose.yml" />
         <File Path="faolan.db" />
         <File Path="faolan.json" />
-        <File Path="faolan.seq.postgres.sql" />
-        <File Path="faolan.seq.sqlite.sql" />
         <File Path="faolan.sql" />
         <File Path="logo.ico" />
         <File Path="logo.png" />

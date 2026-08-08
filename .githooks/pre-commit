@@ -19,11 +19,13 @@
 #     boolean storage class and hands back 0/1, which Postgres rejects for a `boolean` column
 #   - tables emitted in foreign-key dependency order, so it loads with constraints ENFORCED instead of needing
 #     the least portable statement of all (`PRAGMA foreign_keys=OFF` vs `SET session_replication_role = replica`)
-# The one per-dialect part is resyncing the auto-increment counters after inserting explicit ids, so that lives in
-# the small faolan.seq.{sqlite,postgres}.sql sidecars and the big body stays 100% common.
+# It is ONE file, with no per-dialect part left: the counter resync after inserting explicit ids used to live in
+# faolan.seq.{sqlite,postgres}.sql sidecars, and those are gone - no game-content table has a store-generated key
+# any more (every one is keyed by its identity), so both were empty. SqlSeedWriter throws rather than emit a seed
+# that would need one.
 #
-# Restoring: create the schema (`dotnet ef database update`), run faolan.sql, then the matching sidecar. Verified
-# at 0 errors with full row parity into a fresh SQLite AND a fresh Postgres, values compared bit-exact.
+# Restoring: create the schema (`dotnet ef database update`), then run faolan.sql. Verified at 0 errors with full
+# row parity into a fresh SQLite AND a fresh Postgres, values compared bit-exact.
 #
 # Regenerates ONLY when faolan.db is actually being committed, so a normal code commit costs nothing and the
 # server's session writes (character positions, timestamps) never churn the seed on their own.
@@ -54,8 +56,8 @@ trap 'rm -f "$tmp"' EXIT
 git show :faolan.db > "$tmp"
 
 # Point the exporter at the staged copy rather than the working faolan.db (--Database:ConnectionString overrides the
-# configured connection; see CliConfig). It writes faolan.sql + both sidecars into the repo root.
+# configured connection; see CliConfig). It writes faolan.sql into the repo root.
 dotnet run --project Faolan.Importer --verbosity quiet -- --report sql-seed --Database:ConnectionString "Data Source=$tmp"
 
-git add faolan.sql faolan.seq.sqlite.sql faolan.seq.postgres.sql
+git add faolan.sql
 echo "pre-commit: regenerated faolan.sql from the staged faolan.db ($(wc -l < faolan.sql) lines, characters excluded)"

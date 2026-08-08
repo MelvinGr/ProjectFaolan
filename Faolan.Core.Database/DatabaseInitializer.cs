@@ -75,16 +75,11 @@ namespace Faolan.Core.Database
 				throw new InvalidOperationException(
 					$"The database has no game content and the seed '{seed}' is missing, so the world would come up empty. Point FAOLAN_SEED at faolan.sql, or regenerate it with `dotnet run --project Faolan.Importer -- --report sql-seed`.");
 
+			// One file, both dialects, nothing to run after it. There used to be a per-dialect counter-resync sidecar
+			// (faolan.seq.{sqlite,postgres}.sql) for keys the store generates; no game-content table has one - every
+			// one is keyed by its own identity - so both were empty and are gone. SqlSeedWriter refuses to emit a seed
+			// that would need one.
 			await ExecuteScriptAsync(db, seed, cancellationToken);
-
-			// The seed is dialect-neutral, but the counter resync after it is not - identity/AUTOINCREMENT state lives
-			// in sqlite_sequence vs a Postgres sequence (see SqlSeedWriter).
-			var sequences = Path.ChangeExtension(Global.SeedPath, null) + (db.Database.IsNpgsql()
-				? ".seq.postgres.sql"
-				: ".seq.sqlite.sql");
-
-			if (File.Exists(sequences))
-				await ExecuteScriptAsync(db, sequences, cancellationToken);
 
 			return true;
 		}
