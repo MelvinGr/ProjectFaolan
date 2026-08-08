@@ -597,13 +597,18 @@ namespace Faolan.GameServer.Economy
 				? 1u
 				: attachment.Quantity;
 			var item = await _database.GetItem(attachment.Template);
-			if (item != null)
+			if (item is { Hash: not 0 })
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
-				// holds), letting the bought item persist. Hash-0 items the world-entry snapshot drops are
-				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
+				// holds), letting the bought item persist.
 				await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
 			else
-				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
+				// ⚠️ Live-only, deliberately. A row whose item has no hash is dropped by the world-entry snapshot
+				// (it renders Hash != 0 only), so persisting it would leave an invisible item occupying a bag slot -
+				// the #719 state retail never reaches. Better to deliver it for this session and say so than to
+				// persist something that cannot be rendered. The hash is harvestable from a live add; once the
+				// importer has it, this path persists normally.
+				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY ({Reason}; won't persist across relog).",
+					attachment.Template, character.Name, item == null ? "no Items row" : "no item hash");
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.

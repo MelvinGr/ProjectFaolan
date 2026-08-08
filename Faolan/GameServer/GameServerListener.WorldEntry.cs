@@ -235,7 +235,6 @@ namespace Faolan.GameServer
 
 			// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
 			// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.
-			await RedeliverNonSnapshotBagItems(client); // TODO: Is this still needed??
 
 			// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
 			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
@@ -373,34 +372,6 @@ namespace Faolan.GameServer
 			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
 				characterId, client.Session.HasPendingPost205FFollowUp);
 			await FlushPendingPost205FFollowUp(client);
-		}
-
-		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
-		// snapshot DROPPED because they carry no hash (Hash == 0 - e.g. an AH-bought item whose template
-		// we harvested from a listing, which has no hash). The snapshot only renders Hash != 0 rows
-		// (FullCharacterRoots), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
-		// risky, so these ride the mid-session add-item mechanism (which renders by template / Hash 0) once at login.
-		// Items WITH an hash already rode the snapshot, so this only touches the dropped ones (no duplication).
-		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
-		{
-			var character = client.Session.Character;
-
-			var rows = await Database.GetCharacterInventory(character.Id, ContainerKind.Bag);
-			var pushed = 0;
-			foreach (var row in rows.Where(r => r is { ItemId: not null, Item.Hash: 0 }))
-			{
-				var slot = (ulong)row.Slot;
-				var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, slot), row.Item!, 0,
-				[
-					new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, slot)),
-					new SnapshotItems.ItemStat(26, row.Count)
-				], row.Item!.Level);
-				await SendAddItem(client, ContainerKind.Bag, (uint)row.Slot, entry);
-				pushed++;
-			}
-
-			if (pushed > 0)
-				Logger.LogInformation("Re-delivered {Count} hash-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
 		}
 
 		// Resolves the resurrection anchor advertised on the login 0x2024: the closest known / AlwaysKnown RespawnPoint on

@@ -8,11 +8,11 @@ namespace Faolan.Tests
 	// #719: an item may only sit in a character's inventory if we know its HASH.
 	//
 	// Retail never sends a hash-less item in a snapshot - 0 of 8,479 inventory entries across every captured
-	// `FullPlayerCharacterIIR` lack one - so a hash-less bag row is a state retail never reaches. Ours could:
-	// `GrantItemToBackpack(allowHashless: true)` persists a claim redeem whose hash was never harvested, and the
-	// world-entry snapshot then DROPS the row (it only renders Hash != 0). The item was invisible after a relog,
-	// which `RedeliverNonSnapshotBagItems` papered over by re-pushing it as a live add on every world entry - i.e.
-	// re-announcing "You received [X]" on every MAP CHANGE.
+	// `FullPlayerCharacterIIR` lack one - so a hash-less bag row is a state retail never reaches. Ours once could: a
+	// claim redeem was allowed to persist an item whose hash had never been harvested, the world-entry snapshot then
+	// DROPPED the row (it renders Hash != 0 only), and a per-world-entry live re-add papered over the resulting
+	// invisible item - re-announcing "You received [X]" on every MAP CHANGE. Both the escape hatch and the re-add are
+	// gone; this gate is what keeps them from coming back.
 	//
 	// The catalogue itself may hold hash-less items and deliberately does (232 of them): a claim list or a shop
 	// window carries the identity quad with no hash, and those rows are what let the Claims window render an item

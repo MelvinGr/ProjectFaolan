@@ -168,9 +168,24 @@ namespace Faolan.GameServer.Economy
 			}
 
 			// Each redeem delivers exactly ONE of the item (proven by the capture: the delivered DispatchAddItem carries
-			// no stat-26 stack count). The Type is the BINDING (6 account / 4 character), not item-vs-currency. Claim
-			// items carry a key but no hash, so allow the hashless live add.
-			var slot = await _outbound.GrantItemToBackpack(client, claim.ItemTemplateId, allowHashless: true);
+			// no stat-26 stack count). The Type is the BINDING (6 account / 4 character), not item-vs-currency.
+			//
+			// ⚠️ A claim ROW carries the item's key but no hash, and an item with no hash cannot be held: the
+			// world-entry snapshot only renders Hash != 0, so it would vanish on the next relog (#719). The hash is
+			// harvestable from the live add in the same captures the claim came from, so a claim that cannot deliver
+			// means that harvest has not reached this item - which is a DATA gap worth naming, not a full bag.
+			var item = await _database.GetItem(claim.ItemTemplateId);
+			if (item != null && item.Type != ItemType.Quest && item.Hash == 0)
+			{
+				if (characterId != 0)
+					await _chat.SendSystemMessage(characterId, $"'{item.Name}' cannot be delivered yet - we have no item hash for it. The claim is kept.");
+
+				_logger.LogWarning("Claim {ClaimId} (template {Template} '{Name}') has no item hash, so it cannot be held - not delivered; the claim row is kept.",
+					claim.Id, claim.ItemTemplateId, item.Name);
+				return;
+			}
+
+			var slot = await _outbound.GrantItemToBackpack(client, claim.ItemTemplateId);
 			if (slot == null)
 			{
 				// Bag full (or the item template is missing) - keep the claim so the player can retry.

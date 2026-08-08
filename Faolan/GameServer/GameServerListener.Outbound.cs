@@ -44,9 +44,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, bool allowHashless, int? preferredSlot)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count, allowHashless: allowHashless, preferredSlot: preferredSlot);
+			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
@@ -363,7 +363,7 @@ namespace Faolan.GameServer
 		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
 		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
 		// slot index means nothing.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool allowHashless = false, int? preferredSlot = null)
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -372,12 +372,17 @@ namespace Faolan.GameServer
 			var characterId = client.Session.Character.Id;
 
 			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
-			// land in the player's quest-items tab (#261). They are kept even with hash 0 (quest items often have
-			// none); normal bag items still require an hash so the snapshot can render them - EXCEPT when allowHashless
-			// (claim redeems): a claim list carries the item's key but no hash, so the item delivers live (the 0x2020
-			// path renders by template without a hash) but won't survive a relog until we harvest its hash. See #claims.
+			// land in the player's quest-items tab (#261). They are kept even with hash 0 (quest items often have none).
+			//
+			// A normal bag item still REQUIRES a hash, with no exception (#719). There used to be an `allowHashless`
+			// escape hatch for claim redeems - a claim list carries the item's key but no hash - which persisted a row
+			// the world-entry snapshot then DROPPED (it only renders Hash != 0), leaving the item invisible after a
+			// relog. `RedeliverNonSnapshotBagItems` papered over that by re-pushing it as a live add on every world
+			// entry, i.e. re-announcing "You received [X]" on every MAP CHANGE. Retail never holds a hash-less item in
+			// an inventory (0 of 8,479 captured snapshot entries), so the row should never have existed: the hash is
+			// harvestable from the same captures the claim came from, which is now done at the source.
 			var isQuestItem = item.Type == ItemType.Quest;
-			if (!isQuestItem && item.Hash == 0 && !allowHashless)
+			if (!isQuestItem && item.Hash == 0)
 				return null;
 
 			var kind = isQuestItem
