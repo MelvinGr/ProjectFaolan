@@ -615,10 +615,10 @@ namespace Faolan.GameServer
 					// that one). Not a refusal: the protocol is largely shared across builds, and rejecting on a string
 					// would lock out a working client for a trivial difference. It is a loud warning because otherwise
 					// "the client behaves oddly" and "the client is a different build" look identical in the logs.
-					if (clientVersion != Configuration.ClientVersion)
+					if (clientVersion != Configuration.ContentClientVersion)
 					{
 						Logger.LogWarning("GameServer hello: client reports build {Reported}, but the protocol was decoded against {Expected}. Unexpected behaviour past this point may be a build difference.",
-							clientVersion, Configuration.ClientVersion);
+							clientVersion, Configuration.ContentClientVersion);
 					}
 
 					// Character creation has two phases on this GameServer connection:

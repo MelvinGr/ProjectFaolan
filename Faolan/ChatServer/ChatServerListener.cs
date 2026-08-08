@@ -108,7 +108,9 @@ namespace Faolan.ChatServer
 						? character.Name
 						: $"Character{character.Id}")));
 
-					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
+					if(!string.IsNullOrWhiteSpace(Configuration.ServerWelcomeString))
+						await SendSystemMessage(client, Configuration.ServerWelcomeString.Replace("$BUILDSTRING", Global.BuildString));
+
 					await SendSystemMessage(client, ChatMarkup.Lines([.. Global.BuildString.Split('\n').Select(ChatMarkup (l) => l)]));
 
 					// Restore the stored friend list. ⚠️ The MESSAGES are the captured ones (the same pair an add

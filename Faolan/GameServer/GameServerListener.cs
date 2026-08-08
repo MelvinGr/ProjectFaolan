@@ -289,7 +289,7 @@ namespace Faolan.GameServer
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			// Server-side terrain (ground-snap + line-of-sight, #284) from the importer-baked terrain files - the game
 			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
-			var terrain = new TerrainService(configuration.TerrainDir, logger);
+			var terrain = new TerrainService(configuration.ContentTerrainDir, logger);
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
 			// create-editor/cutscene/enter-world flow. The handoff seam washes the new character ashore before the
 			// redirect (#234: changemap-prep IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7 to the Tortage Beach

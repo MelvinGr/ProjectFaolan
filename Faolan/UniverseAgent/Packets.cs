@@ -26,7 +26,7 @@ namespace Faolan.UniverseAgent
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceMethods.DispatchAckAuthenticate, b => b
 				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
 				.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
-				.WriteString($"{Configuration.ServerPublicAddress}:{Configuration.PlayerAgentPort}")
+				.WriteString($"{Configuration.ServerPublicAddress}:{Configuration.ServerPlayerAgentPort}")
 				.WriteUInt32(client.Session.Account.Id)
 				.WriteUInt32(0x00000000)));
 		}

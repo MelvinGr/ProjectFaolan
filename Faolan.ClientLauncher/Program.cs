@@ -312,7 +312,7 @@ namespace Faolan.ClientLauncher
 			// `--restore` to undo it.
 			if (options.PatchUniverseAddr)
 			{
-				var universeAddr = options.Configuration.UniverseAddress;
+				var universeAddr = options.Configuration.ServerUniverseAddress;
 				if (SetUniverseAddr(gameDir, universeAddr) != null)
 					Console.WriteLine($"redirected UniverseAddr -> {universeAddr}");
 			}

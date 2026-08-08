@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			// It resolves through the shared configuration stack rather than reading one env var, because the key
 			// is sectioned: `Content:RdbDir` is not a legal environment-variable name (the provider spells it
 			// `Content__RdbDir`), so a raw GetEnvironmentVariable would find nothing and this would skip forever.
-			var rdbDir = FaolanCommandLine.Build().RdbDir;
+			var rdbDir = FaolanCommandLine.Build().ContentRdbDir;
 			if (string.IsNullOrEmpty(rdbDir) || !File.Exists(Path.Combine(rdbDir, "le.idx")))
 				return; // client RDB unavailable (CI) - skip
 

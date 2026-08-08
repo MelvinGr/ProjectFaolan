@@ -67,7 +67,7 @@ namespace Faolan.Tests
 				out _);
 
 			Assert.NotNull(options);
-			Assert.Equal("192.168.1.5:7000", options.Configuration.UniverseAddress);
+			Assert.Equal("192.168.1.5:7000", options.Configuration.ServerUniverseAddress);
 			Assert.Equal("http://192.168.1.5:7081", options.Configuration.CdnPublicAddress);
 		}
 

@@ -36,11 +36,11 @@ namespace Faolan.Tests
 			Assert.Equal(FaolanDbProvider.Sqlite, config.DatabaseProvider);
 			Assert.Equal("Data Source=faolan.db", config.DatabaseConnectionString);
 			Assert.Equal("127.0.0.1", config.ServerPublicAddress);
-			Assert.Equal(7010, config.UniverseAgentPort);
-			Assert.Equal("127.0.0.1:7010", config.UniverseAddress); // ...derived from those two, not a third literal
-			Assert.Equal(7011, config.PlayerAgentPort);
-			Assert.Equal("Welcome to Project Faolan!", config.WelcomeString);
-			Assert.Equal("v5.01.0@602248", config.ClientVersion);
+			Assert.Equal(7010, config.ServerUniverseAgentPort);
+			Assert.Equal("127.0.0.1:7010", config.ServerUniverseAddress); // ...derived from those two, not a third literal
+			Assert.Equal(7011, config.ServerPlayerAgentPort);
+			Assert.Equal("Welcome to Project Faolan!\n$BUILDSTRING", config.ServerWelcomeString);
+			Assert.Equal("v5.01.0@602248", config.ContentClientVersion);
 			Assert.True(config.LoginAllowUnpatchedClients);
 			Assert.True(config.AccountPremium);
 			Assert.Equal(10u, config.AccountPremiumCharSlots);
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			// Its readers handle the null; nothing else may. (The two Login: keys are optional too, but their
 			// accessors hand back a parsed BigInteger?, so they are checked with the rest of the keypair rather
 			// than here.)
-			Assert.Null(config.RdbDir);
+			Assert.Null(config.ContentRdbDir);
 			Assert.Equal("http://127.0.0.1:7081", config.CdnPublicAddress); // the loopback mirror, at its own port
 		}
 
@@ -113,7 +113,7 @@ namespace Faolan.Tests
 				.AddInMemoryCollection(over)
 				.Build();
 
-			Assert.Equal(expected, config.UniverseAddress);
+			Assert.Equal(expected, config.ServerUniverseAddress);
 
 			// The bind address is not consulted, whatever it is set to.
 			Assert.Equal(expected, new ConfigurationBuilder()
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 				.AddInMemoryCollection(over)
 				.AddInMemoryCollection([new(Keys.ServerListenAddress, "0.0.0.0")])
 				.Build()
-				.UniverseAddress);
+				.ServerUniverseAddress);
 		}
 
 		// A malformed value now FAILS instead of quietly becoming the default. `Account:PremiumCharSlots = ten` used
@@ -170,6 +170,20 @@ namespace Faolan.Tests
 			// a grep for either finds both. Without this the set can match while the names drift apart.
 			foreach (var (name, key) in consts)
 				Assert.Equal(name, key.Replace(":", ""));
+		}
+
+		// The catalog is ORDERED, ordinal by key - the same order as the Keys constants and the accessors beside them,
+		// so the three views of the list read side by side and a missing one shows up as a gap. It is also what the
+		// generated faolan.json and every `--help` inherit, so an unordered catalog is an unordered config file: a new
+		// setting appended at the end lands in the middle of an unrelated section, which is how `Server:ListenAddress`
+		// went missing from the committed file unnoticed. `[NoReorder]` keeps an editor from regrouping the ACCESSORS
+		// (ReSharper sorts by return type, which interleaves the sections); nothing but a test can pin this half.
+		[Fact]
+		public void TheCatalog_IsInKeyOrder()
+		{
+			var keys = FaolanSettings.All.Select(FaolanSettings.Key).ToList();
+
+			Assert.Equal(keys.Order(StringComparer.Ordinal), keys);
 		}
 
 		// The catalog is also the only place a key is spelled, so a *Command asking for one that is not there is a
