@@ -25,7 +25,8 @@ resolves the blend + a backlash roll on deactivate.
 
 ## Which class gets which combo
 
-The map (`ClassCombos`) has three sources. The second was added in #296 and the third in #581, each because the ones before it refuse to guess:
+The map (`ClassCombos`) has four sources. The second was added in #296 and the third and fourth in #581, each
+because the ones before it refuse to guess:
 
 1. **The combo's NAME prefix**, for the class-named ones (`Guardian_`, `Ranger_`, …) — `CaptureAbilityImporter`,
    plus captured action bars for direct `(class, combo)` evidence.
@@ -33,6 +34,7 @@ The map (`ClassCombos`) has three sources. The second was added in #296 and the 
    `Spell.GuiStackingLine` (`ConanClass × 1000 + lineIndex`) names the class. This resolves the FEAT-TREE prefixes
    the name heuristic cannot — `Reaver_` → Barbarian, `Liberator_` → Conqueror, `Halberdier_` → Guardian —
    and it agrees with source 1 on **257 of 257** combos where both speak.
+4. **The GATING FEAT**, which LEADS all of them — see below.
 
 ⚠️ **Only lineIndex ≥ 400, and this is the whole subtlety.** The ARCHETYPE-shared combos sit in a low block that
 reads as class 20 and is not one:
@@ -76,9 +78,46 @@ that line's spells (per line, not per spell: a line's spells are one combo famil
 have a catalogued combo). Lines 20000 and 20001 carry no combo at all, so they are left **unattributed** rather
 than handed to Guardian.
 
+### 4. The GATING FEAT (#581) — the source that LEADS
+
+`Combos.FeatId` is not a `Feats.Id`; it is the **wire** feat id, so it resolves through
+`FeatIdMaps.WireFeatId → TemplateId → Feats.Id`. **482 of the 744** catalogued combos carry one — and **none of
+the 97 `combo_npc_` / `monster_` / `generic_` NPC combos does**, which makes "carries a gating feat" a mechanical
+discriminator for *this is a player combo* in its own right.
+
+The feat's own NAME states the class, in three shapes:
+
+| feat name | reads as | example |
+|---|---|---|
+| `<Class> Class Feat NNN` | that one class | `Guardian Class Feat 041` → Guardian |
+| `<Archetype>: Class Specific N` | the archetype's three | `Rogue: Class Specific 1` → Barbarian/Assassin/Ranger |
+| `<Class>` | that one class | `Ranger` → Ranger |
+
+⭐ **Validated before it was trusted: where the feat and the name prefix both speak, 134 agree and ZERO conflict.**
+That is what earns it precedence — it is narrower than the prefix on three combos and wider on none, so it can
+only ever correct in the safe direction. `FeatGating` (`Faolan.Importer/Captures/FeatGating.cs`) is the reader.
+
+What it adds beyond the prefixes: `SneakAttack_*` (7 to the Rogue archetype, plus `_bow`/`_crossbow` to Ranger via
+the bare `Ranger` feat) and `Halberdier_50_…_Bloody_Vengeance_polearm` → Guardian.
+
+What it **corrects**: `Priest_05/10/15_damagedetaunt_Censuring_Strike_*_2hb` sits on the Priest archetype's
+stacking line 20008, so source 3 fanned it out to all three priests — but its gating feat is
+`Bear Shaman Class Feat 001`/`011`, the *same* feat that unlocks `BearShaman_05_dot_Internal_Bleed_I` and its
+siblings. A combo is granted by the feat that teaches it, so the three are Bear Shaman's alone.
+⚠️ **Assumption:** this reads the missing Priest of Mitra / Tempest of Set variants as absent from the catalog
+rather than as classes sharing the 2HB one. `Soldier_`/`Rogue_` each ship three weapon variants where `Priest_`
+ships only this one, and the two-handed blunt is the Bear Shaman's weapon — so the shape of the gap is a missing
+variant.
+
+**It also settles the LEVEL for some combos.** `Combos.Level <= 1` is the catalog's sentinel for *not stated*, and
+where every LEVELLED combo a feat gates carries one level, that level is the feat's and is lent to the sentinel
+ones. `Rogue: Class Specific N` is exactly that shape (N → level 2N+3, measured: 1→5, 2→7, … 8→19, and the Soldier
+arm agrees independently), which puts the seven `SneakAttack_*` at **level 5** rather than at the sentinel.
+⚠️ Most feats gate a RANGE (`Ranger Class Feat 001` covers 5/7/10) and lend nothing.
+
 Gated by `Faolan.Tests/ClassComboMembershipTests.cs`, which pins all of it: the stacking-line rule never
-contradicts source 1, each archetype combo is mapped to exactly its archetype's three classes, and the archetype
-spells go to those three or to nobody.
+contradicts source 1, every shipped row agrees with its combo's gating feat, each archetype combo is mapped to
+exactly its archetype's three classes, and the archetype spells go to those three or to nobody.
 
 Which classes the remaining ambiguous prefixes belong to — open work tracked in Gitea #581.
 
@@ -94,11 +133,13 @@ Which classes the remaining ambiguous prefixes belong to — open work tracked i
   used to require a `</combo>` and skipped them silently, which is what made #313 read the
   `0x00416541..0x00416549` block as "cataloged nowhere in faolan.db" and hunt for a TEA-encrypted RDB type that was
   never involved. `RdbXml.Carve` handles both forms, for every RDB XML reader (`RdbXmlCarveTests`).
-- **`ClassCombo`** access map — `(Class, ComboId, Level)`, from **three** sources, **668 rows**:
+- **`ClassCombo`** access map — `(Class, ComboId, Level)`, from **four** sources, **686 rows**:
+  - the **GATING FEAT** (`FeatGating`), which runs FIRST and wins: 142 combos, and the only source that can be
+    narrower than the name. See *4. The GATING FEAT* above.
   - the `Combos` name prefix (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes =
     the 8 archetypes that have combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
   - the **ARCHETYPE** prefixes in the same pass (#581): `Soldier_` / `Rogue_` / `Priest_` name an archetype rather
-    than a class, so each fans out to that archetype's three (`ConanArchetypes`). 51 combos, 153 rows.
+    than a class, so each fans out to that archetype's three (`ConanArchetypes`).
   - the **universal kit** (`DeriveUniversalCombosFromCreatesAsync`): the 4 playable races' dance emotes
     (`Cimmerian_`/`Khitan_`/`Stygian_`/`Aquilonian_Dance_combo1..3`), 12 × 12 classes = 144 rows at level 0.
     ⚠️ **Racially NAMED, universally GRANTED** — across the corpus **19 characters spanning every class receive the

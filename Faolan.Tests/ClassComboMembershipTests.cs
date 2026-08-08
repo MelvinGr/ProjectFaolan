@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
+using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -18,10 +20,14 @@ namespace Faolan.Tests
 		// The archetype-shared block: three different archetypes under the same leading "20", which is what proves
 		// the number is a block rather than a class - and, since #581, that each of them goes to its ARCHETYPE's three
 		// classes rather than to the class that number would name.
+		//
+		// ⚠️ `Priest_` is NOT in this theory, and its absence is the point (#581). Its three combos sit on 20008 like
+		// the others, but they are the only archetype combos whose GATING FEAT names a single class rather than the
+		// archetype - see ArchetypeCombos_YieldToTheGatingFeatWhenItNamesOneClass below. The block says which
+		// archetype's LINE a combo is on; the feat says who is taught it, and where they differ the feat wins.
 		[Theory]
 		[InlineData("Soldier_", 20002u, 20005u, ConanArchetype.Soldier)]
 		[InlineData("Rogue_", 20006u, 20007u, ConanArchetype.Rogue)]
-		[InlineData("Priest_", 20008u, 20008u, ConanArchetype.Priest)]
 		public async Task ArchetypeCombos_GoToTheirArchetypesThreeClasses(string prefix, uint lo, uint hi, ConanArchetype archetype)
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
@@ -51,6 +57,36 @@ namespace Faolan.Tests
 
 			Assert.Equal(combos.Count, mapped.Count);
 			Assert.All(mapped, g => Assert.Equal(expected, g.Select(x => x.Class).Order().ToList()));
+		}
+
+		// The one archetype-lined family the feat overrides (#581). `Priest_..._2hb` is on the Priest archetype's
+		// stacking line 20008, so the name rule fanned it out to all three priest classes - but the feat that unlocks
+		// it is `Bear Shaman Class Feat 001`/`011`, the SAME feat that unlocks `BearShaman_05_dot_Internal_Bleed_I`
+		// and its siblings. A combo is granted by the feat that teaches it, so these are Bear Shaman's.
+		//
+		// ⚠️ Assumption, recorded rather than hidden: this reads the missing Priest of Mitra / Tempest of Set variants
+		// as ABSENT FROM THE CATALOG rather than as classes that share the 2HB one. The two-handed blunt is the Bear
+		// Shaman's weapon, and Soldier_/Rogue_ each ship three weapon variants where Priest_ ships only this one, so
+		// the shape of the gap is a missing variant, not a shared combo. If a Priest of Mitra variant ever lands, it
+		// will arrive with its own class feat and this test is where the expectation changes.
+		[Fact]
+		public async Task ArchetypeCombos_YieldToTheGatingFeatWhenItNamesOneClass()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var combos = await db.Combos.AsNoTracking().Where(c => c.Name.StartsWith("Priest_")).Select(c => new
+			{
+				c.Id,
+				c.Name
+			}).ToListAsync(ct);
+
+			Assert.NotEmpty(combos);
+			var ids = combos.Select(c => c.Id).ToList();
+			var mapped = await db.ClassCombos.AsNoTracking().Where(cc => ids.Contains(cc.ComboId)).ToListAsync(ct);
+
+			Assert.Equal(combos.Count, mapped.Select(x => x.ComboId).Distinct().Count());
+			Assert.All(mapped, row => Assert.Equal(ConanClass.BearShaman, row.Class));
 		}
 
 		// The same correction on the SPELL side, which is where it was actually wrong in the shipped data (#581):
@@ -89,6 +125,49 @@ namespace Faolan.Tests
 				foreach (var spell in line.GroupBy(x => x.SpellId))
 					Assert.Equal(expected, spell.Select(x => x.Class).Order().ToList());
 			}
+		}
+
+		// The gating-feat rule, both halves (#581):
+		//
+		//   1. every shipped `ClassCombo` for a combo whose gating feat NAMES its classes is exactly that set - which
+		//      is what makes the feat authoritative rather than one more opinion;
+		//   2. it is not vacuous: it speaks for a substantial slice of the map.
+		//
+		// The property that earned it that authority is the AGREEMENT: where the feat and the catalog name prefix both
+		// spoke, 134 agreed and none conflicted. Once the feat leads, that agreement is no longer observable from the
+		// shipped rows - so what this gates is the invariant it produced.
+		[Fact]
+		public async Task EveryClassComboRow_AgreesWithItsCombosGatingFeat()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var gating = await FeatGating.LoadAsync(db);
+			var combos = await db.Combos.AsNoTracking().Where(c => c.FeatId != null).Select(c => new
+			{
+				c.Id,
+				c.Name,
+				c.FeatId
+			}).ToListAsync(ct);
+
+			var mapped = (await db.ClassCombos.AsNoTracking().ToListAsync(ct)).GroupBy(cc => cc.ComboId)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.Class).Order().ToList());
+
+			var spoken = 0;
+			var bad = new List<string>();
+			foreach (var combo in combos)
+			{
+				if (gating.ClassesOf(combo.FeatId) is not { Count: > 0 } expected)
+					continue;
+
+				spoken++;
+				var actual = mapped.GetValueOrDefault(combo.Id, []);
+				if (!actual.SequenceEqual(expected.Order()))
+					bad.Add($"'{combo.Name}' is mapped to [{string.Join(",", actual)}] but its gating feat names [{string.Join(",", expected.Order())}]");
+			}
+
+			Assert.True(bad.Count == 0, "class<->combo rows contradicting the combo's gating feat: " + string.Join("; ", bad));
+			Assert.True(spoken >= 140, $"the gating feat names classes for only {spoken} combos - it used to speak for 142, so the join has come apart");
 		}
 
 		// Where the rule IS applied - lineIndex 400 and up - it must never contradict the map built independently

@@ -319,6 +319,11 @@ namespace Faolan.Importer.Captures
 		// Derives the class<->combo ACCESS map (ClassCombo) from the combo catalog's class-name prefixes - the combo
 		// analogue of DeriveClassAbilitiesAsync (which derives from grants; combos have none). Combo.Level supplies the
 		// per-class unlock level. Idempotent.
+		//
+		// ⭐ The name prefix is the WEAKER of the two sources and runs second (#581). The client states the answer:
+		// `Combos.FeatId` is the WIRE feat id of the feat that GATES the combo, and `FeatGatedClasses` resolves it to
+		// a class or an archetype out of the feat's own name. Where both speak they agree on 134 combos with ZERO
+		// conflicts, which is what makes the feat authoritative for the handful where they differ.
 		public static async Task<(int Inserted, int Updated)> DeriveClassCombosAsync(IDatabaseContext db, ILogger? logger = null)
 		{
 			var combos = await db
@@ -326,34 +331,60 @@ namespace Faolan.Importer.Captures
 				{
 					c.Id,
 					c.Name,
-					c.Level
+					c.Level,
+					c.FeatId
 				})
 				.ToListAsync();
 			var existing = await db.ClassCombos.ToDictionaryAsync(x => (x.Class, x.ComboId));
 
+			var gating = await FeatGating.LoadAsync(db);
+
 			var inserted = 0;
 			var updated = 0;
+			var removed = 0;
+			var fromFeat = 0;
+			var levelFromFeat = 0;
 			foreach (var combo in combos)
 			{
 				if (combo.Name == null)
 					continue;
 
-				// #581: an ARCHETYPE-shared combo (`Soldier_`, `Rogue_`, `Priest_`) belongs to all THREE classes of
-				// that archetype, so it fans out where a class-named prefix names one. It is the half no class prefix
-				// could ever match, and the half the stacking-line route (#296) refuses too, because those combos sit
-				// in the shared `20000`-`20008` block that reads as class 20 and is not one.
-				var classes = ConanArchetypes.FromNamePrefix(combo.Name) is { } archetype
-					? ConanArchetypes.ClassesOf(archetype)
-					: ClassComboPrefixes.Where(p => combo.Name.StartsWith(p.Prefix, StringComparison.OrdinalIgnoreCase)).Select(p => p.Class).ToArray();
+				// 1. the GATING FEAT, when it names a class or an archetype. Direct client evidence, and the only
+				//    source that can be NARROWER than the name: `Priest_05_damagedetaunt_Censuring_Strike_I_2hb`
+				//    reads as all three priests by its prefix, and its feat says `Bear Shaman Class Feat 001` - which
+				//    is the class that actually wields a two-handed blunt.
+				var classes = gating.ClassesOf(combo.FeatId);
+				var byFeat = classes.Count > 0;
+				if (byFeat)
+					fromFeat++;
+				else
+					// 2. an ARCHETYPE-shared combo (`Soldier_`, `Rogue_`, `Priest_`) belongs to all THREE classes of
+					//    that archetype, so it fans out where a class-named prefix names one. It is the half no class
+					//    prefix could ever match, and the half the stacking-line route (#296) refuses too, because
+					//    those combos sit in the shared `20000`-`20008` block that reads as class 20 and is not one.
+					classes = ConanArchetypes.FromNamePrefix(combo.Name) is { } archetype
+						? ConanArchetypes.ClassesOf(archetype)
+						: ClassComboPrefixes.Where(p => combo.Name.StartsWith(p.Prefix, StringComparison.OrdinalIgnoreCase)).Select(p => p.Class).ToArray();
+
+				// The LEVEL is a second, separate question, and `Combos.Level <= 1` is the catalog's SENTINEL for
+				// "not stated" rather than level one (docs/subsystems/combos.md). The gating feat answers that too
+				// wherever every levelled combo it gates carries ONE level - which is exactly the archetype
+				// `X: Class Specific N` feats. `SneakAttack_*` is the case: sentinel level, gated by
+				// `Rogue: Class Specific 1`, whose three `Rogue_05_…` combos put it at level 5.
+				var level = combo.Level;
+				if (level <= 1 && gating.LevelOf(combo.FeatId) is { } lent)
+				{
+					level = lent;
+					levelFromFeat++;
+				}
 
 				foreach (var cls in classes)
 				{
-
 					if (existing.TryGetValue((cls, combo.Id), out var row))
 					{
-						if (row.Level != combo.Level)
+						if (row.Level != level)
 						{
-							row.Level = combo.Level;
+							row.Level = level;
 							updated++;
 						}
 					}
@@ -363,17 +394,33 @@ namespace Faolan.Importer.Captures
 						{
 							Class = cls,
 							ComboId = combo.Id,
-							Level = combo.Level
+							Level = level
 						});
 						inserted++;
 					}
 				}
+
+				// A feat-derived answer REPLACES whatever a previous run's prefix guess wrote, so a narrowing actually
+				// narrows. Only ever applied when the feat spoke - the prefix rule stays purely additive, because it
+				// cannot tell "I have no opinion" from "no class", and a run against a DB whose Feats are not imported
+				// yet would otherwise delete the whole map.
+				if (!byFeat)
+					continue;
+
+				foreach (var (key, row) in existing)
+					if (key.ComboId == combo.Id && !classes.Contains(key.Class))
+					{
+						db.ClassCombos.Remove(row);
+						removed++;
+					}
 			}
 
-			if (inserted > 0 || updated > 0)
+			if (inserted > 0 || updated > 0 || removed > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated) from validated catalog prefixes.", inserted, updated);
+			logger?.LogInformation(
+				"CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated, {Removed} removed) - {FromFeat} combos attributed by their GATING FEAT, {LevelFromFeat} taking the feat's level over the catalog sentinel; the rest from validated catalog prefixes.",
+				inserted, updated, removed, fromFeat, levelFromFeat);
 			return (inserted, updated);
 		}
 
