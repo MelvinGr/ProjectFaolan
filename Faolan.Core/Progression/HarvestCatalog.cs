@@ -21,16 +21,24 @@ namespace Faolan.Core.Progression
 	///         stream one-for-one, so "Yew Tree" → Yew is a lookup rather than a guess.
 	///     </para>
 	///     <para>
-	///         ⚠️ The <b>yield</b> is the soft part. Only three counts are measured (40 / 60 / 40) and they do not
-	///         correlate with anything else observed, so <see cref="DefaultYield" /> carries the modal 40 for every
-	///         unmeasured node and <see cref="Yields" /> holds only what a capture actually showed. A count is cheap to
-	///         confirm — one more harvest of any node type fills a row — so this is written to be extended, not
-	///         interpolated.
+	///         ⚠️ The <b>yield</b> here is WRONG, and the counts below are not per-harvest. The annotated mining
+	///         session measures a swing at exactly <b>1 unit</b> for exactly <b>100 health</b>, so a full node is ~10
+	///         swings and ~10 units in total — the 40 / 60 / 40 read off the earlier captures were STACK TOTALS after
+	///         many swings, not one harvest's payout. Melvin narrated it as he went ("-10% each time", "also -10 %,
+	///         got 1", and "got 3" after three swings on the gold vein). Correcting it means modelling depletion,
+	///         which needs the health-stat broadcast too, so it is its own change — tracked in Gitea #732. Until then
+	///         <see cref="DefaultYield" /> stays as-is rather than leaving a half-applied model.
+	///         [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5]
 	///     </para>
 	///     <para>
 	///         The node NAME is the key deliberately, matching how shops and conversations key on the NPC name: it means
 	///         no new column, no importer change and no re-harvest of <c>faolan.db</c> to turn harvesting on for the 141
 	///         nodes already imported into <c>WorldObjects</c>.
+	///         ⚠️ That makes the NAME load-bearing, and a <c>WorldObjects.Name</c> taken from the dynel record's own
+	///         name string can be WRONG: retail ships "Silver Vein" as <i>Martial Ring</i> in that field and "Copper
+	///         Node" as <i>Vitalic Bronze-studded Armbands</i>. The DISPLAYED name is the record's <c>DisplayId</c>
+	///         resolved through LDB category 50200; one shipped row already carries the leaked internal name instead,
+	///         which silently makes it un-harvestable.
 	///     </para>
 	/// </remarks>
 	public static class HarvestCatalog
@@ -41,11 +49,32 @@ namespace Faolan.Core.Progression
 		/// <summary>
 		///     A node's health bottoms out at <b>1</b>, never 0 — measured across every capture — and the node then
 		///     despawns. So "exhausted" is <c>health &lt;= ExhaustedHealth</c>, not <c>== 0</c>.
+		///     ⚠️ Retail's own floor is softer than this: the annotated session leaves a gold vein at 31 and a basalt
+		///     rock at 28, both of which then regrow, so a node below one swing's worth is not necessarily finished.
+		///     Whether a swing can be paid out of a partial pool is NOT measured — nobody swung at a node holding less
+		///     than <see cref="SwingCost" /> in any capture — so we require a full swing's worth and stop there rather
+		///     than invent a partial payout. [V0: whether a node under 100 health can still be harvested]
 		/// </summary>
 		public const uint ExhaustedHealth = 1;
 
+		/// <summary>
+		///     What ONE swing takes off a node, measured at exactly 100 of the 1000 max — so a full node is ten swings.
+		///     The client renders <c>health / max</c> as the PERCENTAGE in the node's health bar, which is what the
+		///     annotated mining session narrates: "next to a 30% gold vein now", then "-10% each time", against a node
+		///     the wire walks 298 → 198 → 98.
+		///     [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5, dynel 0x2688]
+		/// </summary>
+		public const uint SwingCost = 100;
+
+		/// <summary>
+		///     What one swing GRANTS: exactly one unit. Measured on every harvest add in both mining captures
+		///     (<c>stat_list</c> 26 = 1) and corroborated by the resource stack ticking up by one per swing, and by the
+		///     annotations ("also -10 %, got 1"; "got 3" after three swings on the gold vein).
+		/// </summary>
+		public const uint YieldPerSwing = 1;
+
 		/// <summary>The yield used for a node whose count no capture has measured. The modal observed value.</summary>
-		public const uint DefaultYield = 40;
+		public const uint DefaultYield = YieldPerSwing;
 
 		/// <summary>Node display name -> the resource <c>Items.Id</c> it yields.</summary>
 		public static readonly ImmutableDictionary<string, uint> Resources = new Dictionary<string, uint>(System.StringComparer.OrdinalIgnoreCase)
@@ -76,15 +105,19 @@ namespace Faolan.Core.Progression
 		}.ToImmutableDictionary(System.StringComparer.OrdinalIgnoreCase);
 
 		/// <summary>
-		///     Node display name -> the stack size it yields, for the nodes a capture measured. Absent = use
-		///     <see cref="DefaultYield" />.
+		///     Node display name -> a measured stack size, for any node whose count differs from
+		///     <see cref="YieldPerSwing" />. <b>Empty, and that is the finding.</b>
+		///     <para>
+		///         It used to hold Granite 40 / Oak 60 / Iron 40, read off the 4th u32 of the
+		///         <c>DispatchDisplayItemLootChatMessage</c> that follows each harvest. That word is the item's
+		///         <b>LEVEL</b>, not a count: the body is the same <c>ProtoAcgItem</c>-shaped layout the client's
+		///         <c>itemref://</c> chat link carries — <c>[template][template][0][level][hash][key1][key2][key3]</c>,
+		///         with <c>key3</c> the <c>NullIdentity</c> sentinel — and <c>Items.Level</c> for Granite, Oak and Iron
+		///         is 40, 60 and 40 exactly. The real count rides the add's own <c>stat_list</c> 26, and it is 1 on
+		///         every captured harvest.
+		///     </para>
 		/// </summary>
-		public static readonly ImmutableDictionary<string, uint> Yields = new Dictionary<string, uint>(System.StringComparer.OrdinalIgnoreCase)
-		{
-			["Granite Rock"] = 40,
-			["Oak Tree"] = 60,
-			["Iron Node"] = 40
-		}.ToImmutableDictionary(System.StringComparer.OrdinalIgnoreCase);
+		public static readonly ImmutableDictionary<string, uint> Yields = ImmutableDictionary.Create<string, uint>(System.StringComparer.OrdinalIgnoreCase);
 
 		/// <summary>The resource a node yields, or null when the object is not a harvest node at all.</summary>
 		public static uint? ResourceFor(string? nodeName) =>

@@ -22,10 +22,24 @@ namespace Faolan.GameServer
 		// DispatchDisplayItemLootChatMessage carrying (itemId, itemId, 0, count) - so nothing new goes on the wire, and
 		// the resource items already ship in faolan.db. Lives here beside UseInventoryItem because the grant does.
 		//
-		// One harvest empties the node. That is measured at the ends, not invented in the middle: node health bottoms
-		// out at 1 in every capture and the node then despawns. The partial values the captures show (901, 701, 382, ...)
-		// are OTHER players harvesting the same shared world node, so they cannot be read as a per-swing decrement -
-		// which is exactly why no decrement curve is modelled here. [V0: the harvest health decrement per swing]
+		// ONE INTERACTION IS ONE SWING, and a swing takes 100 of the node's 1000 health and grants exactly 1 unit - so
+		// a full node is ten swings, not one. This used to empty the node in a single use and hand out 40, both of
+		// which were misreadings the annotated mining session settles:
+		//
+		//   - "one harvest empties it" came from reading the ENDS of the earlier captures and explaining the partial
+		//     values (901, 701, 382, ...) away as OTHER players on a shared node. They are the per-swing decrement.
+		//     Melvin's own gold vein runs 298 -> 198 -> 98 while he narrates "-10% each time".
+		//   - the 40 came from the 4th u32 of the DispatchDisplayItemLootChatMessage that follows. That word is the
+		//     item's LEVEL (see HarvestCatalog.Yields); the count rides the ADD's stat_list 26, and it is 1 every time.
+		//
+		// The client renders health/max as the PERCENTAGE in the node's health bar - which is where the "12% silver
+		// vein" / "30% gold vein" annotations come from - so the swing has to put the new health on the wire or the
+		// node keeps reading full. That is the same StatIIR the respawn sequence already sends for CarsGroup.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 18:22-18:45, dynels 0x2688/0x26d6/0x269a/0x2666/0x26c0]
+		//
+		// Retail also REGROWS a node in place (+33/+26/+16 per 60s, per node) rather than despawning it at the floor.
+		// We still despawn-and-respawn on exhaustion, which is the existing DynelVisualSequence; regrowth-in-place is
+		// tracked in Gitea #732.
 		private async Task HarvestResourceNode(INetworkClient client, LiveWorldObject node)
 		{
 			var character = client.Session.Character;
@@ -51,11 +65,25 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			node.Health = HarvestCatalog.ExhaustedHealth;
+			var before = node.Health ?? HarvestCatalog.NodeMaxHealth;
+			var after = before - HarvestCatalog.SwingCost;
+			node.Health = after;
 			await SendItemLootChatMessage(client, resourceId, count);
+			await _broadcaster.BroadcastNodeHealth(client, node, after);
+
+			// Exhausted only when it can no longer pay for a swing. Until then the node stays in the world with its
+			// health bar down, which is what the player sees in retail.
+			if (after >= HarvestCatalog.SwingCost)
+			{
+				Logger.LogInformation("Harvest: {Player} took {Count}x item {Item} from '{Node}' 0x{Handle:X8}; health {Before} -> {After} ({Percent}%).",
+					character.Name, count, resourceId, name, node.Handle, before, after, after * 100 / HarvestCatalog.NodeMaxHealth);
+				return;
+			}
+
+			node.Health = HarvestCatalog.ExhaustedHealth;
 			await _broadcaster.DespawnHarvestedNode(client, node);
 
-			Logger.LogInformation("Harvest: {Player} harvested {Count}x item {Item} from '{Node}' 0x{Handle:X8}; node exhausted and despawned.",
+			Logger.LogInformation("Harvest: {Player} took the last {Count}x item {Item} from '{Node}' 0x{Handle:X8}; node exhausted and despawned.",
 				character.Name, count, resourceId, name, node.Handle);
 		}
 

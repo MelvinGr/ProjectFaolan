@@ -15,14 +15,33 @@ namespace Faolan.Tests
 	{
 		// The three rows a capture actually measured, each landing beside its own annotation. If the item ids drift,
 		// the identification is what broke.
+		//
+		// ⚠️ The counts here used to be 40 / 60 / 40, read off the 4th u32 of the DispatchDisplayItemLootChatMessage
+		// that follows a harvest. That word is the item's LEVEL, not a count - and Items.Level for Granite, Oak and
+		// Iron is 40, 60 and 40, which is why the misread looked like three independent measurements. The count is on
+		// the ADD, in stat_list 26, and it is 1 on every captured harvest in both mining captures.
 		[Theory]
-		[InlineData("Granite Rock", 161206u, 40u)] // `just mined`
-		[InlineData("Oak Tree", 161213u, 60u)] // `gethering wood` - the tree the maintainer chopped down
-		[InlineData("Iron Node", 161196u, 40u)] // `mining iron`
-		public void TheMeasuredNodes_YieldWhatTheCaptureShowed(string node, uint itemId, uint count)
+		[InlineData("Granite Rock", 161206u)] // `just mined`
+		[InlineData("Oak Tree", 161213u)] // `gethering wood` - the tree the maintainer chopped down
+		[InlineData("Iron Node", 161196u)] // `mining iron`
+		public void TheMeasuredNodes_YieldOneUnitPerSwing(string node, uint itemId)
 		{
 			Assert.Equal(itemId, HarvestCatalog.ResourceFor(node));
-			Assert.Equal(count, HarvestCatalog.YieldFor(node));
+			Assert.Equal(HarvestCatalog.YieldPerSwing, HarvestCatalog.YieldFor(node));
+		}
+
+		// The level of each node's resource - the value the old yield table had actually captured. Kept as a gate so
+		// the coincidence that made the misread convincing cannot quietly come back as a "measurement".
+		[Theory]
+		[InlineData(161206u, 40)]
+		[InlineData(161213u, 60)]
+		[InlineData(161196u, 40)]
+		public async Task TheOldYieldNumbers_AreTheResourcesItemLevel(uint itemId, int level)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(Support.TestPaths.FaolanDb));
+			var item = await db.Items.FindAsync([itemId], TestContext.Current.CancellationToken);
+			Assert.NotNull(item);
+			Assert.Equal(level, item!.Level);
 		}
 
 		// An unmeasured node still yields its resource, at the documented default rather than at 0 (which would look
@@ -33,6 +52,15 @@ namespace Faolan.Tests
 			Assert.Equal(161218u, HarvestCatalog.ResourceFor("Yew Tree"));
 			Assert.Equal(HarvestCatalog.DefaultYield, HarvestCatalog.YieldFor("Yew Tree"));
 			Assert.True(HarvestCatalog.DefaultYield > 0, "a default yield of 0 would be a harvest that grants nothing");
+		}
+
+		// A full node is exactly ten swings: 1000 max, 100 a swing. Both halves are measured, and the arithmetic
+		// between them is what makes "-10% each time" and "a 30% gold vein" the same statement.
+		[Fact]
+		public void AFullNode_IsTenSwings()
+		{
+			Assert.Equal(10u, HarvestCatalog.NodeMaxHealth / HarvestCatalog.SwingCost);
+			Assert.Equal(0u, HarvestCatalog.NodeMaxHealth % HarvestCatalog.SwingCost);
 		}
 
 		// Not everything destructible is harvestable - the guild-city pieces of #498 are the same IIR with max 1,000,000,

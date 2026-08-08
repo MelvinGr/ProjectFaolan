@@ -2607,6 +2607,21 @@ namespace Faolan.GameServer.World
 				(2 * DynelVisualSequence.FadeSeconds) + DynelVisualSequence.RespawnDelaySeconds);
 		}
 
+		// A harvest node's new health after a swing, to everyone who can see it (#732). Retail streams this on the very
+		// same StatIIR the respawn steps use for CarsGroup - stat 0x1B HealthCurrent, addressed to the node's own
+		// destructible class - and the client turns health/max into the PERCENTAGE in the node's health bar. Without
+		// it a depleted node keeps reading full, which is what makes the number the player actually steers by.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5, dynel 0x2688: 298 -> 198 -> 98]
+		public Task BroadcastNodeHealth(INetworkClient client, LiveWorldObject node, uint health)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return Task.CompletedTask;
+
+			var typeTag = WorldObjectColumns.TypeTagForClass(node.SubOpcode);
+			return BroadcastToViewers(_sim.World.ZoneForEntity(player), node, StatCodec.Build(StatIirs.ForWorldObject(typeTag, node.Handle, CharacterStatId.HealthCurrent, health)));
+		}
+
 		// #678: one due step of a harvested object's staged visual sequence, put on the wire for everyone who can see
 		// it. Each step is exactly what retail sends at that moment:
 		//

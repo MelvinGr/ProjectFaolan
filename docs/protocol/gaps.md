@@ -193,18 +193,19 @@ rather than inventing a value the client would display as authoritative.
 none contains 154, 402, 642 or 1892 in either endianness. The cheap source is captures, not RE — one login
 snapshot per level fills a row with no decoding at all.
 
-### The harvest health decrement per swing
-**Tracked: Gitea #494.** [V0: the harvest health decrement per swing] A harvest node's health is measured only at
-the ENDS: it starts at 1000 and bottoms out at **1**, after which the node despawns. What happens in between is
-not recoverable from the corpus, because each node is streamed **once** with whatever health the shared playfield
-has left it at — the partial values (901, 701, 601, 501, 382, 169, 137, 31, 21, 11) are other players harvesting
-the same nodes, not a per-swing curve. So the server empties a node in one harvest rather than inventing a
-decrement.
+### Whether a harvest node under one swing's worth can still be harvested
+**Tracked: Gitea #732.** [V0: whether a node under 100 health can still be harvested] The decrement itself is no
+longer a gap — a swing costs exactly **100** of the 1000 max and grants exactly **1** unit, so a full node is ten
+swings (`docs/subsystems/resource-harvesting.md`). What is still unmeasured is the FLOOR. Retail leaves nodes
+sitting at 31 and 28 and lets them regrow, so the older "bottoms out at 1, then despawns" was what those
+particular captures' nodes happened to do, not a rule; and nobody in any capture swung at a node holding less
+than 100, so whether a partial pool pays out a partial (or a whole) unit is unknown. We require a full swing's
+worth and stop there rather than invent a payout.
 
-The retail swing sequence is undecoded for the same reason: the client selects the node with `LookAtIIR` carrying
-class `0xC879` (`EntityClass.Destructible`) and then sends `BehaviorControlCenterIIR` swings, but how many swings
-and what cast time are not established. A capture of one player emptying a single node from full settles both this
-and the decrement in one go.
+The retail swing sequence is still undecoded: the client selects the node with `LookAtIIR` carrying class
+`0xC879` (`EntityClass.Destructible`) and then sends `BehaviorControlCenterIIR` swings (`BehaviorId.UseDynel`,
+`0x12`), but the cast time is not established. One capture of a player taking a node from full to empty settles
+the floor.
 
 ---
 

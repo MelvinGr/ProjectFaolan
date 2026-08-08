@@ -42,8 +42,8 @@ NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json].
 
 - **Depletion is 100 per swing.** In the annotated capture the player's own mining walks node `0x2943` down
   `900 → 800 → 700`, three records ~8 s apart, and two other nodes do the same in the same span. So a full 1000
-  node is ten swings, not one. (This is the `[V0: the harvest health decrement per swing]` this doc used to
-  carry.)
+  node is ten swings, not one. (This closed the "harvest health decrement per swing" gap this doc used to carry;
+  the annotated mining session then confirmed it independently, with the player narrating "-10% each time".)
 - **Regrowth is a fixed step on a fixed cadence, per node.** The same `0x2943` then climbs `700 → 726 → 752 →
   … → 882`, exactly `+26` every 60 s, starting ~17 s after the last swing. Across the corpus the common steps
   are `+25 / 15 s` (755 samples), `+16 / 60 s` (322), `+26 / 60 s` (182) and `+33 / 60 s` (139) — so the STEP is
@@ -53,8 +53,10 @@ NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json].
   matching `SetKDTree` (that manifest's `<CollisionMesh2 file>`) and, in one case, a particle puff. It is the
   same `SimpleDynelVisualChangeIIR` sequence the quest-item pickups play, on the destructible class.
 
-We model none of this yet: a harvest empties the node in one use and despawns it, and it returns on zone reload.
-Wiring the measured stream up is Gitea #494.
+**Depletion is modelled** (#732): one interaction is one swing, taking 100 health and granting 1 unit, with the
+new health broadcast on that same `StatIIR` so the health bar moves. A node is exhausted only when it can no
+longer pay for a swing, and only then does it despawn and come back through `DynelVisualSequence`. **Regrowth in
+place is not** — see "What is not modelled".
 
 ### The particle puff is not harvestable, and the ATTRACTOR is why (#686)
 
@@ -87,15 +89,65 @@ DispatchAddItem                     -> the resource stack into the backpack (con
 DispatchDisplayItemLootChatMessage  -> [u32 itemId][u32 itemId][u32 0][u32 count]
 ```
 
-Measured in the mining span, each landing beside its own annotation:
+⚠️ **That 4th u32 is the item's LEVEL, not a count**, and reading it as a count is what put 40 / 60 / 40 into
+`HarvestCatalog.Yields`. The body is the same `ProtoAcgItem`-shaped layout the client's `itemref://` chat link
+carries — `[template][template][0][level][hash][key1][key2][key3]`, `key3` being the `NullIdentity` sentinel —
+and `Items.Level` for Granite, Oak and Iron is 40, 60 and 40 exactly, which is why the misread looked like three
+independent measurements.
 
-| annotation | item | id | count |
-|---|---|---|---|
-| `just mined` | Granite | 161206 | 40 |
-| `gethering wood` | Oak | 161213 | 60 |
-| `mining iron` | Iron | 161196 | 40 |
+**One swing grants exactly one unit.** The count rides the ADD's own `stat_list` 26, and it is `1` on every
+captured harvest in *both* mining captures. The resource stack ticks up by one per swing
+(`DispatchSetItemStat` `StackSize` 2, 3, 4 …), and the annotations say the same: *"also -10 %, got 1"*, and
+*"got 3"* after three swings on the gold vein.
+
+| annotation | item | id | level (the old "count") | count |
+|---|---|---|---|---|
+| `just mined` | Granite | 161206 | 40 | 1 |
+| `gethering wood` | Oak | 161213 | 60 | 1 |
+| `mining iron` | Iron | 161196 | 40 | 1 |
 
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated.tshark.json]
+[V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json]
+
+So a full node is ten swings for ten units, not one harvest for forty.
+
+## The percentage the player steers by IS the health bar
+
+The annotated mining session settles what the health stream is *for*: the client renders `health / max` as the
+**percentage in the node's health bar**, like any character's. That is where the player's own running commentary
+comes from, and it makes the numbers checkable against the wire to the digit:
+
+| annotation | node | wire health |
+|---|---|---|
+| `next to a 12% silver vein now` (18:24:16) | Silver Vein `0x26d5` | 129 at 18:24:34 |
+| `next to a 30% gold vein now` (18:26:12) | Gold Vein `0x2688` | 298 at 18:25:34 |
+| `-10% each time` (18:26:42) | Gold Vein `0x2688` | 298 → 198 → 98 |
+| `mining copper, also -10% per` (18:37:59) | Copper Node `0x26c0` | −100 a swing |
+
+Regrowth measured on the same nodes agrees with the corpus figures above: `+33` (Gold, Basalt, Oak, Duskmetal),
+`+26` (Iron, Granite, Yew, Electrum) and `+16` (Silver, Copper) per 60 s.
+
+⚠️ **The node does not stop at 1 here.** The gold vein bottoms at 31 and the basalt rock at 28, and both then
+regrow — so "bottoms out at 1, then despawns" is what the *earlier* captures' nodes happened to do, not a floor.
+Nobody swung at a node holding less than 100, so whether a partial pool can pay for a swing is unmeasured.
+[V0: whether a node under 100 health can still be harvested]
+
+## The node's own name string lies
+
+The `DestructibleFullUpdateIIR` carries both a name STRING and a `DisplayId`. The client shows the `DisplayId`
+resolved through **LDB category 50200**; the string is an internal name that retail itself has wrong on two of
+the ore nodes:
+
+| dynel | name string on the wire | LDB 50200 (what the client shows) |
+|---|---|---|
+| `0x26d5` / `0x26d6` / `0x26d4` | `Martial Ring` | **Silver Vein** |
+| `0x26c0` / `0x26c5` | `Vitalic Bronze-studded Armbands` | **Copper Node** |
+| `0x2688` | `Gold Vein` | Gold Vein |
+| `0x269a` | `Iron Node` | Iron Node |
+
+This matters because `HarvestCatalog` keys on the NAME. `WorldObjects` mostly carries the resolved name, but one
+shipped row is `Vitalic Bronze-studded Armbands` (with `DisplayId` 3237648 = *Copper Node* sitting right beside
+it), which makes that node silently un-harvestable. Never take a dynel's display name from the string field.
 
 The node name maps straight to the resource, and the whole family already ships (161190-161225: Ironsilk, Silk,
 Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandstone, Oak, Yew, Ash) matching the
@@ -104,14 +156,20 @@ and conversations use — so no new column, no importer change, and no re-harves
 
 ## What is not modelled
 
-- **The per-swing decrement**, now that it is measured at 100: one `UseObject` still empties the node here,
-  where retail takes ten swings off it.
+- **Regrowth in place**, now that the cadence is measured: an exhausted node still despawns and comes back
+  through `DynelVisualSequence` rather than climbing its health back on a timer.
 - **The retail swing sequence.** The client selects the node (`LookAtIIR` carrying class `0xC879`
   `EntityClass.Destructible`) and then sends `BehaviorControlCenterIIR` swings; how many swings and what cast time
   are not decoded. The server harvests on the `UseObject` interaction instead.
-- **Respawn**, now that the cadence is measured: nodes still return on zone reload rather than regrowing in
-  place. Which step a given node takes is not derivable from any column we hold, only from what its own series
-  did. [V0: what selects a node's regrowth step]
+  Which step a given node takes is not derivable from any column we hold, only from what its own series did —
+  though the step does at least group by node kind (`+33` Gold/Basalt/Oak/Duskmetal, `+26` Iron/Granite/Yew/
+  Electrum, `+16` Silver/Copper). [V0: what selects a node's regrowth step]
+- **The mine-triggered ambush.** Harvesting can spawn a hostile: at 18:29:47 of the annotated session, mid-swing
+  on an Iron Node, `Argus the Thief` arrives as a full `FA015807` spawn followed by the aggro exchange, and the
+  player narrates *"got ambushed while mining"* ten seconds later. We have no spawn-on-harvest hook at all.
+- **The rare cross-drop.** A copper node paid out **tin** — a resource from a different node type — into its own
+  resource slot at 18:39:57, beside the copper stack it was filling. So the yield is a roll against a table, not
+  a fixed node→resource mapping, and `HarvestCatalog.Resources` models only the fixed part.
 - **`Elm Tree` and `Slate Rock`** ship as nodes but no item named Elm or Slate exists in `faolan.db`, so they are
   deliberately absent from the catalog and inert. `HarvestCatalogTests` fails if an import ever supplies one, so
   the gap cannot quietly become permanent.
