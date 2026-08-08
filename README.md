@@ -57,9 +57,11 @@ we've seen_, and names the gaps). Regenerate with
   captures (#377)
 - ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy
 - ✅ **Sit on benches** — sitting down, switching seats and standing up (#355)
-- 🟡 **Resource harvesting** — mining, chopping and picking on the 144 nodes the captures have shown us; one
-  swing takes 10% of the node and gives 1 unit. Missing: regrowth in place, the harvest ambush, rare
-  cross-drops, Elm/Slate (#494, #732)
+- ✅ **Spend a skillpoint** — putting points into Run Speed, Climbing, Hiding and Perception out of the pool a
+  level-up hands you; the pool and the skills persist. Selling one back waits for a capture (#739, #745)
+- 🟡 **Resource harvesting** — mining, chopping and picking on the 197 nodes the captures have shown us, across
+  all 25 node types; one swing takes 10% of the node and gives 1 unit. Missing: regrowth in place, the harvest
+  ambush, rare cross-drops, and the eleven higher-tier resources with no item in the DB (#494, #732, #746)
 - 🟡 **Ambient wildlife & spawns** — each zone's spawn groups are decoded from the client and a live spawner keeps
   them stocked and roaming. The creature type per group is server-only, so ~21% are auto-matched and the rest are
   hand-confirmed (#332, #363)
@@ -68,8 +70,9 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Damage schools** — every hit carries the element it was dealt with, numbered as the client numbers them,
   and falls and hazards carry their own marker. Physical melee is one school for everyone; retail picks it per
   weapon (#487)
-- 🟡 **Knockback** — a blow can shove you along a path you did not walk. Distance, direction and resistance scaling
-  rest on a single captured sample, and no attack triggers it yet — GM command only (#496)
+- 🟡 **Knockback** — a blow can shove you along a path you did not walk, exactly 3 units straight away from the
+  attacker (two independent captures agree). Resistance scaling is still invented, and no attack triggers it yet —
+  GM command only (#496, #742)
 - 🟡 **Environmental damage** — falls cost health scaled to your maximum and leave a bruise or broken bone; lava
   burns and kills across the client's 105 lava volumes. Death stacks a 30-minute penalty. Pending an in-client
   confirm (#495, #504)
