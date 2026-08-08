@@ -44,9 +44,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, ulong level)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot);
+			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, level);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
@@ -373,7 +373,7 @@ namespace Faolan.GameServer
 		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
 		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
 		// slot index means nothing.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null)
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -411,7 +411,7 @@ namespace Faolan.GameServer
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
 			var entry = SnapshotItems.ListEntry((ulong)slot.Value, FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
-					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash))
+					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), f7: level)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 

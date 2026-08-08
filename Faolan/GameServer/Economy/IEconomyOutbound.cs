@@ -16,7 +16,13 @@ namespace Faolan.GameServer.Economy
 		// Grant an item template into the first free backpack slot, returning the slot (or null when full).
 		// `preferredSlot` is the backpack slot the player asked for - today only the loot window's drag target (#462).
 		// It is a REQUEST, not a reservation: an occupied or out-of-range slot falls back to the first free one.
-		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null);
+		//
+		// `level` is the entry's wire level (ProtoAcgItem.level). It is a PER-TEMPLATE property - across all 8,644
+		// inventory entries in the capture dumps, 0 templates carry two different levels - but our `Items.Level`
+		// cannot supply it: it is 0 for 84% of sighted templates and, where populated, half of it is the wire value
+		// divided by ten (#725). So a caller that HAS the captured level passes it, and everyone else keeps the 1
+		// that every grant has always sent. Remove the parameter once #725 makes Items.Level authoritative.
+		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1);
 
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See GameServerListener.Outbound.cs SendAddItem.
 		Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);

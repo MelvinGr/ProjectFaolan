@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Crypt;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -33,10 +30,6 @@ namespace Faolan.GameServer.Economy
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
-
-		// The backpack's base cell count (mirrors BaseBackpackSlots on the listener) - a read-only query helper is
-		// copied in rather than seamed, per the extraction pattern.
-		private const uint BaseBackpackSlots = 24;
 
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -584,39 +577,37 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			var slot = await FindFreeBagSlot(character.Id);
+			var qty = attachment.Quantity == 0
+				? 1u
+				: attachment.Quantity;
+
+			// Delivered through the SHARED grant, not a private copy of it (#720). This used to find its own bag
+			// slot, build its own wire entry and write its own CharacterInventory row - which meant an item bought
+			// from the auction house and taken from mail did NOT advance a collect objective, while the same item
+			// looted, bought from a vendor, harvested, claimed or `.additem`ed did. `GrantItemToBackpack` ends with
+			// `AdvanceCollectGoals`; its comment calling itself "the one choke point every grant passes through"
+			// only became true here.
+			//
+			// It also picks up two behaviours this path never had: a QUEST item arriving by mail now routes to the
+			// quest tab rather than the backpack, and the bag capacity accounts for the equipped bag's extra slots.
+			//
+			// The attachment's captured `ItemLevel` is passed because `Items.Level` cannot supply it yet (#725).
+			var slot = await _outbound.GrantItemToBackpack(client, attachment.Template, qty, level: attachment.ItemLevel);
 			if (slot == null)
 			{
 				_logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);
 				return;
 			}
-
-			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
-			await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)slot.Value, entry);
-
-			var qty = attachment.Quantity == 0
-				? 1u
-				: attachment.Quantity;
-			// The attachment's template always HAS an Items row - `MailAttachments.Template` is an FK to `Items` with
-			// ON DELETE RESTRICT - so the row is never the problem. The HASH used to be: retail reveals an item's
-			// hash only when it ENTERS AN INVENTORY, traced end to end through the buy capture
-			// (`AssassinL23_..._buy_from_autionhouse_get_mail...`) for template 163118 (Feywater):
+			// The grant PERSISTS as well as delivering, so there is no SetCharacterInventorySlot here. There used to
+			// be, and after the routing above it would have been a double write - into ContainerKind.Bag even when
+			// the grant had routed a quest item to the quest tab, leaving the same item in two containers.
 			//
-			//   AH listing      hash 0
-			//   mail attachment hash 0   (twice)
-			//   live AddItem    hash 909133648   <- first appearance, as it is taken from the mailbox
-			//   snapshot        hash 909133648   <- stable from then on
-			//
-			// Corpus-wide that is the rule, not one sample: 0 of 328 captured search-result rows and 0 of 2 mail
-			// attachments carry a hash, while 8,479 of 8,479 world-entry snapshot entries do. So a bought item whose
-			// template no capture has shown being TAKEN had no knowable hash, and persisting it would have written a
-			// row the snapshot DROPS (it renders Hash != 0 only) - an invisible item holding a bag slot. This branch
-			// therefore delivered such purchases LIVE-ONLY, which was the honest outcome at the time and covered the
-			// ordinary AH case, not an edge (190 listings).
-			//
-			// #723 removed the premise: the token is minted when no capture harvested one, the snapshot renders it,
-			// and the purchase survives the relog. Every take persists.
-			await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
+			// It was also conditional: a purchase whose template had no harvested hash was delivered LIVE-ONLY,
+			// because the world-entry snapshot rendered `Hash != 0` only and persisting one would have left an
+			// invisible item holding a bag slot. That covered the ORDINARY auction-house case, not an edge - retail
+			// reveals an item's hash only as it enters an inventory, so a listing and a mailbox both carry 0.
+			// #723 removed the premise (the token is minted when none was harvested); the trace that established it
+			// is written up in docs/subsystems/item-claims.md.
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
@@ -644,44 +635,5 @@ namespace Faolan.GameServer.Economy
 			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
-		// The first free backpack cell, skipping persisted rows + the legacy starter-bag cell while it renders. The
-		// backpack size is 24 base + the equipped bag's extra slots (#12), so a grown bag can be filled. Null = full.
-		// Read-only DB helper (mirrors GameServerListener.FindFreeBagSlot - copied rather than seamed).
-		private async Task<int?> FindFreeBagSlot(uint characterId)
-		{
-			var equipment = await _database.GetCharacterEquipment(characterId);
-			var taken = (await _database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
-			// The seeded starter-bag item occupies cell 1 whenever it EXISTS. This used to also require a harvested
-			// hash, as a proxy for "will the snapshot render it"; since #723 it always renders, and the old form
-			// would hand cell 1 out twice for a bag item whose token had never been captured.
-			if (equipment?.FirstPosBag != null)
-				taken.Add(1);
-			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
-			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
-		// Builds the live DispatchAddItem entry for a mail attachment via the shared SnapshotItems (the single
-		// item-entry wire builder). The mail-specific glue is only the mapping: the itemId/recordId are derived from the
-		// target BAG slot, the stat triple is the fixed (0=flags, 23=recordId, 26=count), and the template identity +
-		// per-instance hash/level come off the attachment (its Item nav = the FK on Template, so Item.Id == Template;
-		// the caller loads it via Attachments.ThenInclude(a => a.Item) for the TEA key).
-		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
-		{
-			var itemId = FullCharacterRoots.ItemId(charId, ContainerKind.Bag, (ulong)slot);
-			var recordId = (uint)FullCharacterRoots.RecordId(charId, ContainerKind.Bag, (ulong)slot);
-			var qty = a.Quantity == 0
-				? 1u
-				: a.Quantity;
-
-			// Three sources, most specific first: the token the CAPTURE recorded on this attachment, then the one
-			// harvested for the template, then a minted one. The first two are both 0 for an AH purchase - a listing
-			// and a mailbox carry no token - which is exactly the case minting exists for (#723).
-			var harvested = a.ItemHash != 0
-				? a.ItemHash
-				: a.Item.Hash;
-
-			return SnapshotItems.InventoryEntry(itemId, a.Item, AcgHash.ForWire(a.Item.Id, harvested),
-				[new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, recordId), new SnapshotItems.ItemStat(26, qty)], a.ItemLevel);
-		}
 	}
 }
