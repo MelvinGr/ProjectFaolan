@@ -117,16 +117,33 @@ would close the client's window on an item it never received.
   professions match retail exactly. So the gap is the MEANING, not the data: which ids are professions, what the
   rank byte counts, and which recipes each profession covers.
 
-  The **`1.4M` id band** is the standing candidate. Across the shipped characters it is small and rank-uniform:
+  **The professions are the `CharacterSkills` rows whose `Rank` byte is 65–75 (`0x41`–`0x4B`)**, and that byte
+  is a per-profession **SLOT**, not a level. NecroL80's in-client sheet shows eight professions — Weaponsmith and
+  Armorsmith under *Crafting*, Prospector / Weaver / Skinner / Stonecutter / Woodcutter / Miner under
+  *Gathering* — and she carries exactly eight rows in that band. Lining the two level-80s up by slot:
 
-  | character | `1.4M` entries |
-  |---|---|
-  | DemoL80 (L80) | `1410900` r0, then `1411300` `1440000` `1440400` `1440500` `1440700` `1441902` `1445000` all at **r3** |
-  | NecroL80 (L80) | `1440500` r0, `1445000` **r3** |
-  | AssassinL23, Hakotep, Adada | none |
+  | slot | NecroL80 | DemoL80 | base |
+  |---|---|---|---|
+  | 65 | `321502` | — | 3215 |
+  | 66 | `323205` | — | 3232 |
+  | 67 | — | `323201` | 3232 |
+  | 68 | — | `322402` | 3224 |
+  | **70** | `323505` | `323501` | **3235** |
+  | **71** | `327505` | `327500` | **3275** |
+  | **72** | `328908` | `328908` | **3289** |
+  | **73** | `326000` | `326000` | **3260** |
+  | **74** | `323305` | `323300` | **3233** |
+  | **75** | `323405` | `323402` | **3234** |
 
-  Seven at rank 3 versus one is exactly the shape "professions learned" would have, but it is unconfirmed and
-  nothing is gated on it. Tracked in Gitea; deliberately not guessed at.
+  Slots 70–75 carry the **same base id on both characters** — six professions both have — while 65–68 are
+  character-specific. That is AoC's own split: gathering is open to everyone, crafting is chosen. So
+  **slots 70–75 are the six Gathering professions and 65–69 the Crafting picks**, with the `SkillId` base naming
+  which.
+
+  ⚠️ The **tier** (Master vs Grandmaster) is still unpinned. Only the id's trailing two digits differ between the
+  two characters on the shared slots (NecroL80 `05 05 08 00 05 05`, DemoL80 `01 00 08 00 00 02`), matching the known
+  feat-id shape `base*100 + rank` — but no simple threshold on those reproduces NecroL80's 5 Master +
+  1 Grandmaster. A second character's sheet settles it. [V0: what records a learned tradeskill]
 
   What the client settles statically, short of a capture:
   - **Learning a recipe is a GameAction**, not an RPC — `53198` / `e_Type_GC_GameAction_LearnRecipe`, one
