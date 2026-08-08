@@ -180,9 +180,14 @@ namespace Faolan.GameServer
 		}
 
 		// The same body either way; only the opcode says whose side of the table the item is on.
+		// The token was a bare 0 here. No capture pins that (the trade path was recovered from the client's method
+		// table, not a trace) and it contradicts the measured rule: every captured message describing a real item
+		// INSTANCE carries one - 165/165 DispatchAddItem entries, 8,479/8,479 snapshot entries, 2,734/2,734 shop
+		// wares - while only the template ADVERTS (AH listings, mail attachments, claim lists) carry 0. A trade
+		// offer names an instance, so it carries the token (#723).
 		Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
 		{
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(recipientId, ContainerKind.Bag, slot), item, 0,
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(recipientId, ContainerKind.Bag, slot), item, AcgHash.ForWire(item.Id, item.Hash),
 			[
 				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, slot)),
 				new SnapshotItems.ItemStat(26, count)
@@ -244,7 +249,9 @@ namespace Faolan.GameServer
 			if (ClientForCharacter(characterId) is not { } client)
 				return Task.CompletedTask;
 
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot), item, 0,
+			// Carries the token for the same reason SendTradeItem does: this IS a DispatchAddItem body, and every
+			// captured one of those describes a real instance and carries one (#723).
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot), item, AcgHash.ForWire(item.Id, item.Hash),
 			[
 				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(characterId, ContainerKind.Bag, slot)),
 				new SnapshotItems.ItemStat(26, count)
@@ -320,7 +327,10 @@ namespace Faolan.GameServer
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
 			var taken = (await Database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
-			if (equipment?.FirstPosBag is { Hash: not 0 })
+			// The seeded starter-bag item occupies cell 1 whenever it EXISTS. This used to also require a harvested
+			// hash, as a proxy for "will the snapshot render it"; since #723 it always renders, and the old form
+			// would hand cell 1 out twice for a bag item whose token had never been captured.
+			if (equipment?.FirstPosBag != null)
 				taken.Add(1);
 			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
@@ -372,18 +382,15 @@ namespace Faolan.GameServer
 			var characterId = client.Session.Character.Id;
 
 			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
-			// land in the player's quest-items tab (#261). They are kept even with hash 0 (quest items often have none).
+			// land in the player's quest-items tab (#261).
 			//
-			// A normal bag item still REQUIRES a hash, with no exception (#719). There used to be an `allowHashless`
-			// escape hatch for claim redeems - a claim list carries the item's key but no hash - which persisted a row
-			// the world-entry snapshot then DROPPED (it only renders Hash != 0), leaving the item invisible after a
-			// relog. `RedeliverNonSnapshotBagItems` papered over that by re-pushing it as a live add on every world
-			// entry, i.e. re-announcing "You received [X]" on every MAP CHANGE. Retail never holds a hash-less item in
-			// an inventory (0 of 8,479 captured snapshot entries), so the row should never have existed: the hash is
-			// harvestable from the same captures the claim came from, which is now done at the source.
+			// There is no longer a hash gate here. A normal bag item used to REQUIRE a harvested hash (#719): the
+			// world-entry snapshot renders `Hash != 0` only, so persisting a hash-less row left the item invisible
+			// after a relog, and `RedeliverNonSnapshotBagItems` papered over that by re-pushing it as a live add on
+			// every world entry - re-announcing "You received [X]" on every MAP CHANGE. #723 removed the premise:
+			// every item now HAS a token, harvested or minted (AcgHash.ForWire), so the snapshot renders it and the
+			// grant no longer has to refuse the 232 templates no capture ever showed entering an inventory.
 			var isQuestItem = item.Type == ItemType.Quest;
-			if (!isQuestItem && item.Hash == 0)
-				return null;
 
 			var kind = isQuestItem
 				? ContainerKind.Quest
@@ -404,7 +411,7 @@ namespace Faolan.GameServer
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
 			var entry = SnapshotItems.ListEntry((ulong)slot.Value, FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
-					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
+					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash))
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
@@ -436,16 +443,14 @@ namespace Faolan.GameServer
 			if (equipment == null)
 				return;
 
-			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
+			var equipped = new Dictionary<ulong, Item>();
 			foreach (var slot in InventoryEquippedSlots)
 			{
-				if (equipment[slot] is { Hash: not 0 } item)
-					equipped[(ulong)slot] = (item, item.Hash);
+				if (equipment[slot] is { } item)
+					equipped[(ulong)slot] = item;
 			}
 
-			(Item, uint)? bagFirst = equipment.FirstPosBag is { Hash: not 0 }
-				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
-				: null;
+			var bagFirst = equipment.FirstPosBag;
 
 			var containers = FullCharacterRoots.Containers(characterId, equipped, bagFirst, await Database.GetCharacterInventory(characterId));
 

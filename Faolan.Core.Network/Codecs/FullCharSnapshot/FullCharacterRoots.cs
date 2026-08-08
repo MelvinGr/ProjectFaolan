@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
@@ -51,34 +52,36 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
 		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
-		// Same item codec as the snapshot (SnapshotItems.ListEntry). Includes hash-0 items too (they
-		// render by template / Hash 0, like the live add) so an AH-bought item deposited to the bank still shows on
-		// reopen - unlike the chat-critical world-entry snapshot, the BankIIR is its own channel, so a half-identified
-		// item here can't break world entry. Rows without a resolved Item (no DB identity at all) are still skipped.
+		// Same item codec as the snapshot (SnapshotItems.ListEntry). Rows without a resolved Item (no DB identity
+		// at all) are skipped; everything else renders, because every item HAS a token - harvested when a capture
+		// carried one, minted otherwise (AcgHash.ForWire, #723).
 		public static ProtoInventoryGame Container(ContainerKind kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
 		{
 			var container = NewContainer(kind, capacity, disabledSlots, instance);
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, row.Item!.Hash));
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash)));
 			}
 
 			return container;
 		}
 
-		public static List<ProtoInventoryGame> Containers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
+		// `equipped` / `bagFirst` used to carry the token beside the Item as a `(Item, uint Hash)` tuple, which every
+		// caller filled with `item.Hash` - i.e. a second, redundant way to name the token, and the one way to bypass
+		// minting. The token now comes from the Item, here, so there is exactly one source for it.
+		public static List<ProtoInventoryGame> Containers(uint instance, IReadOnlyDictionary<ulong, Item> equipped, Item? bagFirst,
 			IReadOnlyCollection<CharacterInventory>? inventoryRows = null)
 		{
 			// The backpack grows by the bag equipped in the bag slot (slot 3): base 24 + its BagExtraSlots.
 			var backpackSlots = BaseBackpackSlots + (equipped.TryGetValue(BagEquipSlot, out var bagItem)
-				? bagItem.Item.BagExtraSlots ?? 0
+				? bagItem.BagExtraSlots ?? 0
 				: 0);
 
 			// The resource container grows by the resource bag equipped in the resource-bag slot (slot 26): base 48 +
 			// its ResourceBagExtraSlots - the sibling of the backpack sizing above.
 			var resourceSlots = BaseResourceSlots + (equipped.TryGetValue(ResourceBagEquipSlot, out var resItem)
-				? resItem.Item.ResourceBagExtraSlots ?? 0
+				? resItem.ResourceBagExtraSlots ?? 0
 				: 0);
 
 			var containers = new List<ProtoInventoryGame>
@@ -90,20 +93,21 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			};
 
 			foreach (var (slot, resolved) in equipped.OrderBy(kv => kv.Key))
-				containers[0].Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, ContainerKind.Equipped, slot), RecordId(instance, ContainerKind.Equipped, slot), 1, resolved.Item, resolved.Hash));
+				containers[0].Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, ContainerKind.Equipped, slot), RecordId(instance, ContainerKind.Equipped, slot), 1, resolved, AcgHash.ForWire(resolved.Id, resolved.Hash)));
 
 			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
-			// quest rows once something writes them). Buildable items only - a row without real identity is
-			// silently absent, like the equipped path.
+			// quest rows once something writes them). A row without a resolved Item (no DB identity at all) is
+			// still silently absent, like the equipped path - but a row whose item merely lacks a HARVESTED token
+			// no longer is: it gets a minted one (#723), which is what used to make claim/AH items vanish on relog.
 			var byKind = containers.ToDictionary(c => (ContainerKind)c.InventoryId.Type);
 			var bagSlotsTaken = new HashSet<ulong>();
-			foreach (var row in (inventoryRows ?? []).Where(r => r.Item is { Hash: not 0 }).OrderBy(r => r.Slot))
+			foreach (var row in (inventoryRows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				if (!byKind.TryGetValue(row.Container, out var container))
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, row.Item!.Hash));
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, AcgHash.ForWire(row.Item!.Id, row.Item!.Hash)));
 				if ((ContainerKind)container.InventoryId.Type == ContainerKind.Bag)
 					bagSlotsTaken.Add(slot);
 			}
@@ -113,8 +117,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (bagFirst != null && !bagSlotsTaken.Contains(BagFirstPos))
 			{
 				containers[1]
-					.Items.Add(SnapshotItems.ListEntry(BagFirstPos, ItemId(instance, ContainerKind.Bag, BagFirstPos), RecordId(instance, ContainerKind.Bag, BagFirstPos), 1, bagFirst.Value.Item,
-						bagFirst.Value.Hash));
+					.Items.Add(SnapshotItems.ListEntry(BagFirstPos, ItemId(instance, ContainerKind.Bag, BagFirstPos), RecordId(instance, ContainerKind.Bag, BagFirstPos), 1, bagFirst,
+						AcgHash.ForWire(bagFirst.Id, bagFirst.Hash)));
 			}
 
 			// Captured containers list entries in ascending pos.

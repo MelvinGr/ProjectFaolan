@@ -36,7 +36,13 @@ all **big-endian**:
 
 Containers are built wholesale from the DB (`FullCharacterRoots.Containers`:
 `CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItems.ListEntry`, identity =
-the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snapshot iff `Hash != 0`).
+the `Item.Key` (Data1..4) quad + the wire token `AcgHash.ForWire(Item.Id, Item.Hash)`). Every row with a
+resolved `Item` renders; only a row with no `Item` at all is skipped.
+
+`Items.Hash` is the **harvested** token and is legitimately `0` for 232 of the 4,225 shipped items — those no
+capture ever showed entering an inventory or a shop window. The snapshot used to drop them (it rendered
+`Hash != 0` only), which is what made claims undeliverable and AH purchases live-only; `AcgHash` mints a
+token for them instead. See [item-claims.md](item-claims.md) and `Faolan.Core/Crypt/AcgHash.cs`.
 
 ## Delivery model (the hard-won facts)
 

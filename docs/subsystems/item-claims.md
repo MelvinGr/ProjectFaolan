@@ -70,16 +70,31 @@ claims) and the number otherwise. The one type-4 row is "Double XP" — **Charac
 multi-charge potion: each redeem hands over ONE and re-sends the row via the **sub 0x05** ack with
 `[remaining−1][max]` (`SendRedeemAck`), dropping it only at 0.
 
-### No hash on the wire
+### No hash on the wire — and why that stopped mattering
 
 A claim row carries the item's **key but no hash** — and neither does the in-inventory item-use record
-(`TemplateActionIIR 0x6C300937`, same key-only shape). Retail identifies these (often shop-only) items by
-their key alone and renders them from the client RDB. So the ~10 templates that appear *only* in a claim
-list import into `Items` with `Hash = 0` (`ItemHashHarvester`'s claim-list source harvests the key). Live
-redeem works (the `0x2020` add path renders by template without a hash, via `GrantItemToBackpack(...,
-allowHashless: true)`), but our login snapshot is hash-gated, so a redeemed hash-less item **drops on
-relog**. The fix is render-by-key in the snapshot (matching the client), not hash harvesting — the hash does
-not exist to harvest. Tracked as a follow-up.
+(`TemplateActionIIR 0x6C300937`, same key-only shape), an AH search listing (0 of 328) or a mail attachment
+(0 of 2). Only messages describing a real item **instance** carry one: the world-entry snapshot (8,479 of
+8,479), a shop window (2,734 of 2,734) and the live `0x2020` add.
+
+That used to make a claim for such an item **undeliverable**. The redeem itself worked, but the login
+snapshot rendered `Hash != 0` only, so a hash-less item dropped on relog — and the workaround (re-pushing it
+as a live add at every world entry) re-announced "You received [X]" on every *map change*.
+
+Two findings closed it:
+
+- **The hash is harvestable after all**, just not from the claim list — browsing any vendor that stocks the
+  item is enough, since a shop window carries the full identity. That took the gap from 243 templates to 232.
+- **The remaining 232 do not need one** (#723). The field is the client's `ACGHash`: a 4-character
+  `[0-9A-Z_]` token whose bytes are all the client's reader validates — it compares the word against no
+  expected value, and #547 proved the token resolves to nothing in 28 GB of RDB content. Measured over the
+  120 capture dumps it is per-template and perfectly stable (107,929 sightings, 0 templates carrying two),
+  uniformly random at every position, and derivable from nothing. Confirmed in-client: an item given an
+  invented in-charset token renders correctly, live **and** after a relog.
+
+So `AcgHash.ForWire` mints a token when none was harvested, and `Items.Hash = 0` now means "not harvested"
+rather than "cannot be held". ⚠️ A minted token must be four `[0-9A-Z]` characters — a random u32 fails the
+client's charset check, which tests the validator rather than the identity.
 
 ### The 0x0009 "new claims" glow
 
@@ -98,7 +113,7 @@ unconditionally, so the button lit up for every account.
 - **List / redeem:** `GameServerListener.Claims.cs` — `HandleCoreClaim` dispatches the sub-opcode;
   `SendClaimList` builds the `0x0001` list (emitting each item's real key), snapshots the sent order into
   `Session.ClaimSlots`, and marks the account's claims seen; `RedeemClaim` resolves the index through that
-  snapshot, grants one item (`GrantItemToBackpack(..., allowHashless: true)`), and drops the row.
+  snapshot, grants one item (`GrantItemToBackpack`), and drops the row.
 - **Import:** the item **keys** are harvested into `Items` by the `items` module (`ItemHashHarvester`'s
   claim-list source); the `AccountClaim` rows are a **separate** opt-in `claims` module
   (`CaptureClaimImporter`, `--only claims`) onto the shared `captured` account.
@@ -107,8 +122,6 @@ unconditionally, so the button lit up for every account.
 
 ## Follow-ups
 
-- **Render-by-key on relog (Gitea #359)** — the login snapshot is hash-gated, so a redeemed hash-less claim
-  item (no hash exists in the protocol) drops on relog. Render it from the key like the client does.
 - **Double XP "already held" rule (Gitea #360)** — the multi-charge decrement + `0x05` ack and the potion's
   on-use Double XP buff (`ItemUseType.XpBoost`) are implemented; the retail no-op-if-you-already-hold-one gate
   is not.

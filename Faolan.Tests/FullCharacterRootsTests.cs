@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -47,14 +48,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildContainers_AllocatesUniqueStableIds()
 		{
-			var equipped = new Dictionary<ulong, (Item, uint)>
+			var equipped = new Dictionary<ulong, Item>
 			{
-				[0x05] = (Manacles, Manacles.Hash),
-				[0x12] = (Manacles, Manacles.Hash)
+				[0x05] = Manacles,
+				[0x12] = Manacles
 			};
 
-			var first = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
-			var second = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
+			var first = FullCharacterRoots.Containers(0x02000005, equipped, Signet);
+			var second = FullCharacterRoots.Containers(0x02000005, equipped, Signet);
 
 			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
 			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
@@ -90,10 +91,10 @@ namespace Faolan.Tests
 				ResourceBagExtraSlots = 102
 			};
 
-			var equipped = new Dictionary<ulong, (Item, uint)>
+			var equipped = new Dictionary<ulong, Item>
 			{
-				[(ulong)CharacterEquipmentSlot.Bag] = (backpackBag, backpackBag.Hash), // slot 3
-				[(ulong)CharacterEquipmentSlot.ResourceBag] = (resourceBag, resourceBag.Hash) // slot 26
+				[(ulong)CharacterEquipmentSlot.Bag] = backpackBag, // slot 3
+				[(ulong)CharacterEquipmentSlot.ResourceBag] = resourceBag // slot 26
 			};
 
 			var containers = FullCharacterRoots.Containers(0x02000005, equipped, null);
@@ -110,12 +111,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildContainers_MatchesTheCapturedShape()
 		{
-			var equipped = new Dictionary<ulong, (Item, uint)>
+			var equipped = new Dictionary<ulong, Item>
 			{
-				[0x12] = (Manacles, Manacles.Hash)
+				[0x12] = Manacles
 			};
 
-			var containers = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
+			var containers = FullCharacterRoots.Containers(0x02000005, equipped, Signet);
 
 			Assert.Equal(new uint[] { 101, 104, 112, 113 }, containers.Select(c => c.InventoryId.Type));
 			Assert.All(containers, c => Assert.Equal(0x02000005u, c.InventoryId.Instance));
@@ -169,16 +170,26 @@ namespace Faolan.Tests
 						Hash = 0
 					},
 					ItemId = 9
-				} // not buildable
+				}, // no HARVESTED token - renders on a minted one (#723)
+				new CharacterInventory
+				{
+					Container = (ContainerKind)104,
+					Slot = 7,
+					Item = null,
+					ItemId = null
+				} // no identity at all - still absent
 			};
 
-			var containers = FullCharacterRoots.Containers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
+			var containers = FullCharacterRoots.Containers(0x02000005, new Dictionary<ulong, Item>(), Manacles, rows);
 
 			var bag = containers[1].Items;
-			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
+			Assert.Equal(new uint[] { 1, 3, 5 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
 			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
 			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
 			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the row
+
+			// The hash-less row used to be dropped here, which is what made a claim/AH item vanish on relog (#719).
+			Assert.Equal(AcgHash.Mint(9), bag[2].Item.ItemData.Hash);
 		}
 
 		// The world-entry tail patch (live level + current vitals) must survive the tails serialize and leave

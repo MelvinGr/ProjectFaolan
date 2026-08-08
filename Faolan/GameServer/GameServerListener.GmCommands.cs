@@ -43,12 +43,13 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// A missing Items row is the only refusal left. This also demanded a harvested hash until #723, which
+			// made the 232 never-captured templates un-`.additem`-able - and .additem is the standard bootstrap for
+			// testing exactly those.
 			var item = await Database.GetItem(itemId);
-			if (item is not { Hash: not 0 })
+			if (item == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, item == null
-					? $"No item with id {itemId}."
-					: $"Item {itemId} ('{item.Name}') has no hash - not snapshot-buildable.");
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No item with id {itemId}.");
 				return;
 			}
 

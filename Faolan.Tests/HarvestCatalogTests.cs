@@ -48,8 +48,9 @@ namespace Faolan.Tests
 			Assert.Null(HarvestCatalog.ResourceFor(name));
 		}
 
-		// Every resource the catalog points at must be a real, GRANTABLE item: a missing row or a hashless item cannot
-		// be added to a bag, so the harvest would fail at the grant with the node already consumed.
+		// Every resource the catalog points at must be a real item: a missing Items row cannot be added to a bag, so
+		// the harvest would fail at the grant with the node already consumed. A missing HASH used to disqualify an
+		// item here too - it no longer does, since the wire token is minted when no capture harvested one (#723).
 		[Fact]
 		public async Task EveryResource_IsARealGrantableItem()
 		{
@@ -62,8 +63,6 @@ namespace Faolan.Tests
 				var item = await db.Items.FirstOrDefaultAsync(i => i.Id == itemId, ct);
 				if (item == null)
 					broken.Add($"{node} -> item {itemId} has no Items row");
-				else if (item.Hash == 0)
-					broken.Add($"{node} -> '{item.Name}' ({itemId}) has no hash, so it cannot be granted");
 			}
 
 			Assert.True(broken.Count == 0, "Harvest resources that cannot be granted: " + string.Join("; ", broken));
@@ -106,7 +105,9 @@ namespace Faolan.Tests
 			foreach (var node in noResourceItemShipped)
 			{
 				var resource = node.Replace(" Tree", "").Replace(" Rock", "");
-				if (await db.Items.AnyAsync(i => i.Name == resource && i.Hash != 0, ct))
+				// No `Hash != 0` here: since #723 an item is grantable whether or not a capture harvested its
+				// token, so the only question left is whether the resource item EXISTS.
+				if (await db.Items.AnyAsync(i => i.Name == resource, ct))
 					resolvable.Add($"{node} -> '{resource}'");
 			}
 

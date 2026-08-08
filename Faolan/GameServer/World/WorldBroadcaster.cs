@@ -2133,7 +2133,7 @@ namespace Faolan.GameServer.World
 			return (uint)Interlocked.Increment(ref _nextRuntimeHandle);
 		}
 
-		// A few random snapshot-buildable item templates (Hash != 0) for a loot bag. Drops from the MAP's loot pool
+		// A few random snapshot-buildable item templates for a loot bag. Drops from the MAP's loot pool
 		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
 		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
 		private async Task<List<uint>> RollLootItems(int count, uint mapId)
@@ -2503,8 +2503,8 @@ namespace Faolan.GameServer.World
 
 			var handle = NextRuntimeHandle();
 
-			// Resolve the rolled templates to the items the loot window can actually DISPLAY (Hash != 0, present in
-			// the item table) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
+			// Resolve the rolled templates to the items the loot window can actually DISPLAY (present in the item
+			// table - a harvested hash stopped being a requirement in #723) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
 			// non-buildable template dropped only at splice-time (the old behaviour) shifted every later display slot,
 			// so a single-drag (TakeBagItem indexes LootItems by the client's display Pos) removed/granted the WRONG
 			// item and the window showed one fewer than it held (#226 / handoff Problems 2+3).

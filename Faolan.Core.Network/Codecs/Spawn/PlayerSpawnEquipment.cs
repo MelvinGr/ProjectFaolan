@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
@@ -29,7 +30,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Template1 = item.Id,
 					Template2 = item.Id,
 					Level = 1,
-					Hash = item.Hash
+					Hash = AcgHash.ForWire(item.Id, item.Hash)
 				}
 			};
 		}
@@ -49,17 +50,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (item == null)
 					continue; // slot not worn
 
-				// An item WITHOUT a hash cannot be described to other clients, and skipping it silently is the worst
-				// half-measure available: the wearer sees the piece (their own client rendered it from their inventory),
-				// while everybody else sees them without it, and nothing says why. The NPC path already refuses this
-				// (NpcSpawnEquipmentBuilder.BuildEntry: "say what's missing"); an equipped item is the same promise -
-				// a hash is harvested content, so a worn item lacking one is a gap in Items, not a state to render around.
-				if (item.Hash == 0)
-				{
-					throw new InvalidOperationException(
-						$"Equipped item {item.Id} '{item.Name}' in slot {slot} has no hash, so it cannot be put on the wire - other players would see the wearer without it. Harvest the item's hash.");
-				}
-
+				// This used to REFUSE an item with no harvested hash, on the reasoning that a hash is harvested
+				// content so a worn item lacking one is a gap in Items rather than a state to render around. The
+				// refusal was right while the token could only be harvested; #723 removed that premise - the token
+				// carries no information and the client validates nothing, so BuildEntry mints one and the wearer
+				// and everybody else now see the same piece either way.
+				//
 				// Every worn + vanity item ships - NOTHING is withheld for the vanity filter. Show/hide is driven purely
 				// by the bitmask in the spawn header (CharacterEquipment.VanityShownMask, emitted by
 				// PlayerSpawnScaffoldRows); the client renders it off that mask (#336).

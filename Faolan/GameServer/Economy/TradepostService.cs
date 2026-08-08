@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -597,31 +598,25 @@ namespace Faolan.GameServer.Economy
 				? 1u
 				: attachment.Quantity;
 			// The attachment's template always HAS an Items row - `MailAttachments.Template` is an FK to `Items` with
-			// ON DELETE RESTRICT - so what decides persistence is the HASH, not whether we hold the item.
-			var item = await _database.GetItem(attachment.Template);
-			if (item is { Hash: not 0 })
-				await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
-			else
-				// ⚠️ Live-only, deliberately - and for an AH purchase this is the ORDINARY case, not an edge.
-				//
-				// Retail reveals an item's hash only when it ENTERS AN INVENTORY. Traced end to end through the buy
-				// capture (`AssassinL23_..._buy_from_autionhouse_get_mail...`) for template 163118 (Feywater):
-				//
-				//   AH listing      hash 0
-				//   mail attachment hash 0   (twice)
-				//   live AddItem    hash 909133648   <- first appearance, as it is taken from the mailbox
-				//   snapshot        hash 909133648   <- stable from then on
-				//
-				// Corpus-wide that is the rule, not one sample: 0 of 328 captured search-result rows and 0 of 2 mail
-				// attachments carry a hash, while 8,479 of 8,479 world-entry snapshot entries do. So for a bought item
-				// whose template no capture has ever shown being TAKEN, we genuinely cannot know the hash.
-				//
-				// Persisting it anyway would write a row the snapshot DROPS (it renders Hash != 0 only), leaving an
-				// invisible item holding a bag slot - the #719 state retail never reaches. Delivering it for the
-				// session and saying so is the honest outcome; the item leaves this branch the moment any capture
-				// shows that template entering an inventory (ItemHashHarvester's live-add source).
-				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no item hash - retail sends none in a listing or a mailbox; won't persist across relog).",
-					attachment.Template, character.Name);
+			// ON DELETE RESTRICT - so the row is never the problem. The HASH used to be: retail reveals an item's
+			// hash only when it ENTERS AN INVENTORY, traced end to end through the buy capture
+			// (`AssassinL23_..._buy_from_autionhouse_get_mail...`) for template 163118 (Feywater):
+			//
+			//   AH listing      hash 0
+			//   mail attachment hash 0   (twice)
+			//   live AddItem    hash 909133648   <- first appearance, as it is taken from the mailbox
+			//   snapshot        hash 909133648   <- stable from then on
+			//
+			// Corpus-wide that is the rule, not one sample: 0 of 328 captured search-result rows and 0 of 2 mail
+			// attachments carry a hash, while 8,479 of 8,479 world-entry snapshot entries do. So a bought item whose
+			// template no capture has shown being TAKEN had no knowable hash, and persisting it would have written a
+			// row the snapshot DROPS (it renders Hash != 0 only) - an invisible item holding a bag slot. This branch
+			// therefore delivered such purchases LIVE-ONLY, which was the honest outcome at the time and covered the
+			// ordinary AH case, not an edge (190 listings).
+			//
+			// #723 removed the premise: the token is minted when no capture harvested one, the snapshot renders it,
+			// and the purchase survives the relog. Every take persists.
+			await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
@@ -656,7 +651,10 @@ namespace Faolan.GameServer.Economy
 		{
 			var equipment = await _database.GetCharacterEquipment(characterId);
 			var taken = (await _database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
-			if (equipment?.FirstPosBag is { Hash: not 0 })
+			// The seeded starter-bag item occupies cell 1 whenever it EXISTS. This used to also require a harvested
+			// hash, as a proxy for "will the snapshot render it"; since #723 it always renders, and the old form
+			// would hand cell 1 out twice for a bag item whose token had never been captured.
+			if (equipment?.FirstPosBag != null)
 				taken.Add(1);
 			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
@@ -675,7 +673,14 @@ namespace Faolan.GameServer.Economy
 				? 1u
 				: a.Quantity;
 
-			return SnapshotItems.InventoryEntry(itemId, a.Item, a.ItemHash,
+			// Three sources, most specific first: the token the CAPTURE recorded on this attachment, then the one
+			// harvested for the template, then a minted one. The first two are both 0 for an AH purchase - a listing
+			// and a mailbox carry no token - which is exactly the case minting exists for (#723).
+			var harvested = a.ItemHash != 0
+				? a.ItemHash
+				: a.Item.Hash;
+
+			return SnapshotItems.InventoryEntry(itemId, a.Item, AcgHash.ForWire(a.Item.Id, harvested),
 				[new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, recordId), new SnapshotItems.ItemStat(26, qty)], a.ItemLevel);
 		}
 	}

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
@@ -28,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.World
 			foreach (var (pos, item) in entries)
 			{
 				var guid = ((ulong)handle << 16) | pos; // synthetic per-instance id (display only)
-				contents.Inventory.Items.Add(SnapshotItems.ListEntry(pos, guid, guid, 1, item, item.Hash));
+				contents.Inventory.Items.Add(SnapshotItems.ListEntry(pos, guid, guid, 1, item, AcgHash.ForWire(item.Id, item.Hash)));
 				maxPos = Math.Max(maxPos, pos);
 			}
 

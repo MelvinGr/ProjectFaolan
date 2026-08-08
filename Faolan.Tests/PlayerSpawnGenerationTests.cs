@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -148,11 +149,16 @@ namespace Faolan.Tests
 			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItems)
 		}
 
-		// A worn item with no hash cannot be described on the wire. It used to be skipped, which showed the piece to its
-		// WEARER (their client rendered it from their own inventory) and to nobody else - a divergence with no error
-		// anywhere. The NPC builder already refuses the same shape.
+		// A worn item whose token was never harvested renders anyway, with a minted one (#723).
+		//
+		// The history is worth keeping: this piece used to be SKIPPED, which showed it to its WEARER (their client
+		// rendered it from their own inventory) and to nobody else - a divergence with no error anywhere - and was
+		// then changed to THROW, on the reasoning that a token is harvested content so a worn item lacking one is a
+		// gap in Items rather than a state to render around. Both were right while the token could only be
+		// harvested. It carries no information and the client validates nothing, so there is now a third option
+		// that is better than either: mint one, and let everybody see the same piece.
 		[Fact]
-		public void PlayerSpawnEquipment_WornItemWithoutAHash_Throws()
+		public void PlayerSpawnEquipment_WornItemWithoutAHarvestedHash_RendersWithAMintedToken()
 		{
 			var equipment = new CharacterEquipment
 			{
@@ -164,8 +170,9 @@ namespace Faolan.Tests
 				}
 			};
 
-			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnEquipment.BuildInventoryEntries(equipment));
-			Assert.Contains("has no hash", ex.Message);
+			var entry = Assert.Single(PlayerSpawnEquipment.BuildInventoryEntries(equipment));
+			Assert.Equal(AcgHash.Mint(0x99), entry.Item.Hash);
+			Assert.True(AcgHash.IsWellFormed(entry.Item.Hash), $"minted {AcgHash.Token(entry.Item.Hash)} is not a token the client would accept");
 		}
 
 		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair

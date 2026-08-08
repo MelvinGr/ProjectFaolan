@@ -62,11 +62,11 @@ namespace Faolan.Tests
 		{
 			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
 
-			var equipped = new Dictionary<ulong, (Item, uint)>
+			var equipped = new Dictionary<ulong, Item>
 			{
-				{ 0x12, (Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565), 1129664565) }
+				{ 0x12, Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565) }
 			};
-			(Item, uint)? bagFirst = (Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359), 1347105359);
+			var bagFirst = Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359);
 			var rows = new[]
 			{
 				new CharacterInventory

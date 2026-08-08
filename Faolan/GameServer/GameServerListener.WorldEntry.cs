@@ -576,17 +576,17 @@ namespace Faolan.GameServer
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
 			var instance = client.Session.Character.Id;
-			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
+			// Every resolved item renders: the token is harvested when a capture carried one and minted otherwise
+			// (AcgHash.ForWire, #723), so a `Hash: not 0` gate here would drop exactly the claim/AH items this is
+			// meant to deliver.
+			var equipped = new Dictionary<ulong, Item>();
 			foreach (var slot in InventoryEquippedSlots)
 			{
-				var item = equipment![slot];
-				if (item is { Hash: not 0 })
-					equipped[(ulong)slot] = (item, item.Hash);
+				if (equipment![slot] is { } item)
+					equipped[(ulong)slot] = item;
 			}
 
-			(Item, uint)? bagFirst = equipment!.FirstPosBag is { Hash: not 0 }
-				? (equipment!.FirstPosBag, equipment!.FirstPosBag.Hash)
-				: null;
+			var bagFirst = equipment!.FirstPosBag;
 
 			var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
 				FullCharacterRoots.Containers(instance, equipped, bagFirst, inventoryRows ?? []));

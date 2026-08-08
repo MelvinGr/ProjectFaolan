@@ -105,8 +105,15 @@ namespace Faolan.Core.Database.Tables
 		// template 163118 (Feywater) through the AH buy capture: listing 0, mail attachment 0 (twice), then the live
 		// add that delivers it carries 909133648 and every later snapshot carries the same.
 		//
-		// An item is renderable by the world-entry snapshot iff Hash != 0 AND it has a Data quad; the snapshot drops
-		// the rest, which is why nothing hash-less may be placed in an inventory (InventoryItemHashTests, #719).
+		// ⚠️ 0 means NOT HARVESTED, not "has none". This column is the provenance record - the token a capture
+		// actually carried - and 232 of the 4,225 shipped items legitimately sit at 0 because no capture ever showed
+		// them entering an inventory or a shop window.
+		//
+		// It is NOT what goes on the wire: read `AcgHash.ForWire(Id, Hash)` for that, which mints a token when this
+		// is 0. Nothing renders on `Hash != 0` any more. It used to - the world-entry snapshot dropped hash-less
+		// entries, so a hash-less item could not be held at all, which made claims undeliverable and AH purchases
+		// live-only - until #723 established in-client that the client carries the token opaquely: it validates the
+		// four characters and resolves nothing through them, so a minted one is indistinguishable from a retail one.
 		public uint Hash { get; set; }
 
 		// The auction-house SEARCH CATEGORY id the client queries by (e.g. 30000/30030, NOT the template id) - the

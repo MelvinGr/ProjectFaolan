@@ -130,7 +130,9 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx
 				.MapLootEntries.Where(e => e.MapId == mapId)
 				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
-				.Where(i => i.Hash != 0 && !string.IsNullOrEmpty(i.Name) && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
+				// No `Hash != 0` here - every item has a wire token since #723 (harvested or minted), so that filter
+				// would only drop the templates our harvest has not reached. A name is still required.
+				.Where(i => !string.IsNullOrEmpty(i.Name) && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
 				.ToArrayAsync();

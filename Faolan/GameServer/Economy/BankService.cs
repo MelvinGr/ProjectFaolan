@@ -1,6 +1,7 @@
 using Faolan.Core.Constants;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -101,11 +102,11 @@ namespace Faolan.GameServer.Economy
 					return;
 
 				var item = await _database.GetItem(row.ItemId.Value);
-				if (item is not { Hash: not 0 })
+				if (item == null)
 					return;
 
 				var entry = SnapshotItems.ListEntry((ulong)dPos, FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, (ulong)dPos),
-						FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, (ulong)dPos), row.Count, item, item.Hash)
+						FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, (ulong)dPos), row.Count, item, AcgHash.ForWire(item.Id, item.Hash))
 					.Item;
 				await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)dPos, entry);
 			}

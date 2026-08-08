@@ -195,10 +195,14 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.MorphTargets.AsNoTracking().ToDictionaryAsync(t => t.Name);
 		}
 
+		// "Buildable" no longer means "has a harvested hash": since #723 every item HAS a wire token, harvested or
+		// minted (AcgHash.ForWire), so the `Hash != 0` filter that used to sit here would only exclude the 232
+		// templates no capture happened to show entering an inventory - which is a gap in our harvest, not a
+		// property of the item. A NAME is still required: a nameless row has no identity to render.
 		public async Task<Item[]> GetRandomBuildableItems(int count)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => i.Hash != 0 && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot).OrderBy(_ => EF.Functions.Random()).Take(count).ToArrayAsync();
+			return await ctx.Items.Where(i => i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot).OrderBy(_ => EF.Functions.Random()).Take(count).ToArrayAsync();
 		}
 
 		public async Task<Item[]> GetRandomLootExcludedItems()
