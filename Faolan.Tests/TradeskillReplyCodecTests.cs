@@ -128,8 +128,8 @@ namespace Faolan.Tests
 				MidFlag = r.MidFlag,
 				Tail = r.Tail,
 				TrailingFlag = r.TrailingFlag,
-				RefId0 = r.RefIds[0],
-				RefId1 = r.RefIds.Count > 1
+				RequiredFeatId = r.RefIds[0],
+				RequiredWorkshopFeatId = r.RefIds.Count > 1
 					? r.RefIds[1]
 					: null
 			};

@@ -3257,10 +3257,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("RdbType")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("RefId0")
+                    b.Property<uint>("RequiredFeatId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint?>("RefId1")
+                    b.Property<uint?>("RequiredWorkshopFeatId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Tail")

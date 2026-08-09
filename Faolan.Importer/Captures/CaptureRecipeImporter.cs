@@ -66,8 +66,8 @@ namespace Faolan.Importer.Captures
 					existing.MidFlag = row.MidFlag;
 					existing.Tail = row.Tail;
 					existing.TrailingFlag = row.TrailingFlag;
-					existing.RefId0 = row.RefId0;
-					existing.RefId1 = row.RefId1;
+					existing.RequiredFeatId = row.RequiredFeatId;
+					existing.RequiredWorkshopFeatId = row.RequiredWorkshopFeatId;
 					existing.Items.Clear(); // cascade-delete the old rows, then re-add the freshly parsed set
 					foreach (var item in row.Items)
 						existing.Items.Add(item);
@@ -111,8 +111,8 @@ namespace Faolan.Importer.Captures
 				MidFlag = r.MidFlag,
 				Tail = r.Tail,
 				TrailingFlag = r.TrailingFlag,
-				RefId0 = r.RefIds[0],
-				RefId1 = r.RefIds.Count > 1
+				RequiredFeatId = r.RefIds[0],
+				RequiredWorkshopFeatId = r.RefIds.Count > 1
 					? r.RefIds[1]
 					: null
 			};

@@ -36,8 +36,12 @@ namespace Faolan.Core.Database.Tables
 		// REQUIREMENTS**, not an opaque list: every one of the 18 distinct ids resolves in `FeatIdMaps.WireFeatId`,
 		// and through its `TemplateId` to a named tradeskill feat.
 		//
-		// `RefId0` is the crafting-skill feat that unlocks the recipe; `RefId1`, present only on the higher ranks, is
-		// the WORKSHOP tier it additionally needs. The whole shipped set:
+		// `RequiredFeatId` is the crafting-skill feat that unlocks the recipe; `RequiredWorkshopFeatId`, present only
+		// on the higher ranks, is the WORKSHOP the recipe additionally needs - and a workshop is a **guild-city
+		// building**, not a personal feat. The feat table makes that plain: the same family holds
+		// `Battlekeep Armorsmith Workshop I/II/III`, `Battlekeep Barracks`, `Architect Workshop` and
+		// `Alchemist Workshop`. So a high-rank recipe is gated on the player's guild having built the thing.
+		// The whole shipped set:
 		//
 		//     321000/321001/321100  Weaponsmith Novice / Apprentice / Adept        -            9/18/18 recipes
 		//     321101/321200/321201  Weaponsmith Artisan / Expert / Master          Workshop I/II/III   18 each
@@ -48,12 +52,11 @@ namespace Faolan.Core.Database.Tables
 		// ⚠️ Only Weaponsmith and Armorsmith are present - the other tradeskills are simply not in the captured
 		// records, not evidence that they work differently.
 		//
-		// Nothing gates on this yet: crafting does not check either feat. The names are kept as RefId0/RefId1 for
-		// now because renaming is a schema change; they should become `RequiredFeatId`/`RequiredWorkshopFeatId`.
-		public uint RefId0 { get; set; }
+		// ⚠️ Nothing gates on this yet - crafting checks neither feat, so every recipe is craftable by anyone.
+		public uint RequiredFeatId { get; set; }
 
 		// The record's trailing u32 (@0x50) before the flag byte.
 		public uint Tail { get; set; }
-		public uint? RefId1 { get; set; }
+		public uint? RequiredWorkshopFeatId { get; set; }
 	}
 }

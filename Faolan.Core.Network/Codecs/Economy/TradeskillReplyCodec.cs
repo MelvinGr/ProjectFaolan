@@ -258,10 +258,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 			ArgumentNullException.ThrowIfNull(row);
 			var refIds = new List<uint>
 			{
-				row.RefId0
+				row.RequiredFeatId
 			};
-			if (row.RefId1.HasValue)
-				refIds.Add(row.RefId1.Value);
+			if (row.RequiredWorkshopFeatId.HasValue)
+				refIds.Add(row.RequiredWorkshopFeatId.Value);
 
 			return new RecipeRecord(row.Id, row.Header1, row.RdbType, row.MidFlag, row.Tail, row.TrailingFlag, refIds, ElementsFor(row, RecipeItemRole.Ingredient),
 				ElementsFor(row, RecipeItemRole.Result));
