@@ -27,8 +27,20 @@ namespace Faolan.Core.Database.Tables
 		// it would abort the migration outright rather than fail later.
 		public uint ItemTemplateId { get; set; }
 
-		// The catalog's own `MainQuestReward.type` word (30000, 30001, 30009, 30020, 30021, 30029, 30035, ...).
-		// Carried raw: it is a small enum whose values are not decoded, and naming it before it is would be a guess.
+		// The catalog's own `MainQuestReward.type` word - and it is **the rewarded item's `SearchCategory`**, the
+		// 30000-range AH/search category, not a reward-kind enum. Measured: over the 1,635 rewards whose template we
+		// have harvested it equals `Items.SearchCategory` on **1,635 of 1,635**, with no counterexample, across all
+		// 27 values present. The groups read as exactly that - 30011 khopesh/broadsword, 30012 greatsword, 30017 bow,
+		// 30018 crossbow, 30020 necklace, 30021 ring, 30023 cloak, 30029 ale, 30047 companion.
+		//
+		// ⚠️ Not `Items.Type`, which is the coarse 104 (or 113 for the Phoenix Medallion) on every one of them and
+		// therefore separates nothing. The pairing only shows up if you compare against SearchCategory.
+		//
+		// ⭐ What it buys: 2,308 of the 3,943 rewards name templates the item harvest has never seen (1,367 distinct),
+		// and this gives every one of them a search category with no capture needed.
+		//
+		// The name is kept for now because renaming it is a schema change - tracked as its own follow-up rather than
+		// smuggled into a decode commit. It should become `SearchCategory`.
 		public uint RewardType { get; set; }
 
 		// True for `optional_reward` - the pick-one-of-several set - and false for the guaranteed `reward` list.
