@@ -46,6 +46,11 @@ namespace Faolan.GameServer.Combat
 		// casting-combat capture). Distinct from the melee DamageResult path - the client renders a spell hit's number
 		// from StatDamage (the same IIR that renders incoming DoT numbers on the player), NOT DamageResult.
 		private const uint SpellDamageStatId = 0x0A;
+
+		// What retail puts in StatDamageIIR's `SpellBaseId`: nothing. 3,059 of the corpus's 3,061 records carry 0, and
+		// the two that do not name an id absent from the spell catalog. Named rather than inlined so the next reader
+		// finds the measurement instead of an unexplained literal - see SendSpellDamageNumber (#767).
+		private const uint RetailSpellBaseId = 0;
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
 		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
 
@@ -822,7 +827,24 @@ namespace Faolan.GameServer.Combat
 		// (casting-combat capture) - so a spell hit must use StatDamage, not the melee DamageResult (which the client
 		// only floats after a BCC attack behavior arms the target). Mirrors the incoming DoT-tick StatDamage that
 		// already renders on the player: statValue = the target's resulting health, delta = -damage, caster = the
-		// player, spellBase = the wire id >> 8. Call AFTER ApplyNpcDamage so the health is the post-hit value.
+		// player. Call AFTER ApplyNpcDamage so the health is the post-hit value.
+		//
+		// ⚠️ RETAIL PUTS NOTHING IN `SpellBaseId` HERE - it sends ZERO. Measured over the corpus: of 3,061
+		// StatDamageIIR records, 3,059 carry 0, and the two that do not name an id absent from the whole spell
+		// catalog. Split by stat id it is total for ours - all 50 records with statId 10 (`SpellDamageStatId`) carry
+		// 0, as do all 2,892 with statId 0 and all 119 with statId 5.
+		//
+		// This used to pass `spellId >> 8`, copying the DoT-tick call in `WorldSimulation` where the source really IS
+		// a wire id (`buff.BuffId`). Here `spellId` is ALREADY the base - it comes off the cast trailer, which carries
+		// the bare `Spells` key (`HandleBccCastSpell` shifts it to wire form only for `ApplySpell`), and every other
+		// use in this class treats it as one (`GetSpell(spellId)`, `MagicDamageFor(spellId)`). So it was a shift too
+		// many on a field that should have been empty, and the client said so on every single spell hit (#767):
+		//
+		//     Resource 1040005:14321 does not exist in any available RDB sources.
+		//     SpellTemplate_t::GetMagicSpell failed to load spell with id 14321        (= 3666380 >> 8, Chill)
+		//
+		// 1040005 is the spell record type, so the client was being handed a spell id, failing to load it, and losing
+		// the spell's own GameActions with it - the recast setter among them.
 		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
 		{
 			var vitals = ResolveNpcVitals(client, npcHandle, out _);
@@ -832,7 +854,7 @@ namespace Faolan.GameServer.Combat
 			// is worse than none.
 			return vitals == null
 				? Task.CompletedTask
-				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId >> 8);
+				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, RetailSpellBaseId);
 		}
 
 		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
