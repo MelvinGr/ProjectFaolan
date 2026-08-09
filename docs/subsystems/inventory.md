@@ -138,10 +138,16 @@ Slot ids (equipped container `pos` = `CharacterEquipmentSlot` = the worn instanc
 A socket lives on the wire in two forms, and **neither carries a stat value** — the socket names the GEM by
 template and the client derives its effect from the gem's own template:
 
-- **persistent**: `ProtoInventoryGameEntry.slot_map` (field 4), repeated `{ slot, item: ProtoAcgItem }`. The
-  login snapshot restates every socketed item's full gem list, which is how a gemmed item survives a relog.
-  Measured over the 898 blocks in the corpus slice: socket indices are 0/1/2 only (up to THREE per item), the
-  gem's `level` is its own `Items.Level`, and its `hash` is 0.
+- **persistent, twice over.** `ProtoInventoryGameEntry.slot_map` (field 4), repeated
+  `{ slot, item: ProtoAcgItem }` — the login snapshot restates every socketed item's full gem list, which is how a
+  gemmed item survives a relog. Measured over the 898 blocks in the corpus slice: the gem's `level` is its own
+  `Items.Level` and its `hash` is 0.
+  ⚠️ **The same socket ALSO rides the entry's `stat_list`** as the pair `ItemSlot<N>ACG1` / `ItemSlot<N>ACG2`
+  (stat ids `0x2A3 + 2N` / `0x2A4 + 2N`) — the client's own names for a socket slot's two ACG ids, which are the
+  gem's `template1`/`template2`. The two forms **agree 898/898**, with zero disagreements and zero cases of one
+  present without the other, so they are not alternatives: retail sends both, every time, and so do we.
+  The stat table names FOUR slots (`ItemSlot1`..`ItemSlot4`), so the corpus' socket indices 0/1/2 are a **capture**
+  limit rather than the game's.
 - **live**: `DispatchAddToItemSlot` (GameCharInterface 0x1D) carries the same pair for one socket, followed by
   an ordinary `DispatchRemoveItem` for the gem leaving the bag. The socketed item's container entry is NOT
   re-sent. The c2s trigger is BCC behaviour `0x27`. ⚠️ That is the same behaviour id recorded elsewhere as
@@ -155,3 +161,31 @@ insert-only.
 
 ⚠️ `slot_map` was in the recovered schema from the start and was populated NOWHERE until #750, so every gemmed
 item silently lost its gems at world entry.
+
+### Binding — the client names the rules, and reads them from the TEMPLATE
+
+Two in-client GM tooltips: `Character Bound : Binds when Picked Up` (Cloak of Hugin, template 3908313) and
+`Binds when Equipped` (Bindings of Dark Terror, template 3762969). So there are two rules, and `Character Bound :`
+is a separate prefixed clause — a state or binding TYPE, not the rule.
+
+⚠️ **The carrier is the RDB item template, not the wire.** Both of those templates carry identical wire Flags
+(`0x04000001`) across the corpus, and we send `flags = 1` for every item anyway, yet the client still renders the
+binding line on our server. `ItemInstance.Binding` (`ItemBindingType`) exists as a column but is inert; when it is
+populated the RULE will belong on `Item` (per-template) with only "has it bound yet" per-instance. Open work tracked
+in Gitea #756.
+
+## A trade HANDS the item over
+
+`TradeService.Exchange` calls `ITradeOutbound.TransferItemToCharacter`, which routes to the same
+`GrantItemToBackpack` choke point with a `transferring` instance: the slot search, the live add, the quest-container
+routing and `AdvanceCollectGoals` are identical, but the instance MOVES (owner + container + slot) instead of a new
+one being minted. So the crafter, the stack and the socketed gems cross with it.
+
+The service writes no item rows at all — the move IS the transfer, so there is no giver-side clear and no window in
+which the item exists twice. A failed transfer (receiver offline, bag full, destination cell occupied) leaves the
+item with the giver, structurally rather than by an ordering rule.
+
+⚠️ Before #750 this granted a FRESH instance from the template and then cleared the giver's cell, which deleted the
+giver's row and cascaded its sockets: the receiver got a gemless copy with no crafter. Mail attachments and AH
+listings still keep their own tables and still re-mint on delivery (#750 §8) — `MailAttachment` carries only
+Template/ItemLevel/ItemHash, so there is nothing per-instance for it to preserve yet.

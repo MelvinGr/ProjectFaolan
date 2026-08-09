@@ -52,8 +52,14 @@ namespace Faolan.Core.Database.Tables
 		public bool ExcludeFromRandomLoot { get; set; }
 		// Id (BaseEntity) is the item TEMPLATE id (== ProtoAcgItem.Template1/Template2 on the wire).
 
-		// Level requirement / item level. byte on the wire; mostly 0 for capture-harvested items (the RDB carries
-		// the real value), so level-appropriate filtering is limited until RDB item levels are imported.
+		// The item level, and it is EXACTLY what the wire carries: across all 8,479 captured snapshot entries the
+		// entry's `level` field equals this column for its template - 8,479 for 8,479, zero exceptions. So this is the
+		// one source for it, and SnapshotItems.Identity reads it here rather than taking it from a caller (it used to
+		// be a `level = 1` default parameter nobody passed, which shipped level 1 on every item we sent).
+		//
+		// 4,107 of the 4,669 shipped items carry a real value; the 562 zeroes are templates no source has given a level
+		// yet, not a general gap. This comment used to claim the opposite ("mostly 0 for capture-harvested items"),
+		// which is what stopped anyone looking at the column when the emitter was sending 1.
 		public byte Level { get; set; }
 		public int? MaxDamage { get; set; }
 
