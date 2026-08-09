@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Importer.Cli
@@ -35,7 +36,7 @@ namespace Faolan.Importer.Cli
 		private static readonly (uint LineId, string Token)[] CapturedLineTokens =
 			[(241, "W6QT"), (1054, "RRL3"), (1772, "B0DN"), (1834, "3734")];
 
-		private static void RdbQuestCatalog(string rdbDir, string? arg)
+		private static async Task RdbQuestCatalog(string rdbDir, string? arg)
 		{
 			var wanted = ParseIdFilter(arg);
 			var catalog = ReadQuestCatalog(rdbDir);
@@ -120,8 +121,10 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  prev links {prevLinks.Count}, of which {reciprocal} are mirrored by a next link -> prerequisite pointer, NOT a linked list");
 			Console.WriteLine($"  prev targets that are not a line in this table: {(dangling.Count == 0 ? "none" : string.Join(", ", dangling))}");
 			Console.WriteLine($"  lines holding more than one quest: {questsByChapter.Count(g => g.Count() > 1)}");
-			Console.WriteLine("  ⚠️  ordering is between LINES. Step order WITHIN a chapter is not in this table -");
-			Console.WriteLine("      Quest.tier and Quest.start_new_tier, the fields for exactly that, are empty (census above).");
+			Console.WriteLine("  ⚠️  no FIELD orders the steps within a chapter - Quest.tier and Quest.start_new_tier, the");
+			Console.WriteLine("      fields shaped for exactly that, are empty (census above). The ROW ORDER is scored below.");
+
+			await StepOrderCheck(catalog);
 
 			if (wanted.Count > 0)
 			{
@@ -194,6 +197,107 @@ namespace Faolan.Importer.Cli
 					? ""
 					: $"  ⚠️  {differing.Count} of them DIFFER: {string.Join(", ", differing.OrderBy(i => i))}";
 				Console.WriteLine($"  {list,-10} {byId.Count,4} repeated id(s){note}");
+			}
+		}
+
+		// Does the catalog's own ROW ORDER give the step order within a quest line?
+		//
+		// No FIELD does: `Quest.tier` and `Quest.start_new_tier` are zero on all 5042 rows. But a protobuf's repeated
+		// field preserves the order it was written in, and the journal has to get its order from SOMEWHERE the client
+		// can read offline - the completed-quest journal renders the steps of a line in order with no server input
+		// beyond the ids. So the hypothesis is positional: the Nth `Quest` row of a chapter is its Nth step.
+		//
+        // The captured `JournalSequence` is the ground truth to score it against (harvested from the FullChar
+		// snapshot's completed-quest journal, which ships an explicit `[seq][questId]` pair per step). Only lines
+		// where EVERY step carries a captured sequence are scored - a partially-covered line cannot falsify anything.
+		//
+		// ⚠️ Two CONTROLS run beside it, because a hypothesis that cannot fail is not evidence. Ascending template id
+		// is the null hypothesis (if it scored the same, row order would be telling us nothing that sorting already
+		// does), and reversed row order catches a corpus so degenerate that any total order fits it.
+		private static async Task StepOrderCheck(QuestGiverList catalog)
+		{
+			await using var db = OpenDb();
+			var captured = db.QuestDefinitions
+				.Where(q => q.JournalSequence > 0)
+				.Select(q => new { q.QuestId, q.QuestLineId, q.JournalSequence })
+				.AsEnumerable()
+				.GroupBy(q => q.QuestLineId)
+				.ToDictionary(g => g.Key, g => g.ToDictionary(q => q.QuestId, q => q.JournalSequence));
+
+			// First occurrence wins, so a step listed twice keeps the position of its FIRST row - the same rule the
+			// tree print uses, and the only one under which "the Nth row" is well defined.
+			var byChapter = catalog.Quests
+				.Where(q => q.MainQuestTemplateId != 0)
+				.GroupBy(q => q.MainQuestTemplateId)
+				.ToDictionary(g => g.Key, g => g.Select(q => q.TemplateId).Distinct().ToList());
+
+			int scored = 0, rowOrder = 0, idOrder = 0, reversed = 0, multiStep = 0;
+			var mismatches = new List<string>();
+
+			// A 2-step line is a coin flip, so a headline percentage over a corpus that is mostly 2-step lines says more
+			// about the corpus than about the ordering. Bucketing by length is what separates the two.
+			var buckets = new SortedDictionary<int, (int Lines, int Row, int Id)>();
+
+			foreach (var (lineId, steps) in byChapter)
+			{
+				if (!captured.TryGetValue(lineId, out var seq) || steps.Count < 2)
+					continue;
+
+				// Every step of the line must be covered, and the captured set must be the catalog set - otherwise a
+				// missing step silently shifts every position after it and the comparison measures the gap, not the order.
+				if (steps.Any(s => !seq.ContainsKey(s)) || seq.Count != steps.Count)
+					continue;
+
+				scored++;
+				multiStep += steps.Count;
+				var truth = steps.OrderBy(s => seq[s]).ToList();
+
+				if (steps.SequenceEqual(truth))
+					rowOrder++;
+				else if (mismatches.Count < 5)
+					mismatches.Add($"    line {lineId}: rows [{string.Join(",", steps)}] vs captured [{string.Join(",", truth)}]");
+
+				var byId = steps.OrderBy(s => s).SequenceEqual(truth);
+				if (byId)
+					idOrder++;
+				if (Enumerable.Reverse(steps).SequenceEqual(truth))
+					reversed++;
+
+				var key = Math.Min(steps.Count, 6);
+				var b = buckets.TryGetValue(key, out var cur) ? cur : default;
+				buckets[key] = (b.Lines + 1, b.Row + (steps.SequenceEqual(truth) ? 1 : 0), b.Id + (byId ? 1 : 0));
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("--- step order within a line: catalog ROW ORDER vs the captured JournalSequence ---");
+			if (scored == 0)
+			{
+				Console.WriteLine("  no fully-covered multi-step line to score - import the capture corpus first.");
+				return;
+			}
+
+			Console.WriteLine($"  scored {scored} fully-covered multi-step line(s), {multiStep} steps");
+			Report("catalog row order", rowOrder);
+			Report("ascending template id  (control)", idOrder);
+			Report("reversed row order     (control)", reversed);
+			foreach (var m in mismatches)
+				Console.WriteLine(m);
+
+			Console.WriteLine("  by line length (a 2-step line is a coin flip; the long ones are where a real order shows):");
+			foreach (var (len, b) in buckets)
+			{
+				var label = len == 6 ? "6+" : len.ToString();
+				Console.WriteLine($"    {label,-3} steps  {b.Lines,4} line(s)   row order {b.Row,4} ({100.0 * b.Row / b.Lines,5:0.0}%)" +
+				                  $"   ascending id {b.Id,4} ({100.0 * b.Id / b.Lines,5:0.0}%)");
+			}
+
+			var unscored = byChapter.Count(c => c.Value.Count > 1) - scored;
+			Console.WriteLine($"  multi-step lines with no full captured order to score against: {unscored}");
+			return;
+
+			void Report(string label, int hits)
+			{
+				Console.WriteLine($"  {label,-34} {hits,5} / {scored,-5} ({100.0 * hits / scored,5:0.0}%)");
 			}
 		}
 

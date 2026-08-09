@@ -98,11 +98,12 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
-			// RDB only, no corpus and no DB: the client's own quest catalog, RDB type 1000104 (#569). The DEFINITION
-			// side of the quest system - every quest in the game, with the designers' names in plaintext.
+			// RDB + DB, no corpus: the client's own quest catalog, RDB type 1000104 (#569). The DEFINITION side of the
+			// quest system - every quest in the game, with the designers' names in plaintext. The DB half is the
+			// captured `JournalSequence`, which the step-order check scores the catalog's own row order against.
 			if (report == "rdb-quest-catalog")
 			{
-				RdbQuestCatalog(RdbDir(), arg);
+				await RdbQuestCatalog(RdbDir(), arg);
 				return 0;
 			}
 

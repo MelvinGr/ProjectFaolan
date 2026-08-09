@@ -119,9 +119,35 @@ Bone → The Obsidian Cult → Matters of Trust → The Passage North → The Wo
 Hatred → The One Forsaken → Immortal Vengeance → Test of Endurance → On the Origin of Species — a coherent
 narrative order, which is what says the pointer is a prerequisite rather than an arbitrary grouping.]
 
-**Step order WITHIN a line is not in this table.** `Quest.tier` and `start_new_tier`, the two fields shaped
-for exactly that, are empty. A line gives you its first and last step and its membership; the order of the
-ones between is still hand-authored (`ImportOps.Chain`).
+**Step order WITHIN a line is not in this table** — no field carries it, and neither does the row order.
+`Quest.tier` and `start_new_tier`, the two fields shaped for exactly that, are empty. A line gives you its
+first and last step and its membership; the order of the ones between is still hand-authored
+(`ImportOps.Chain`).
+
+The row order deserved a test of its own, because a protobuf's repeated field preserves the order it was
+written in and no *field* being present does not mean no *order* is. It fails. `--report rdb-quest-catalog`
+scores the catalog's row order per line against the captured `JournalSequence` (the FullChar completed-quest
+journal's explicit `[seq][questId]` pairs), over the 724 lines where every step has a captured sequence:
+
+| ordering | lines matching the captured order |
+|---|---|
+| catalog row order | 381 / 724 (52.6%) |
+| ascending `template_id` (control) | 646 / 724 (89.2%) |
+| reversed row order (control) | 233 / 724 (32.2%) |
+
+Row order loses to *sorting the ids*, which settles it. The length breakdown is what makes the result
+unambiguous rather than a wash: 2-step lines are a coin flip and carry the headline (574 of the 724), and as
+lines get longer row order collapses — 23.5% at 3 steps, 5.9% at 5, and **0 of 20 at 6+ steps**, where chance
+is negligible. Ascending id decays too (93.6% → 50.0% over the same buckets), so it is a *correlation* from ids
+having been handed out roughly in design order, not a rule: Shipwrecked (line 241) runs
+`10238, 12369, 12373, 10320, 12371, 10286, 10287, 10915`, where a later revision inserted `12xxx` steps between
+the original `10xxx` ones. It is not imported, and an 89% guess must not be written into a column that reads as
+fact.
+
+**So the step order is server-side data.** Retail shipped it on the wire and kept it out of the client's
+catalog, which is consistent with the client never needing it offline. Captures are the only source: 1,963
+quests carry a `JournalSequence` today (890 fully-ordered lines), and 1,031 multi-step lines have no captured
+order at all. More coverage means a login capture of a character who completed those lines, not more RDB work.
 
 ## The reward fields do NOT name the journal record's scalars
 
