@@ -67,10 +67,10 @@ namespace Faolan.Core.Database.Tables
 
 		// Whether this item is BOUND to whoever holds it, and to what.
 		//
-		// ⚠️ Nothing sets it and nothing sends it - see ItemBindingType for the full measurement and why it cannot be
-		// settled from the corpus. It is a column because binding is per-INSTANCE ("this copy is bound, that copy is
-		// not"), which is precisely the class of fact the old address-keyed model had nowhere to put; the strong lead is
-		// that bits 24/26/27 of the entry's Flags word (stat 0) are per-instance and sticky.
+		// ⚠️ Nothing sets it and nothing sends it yet - see ItemBindingType for the measurement. The carrier is bits
+		// 24/26/27 of the entry's Flags word (stat 0), and it BINDS ON PICKUP: a claimed item arrives with the bits
+		// already set, and equipping never sets them. It is a column because binding is per-INSTANCE ("this copy is
+		// bound, that copy is not"), which is precisely the class of fact the old address-keyed model had nowhere to put.
 		//
 		// Default None, so the column is inert until the decode lands - an item is tradeable unless something says
 		// otherwise, which is the safe side of the unknown (wrongly binding an item takes it away from a player).

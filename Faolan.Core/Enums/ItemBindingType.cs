@@ -2,9 +2,9 @@ namespace Faolan.Core.Enums
 {
 	// Whether an item INSTANCE is bound to who holds it, and to what (#750).
 	//
-	// ⚠️ UNDECODED ON THE WIRE. Nothing sets this yet and nothing sends it - it is modelled because binding is
-	// per-INSTANCE state and #750's whole point is that per-instance state now has somewhere to live. Do not read the
-	// values as a decoded client enum; the numbering is ours.
+	// ⚠️ NOT YET DECODED WELL ENOUGH TO SET. Nothing writes this and nothing sends it - it is modelled because binding
+	// is per-INSTANCE state and #750's whole point is that per-instance state now has somewhere to live. Do not read
+	// the values as a decoded client enum; the numbering is ours.
 	//
 	// ## What IS measured (2026-08-09, over the corpus' 8,479 snapshot entries)
 	//
@@ -26,12 +26,32 @@ namespace Faolan.Core.Enums
 	// and set on a bag item). It is also NOT plain bind-on-equip: AssassinL23 has the cape EQUIPPED with the bit CLEAR, and
 	// a bind-on-equip flag would have been set the moment it went on.
 	//
-	// ## Why it cannot be settled from what we have
+	// ## ⭐ Bind-on-EQUIP is RULED OUT; the flag is present at PICKUP
 	//
-	// Every corpus sighting of the Flags word is a LOGIN SNAPSHOT, i.e. steady state. Binding is a TRANSITION, so no
-	// number of snapshots can distinguish bind-on-pickup from bind-on-equip - the flip is never in frame. Settling it
-	// needs a capture that contains the transition: acquire an item, note its Flags in the live `DispatchAddItem`,
-	// equip it, and read the flag again. Tracked in Gitea.
+	// Measured over the 178 live `DispatchAddItem` entries in the dumps - the moment of ACQUISITION, which no snapshot
+	// can show:
+	//
+	//   103 of 178 arrive with flags 0x00000001   (bits 26/27 CLEAR)
+	//    56 of 178 carry bit 26,  27 carry bit 27
+	//
+	// The decisive one is the "Drinking Cape" (318951), the same template that varies across characters above: it
+	// arrives via a CLAIM redemption already carrying **0x0C000001 - bits 26 AND 27 set at delivery**. So the flag is
+	// stamped at pickup, and equipping does not stamp it (AssassinL23's copy is worn with the bits clear while Hakotep's
+	// worn copy of the same template has them set). If this is a binding, it BINDS ON PICKUP.
+	//
+	// The value is also CONSISTENT PER TEMPLATE at acquisition: across all 178 adds, zero templates ever arrive with
+	// two different flag values. And it is not simply "starter gear" - within the create captures 33 adds are unbound
+	// and 31 carry bit 26, split cleanly by template (Slave Manacles unbound; 324066/324067/324139/... bound). That
+	// reads as a per-TEMPLATE declaration ("this item is no-trade") stamped onto the instance when it is handed over.
+	//
+	// ## ⚠️ The one thing that reading does not explain
+	//
+	// A per-template declaration should never differ between two copies - and for a handful it does (3 templates for
+	// bit 26, 1 for bit 27, 2 for bit 24, listed above). Those exceptions are what is left to chase, and they are the
+	// reason nothing sets this column yet: the rule is nearly pinned, and "nearly" is not enough to start taking items
+	// off players. Candidates: those instances were acquired by a path the corpus does not contain, or predate a
+	// server-side change. Tracked in Gitea #756.
+	//
 	public enum ItemBindingType
 	{
 		// Freely tradeable. The default, and what every item we mint is today.
