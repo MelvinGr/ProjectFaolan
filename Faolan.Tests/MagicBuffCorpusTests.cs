@@ -80,6 +80,47 @@ namespace Faolan.Tests
 			Assert.Equal(0, CapturedApplies().Count(a => a.Buff.Data[Bool1Offset] != 0));
 		}
 
+		// ⭐ #767: retail sends an ApplySpell only for a spell that HAS something to apply. The whole-corpus form of
+		// that claim, and the reason it matters: sending one for a zero-duration spell is not merely redundant, it
+		// ABORTS the client's `CoreMagicHolder::ActivateBuff` ("remaining time 0", logged at ERROR), and the spell's
+		// own GameActions - which for `Chill` is exactly one element, `SetSpellLineRecastTime(41028, 400)` - never
+		// execute. That is what stopped every cooldown from starting.
+		//
+		// The nukes cast constantly through the corpus (Chill, Ice Strike, Lifestrike, Pestilential Blast) never
+		// carry one. The handful that DO resolve to a zero-duration row are pinned as a population rather than
+		// asserted away, because they are OUR data gap, not retail's behaviour: they are real buffs
+		// (`Armor of Faith`, `Emerald Aptitude`, `Resting`) whose `DurationMs` we have not imported. If that number
+		// grows, a genuine zero-duration apply has appeared and the rule above needs re-testing; if it shrinks, the
+		// missing durations have been filled and the count should come down with it.
+		[Fact]
+		public void EveryCapturedApply_CarriesASpellThatHasADuration()
+		{
+			var applies = CapturedApplies();
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ids = applies.Select(a => a.Buff.SpellBaseId).Distinct().ToList();
+			var rows = db.Spells.Where(s => ids.Contains(s.Id)).ToDictionary(s => s.Id, s => new { s.Name, s.DurationMs });
+
+			var resolved = 0;
+			var zero = new List<string>();
+			foreach (var (_, buff) in applies)
+			{
+				if (!rows.TryGetValue(buff.SpellBaseId, out var row))
+					continue; // no row to judge against - a catalog gap, not a counter-example
+
+				resolved++;
+				if (row.DurationMs == 0)
+					zero.Add($"{buff.SpellBaseId} {row.Name}");
+			}
+
+			Assert.True(resolved > 2000, $"expected the corpus's applies to resolve against Spells; only {resolved} did");
+
+			// Measured 2026-08-09: 7 of 5,423 s2c bodies, over three spells. A hard ceiling rather than an equality,
+			// so filling one of those durations does not fail the gate it was meant to satisfy.
+			Assert.True(zero.Count <= 7,
+				$"{zero.Count} captured applies carry a spell with DurationMs == 0 (expected at most the 7 known missing durations): "
+				+ string.Join(", ", zero.Distinct().Take(12)));
+		}
+
 		// The DURATION at +8, against the `Spells` row it is built from - the original point of this ticket.
 		//
 		// ⭐ It exposed a mechanic rather than a bug. 242 of the 2,929 applies carry a duration the row disagrees

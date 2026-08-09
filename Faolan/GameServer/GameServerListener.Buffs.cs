@@ -175,6 +175,36 @@ namespace Faolan.GameServer
 			}
 
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
+
+			// ⚠️ RETAIL SENDS NO ApplySpell FOR A SPELL WITH NOTHING TO APPLY, and sending one anyway is what broke
+			// spell cooldowns (#767). Measured over all 132 dumps: of 5,423 s2c MagicBuffIIR bodies, 5,416 carry a
+			// spell with a real duration and SEVEN carry a zero-duration one - and those seven are `Armor of Faith`
+			// (x4), `Emerald Aptitude` (x2) and `Resting`, i.e. genuine buffs whose duration is missing on OUR side,
+			// not damage casts. Chill, Ice Strike, Lifestrike and Pestilential Blast - the nukes cast constantly
+			// throughout the corpus - never appear once.
+			//
+			// What it costs to send one anyway, in the client's own words (in-client 2026-08-09, channel
+			// GameCode/Magic at ERROR):
+			//
+			//     CoreMagicHolder::ActivateBuff 3666380 remaining time 0
+			//     SpellTemplate_t::GetMagicSpell failed to load spell with id 14321      (= 3666380 >> 8)
+			//
+			// ActivateBuff ABORTS on a zero remaining time, and the spell's own GameActions - which for `Chill` is
+			// exactly one element, `SetSpellLineRecastTime(41028, 400)` - never execute. That is why the cooldown
+			// never started: the arm is real and lives inside this path. The same log shows it working on a spell
+			// that DOES have a duration, arming a whole line at once:
+			//
+			//     GameCode/Magic/Recast - Setting recast timer on spell: 144674..144677, 1206011 ... to: 600
+			//
+			// So the send is gated on there being something to apply. The old code sent unconditionally and called it
+			// "retail's carrier"; that was never measured, and the measurement says otherwise.
+			if (durationCs == 0)
+			{
+				Logger.LogDebug("Cast {Spell} has no duration and no effect spell - no ApplySpell sent (retail sends none; a zero-duration one aborts the client's ActivateBuff and eats the spell's recast).", spellId >> 8);
+				await ApplyPoolEffects(client, applyTo, spellId >> 8); // an INSTANT pool move still lands (#702)
+				return;
+			}
+
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client)));
 			await ApplyPoolEffects(client, applyTo, spellId >> 8);
 		}
@@ -507,8 +537,13 @@ namespace Faolan.GameServer
 				// #371: only a TIMED self-buff is tracked. A zero-duration spell is an INSTANT effect (the RDB leads:
 				// field 0x008 absent == "no duration"), not a permanent buff - it has nothing for TickBuffExpiry to
 				// expire, renders no icon, and registering it would leak a never-expiring ActiveBuffs entry that also
-				// persists (ExpiresAt NULL) and re-applies on every login. The wire ApplySpell is still SENT above
-				// (retail's carrier); we just don't TRACK an instant as an active buff. Every real buff has a finite
+				// persists (ExpiresAt NULL) and re-applies on every login.
+				// ⚠️ This used to add "the wire ApplySpell is still SENT above (retail's carrier)". That was never
+				// measured and is FALSE: retail sends no ApplySpell for a zero-duration spell (7 of 5,423 in the
+				// corpus, all of them buffs whose duration we are missing), and sending one aborts the client's
+				// ActivateBuff and eats the spell's recast (#767). `ApplySpell` now returns before the send, so a
+				// zero duration reaches here only from the paths that build a payload directly.
+				// We just don't TRACK an instant as an active buff. Every real buff has a finite
 				// duration (mount ride 24h, Shield 1h/10h, longest is Barrel Blast 1000h), so nothing legitimate needs
 				// the old "lives until cancelled" (null) path. This mirrors the NPC-debuff path (WorldSimulation), which
 				// already tracks only when duration > 0.
