@@ -188,6 +188,14 @@ namespace Faolan.GameServer.World
 				// plus the per-spell attribute overrides. Same inputs as the pools above (VitalAttributes.From), so
 				// the two never disagree about what the character's Intelligence is.
 				Attributes = VitalAttributes.From(classBase, statBonuses),
+				// ⚠️ The character's LEVEL. This was never set, so every player entity carried Level 0 while only NPCs
+				// got a real one - and two things read it, both silently wrong:
+				//   * BuffStatEffects resolves a RAMPED buff delta off it (#599: the same buff is +887 health at level
+				//     20 and +17500 at level 80), so every ramped buff on a player was resolved at level 0;
+				//   * RebaseFromAttributes passes it to CharacterMaxStats.ClassBaseHundredths, which THROWS on 0.
+				// The throw is what finally surfaced it: the rebase only runs when an equip CHANGES an attribute, so
+				// equipping a piece with an attribute bonus killed the packet loop and dropped the player's connection.
+				Level = character.Level,
 				CharacterClass = character.Class,
 				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>(),
 				// #697: what the character's feats do to their combos, resolved once here for the same reason the

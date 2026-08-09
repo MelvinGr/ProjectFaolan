@@ -609,6 +609,11 @@ namespace Faolan.GameServer.Combat
 			{
 				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
 
+				// The LIVE entity's level too: it is what ramped buff deltas and the attribute rebase read, so leaving it
+				// behind would keep resolving them at the level the player entered the world with.
+				if (_sim.PlayerWorldEntity(killer!) is { } leveled)
+					leveled.Level = character.Level;
+
 				// No ceiling to store: the vitals max is DERIVED from (Class, Level), so writing the level IS writing
 				// the new max (#578). It used to be a persisted CharacterMaxStats row that only the `.level` GM command
 				// ever updated - a combat level-up wrote the level and left the row at its creation value, so the next

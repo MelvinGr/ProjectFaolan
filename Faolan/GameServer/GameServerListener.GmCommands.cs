@@ -743,6 +743,10 @@ namespace Faolan.GameServer
 
 			var previousLevel = character.Level;
 			character.Level = level;
+			// The live entity's level follows, same as the XP path - it drives ramped buff deltas and the attribute
+			// rebase, so a `.level` that left it stale would keep resolving them at the old level.
+			if (_simulation.PlayerWorldEntity(client) is { } leveled)
+				leveled.Level = level;
 			// A GM `.level` set jumps to the START of the target level, so zero the within-level XP: otherwise stale
 			// progress from a higher level shows against the (smaller) new MaxExp and the XP bar renders NEGATIVE on a
 			// level-DOWN (the bar's fill = Exp/MaxExp with Exp > MaxExp, or Exp for a level whose threshold is now below
