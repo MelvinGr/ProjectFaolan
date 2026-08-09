@@ -185,15 +185,18 @@ namespace Faolan.GameServer
 		// INSTANCE carries one - 165/165 DispatchAddItem entries, 8,479/8,479 snapshot entries, 2,734/2,734 shop
 		// wares - while only the template ADVERTS (AH listings, mail attachments, claim lists) carry 0. A trade
 		// offer names an instance, so it carries the token (#723).
-		Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
+		async Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
 		{
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(recipientId, ContainerKind.Bag, slot), item, AcgHash.ForWire(item.Id, item.Hash),
+			// The offered item's own instance id, so the offer names the same thing the offerer's inventory does. A
+			// captured-only cell (no instance behind it) falls back to 0, which is what the template ADVERTS carry.
+			var offered = await Database.GetCharacterItemSlot(recipientId, ContainerKind.Bag, (int)slot);
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(offered?.Id ?? 0), item, AcgHash.ForWire(item.Id, item.Hash),
 			[
 				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, slot)),
 				new SnapshotItems.ItemStat(26, count)
-			], item.Level);
+			], sockets: offered?.Sockets);
 
-			return SendTradeRpc(recipientId, mine
+			await SendTradeRpc(recipientId, mine
 				? GameCharInterfaceMethods.DispatchTradeAddedItem
 				: GameCharInterfaceMethods.DispatchTradePartnerAddedItem, TradeAddedItemCodec.Build(new TradeAddedItem(entry, count)));
 		}
@@ -310,23 +313,17 @@ namespace Faolan.GameServer
 
 		private async Task<int> BackpackCapacity(uint characterId)
 		{
-			var equipment = await Database.GetCharacterEquipment(characterId);
-			return (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
+			var bag = await Database.GetCharacterItemSlot(characterId, ContainerKind.Equipped, (int)CharacterEquipmentSlot.Bag);
+			return (int)(BaseBackpackSlots + (bag?.Template.BagExtraSlots ?? 0));
 		}
 
-		// The first free backpack cell, skipping persisted rows + the legacy starter-bag cell while it renders. The
-		// backpack size is 24 base + the equipped bag's extra slots (#12), so a grown bag can be filled. Null = full.
-		// Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
+		// The first free backpack cell, skipping occupied ones. The backpack size is 24 base + the equipped bag's extra
+		// slots (#12), so a grown bag can be filled. Null = full. Read-only DB helper (mirrors
+		// AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
 		private async Task<int?> FindFreeBagSlot(uint characterId)
 		{
-			var equipment = await Database.GetCharacterEquipment(characterId);
-			var taken = (await Database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
-			// The seeded starter-bag item occupies cell 1 whenever it EXISTS. This used to also require a harvested
-			// hash, as a proxy for "will the snapshot render it"; since #723 it always renders, and the old form
-			// would hand cell 1 out twice for a bag item whose token had never been captured.
-			if (equipment?.FirstPosBag != null)
-				taken.Add(1);
-			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
+			var taken = (await Database.GetCharacterItems(characterId, ContainerKind.Bag)).Select(i => i.Slot).ToHashSet();
+			var capacity = await BackpackCapacity(characterId);
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
@@ -345,7 +342,7 @@ namespace Faolan.GameServer
 			if (preferred is { } slot && (slot < 0 || slot >= capacity))
 				throw new ArgumentOutOfRangeException(nameof(preferred), slot, $"a requested {container} slot outside 0..{capacity - 1} cannot come from the client - the body was misread.");
 
-			var taken = (await Database.GetCharacterInventory(characterId, container)).Select(r => r.Slot).ToHashSet();
+			var taken = (await Database.GetCharacterItems(characterId, container)).Select(i => i.Slot).ToHashSet();
 			if (preferred is { } wanted && !taken.Contains(wanted))
 				return wanted;
 
@@ -398,15 +395,18 @@ namespace Faolan.GameServer
 			if (slot == null)
 				return null;
 
-			await Database.SetCharacterInventorySlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
+			// The MINTED instance: this is a grant, so the item comes into existence here and its id is what the live add
+			// and the next login's snapshot both name it by (#750). The two used to agree via a formula over
+			// (instance, kind, slot); they agree by identity now.
+			var minted = await Database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
 			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
-			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
-				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), level, creatorName: creatorName);
+			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(minted!.Id),
+				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), creatorName: creatorName);
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
 			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got
@@ -433,20 +433,7 @@ namespace Faolan.GameServer
 		private async Task SendUpdateInventory(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var equipment = await Database.GetCharacterEquipment(characterId);
-			if (equipment == null)
-				return;
-
-			var equipped = new Dictionary<ulong, Item>();
-			foreach (var slot in InventoryEquippedSlots)
-			{
-				if (equipment[slot] is { } item)
-					equipped[(ulong)slot] = item;
-			}
-
-			var bagFirst = equipment.FirstPosBag;
-
-			var containers = FullCharacterRoots.Containers(characterId, equipped, bagFirst, await Database.GetCharacterInventory(characterId));
+			var containers = FullCharacterRoots.Containers(characterId, await Database.GetCharacterItems(characterId));
 
 			// containers[0] = Equipped(101), [1] = Bag(104) - the two retail pushes. The Resource and Quest containers
 			// it also builds are NOT pushed: the capture carries exactly these two.
@@ -463,24 +450,16 @@ namespace Faolan.GameServer
 			Logger.LogDebug("Pushed UpdateInventoryIIR for {Character}: Equipped + Bag (#380).", client.Session.Character.Name);
 		}
 
-		// Removes an item from the player's backpack: clears the persisted CharacterInventory bag cell (so it stays
-		// gone across relog) AND pushes the live DispatchRemoveItem so it disappears immediately. The mirror of
-		// GrantItemToBackpack. Returns true if a row was cleared.
+		// Removes an item from the player's backpack: deletes the persisted bag item (so it stays gone across relog) AND
+		// pushes the live DispatchRemoveItem so it disappears immediately. The mirror of GrantItemToBackpack. Returns
+		// true if an item was there to remove.
 		private async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
 		{
 			var characterId = client.Session.Character.Id;
-			var rows = await Database.GetCharacterInventory(characterId);
-			var present = false;
-			foreach (var r in rows)
-			{
-				if (r.Container == ContainerKind.Bag && r.Slot == slot)
-					present = true;
-			}
-
-			if (!present)
+			if (await Database.GetCharacterItemSlot(characterId, ContainerKind.Bag, slot) == null)
 				return false;
 
-			await Database.SetCharacterInventorySlot(characterId, ContainerKind.Bag, slot, null);
+			await Database.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
 			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
 
 			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
@@ -508,14 +487,16 @@ namespace Faolan.GameServer
 				return 0;
 
 			var characterId = client.Session.Character.Id;
-			var steps = InventoryTake.Plan(await Database.GetCharacterInventory(characterId), itemTemplateId, count);
+			var steps = InventoryTake.Plan(await Database.GetCharacterItems(characterId), itemTemplateId, count);
 
 			foreach (var step in steps)
 			{
+				// A partial take DECREMENTS the item in place - the crafter and any socketed gems stay on it because the
+				// row is not re-minted (#750).
 				if (step.Remaining == 0)
-					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, null);
+					await Database.SetCharacterItemSlot(characterId, step.Container, step.Slot, null);
 				else
-					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, itemTemplateId, step.Remaining, step.CreatorName);
+					await Database.SetCharacterItemCount(characterId, step.Container, step.Slot, step.Remaining);
 
 				await SendRemoveItem(client, step.Container, (uint)step.Slot, step.Taken);
 			}

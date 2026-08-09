@@ -27,7 +27,8 @@ just logs a warning and skips the spawn):
    (kept from the capture: rebuilding rotation from unreliable DB data once hung the client).
 2. **CharacterIIR** — `SpawnBodyReader` locates the embedded `ProtoCoreCharacterIIR` (any spawn, any
    layout); name/sex/race/level/vitals are overridden from `Character`/`CharacterMaxStats`, the worn
-   equipment from `CharacterEquipment` via `PlayerSpawnEquipment` (`InventoryEntry { pos, ProtoAcgItem }`,
+   equipment from the character's `Equipped` `ItemInstance` rows via `PlayerSpawnEquipment` (`InventoryEntry
+   { pos, ProtoAcgItem }`,
    items built like `SnapshotItems`); `SpawnPacketBuilder.SetCharacterMessage` splices it back.
 3. **Scaffold frame** — `SimpleCharFullUpdateCodec` (byte-exact parse/generate of the full body) +
    `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character:
@@ -309,12 +310,13 @@ The same playbook applied to the FullChar/inventory snapshot:
   Smoke-verified in-client 16/16: generated containers + patched tails live in the same session, no
   fallback warnings in the server log.
 
-- **Bag rows WIRED (same day)**: `CharacterInventory` now has its writer — unequip parks the item as a bag
-  row at the client-given cell (multiple unequips coexist; the old single-`FirstPosBag` parking lost items),
-  equip consumes the source row; world entry renders the rows in their containers by kind (`BuildContainers`
-  inventoryRows; the seeded FirstPosBag yields its cell to a persisted row; entries pos-ascending). Locked
-  by `InventorySlot_UpsertAndClear_RoundTripAcrossContexts` + `BuildContainers_RendersPersistedBagRows`;
-  smoke 16/16 with a live bag item rendered from rows.
+- **Bag rows WIRED (same day)**: carried items got their writer — unequip parks the item at the client-given
+  cell (multiple unequips coexist; the old single-`FirstPosBag` parking lost items), equip consumes the source
+  cell; world entry renders them in their containers by kind, pos-ascending. Locked by
+  `InventorySlot_UpsertAndClear_RoundTripAcrossContexts` + `BuildContainers_RendersBagItems`; smoke 16/16 with
+  a live bag item rendered from rows. (The table behind this was `CharacterInventory`, replaced by
+  `ItemInstance` in #750 along with `FirstPosBag`, which was a second source for bag cell 1 — see
+  [inventory.md](../subsystems/inventory.md).)
 
 ### UPDATE 2026-06-12 — beach FullChar now CONSTRUCTED FROM SCRATCH
 

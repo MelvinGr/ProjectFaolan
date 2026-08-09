@@ -103,10 +103,10 @@ namespace Faolan.GameServer.Economy
 			// CHECK EVERYTHING BEFORE TAKING ANYTHING. Taking as we go would leave a player who is one silver short
 			// having paid the copper - the same grant-before-consume discipline the shop's buy path and the harvest
 			// bag-full refusal use.
-			var held = await _database.GetCharacterInventory(character.Id);
+			var held = await _database.GetCharacterItems(character.Id);
 			foreach (var (itemId, quantity) in needed)
 			{
-				var have = held.Where(r => r.ItemId == itemId).Aggregate(0u, (sum, r) => sum + (r.Count == 0 ? 1u : r.Count));
+				var have = held.Where(i => i.TemplateId == itemId).Aggregate(0u, (sum, i) => sum + (i.Count == 0 ? 1u : i.Count));
 				if (have >= quantity)
 					continue;
 

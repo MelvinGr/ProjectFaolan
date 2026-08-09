@@ -34,14 +34,14 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "get_character"),
 		 Description(
-			 "Inspect one character: persisted DB state (level, wallet, inventory rows, quests, tags) plus live world state (position, vitals, buffs) when connected. Character ids: see list_world_sessions or list_sessions. Read-only.")]
+			 "Inspect one character: persisted DB state (level, wallet, items incl. worn + socketed gems, quests, tags) plus live world state (position, vitals, buffs) when connected. Character ids: see list_world_sessions or list_sessions. Read-only.")]
 		public async Task<string> GetCharacter([Description("Numeric character id")] uint characterId)
 		{
 			var character = await _db.GetCharacter(characterId);
 			if (character == null)
 				return $"No character with id {characterId}.";
 
-			var inventory = await _db.GetCharacterInventory(characterId);
+			var items = await _db.GetCharacterItems(characterId);
 			var quests = await _db.GetCharacterQuests(characterId);
 			var tags = await _db.GetCharacterTags(characterId);
 
@@ -56,17 +56,24 @@ namespace Faolan.Mcp.Tools
 				character.AccountId,
 				character.GuildId,
 				Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
-				Inventory = inventory
-					.OrderBy(r => r.Container)
-					.ThenBy(r => r.Slot)
-					.Select(r => new
+				// Every item the character holds, worn (container Equipped, slot = the equip slot id) and carried alike -
+				// they are one table since #750, so the worn set no longer needs its own shape here.
+				Items = items.Select(i => new
+				{
+					i.Id,
+					i.Container,
+					i.Slot,
+					i.TemplateId,
+					ItemName = i.Template?.Name,
+					i.Count,
+					i.CreatorName,
+					Sockets = i.Sockets.OrderBy(x => x.SocketIndex).Select(x => new
 					{
-						r.Container,
-						r.Slot,
-						r.ItemId,
-						ItemName = r.Item?.Name,
-						r.Count
-					}),
+						x.SocketIndex,
+						x.GemItemId,
+						GemName = x.Gem?.Name
+					})
+				}),
 				Quests = quests.Select(q => new
 				{
 					q.QuestId,

@@ -252,7 +252,7 @@ namespace Faolan.GameServer.Economy
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
 			var seller = await _database.GetCharacterByName(listing.SellerName, character.RealmId);
 			if (seller != null && seller.Id != character.Id)
-				await _database.SetCharacterInventorySlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
+				await _database.SetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
@@ -399,8 +399,8 @@ namespace Faolan.GameServer.Economy
 			var bankSlot = (int)body.ReadUInt32();
 			var price = body.ReadUInt64();
 
-			var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
-			if (row?.Item == null)
+			var listed = await _database.GetCharacterItemSlot(character.Id, ContainerKind.Bank, bankSlot);
+			if (listed == null)
 			{
 				_logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
 				return;
@@ -409,7 +409,7 @@ namespace Faolan.GameServer.Economy
 			// #181: file the listing under the item's AH search CATEGORY (the item-type-search id the client queries
 			// by, e.g. 30030) so a normal item-type search surfaces it, recovered from captured listings. Falls back
 			// to the template when the category is unknown (no regression vs the old template-filing).
-			var searchCategory = await _database.GetItemSearchCategory(row.Item.Id) ?? row.Item.Id;
+			var searchCategory = await _database.GetItemSearchCategory(listed.TemplateId) ?? listed.TemplateId;
 
 			var listing = new TradepostListing
 			{
@@ -419,17 +419,17 @@ namespace Faolan.GameServer.Economy
 				SellerName = character.Name!,
 				BankSlot = (uint)bankSlot,
 				Price = price,
-				Quantity = row.Count == 0
+				Quantity = listed.Count == 0
 					? 1u
-					: row.Count,
-				ItemId = searchCategory, // #181: the item-type search category (was row.Item.Id, the template)
+					: listed.Count,
+				ItemId = searchCategory, // #181: the item-type search category (was the template id)
 				InstanceField = 0,
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = 0,
-				Template = row.Item.Id, // the key lives in Items (FK on Template); no inline copy
-				ItemLevel = row.Item.Level,
-				ItemHash = row.Item.Hash
+				Template = listed.TemplateId, // the key lives in Items (FK on Template); no inline copy
+				ItemLevel = listed.Template.Level,
+				ItemHash = listed.Template.Hash
 			};
 			await _database.CreateTradepostListing(listing);
 
@@ -446,8 +446,8 @@ namespace Faolan.GameServer.Economy
 			// the HUD stays in sync; no debit.
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			_logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", character.Name, row.Item.Name,
-				listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
+			_logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.", character.Name, listed.Template.Name,
+				listing.Quantity, bankSlot, listed.TemplateId, price, listing.SaleId);
 		}
 
 		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][attachments: ListFrame word + u32 slot each]: a
@@ -520,8 +520,8 @@ namespace Faolan.GameServer.Economy
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
 			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
 			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
-			var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
-			if (row?.Item != null)
+			var attached = await _database.GetCharacterItemSlot(character.Id, ContainerKind.Bank, bankSlot);
+			if (attached != null)
 			{
 				mail.SenderBankSlot = (uint)bankSlot;
 				mail.Attachments.Add(new MailAttachment
@@ -530,12 +530,12 @@ namespace Faolan.GameServer.Economy
 					// mail's ItemInstanceId = listing.SaleId. Only needs to be unique within the mail's attachments -
 					// TakeMailItem resolves the item by Template, not by this id.
 					ItemInstanceId = mail.MailId,
-					Quantity = row.Count == 0
+					Quantity = attached.Count == 0
 						? 1u
-						: row.Count,
-					Template = row.Item.Id, // the key lives in Items (FK on Template); no inline copy
-					ItemLevel = row.Item.Level,
-					ItemHash = row.Item.Hash,
+						: attached.Count,
+					Template = attached.TemplateId, // the key lives in Items (FK on Template); no inline copy
+					ItemLevel = attached.Template.Level,
+					ItemHash = attached.Template.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,
 					TrailerTail = 0
@@ -546,7 +546,7 @@ namespace Faolan.GameServer.Economy
 			await TradepostResponses.SendMailSendResult(client, true, packet.Sender.Instance);
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
-			if (row?.Item != null)
+			if (attached != null)
 				await TradepostResponses.SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagMailPending);
 
 			// Retail pushes a 0x2005 wallet refresh after SendMail too - again with NO postage fee (the captured
@@ -555,7 +555,7 @@ namespace Faolan.GameServer.Economy
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText,
-				money, row?.Item != null);
+				money, attached != null);
 		}
 
 		// GetMailItem: grant the escrowed attachment into the bag, then drop it from the mail and re-send the
@@ -616,7 +616,7 @@ namespace Faolan.GameServer.Economy
 			{
 				var sender = await _database.GetCharacterByName(mail.SenderName, mail.RealmId);
 				if (sender != null)
-					await _database.SetCharacterInventorySlot(sender.Id, ContainerKind.Bank, (int)mail.SenderBankSlot, null);
+					await _database.SetCharacterItemSlot(sender.Id, ContainerKind.Bank, (int)mail.SenderBankSlot, null);
 			}
 
 			await _database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);

@@ -149,7 +149,7 @@ Per-packet byte layouts (server→client):
 **Gate / path:** the open is mediated by an RDB Lua `TreasureChestScript` (same VM PINNED for conversations), but is
 **bypassable** like conversations — answer the use-Interact directly with NewCurrentLooter → LootRemoveItems → fade
 without running the real script. The looted item appears in the bag **client-side**; persisting it server-side means
-writing the `CharacterInventory` row on the take and re-sending the post-load `0x737A6DF9` snapshot (the only
+writing the item row on the take and re-sending the post-load `0x737A6DF9` snapshot (the only
 inventory-delivery mechanism — see memory `protocol_containeradditem`).
 
 ## Quests

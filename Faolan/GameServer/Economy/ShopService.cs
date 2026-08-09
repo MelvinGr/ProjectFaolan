@@ -142,31 +142,35 @@ namespace Faolan.GameServer.Economy
 					return;
 				}
 
-			var row = await _database.GetInventorySlot(character.Id, (ContainerKind)container, (int)slot);
-			if (row?.Item == null)
+			var sold = await _database.GetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot);
+			if (sold == null)
 			{
 				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);
 				return;
 			}
 
-			var price = VendorPriceTin(row.Item.Value, row.Count);
+			var price = VendorPriceTin(sold.Template.Value, sold.Count);
 			if (price == 0)
 			{
 				// A valueless item (RDB value 0, e.g. the Totem of Origins) is no-sell - refuse rather than invent
 				// a price. The client keeps the item in the slot since we send no DispatchItemSoldToShop.
-				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", row.Item.Name, row.Item.Id, character.Name);
+				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", sold.Template.Name, sold.TemplateId, character.Name);
 				return;
 			}
 
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)container, (int)slot, null);
+			await _database.SetCharacterItemSlot(character.Id, (ContainerKind)container, (int)slot, null);
 			character.Money += price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
+			// ⚠️ The undo re-MINTS the item from its template, so anything per-instance about the sold one is gone: a
+			// crafted item comes back without its crafter and a gemmed one without its gems. The sold instance is
+			// deleted outright rather than parked, which is what makes that unavoidable here - see #750 for the shape
+			// an undo buffer would want (move it to a holding container instead of deleting it).
+			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, sold.TemplateId, sold.Count, price);
 
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceMethods.DispatchItemSoldToShop, b => WriteItemSoldBody(b, container, sellerId, slot)));
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 
-			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).", character.Name, row.Item.Name, row.Count,
+			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).", character.Name, sold.Template.Name, sold.Count,
 				container, slot, price, character.Money);
 		}
 
@@ -180,7 +184,7 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
-			await _database.SetCharacterInventorySlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
+			await _database.SetCharacterItemSlot(character.Id, (ContainerKind)sale.Container, sale.Slot, sale.ItemId, sale.Count);
 			character.Money = character.Money >= sale.PriceTin
 				? character.Money - sale.PriceTin
 				: 0;

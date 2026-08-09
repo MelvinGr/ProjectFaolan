@@ -8,8 +8,15 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// #720: an item ENTERING a player's inventory must pass through `GrantItemToBackpack`, because that is where
-	// `AdvanceCollectGoals` fires. A path that writes `SetCharacterInventorySlot` itself delivers the item fine and
-	// silently fails every collect objective asking for it.
+	// `AdvanceCollectGoals` fires. A path that MINTS an item itself delivers it fine and silently fails every collect
+	// objective asking for it.
+	//
+	// The gate watches `SetCharacterItemSlot` - the one repository method that brings an item into existence. Its two
+	// siblings are exempt BY CONSTRUCTION rather than by classification, which is the sharpest the census has been:
+	// `MoveCharacterItem` and `SetCharacterItemCount` only ever act on a row that is already there, so neither can
+	// introduce an item and neither can newly tick a collect goal. Before #750 there was no such distinction to draw -
+	// a "move" was a pair of `SetCharacterInventorySlot` calls, indistinguishable from a grant, so an in-inventory move
+	// had to be classified as "not a bypass, trust me" and EquipmentService accounted for 7 of the census' entries.
 	//
 	// That is not hypothetical - it shipped twice. `TradepostService.TakeMailItem` found its own bag slot, built its
 	// own wire entry and wrote its own row, so an item bought from the auction house and taken from mail did not
@@ -25,12 +32,17 @@ namespace Faolan.Tests
 		private static readonly Dictionary<string, (int Calls, string Why)> Writers = new()
 		{
 			["Faolan/GameServer/GameServerListener.Outbound.cs"] =
-				(4, "THE choke point itself (GrantItemToBackpack) + removals: a bag clear and TakeItemsFromInventory's "
-				    + "per-step clear/partial-stack restore. The only file allowed to write a GRANT."),
+				(3, "THE choke point itself (GrantItemToBackpack) + two removals: the bag clear and TakeItemsFromInventory's "
+				    + "per-step clear. The only file allowed to write a GRANT."),
 
 			["Faolan/GameServer/Inventory/EquipmentService.cs"] =
-				(7, "MOVES within the player's own inventory - equip/unequip, slot swap, stack split, bag re-place. The "
-				    + "item was already held, so nothing is entering the inventory and no collect goal can newly tick."),
+				(2, "a drop (clearing the dropped cell) and the new half of a stack SPLIT. Splitting is the one inventory "
+				    + "action that legitimately mints, and it cannot tick a collect goal: the items were already held, the "
+				    + "stack just became two. Equip/unequip/move are MoveCharacterItem calls and are structurally exempt."),
+
+			["Faolan/GameServer/CreateFlow/CreateFlowService.cs"] =
+				(1, "the #220 STARTER GEAR, worn onto a brand-new character at creation. No collect goal can exist yet - "
+				    + "the character has no quests - and the connection is still the character editor."),
 
 			["Faolan/GameServer/Economy/ShopService.cs"] =
 				(2, "a vendor SALE: clearing the sold slot, and restoring the partial stack when only part of it sold. "
@@ -55,7 +67,7 @@ namespace Faolan.Tests
 				if (file.Contains("/obj/") || file.Contains("/bin/"))
 					continue;
 
-				var calls = Regex.Matches(File.ReadAllText(file), @"SetCharacterInventorySlot\s*\(").Count;
+				var calls = Regex.Matches(File.ReadAllText(file), @"SetCharacterItemSlot\s*\(").Count;
 				if (calls == 0)
 					continue;
 
@@ -65,9 +77,9 @@ namespace Faolan.Tests
 
 			var unclassified = found.Keys.Where(f => !Writers.ContainsKey(f)).OrderBy(f => f).ToList();
 			Assert.True(unclassified.Count == 0,
-				"A new path writes CharacterInventory rows directly. If it DELIVERS an item to a player it must go "
+				"A new path MINTS item instances directly. If it DELIVERS an item to a player it must go "
 				+ "through GrantItemToBackpack instead, or collect objectives will silently not tick (#720). If it is a "
-				+ "removal or an in-inventory move, classify it in InventoryGrantChokePointTests.Writers:\n  "
+				+ "removal or a split, classify it in InventoryGrantChokePointTests.Writers:\n  "
 				+ string.Join("\n  ", unclassified));
 
 			var changed = Writers
@@ -76,7 +88,7 @@ namespace Faolan.Tests
 				.ToList();
 
 			Assert.True(changed.Count == 0,
-				"A classified file gained or lost a CharacterInventory write. Confirm the new call is not a GRANT "
+				"A classified file gained or lost an item MINT. Confirm the new call is not a GRANT "
 				+ "bypassing GrantItemToBackpack, then update the count:\n  " + string.Join("\n  ", changed));
 
 			var gone = Writers.Keys.Where(f => !found.ContainsKey(f)).OrderBy(f => f).ToList();
@@ -99,7 +111,7 @@ namespace Faolan.Tests
 				take = take[..next];
 
 			Assert.Contains("GrantItemToBackpack", take);
-			Assert.DoesNotContain("SetCharacterInventorySlot(character.Id", take);
+			Assert.DoesNotContain("SetCharacterItemSlot(character.Id", take);
 		}
 	}
 }

@@ -135,7 +135,7 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var item = (await Database.GetInventorySlot(character.Id, container, slot))?.Item;
+			var item = (await Database.GetCharacterItemSlot(character.Id, container, slot))?.Template;
 			if (item == null)
 			{
 				Logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);

@@ -79,21 +79,23 @@ namespace Faolan.Tests
 				var character = await repo.CreateCharacter(accountId, realmId);
 
 				// Deposit: item lands in bank slot 3 (what PersistInventoryMove writes for a bag->bank move).
-				await repo.SetCharacterInventorySlot(character.Id, bank, 3, itemId);
+				var deposited = await repo.SetCharacterItemSlot(character.Id, bank, 3, itemId);
+				Assert.NotNull(deposited);
 
-				// Reload across a fresh context: the bank row persists, and the on-demand bank container rebuilds it.
-				var bankRows = (await repo.GetCharacterInventory(character.Id)).Where(r => r.Container == bank).ToList();
-				Assert.Single(bankRows);
-				var container = FullCharacterRoots.Container(bank, 50, 30, character.Id, bankRows);
+				// Reload across a fresh context: the bank item persists, and the on-demand bank container rebuilds it.
+				var banked = await repo.GetCharacterItems(character.Id, bank);
+				Assert.Single(banked);
+				var container = FullCharacterRoots.Container(bank, 50, 30, character.Id, banked);
 				Assert.Contains(container.Items, e => e.Pos == 3);
 
-				// Withdraw: bank slot 3 -> bag slot 0 (the move clears the bank cell, writes the bag cell).
-				await repo.SetCharacterInventorySlot(character.Id, bank, 3, null);
-				await repo.SetCharacterInventorySlot(character.Id, bag, 0, itemId);
+				// Withdraw: bank slot 3 -> bag slot 0. A MOVE, so it is the SAME instance in the bag afterwards - which is
+				// the whole point of an item being a row rather than an address (#750).
+				Assert.True(await repo.MoveCharacterItem(character.Id, bank, 3, bag, 0));
 
-				var rows = await repo.GetCharacterInventory(character.Id);
-				Assert.DoesNotContain(rows, r => r.Container == bank); // bank now empty
-				Assert.Contains(rows, r => r is { Container: bag, Slot: 0, ItemId: itemId });
+				var held = await repo.GetCharacterItems(character.Id);
+				Assert.DoesNotContain(held, i => i.Container == bank); // bank now empty
+				var withdrawn = Assert.Single(held);
+				Assert.Equal((bag, 0, itemId, deposited!.Id), (withdrawn.Container, withdrawn.Slot, withdrawn.TemplateId, withdrawn.Id));
 			}
 			finally
 			{
@@ -300,32 +302,25 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				// 1) No equipment yet.
-				Assert.Null(await repo.GetCharacterEquipment(characterId));
+				// 1) Nothing worn yet. An UNDRESSED character is an empty worn set, not a missing row: since #750 there is
+				// no equipment row whose absence could mean anything else.
+				Assert.Empty(await repo.GetEquippedItems(characterId));
 
-				// 2) Seed equipment with two real items (detached, from separate GetItem calls) and save.
-				var equipment = new CharacterEquipment
-				{
-					CharacterId = characterId,
-					Wrist = await repo.GetItem(slaveManacles),
-					FirstPosBag = await repo.GetItem(bagItem)
-				};
-				await repo.SaveCharacterEquipment(equipment);
+				// 2) Wear one item and put another in the bag.
+				await repo.SetCharacterItemSlot(characterId, ContainerKind.Equipped, (int)CharacterEquipmentSlot.Wrist, slaveManacles);
+				var inBag = await repo.SetCharacterItemSlot(characterId, ContainerKind.Bag, 1, bagItem);
 
-				// 3) Reload in a fresh context: item navs resolved.
-				var loaded = await repo.GetCharacterEquipment(characterId);
-				Assert.NotNull(loaded);
-				Assert.Equal(slaveManacles, loaded!.Wrist!.Id);
-				Assert.Equal(bagItem, loaded.FirstPosBag!.Id);
+				// 3) Reload in a fresh context: templates resolved.
+				var worn = await repo.GetEquippedItems(characterId);
+				Assert.Equal(slaveManacles, worn[CharacterEquipmentSlot.Wrist].TemplateId);
+				Assert.Equal(bagItem, (await repo.GetCharacterItemSlot(characterId, ContainerKind.Bag, 1))!.TemplateId);
 
-				// 4) Equip the ring: move FirstPosBag -> RingLeft, save, reload, verify (the original equip bug).
-				loaded.RingLeft = loaded.FirstPosBag;
-				loaded.FirstPosBag = null;
-				await repo.SaveCharacterEquipment(loaded);
+				// 4) Equip it: bag[1] -> the left ring slot. The instance is the same one, worn.
+				Assert.True(await repo.MoveCharacterItem(characterId, ContainerKind.Bag, 1, ContainerKind.Equipped, (int)CharacterEquipmentSlot.LeftRing));
 
-				var afterEquip = await repo.GetCharacterEquipment(characterId);
-				Assert.Equal(bagItem, afterEquip!.RingLeft!.Id);
-				Assert.Null(afterEquip.FirstPosBag);
+				var afterEquip = await repo.GetEquippedItems(characterId);
+				Assert.Equal((bagItem, inBag!.Id), (afterEquip[CharacterEquipmentSlot.LeftRing].TemplateId, afterEquip[CharacterEquipmentSlot.LeftRing].Id));
+				Assert.Null(await repo.GetCharacterItemSlot(characterId, ContainerKind.Bag, 1));
 
 				// 5) SaveAccount persists the on-wire ClientInstance (read back by a fresh load).
 				var account = await repo.GetAccount(accountId);
@@ -464,23 +459,23 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 2, 100);
-				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 7, 200, 3); // a second cell coexists
+				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 2, 100);
+				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 7, 200, 3); // a second cell coexists
 
-				var rows = await repo.GetCharacterInventory(5);
-				Assert.Equal(2, rows.Length);
-				Assert.Equal(100u, rows.Single(r => r.Slot == 2).ItemId);
-				Assert.Equal("A", rows.Single(r => r.Slot == 2).Item!.Name); // Item nav loaded
-				Assert.Equal(3u, rows.Single(r => r.Slot == 7).Count);
+				var items = await repo.GetCharacterItems(5);
+				Assert.Equal(2, items.Length);
+				Assert.Equal(100u, items.Single(i => i.Slot == 2).TemplateId);
+				Assert.Equal("A", items.Single(i => i.Slot == 2).Template.Name); // Template nav loaded
+				Assert.Equal(3u, items.Single(i => i.Slot == 7).Count);
 
-				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 2, 200); // re-upsert updates in place
-				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 7, null); // clear removes
-				await repo.SetCharacterInventorySlot(5, (ContainerKind)104, 9, null); // clearing an empty cell is a no-op
+				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 2, 200); // minting over an occupied cell replaces it
+				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 7, null); // clear removes
+				await repo.SetCharacterItemSlot(5, ContainerKind.Bag, 9, null); // clearing an empty cell is a no-op
 
-				rows = await repo.GetCharacterInventory(5);
-				var only = Assert.Single(rows);
+				items = await repo.GetCharacterItems(5);
+				var only = Assert.Single(items);
 				Assert.Equal(2, only.Slot);
-				Assert.Equal(200u, only.ItemId);
+				Assert.Equal(200u, only.TemplateId);
 			}
 			finally
 			{

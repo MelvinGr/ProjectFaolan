@@ -444,7 +444,13 @@ EQUIP/UNEQUIP PERSISTENCE (2026-06-07, pending in-client test). The player's equ
 - `PersistEquip(targetSlot, handle)` resolves the handle via `Database.GetItem`, sets the mapped
   `CharacterEquipment` slot and clears the bag (FirstPosBag) if it held it. `PersistUnequip(fromSlot)` clears the
   slot and parks the item in the bag. Slot<->nav map (`Get/SetEquipmentSlot`) matches `CharacterEquipmentSlot`
-  (Chest=5, MainWeapon=6, LeftRing=9, Legs=16, Wrist=18, ...), tested by `EquipmentSlotMappingTests`.
+  (Chest=5, MainWeapon=6, LeftRing=9, Legs=16, Wrist=18, ...).
+
+  ⚠️ The two paragraphs above are the 2026-06 MODEL, kept for the decode history; the wire facts still hold but
+  the storage does not. Since #750 a worn item is an `ItemInstance` in container 101 whose `Slot` IS the wire
+  equip slot, so there is no slot<->column mapping left to get wrong (and the gate that tested it went with it),
+  an equip is a MOVE of that row rather than a write of a slot column, and `FirstPosBag` is gone. See
+  [inventory.md](../subsystems/inventory.md).
 - The starting gear is seeded ONCE at character creation, so persisted player changes
   are never overwritten on relogin.
 - Non-DB (captured-only) items can't be resolved to a DB row, so their moves are logged and skipped (harmless).

@@ -100,20 +100,20 @@ namespace Faolan.GameServer.Economy
 			if (!TryGetSide(characterId, out var session, out var side))
 				return;
 
-			var row = await _database.GetInventorySlot(characterId, ContainerKind.Bag, (int)itemPos);
-			if (row?.Item == null)
+			var offer = await _database.GetCharacterItemSlot(characterId, ContainerKind.Bag, (int)itemPos);
+			if (offer == null)
 			{
 				_logger.LogWarning("Trade: {Character:X8} offered empty bag slot {Slot}.", characterId, itemPos);
 				return;
 			}
 
 			// The message carries no quantity, so the WHOLE stack goes on the table.
-			side.Items[destPos] = new OfferedItem(itemPos, row.Item, row.Count);
+			side.Items[destPos] = new OfferedItem(itemPos, offer.Template, offer.Count);
 			session.ResetAccepts();
 
 			var partnerId = session.Other(characterId).CharacterId;
-			await _outbound.SendTradeItem(characterId, row.Item, destPos, row.Count, true);
-			await _outbound.SendTradeItem(partnerId, row.Item, destPos, row.Count, false);
+			await _outbound.SendTradeItem(characterId, offer.Template, destPos, offer.Count, true);
+			await _outbound.SendTradeItem(partnerId, offer.Template, destPos, offer.Count, false);
 		}
 
 		// c2s RemoveTradeItem (0x2069): take an item back off the table. The mirror of AddItem - the same two s2c halves
@@ -211,7 +211,7 @@ namespace Faolan.GameServer.Economy
 					continue;
 				}
 
-				await _database.SetCharacterInventorySlot(from.CharacterId, ContainerKind.Bag, (int)offered.ItemPos, null);
+				await _database.SetCharacterItemSlot(from.CharacterId, ContainerKind.Bag, (int)offered.ItemPos, null);
 
 				// ...and TELL the giver's client. Moving the row is not enough: the client renders what it last knew,
 				// so without this a traded-away item sits visibly in the giver's bag until relog - the DB was right

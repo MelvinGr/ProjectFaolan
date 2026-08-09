@@ -229,7 +229,7 @@ And the in-world ones that had unnamed reads:
 |---|---|
 | `GameAgent.ChatVicinity(cSenderID, nMode, cMsg)` | `[ID32 sender][u32 mode][u32 msgLen][string text][u8 0]` — the sender ID32 is usually `{0,0}` (the client leaves it for the server), the `BinaryStream` length counts the string's own u16 plus its bytes plus the trailing zero [V2: Barbarian-login.tshark.json frame 138] |
 | `GameCharAgent.CinematicTransition(i_cClientId, i_bEntering)` | `[ID32 {0xC350, handle}][u8 entering]` — 9 bytes in all 402 captured packets [V2: Barbarian-login.tshark.json frame 71] |
-| `GameCharAgent.SplitInventoryItem(i_cInventory, i_nSrcPos, i_nSplitSize, i_nDstPos)` | `[ID32 {container kind, owner handle}][u32 src][u32 size][u32 dst]` — the leading ID32 is the CONTAINER, `0x68` = the backpack, i.e. the same value as `CharacterInventory.Container` [V2: DemoL80_mage-demonologist_login_randomActions.tshark.json frame 704] |
+| `GameCharAgent.SplitInventoryItem(i_cInventory, i_nSrcPos, i_nSplitSize, i_nDstPos)` | `[ID32 {container kind, owner handle}][u32 src][u32 size][u32 dst]` — the leading ID32 is the CONTAINER, `0x68` = the backpack, i.e. the same value as `ItemInstance.Container` [V2: DemoL80_mage-demonologist_login_randomActions.tshark.json frame 704] |
 | `GameCharAgent.AddShortcut(i_eType, i_nPosition, i_nData, i_nInventoryType)` | `[u32 type][u32 position][u32 data][u32 inventoryType]` — the trailing word is 0 in all 192 captured AddShortcuts [V2: Barbarian-create.tshark.json frame 235] |
 
 The same reading applies to `0x2000` IIR bodies once the carrier (§03) is stripped: the client→server `QuestIIR`

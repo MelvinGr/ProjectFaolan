@@ -36,6 +36,8 @@ namespace Faolan.Importer.Captures
 
 			var charactersSeeded = 0;
 			var itemsStored = 0;
+			var knownTemplates = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
+			var unresolvedGems = new HashSet<uint>();
 			foreach (var (characterId, container) in byCharacter)
 			{
 				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
@@ -44,34 +46,22 @@ namespace Faolan.Importer.Captures
 				var kind = (ContainerKind)container.InventoryId.Type;
 
 				// Replace the character's bank container with the captured contents (the BankIIR is the whole bank).
-				var oldRows = await db.CharacterInventory.Where(r => r.CharacterId == characterId && r.Container == kind).ToListAsync();
-				db.CharacterInventory.RemoveRange(oldRows);
+				var old = await db.ItemInstances.Where(i => i.OwnerCharacterId == characterId && i.Container == kind).ToListAsync();
+				db.ItemInstances.RemoveRange(old);
 
 				var stored = 0;
 				foreach (var entry in container.Items)
 				{
-					var templateId = entry.Item?.ItemData?.Template1 ?? 0;
-					if (templateId == 0 || !await db.Items.AnyAsync(i => i.Id == templateId))
+					// The banked item keeps its crafter and its socketed gems, same as a carried one - the BankIIR is the
+					// same ProtoInventoryGame shape, so both ride it too (#727/#750).
+					if (CapturedItemInstances.From(entry, characterId, kind, knownTemplates, unresolvedGems) is not { } instance)
 						continue;
 
-					db.CharacterInventory.Add(new CharacterInventory
-					{
-						CharacterId = characterId,
-						Container = kind,
-						Slot = (int)entry.Pos,
-						ItemId = templateId,
-						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1,
-
-						// The banked stack keeps its crafter, same as a carried one (#727) - the BankIIR is the same
-						// ProtoInventoryGame shape, so creator_name rides it too.
-						CreatorName = string.IsNullOrEmpty(entry.Item!.CreatorName)
-							? null
-							: entry.Item!.CreatorName
-					});
+					db.ItemInstances.Add(instance);
 					stored++;
 				}
 
-				if (stored > 0 || oldRows.Count > 0)
+				if (stored > 0 || old.Count > 0)
 					charactersSeeded++;
 				itemsStored += stored;
 			}

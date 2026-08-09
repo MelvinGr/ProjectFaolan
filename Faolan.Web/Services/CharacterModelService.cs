@@ -353,47 +353,50 @@ namespace Faolan.Web.Services
 			return RdbAssetExtractor.DescribeBodyUv(Reader(), bodyMeshIndexId);
 		}
 
+		// The viewer's paper-doll slot LABELS, per wire equip slot. One map, shared by the paper doll and the worn-mesh
+		// resolver, so a label cannot mean one slot in one place and another in the other - and so `hiddenSlots` (which
+		// is keyed by these labels) lines up with what the doll shows.
+		//
+		// Slot 3 is labelled "Bag" because that is what it is: the equipped bag whose Item.BagExtraSlots sizes the
+		// backpack. It used to read "Tokens" - the old mislabel - with "Bag" taken by the legacy FirstPosBag nav, an
+		// item that rendered at bag cell 1 with no row behind it. That nav is retired (#750): the starter item is an
+		// ordinary bag item now, so it shows up under Inventory like everything else and the label is free.
+		private static readonly (CharacterEquipmentSlot Slot, string Label)[] PaperDollSlots =
+		[
+			(CharacterEquipmentSlot.Head, "Head"), (CharacterEquipmentSlot.Neck, "Neck"), (CharacterEquipmentSlot.Shoulder, "Shoulder"), (CharacterEquipmentSlot.Cape, "Cloak"),
+			(CharacterEquipmentSlot.Chest, "Chest"), (CharacterEquipmentSlot.Wrist, "Wrist"), (CharacterEquipmentSlot.Hands, "Hands"), (CharacterEquipmentSlot.Belt, "Belt"),
+			(CharacterEquipmentSlot.Boots, "Boots"), (CharacterEquipmentSlot.LeftRing, "Ring L"), (CharacterEquipmentSlot.RightRing, "Ring R"), (CharacterEquipmentSlot.Legs, "Legs"),
+			(CharacterEquipmentSlot.MainWeapon, "Main Hand"), (CharacterEquipmentSlot.OffHandWeapon, "Off Hand"), (CharacterEquipmentSlot.RangedWeapon, "Ranged"),
+			(CharacterEquipmentSlot.Bag, "Bag")
+		];
+
 		// A character's equipped items keyed by the viewer's slot labels (only non-empty slots), to populate the
 		// equipment paper-doll. Item id + display name; the icon is resolved separately from the RDB item template.
 		public IReadOnlyDictionary<string, ItemInfo> Equipment(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
-			var e = db
-				.CharacterEquipment.AsNoTracking()
-				.Include(x => x.Head)
-				.Include(x => x.Neck)
-				.Include(x => x.Shoulder)
-				.Include(x => x.Cloak)
-				.Include(x => x.Chest)
-				.Include(x => x.Wrist)
-				.Include(x => x.Hands)
-				.Include(x => x.Belt)
-				.Include(x => x.Boots)
-				.Include(x => x.RingLeft)
-				.Include(x => x.RingRight)
-				.Include(x => x.Legs)
-				.Include(x => x.MainHandLeft)
-				.Include(x => x.OffHandLeft)
-				.Include(x => x.Bag)
-				.Include(x => x.FirstPosBag)
-				.FirstOrDefault(x => x.CharacterId == characterId);
-			if (e == null)
-				return new Dictionary<string, ItemInfo>();
-
-			var map = new (string Slot, Item? Item)[]
-			{
-				("Head", e.Head), ("Neck", e.Neck), ("Shoulder", e.Shoulder), ("Cloak", e.Cloak), ("Chest", e.Chest), ("Wrist", e.Wrist), ("Hands", e.Hands), ("Belt", e.Belt), ("Boots", e.Boots),
-				("Ring L", e.RingLeft), ("Ring R", e.RingRight), ("Legs", e.Legs), ("Main Hand", e.MainHandLeft), ("Off Hand", e.OffHandLeft), ("Tokens", e.Bag), ("Bag", e.FirstPosBag)
-			};
+			var worn = WornBySlot(db, characterId);
 
 			var result = new Dictionary<string, ItemInfo>();
-			foreach (var (slot, item) in map)
+			foreach (var (slot, label) in PaperDollSlots)
 			{
-				if (item != null)
-					result[slot] = ItemInfo.From(item);
+				if (worn.TryGetValue(slot, out var item))
+					result[label] = ItemInfo.From(item);
 			}
 
 			return result;
+		}
+
+		// The character's Equipped container (kind 101) as slot -> template. Vanity slots come back too; a caller that
+		// only wants the base slots simply doesn't ask for them (PaperDollSlots names none).
+		private static Dictionary<CharacterEquipmentSlot, Item> WornBySlot(DatabaseContext db, uint characterId)
+		{
+			return db.ItemInstances.AsNoTracking()
+				.Include(i => i.Template)
+				.Where(i => i.OwnerCharacterId == characterId && i.Container == ContainerKind.Equipped)
+				.AsEnumerable()
+				.Where(i => Enum.IsDefined((CharacterEquipmentSlot)i.Slot))
+				.ToDictionary(i => (CharacterEquipmentSlot)i.Slot, i => i.Template);
 		}
 
 		// One clip's decoded keyframes (type 1010003, by rdbname), shaped for the viewer to build THREE.KeyframeTracks:
@@ -501,19 +504,19 @@ namespace Faolan.Web.Services
 		}
 
 		// The character's carried (non-worn) items — the backpack/quest/resource contents — as a flat, display-ordered
-		// list (container, then slot), each tagged with its tab. Empty slots are dropped; the viewer pages what remains.
-		// Containers: 104 = normal backpack, 112 = resources, 113 = quest (Faolan.Core/Enums/ItemType.cs).
+		// list (container, then slot), each tagged with its tab. The worn set is the paper doll's (Equipment above), so
+		// the Equipped container is excluded here. Containers: 104 = normal backpack, 112 = resources, 113 = quest
+		// (Faolan.Core/Enums/ItemType.cs).
 		public IReadOnlyList<(ItemInfo Info, string Tab)> Inventory(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
-			return db
-				.CharacterInventory.AsNoTracking()
-				.Where(x => x.CharacterId == characterId && x.ItemId != null)
-				.Include(x => x.Item)
+			return db.ItemInstances.AsNoTracking()
+				.Where(x => x.OwnerCharacterId == characterId && x.Container != ContainerKind.Equipped)
+				.Include(x => x.Template)
 				.OrderBy(x => x.Container)
 				.ThenBy(x => x.Slot)
 				.AsEnumerable()
-				.Select(x => (ItemInfo.From(x.Item!, x.Count), x.Container switch
+				.Select(x => (ItemInfo.From(x.Template, x.Count), x.Container switch
 				{
 					ContainerKind.Quest    => "Quest",
 					ContainerKind.Resource => "Resources",
@@ -617,28 +620,7 @@ namespace Faolan.Web.Services
 		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex, IReadOnlySet<string>? hiddenSlots = null)
 		{
 			using var db = _dbFactory.CreateDbContext();
-			var eq = db
-				.CharacterEquipment.AsNoTracking()
-				.Include(e => e.Head)
-				.Include(e => e.Chest)
-				.Include(e => e.Legs)
-				.Include(e => e.Hands)
-				.Include(e => e.Boots)
-				.Include(e => e.Shoulder)
-				.Include(e => e.Wrist)
-				.Include(e => e.Belt)
-				.Include(e => e.Cloak)
-				.Include(e => e.Bag)
-				.FirstOrDefault(e => e.CharacterId == characterId);
-			if (eq == null)
-				return [];
-
-			// Slot names match the viewer's equipment paper-doll labels so a hidden slot maps 1:1 to the hide toggle.
-			var slots = new (string Slot, Item? Item)[]
-			{
-				("Head", eq.Head), ("Chest", eq.Chest), ("Legs", eq.Legs), ("Hands", eq.Hands), ("Boots", eq.Boots), ("Shoulder", eq.Shoulder), ("Wrist", eq.Wrist), ("Belt", eq.Belt),
-				("Cloak", eq.Cloak), ("Tokens", eq.Bag)
-			};
+			var worn = WornBySlot(db, characterId);
 
 			var rdb = Reader();
 			var want = sex == Sex.Female
@@ -646,12 +628,14 @@ namespace Faolan.Web.Services
 				: "Male";
 			var seen = new HashSet<uint>();
 			var result = new List<uint>();
-			foreach (var (slot, item) in slots)
+			foreach (var (slot, label) in PaperDollSlots)
 			{
-				if (hiddenSlots != null && hiddenSlots.Contains(slot))
+				if (hiddenSlots != null && hiddenSlots.Contains(label))
 					continue;
 
-				var template = DecryptTemplate(rdb, item);
+				var template = worn.TryGetValue(slot, out var item)
+					? DecryptTemplate(rdb, item)
+					: null;
 				if (template == null)
 					continue;
 

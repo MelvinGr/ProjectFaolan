@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			// ClassAttributeBases HealthMax row (200 wire = 2). All three terms, or the number is not retail's.
 			var classAttributeBase = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 200 };
 			var maxVitals = character.MaxVitals(VitalAttributes.LevelOneBase, classAttributeBase);
-			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment(), maxVitals);
+			var message = PlayerCharacterIirs.ForCharacter(character, Worn(), maxVitals);
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
 			// `life` carries the CLASS BASE, which the client tops up - not our sheet ceiling. Retail proves the split
@@ -106,9 +106,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnEquipment_BuildsInventoryEntriesFromWornItems()
 		{
-			var equipment = new CharacterEquipment
-			{
-				Head = new Item
+			var entries = PlayerSpawnEquipment.BuildInventoryEntries(Worn(
+				(CharacterEquipmentSlot.Head, new Item
 				{
 					Id = 0x00308E19,
 					Key = new ProtoDecryptionKey
@@ -119,8 +118,8 @@ namespace Faolan.Tests
 						Key4 = 0x892A0B17
 					},
 					Hash = 0x1234
-				},
-				Chest = new Item
+				}),
+				(CharacterEquipmentSlot.Chest, new Item
 				{
 					Id = 0x000035F9,
 					Key = new ProtoDecryptionKey
@@ -131,10 +130,7 @@ namespace Faolan.Tests
 						Key4 = 0x1E1E835F
 					},
 					Hash = 0x5678
-				},
-			};
-
-			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+				})));
 
 			Assert.Equal(2, entries.Count);
 			Assert.Equal((uint)CharacterEquipmentSlot.Head, entries[0].Pos); // 2, sorted before Chest (5)
@@ -160,17 +156,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnEquipment_WornItemWithoutAHarvestedHash_RendersWithAMintedToken()
 		{
-			var equipment = new CharacterEquipment
+			var entry = Assert.Single(PlayerSpawnEquipment.BuildInventoryEntries(Worn((CharacterEquipmentSlot.Belt, new Item
 			{
-				Belt = new Item
-				{
-					Id = 0x99,
-					Name = "Hashless Belt",
-					Hash = 0
-				}
-			};
-
-			var entry = Assert.Single(PlayerSpawnEquipment.BuildInventoryEntries(equipment));
+				Id = 0x99,
+				Name = "Hashless Belt",
+				Hash = 0
+			}))));
 			Assert.Equal(AcgHash.Mint(0x99), entry.Item.Hash);
 			Assert.True(AcgHash.IsWellFormed(entry.Item.Hash), $"minted {AcgHash.Token(entry.Item.Hash)} is not a token the client would accept");
 		}
@@ -181,56 +172,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnEquipment_MapsWeaponPairsToTheCorrectHands()
 		{
-			var equipment = new CharacterEquipment
-			{
-				MainHandLeft = new Item
-				{
-					Id = 1,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 1
-					},
-					Hash = 1
-				},
-				OffHandLeft = new Item
-				{
-					Id = 2,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 2
-					},
-					Hash = 2
-				},
-				MainHandRight = new Item
-				{
-					Id = 3,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 3
-					},
-					Hash = 3
-				},
-				OffHandRight = new Item
-				{
-					Id = 4,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 4
-					},
-					Hash = 4
-				},
-				Bag = new Item
-				{
-					Id = 5,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 5
-					},
-					Hash = 5
-				}
-			};
-
-			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+			var entries = PlayerSpawnEquipment.BuildInventoryEntries(Worn(
+				(CharacterEquipmentSlot.MainWeapon, Piece(1)), (CharacterEquipmentSlot.OffHandWeapon, Piece(2)),
+				(CharacterEquipmentSlot.RangedWeapon, Piece(3)), (CharacterEquipmentSlot.Ammo, Piece(4)),
+				(CharacterEquipmentSlot.Bag, Piece(5))));
 
 			Assert.Equal(
 				new[]
@@ -246,52 +191,24 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnEquipment_ShipsAllItems_HideIsMaskOnly()
 		{
-			var equipment = new CharacterEquipment
-			{
-				Head = new Item
-				{
-					Id = 0x10,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 0x10
-					},
-					Hash = 0x10
-				},
-				VanityHead = new Item
-				{
-					Id = 0x20,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 0x20
-					},
-					Hash = 0x20
-				},
-				VanityCape = new Item
-				{
-					Id = 0x30,
-					Key = new ProtoDecryptionKey
-					{
-						Key1 = 0x30
-					},
-					Hash = 0x30
-				}
-			};
+			var character = new Character();
+			var worn = Worn((CharacterEquipmentSlot.Head, Piece(0x10)), (CharacterEquipmentSlot.VanityHead, Piece(0x20)), (CharacterEquipmentSlot.VanityCape, Piece(0x30)));
 
-			var before = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
+			var before = PlayerSpawnEquipment.BuildInventoryEntries(worn).Select(e => e.Pos).ToHashSet();
 			Assert.Contains((uint)CharacterEquipmentSlot.VanityHead, before);
 			Assert.Contains((uint)CharacterEquipmentSlot.VanityCape, before);
 			Assert.Contains((uint)CharacterEquipmentSlot.Head, before);
 
 			// Toggle head + the global master: the mask picks up bits 2 and 31, but the shipped entries are unchanged.
-			Assert.True(equipment.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true));
-			Assert.True(equipment.SetVanityFilter(CharacterEquipment.VanityFilterMainSlot, true));
-			Assert.Equal((1u << 2) | (1u << 31), equipment.VanityShownMask);
+			Assert.True(character.SetVanityFilter((uint)CharacterEquipmentSlot.Head, true));
+			Assert.True(character.SetVanityFilter(Character.VanityFilterMainSlot, true));
+			Assert.Equal((1u << 2) | (1u << 31), character.VanityShownMask);
 
-			var after = PlayerSpawnEquipment.BuildInventoryEntries(equipment).Select(e => e.Pos).ToHashSet();
+			var after = PlayerSpawnEquipment.BuildInventoryEntries(worn).Select(e => e.Pos).ToHashSet();
 			Assert.Equal(before, after); // nothing withheld
 
 			// An out-of-range slot is rejected, changing nothing.
-			Assert.False(equipment.SetVanityFilter(32, true));
+			Assert.False(character.SetVanityFilter(32, true));
 		}
 
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed
@@ -336,6 +253,33 @@ namespace Faolan.Tests
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
 
 			Assert.Equal(body, rebuilt);
+		}
+
+		// A worn set as the builder takes it since #750: slot -> the item instance in it. The instances are in-memory
+		// only (no DB), which is all the builder reads - it wants the template behind each slot.
+		private static Dictionary<CharacterEquipmentSlot, ItemInstance> Worn(params (CharacterEquipmentSlot Slot, Item Item)[] pieces)
+		{
+			return pieces.ToDictionary(p => p.Slot, p => new ItemInstance
+			{
+				Container = ContainerKind.Equipped,
+				Slot = (int)p.Slot,
+				TemplateId = p.Item.Id,
+				Template = p.Item
+			});
+		}
+
+		// A minimal identifiable piece: its id doubles as its key and token, so a slot mix-up is visible in one number.
+		private static Item Piece(uint id)
+		{
+			return new Item
+			{
+				Id = id,
+				Key = new ProtoDecryptionKey
+				{
+					Key1 = id
+				},
+				Hash = id
+			};
 		}
 
 		// The ProtoCoreCharacterIIR sub-message sits at NameTagOffset (its first field, name=0x0A) and is enclosed by

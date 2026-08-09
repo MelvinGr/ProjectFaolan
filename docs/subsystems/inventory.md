@@ -34,10 +34,35 @@ all **big-endian**:
   `SnapshotTails.FromScratch`, proven byte-exact against the captured `BeachTailsTemplate.bin`
   oracle (golden tests `BeachSnapshotConstructionTests`).
 
-Containers are built wholesale from the DB (`FullCharacterRoots.Containers`:
-`CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItems.ListEntry`, identity =
-the `Item.Key` (Data1..4) quad + the wire token `AcgHash.ForWire(Item.Id, Item.Hash)`). Every row with a
-resolved `Item` renders; only a row with no `Item` at all is skipped.
+Containers are built wholesale from the DB (`FullCharacterRoots.Containers`: the character's `ItemInstance`
+rows — ALL of them, worn included; entry = `SnapshotItems.ListEntry`, identity = the `Item.Key` (Data1..4) quad
++ the wire token `AcgHash.ForWire(Item.Id, Item.Hash)`). Every item renders.
+
+## An item is a row, not an address (#750)
+
+`ItemInstance` is ONE ITEM: the template it copies, where it currently sits (`Container` + `Slot`, with a
+UNIQUE index on `(OwnerCharacterId, Container, Slot)`), and every per-instance fact — the stack `Count`, the
+`CreatorName`, and the gems in `ItemInstanceSocket`. A WORN item is an instance in container `Equipped` (101)
+whose `Slot` is the wire equip slot id, vanity slots (1000 + the base slot) included.
+
+- **A move is an UPDATE of two columns on one row** (`IDatabaseRepository.MoveCharacterItem`), so the instance
+  and everything hanging off it survives by construction. A SWAP is three statements in one transaction: two
+  rows trading `(container, slot)` is a cycle under the unique index, so the displaced one is parked at a
+  negative slot in between.
+- **Only `SetCharacterItemSlot` mints**, which is what lets `InventoryGrantChokePointTests` gate deliveries on
+  one method: a move or a count change cannot introduce an item, so neither can newly tick a collect goal.
+- **Splitting a stack mints a new instance.** A stack of 20 Copper is ONE row with `Count = 20`.
+- `ItemInstance.Id` is a store-generated identity — correct here, despite the no-surrogate model convention,
+  because that convention is about tables the importer delete+reinserts. This is player state, excluded from
+  `faolan.sql` like `Characters`. The id is also the low half of the wire's `item_id` under the retail
+  `0x20D82B63` epoch, which is what retail's own "epoch + a server allocation counter" shape wants.
+- **`OwnerCharacterId` is nullable** so the same table can absorb mail attachments, AH listings and loot bags
+  later, with `Container` as the discriminator. Those keep their own tables for now.
+
+It replaces `CharacterEquipment` (one wide row of 26 per-slot item FK columns) and `CharacterInventory` (keyed
+`(CharacterId, Container, Slot)`). Under those an "item" was an ADDRESS: every per-instance property had to be
+carried by hand through every move, and a worn item had nowhere to keep one at all. `Character.VanityShownMask`
+is what is left of the wide row — it is not a property of any item.
 
 `Items.Hash` is the **harvested** token and is legitimately `0` for 232 of the 4,225 shipped items — those no
 capture ever showed entering an inventory or a shop window. The snapshot used to drop them (it rendered
@@ -56,14 +81,10 @@ every other entry ends at the item block with no field-5 tag at all. So an empty
 rather than an empty string. It rides both shapes — the world-entry snapshot (348 sightings in `Bag`, 271 in
 `Equipped`) and the live `DispatchAddItem`.
 
-Persisted as `CharacterInventory.CreatorName`: it is a per-INSTANCE fact, so it cannot live on `Item`.
-`SetCharacterInventorySlot` assigns it on insert *and* overwrite (defaulting to null), and a move or split
-carries the source row's value across — leaving the column untouched would glue an old crafter to whatever
-item next occupies the cell.
-
-⚠️ The `Equipped` sightings are **not** persisted yet: `CharacterEquipment` is one wide row of 26 per-slot item
-FKs with nowhere to hang a per-slot creator, so equipping a crafted item currently drops its crafter. Tracked
-in Gitea.
+Persisted as `ItemInstance.CreatorName`: it is a per-INSTANCE fact, so it cannot live on `Item`. A MOVE keeps
+it without anyone carrying it (the row is updated, not re-created); a MINT assigns it explicitly, defaulting to
+null, so an item arriving in a cell a crafted item used to occupy is not itself player-made. The `Equipped`
+sightings persist too — a worn item is an instance like any other (#733).
 
 ## Delivery model (the hard-won facts)
 
@@ -85,7 +106,7 @@ in Gitea.
    `DispatchRemoveItemTests`), `RemoveItemFromBackpack` clears the persisted cell AND pushes the live remove, wired to
    the `.removeitem <slot>` GM command (inverse of `.additem`).
 4. **Bag-poison items**: an item only ever captured WORN (never inside an inventory container) can render
-   the WHOLE bag empty when placed in `CharacterInventory` (repro: 13826 Combatant's Hauberk; client logs
+   the WHOLE bag empty when placed in a bag cell (repro: 13826 Combatant's Hauberk; client logs
    VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources.
 5. **Wire health matters more than content**: `Socket.Send/SendAsync` partial writes used to truncate the
    ~10 KB snapshot mid-frame (send buffer full right after the world burst), making byte-identical
@@ -109,5 +130,28 @@ Capture: `Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed` (2026-06-12
 - Persistence: `Inventory/EquipmentService.cs` (equip writes the slot + consumes the bag row; unequip parks the
   item at the exact bag cell).
 
-Slot ids (equipped container `pos` = `CharacterEquipment` slot): chest 5, main hand 6, ring 9, legs 16,
-wrist 18, second weapon/sheath 0x14 - verified against the captured container.
+Slot ids (equipped container `pos` = `CharacterEquipmentSlot` = the worn instance's `Slot`): chest 5, main hand
+6, ring 9, legs 16, wrist 18, second weapon/sheath 0x14 - verified against the captured container.
+
+## Sockets (gems)
+
+A socket lives on the wire in two forms, and **neither carries a stat value** — the socket names the GEM by
+template and the client derives its effect from the gem's own template:
+
+- **persistent**: `ProtoInventoryGameEntry.slot_map` (field 4), repeated `{ slot, item: ProtoAcgItem }`. The
+  login snapshot restates every socketed item's full gem list, which is how a gemmed item survives a relog.
+  Measured over the 898 blocks in the corpus slice: socket indices are 0/1/2 only (up to THREE per item), the
+  gem's `level` is its own `Items.Level`, and its `hash` is 0.
+- **live**: `DispatchAddToItemSlot` (GameCharInterface 0x1D) carries the same pair for one socket, followed by
+  an ordinary `DispatchRemoveItem` for the gem leaving the bag. The socketed item's container entry is NOT
+  re-sent. The c2s trigger is BCC behaviour `0x27`. ⚠️ That is the same behaviour id recorded elsewhere as
+  `Tradeskill` with a `[flag][recipeId][count]` trailer, so `0x27` carries at least two trailer shapes.
+
+Stored as `ItemInstanceSocket` `(ItemInstanceId, SocketIndex) -> GemItemId`, and emitted back by
+`SnapshotItems`. The socket CONTENTS are the truth; the stats are derived — which is why sockets are their own
+table rather than rows in a per-instance stat table. `CaptureSocketImporter` (importer module
+`character-sockets`) harvests them onto characters that already exist, since the `characters` module is
+insert-only.
+
+⚠️ `slot_map` was in the recovered schema from the start and was populated NOWHERE until #750, so every gemmed
+item silently lost its gems at world entry.

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
@@ -22,24 +24,34 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
 		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
-		public static ProtoInventoryGameEntry InventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1, string? creatorName = null)
+		public static ProtoInventoryGameEntry InventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, string? creatorName = null,
+			IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
-			var key = item.Key;
-
 			var entry = new ProtoInventoryGameEntry
 			{
 				ItemId = itemId,
-				ItemData = new ProtoAcgItem
-				{
-					Key1 = key,
-					Key2 = key,
-					Key3 = key,
-					Template1 = item.Id,
-					Template2 = item.Id,
-					Level = (uint)level,
-					Hash = hash
-				}
+				ItemData = Identity(item, hash)
 			};
+
+			// The GEMS socketed into this item (#750). `slot_map` (field 4) is the PERSISTENT form of a socket, and it
+			// is how a gemmed item survives a relog: the login snapshot restates every socketed item's full gem list.
+			// Each entry names the gem BY TEMPLATE and carries no stat values at all - the client derives the gem's
+			// effect from the gem's own template - so this is the whole of a socket on the wire.
+			//
+			// ⚠️ We populated this NOWHERE until #750, which means every gemmed item silently lost its gems at world
+			// entry. It was not a decode gap: the field has been in the schema the whole time.
+			//
+			// Measured over the 898 slot_map blocks in the corpus slice: socket indices are 0/1/2 only (up to THREE
+			// sockets per item), the gem's `level` is its own Items.Level and its `hash` is 0, and the gem block is
+			// an ordinary ProtoAcgItem - the same Identity() the outer item gets.
+			foreach (var socket in (sockets ?? []).OrderBy(s => s.SocketIndex))
+			{
+				entry.SlotMaps.Add(new ProtoInventoryGameEntry.SlotMap
+				{
+					Slot = socket.SocketIndex,
+					Item = Identity(socket.Gem, AcgHash.ForWire(socket.Gem.Id, socket.Gem.Hash))
+				});
+			}
 
 			foreach (var stat in stats)
 			{
@@ -68,14 +80,23 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// entries, 100% carry StaticInstance(0x17), 95% Flags(0x00) and 93% StackSize(0x1A), and the rest of the
 		// stats are sparse (Duration on 16%, ItemSource on 5 entries total). The LIVE add is a different shape -
 		// see LiveAddEntry (#722).
-		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1,
-			string? creatorName = null)
+		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1,
+			string? creatorName = null, IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], f7, creatorName)
+				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], creatorName, sockets)
 			};
+		}
+
+		// The item INSTANCE overload - one row in, the whole entry out, so a caller holding an ItemInstance never has
+		// to spread it back into loose scalars and can't forget a piece of it. Which is the point: the crafter and the
+		// SOCKETS travelled by hand before #750, and the sockets were simply never picked up.
+		public static ProtoInventoryGame.InventoryListEntry ListEntry(ItemInstance instance, ulong itemId, ulong recordId)
+		{
+			return ListEntry((ulong)instance.Slot, itemId, recordId, instance.Count, instance.Template, AcgHash.ForWire(instance.TemplateId, instance.Template.Hash),
+				creatorName: instance.CreatorName, sockets: instance.Sockets);
 		}
 
 		// The LIVE DispatchAddItem (0x2020) form - a different stat list from the snapshot's, which is why it is its
@@ -106,7 +127,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// (1,2,5,7,13,15,16,19) and guessing is worse than omitting - a wrong provenance is a false claim, a missing
 		// one is a gap. Decoding it needs each add correlated with the c2s action that produced it; grouping by
 		// capture is too coarse, since values 2, 7 and 15 all appear within the same sessions. Tracked separately.
-		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong level = 1, ulong flags = 1, string? creatorName = null)
+		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, string? creatorName = null,
+			IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
 			return InventoryEntry(itemId, item, hash,
 			[
@@ -114,7 +136,37 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				new ItemStat((uint)CharacterStatId.Duration, NoExpiry),
 				new ItemStat(23, (uint)recordId),
 				new ItemStat(26, (uint)count)
-			], level, creatorName);
+			], creatorName, sockets);
+		}
+
+		// The entry's TEMPLATE identity block, shared by the item itself and by every gem in its sockets - a gem in a
+		// slot_map is an ordinary ProtoAcgItem, so there is one function for both rather than two that must agree.
+		//
+		// ⚠️ `level` is the item's OWN Items.Level, not 1. It used to be a `level = 1` default parameter that no caller
+		// ever passed, so every item we sent claimed level 1 - wrong for 49% of them (4,170 of 8,479 captured entries
+		// carry a level other than 1). It is per-TEMPLATE and it is exact: across all 8,479 captured snapshot entries
+		// the wire's `level` equals that template's Items.Level, 8,479 for 8,479, zero exceptions. So there was never
+		// anything to decode here - the column was already right and the emitter simply ignored it. (#725 settled the
+		// value as per-template; this is the emit half.)
+		//
+		// ⚠️ `template2`/`key2` are emitted as COPIES of template1/key1, which is what 8,445 of 8,479 captured entries
+		// carry - but not all of them: 34 top-level entries and 10 socket blocks carry `template2 = template1 + 1`
+		// with a SECOND, unrelated TEA key, while key3 still equals key1. So ProtoAcgItem has room for a second
+		// identity that our Items row (one template, one key) cannot express, and we flatten it. Tracked separately -
+		// do not read the copy as a decoded fact.
+		private static ProtoAcgItem Identity(Item item, uint hash)
+		{
+			var key = item.Key;
+			return new ProtoAcgItem
+			{
+				Key1 = key,
+				Key2 = key,
+				Key3 = key,
+				Template1 = item.Id,
+				Template2 = item.Id,
+				Level = item.Level,
+				Hash = hash
+			};
 		}
 
 		// The value retail puts in Duration on an item that does not expire: 1,497 of 1,528 captured sightings.

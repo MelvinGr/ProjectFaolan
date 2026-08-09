@@ -148,9 +148,9 @@ namespace Faolan.Tests
 				});
 
 				// Where the capture had them: the hilt in the bag, the ores in the resource container.
-				ctx.CharacterInventory.Add(new CharacterInventory { CharacterId = Crafter, Container = ContainerKind.Bag, Slot = 19, ItemId = PlainHiltPiece, Count = 1 });
-				ctx.CharacterInventory.Add(new CharacterInventory { CharacterId = Crafter, Container = ContainerKind.Resource, Slot = 13, ItemId = Copper, Count = 4 });
-				ctx.CharacterInventory.Add(new CharacterInventory { CharacterId = Crafter, Container = ContainerKind.Resource, Slot = 10, ItemId = Silver, Count = silverHeld });
+				ctx.ItemInstances.Add(new ItemInstance { OwnerCharacterId = Crafter, Container = ContainerKind.Bag, Slot = 19, TemplateId = PlainHiltPiece, Count = 1 });
+				ctx.ItemInstances.Add(new ItemInstance { OwnerCharacterId = Crafter, Container = ContainerKind.Resource, Slot = 13, TemplateId = Copper, Count = 4 });
+				ctx.ItemInstances.Add(new ItemInstance { OwnerCharacterId = Crafter, Container = ContainerKind.Resource, Slot = 10, TemplateId = Silver, Count = silverHeld });
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 			}
 

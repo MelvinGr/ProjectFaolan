@@ -34,7 +34,7 @@ namespace Faolan.Tests
 				var options = TestDb.Options(path);
 				await using (var ctx = new DatabaseContext(options))
 				{
-					// CharacterEquipment.CharacterId FKs Character, so the owner has to exist.
+					// ItemInstance.OwnerCharacterId FKs Character, so the owner has to exist.
 					var realm = await ctx.Realms.Select(r => r.Id).FirstAsync(TestContext.Current.CancellationToken);
 					var account = await ctx.Accounts.Select(a => a.Id).FirstAsync(TestContext.Current.CancellationToken);
 					ctx.Characters.Add(new Character
@@ -44,13 +44,20 @@ namespace Faolan.Tests
 					});
 					ctx.Items.Add(new Item { Id = 4242, Name = "Ring of the Same" });
 					ctx.Items.Add(new Item { Id = 4243, Name = "A Different Ring" });
-					ctx.CharacterEquipment.Add(new CharacterEquipment
+					// The same template in BOTH ring slots - two occupied slots, two instances.
+					foreach (var (slot, template) in new[]
+					         {
+						         (CharacterEquipmentSlot.LeftRing, 4242u), (CharacterEquipmentSlot.RightRing, 4242u), (CharacterEquipmentSlot.Neck, 4243u)
+					         })
 					{
-						CharacterId = 7,
-						RingLeftId = 4242,
-						RingRightId = 4242, // the same template in both ring slots
-						NeckId = 4243
-					});
+						ctx.ItemInstances.Add(new ItemInstance
+						{
+							OwnerCharacterId = 7,
+							Container = ContainerKind.Equipped,
+							Slot = (int)slot,
+							TemplateId = template
+						});
+					}
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 

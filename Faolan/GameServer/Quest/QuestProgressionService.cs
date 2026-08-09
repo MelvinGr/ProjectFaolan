@@ -433,8 +433,7 @@ namespace Faolan.GameServer.Quest
 
 			// Summed across slots: a stack can be split over several cells, and a split stack is still the items.
 			var itemId = QuestProgress.DeliveryItemId(goal);
-			var inventory = await _database.GetCharacterInventory(characterId);
-			var held = inventory.Where(i => i.ItemId == itemId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
+			var held = (await _database.GetCharacterItems(characterId)).Where(i => i.TemplateId == itemId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
 			return QuestProgress.CanHandIn(goal, held);
 		}
 

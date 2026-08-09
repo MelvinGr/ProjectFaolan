@@ -1,89 +1,156 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// #400: only the ACTIVE weapon set's two slots feed the gear-stat aggregation input (StatBearingItemIds), because a
-	// character can carry both a melee and a ranged set at once and counting all four would double-count. Armour +
-	// jewellery always apply; the weapon set is selected by the drawn loadout. Slot->column map is CharacterEquipmentSlot's.
+	// #400: only the ACTIVE weapon set's two slots feed the gear-stat aggregation, because a character can carry both a
+	// melee and a ranged set at once and counting all four would double-count. Armour + jewellery always apply; the
+	// weapon set is selected by the drawn loadout.
+	//
+	// This used to test an in-memory CharacterEquipment.StatBearingItemIds over 26 slot COLUMNS. Since #750 the worn set
+	// is item instances in container 101, so the selection is a slot filter in the repository query - which means the
+	// gate has to go through the DB to exercise it at all. That is the point: the in-memory version could agree with
+	// itself while the query it stood in for disagreed.
 	public class CharacterEquipmentStatSlotsTests
 	{
+		// One item in every stat-bearing armour/jewellery slot, ids 1..12 so each slot is identifiable, plus both
+		// weapon loadouts: set 1 (MainWeapon 6 / OffHandWeapon 8) at 100/101 and set 2 (RangedWeapon 20 / Ammo 21) at
+		// 200/201.
+		private static readonly (CharacterEquipmentSlot Slot, uint Template)[] FullyGeared =
+		[
+			(CharacterEquipmentSlot.Neck, 1), (CharacterEquipmentSlot.Head, 2), (CharacterEquipmentSlot.Chest, 3), (CharacterEquipmentSlot.Belt, 4),
+			(CharacterEquipmentSlot.LeftRing, 5), (CharacterEquipmentSlot.RightRing, 6), (CharacterEquipmentSlot.Cape, 7), (CharacterEquipmentSlot.Shoulder, 8),
+			(CharacterEquipmentSlot.Boots, 9), (CharacterEquipmentSlot.Hands, 10), (CharacterEquipmentSlot.Legs, 11), (CharacterEquipmentSlot.Wrist, 12),
+			(CharacterEquipmentSlot.MainWeapon, 100), (CharacterEquipmentSlot.OffHandWeapon, 101),
+			(CharacterEquipmentSlot.RangedWeapon, 200), (CharacterEquipmentSlot.Ammo, 201)
+		];
+
 		private static readonly uint[] Armour = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 		[Fact]
-		public void EmptyWeaponSlots_AreSkipped()
+		public async Task EmptyWeaponSlots_AreSkipped()
 		{
-			// A character with only a set-1 weapon equipped, drawing set 1: only its one weapon id appears.
-			var eq = new CharacterEquipment
+			// A character with only a set-1 weapon equipped, drawing set 1: its one weapon plus the chest piece.
+			await WithWorn([(CharacterEquipmentSlot.Chest, 3), (CharacterEquipmentSlot.MainWeapon, 100)], async repo =>
 			{
-				ChestId = 3,
-				MainHandLeftId = 100
-			};
-
-			Assert.Equal([3u, 100u], eq.StatBearingItemIds(WeaponSet.Primary).ToArray());
-			// Drawing a second set it does not own yields no weapon ids (nothing to double-count, nothing crashes).
-			Assert.Equal([3u], eq.StatBearingItemIds(WeaponSet.Secondary).ToArray());
+				Assert.Equal(new uint[] { 3, 100 }, (await repo.GetEquippedStatItems(CharacterId, WeaponSet.Primary)).Select(i => i.Id).Order().ToArray());
+				// Drawing a second set it does not own yields no weapon ids (nothing to double-count, nothing crashes).
+				Assert.Equal(new uint[] { 3 }, (await repo.GetEquippedStatItems(CharacterId, WeaponSet.Secondary)).Select(i => i.Id).ToArray());
+			});
 		}
 
 		[Fact]
-		public void NoActiveSet_YieldsArmourOnly_NoWeapons()
+		public async Task PrimarySet_AddsSet1Weapons_ExcludesSet2()
 		{
-			var ids = FullyGeared().StatBearingItemIds();
-
-			Assert.Equal(Armour, ids.ToArray());
-		}
-
-		[Fact]
-		public void PrimarySet_AddsSet1Weapons_ExcludesSet2()
-		{
-			var ids = new HashSet<uint>(FullyGeared().StatBearingItemIds(WeaponSet.Primary));
-
-			Assert.Contains(100u, ids); // set-1 MainHandLeft
-			Assert.Contains(101u, ids); // set-1 OffHandLeft
-			Assert.DoesNotContain(200u, ids); // set-2 main NOT counted
-			Assert.DoesNotContain(201u, ids); // set-2 off NOT counted
-			Assert.All(Armour, a => Assert.Contains(a, ids));
-		}
-
-		[Fact]
-		public void SecondarySet_AddsSet2Weapons_ExcludesSet1()
-		{
-			var ids = new HashSet<uint>(FullyGeared().StatBearingItemIds(WeaponSet.Secondary));
-
-			Assert.Contains(200u, ids); // set-2 MainHandRight (often a bow/crossbow)
-			Assert.Contains(201u, ids); // set-2 OffHandRight (often ammo)
-			Assert.DoesNotContain(100u, ids); // set-1 main NOT counted
-			Assert.DoesNotContain(101u, ids); // set-1 off NOT counted
-		}
-
-		// A character wearing one item in every stat-bearing slot, with distinct ids so each slot is identifiable.
-		private static CharacterEquipment FullyGeared()
-		{
-			return new CharacterEquipment
+			await WithWorn(FullyGeared, async repo =>
 			{
-				// armour + jewellery
-				NeckId = 1,
-				HeadId = 2,
-				ChestId = 3,
-				BeltId = 4,
-				RingLeftId = 5,
-				RingRightId = 6,
-				CloakId = 7,
-				ShoulderId = 8,
-				BootsId = 9,
-				HandsId = 10,
-				LegsId = 11,
-				WristId = 12,
-				// weapon set 1 (slots 6 / 8)
-				MainHandLeftId = 100,
-				OffHandLeftId = 101,
-				// weapon set 2 (slots 20 / 21)
-				MainHandRightId = 200,
-				OffHandRightId = 201
-			};
+				var ids = (await repo.GetEquippedStatItems(CharacterId, WeaponSet.Primary)).Select(i => i.Id).ToHashSet();
+
+				Assert.Contains(100u, ids); // set-1 MainWeapon
+				Assert.Contains(101u, ids); // set-1 OffHandWeapon
+				Assert.DoesNotContain(200u, ids); // set-2 ranged NOT counted
+				Assert.DoesNotContain(201u, ids); // set-2 ammo NOT counted
+				Assert.All(Armour, a => Assert.Contains(a, ids));
+			});
+		}
+
+		[Fact]
+		public async Task SecondarySet_AddsSet2Weapons_ExcludesSet1()
+		{
+			await WithWorn(FullyGeared, async repo =>
+			{
+				var ids = (await repo.GetEquippedStatItems(CharacterId, WeaponSet.Secondary)).Select(i => i.Id).ToHashSet();
+
+				Assert.Contains(200u, ids); // set-2 RangedWeapon (often a bow/crossbow)
+				Assert.Contains(201u, ids); // set-2 Ammo (often a quiver)
+				Assert.DoesNotContain(100u, ids); // set-1 main NOT counted
+				Assert.DoesNotContain(101u, ids); // set-1 off NOT counted
+				Assert.All(Armour, a => Assert.Contains(a, ids));
+			});
+		}
+
+		// The VANITY slots and the bag containers are NOT stat-bearing: vanity is appearance only and a bag's capacity is
+		// a bag stat, not a combat one. They are worn instances like any other, so nothing but the slot filter keeps them
+		// out - which is exactly the sort of thing a column-based model got for free and a row-based one has to state.
+		[Fact]
+		public async Task VanityAndBagSlots_AreNotStatBearing()
+		{
+			await WithWorn([
+				(CharacterEquipmentSlot.Chest, 3), (CharacterEquipmentSlot.VanityChest, 500), (CharacterEquipmentSlot.VanityHead, 501),
+				(CharacterEquipmentSlot.Bag, 502), (CharacterEquipmentSlot.ResourceBag, 503)
+			], async repo => Assert.Equal(new uint[] { 3 }, (await repo.GetEquippedStatItems(CharacterId, WeaponSet.Primary)).Select(i => i.Id).ToArray()));
+		}
+
+		private const uint CharacterId = 7;
+
+		// A WRITABLE copy of the shipped fixture rather than a bare EnsureCreated: Character hangs off Account, Realm and
+		// Map, and the fixture already carries the seeded realm/account and the map rows.
+		private static async Task WithWorn(IEnumerable<(CharacterEquipmentSlot Slot, uint Template)> worn, Func<DatabaseRepository, Task> assert)
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-equip-slots-{Guid.NewGuid():N}.db");
+			File.Copy(TestDb.GameDatabase, path);
+			try
+			{
+				var options = TestDb.Options(path);
+				await using (var ctx = new DatabaseContext(options))
+				{
+					var realm = await ctx.Realms.Select(r => r.Id).FirstAsync(TestContext.Current.CancellationToken);
+					var account = await ctx.Accounts.Select(a => a.Id).FirstAsync(TestContext.Current.CancellationToken);
+					ctx.Characters.Add(new Character
+					{
+						Id = CharacterId, Name = "Slottest", Class = ConanClass.Assassin, Level = 20, Race = Race.Stygian,
+						Sex = Sex.Female, RealmId = realm, AccountId = account
+					});
+
+					foreach (var (slot, template) in worn)
+					{
+						// ItemInstance.TemplateId FKs Items, so each worn template needs a catalog row.
+						ctx.Items.Add(new Item
+						{
+							Id = template,
+							Name = $"Test {slot}"
+						});
+						ctx.ItemInstances.Add(new ItemInstance
+						{
+							OwnerCharacterId = CharacterId,
+							Container = ContainerKind.Equipped,
+							Slot = (int)slot,
+							TemplateId = template
+						});
+					}
+
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				await assert(new DatabaseRepository(new Factory(options)));
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
+		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default)
+			{
+				return Task.FromResult(new DatabaseContext(options));
+			}
 		}
 	}
 }

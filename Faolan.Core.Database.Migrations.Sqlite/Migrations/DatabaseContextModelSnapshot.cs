@@ -331,6 +331,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<ulong>("TutorialStepsSeen")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("VanityShownMask")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
@@ -544,149 +547,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("CharacterCombos");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterEquipment", b =>
-                {
-                    b.Property<uint>("CharacterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("BagId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("BeltId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("BootsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("ChestId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("CloakId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("FirstPosBagId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("HandsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("HeadId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("LegsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("MainHandLeftId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("MainHandRightId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("NeckId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("OffHandLeftId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("OffHandRightId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("ResourceBagId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("RingLeftId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("RingRightId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("ShoulderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityBeltId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityBootsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityCapeId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityChestId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityHeadId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityLegsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("VanityShownMask")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("VanityWristId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("WristId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CharacterId");
-
-                    b.HasIndex("BagId");
-
-                    b.HasIndex("BeltId");
-
-                    b.HasIndex("BootsId");
-
-                    b.HasIndex("ChestId");
-
-                    b.HasIndex("CloakId");
-
-                    b.HasIndex("FirstPosBagId");
-
-                    b.HasIndex("HandsId");
-
-                    b.HasIndex("HeadId");
-
-                    b.HasIndex("LegsId");
-
-                    b.HasIndex("MainHandLeftId");
-
-                    b.HasIndex("MainHandRightId");
-
-                    b.HasIndex("NeckId");
-
-                    b.HasIndex("OffHandLeftId");
-
-                    b.HasIndex("OffHandRightId");
-
-                    b.HasIndex("ResourceBagId");
-
-                    b.HasIndex("RingLeftId");
-
-                    b.HasIndex("RingRightId");
-
-                    b.HasIndex("ShoulderId");
-
-                    b.HasIndex("VanityBeltId");
-
-                    b.HasIndex("VanityBootsId");
-
-                    b.HasIndex("VanityCapeId");
-
-                    b.HasIndex("VanityChestId");
-
-                    b.HasIndex("VanityHeadId");
-
-                    b.HasIndex("VanityLegsId");
-
-                    b.HasIndex("VanityWristId");
-
-                    b.HasIndex("WristId");
-
-                    b.ToTable("CharacterEquipment");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
                 {
                     b.Property<uint>("CharacterId")
@@ -736,36 +596,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("FriendCharacterId");
 
                     b.ToTable("CharacterFriends");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
-                {
-                    b.Property<uint>("CharacterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Container")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Slot")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Count")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("CreatorName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<uint?>("ItemId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CharacterId", "Container", "Slot");
-
-                    b.HasIndex("ItemId");
-
-                    b.ToTable("CharacterInventory", t =>
-                        {
-                            t.HasCheckConstraint("CK_CharacterInventory_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
-                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
@@ -1797,6 +1627,62 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Item_Type", "Type IN (104, 112, 113)");
                         });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.Property<uint>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Container")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Count")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CreatorName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("OwnerCharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("OwnerCharacterId", "Container", "Slot")
+                        .IsUnique();
+
+                    b.ToTable("ItemInstances", t =>
+                        {
+                            t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstanceSocket", b =>
+                {
+                    b.Property<uint>("ItemInstanceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SocketIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("GemItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ItemInstanceId", "SocketIndex");
+
+                    b.HasIndex("GemItemId");
+
+                    b.ToTable("ItemInstanceSockets");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemStatModifier", b =>
@@ -4103,173 +3989,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterEquipment", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Bag")
-                        .WithMany()
-                        .HasForeignKey("BagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Belt")
-                        .WithMany()
-                        .HasForeignKey("BeltId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Boots")
-                        .WithMany()
-                        .HasForeignKey("BootsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithOne("Equipment")
-                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterEquipment", "CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Chest")
-                        .WithMany()
-                        .HasForeignKey("ChestId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Cloak")
-                        .WithMany()
-                        .HasForeignKey("CloakId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "FirstPosBag")
-                        .WithMany()
-                        .HasForeignKey("FirstPosBagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Hands")
-                        .WithMany()
-                        .HasForeignKey("HandsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Head")
-                        .WithMany()
-                        .HasForeignKey("HeadId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Legs")
-                        .WithMany()
-                        .HasForeignKey("LegsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "MainHandLeft")
-                        .WithMany()
-                        .HasForeignKey("MainHandLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "MainHandRight")
-                        .WithMany()
-                        .HasForeignKey("MainHandRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Neck")
-                        .WithMany()
-                        .HasForeignKey("NeckId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "OffHandLeft")
-                        .WithMany()
-                        .HasForeignKey("OffHandLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "OffHandRight")
-                        .WithMany()
-                        .HasForeignKey("OffHandRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "ResourceBag")
-                        .WithMany()
-                        .HasForeignKey("ResourceBagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "RingLeft")
-                        .WithMany()
-                        .HasForeignKey("RingLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "RingRight")
-                        .WithMany()
-                        .HasForeignKey("RingRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Shoulder")
-                        .WithMany()
-                        .HasForeignKey("ShoulderId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityBelt")
-                        .WithMany()
-                        .HasForeignKey("VanityBeltId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityBoots")
-                        .WithMany()
-                        .HasForeignKey("VanityBootsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityCape")
-                        .WithMany()
-                        .HasForeignKey("VanityCapeId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityChest")
-                        .WithMany()
-                        .HasForeignKey("VanityChestId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityHead")
-                        .WithMany()
-                        .HasForeignKey("VanityHeadId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityLegs")
-                        .WithMany()
-                        .HasForeignKey("VanityLegsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityWrist")
-                        .WithMany()
-                        .HasForeignKey("VanityWristId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Wrist")
-                        .WithMany()
-                        .HasForeignKey("WristId");
-
-                    b.Navigation("Bag");
-
-                    b.Navigation("Belt");
-
-                    b.Navigation("Boots");
-
-                    b.Navigation("Character");
-
-                    b.Navigation("Chest");
-
-                    b.Navigation("Cloak");
-
-                    b.Navigation("FirstPosBag");
-
-                    b.Navigation("Hands");
-
-                    b.Navigation("Head");
-
-                    b.Navigation("Legs");
-
-                    b.Navigation("MainHandLeft");
-
-                    b.Navigation("MainHandRight");
-
-                    b.Navigation("Neck");
-
-                    b.Navigation("OffHandLeft");
-
-                    b.Navigation("OffHandRight");
-
-                    b.Navigation("ResourceBag");
-
-                    b.Navigation("RingLeft");
-
-                    b.Navigation("RingRight");
-
-                    b.Navigation("Shoulder");
-
-                    b.Navigation("VanityBelt");
-
-                    b.Navigation("VanityBoots");
-
-                    b.Navigation("VanityCape");
-
-                    b.Navigation("VanityChest");
-
-                    b.Navigation("VanityHead");
-
-                    b.Navigation("VanityLegs");
-
-                    b.Navigation("VanityWrist");
-
-                    b.Navigation("Wrist");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -4317,23 +4036,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
 
                     b.Navigation("Friend");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithMany("Inventory")
-                        .HasForeignKey("CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Item")
-                        .WithMany()
-                        .HasForeignKey("ItemId");
-
-                    b.Navigation("Character");
-
-                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
@@ -4813,6 +4515,43 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("OnUseSpellDefinition");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "OwnerCharacter")
+                        .WithMany("Items")
+                        .HasForeignKey("OwnerCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Faolan.Core.Database.Tables.Item", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OwnerCharacter");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstanceSocket", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Item", "Gem")
+                        .WithMany()
+                        .HasForeignKey("GemItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.ItemInstance", "ItemInstance")
+                        .WithMany("Sockets")
+                        .HasForeignKey("ItemInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Gem");
+
+                    b.Navigation("ItemInstance");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemStatModifier", b =>
@@ -5757,13 +5496,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Navigation("ClientSettings");
 
-                    b.Navigation("Equipment");
-
                     b.Navigation("FeatSpecs");
 
                     b.Navigation("Feats");
 
-                    b.Navigation("Inventory");
+                    b.Navigation("Items");
 
                     b.Navigation("Quests");
 
@@ -5805,6 +5542,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.Item", b =>
                 {
                     b.Navigation("StatModifiers");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.Navigation("Sockets");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Mail", b =>

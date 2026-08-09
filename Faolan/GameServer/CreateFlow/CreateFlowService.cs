@@ -523,37 +523,44 @@ namespace Faolan.GameServer.CreateFlow
 		// slave outfit (male loincloth / female gown + bottom, colour randomised per character as retail does) and the
 		// class's improvised weapon.
 		//
-		// This used to run on first world entry, keyed on the CharacterEquipment ROW being absent - and it silently
-		// stopped working the moment that row started being created with the character (ce580410): the row now always
-		// exists, so the seeding branch became unreachable and new characters entered the world naked. Keyed on the
-		// SLOTS being empty instead, and run where sex and class are known, which is the same place they became known
-		// for the scaffold.
+		// Keyed on the character being UNDRESSED - having no worn items at all. This used to run on first world entry
+		// keyed on the CharacterEquipment ROW being absent, and silently stopped working the moment that row started
+		// being created with the character (ce580410): the row always existed, so the seeding branch became unreachable
+		// and new characters entered the world naked. It then keyed on the SLOTS being empty; since #750 a naked
+		// character simply has no Equipped items, so there is only one thing left to check.
 		private async Task SeedStarterEquipment(Character character)
 		{
-			var equipment = await _database.GetCharacterEquipment(character.Id)
-				?? throw new InvalidOperationException($"Character {character.Id:X8} has no CharacterEquipment row - it is created with the character, so this is corruption.");
-
 			// Only ever dress an UNDRESSED character. Re-filling emptied slots later would undo the player's own
 			// unequips, which is why this cannot simply run on every login.
-			if (equipment.WristId != null || equipment.ChestId != null || equipment.LegsId != null || equipment.MainHandLeftId != null)
+			if ((await _database.GetEquippedItems(character.Id)).Count > 0)
 				return;
 
 			var female = character.Sex == Sex.Female;
 			var femaleOutfit = StartingData.StartingFemaleOutfits[Random.Shared.Next(StartingData.StartingFemaleOutfits.Length)];
 
-			equipment.Wrist = await _database.GetItem(StartingData.StartingWristItem);
-			equipment.Chest = female
-				? await _database.GetItem(femaleOutfit.Gown)
-				: null;
-			equipment.Legs = await _database.GetItem(female
-				? femaleOutfit.Bottom
-				: StartingData.StartingMaleLegsItem);
-			// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
-			equipment.MainHandLeft = StartingData.StartingWeapon.TryGetValue(character.Class, out var weaponId)
-				? await _database.GetItem(weaponId)
-				: null;
+			// A null template is a slot this sex/class does not get (a male gets no gown, a class the create dumps do
+			// not cover gets no weapon), so the slot is simply left unworn.
+			var gear = new (CharacterEquipmentSlot Slot, uint? Template)[]
+			{
+				(CharacterEquipmentSlot.Wrist, StartingData.StartingWristItem),
+				(CharacterEquipmentSlot.Chest, female
+					? femaleOutfit.Gown
+					: null),
+				(CharacterEquipmentSlot.Legs, female
+					? femaleOutfit.Bottom
+					: StartingData.StartingMaleLegsItem),
+				// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
+				(CharacterEquipmentSlot.MainWeapon, StartingData.StartingWeapon.TryGetValue(character.Class, out var weaponId)
+					? weaponId
+					: null)
+			};
 
-			await _database.SaveCharacterEquipment(equipment);
+			foreach (var (slot, template) in gear)
+			{
+				if (template is { } id && await _database.GetItem(id) != null)
+					await _database.SetCharacterItemSlot(character.Id, ContainerKind.Equipped, (int)slot, id);
+			}
+
 			_logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
 		}
 

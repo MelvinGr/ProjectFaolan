@@ -2782,11 +2782,11 @@ namespace Faolan.GameServer.World
 			if (subject.Client?.Session.Character is not { } character)
 				return null;
 
-			// Every character gets an equipment row at creation, so a missing one is CORRUPTION - it throws. Substituting
-			// an empty row would put a character on other people's screens wearing nothing and call that success, which
-			// is exactly the kind of quiet wrong answer that costs hours later.
-			var equipment = await _database.GetCharacterEquipment(character.Id)
-				?? throw new InvalidOperationException($"Character {character.Id:X8} ({character.Name}) has no CharacterEquipment row - cannot build its spawn record.");
+			// The character's worn set. An EMPTY one is a naked character, not corruption: since #750 a worn item is an
+			// item instance in container 101, so there is no equipment ROW whose absence could mean anything else. (This
+			// used to throw on a missing row - which was right while the row was seeded at creation and its absence
+			// really was corruption.)
+			var worn = await _database.GetEquippedItems(character.Id);
 
 			var rotation = character.Rotation.LengthSquared() > 0.0001f
 				? character.Rotation
@@ -2800,7 +2800,7 @@ namespace Faolan.GameServer.World
 			// The vitals in the record are the subject's LIVE ceiling - the same value they see on their own sheet, so
 			// a third party's health bar reads what its owner's does rather than a gear-less class curve (#580).
 			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation,
-				PlayerCharacterIirs.ForCharacter(character, equipment, subject.Vitals?.ToMaxStats()!), character,
+				PlayerCharacterIirs.ForCharacter(character, worn, subject.Vitals?.ToMaxStats()!), character,
 				await _database.GetMorphTargetRegistry());
 		}
 

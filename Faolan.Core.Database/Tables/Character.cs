@@ -54,7 +54,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual Realm Realm { get; set; } = null!;
 
 		public virtual CharacterBody? Body { get; set; }
-		public virtual CharacterEquipment? Equipment { get; set; }
 
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
 		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries - which,
@@ -72,9 +71,11 @@ namespace Faolan.Core.Database.Tables
 		// of these via CharacterFeat.SpecIndex.
 		public virtual ICollection<CharacterFeatSpec> FeatSpecs { get; set; } = [];
 
-		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
-		// inventory snapshot. See [[CharacterInventory]] / docs/re/player-spawn-generation.md.
-		public virtual ICollection<CharacterInventory> Inventory { get; set; } = [];
+		// EVERY item the character holds - worn (container Equipped, slot = the equip slot id) and carried
+		// (bag/resource/quest) alike, one row per item rather than a wide worn row plus an address-keyed carried table
+		// (#750). Drives the FullChar inventory snapshot AND the spawn's visible gear. See [[ItemInstance]] /
+		// docs/re/player-spawn-generation.md.
+		public virtual ICollection<ItemInstance> Items { get; set; } = [];
 
 		// Per-character progression/state collections (inverse sides of the matching child tables, all cascade-delete
 		// with the character). Quests/Tags are the quest-state machine, RespawnPoints the resurrection points the
@@ -111,8 +112,51 @@ namespace Faolan.Core.Database.Tables
 		// #400: which of the two swappable weapon LOADOUTS (WeaponSet.Primary = equip slots 6/8, Secondary = 20/21)
 		// the character currently has drawn. Toggled by the SwitchWeaponsButton action (0x2E, capture-confirmed as the
 		// SET switch) and persisted so BOTH the drawn set and the login-time gear-stat aggregation (which counts only
-		// the ACTIVE set's weapons, CharacterEquipment.StatBearingItemIds) survive relog. Default Primary.
+		// the ACTIVE set's weapons, CharacterEquipmentSlot.StatBearing) survive relog. Default Primary.
 		public WeaponSet ActiveWeaponSet { get; set; }
+
+		// --- vanity ("costume") armour filter (client method ToggleVanityArmorFilter, GameCharAgentProject 0x200B).
+		// The per-slot toggles are stored as ONE bitmask: bit N SET = slot N's vanity piece is SHOWN. The bit index IS
+		// the toggle's wire `slot` arg = the BASE equip slot id, so any slot round-trips by construction (incl. the
+		// still-unidentified 29/30 and the 31 master). Emitted VERBATIM to the client on world entry - the FA015807
+		// self-spawn's PlayerSpawnScaffold PreFrame carries it as 4 bytes big-endian - so the setting survives relog
+		// (the client renders the show/hide off it).
+		//
+		// It lives on the CHARACTER because it is not a property of any item: it rode the old wide CharacterEquipment
+		// row purely because that row was "the character's gear", and when that row became one instance per worn item
+		// (#750) the mask had nowhere item-shaped to go.
+		//
+		// ⚠️ POLARITY: 1 = enabled = SHOWN. This was modelled backwards and called VanityHiddenMask, which read as the
+		// exact opposite of what it holds, and every comment describing it inherited the inversion. The code was
+		// always right (`if (toggleState) mask |= bit`, and the wire's toggleState 1 = enabled); only the NAME and the
+		// prose were wrong. NecroL80's captured mask 0x000450A4 is bits 2/5/7/12/14/18 = her Head/Belt/Boots/Wrist
+		// vanity SHOWN, which is what the client actually renders - under the old "hidden" reading four of her five
+		// vanity pieces would have been hidden, which they visibly are not.
+		//
+		// Capture-confirmed slot mapping: the vanity-head login dump carries bit 2 (Head), vanity-chest carries bit 5
+		// (Chest); the "global" master toggle is slot 31 -> bit 31. See PlayerSpawnScaffoldRows (#336).
+		public uint VanityShownMask { get; set; }
+
+		// The ToggleVanityArmorFilter 'slot' arg / bitmask bit that means the MAIN ("global" hide-all) toggle - slot
+		// 31, capture-confirmed (the "toggle vanity global" toggle carries slot 31).
+		public const int VanityFilterMainSlot = 31;
+
+		// Apply one ToggleVanityArmorFilter(slot, toggleState): set/clear the slot's bit. toggleState 1 = enabled =
+		// SHOWN, so it sets the bit. The wire `slot` is the bit index directly (0..31) - no per-slot mapping needed.
+		// Returns false for an out-of-range slot.
+		public bool SetVanityFilter(uint slot, bool toggleState)
+		{
+			if (slot > 31)
+				return false;
+
+			var bit = 1u << (int)slot;
+			if (toggleState)
+				VanityShownMask |= bit;
+			else
+				VanityShownMask &= ~bit;
+
+			return true;
+		}
 
 		// True once a bind point has been set (an unbound character recalls to / reports its current map).
 		[NotMapped]

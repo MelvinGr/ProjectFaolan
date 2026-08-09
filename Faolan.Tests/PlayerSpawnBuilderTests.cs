@@ -82,7 +82,7 @@ namespace Faolan.Tests
 				Level = 1,
 				Class = ConanClass.Guardian
 			};
-			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
+			var message = PlayerCharacterIirs.ForCharacter(character, worn: null);
 
 			var scaffoldCharacter = new Character
 			{

@@ -403,7 +403,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
 			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
 			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
-			scaffold.PreIir = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
+			scaffold.PreIir = FreshPreFrame(character.Class, character.VanityShownMask, SpecsOf(character));
 			var slot = PlayerSlotOf(scaffold);
 			slot.EntryTableX = FreshEntryTableX;
 			scaffold.Post.BuffRecords.Clear();

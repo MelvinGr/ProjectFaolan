@@ -33,7 +33,12 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterClientSettings(uint characterId, byte[]? settings, byte[]? preview);
 		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
-		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
+		/// <summary>
+		///     The character's WORN set (container <see cref="ContainerKind.Equipped" />) as slot -> the item instance in
+		///     it, templates loaded. Vanity slots (1000 + the base slot) are included: they are real equipped-container
+		///     positions, not a display-only overlay, and a captured L80 snapshot carries pos 1002/1007/1011/1014/1018.
+		/// </summary>
+		Task<IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>> GetEquippedItems(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
 
 		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
@@ -64,8 +69,18 @@ namespace Faolan.Core.Database.Repositories
 		/// </summary>
 		Task<IReadOnlyDictionary<uint, uint>> GetCharacterSpellScalingAttributes(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
-		Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null);
-		Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot);
+		/// <summary>
+		///     The character's item instances, template + sockets loaded. <paramref name="container" /> filters in SQL to
+		///     one container (the bag, the bank); null (the default) returns every item the character holds, worn
+		///     included, which is what the world-entry snapshot wants.
+		/// </summary>
+		Task<ItemInstance[]> GetCharacterItems(uint characterId, ContainerKind? container = null);
+
+		/// <summary>
+		///     The item in ONE cell, or null when it is empty. The equip / item-use / trade / tradepost paths all want a
+		///     single (container, slot) and would otherwise read the whole inventory to pick it out in memory.
+		/// </summary>
+		Task<ItemInstance?> GetCharacterItemSlot(uint characterId, ContainerKind container, int slot);
 		/// <summary>
 		///     A character's secondary-goal progress rows. <paramref name="questId" /> filters to one quest; null (the
 		///     default) returns every held quest's rows in ONE query, which is what the world-entry journal wants - it
@@ -101,13 +116,29 @@ namespace Faolan.Core.Database.Repositories
 		///     a position no capture has.
 		/// </summary>
 		Task SaveCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
-		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
-		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1, string? creatorName = null);
+		/// <summary>
+		///     MINTS a new item in a cell, or CLEARS the cell when <paramref name="templateId" /> is null. Whatever was
+		///     there is deleted, sockets and all - so this is the right call for a grant, a purchase, a loot pickup or a
+		///     split's new half, and the WRONG one for a move: use <see cref="MoveCharacterItem" />, which preserves the
+		///     instance. Returns the new instance (null when the cell was cleared).
+		/// </summary>
+		Task<ItemInstance?> SetCharacterItemSlot(uint characterId, ContainerKind container, int slot, uint? templateId, uint count = 1, string? creatorName = null);
+
+		/// <summary>
+		///     MOVES the item at one cell to another, swapping with the destination's occupant when there is one. The
+		///     instances are UPDATED in place, never re-minted, so the crafter, the stack count and the socketed gems
+		///     travel with the item by construction - which is the whole point of an item being a row rather than an
+		///     address (#750). Returns false when the source cell is empty.
+		/// </summary>
+		Task<bool> MoveCharacterItem(uint characterId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot);
+
+		/// <summary>Sets an existing stack's size. Returns false when the cell is empty.</summary>
+		Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths);
 
@@ -309,16 +340,11 @@ namespace Faolan.Core.Database.Repositories
 					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
-				// Every character gets its equipment row HERE, with the character itself, so "a character has one" is an
-				// invariant established at creation rather than something each reader has to cope with. The slots are all
-				// empty - the first-login starter gear (#220) fills them - but the ROW exists, which is what the spawn and
-				// equip paths depend on: they now throw on a missing one instead of substituting an empty object, and that
-				// throw is only ever corruption if this holds.
-				character.Equipment = new CharacterEquipment
-				{
-					CharacterId = character.Id
-				};
-
+				// No equipment row to create: a naked character is a character with no Equipped item instances (#750),
+				// which the spawn and equip paths read as the empty worn set it is. This used to seed ONE WIDE ROW of 26
+				// empty slot columns purely so "a character has an equipment row" could be an invariant every reader
+				// depended on, and half a dozen call sites threw on its absence. The representation no longer has an
+				// absence to distinguish from emptiness.
 				ctx.Characters.Add(character);
 				await ctx.SaveChangesAsync();
 			}
@@ -434,36 +460,23 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.ComboId).ToArrayAsync();
 		}
 
-		public async Task<CharacterEquipment?> GetCharacterEquipment(uint characterId)
+		public async Task<IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>> GetEquippedItems(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.CharacterEquipment.Include(e => e.Neck)
-				.Include(e => e.Head)
-				.Include(e => e.Bag)
-				.Include(e => e.ResourceBag)
-				.Include(e => e.Chest)
-				.Include(e => e.MainHandLeft)
-				.Include(e => e.MainHandRight)
-				.Include(e => e.OffHandLeft)
-				.Include(e => e.OffHandRight)
-				.Include(e => e.Belt)
-				.Include(e => e.RingLeft)
-				.Include(e => e.RingRight)
-				.Include(e => e.Cloak)
-				.Include(e => e.Shoulder)
-				.Include(e => e.Boots)
-				.Include(e => e.Hands)
-				.Include(e => e.Legs)
-				.Include(e => e.FirstPosBag)
-				.Include(e => e.VanityHead)
-				.Include(e => e.VanityChest)
-				.Include(e => e.VanityBelt)
-				.Include(e => e.VanityCape)
-				.Include(e => e.VanityBoots)
-				.Include(e => e.VanityWrist)
-				.Include(e => e.Wrist)
-				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
+			var worn = await ctx.ItemInstances.AsNoTracking()
+				.Include(i => i.Template)
+				.Include(i => i.Sockets)
+				.ThenInclude(x => x.Gem)
+				.Where(i => i.OwnerCharacterId == characterId && i.Container == ContainerKind.Equipped)
+				.ToArrayAsync();
+
+			// A worn item's Slot IS a CharacterEquipmentSlot. An UNDEFINED one is dropped rather than cast through: the
+			// enum is the set of slots we can render, so an unknown slot on the wire would be a decode gap to report, not
+			// something to guess at. (This is the same Enum.IsDefined gate the capture importer applies on the way in -
+			// which is how VanityLegs (1016) was found, one item short at "20/21 worn".)
+			return worn
+				.Where(i => Enum.IsDefined((CharacterEquipmentSlot)i.Slot))
+				.ToDictionary(i => (CharacterEquipmentSlot)i.Slot);
 		}
 
 		public async Task<uint[]> GetCharacterFeats(uint characterId)
@@ -631,25 +644,22 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// `container` filters in SQL, like the quest reads' state: most callers want one container (the bag, the bank),
-		// not the whole inventory. Null (the default) returns every row, which is what the snapshot builder wants.
-		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null)
+		// not everything the character holds. Null (the default) returns every item INCLUDING the worn set, which is
+		// what the snapshot builder wants - all four of its containers now come from these rows.
+		public async Task<ItemInstance[]> GetCharacterItems(uint characterId, ContainerKind? container = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.CharacterInventory.Include(i => i.Item)
-				.Where(i => i.CharacterId == characterId && (container == null || i.Container == container))
+			return await ItemsOf(ctx)
+				.Where(i => i.OwnerCharacterId == characterId && (container == null || i.Container == container))
+				.OrderBy(i => i.Container)
+				.ThenBy(i => i.Slot)
 				.ToArrayAsync();
 		}
 
-		// ONE slot. The equip / item-use / trade / tradepost paths all want a single (container, slot) row and were
-		// reading the character's whole inventory to pick it out in memory - small (21-127 rows) but paid on every
-		// inventory action, and it reads as a scan of something it isn't.
-		public async Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot)
+		public async Task<ItemInstance?> GetCharacterItemSlot(uint characterId, ContainerKind container, int slot)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.CharacterInventory.Include(i => i.Item)
-				.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
+			return await ItemsOf(ctx).FirstOrDefaultAsync(i => i.OwnerCharacterId == characterId && i.Container == container && i.Slot == slot);
 		}
 
 		public async Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint? questId = null)
@@ -722,38 +732,59 @@ namespace Faolan.Core.Database.Repositories
 				.ToDictionaryAsync(r => r.StatId, r => r.Amount);
 		}
 
+		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
+		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3).
+		//
+		// #400: only the ACTIVE weapon SET's two slots are folded in - armour + jewellery always apply. A character can
+		// have BOTH loadouts equipped at once (Primary = slots 6/8, Secondary = 20/21) and counting all four would
+		// double-count. The two sets are just swappable loadouts, not inherently melee vs ranged.
+		//
+		// #585: the result is one entry per occupied SLOT, and the DISTINCT set is for the QUERY only - `IN (...)` cannot
+		// use a duplicate, and loading the same template twice is just a second copy of one row. Returning the distinct
+		// set silently HALVED every stat the character wore twice: their pools, their attribute scores, and (since #580)
+		// the attribute-scaled part of every pool with them.
 		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var equipment = await ctx.CharacterEquipment.AsNoTracking().FirstOrDefaultAsync(e => e.CharacterId == characterId);
-			if (equipment == null)
-				return [];
 
-			// #400: fold in only the ACTIVE weapon set's two weapon slots (armour + jewellery always apply); counting
-			// both the melee and ranged sets when both are equipped would double-count.
-			var worn = equipment.StatBearingItemIds(activeSet).ToArray();
+			var wielded = activeSet == WeaponSet.Primary
+				? new[] { CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.OffHandWeapon }
+				: [CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo];
+			// The stat-bearing set minus the weapon slots of the loadout that is NOT drawn. Vanity slots are appearance
+			// only and the Bag / ResourceBag containers carry a bag stat, not a combat one - neither is stat-bearing.
+			var slots = CharacterEquipmentSlot.StatBearing
+				.Where(slot => !IsWeaponSlot(slot))
+				.Concat(wielded)
+				.Select(slot => (int)slot)
+				.ToArray();
+
+			var worn = await ctx.ItemInstances.AsNoTracking()
+				.Where(i => i.OwnerCharacterId == characterId && i.Container == ContainerKind.Equipped && slots.Contains(i.Slot))
+				.Select(i => i.TemplateId)
+				.ToArrayAsync();
 			if (worn.Length == 0)
 				return [];
 
-			// #585: the DISTINCT set is for the query only - `IN (...)` cannot use a duplicate, and loading the same
-			// template twice would just be a second copy of the same row. The RESULT must go back to one entry per
-			// occupied SLOT: two identical rings are two slots granting the stat, and returning the distinct set
-			// silently halved every stat the character wore twice - their pools, their attribute scores, and (since
-			// #580) the attribute-scaled part of every pool with them.
 			var ids = worn.Distinct().ToArray();
 			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
 			return worn.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+
+			static bool IsWeaponSlot(CharacterEquipmentSlot slot)
+			{
+				return slot is CharacterEquipmentSlot.MainWeapon or CharacterEquipmentSlot.OffHandWeapon or CharacterEquipmentSlot.RangedWeapon or CharacterEquipmentSlot.Ammo;
+			}
 		}
 
-		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainHandLeft), for melee resolution
+		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainWeapon), for melee resolution
 		// (#395), or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection -
 		// no nav graph loaded (the combat swing hot path).
 		public async Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var dmg = await ctx
-				.CharacterEquipment.Where(e => e.CharacterId == characterId && e.MainHandLeftId != null)
-				.Join(ctx.Items, e => e.MainHandLeftId, i => i.Id, (_, i) => new
+			const int mainWeapon = (int)CharacterEquipmentSlot.MainWeapon;
+			var dmg = await ctx.ItemInstances
+				.Where(i => i.OwnerCharacterId == characterId && i.Container == ContainerKind.Equipped && i.Slot == mainWeapon)
+				.Join(ctx.Items, i => i.TemplateId, i => i.Id, (_, i) => new
 				{
 					i.MinDamage,
 					i.MaxDamage
@@ -841,89 +872,15 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsDead, isDead));
 		}
 
-		public async Task SaveCharacterEquipment(CharacterEquipment equipment)
+		// The one query shape every item read shares: the template (so a caller can name the item) plus the socketed
+		// gems and THEIR templates (so a restored socket can name its gem). Split-query because two collection Includes
+		// over one root is the cartesian-explosion shape (see the [[ef_split_query_for_multi_collection_includes]] note).
+		private static IQueryable<ItemInstance> ItemsOf(DatabaseContext ctx)
 		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			var tracked = await LoadTrackedEquipment(ctx, equipment.CharacterId) ?? AddNewEquipment(ctx, equipment.CharacterId);
-
-			tracked.Neck = await ResolveItem(ctx, equipment.Neck?.Id);
-			tracked.Head = await ResolveItem(ctx, equipment.Head?.Id);
-			tracked.Bag = await ResolveItem(ctx, equipment.Bag?.Id);
-			tracked.ResourceBag = await ResolveItem(ctx, equipment.ResourceBag?.Id);
-			tracked.Chest = await ResolveItem(ctx, equipment.Chest?.Id);
-			tracked.MainHandLeft = await ResolveItem(ctx, equipment.MainHandLeft?.Id);
-			tracked.MainHandRight = await ResolveItem(ctx, equipment.MainHandRight?.Id);
-			tracked.OffHandLeft = await ResolveItem(ctx, equipment.OffHandLeft?.Id);
-			tracked.OffHandRight = await ResolveItem(ctx, equipment.OffHandRight?.Id);
-			tracked.Belt = await ResolveItem(ctx, equipment.Belt?.Id);
-			tracked.RingLeft = await ResolveItem(ctx, equipment.RingLeft?.Id);
-			tracked.RingRight = await ResolveItem(ctx, equipment.RingRight?.Id);
-			tracked.Cloak = await ResolveItem(ctx, equipment.Cloak?.Id);
-			tracked.Shoulder = await ResolveItem(ctx, equipment.Shoulder?.Id);
-			tracked.Boots = await ResolveItem(ctx, equipment.Boots?.Id);
-			tracked.Hands = await ResolveItem(ctx, equipment.Hands?.Id);
-			tracked.Legs = await ResolveItem(ctx, equipment.Legs?.Id);
-			tracked.FirstPosBag = await ResolveItem(ctx, equipment.FirstPosBag?.Id);
-			tracked.VanityHead = await ResolveItem(ctx, equipment.VanityHead?.Id);
-			tracked.VanityChest = await ResolveItem(ctx, equipment.VanityChest?.Id);
-			tracked.VanityBelt = await ResolveItem(ctx, equipment.VanityBelt?.Id);
-			tracked.VanityCape = await ResolveItem(ctx, equipment.VanityCape?.Id);
-			tracked.VanityBoots = await ResolveItem(ctx, equipment.VanityBoots?.Id);
-			tracked.VanityWrist = await ResolveItem(ctx, equipment.VanityWrist?.Id);
-			tracked.Wrist = await ResolveItem(ctx, equipment.Wrist?.Id);
-
-			await ctx.SaveChangesAsync();
-
-			return;
-
-			static async Task<Item?> ResolveItem(DatabaseContext ctx, uint? id)
-			{
-				return id == null
-					? null
-					: await ctx.Items.FindAsync(id.Value);
-			}
-
-			static CharacterEquipment AddNewEquipment(DatabaseContext ctx, uint characterId)
-			{
-				var equipment = new CharacterEquipment
-				{
-					CharacterId = characterId
-				};
-				ctx.CharacterEquipment.Add(equipment);
-				return equipment;
-			}
-
-			static Task<CharacterEquipment?> LoadTrackedEquipment(DatabaseContext ctx, uint characterId)
-			{
-				return ctx
-					.CharacterEquipment.Include(e => e.Neck)
-					.Include(e => e.Head)
-					.Include(e => e.Bag)
-					.Include(e => e.ResourceBag)
-					.Include(e => e.Chest)
-					.Include(e => e.MainHandLeft)
-					.Include(e => e.MainHandRight)
-					.Include(e => e.OffHandLeft)
-					.Include(e => e.OffHandRight)
-					.Include(e => e.Belt)
-					.Include(e => e.RingLeft)
-					.Include(e => e.RingRight)
-					.Include(e => e.Cloak)
-					.Include(e => e.Shoulder)
-					.Include(e => e.Boots)
-					.Include(e => e.Hands)
-					.Include(e => e.Legs)
-					.Include(e => e.FirstPosBag)
-					.Include(e => e.VanityHead)
-					.Include(e => e.VanityChest)
-					.Include(e => e.VanityBelt)
-					.Include(e => e.VanityCape)
-					.Include(e => e.VanityBoots)
-					.Include(e => e.VanityWrist)
-					.Include(e => e.Wrist)
-					.FirstOrDefaultAsync(e => e.CharacterId == characterId);
-			}
+			return ctx.ItemInstances.AsNoTracking()
+				.Include(i => i.Template)
+				.Include(i => i.Sockets)
+				.ThenInclude(x => x.Gem);
 		}
 
 		public async Task SaveCharacterMount(uint characterId, uint? mountId)
@@ -994,44 +951,102 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.GuildId, guildId).SetProperty(c => c.GuildRank, rank)) == 1;
 		}
 
-		// `creatorName` is the crafter of the stack being written (#727), and it is assigned on BOTH the insert and the
-		// overwrite. Defaulting it to null is what makes an ordinary grant safe: an item arriving in a cell that a
-		// crafted item used to occupy is not itself player-made, and leaving the column untouched on overwrite would
-		// glue the old crafter to the new item - the same insert-only-writer shape that froze stale Hash (#719) and
-		// Level (#725) values. A caller that MOVES a stack (PersistInventoryMove, PersistSplitStack) therefore has to
-		// pass the source row's creator through explicitly.
-		public async Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1, string? creatorName = null)
+		// `creatorName` is the crafter of the item being MINTED (#727). Defaulting it to null is what makes an ordinary
+		// grant safe: an item arriving in a cell a crafted item used to occupy is not itself player-made, and carrying
+		// the old value forward would glue the previous crafter to the new item - the same insert-only-writer shape that
+		// froze stale Hash (#719) and Level (#725) values.
+		//
+		// ⚠️ This DELETES whatever occupied the cell, sockets included. That is right for a grant and wrong for a move -
+		// a move must keep the instance, so it goes through MoveCharacterItem. Before #750 there was no difference to
+		// draw: a "move" was a pair of writes that re-stated the id, the count and (by hand) the crafter into a new
+		// address, and anything the code did not think to re-state was silently dropped. A gem is exactly that.
+		public async Task<ItemInstance?> SetCharacterItemSlot(uint characterId, ContainerKind container, int slot, uint? templateId, uint count = 1, string? creatorName = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
+			var existing = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.OwnerCharacterId == characterId && i.Container == container && i.Slot == slot);
+			if (existing != null)
+				ctx.ItemInstances.Remove(existing);
 
-			if (itemId == null)
+			if (templateId == null)
 			{
-				if (row == null)
-					return;
+				if (existing != null)
+					await ctx.SaveChangesAsync();
 
-				ctx.CharacterInventory.Remove(row);
-			}
-			else if (row == null)
-			{
-				ctx.CharacterInventory.Add(new CharacterInventory
-				{
-					CharacterId = characterId,
-					Container = container,
-					Slot = slot,
-					ItemId = itemId,
-					Count = count,
-					CreatorName = creatorName
-				});
-			}
-			else
-			{
-				row.ItemId = itemId;
-				row.Count = count;
-				row.CreatorName = creatorName;
+				return null;
 			}
 
+			var minted = new ItemInstance
+			{
+				OwnerCharacterId = characterId,
+				Container = container,
+				Slot = slot,
+				TemplateId = templateId.Value,
+				Count = count,
+				CreatorName = creatorName
+			};
+			ctx.ItemInstances.Add(minted);
 			await ctx.SaveChangesAsync();
+			return minted;
+		}
+
+		// A move is a column UPDATE on the item's own row, which is the entire reason location lives on the instance.
+		//
+		// ⚠️ A SWAP cannot be one batch. Two rows trading (container, slot) is a CYCLE under the UNIQUE
+		// (owner, container, slot) index - whichever UPDATE runs first collides with the row that has not moved yet -
+		// and EF says so rather than picking an order ("a circular dependency was detected in the data to be saved").
+		// SQLite would reject the intermediate state even if it did pick one: a unique index is enforced per statement,
+		// there is nothing to defer to the end of the transaction.
+		//
+		// So the destination's occupant is PARKED at a slot no real cell uses, then the source moves in, then the parked
+		// row takes the source's old cell - three statements, inside ONE transaction so a failure between them cannot
+		// strand an item at the parking slot.
+		public async Task<bool> MoveCharacterItem(uint characterId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot)
+		{
+			if (from == to && fromSlot == toSlot)
+				return true;
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var source = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.OwnerCharacterId == characterId && i.Container == from && i.Slot == fromSlot);
+			if (source == null)
+				return false;
+
+			var destination = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.OwnerCharacterId == characterId && i.Container == to && i.Slot == toSlot);
+			if (destination == null)
+			{
+				source.Container = to;
+				source.Slot = toSlot;
+				await ctx.SaveChangesAsync();
+				return true;
+			}
+
+			await using var transaction = await ctx.Database.BeginTransactionAsync();
+
+			destination.Slot = ParkedSlot;
+			await ctx.SaveChangesAsync();
+
+			source.Container = to;
+			source.Slot = toSlot;
+			await ctx.SaveChangesAsync();
+
+			destination.Container = from;
+			destination.Slot = fromSlot;
+			await ctx.SaveChangesAsync();
+
+			await transaction.CommitAsync();
+			return true;
+		}
+
+		// Where a swap parks the displaced item for the duration of the swap. Negative because every real cell position
+		// is a wire slot index and those are non-negative, so it cannot collide with one; the transaction is what
+		// guarantees nothing is ever observed sitting here.
+		private const int ParkedSlot = -1;
+
+		public async Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ItemInstances
+				.Where(i => i.OwnerCharacterId == characterId && i.Container == container && i.Slot == slot)
+				.ExecuteUpdateAsync(s => s.SetProperty(i => i.Count, count)) == 1;
 		}
 
 		public async Task SetCharacterMoney(uint characterId, ulong money)
@@ -1155,8 +1170,8 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<bool> SetVanityFilter(uint characterId, uint slot, bool toggleState)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var equipment = await ctx.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId);
-			if (equipment == null || !equipment.SetVanityFilter(slot, toggleState))
+			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
+			if (character == null || !character.SetVanityFilter(slot, toggleState))
 				return false;
 
 			await ctx.SaveChangesAsync();
@@ -1187,7 +1202,6 @@ namespace Faolan.Core.Database.Repositories
 				.Include(c => c.Account)
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
-				.Include(c => c.Equipment)
 				.Include(c => c.Skills)
 				.Include(c => c.Feats)
 				.Include(c => c.FeatSpecs)

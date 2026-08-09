@@ -64,7 +64,7 @@ namespace Faolan.Tests
 			[
 				new SnapshotItems.ItemStat(0, 17), new SnapshotItems.ItemStat(8, 0), new SnapshotItems.ItemStat(23, (uint)RecordId),
 				new SnapshotItems.ItemStat(46, 0)
-			], 40, Crafter);
+			], Crafter);
 
 			Assert.Equal(CraftedEntry, Convert.ToHexStringLower(entry.ToProtobuf()));
 			Assert.Equal(CraftedBody, Convert.ToHexStringLower(AddItemCodec.Build(new AddItem(ContainerKind.Bag, CharId, ItemPos, entry))));

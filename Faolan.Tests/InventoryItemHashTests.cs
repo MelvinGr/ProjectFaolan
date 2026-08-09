@@ -27,9 +27,9 @@ namespace Faolan.Tests
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 
-			var held = (from ci in db.CharacterInventory
-					join i in db.Items on ci.ItemId equals i.Id
-					select new { ci.CharacterId, ci.Container, ci.Slot, i.Id, i.Name, i.Hash })
+			var held = (from ii in db.ItemInstances
+					join i in db.Items on ii.TemplateId equals i.Id
+					select new { ii.OwnerCharacterId, ii.Container, ii.Slot, i.Id, i.Name, i.Hash })
 				.ToList();
 
 			var offenders = held
@@ -40,28 +40,31 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0,
 				"a character is holding an item whose wire token the client would refuse:\n  "
 				+ string.Join("\n  ", offenders.Select(o =>
-					$"character {o.CharacterId} {o.Container}[{o.Slot}] -> item {o.Id} '{o.Name}' (harvested 0x{o.Hash:X8}, wire 0x{AcgHash.ForWire(o.Id, o.Hash):X8})")));
+					$"character {o.OwnerCharacterId} {o.Container}[{o.Slot}] -> item {o.Id} '{o.Name}' (harvested 0x{o.Hash:X8}, wire 0x{AcgHash.ForWire(o.Id, o.Hash):X8})")));
 		}
 
-		// A row pointing at a template that is not in Items at all is still a real defect - that one has no
+		// An item pointing at a template that is not in Items at all is still a real defect - that one has no
 		// identity to mint FROM, and the snapshot skips it, so the item is invisible with nothing to explain it.
+		//
+		// ⚠️ Since #750 the FK enforces this (ItemInstance.TemplateId -> Items, Restrict), so the gate can only fail on
+		// a database whose constraints were bypassed. It is kept for that: faolan.db is a committed artifact and a hand
+		// edit through the sqlite3 CLI has foreign keys OFF by default.
 		[Fact]
 		public async Task NoInventoryRow_PointsAtAMissingItemTemplate()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 
 			var itemIds = db.Items.Select(i => i.Id).ToHashSet();
-			var offenders = db.CharacterInventory
-				.Where(ci => ci.ItemId != null)
-				.Select(ci => new { ci.CharacterId, ci.Container, ci.Slot, ci.ItemId })
+			var offenders = db.ItemInstances
+				.Select(ii => new { ii.OwnerCharacterId, ii.Container, ii.Slot, ItemId = (uint?)ii.TemplateId })
 				.ToList()
-				.Where(ci => !itemIds.Contains(ci.ItemId!.Value))
+				.Where(ii => !itemIds.Contains(ii.ItemId!.Value))
 				.Take(20)
 				.ToList();
 
 			Assert.True(offenders.Count == 0,
 				"a character is holding a template with no Items row:\n  "
-				+ string.Join("\n  ", offenders.Select(o => $"character {o.CharacterId} {o.Container}[{o.Slot}] -> item {o.ItemId}")));
+				+ string.Join("\n  ", offenders.Select(o => $"character {o.OwnerCharacterId} {o.Container}[{o.Slot}] -> item {o.ItemId}")));
 		}
 	}
 }

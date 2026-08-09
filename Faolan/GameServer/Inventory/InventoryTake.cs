@@ -18,32 +18,34 @@ namespace Faolan.GameServer.Inventory
 		// One slot's share of the take. `Taken` is how many come out of it; `Remaining` is what is left behind, so 0
 		// means the cell is cleared and anything else means it is rewritten with the smaller stack.
 		//
-		// `CreatorName` rides along because a partial take REWRITES the cell, and the writer assigns the crafter
-		// rather than leaving it (#727) - so a decremented stack of a player-made item would otherwise lose its
-		// "Created by" line. It is the row's own value, carried through unchanged.
-		public readonly record struct Step(ContainerKind Container, int Slot, uint Taken, uint Remaining, string? CreatorName = null);
+		// A partial take DECREMENTS the item in place (the instance is not re-minted), so nothing per-instance needs
+		// carrying through the step - the crafter and any socketed gems stay on the row by construction. The step used
+		// to carry the CreatorName for exactly that reason: the cell was REWRITTEN, and the writer assigned the crafter
+		// rather than leaving it (#727), so a decremented stack of a player-made item lost its "Created by" line
+		// unless the plan passed the name back in. That whole class of hand-carrying is what #750 removed.
+		public readonly record struct Step(ContainerKind Container, int Slot, uint Taken, uint Remaining);
 
 		// The steps that remove `count` of `itemTemplateId`, in container-then-slot order. Takes as much as it can and
 		// stops: a short plan (its Taken summing to less than `count`) means the player does not hold enough, which is
 		// the caller's to report - this never throws and never over-takes.
-		public static List<Step> Plan(IEnumerable<CharacterInventory> rows, uint itemTemplateId, uint count)
+		public static List<Step> Plan(IEnumerable<ItemInstance> items, uint itemTemplateId, uint count)
 		{
 			var steps = new List<Step>();
 			if (count == 0 || itemTemplateId == 0)
 				return steps;
 
 			var remaining = count;
-			foreach (var row in rows.Where(r => r.ItemId == itemTemplateId).OrderBy(r => r.Container).ThenBy(r => r.Slot))
+			foreach (var item in items.Where(i => i.TemplateId == itemTemplateId).OrderBy(i => i.Container).ThenBy(i => i.Slot))
 			{
 				if (remaining == 0)
 					break;
 
-				// A row with no explicit stack size is one item - the same reading HoldsDeliveryItem sums with, so the
+				// An item with no explicit stack size is one item - the same reading HoldsDeliveryItem sums with, so the
 				// check and the take can never disagree about how much a cell is worth.
-				var held = row.Count == 0 ? 1u : row.Count;
+				var held = item.Count == 0 ? 1u : item.Count;
 				var taken = held < remaining ? held : remaining;
 				remaining -= taken;
-				steps.Add(new Step(row.Container, row.Slot, taken, held - taken, row.CreatorName));
+				steps.Add(new Step(item.Container, item.Slot, taken, held - taken));
 			}
 
 			return steps;

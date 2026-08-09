@@ -335,9 +335,9 @@ namespace Faolan.Tests
 		{
 			// "Deliver 3 stone bricks to Turach" against FIVE bricks in one quest-container cell: 3 come out, 2 stay.
 			// Clearing the cell would destroy items the player legitimately keeps.
-			var oneBigStack = new List<CharacterInventory>
+			var oneBigStack = new List<ItemInstance>
 			{
-				Row(ContainerKind.Quest, 0, 193400, 5)
+				Held(ContainerKind.Quest, 0, 193400, 5)
 			};
 			var plan = InventoryTake.Plan(oneBigStack, 193400, 3);
 			var step = Assert.Single(plan);
@@ -346,12 +346,12 @@ namespace Faolan.Tests
 
 			// Split across two containers and three cells, with an unrelated item in between: the walk spans them and
 			// STOPS at the count - the last brick-holding cell is untouched.
-			var split = new List<CharacterInventory>
+			var split = new List<ItemInstance>
 			{
-				Row(ContainerKind.Bag, 4, 999999),
-				Row(ContainerKind.Quest, 2, 193400),
-				Row(ContainerKind.Bag, 1, 193400),
-				Row(ContainerKind.Bag, 7, 193400)
+				Held(ContainerKind.Bag, 4, 999999),
+				Held(ContainerKind.Quest, 2, 193400),
+				Held(ContainerKind.Bag, 1, 193400),
+				Held(ContainerKind.Bag, 7, 193400)
 			};
 			plan = InventoryTake.Plan(split, 193400, 3);
 			Assert.Equal(3, plan.Count);
@@ -373,12 +373,12 @@ namespace Faolan.Tests
 			Assert.Empty(InventoryTake.Plan(split, 0, 3));
 			Assert.Empty(InventoryTake.Plan(split, 12345, 3));
 
-			static CharacterInventory Row(ContainerKind container, int slot, uint itemId, uint count = 1) =>
-				new CharacterInventory
+			static ItemInstance Held(ContainerKind container, int slot, uint templateId, uint count = 1) =>
+				new ItemInstance
 			{
 				Container = container,
 				Slot = slot,
-				ItemId = itemId,
+				TemplateId = templateId,
 				Count = count
 			};
 		}

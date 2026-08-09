@@ -62,32 +62,17 @@ namespace Faolan.Tests
 		{
 			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
 
-			var equipped = new Dictionary<ulong, Item>
+			var held = new[]
 			{
-				{ 0x12, Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565) }
-			};
-			var bagFirst = Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359);
-			var rows = new[]
-			{
-				new CharacterInventory
-				{
-					Container = (ContainerKind)104,
-					Slot = 2,
-					Count = 1,
-					Item = Mk(13817, 1796783475, 3438012111, 3985322333, 505316191, 1177700698)
-				},
-				new CharacterInventory
-				{
-					Container = (ContainerKind)104,
-					Slot = 3,
-					Count = 1,
-					Item = Mk(13826, 1761429601, 4267309034, 1871298002, 3660826526, 1160857399)
-				}
+				Held(1, ContainerKind.Equipped, 0x12, Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565)),
+				Held(2, ContainerKind.Bag, 1, Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359)),
+				Held(3, ContainerKind.Bag, 2, Mk(13817, 1796783475, 3438012111, 3985322333, 505316191, 1177700698)),
+				Held(4, ContainerKind.Bag, 3, Mk(13826, 1761429601, 4267309034, 1871298002, 3660826526, 1160857399))
 			};
 
 			var typed = verbatimRoot.FromProtobuf<ProtoFullCharacterIIR>();
 			typed.Inventories.Clear();
-			foreach (var c in FullCharacterRoots.Containers(instance, equipped, bagFirst, rows))
+			foreach (var c in FullCharacterRoots.Containers(instance, held))
 				typed.Inventories.Add(c);
 			var genRoot = typed.ToProtobuf();
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
@@ -130,6 +115,21 @@ namespace Faolan.Tests
 					Hash = arch
 				};
 			}
+		}
+
+		// A held item, as the container builder takes it since #750: the instance's own id is what the wire's item_id
+		// carries, so the test states it explicitly rather than deriving it from the cell.
+		private static ItemInstance Held(uint id, ContainerKind container, int slot, Item template)
+		{
+			return new ItemInstance
+			{
+				Id = id,
+				Container = container,
+				Slot = slot,
+				TemplateId = template.Id,
+				Template = template,
+				Count = 1
+			};
 		}
 
 		private static (byte[] Prefix, int RootLen, byte[] SubClass) Split(string bin)

@@ -158,7 +158,7 @@ namespace Faolan.GameServer.Economy
 			// spent on a duplicate the player cannot use burns it for good.
 			if (claim.Quantity is not null && characterId != 0)
 			{
-				var alreadyHeld = (await _database.GetCharacterInventory(characterId)).Any(i => i.Item?.Id == claim.ItemTemplateId);
+				var alreadyHeld = (await _database.GetCharacterItems(characterId)).Any(i => i.TemplateId == claim.ItemTemplateId);
 				if (alreadyHeld)
 				{
 					_logger.LogInformation("Redeem of claim {ClaimId} (template {Template}) refused: {Character} already holds one.", claim.Id, claim.ItemTemplateId, characterId);

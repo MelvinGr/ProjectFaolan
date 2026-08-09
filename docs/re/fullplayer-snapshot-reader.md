@@ -519,7 +519,7 @@ FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag seriali
   and a nested tiny message shaped like { f1=26, f2=count } reproduces stack counts such as
   20,78,100,34,96,83,82,56,4,1,5,3 from the earlier bag notes
 - by count profile alone, 112 now looks resource-like (many non-1 stacks) and 113 looks quest-like
-  (mostly count=1); this tentatively matches the CharacterEquipment model's Bag/Resources/Quest split
+  (mostly count=1); this tentatively matches our own Bag/Resources/Quest container split
 - the tiny message { f1=23, f2=value } now looks like a local inventory-record id rather than an
   item template id: across 104/112/113 it forms one perfect contiguous range 168534..168658
   and is the only tiny submessage that is present on every parsed entry in this sample

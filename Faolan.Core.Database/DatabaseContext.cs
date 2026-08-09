@@ -37,10 +37,8 @@ namespace Faolan.Core.Database
 		DbSet<CharacterBuff> CharacterBuffs { get; }
 		DbSet<CharacterClientSettings> CharacterClientSettings { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
-		DbSet<CharacterEquipment> CharacterEquipment { get; }
 		DbSet<CharacterFeat> CharacterFeats { get; }
 		DbSet<CharacterFeatSpec> CharacterFeatSpecs { get; }
-		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterQuest> CharacterQuests { get; }
 		DbSet<CharacterQuestGoal> CharacterQuestGoals { get; }
 		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
@@ -65,6 +63,10 @@ namespace Faolan.Core.Database
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
 		DbSet<ClassAttributeBase> ClassAttributeBases { get; }
+		DbSet<ItemInstance> ItemInstances { get; }
+
+		DbSet<ItemInstanceSocket> ItemInstanceSockets { get; }
+
 		DbSet<ItemStatModifier> ItemStatModifiers { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
@@ -141,10 +143,8 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
 		public DbSet<CharacterClientSettings> CharacterClientSettings { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
-		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 		public DbSet<CharacterFeat> CharacterFeats { get; set; }
 		public DbSet<CharacterFeatSpec> CharacterFeatSpecs { get; set; }
-		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
 		public DbSet<CharacterQuestGoal> CharacterQuestGoals { get; set; }
 		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
@@ -169,6 +169,10 @@ namespace Faolan.Core.Database
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<ClassAttributeBase> ClassAttributeBases { get; set; }
+		public DbSet<ItemInstance> ItemInstances { get; set; }
+
+		public DbSet<ItemInstanceSocket> ItemInstanceSockets { get; set; }
+
 		public DbSet<ItemStatModifier> ItemStatModifiers { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
@@ -395,7 +399,27 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).OnDelete(DeleteBehavior.Cascade);
+			// An ITEM the character holds (#750) - worn and carried alike. It dies with the character (nobody else can
+			// reach it), its template is Restrict (a catalog item cannot be deleted out from under a live item), and
+			// its sockets die with it: dropping a gemmed item drops its gems, which is the whole reason the socket
+			// contents live in their own table rather than being carried by hand through every move.
+			//
+			// ⚠️ The UNIQUE index is what enforces "one item per cell". Without it a lost UPDATE in a move/swap leaves
+			// two rows addressing one (owner, container, slot) and the snapshot renders whichever the query returns
+			// first - a duplicated item that looks like a render bug. A NULL owner is exempt by SQL's own rules (NULLs
+			// don't collide), which is exactly right for the not-in-a-character's-possession case the nullable owner
+			// is reserved for.
+			modelBuilder.Entity<Character>().HasMany(c => c.Items).WithOne(i => i.OwnerCharacter).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<ItemInstance>().HasOne(i => i.Template).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ItemInstance>().HasMany(i => i.Sockets).WithOne(s => s.ItemInstance).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<ItemInstanceSocket>().HasOne(s => s.Gem).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ItemInstance>().HasIndex(i => new
+			{
+				i.OwnerCharacterId,
+				i.Container,
+				i.Slot
+			}).IsUnique();
+
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);

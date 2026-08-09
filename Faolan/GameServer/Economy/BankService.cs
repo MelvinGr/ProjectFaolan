@@ -41,19 +41,19 @@ namespace Faolan.GameServer.Economy
 			_outbound = outbound;
 		}
 
-		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted CharacterInventory
-		// rows and re-sends it. Reuses the same path as the .ah bank tab open.
+		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted bank items and
+		// re-sends it. Reuses the same path as the .ah bank tab open.
 		public async Task ResendBank(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var bankRows = (await _database.GetCharacterInventory(characterId, ContainerKind.Bank)).ToList();
-			var bank = FullCharacterRoots.Container(ContainerKind.Bank, BankMaxSize, BankDisabledSlots, characterId, bankRows);
+			var stored = await _database.GetCharacterItems(characterId, ContainerKind.Bank);
+			var bank = FullCharacterRoots.Container(ContainerKind.Bank, BankMaxSize, BankDisabledSlots, characterId, stored);
 			await SendBank(client, bank);
 		}
 
 		// Sends the bank: a 0x201c slot registration per occupied cell, then the BankIIR content. The container is
-		// built from the character's CharacterInventory rows in the bank container (kind 105) via the proven
-		// snapshot item codec.
+		// built from the character's item instances in the bank container (kind 105) via the proven snapshot item
+		// codec.
 		public async Task SendBank(INetworkClient client, ProtoInventoryGame bank)
 		{
 			var charInstance = client.Session.Character.Id;
@@ -97,17 +97,13 @@ namespace Faolan.GameServer.Economy
 			if (sKind == ContainerKind.Bank && dKind == ContainerKind.Bag)
 			{
 				var dPos = move.DestinationItemPos;
-				var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bag, dPos);
-				if (row?.ItemId == null)
+				var withdrawn = await _database.GetCharacterItemSlot(character.Id, ContainerKind.Bag, dPos);
+				if (withdrawn == null)
 					return;
 
-				var item = await _database.GetItem(row.ItemId.Value);
-				if (item == null)
-					return;
-
-				var entry = SnapshotItems.ListEntry((ulong)dPos, FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, (ulong)dPos),
-						FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, (ulong)dPos), row.Count, item, AcgHash.ForWire(item.Id, item.Hash))
-					.Item;
+				// The SAME instance that was in the bank - a withdrawal is a move, so the live add names it by its own
+				// id and carries its crafter and its gems with it (#750).
+				var entry = SnapshotItems.ListEntry(withdrawn, FullCharacterRoots.ItemId(withdrawn.Id), FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, (ulong)dPos)).Item;
 				await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)dPos, entry);
 			}
 		}

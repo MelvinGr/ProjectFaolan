@@ -331,38 +331,17 @@ namespace Faolan.Importer.Captures
 			if (morphsApplied > 0 || resourcesRecovered > 0)
 				Console.WriteLine($"  {character.Name}: lifted {morphsApplied} morph slider(s) into CharacterBody and recovered {resourcesRecovered} appearance resource(s).");
 
-			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
-			var equipment = new CharacterEquipment
-			{
-				CharacterId = character.Id,
+			// The vanity shown-mask, lifted back out of the captured spawn's PreFrame. Without this every imported
+			// character came in at 0 (NO vanity shown) no matter what the capture held - the one piece of
+			// per-character vanity state the import silently dropped. NecroL80's login capture carries 0x000450A4
+			// (bits 2/5/7/12/14/18); the vanity-head/-chest dumps carry 0x04 and 0x20 respectively, which is what
+			// pinned the bit = base equip slot mapping in the first place (#336).
+			character.VanityShownMask = PlayerSpawnScaffoldRows.ReadVanityShownMask(scaffold);
 
-				// The vanity shown-mask, lifted back out of the captured spawn's PreFrame. Without this every
-				// imported character came in at 0 (NO vanity shown) no matter what the capture held - the one piece
-				// of per-character vanity state the import silently dropped. NecroL80's login capture carries
-				// 0x000450A4 (bits 2/5/7/12/14/18); the vanity-head/-chest dumps carry 0x04 and 0x20 respectively,
-				// which is what pinned the bit = base equip slot mapping in the first place (#336).
-				VanityShownMask = PlayerSpawnScaffoldRows.ReadVanityShownMask(scaffold)
-			};
-			var worn = 0;
-			foreach (var entry in message.InventoryEntries)
-			{
-				var item = await db.Items.FirstOrDefaultAsync(i => i.Id == entry.Item.Template1);
-				if (item == null)
-					continue;
+			var knownTemplates = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
 
-				// entry.Pos is a raw wire slot: the worn slots + vanity map to a column; the bag / out-of-range ids don't.
-				var slot = (CharacterEquipmentSlot)entry.Pos;
-				if (!Enum.IsDefined(slot))
-					continue;
-
-				equipment[slot] = item;
-				worn++;
-			}
-
-			db.CharacterEquipment.Add(equipment);
-
-			// Carried inventory (bag/resource/quest containers) from the capture's FullChar snapshot, when one
-			// was sent for this character's instance. Items not in the DB are skipped like the worn ones.
+			// The character's ITEMS, from the capture's FullChar snapshot when one was sent for this character's
+			// instance: all four containers, WORN INCLUDED (#750). Items not in the Items catalog are skipped.
 			var carried = 0;
 			var carriedTotal = 0;
 			var knownSpells = 0;
@@ -371,11 +350,11 @@ namespace Faolan.Importer.Captures
 			{
 				try
 				{
-					(carried, carriedTotal) = await ImportCarriedInventory(db, character.Id, snapshots);
+					(carried, carriedTotal) = await ImportCarriedInventory(db, character.Id, knownTemplates, snapshots);
 				}
 				catch (Exception e)
 				{
-					Console.WriteLine($"Character '{name}': carried-inventory import failed ({e.GetType().Name}: {e.Message}); worn equipment only.");
+					Console.WriteLine($"Character '{name}': inventory import failed ({e.GetType().Name}: {e.Message}); worn equipment only.");
 				}
 
 				// The character's SPELLBOOK is the snapshot's known-spell list (its actual learned set - EVERY rank,
@@ -401,6 +380,35 @@ namespace Faolan.Importer.Captures
 				{
 					Console.WriteLine($"Character '{name}': stat-block import failed ({e.GetType().Name}: {e.Message}).");
 				}
+			}
+
+			// Worn equipment from the SPAWN IIR - a FALLBACK that fills only the equip slots the snapshot did not
+			// describe. The snapshot's Equipped container is the better source and runs first: the spawn's worn
+			// entries carry the template and nothing else, while the snapshot's carry the stack count, the crafter
+			// and the SOCKETED GEMS. (The snapshot pass used to SKIP container 101 on the reasoning that "the spawn
+			// already provided the worn set" - which threw away the crafter and the gems of every worn item, and
+			// there was nowhere to put either until worn items became instances.)
+			var filled = db.ItemInstances.Local.Where(i => i.OwnerCharacterId == character.Id && i.Container == ContainerKind.Equipped).Select(i => i.Slot).ToHashSet();
+			var worn = filled.Count;
+			foreach (var entry in message.InventoryEntries)
+			{
+				if (!knownTemplates.Contains(entry.Item.Template1))
+					continue;
+
+				// entry.Pos is a raw wire slot: the worn slots + vanity map to a known slot; the bag / out-of-range
+				// ids don't.
+				var slot = (CharacterEquipmentSlot)entry.Pos;
+				if (!Enum.IsDefined(slot) || !filled.Add((int)slot))
+					continue;
+
+				db.ItemInstances.Add(new ItemInstance
+				{
+					OwnerCharacterId = character.Id,
+					Container = ContainerKind.Equipped,
+					Slot = (int)slot,
+					TemplateId = entry.Item.Template1
+				});
+				worn++;
 			}
 
 			await db.SaveChangesAsync();
@@ -503,10 +511,17 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// Parses the snapshot's ProtoFullCharacterIIR root and stores the Bag/Resource/Quest container entries
-		// as CharacterInventory rows (Container = the wire kind, Slot = pos, Count = stat 26). The Equipped
-		// container is intentionally ignored - the spawn IIR already provided the worn set.
-		private static async Task<(int Stored, int Total)> ImportCarriedInventory(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
+		// Parses the snapshot's ProtoFullCharacterIIR root and stores EVERY container's entries as item instances
+		// (Container = the wire kind, Slot = pos, Count = stat 26, plus the crafter and the socketed gems).
+		//
+		// ⚠️ The EQUIPPED container (101) is imported HERE, not from the spawn IIR. It used to be skipped on the
+		// reasoning that "the spawn IIR already provided the worn set" - and the spawn does give the worn TEMPLATES, but
+		// it carries no stack count, no creator_name and no slot_map. So skipping it threw away the crafter and the gems
+		// of every WORN item, and there was nowhere to put either until worn items became instances (#750). Every
+		// socketed-worn-item sighting in the corpus is in this container. The spawn is the FALLBACK for slots this does
+		// not cover; the caller runs it after this for exactly that reason.
+		private static async Task<(int Stored, int Total)> ImportCarriedInventory(DatabaseContext db, uint characterId, IReadOnlySet<uint> knownTemplates,
+			IReadOnlyList<byte[]> snapshotBodies)
 		{
 			// Largest snapshot first; analyzer-truncated ones (the TCP-reassembly gap) fail to split and the
 			// next-largest is tried instead.
@@ -529,38 +544,30 @@ namespace Faolan.Importer.Captures
 			if (root == null)
 				return (0, 0);
 
+			var unresolvedGems = new HashSet<uint>();
 			var stored = 0;
 			var total = 0;
 			foreach (var container in root.Inventories)
 			{
-				if ((ContainerKind)container.InventoryId.Type == ContainerKind.Equipped)
-					continue;
+				var kind = (ContainerKind)container.InventoryId.Type;
 
 				foreach (var entry in container.Items)
 				{
 					total++;
-					var templateId = entry.Item?.ItemData?.Template1 ?? 0;
-					if (templateId == 0 || !await db.Items.AnyAsync(i => i.Id == templateId))
+					if (CapturedItemInstances.From(entry, characterId, kind, knownTemplates, unresolvedGems) is not { } instance)
 						continue;
 
-					db.CharacterInventory.Add(new CharacterInventory
-					{
-						CharacterId = characterId,
-						Container = (ContainerKind)container.InventoryId.Type,
-						Slot = (int)entry.Pos,
-						ItemId = templateId,
-						Count = entry.Item!.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1,
-
-						// Player-crafted stacks carry their crafter in creator_name (field 5); everything else omits
-						// the field. Harvesting it is what makes the imported character's snapshot render retail's
-						// "Created by <name>" tooltip line after a relog, exactly as the capture did (#727).
-						// ShouldSerializeCreatorName means an ABSENT field reads back as "", so normalize to null.
-						CreatorName = string.IsNullOrEmpty(entry.Item!.CreatorName)
-							? null
-							: entry.Item!.CreatorName
-					});
+					db.ItemInstances.Add(instance);
 					stored++;
 				}
+			}
+
+			// Say it out loud rather than importing a gemmed item as gemless: a gem template the Items catalog does not
+			// hold is a CONTENT gap (the gem was only ever seen inside a socket), and the socket is dropped.
+			if (unresolvedGems.Count > 0)
+			{
+				Console.WriteLine(
+					$"  ⚠️  {unresolvedGems.Count} socketed GEM template(s) are missing from Items, so those sockets were dropped: {string.Join(", ", unresolvedGems.OrderBy(id => id))}");
 			}
 
 			return (stored, total);

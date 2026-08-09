@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
@@ -19,12 +20,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Capture-derived (conqueror); may be per-skeleton - see the call site.
 		private const uint DeathForcedAnimId = 41877;
 
-		// The player-spawn message for `character` (worn `equipment` applied). character == null returns the bare
+		// The player-spawn message for `character` (their `worn` item instances applied). character == null returns the bare
 		// render template (fixed constants + Strie's identity/looks fallbacks, no worn gear).
 		//
 		// `maxVitals` is the character's LIVE ceiling (the world entity's EntityVitals) - the current-side vitals
 		// fields carry it, and only the live value knows the character's gear. Ignored when `character` is null.
-		public static ProtoCoreCharacterIIR ForCharacter(Character character, CharacterEquipment equipment, CharacterMaxStats maxVitals = null!)
+		public static ProtoCoreCharacterIIR ForCharacter(Character character, IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>? worn, CharacterMaxStats maxVitals = null!)
 		{
 			var message = new ProtoCoreCharacterIIR
 			{
@@ -80,7 +81,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 
 			if (character != null)
-				ApplyCharacter(message, character, equipment, maxVitals);
+				ApplyCharacter(message, character, worn, maxVitals);
 
 			// GM Level: drive player_stats.gm_level from the account type (GM/Admin -> non-zero -> retail GM mode).
 			// Only set when non-zero so the bare template (character == null) and normal players don't serialize the
@@ -95,7 +96,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Overrides `message` in place from the character: name, identity (sex/race/level + cur==max vitals), editor
 		// looks, worn equipment, and the dead-state signals. Fields with no DB value (race/sex 0, no Body, no buildable
 		// gear) keep the template's captured value.
-		private static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, CharacterEquipment equipment, CharacterMaxStats maxVitals)
+		private static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>? worn, CharacterMaxStats maxVitals)
 		{
 			message.Name = character.Name;
 
@@ -176,7 +177,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 
 			// Replace the worn equipment with the character's own (when it has fully-buildable gear).
-			var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+			var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(worn);
 			if (wornEquipment.Count > 0)
 			{
 				message.InventoryEntries.Clear();

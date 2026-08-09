@@ -98,7 +98,7 @@ retail's. [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json 
 `TradeskillService` runs it: check every material first (a player one silver short must keep their copper), grant
 the product before consuming (a full bag refuses the craft with the materials still in hand), then take the
 materials and send the completion. The product carries the crafter through
-`CharacterInventory.CreatorName` — see [inventory.md](inventory.md).
+`ItemInstance.CreatorName` — see [inventory.md](inventory.md).
 
 Retail leaves ~5 s between the ack and the completion, a bar the client animates; we complete immediately.
 Refusals are **silent**, because retail has no failure form here and a completion over a craft that did not happen
