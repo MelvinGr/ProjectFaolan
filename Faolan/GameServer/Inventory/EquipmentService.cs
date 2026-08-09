@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Protobuf;
@@ -59,7 +60,11 @@ namespace Faolan.GameServer.Inventory
 		// in the bag is the one now worn - which is what gives #733 (the crafter on a worn item) and the socketed gems
 		// on worn gear their answer for free. `itemHandle` is the template the client says it dragged; it is checked
 		// against the source cell rather than used to build anything.
-		public async Task PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle, int fromBagSlot)
+		//
+		// Returns the instance IFF this equip BOUND it (#756), so the caller can send the stat-0 update; null when
+		// nothing bound - the item does not bind on equip, it was already bound, or the equip was not persisted at
+		// all. A returned value therefore always means "something changed that the client has not been told about".
+		public async Task<ItemInstance?> PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle, int fromBagSlot)
 		{
 			var character = client.Session.Character;
 
@@ -67,7 +72,7 @@ namespace Faolan.GameServer.Inventory
 			if (source == null || source.TemplateId != itemHandle)
 			{
 				_logger.LogInformation("Equip not persisted: bag[{BagSlot}] does not hold template {Handle} (captured-only entry or stale client state).", fromBagSlot, itemHandle);
-				return;
+				return null;
 			}
 
 			// A swap, when the target slot is already worn: the previously worn piece lands in the bag cell the newly
@@ -76,6 +81,19 @@ namespace Faolan.GameServer.Inventory
 
 			_logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", source.Template.Name, source.TemplateId, fromBagSlot, targetSlot,
 				character.Id);
+
+			// BIND ON EQUIP (#756). Wearing an item whose template carries the rule binds THIS copy to this character,
+			// permanently, and the server tells the client by re-sending the cell's stat 0 with bit 26 set. The caller
+			// sends it - this class is persistence only - which is why the outcome is returned rather than announced.
+			//
+			// A bind-on-PICKUP item needs nothing here: its template's own Flags word already carries the bit, so
+			// every copy is born bound and the emitters send it whatever this row says.
+			if (!source.Template.BindsOnEquip || source.Bound || !await _database.BindCharacterItem(source.Id))
+				return null;
+
+			_logger.LogInformation("BOUND on equip: {Name} ({Id}) is now bound to character {CharacterId}.", source.Template.Name, source.TemplateId, character.Id);
+
+			return source;
 		}
 
 		// Persists a within-inventory item move (MoveItemInInventory / ProtoMoveInventoryItemIIR) so bag slot

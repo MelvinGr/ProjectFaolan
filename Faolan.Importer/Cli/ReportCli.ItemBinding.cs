@@ -104,7 +104,7 @@ namespace Faolan.Importer.Cli
 
 			PrintPinned(properties, names);
 			PrintFlagsCensus(properties);
-			PrintEquipRuleCensus(properties, names);
+			PrintEquipRuleCensus(properties, names, items);
 			PrintWireFlags(captures, properties, names);
 		}
 
@@ -193,7 +193,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 		}
 
-		private static void PrintEquipRuleCensus(IReadOnlyDictionary<uint, ItemTemplateProperties.Table> properties, IReadOnlyDictionary<uint, string> names)
+		private static void PrintEquipRuleCensus(IReadOnlyDictionary<uint, ItemTemplateProperties.Table> properties, IReadOnlyDictionary<uint, string> names,
+			IReadOnlyList<Item> items)
 		{
 			int byMoreFlags = 0, byQualityAndCan = 0, both = 0, neither = 0;
 			foreach (var t in properties.Values)
@@ -222,6 +223,27 @@ namespace Faolan.Importer.Cli
 			var canBit = properties.Values.Count(t => (t.Value(CanField) & 0x04) != 0);
 			var quality = properties.Values.Count(t => t.Value(PowerLevelField) > 1);
 			Console.WriteLine($"  (of which: {canBit} carry Can bit 2 at all, {quality} carry PowerLevel > 1 - whichever is the RARER is the one doing the work)");
+			Console.WriteLine();
+
+			// ⚠️ The quality term. `Item.Quality` IS field 499, but it is filled by a LENIENT reader
+			// (RdbItemImporter.TryReadQualityAnywhere) that scans the whole record, while this report reads the head
+			// property table only - so where 499 sits past the display-name string the two disagree, and since
+			// `Quality > 1` is the clause that actually discriminates, a disagreement flips the binding answer.
+			// Production derives Item.BindsOnEquip from `Quality`, so that is the number that ships; this says how far
+			// apart they are rather than leaving two counts to be found later and mistaken for a regression.
+			var byQuality = items.Count(i => i.BindsOnEquip);
+			var byHeadTable = properties.Count(p => BindsOnEquip(p.Value));
+			Console.WriteLine($"  cross-check: {byQuality} bind on equip via Items.Quality (what SHIPS), {byHeadTable} via this report's head-table 499 - a gap of {byQuality - byHeadTable}.");
+			// Only disagreements that FLIP the predicate are interesting. Comparing the raw values instead reports 149
+			// templates, ~130 of them a NULL Quality against a head-table 0 - the same answer written two ways, which
+			// buries the 21 that actually change what binds.
+			var disagreeing = items
+				.Where(i => properties.TryGetValue(i.Id, out var t) && (uint?)i.Quality > 1 != t.Value(PowerLevelField) > 1)
+				.ToList();
+			Console.WriteLine($"    {disagreeing.Count} template(s) where the two readers disagree about `499 > 1`:");
+			foreach (var i in disagreeing.Take(10))
+				Console.WriteLine($"      {i.Id,-9} \"{i.Name}\"  Quality={(uint?)i.Quality} head-table 499={properties[i.Id].Value(PowerLevelField)}");
+
 			Console.WriteLine();
 
 			Console.WriteLine("  a sample of the templates the rule says bind on equip:");

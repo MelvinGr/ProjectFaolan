@@ -26,7 +26,11 @@ namespace Faolan.Importer.Rdb
 		// Property field 0 is the client's `Flags` word - the item's birth stat-0 value (#756). Bit 26 is BOUND, so a
 		// template carrying it mints items that are already bound: the client's "Binds when Picked Up".
 		private const uint FlagsPropertyField = 0;
-		private const uint BoundFlag = 1u << 26;
+
+		// The two fields the client's bind-on-EQUIP predicate reads besides the quality tier (field 499, which is
+		// already Item.Quality): 177 "More Flags" and 30 "Can". See Item.BindsOnEquip.
+		private const uint MoreFlagsPropertyField = 177;
+		private const uint CanPropertyField = 30;
 		private const uint MarkerItem = 1000000;
 
 		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
@@ -139,6 +143,7 @@ namespace Faolan.Importer.Rdb
 				statsAdded = 0,
 				bagsAdded = 0,
 				flagsAdded = 0,
+				bindFieldsAdded = 0,
 				weaponDamageAdded = 0;
 			var firstSampleShown = false;
 
@@ -204,6 +209,18 @@ namespace Faolan.Importer.Rdb
 				{
 					item.Flags = flags;
 					flagsAdded++;
+				}
+
+				// The other two fields the client's bind-on-EQUIP predicate reads, stored raw so Item.BindsOnEquip
+				// stays a derivation over template data rather than a conclusion frozen at import. Absent reads as 0,
+				// which is what the client's own getProp returns for a field a template does not carry.
+				var moreFlags = properties.Fields.GetValueOrDefault(MoreFlagsPropertyField);
+				var can = properties.Fields.GetValueOrDefault(CanPropertyField);
+				if (moreFlags != item.MoreFlags || can != item.Can)
+				{
+					item.MoreFlags = moreFlags;
+					item.Can = can;
+					bindFieldsAdded++;
 				}
 
 				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
@@ -317,18 +334,19 @@ namespace Faolan.Importer.Rdb
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
 			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0 ||
-			    flagsAdded > 0)
+			    flagsAdded > 0 || bindFieldsAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
 
-			if (flagsAdded > 0)
+			if (flagsAdded > 0 || bindFieldsAdded > 0)
 			{
-				// ⚠️ `i.Flags is { } f && ...`, NOT `(i.Flags & BoundFlag) != 0`: `Flags` is `uint?`, and a LIFTED
-				// `!= 0` is TRUE for null - so the short form counted all 61 items with no readable template as bound.
-				var bound = items.Count(i => i.Flags is { } f && (f & BoundFlag) != 0);
-				Console.WriteLine($"  Flags (field 0) set on {flagsAdded} item(s); {bound} of them are BOUND on pickup (bit 26, #756).");
+				// ⚠️ `BindsOnPickup` derives through `Flags is { } f && ...`, NOT `(i.Flags & Bit) != 0`: `Flags` is
+				// `uint?` and a LIFTED `!= 0` is TRUE for null, which counted all 61 items with no readable template
+				// as bound the first time this was written.
+				Console.WriteLine($"  Flags (field 0) set on {flagsAdded} item(s), MoreFlags/Can (177/30) on {bindFieldsAdded}; " +
+					$"{items.Count(i => i.BindsOnPickup)} bind on PICKUP, {items.Count(i => i.BindsOnEquip)} on EQUIP (#756).");
 			}
 
 			if (weaponDamageAdded > 0)

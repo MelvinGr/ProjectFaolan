@@ -313,9 +313,42 @@ also mean "unread". `SnapshotItems` sends it as stat 0 on both the snapshot entr
 to `1` only for the null case. The `flags = 1` default parameter that no caller ever passed is gone — the third
 time that exact shape shipped a wrong constant on this message.
 
-Not shipped yet: the per-INSTANCE half. An item that binds when EQUIPPED needs the server to set bit 26 on the
-equipped cell and re-send stat 0 (the message the capture above shows), and somewhere to persist that it has
-bound. `ItemInstance.Binding` was **deleted** rather than repurposed — the decode says the per-instance state is
-one bit, not the three-valued enum that column modelled — so the storage lands with the equip behaviour that
-needs it. Gated by `ItemFlagsTests`; measured by `--report item-binding`.
+Both rules are DERIVED from stored template data, never from a conclusion frozen at import:
+
+| | how | stored |
+|---|---|---|
+| `Item.BindsOnPickup` | `Flags` bit 26 | nothing — `Flags` already holds it, and that word must be sent verbatim anyway |
+| `Item.BindsOnEquip` | `MoreFlags & 0x20 \|\| (Quality > 1 && Can & 4)` | `MoreFlags` (field 177) and `Can` (field 30), raw |
+
+⚠️ A second `BindsOnPickup` **column** would be a copy of a bit `Flags` must keep regardless — two sources for one
+fact. A `[Flags]` enum over the pair was rejected for the same reason, and because the two are not exclusive:
+`Cloak of Hugin` satisfies both.
+
+⚠️ The quality term reads `Item.Quality`, not the head table's 499, and that is deliberate:
+`ItemTemplateProperties` is a *prefix* read and **25 templates carry 499 past the display-name string**, where only
+`TryReadQualityAnywhere`'s whole-record scan reaches it. Using the head table would silently stop those 25 binding
+(2,014 vs the 2,035 that ship). `--report item-binding` prints the gap.
+
+### The per-instance half
+
+`ItemInstance.Bound` is one **bit** — `ItemBindingType` was deleted rather than repurposed, because the decode says
+the state is binary and what varies between items is the RULE, not the state. Only bind-on-EQUIP needs it: a
+bind-on-pickup item's own template word already carries the bit, so every copy is born bound with nothing stored.
+
+`EquipmentService.PersistEquip` sets it and returns the instance when it changed; the listener answers with
+retail's own last message of the sequence, byte-exact:
+
+```
+00000065 110099bd 00000002 00000000 04000001     equipped(101) char slot 2, stat 0 = flags | bit 26
+```
+
+The bit reaches the wire through the **instance** overloads of `SnapshotItems.ListEntry` / `LiveAddEntry` only —
+a caller holding no instance (a loot bag, a vendor's wares) is describing an item nobody owns, which is never
+bound, so the two overloads differ by what they can *know* rather than by convenience.
+
+Binding is one-way: nothing in the corpus or the client's method table unbinds an item, and the client has a
+separate `CanNotBeUnbound` token implying unbinding exists for some items, so clearing it is left alone rather
+than guessed at. Not enforced yet either — a bound item can still be traded, mailed and AH-sold (Gitea #756).
+
+Gated by `ItemFlagsTests`; measured by `--report item-binding`.
 

@@ -856,6 +856,14 @@ namespace Faolan.GameServer
 			await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, receiver, 0x00000068, 0x00000001, ticketBase + 4);
 		}
 
+		// The item at `slot` has BOUND to its owner: re-send that cell's Flags word (stat 0) with bit 26 set (#756).
+		// Retail sends it as the last message of an equip that binds, after the two 0x17 slot registrations.
+		private Task SendItemBound(INetworkClient client, CharacterEquipmentSlot slot, ItemInstance instance)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), SetItemStatCodec.Method,
+				SetItemStatCodec.Build(SetItemStats.Bound(ContainerKind.Equipped, client.Session.Character.Id, (uint)slot, instance.Template.WireFlags))));
+		}
+
 		private static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceMethods.DispatchSetItemStat,

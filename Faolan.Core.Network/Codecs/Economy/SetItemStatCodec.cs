@@ -70,5 +70,19 @@ namespace Faolan.Core.Network.Codecs.Economy
 		{
 			return new SetItemStat(ContainerKind.Bank, charInstance, slot, statId, value);
 		}
+
+		// The item BOUND to its owner (#756): the cell's `Flags` word (stat 0) re-sent with bit 26 set. Retail's own
+		// last message of an equip that binds - the stat id is 0, which is why this is a factory rather than a
+		// BankSlot call with a 0 passed in: "stat zero" reads as a missing argument, and the WORD is the message.
+		// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:47:00.842 - equipped(101) slot 2,
+		//  stat 0 = 0x04000001, on an item that had arrived in the bag at 0x00000001]
+		public static SetItemStat Bound(ContainerKind container, uint charInstance, uint slot, uint flags)
+		{
+			return new SetItemStat(container, charInstance, slot, FlagsStat, flags | BoundFlag);
+		}
+
+		// stat 0 is the entry's `Flags` word; bit 26 is "bound to whoever holds it".
+		private const uint FlagsStat = 0;
+		private const uint BoundFlag = 1u << 26;
 	}
 }

@@ -56,6 +56,27 @@ namespace Faolan.Core.Database.Tables
 		// Stack size (1 for non-stackable gear).
 		public uint Count { get; set; } = 1;
 
+		// Whether this instance has BOUND to its owner - the per-instance half of #756, and deliberately one BIT.
+		//
+		// On the wire it is bit 26 of the entry's `Flags` stat (stat 0), OR-ed onto the template's own `Item.Flags`
+		// word by the emitters. There is no enum here on purpose: `ItemBindingType` used to be a three-valued column
+		// and the decode says the state is binary - what VARIES between items is the RULE (per-template), not the
+		// state.
+		//
+		// Two ways it becomes true, and only one of them is stored:
+		//   * BIND ON PICKUP  the TEMPLATE's own Flags already carries bit 26, so every copy is born bound. Nothing is
+		//                     stored - `Item.Flags` says it, and the emitters send that word whatever this column is.
+		//   * BIND ON EQUIP   the item binds the first time it is worn (`Item.BindsOnEquip`). That is a change to THIS
+		//                     copy and nothing in the template records it, so it is stored here.
+		//
+		// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:46:44 and 09:47:00 - the same item's
+		//  stat 0 goes 0x00000001 in the bag to 0x04000001 in the equip slot, with the player narrating both]
+		//
+		// It is one-way: nothing in the corpus or the client's method table unbinds an item, and the client has a
+		// `CanNotBeUnbound` tooltip token implying unbinding exists for SOME items, so clearing it is left alone
+		// rather than guessed at.
+		public bool Bound { get; set; }
+
 		// The name of the player who CRAFTED this item, or null when it was not player-made - the client's
 		// "Created by <name>" tooltip line, carried on the wire as ProtoInventoryGameEntry.creator_name (field 5, a
 		// plain Latin1 string) and NOT as a stat. #727 predicted the carrier was the ItemOrigin stat (0x554) holding

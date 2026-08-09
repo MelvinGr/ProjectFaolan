@@ -427,9 +427,11 @@ namespace Faolan.GameServer
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
 			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
-			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(delivered.Id),
-				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), creatorName: delivered.CreatorName,
-				sockets: delivered.Sockets);
+			// The INSTANCE overload: a hand-over can carry an item that has already BOUND to its previous owner, and
+			// only the row knows that. Spreading it back into loose scalars is how the crafter and the sockets got
+			// lost before #750, and the bound bit would have been the next one.
+			var entry = SnapshotItems.LiveAddEntry(delivered, FullCharacterRoots.ItemId(delivered.Id),
+				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value));
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
 			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got

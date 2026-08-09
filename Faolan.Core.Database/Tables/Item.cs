@@ -84,6 +84,63 @@ namespace Faolan.Core.Database.Tables
 		// template said zero.
 		public uint? Flags { get; set; }
 
+		// The two other template property fields the client's binding rules read - stored RAW, exactly like `Flags`,
+		// so both rules stay derived from what the template says rather than from a conclusion we drew at import.
+		//
+		//   177  "More Flags"   bit 5 alone makes an item bind on equip
+		//    30  "Can"          bit 2, gated by Quality (field 499) being better than 1
+		//
+		// ⚠️ Non-nullable, unlike `Flags`, and for a reason rather than by omission: the client's `getProp` returns 0
+		// for a field the template does not carry, so 0 IS the client's answer for absent and there is nothing to
+		// distinguish. `Flags` is nullable only because its absent case falls back to 1 rather than to 0.
+		public uint MoreFlags { get; set; }
+
+		public uint Can { get; set; }
+
+		// Whether wearing this item BINDS it to the character - the client's own predicate, transcribed from
+		// `ItemInfoView`'s FUN_014d51a0 (#756):
+		//
+		//     MoreFlags(177) & 0x20  ||  (PowerLevel(499) > 1 && Can(30) & 0x04)
+		//
+		// 2,014 of the 4,741 readable templates satisfy it. The MoreFlags clause fires on none of them today, and
+		// within the other the `Can` bit is near-universal (3,854 templates) so `Quality > 1` is what actually
+		// discriminates - the rule is "better than Common, and flagged equippable".
+		//
+		// `Quality` IS field 499 (its enum values are the field's own 0-indexed tiers), which is why the rule reads it
+		// here instead of a fourth raw column - and it is also the BETTER reader for it. `ItemTemplateProperties`, which
+		// fills MoreFlags/Can, only walks the property table's head; 25 templates carry 499 beyond the display-name
+		// string where only Quality's lenient whole-record scan reaches it, and since `Quality > 1` is the clause that
+		// discriminates, those 25 would otherwise silently stop binding. `--report item-binding` prints the gap
+		// (2,035 via Quality vs 2,014 via the head table) so it stays a number rather than a mystery.
+		[NotMapped]
+		public bool BindsOnEquip => (MoreFlags & 0x20) != 0 || ((uint?)Quality > 1 && (Can & 0x04) != 0);
+
+		// Whether this item binds the moment it is acquired - the client's `FUN_014d5210`, which is bit 26 of the
+		// template's own `Flags` word. It mints BOUND: every copy carries the bit from the moment it exists, which is
+		// what "Binds when Picked Up" means.
+		//
+		// ⚠️ `Flags is { } f`, not `(Flags & Bit) != 0`: a LIFTED `!= 0` over a `uint?` is TRUE for null, so the short
+		// form would call every item with no readable template bound.
+		[NotMapped]
+		public bool BindsOnPickup => Flags is { } f && (f & BoundOnTheWire) != 0;
+
+		// The `Flags` word to put on the wire for a copy of this template that has not bound - i.e. `Flags` with the
+		// unknown-template case resolved. NULL means no RDB template was readable (61 of the shipped rows), and the
+		// fallback is 1: what every item shipped before #756, and the one bit 4,676 of the 4,741 readable templates
+		// carry. It is NOT a decoded default - an item that reaches it renders unbound whatever its template says.
+		//
+		// Here rather than at each emitter because there are two of them (the snapshot entry and the live add) plus
+		// the bind message, and a bare `?? 1` repeated three times is how they stop agreeing.
+		[NotMapped]
+		public uint WireFlags => Flags ?? UnreadTemplateFlags;
+
+		private const uint UnreadTemplateFlags = 1;
+
+		// Bit 26 of the entry's `Flags` stat (stat 0) - "this item is bound to whoever holds it". The client tests it
+		// with `vt+0xA0(0x04000000)` before printing "Character Bound"; the server sets it on the equipped cell when a
+		// bind-on-equip item goes on. One name for it, shared by the template's word and the instance's.
+		public const uint BoundOnTheWire = 1u << 26;
+
 		public int? MaxDamage { get; set; }
 
 		// The weapon's inherent MIN/MAX damage - RDB item-template property fields 286 (0x11E) / 285 (0x11D), decoded

@@ -32,6 +32,12 @@ namespace Faolan.Core.Rdb
 	// words `0x7E2` and `0xBD3` at three different byte alignments (CLAUDE.md: there is no such thing as a
 	// `0x7E2` constant). Stopping at the string removes all of them.
 	//
+	// ⚠️ **This is a PREFIX read, not the whole record.** Stopping at the name is what keeps the walk honest, but it
+	// also means a field that sits BEYOND the name is invisible here: 25 templates carry field 499 (the quality tier)
+	// past it, which `RdbItemImporter.TryReadQualityAnywhere` does find. So this is the right reader for the fields
+	// that live in the head runs (0 `Flags`, 30 `Can`, 177 `More Flags`) and the WRONG one to reach for when a lenient
+	// whole-record scan already exists. `--report item-binding` prints the disagreement rather than hiding it.
+	//
 	// Field ids ARE wire stat ids (see docs/rdb/item-template-stats.md), so the client's own name table names them:
 	// 0 `Flags`, 30 `Can`, 177 `More Flags`, 499 `Power Level`, 54 the item level, 21 the display name.
 	public static class ItemTemplateProperties

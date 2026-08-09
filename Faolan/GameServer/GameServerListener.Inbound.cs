@@ -2570,9 +2570,10 @@ namespace Faolan.GameServer
 					var movedItem = equipHandle != 0
 						? await Database.GetItem(equipHandle)
 						: null;
+					ItemInstance? justBound = null;
 					if (equipHandle != 0)
 					{
-						await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
+						justBound = await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
 						// What is WORN changed, so the live gear aggregate is stale - see RefreshGearBonuses.
 						await RefreshGearBonuses(client);
 					}
@@ -2582,6 +2583,14 @@ namespace Faolan.GameServer
 					await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
 					await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), 0x00000065, target,
 						0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+
+					// ...and, when this equip BOUND the item, the cell's Flags word again with bit 26 set (#756). This
+					// is retail's own last message of the sequence:
+					//   [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:47:00.842 - after the two
+					//    0x17 slot registrations, equipped(101) slot 2 stat 0 = 0x04000001, where the same item had
+					//    arrived in the bag at 0x00000001 twelve seconds earlier]
+					if (justBound != null)
+						await SendItemBound(client, targetSlot, justBound);
 
 					break;
 				}

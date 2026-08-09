@@ -24,7 +24,16 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// there is no measured word to send. `1` is the value every item shipped before #756 and the one bit 4,676 of
 		// the 4,741 readable templates carry, so it is the least-wrong fallback; it is NOT a decoded default, and an
 		// item that reaches it renders as unbound whatever its template would have said.
-		private const uint DefaultFlags = 1;
+		// The `Flags` word to send for one item: the TEMPLATE's own word (`Item.WireFlags`, which resolves the
+		// unreadable-template case), plus bit 26 when this particular copy has bound to its owner (#756). Both halves
+		// in one place, because they are one wire field - the template says "every copy of me is born bound" (bind on
+		// pickup) and the instance says "this copy bound when it was worn".
+		private static uint WireFlags(Item item, bool bound)
+		{
+			return item.WireFlags | (bound
+				? Item.BoundOnTheWire
+				: 0u);
+		}
 
 		// Builds the bare per-item entry (ProtoInventoryGameEntry, i.e. InventoryListEntry.item without the Pos
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
@@ -120,8 +129,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// land with the equip behaviour that needs it.
 		//
 		// A NULL `Item.Flags` means no template was readable for that item (61 of the shipped rows), NOT that the
-		// template said zero - 65 templates genuinely carry 0, which is why the column is nullable. Those fall back
-		// to DefaultFlags.
+		// template said zero - 65 templates genuinely carry 0, which is why the column is nullable. `Item.WireFlags`
+		// is where that fallback lives.
 		//
 		// That triple is the SNAPSHOT's shape and it is a good match for retail's: of 8,479 captured snapshot
 		// entries, 100% carry StaticInstance(0x17), 95% Flags(0x00) and 93% StackSize(0x1A), and the rest of the
@@ -130,10 +139,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash,
 			string? creatorName = null, IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
+			return ListEntry(slot, itemId, recordId, count, item, hash, false, creatorName, sockets);
+		}
+
+		// The full form. `bound` is the per-INSTANCE half and is why the loose overload above cannot answer it: a
+		// caller holding no instance (a loot bag, a vendor's wares, a test) is describing an item nobody owns, which
+		// is never bound - so the two overloads differ by what they can KNOW, not by convenience.
+		private static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, bool bound,
+			string? creatorName, IEnumerable<ItemInstanceSocket>? sockets)
+		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, item.Flags ?? DefaultFlags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], creatorName, sockets)
+				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, WireFlags(item, bound)), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], creatorName, sockets)
 			};
 		}
 
@@ -143,7 +161,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static ProtoInventoryGame.InventoryListEntry ListEntry(ItemInstance instance, ulong itemId, ulong recordId)
 		{
 			return ListEntry((ulong)instance.Slot, itemId, recordId, instance.Count, instance.Template, AcgHash.ForWire(instance.TemplateId, instance.Template.Hash),
-				creatorName: instance.CreatorName, sockets: instance.Sockets);
+				instance.Bound, instance.CreatorName, instance.Sockets);
 		}
 
 		// The LIVE DispatchAddItem (0x2020) form - a different stat list from the snapshot's, which is why it is its
@@ -174,12 +192,18 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// (1,2,5,7,13,15,16,19) and guessing is worse than omitting - a wrong provenance is a false claim, a missing
 		// one is a gap. Decoding it needs each add correlated with the c2s action that produced it; grouping by
 		// capture is too coarse, since values 2, 7 and 15 all appear within the same sessions. Tracked separately.
-		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, string? creatorName = null,
+		public static ProtoInventoryGameEntry LiveAddEntry(ItemInstance instance, ulong itemId, ulong recordId)
+		{
+			return LiveAddEntry(itemId, recordId, instance.Count, instance.Template, AcgHash.ForWire(instance.TemplateId, instance.Template.Hash), instance.Bound,
+				instance.CreatorName, instance.Sockets);
+		}
+
+		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, bool bound = false, string? creatorName = null,
 			IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
 			return InventoryEntry(itemId, item, hash,
 			[
-				new ItemStat(0, item.Flags ?? DefaultFlags),
+				new ItemStat(0, WireFlags(item, bound)),
 				new ItemStat((uint)CharacterStatId.Duration, NoExpiry),
 				new ItemStat(23, (uint)recordId),
 				new ItemStat(26, (uint)count)

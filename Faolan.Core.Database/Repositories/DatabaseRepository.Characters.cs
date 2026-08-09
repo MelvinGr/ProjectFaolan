@@ -137,6 +137,17 @@ namespace Faolan.Core.Database.Repositories
 		/// </summary>
 		Task<bool> MoveCharacterItem(uint characterId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot);
 
+		/// <summary>
+		///     Marks one item instance BOUND to whoever holds it (#756) - the per-instance half of binding, set when a
+		///     bind-on-equip item is first worn. Returns false when the instance is gone or was already bound, so the
+		///     caller only announces a change that happened.
+		///     <para>
+		///         The RULE ("does this template bind on equip") is NOT decided here: that is <c>Item.BindsOnEquip</c>,
+		///         and the caller applies it. This only persists the outcome.
+		///     </para>
+		/// </summary>
+		Task<bool> BindCharacterItem(uint itemInstanceId);
+
 		/// <summary>Sets an existing stack's size. Returns false when the cell is empty.</summary>
 		Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count);
 
@@ -997,6 +1008,13 @@ namespace Faolan.Core.Database.Repositories
 			};
 			ctx.ItemInstances.Add(minted);
 			await ctx.SaveChangesAsync();
+
+			// Load the Template the caller is going to need. Lazy loading is deliberately OFF, so a freshly minted
+			// instance comes back with a null navigation while its sibling TransferCharacterItem Includes it - and
+			// both feed the SAME live-add emitter, so the grant path would NRE on exactly the code path the hand-over
+			// path exercises safely. Explicit load, per the DB conventions.
+			await ctx.Entry(minted).Reference(i => i.Template).LoadAsync();
+
 			return minted;
 		}
 
@@ -1011,6 +1029,19 @@ namespace Faolan.Core.Database.Repositories
 		// So the destination's occupant is PARKED at a slot no real cell uses, then the source moves in, then the parked
 		// row takes the source's old cell - three statements, inside ONE transaction so a failure between them cannot
 		// strand an item at the parking slot.
+		public async Task<bool> BindCharacterItem(uint itemInstanceId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var instance = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.Id == itemInstanceId);
+			if (instance == null || instance.Bound)
+				return false;
+
+			instance.Bound = true;
+			await ctx.SaveChangesAsync();
+
+			return true;
+		}
+
 		public async Task<bool> MoveCharacterItem(uint characterId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot)
 		{
 			if (from == to && fromSlot == toSlot)
