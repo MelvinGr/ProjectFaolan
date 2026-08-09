@@ -6,16 +6,47 @@ granted" — is **wrong in its second half**, and that mistake is why nothing on
 
 ## The corpus says retail sends no recast, ever
 
-Every `GameActionListIIR` (`0xF508F4C1`) body in the corpus was parsed and its element type ids tallied against
-the recovered catalog (`docs/re/gameaction_types.json`, 68 types):
+Every packet body in all **132** dumps was swept for the GameActionData element signature — a u32be inside the
+client's asserted type range (`0xCF09`..`0xD026`, `GameActionTypeId`) with the version word `4` exactly 8 bytes
+later. Anchoring on the signature rather than on the `GameActionListIIR` framing means an element nested as a
+**sub-record** is counted too, which the earlier framing-based tally could not see:
 
-> **1745 GameActionList packets across 101 captures carry exactly 5 distinct types** — `Hit` (38),
-> `TimedEffect` (18), `BCCCastSpell` (15), `SpawnRemotePet` (9), `TeamFormula` (5).
+> **2,095 elements across 15 distinct type ids**, every one of them inside a `0xF508F4C1` body, every one s2c —
+> `CastNano` (967), `VisualLocation` (541), `StartParticleEffect` (290), `StartClientSideScryScriptWithParams`
+> (61), `AttractorMesh` (50), `SetIdleBaseAnim` (40), `BindAtLocation` (38), `StopScryScript` (21),
+> `CameraRoll` (18), `SetTradingPostAccess` (18), `SendScryEvent` (15), `StartServerSideScryScript` (13),
+> `StartServerSideScryScriptWithParams` (12), `StartClientSideScryScript` (10), `CameraShake` (1).
 
-None of the six recast/cooldown types (`ChangeRecastTime` `0xCF81`, `ChangeLineRecastTime` `0xD019`,
-`SetSpellRecastTime`, `SetSpellLineRecastTime`, `ModifyTemplateCooldown`, `ModifySpellLineCooldown`) appears.
-So the recast is **not** something the retail server pushes on a cast, and `SpellRecastActions` staying
-construct-only is correct.
+**None of the four recast types appears, under either numbering** (see the catalog warning below). So the recast
+is **not** something the retail server pushes on a cast. The sub-record blind spot was checked precisely because
+it would have been the obvious place for the carrier to hide; it is not there either.
+
+### ⚠️ `gameaction_types.json`'s `typeId` column is NOT the wire value
+
+The earlier reading of this sweep — *"1745 packets carry exactly 5 distinct types: `Hit` (38), `TimedEffect`
+(18), `BCCCastSpell` (15), `SpawnRemotePet` (9), `TeamFormula` (5)"* — is an artifact of resolving observed ids
+through `docs/re/gameaction_types.json`, which holds 68 types and whose `typeId` is a **step-4 sequence**
+(53005, 53009, 53013…) rather than the contiguous enum the wire carries. Only 5 of the 15 observed ids happened
+to land on an entry, and those 5 landed on the *wrong* entry.
+
+**The wire numbering is `docs/re/gameaction-type-ids.tsv`** (contiguous: 53002 `Hit`, 53003
+`AddLayeredSkinnedMesh`, …). The corpus anchors it: our capture-verified travel action is `0xD00D` and carries a
+`ScriptParams` string (`xpos=..;PlayFieldID=..;Local=1`), which is `StartServerSideScryScriptWithParams` — the
+tsv's name for `0xD00D`. The json calls it `TeamFormula`. The tsv reading also produces a coherent corpus
+(a `CastNano` on nearly every spell effect, a Scry-script family, camera actions); the json reading does not.
+
+This is not academic. `SpellRecastActions` took its ids from the json, so `ChangeRecastTimeType` was `0xCF81` —
+which the real catalog names **`Feared`**. The builder was construct-only, which is the only reason a fear was
+never sent in place of a cooldown. Pinned by `SpellRecastActionsTests.RecastTypeIds_AreTheWireEnum_NotTheStepFourSequence`.
+
+The four recast types, with the key order `Build` writes (`docs/re/gameaction-keylists.tsv`):
+
+| type | wire id | keyList order |
+|---|---|---|
+| `SetSpellRecastTime` | `0xCFEA` | `0x463` spell, `0x2F9` recast |
+| `SetSpellLineRecastTime` | `0xCF55` | `0x2D3` line, `0x2F9` recast |
+| `ChangeRecastTime` | `0xCF27` | `0x4C3` spell, `0x2F9` delta |
+| `ChangeLineRecastTime` | `0xCF4D` | `0x2D3` line, `0x2F9` delta |
 
 ## The client's own cast path arms only CONSTANTS
 
@@ -31,7 +62,7 @@ per-spell data:
 `FUN_007d7ee0` also walks the caster's other spells and arms the same value on every one sharing a line
 (`FUN_005eed00` equality) — i.e. this is the shared GCD, not a spell's own recast.
 
-## The per-spell recast timer has exactly two entry points, and both are server GameActions
+## The per-spell recast timer has exactly two entry points, and both are GameAction handlers
 
 `FUN_007e1080` is the only per-spell arm — its debug channel is `GameCode/Magic/Recast` and it logs
 `"Setting recast timer on spell: <id> For player: <p> to: <cs>"`, then applies `value * 0.01` seconds. Its only
@@ -198,28 +229,48 @@ below — it just gates nothing. The group is the spell's GUI stacking line wher
 ranks share the 4 s), the spell id otherwise; armed when the spell goes off, so an interrupted cast costs nothing,
 and a relog re-arms nothing.
 
-## What is still open
+## The cooldown never worked for ANY spell — and the "working" spells were a buff (#767)
 
-⚠️ **The live bug: the client's cooldown does not display for many spells (#767).** Per-spell and consistent —
-Flesh to Worms (R5), Gangrenous Stench, Freeze (R2), Tome of Epithur, Ghoulish Feast (R3) and Quell the Ether (R5)
-show a cooldown and cannot be spammed; Chill (R5), Lifestrike (R5), Life Leech, Gelid Bones (R5), Ancient Soul,
-Dread Archmage and Cannibalism show nothing and can be.
+The reported symptom was per-spell and looked unexplainable: Flesh to Worms (R5), Gangrenous Stench, Freeze (R2),
+Tome of Epithur, Ghoulish Feast (R3) and Quell the Ether (R5) showed a cooldown and could not be spammed; Chill
+(R5), Lifestrike (R5), Life Leech, Gelid Bones (R5), Ancient Soul, Dread Archmage and Cannibalism showed nothing
+and could be. Six readings were tested and falsified against it (over-attribution from `SetSpellLineRecastTime`;
+"needs a direct `SetSpellRecastTime`"; "direct AND non-zero line"; the bar casting a different id; line
+membership; spell-id magnitude).
 
-**Our data is not the problem.** `SpellRecastTests.ObservedTooltips` carries values transcribed from RETAIL
-TOOLTIPS on a level-80 necromancer, and three of the failing spells are in it: Chill (R5) 4 s, Lifestrike (R5)
-12 s, Life Leech 30 s. Retail shows a cooldown for exactly the spells our client does not, on the same numbers.
+**The split is `Spells.DurationMs`, and it is total: all six working have `DurationMs > 0`, all seven failing
+have `DurationMs == 0`.** That is a BUFF column, not a cooldown one — so the six were never on cooldown. They
+have a buff sitting on them: `ApplySpell` sends a `MagicBuffIIR` carrying a real duration, the client renders it
+and will not re-cast a spell whose own effect is up. A `DurationMs == 0` spell gets a duration-0 `MagicBuffIIR`,
+which #371 established is an INSTANT — no icon, untracked — so nothing blocks it. The two spells that break every
+*other* pattern fall out of this one: **Dread Archmage** has `DurationMs 0` but `EffectSpell 1366143` (4 h), so
+the buff we send is a *different id* from the bar button and blocks nothing; **Ancient Soul** resolves as a pet
+summon and returns before `ApplySpell` is reached at all.
 
-Six readings have been tested and falsified: over-attribution from `SetSpellLineRecastTime`; "needs a direct
-`SetSpellRecastTime`" (Tome of Epithur works without one, Ancient Soul fails with one); "direct AND non-zero
-line"; the bar casting a different id (it does not); line membership; and spell-id magnitude (144673 fails,
-144677 works). The next probe is a packet-for-packet diff of a working cast against a failing one, and
-`SpellRecastActions.ChangeRecastTime` — already built and round-trip tested, never sent by anything — is the
-leading suspect for the missing signal.
+So the recast had never worked for any spell, and there was no per-spell mystery to solve.
 
-Whether the CLIENT gates too. Retail never sends a recast GameAction and the client's cast path arms only the GCD
-constants, so the client must read this same base locally at cast time — the elements are right there on the spell
-object, and the only per-spell arm (`FUN_007e1080`) is reachable from the `SetSpellRecastTime` handler, which is
-exactly the element type the record carries. That is a coherent account, and it is now the leading one, but the
-local call site has not been pinned. It changes nothing server-side: the gate above does not depend on it.
+**The data was never the problem.** `RecastCentiseconds` is filled for 3,710 spells; measured against every
+recast element in the RDB (3,279 spells' worth, direct + line inheritance), exactly **3** are unfilled and one of
+those carries `cs = 0`. Life Leech holds 3000 cs = the 30 s its in-client tooltip renders.
 
-Open work tracked in Gitea #271.
+**The problem was that the number never left the server.** `RecastCentiseconds` occurred in four non-comment
+places, all in `HandleBccCastSpell`, all writing `Session.SpellReadyAt` — a server-side dictionary. Nothing wrote
+it to a packet.
+
+### The fix
+
+`SendRecastArm` (`GameServerListener.Combat.cs`) sends a `SetSpellRecastTime` / `SetSpellLineRecastTime` element
+in a `GameActionListIIR`, from the site in `Resolve()` that already arms the server's own timer — so it is
+uniform by construction: every spell with a recast, buff or no buff. Line-scoped where the spell has a
+`GuiStackingLine` (all five Chill ranks share one timer), per-spell otherwise, matching the server's own
+`recastGroup`. The value sent is what REMAINS after the cast time, because the server measures the recast from
+the cast BEGIN while the client starts counting on receipt.
+
+⚠️ **This is not captured behaviour.** Retail sends no recast GameAction at all, so the client must normally arm
+this locally from the spell's own RDB element — the elements are on the spell object, and the only per-spell arm
+(`FUN_007e1080`) is reachable from the `SetSpellRecastTime` handler, which is exactly the element type the record
+carries. That local call site is **not pinned**. Driving the same handler from the wire delivers the element the
+client would have applied to itself, carrying a value it already agrees with (its own tooltip). If the local arm
+is later found to hang off a signal we already send, this becomes redundant rather than wrong.
+
+Open work tracked in Gitea #271 / #767.
