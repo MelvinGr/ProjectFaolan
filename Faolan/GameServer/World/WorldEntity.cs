@@ -770,18 +770,26 @@ namespace Faolan.GameServer.World
 		// For a PATROLLER the route is territory too: a captured route can run hundreds of units, so an anchor past the
 		// leash is a legitimate destination, not a player dragging it. Without this the #266 wander and the leash fight
 		// each other - the wander assigns a far anchor, the next tick reads it as "led too far from spawn" and walks the
-		// NPC straight back off its own route, every cycle. Only a position far from spawn AND from every anchor is a
+		// NPC straight back off its own route, every cycle. Only a position far from spawn AND from the route itself is a
 		// real stray, so a dragged patroller still leashes.
+		//
+		// #716: "the route" is the POLYLINE, not its vertices. Measuring to the waypoints alone leaves the MIDDLE of a
+		// long leg outside the NPC's own territory - and the walk goes straight down that middle. Over the 1,073 stored
+		// beats that put 28 of them (all map 2070, 22 being the single-leg animal wanders whose one leg runs up to 228u)
+		// permanently in leash-return: the walker sets off, escapes its territory ~40u out, turns round, streams the walk
+		// home as ~6u chase segments, rejoins at the nearest waypoint and starts over - so it never once reached the far
+		// end of its beat, and paid MoveTask traffic for the ping-pong.
 		public bool BeyondLeash(float homeDistance, float leash)
 		{
 			if (homeDistance <= leash)
 				return false; // inside the leash of its spawn: nothing a route could add
 
-			foreach (var waypoint in PatrolWaypoints)
+			var here = new Vector3(Position.X, 0f, Position.Z); // horizontal, like homeDistance
+			for (var i = 0; i < PatrolWaypoints.Count; i++)
 			{
-				var dx = waypoint.X - Position.X;
-				var dz = waypoint.Z - Position.Z;
-				if (dx * dx + dz * dz <= leash * leash)
+				var to = new Vector3(PatrolWaypoints[i].X, 0f, PatrolWaypoints[i].Z);
+				var from = i == 0 ? to : new Vector3(PatrolWaypoints[i - 1].X, 0f, PatrolWaypoints[i - 1].Z);
+				if (DistanceToSegment(from, to, here) <= leash)
 					return false;
 			}
 
@@ -1074,6 +1082,19 @@ namespace Faolan.GameServer.World
 				Vitals = vitals!,
 				NpcTemplateId = templateId
 			};
+		}
+
+		// Distance from `p` to the SEGMENT a->b (not to the infinite line, and not merely to its ends). A degenerate
+		// segment (a == b - the first waypoint's self-segment) falls out as the point distance.
+		private static float DistanceToSegment(Vector3 a, Vector3 b, Vector3 p)
+		{
+			var ab = b - a;
+			var lengthSquared = ab.LengthSquared();
+			if (lengthSquared < 1e-6f)
+				return Vector3.Distance(a, p);
+
+			var t = Math.Clamp(Vector3.Dot(p - a, ab) / lengthSquared, 0f, 1f);
+			return Vector3.Distance(a + ab * t, p);
 		}
 	}
 

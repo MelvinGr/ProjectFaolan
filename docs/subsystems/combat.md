@@ -527,6 +527,13 @@ origin->this-tick position, facing travel direction) so nearby viewers watch it 
 spawn it disengages, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival; losing
 the target out in the field also sends it home. WORKS in-client (it moves + leashes + stops on de-aggro).
 
+A **patroller's** territory is its spawn *plus its whole beat* (`WorldEntity.BeyondLeash`), measured to the
+route's **polyline** rather than to its waypoints — the walk goes down the middle of each leg, and a sparsely
+sampled beat (the single-leg animal wanders on map 2070 run up to 228u end to end) has its entire middle
+further than 40u from both ends. Measuring to the vertices alone therefore read 28 of the 1,073 stored beats as
+"dragged too far from home" ~40u in, so those NPCs ping-ponged off their own route forever and never reached the
+far end of it (#716).
+
 **Anti-whittle:** a disengaged NPC with its health down restores to full, so it cannot be worn down from
 outside its aggro range across separate approaches. The trigger is the combat memory lapsing — 10s since the
 last hit — **not** "no player currently in aggro range", which is a different question and, while damage did

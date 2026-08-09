@@ -60,6 +60,28 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void LongLeg_IsStillTheNpcsOwnTerritory_SoItIsNotLeashedOffItsBeat()
+		{
+			// #716: the leash territory is the route's POLYLINE, not its vertices. A beat sampled sparsely - the 150
+			// single-leg animal wanders on map 2070 run up to 228u between their two waypoints - puts the whole MIDDLE
+			// of the leg further than NpcLeashRange from both ends, so the walker set off, was read as "dragged too far
+			// from home" ~40u out, walked back streaming chase segments, rejoined at the nearest waypoint and did it
+			// again. Forever, and it never once saw the far end of its own beat.
+			var leg = new[] { new Vector3(0, 0, 0), new Vector3(0, 0, 220) };
+			var (world, npc) = Walker(leg);
+
+			var reached = 0f;
+			for (var i = 0; i < 1100; i++) // 110s: 220u at RouteWalkSpeed is 100s of walking
+			{
+				world.Tick(0.1);
+				Assert.False(npc.Returning, $"leashed off its own route at {npc.Position}");
+				reached = MathF.Max(reached, npc.Position.Z);
+			}
+
+			Assert.True(reached > 215f, $"only covered {reached:F1}u of a 220u leg");
+		}
+
+		[Fact]
 		public void RouteWalker_AfterAChase_RejoinsAtTheNEARESTWaypoint()
 		{
 			// Dragged off its beat, an NPC must pick the route up where it now stands. Resuming the stale index would
