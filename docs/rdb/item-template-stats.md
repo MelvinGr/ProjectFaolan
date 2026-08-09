@@ -175,6 +175,33 @@ coincidental `2,9` word pairs); the signature yields 1550 clean records (the wor
 (`1000017`/`1000018`) or garbage (`0x3de071`, `0xd00d`) — filter by a **known-stat-id whitelist**, exactly as
 field 972 is whitelisted to the 5 attribute ids.
 
+### The `typeMarker` is a GameAction type — and `CastNano` is the ON-USE spell
+
+The word that OPENS each record is not padding and not a "type marker" in the vague sense: it is a **GameAction
+type id**, catalogued with its key list in `GameActionTypes`. `53045` (flat modifier) and `53067`
+(percent) are the ones the stat list uses; the region is heterogeneous because a template mixes elements.
+
+**`53051` is `e_Type_GC_GameAction_CastNano`, key 39** — "nano" is Funcom's Anarchy Online word for a spell —
+and on an ITEM template its payload is a `Spells.Id`: **the spell the item casts when it is used**. That is the
+scalable source `Item.OnUseSpell` had been waiting for; today only 12 of 4,749 items have one, harvested from
+captures where somebody happened to right-click the thing on camera.
+
+| | |
+|---|---|
+| controls recovered | **8 of 12**, each resolving to the right spell *name* |
+| false positives | **0 of 14** non-consumables |
+
+Raw Beets → 112936 *Hearty Meal* · Daggamalt → 180250 *Health Potion Effect 10* · Double XP → 4552864 *Double
+XP*. The four misses are explained: both loot caches carry no spell in the template at all, `Totem of Origins`
+carries 3763119 (*Totem of Origins*) where the capture recorded 3981764 (*Degeneration*), and `Moonspill`
+carries its under a different prefix.
+
+⚠️ **Nothing about the region was undecoded here — only the connection was.** The record shape, the
+kind-as-GameAction-type reading and the name `CastNano` all already existed. A spell id also sits far above the
+`statId < 0x1000` bound `Parse` applies, so these records were already being collected by
+`ItemTemplateStatModifiers.ParseRejected` and discarded. Reading them is a kind mapping, not new parsing.
+Open work tracked in Gitea #762.
+
 ### Scale/divisibility proof + in-client ground truth
 
 Across all 3201 decrypted templates every vital `amount` is divisible by 100 and every attribute `amount` by

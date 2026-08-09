@@ -290,28 +290,24 @@ namespace Faolan.Core.Database.Tables
 		//     Raw Beets  @209:  02 00 00 00 | 09 00 00 00 | 28 b9 01 00   -> 112936  "Hearty Meal"
 		//     Moonspill  @253:  02 00 00 00 | 09 00 00 00 | 27 c0 02 00   -> 180263  "Mana Potion Effect 10"
 		//
-		// ⭐ The record is keyed, and **the key is 53051**: the full little-endian run is
+		// ⭐ **It is a `CastNano` GameAction element.** The record is the 10-word stat-modifier/GameAction record
+		// `ItemTemplateStatModifiers` already parses - `[kind][0][4][0][1][0][2][9][payload][...]` - and its kind is
 		//
-		//     53051, 0, 4, 0, 1, 0, 2, 9, <spellId>
+		//     53051 = e_Type_GC_GameAction_CastNano, key 39   ("nano" is Funcom's Anarchy Online word for a spell)
 		//
-		// ⚠️ That is NOT a new region - it is the stat-modifier record `ItemTemplateStatModifiers` already parses,
-		// whose leading word is an effect-KIND tag. A spell id sits far above the `statId < 0x1000` bound `Parse`
-		// applies, so a 53051 record lands in `ParseRejected` - the "same scan, opposite filter" whose note said only
-		// kind 53075 was decoded. 53051 is the second, so the plumbing to read it already exists.
+		// On an item template the payload is a `Spells.Id`: the spell the item casts when it is used.
 		//
-		// ⚠️ The `[2][9]` triplet alone is NOT the marker - it is a generic slot that also appears on items with no
-		// on-use effect (Quilted Pants carries `[2][9][712801]`), and so is the `4` before it. Only the 53051 key
-		// separates them, and 53051 sits in the same 53xxx family as the script params behind
-		// `rdb_script_params_carry_server_side_facts`.
+		// ⚠️ Nothing here was undecoded except the CONNECTION. The region, the record shape, the kind-as-GameAction
+		// -type reading and the name `CastNano` all already existed (`GameActionTypes`, `GameActionKeyListTests`);
+		// what was missing is that an item's CastNano element IS its on-use spell. A spell id also sits far above the
+		// `statId < 0x1000` bound `Parse` applies, so these records were already being collected by `ParseRejected`
+		// and simply thrown away.
 		//
-		// Measured over 26 dumped templates - 12 with a captured on-use spell, 14 without:
-		//   * 8 of the 12 controls recovered exactly, each resolving to the right spell name;
-		//   * **0 false positives** - not one of the 14 non-consumables yields a value, which is what the earlier
-		//     `[2][9]` and `kind == 4` readings both failed;
-		//   * of the 4 misses, `Contender's Cache` and `Exemplar's Cache` do not carry their spell in the template
-		//     at all (loot caches, a different mechanism), `Totem of Origins` carries 3763119 ("Totem of Origins")
-		//     where the capture recorded 3981764 ("Degeneration"), and `Moonspill` carries its spell under a
-		//     different prefix.
+		// Measured over 26 dumped templates, 12 with a captured on-use spell and 14 without: 8 of 12 controls
+		// recovered exactly, each resolving to the right spell NAME; **0 false positives** across the 14; and the 4
+		// misses are explained - both loot caches carry no spell in the template at all, Totem of Origins carries
+		// 3763119 ("Totem of Origins") where the capture recorded 3981764 ("Degeneration"), and Moonspill carries its
+		// under a different prefix.
 		//
 		// ⚠️ Still not imported. This was found with a byte-pattern search, not a walk: `ItemTemplateProperties` is a
 		// PREFIX read that stops at the display-name string, and the honest fix is to teach it the tail's record
