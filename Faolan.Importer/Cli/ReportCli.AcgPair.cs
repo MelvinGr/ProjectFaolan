@@ -14,19 +14,16 @@ namespace Faolan.Importer.Cli
 {
 	// `--report acg-pair` (#752): what the SECOND template on a `ProtoAcgItem` is.
 	//
-	// Every item on the wire carries `template1`/`template2`/`template3` and three decryption keys. We emit
-	// `template2 = template1` (`SnapshotItems.Identity` says so in as many words), which is right for 8,445 of the
-	// 8,479 captured entries and a guess for the rest - and it is now blocking two other issues, because BOTH of
-	// them found template1 disagreeing with what the client actually reads:
+	// Every item on the wire carries `template1`/`template2`/`template3` and three decryption keys. We used to emit
+	// `template2 = template1`, which is right for 8,445 of the 8,479 captured entries and was a guess for the rest.
+	// This report settled it: the pair is a LEVEL RANGE - both halves are the same item, differing only in their
+	// level fields, and the entry's own `level` says where between them this copy sits, which is what
+	// `AcgItemData_t::GetInterpolatedItem` is named for. `Item.TemplateId2` + `Item.PairKey` now carry it.
 	//
-	//   #756  the client's bind-on-pickup test reads `AcgItemData_t::GetInterpolatedItem(quad)[+0xC8]`, and for
-	//         `Bindings of Dark Terror` that disagreed with template1's own Flags word.
-	//   #754  three of the six templates we have observed sockets on carry THREE gems while template1 declares ONE
-	//         slot (field 114).
-	//
-	// Both are "the generated item is not template1". `AcgItemData_t::GetInterpolatedItem` takes the whole quad and
-	// picks/derives an item from it, so template2 is the other half of that input - which makes this the upstream
-	// question.
+	// ⚠️ It was written up as the upstream cause of #754's socket-count anomaly and #756's `Bindings of Dark Terror`
+	// Flags disagreement. That was WRONG and is recorded here so it is not re-derived: all of those items have
+	// `template2 == template1`, so no generation is involved in either. #754's is legacy gem overflow (the client
+	// has a `GemOverflow` token for exactly that state); #756's is its own question.
 	//
 	// The report walks the DUMPS for every ProtoAcgItem it can reach, tabulates how template2 relates to template1
 	// and how the keys relate, and - the point - DECRYPTS BOTH HALVES of every differing pair (template1 with key1,
@@ -40,6 +37,15 @@ namespace Faolan.Importer.Cli
 			var seen = new Dictionary<(uint T1, uint T2), Sighting>();
 			var total = 0;
 
+			// ⚠️ The key relations are tallied HERE, per sighting, and deliberately not off `seen.Values` afterwards.
+			// `seen` keeps only the FIRST ProtoAcgItem of each (template1, template2) pair, so a count taken from it
+			// is over ~340 representatives, not the ~13k sightings - and it would be blind to exactly the case that
+			// matters: a later sighting of an already-seen pair whose key3 stopped equalling key1. The keys ought to
+			// be per-TEMPLATE (keyN decrypts RDB template N), but that is the assumption under test, not a premise.
+			var key3IsKey1 = 0;
+			var key2IsKey1 = 0;
+			var template3Set = 0;
+
 			foreach (var capture in captures)
 			foreach (var packet in capture.Packets)
 			foreach (var acg in AcgItemsIn(packet))
@@ -48,6 +54,15 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				total++;
+				if (Same(acg.Key3, acg.Key1))
+					key3IsKey1++;
+
+				if (Same(acg.Key2, acg.Key1))
+					key2IsKey1++;
+
+				if (acg.Template3 != 0)
+					template3Set++;
+
 				var key = (acg.Template1, acg.Template2);
 				if (!seen.TryGetValue(key, out var sighting))
 					seen[key] = sighting = new Sighting(acg, capture.Name);
@@ -62,10 +77,10 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    of which template2 == template1 + 1: {differing.Count(p => p.Key.T2 == p.Key.T1 + 1)}");
 			Console.WriteLine();
 
-			Console.WriteLine("  how the three keys relate, over every sighting:");
-			Console.WriteLine($"    key3 == key1 : {seen.Values.Count(s => Same(s.Item.Key3, s.Item.Key1))} of {seen.Count}");
-			Console.WriteLine($"    key2 == key1 : {seen.Values.Count(s => Same(s.Item.Key2, s.Item.Key1))} of {seen.Count}");
-			Console.WriteLine($"    template3 != 0: {seen.Values.Count(s => s.Item.Template3 != 0)} of {seen.Count}");
+			Console.WriteLine("  how the three keys relate, over every SIGHTING (not per distinct pair):");
+			Console.WriteLine($"    key3 == key1  : {key3IsKey1} of {total}");
+			Console.WriteLine($"    key2 == key1  : {key2IsKey1} of {total}");
+			Console.WriteLine($"    template3 != 0: {template3Set} of {total}");
 			Console.WriteLine();
 
 			if (differing.Count == 0)
