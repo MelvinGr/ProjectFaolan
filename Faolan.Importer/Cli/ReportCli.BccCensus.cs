@@ -18,10 +18,15 @@ namespace Faolan.Importer.Cli
 	// registration for, or (as #549 turned out) a record we are reading wrong.
 	public static partial class ReportCli
 	{
-		// `--report-arg <hex>` additionally dumps, in full, every record whose PHASE byte is <hex> (e.g. `0E`).
+		// `--report-arg <hex>` additionally dumps, in full, every record whose PHASE byte is <hex> (e.g. `0E`);
+		// `--report-arg cmd:<hex>` dumps every record of one COMMAND instead (e.g. `cmd:27`). Phase was the only
+		// filter for a while, which is the wrong axis when the question is "what do this command's records look
+		// like" - and for a command with four records in the whole corpus, phase pulls in thousands of neighbours.
 		private static void BccCensus(IReadOnlyList<NamedCapture> captures, string? phaseArg)
 		{
-			var phase = ParseHexByte(phaseArg);
+			var wantsCommand = (phaseArg ?? "").StartsWith("cmd:", StringComparison.OrdinalIgnoreCase);
+			var command = wantsCommand ? ParseHexByte(phaseArg![4..]) : null;
+			var phase = wantsCommand ? null : ParseHexByte(phaseArg);
 			var known = Enum.GetValues<BehaviorId>().ToDictionary(b => (uint)b, b => b.ToString());
 			var buckets = new SortedDictionary<uint, Bucket>();
 			var interesting = new List<(string Capture, CapturedPacket Packet, BehaviorControlCenterIIR Bcc)>();
@@ -46,7 +51,7 @@ namespace Faolan.Importer.Cli
 
 					bucket.Add(p.IsDownload, bcc);
 
-					if (!known.ContainsKey(bcc.BehaviorId) || (byte)bcc.Seq == phase)
+					if (!known.ContainsKey(bcc.BehaviorId) || (byte)bcc.Seq == phase || bcc.BehaviorId == command)
 						interesting.Add((c.Name, p, bcc));
 				}
 
@@ -64,7 +69,7 @@ namespace Faolan.Importer.Cli
 				return;
 
 			Console.WriteLine();
-			Console.WriteLine($"{interesting.Count} record(s) in full (an id outside the classmap, or the requested phase):");
+			Console.WriteLine($"{interesting.Count} record(s) in full (an id outside the classmap, or the requested phase/command):");
 
 			foreach (var (capture, p, bcc) in interesting)
 			{

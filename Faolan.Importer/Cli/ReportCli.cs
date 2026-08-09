@@ -442,6 +442,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "gem-slots":
+				{
+					GemSlots(RdbDir());
+					return 0;
+				}
+
 				case "region-stat-census":
 				{
 					RegionStatCensus(RdbDir());

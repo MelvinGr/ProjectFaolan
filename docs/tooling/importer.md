@@ -225,6 +225,9 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
 `class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
+`gem-slots` (#754: the client's `Gem Slots`/`Gem Size` template fields 113/114 measured against every socket actually
+observed - the cross-check REFUTES 114 as the socket count on its own, 3 of 6 observed items carry more gems than
+they declare),
 `spawn-item-level` (#755: what LEVEL a character spawn puts on each worn item, measured against `Items.Level` over
 the dumps - 125,721 of 125,722 entries agree, so the spawn carries the item's own level exactly as the snapshot
 entry does),
