@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		public async Task RepositoryLoadedObjects_BuildTheSameRecordAsFullyLoadedOnes()
 		{
 			var options = TestDb.ReadOnly(TestDb.GameDatabase);
-			var repo = new DatabaseRepository(new TestContextFactory(options));
+			var repo = new DatabaseRepository(new TestDb.ContextFactory(options));
 			var ct = TestContext.Current.CancellationToken;
 
 			await using var ctx = new DatabaseContext(options);
@@ -55,19 +55,6 @@ namespace Faolan.Tests
 
 			// Guard the guard: if the seed ever stopped carrying word rows, every comparison above would pass trivially.
 			Assert.True(withWords > 300, $"only {withWords} of {checkedObjects} shipped objects carry word rows - the seed looks wrong, so this test proves nothing");
-		}
-
-		private sealed class TestContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
-		{
-			public DatabaseContext CreateDbContext()
-			{
-				return new DatabaseContext(options);
-			}
-
-			public Task<DatabaseContext> CreateDbContextAsync(System.Threading.CancellationToken ct = default)
-			{
-				return Task.FromResult(new DatabaseContext(options));
-			}
 		}
 	}
 }

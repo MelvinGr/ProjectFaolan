@@ -741,7 +741,8 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
-		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
+		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3) - PLUS the
+		// gems socketed into them (#311), one entry per socket. Reads the
 		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
 		// character has no equipment row or no stat-bearing gear.
 		// The class/level BASE stats (#444). Empty when that (class, level) has no decoded row - some classes' higher
@@ -780,16 +781,35 @@ namespace Faolan.Core.Database.Repositories
 				.Select(slot => (int)slot)
 				.ToArray();
 
-			var worn = await ctx.ItemInstances.AsNoTracking()
+			var wornInstances = await ctx.ItemInstances.AsNoTracking()
 				.Where(i => i.OwnerCharacterId == characterId && i.Container == ContainerKind.Equipped && slots.Contains(i.Slot))
-				.Select(i => i.TemplateId)
+				.Select(i => new
+				{
+					i.Id,
+					i.TemplateId
+				})
 				.ToArrayAsync();
-			if (worn.Length == 0)
+			if (wornInstances.Length == 0)
 				return [];
 
-			var ids = worn.Distinct().ToArray();
+			// #311: the GEMS socketed into those worn items count too, and they count through the ordinary item-stat
+			// path - a socket carries no stat value in either wire form, so a gem's effect IS its own template's
+			// modifier list. Returning them as extra entries is the whole of it, because the caller sums StatModifiers
+			// across the array.
+			//
+			// One entry per SOCKET, exactly as the worn set is one entry per occupied slot: two of the same gem in two
+			// sockets is that bonus twice. Distinct-ing here would halve it, which is the bug #585 fixed for the worn
+			// items themselves.
+			var wornIds = wornInstances.Select(i => i.Id).ToArray();
+			var gems = await ctx.ItemInstanceSockets.AsNoTracking()
+				.Where(s => wornIds.Contains(s.ItemInstanceId))
+				.Select(s => s.GemItemId)
+				.ToArrayAsync();
+
+			var templates = wornInstances.Select(i => i.TemplateId).Concat(gems).ToArray();
+			var ids = templates.Distinct().ToArray();
 			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
-			return worn.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+			return templates.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
 
 			static bool IsWeaponSlot(CharacterEquipmentSlot slot)
 			{

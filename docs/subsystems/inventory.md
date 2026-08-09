@@ -155,37 +155,43 @@ template and the client derives its effect from the gem's own template:
 
 Stored as `ItemInstanceSocket` `(ItemInstanceId, SocketIndex) -> GemItemId`, and emitted back by
 `SnapshotItems`. The socket CONTENTS are the truth; the stats are derived — which is why sockets are their own
-table rather than rows in a per-instance stat table. `CaptureSocketImporter` (importer module
+table rather than rows in a per-instance stat table.
+
+**A gem in a WORN item grants its stats (#311).** Because a socket carries no stat value, the gem's effect is just
+its own template's modifier list, so `GetEquippedStatItems` returns the socketed gems alongside the items holding
+them and the ordinary aggregation does the rest — **one entry per socket**, so two of the same gem is that bonus
+twice (de-duplicating is the halving #585 fixed for worn items). Only gems in EQUIPPED items count; one in a bag
+item does not. Until this, every gem in the game was inert: stored and displayed, but worth nothing. `CaptureSocketImporter` (importer module
 `character-sockets`) harvests them onto characters that already exist, since the `characters` module is
 insert-only.
 
 ⚠️ `slot_map` was in the recovered schema from the start and was populated NOWHERE until #750, so every gemmed
 item silently lost its gems at world entry.
 
-### Binding — the client names the rules, and reads them from the TEMPLATE
+### Binding (#756)
 
-Two in-client GM tooltips: `Character Bound : Binds when Picked Up` (Cloak of Hugin, template 3908313) and
-`Binds when Equipped` (Bindings of Dark Terror, template 3762969). So there are two rules, and `Character Bound :`
-is a separate prefixed clause — a state or binding TYPE, not the rule.
+`Flags` — the entry's **stat 0** — carries the bound state in **bit 26**, and the wire was caught doing it:
 
-⚠️ **The carrier is the RDB item template, not the wire.** Both of those templates carry identical wire Flags
-(`0x04000001`) across the corpus, and we send `flags = 1` for every item anyway, yet the client still renders the
-binding line on our server. `ItemInstance.Binding` (`ItemBindingType`) exists as a column but is inert; when it is
-populated the RULE will belong on `Item` (per-template) with only "has it bound yet" per-instance. Open work tracked
-in Gitea #756.
+```
+09:46:44  SetItemStat  bag(104) slot 8       stat 0 = 0x00000001    "unbound: [Imbued Frayed Circlet]"
+09:47:00  SetItemStat  equipped(101) slot 2  stat 0 = 0x04000001    "just eqpuied item, it is now bound"
+```
 
-## A trade HANDS the item over
+`[V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:46:44 and 09:47:00]` — the player narrating
+both halves in `/say`. So binding is the server re-sending that cell's `Flags` with bit 26 set; nothing else moves.
 
-`TradeService.Exchange` calls `ITradeOutbound.TransferItemToCharacter`, which routes to the same
-`GrantItemToBackpack` choke point with a `transferring` instance: the slot search, the live add, the quest-container
-routing and `AdvanceCollectGoals` are identical, but the instance MOVES (owner + container + slot) instead of a new
-one being minted. So the crafter, the stack and the socketed gems cross with it.
+Both RULES come from the RDB item template, and both are DERIVED rather than stored as conclusions:
 
-The service writes no item rows at all — the move IS the transfer, so there is no giver-side clear and no window in
-which the item exists twice. A failed transfer (receiver offline, bag full, destination cell occupied) leaves the
-item with the giver, structurally rather than by an ordering rule.
+| | derivation | stored |
+|---|---|---|
+| `Item.BindsOnPickup` | `Flags` bit 26 — the template mints its copies already bound | nothing; `Flags` holds it and ships verbatim |
+| `Item.BindsOnEquip` | `MoreFlags & 0x20 \|\| (Quality > 1 && Can & 4)` | `MoreFlags` (field 177), `Can` (field 30) |
 
-⚠️ Before #750 this granted a FRESH instance from the template and then cleared the giver's cell, which deleted the
-giver's row and cascaded its sockets: the receiver got a gemless copy with no crafter. Mail attachments and AH
-listings still keep their own tables and still re-mint on delivery (#750 §8) — `MailAttachment` carries only
-Template/ItemLevel/ItemHash, so there is nothing per-instance for it to preserve yet.
+1,267 templates bind on pickup, 2,035 on equip. `ItemInstance.Bound` is the per-instance half and is one **bit** —
+only bind-on-equip needs it, since a bind-on-pickup item's own template word already carries the bit. It is set by
+`EquipmentService.PersistEquip` and reaches the wire through the **instance** overloads of `SnapshotItems.ListEntry`
+/ `LiveAddEntry` only: a caller holding no instance is describing an item nobody owns, which is never bound.
+
+Binding is one-way — nothing unbinds an item in the corpus or the client's method table. Not enforced yet: a bound
+item can still be traded, mailed and AH-sold (Gitea #756). Full derivation in
+[`../rdb/item-template-stats.md`](../rdb/item-template-stats.md); measured by `--report item-binding`.

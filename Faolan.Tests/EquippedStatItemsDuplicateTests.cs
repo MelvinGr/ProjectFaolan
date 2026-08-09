@@ -61,7 +61,7 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				var repo = new DatabaseRepository(new TestContextFactory(options));
+				var repo = new DatabaseRepository(new TestDb.ContextFactory(options));
 				var worn = await repo.GetEquippedStatItems(7, WeaponSet.Primary);
 
 				Assert.Equal(3, worn.Length);
@@ -71,19 +71,6 @@ namespace Faolan.Tests
 			finally
 			{
 				TestDb.Delete(path);
-			}
-		}
-
-		private sealed class TestContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
-		{
-			public DatabaseContext CreateDbContext()
-			{
-				return new DatabaseContext(options);
-			}
-
-			public Task<DatabaseContext> CreateDbContextAsync(System.Threading.CancellationToken ct = default)
-			{
-				return Task.FromResult(new DatabaseContext(options));
 			}
 		}
 	}

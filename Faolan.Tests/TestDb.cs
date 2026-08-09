@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
@@ -31,6 +32,23 @@ namespace Faolan.Tests
 	// THIS CLASS IS THE SINGLE SEAM: to change the strategy, edit only these two methods; the tests don't change.
 	public static class TestDb
 	{
+		// An IDbContextFactory over a fixed options object, so a test can build a real DatabaseRepository against a
+		// throwaway file DB. It existed as a byte-identical PRIVATE copy in two test classes and was about to become a
+		// third; the repository takes a factory, so every repository-level test needs one, and that makes it part of
+		// this seam rather than a detail of whichever test needed it first.
+		public sealed class ContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default)
+			{
+				return Task.FromResult(new DatabaseContext(options));
+			}
+		}
+
 		// The real-data fixture, BUILT rather than checked in (#412): migrations + faolan.sql, through the very same
 		// DatabaseInitializer the server runs at startup. So the golden tests keep asserting against the shipped
 		// game DATA without depending on a shipped BINARY - and if seeding ever breaks, these tests break with it.
