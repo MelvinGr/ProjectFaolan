@@ -171,8 +171,9 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Gear stat bonuses** — 4,223 stat rows over 1,705 items decoded from their templates: +HP/+Mana, weapon
   damage, armour and Protection, crit ratings, Magic Damage, Combat Rating and regen all feed the fight. The
   per-hit formulas are provisional pending in-client tuning (#3, #395, #401, #441)
-- 🟡 **Guild bank** — money in and out, rank-gated and balance-checked. The window itself and the item vault are
-  unhandled, though both are now fully decoded from a capture (#132, #654)
+- 🟡 **Guild bank** — money in and out, rank-gated and balance-checked, plus the shared ITEM vault: the window
+  opens with the banker and members can deposit and withdraw items, which keep their crafter and gems. Item
+  moves are not rank-gated and nothing records who deposited what (#132, #654)
 - 🟡 **Crafting** — the recipe book, and making a recipe: materials consumed, product granted with its
   crafter's name. Professions and ranks are not modelled, so nothing gates who may craft what (#148, #735)
 - 🟡 **Gem socketing** — you can put a gem into an item and it does something: the socketing action is accepted,
