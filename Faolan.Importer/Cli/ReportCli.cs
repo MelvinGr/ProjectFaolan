@@ -444,7 +444,13 @@ namespace Faolan.Importer.Cli
 
 				case "gem-slots":
 				{
-					GemSlots(RdbDir());
+					GemSlots(RdbDir(), NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
+				case "acg-pair":
+				{
+					AcgPair(NamedCapture.LoadAll(capturesDir), RdbDir());
 					return 0;
 				}
 
