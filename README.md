@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,659 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,749 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -30,9 +30,9 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-- **NPC conversations** — 110/117 greeted dialogue NPCs imported (94.0%)
+- **NPC conversations** — 110/118 greeted dialogue NPCs imported (93.2%)
 - **Vendor shops** — 75/75 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,874/77,631 decrypted, **6.3% of the total encrypted**. Keys held per category: 4,609 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,961/77,631 decrypted, **6.4% of the total encrypted**. Keys held per category: 4,696 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -171,12 +171,17 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Gear stat bonuses** — 4,223 stat rows over 1,705 items decoded from their templates: +HP/+Mana, weapon
   damage, armour and Protection, crit ratings, Magic Damage, Combat Rating and regen all feed the fight. The
   per-hit formulas are provisional pending in-client tuning (#3, #395, #401, #441)
-- 🟡 **Guild bank** — a member can withdraw money, rank-gated and balance-checked; the window itself, deposits
-  and item storage are unhandled (#132, #654)
+- 🟡 **Guild bank** — money in and out, rank-gated and balance-checked. The window itself and the item vault are
+  unhandled, though both are now fully decoded from a capture (#132, #654)
 - 🟡 **Crafting** — the recipe book, and making a recipe: materials consumed, product granted with its
   crafter's name. Professions and ranks are not modelled, so nothing gates who may craft what (#148, #735)
-- 🟡 **Gem socketing** — a gemmed item keeps its gems: they are stored per item, restored in the login snapshot
-  and named on the wire. Socketing one YOURSELF is not accepted yet (#311, #750, #754)
+- 🟡 **Gem socketing** — you can put a gem into an item and it does something: the socketing action is accepted,
+  the gem is consumed into the first free slot, and a socketed gem's stats now count towards the wearer. Gems are
+  stored per item and restored in the login snapshot. The slot COUNT is enforced, the slot COLOUR is not
+  (#311, #750, #754)
+- 🟡 **Item binding** — an item that binds when picked up says so, and one that binds when EQUIPPED binds the
+  first time you wear it and stays bound across a relog. Nothing yet stops you trading or selling a bound item
+  (#756)
 
 ### Social & guilds
 
@@ -522,7 +527,6 @@ captures against the local server (no root needed) and retail-session captures a
   already decoded and placed, but nothing in the corpus ever shows one being damaged, so there is no destruction
   or construction grammar to reproduce (#498)
 - **Level-up** captures across more classes/levels → fill the combo/spell/XP tables (#296, #297)
-- A **dungeon run**, the **faction/reputation** UI, and an **item socket** action → the roadmap features
-  (#309, #310, #311)
+- A **dungeon run** and the **faction/reputation** UI → the roadmap features (#309, #310)
 
 Contributing such captures is the single highest-leverage way to move the blocked items.
