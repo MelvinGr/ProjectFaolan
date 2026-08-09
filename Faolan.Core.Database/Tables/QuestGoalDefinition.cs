@@ -279,12 +279,34 @@ namespace Faolan.Core.Database.Tables
 		public uint Sequence { get; set; }
 		public uint TrailingCategory { get; set; }
 
-		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158
+		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the
 		// captured goals. Stable per goal across every capture, so it is quest data. (The two comment blocks that used
 		// to sit above this one described the Extra* words; they are now on those properties.)
+		//
+		// ⭐ **It only ever appears on COLLECT and KILL goals.** Measured over the 171 goals that carry a `Separator`
+		// (the captured ones - scoping to those matters, since an unharvested row reads 0 and would make the test
+		// vacuous):
+		//
+		//     sep 23 Collect   44 goals, 14 carry it
+		//     sep 12 Kill      30 goals, 10 carry it
+		//     the other 7 kinds (22, 20, 25, 5, 9, 24, 10)   97 goals, ZERO carry it
+		//
+		// Those two kinds are exactly the ones where a quest item comes off a mob, which makes a per-goal DROP RATE
+		// the obvious reading - and we model no such thing. ⚠️ Unproven, and the magnitudes do not settle it: the
+		// values are 3, 10, 20, 25, 40, 50 (x11), 60, 80, 90, 100, 105, 130, 150, 170, so a plain percentage would
+		// have four goals above 100%. Tenths of a percent (0.3%..17%) fits the ladder, a per-kill weight allowing
+		// multiple drops fits too. It does NOT track RequiredCount (count 64 and count 1 both carry 50).
+		// [V0: what QuestGoalDefinition.Unknown1 scales on a Collect/Kill goal]
 		public uint Unknown1 { get; set; }
 
-		// The second word after the marker block; "Zero2" in the codec, but nonzero on 318 captured goals.
+		// The second word after the marker block; "Zero2" in the codec. The client writes it as the BYTE 0x01
+		// followed by three zero bytes, so every set value reads 0x01000000 as a word - see QuestObjectiveGoalCodec.
+		//
+		// It is a flag, and what it flags looks like EXPANSION content: all 17 goals that carry it sit on quests
+		// 15378-17774 and are Khitai/RoTG by name (Xibaluku, the Jade Artifact, Kian Lai, Lao-che, Kun Whu, Po-Sha,
+		// Zhu-la, Balbet-Zhun, Blood Ravine, the Emperor's Manifestation, the Pods). ⚠️ Necessary, not sufficient -
+		// only 17 of the 3,464 goals on quests >= 15000 carry it, so "expansion" cannot BE the definition, exactly as
+		// with QuestDefinition.QuestLineFlags bit 4. [V0: what QuestGoalDefinition.Unknown2 flags]
 		public uint Unknown2 { get; set; }
 
 		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
