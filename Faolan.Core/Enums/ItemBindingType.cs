@@ -41,16 +41,29 @@ namespace Faolan.Core.Enums
 	//
 	// The value is also CONSISTENT PER TEMPLATE at acquisition: across all 178 adds, zero templates ever arrive with
 	// two different flag values. And it is not simply "starter gear" - within the create captures 33 adds are unbound
-	// and 31 carry bit 26, split cleanly by template (Slave Manacles unbound; 324066/324067/324139/... bound). That
-	// reads as a per-TEMPLATE declaration ("this item is no-trade") stamped onto the instance when it is handed over.
+	// and 31 carry bit 26, split cleanly by template (Slave Manacles unbound; 324066/324067/324139/... bound). So no
+	// binding state is ever ACQUIRED on the wire, which is the useful half of this: nothing we send has to change for
+	// binding to work. It is a server-side rule fed by template data.
 	//
-	// ## ⚠️ The one thing that reading does not explain
+	// ## ⚠️⚠️ AND THEN THE CLIENT SAID IT OUT LOUD - the carrier is the TEMPLATE, not this word
 	//
-	// A per-template declaration should never differ between two copies - and for a handful it does (3 templates for
-	// bit 26, 1 for bit 27, 2 for bit 24, listed above). Those exceptions are what is left to chase, and they are the
-	// reason nothing sets this column yet: the rule is nearly pinned, and "nearly" is not enough to start taking items
-	// off players. Candidates: those instances were acquired by a path the corpus does not contain, or predate a
-	// server-side change. Tracked in Gitea #756.
+	// Two in-client GM tooltips settle what the bits could not:
+	//
+	//   "Cloak of Hugin"          -> "Character Bound : Binds when Picked Up"   Template ID 3908313/3908313 (63)
+	//   "Bindings of Dark Terror" -> "Binds when Equipped"                      Template ID 3762969/3762969 (80)
+	//
+	// So there are TWO rules, the client names them, and `Character Bound :` is a separate prefixed clause - a state
+	// or a binding TYPE, not the rule. But both of those templates carry the SAME wire Flags across the corpus
+	// (0x04000001, bits 0 and 26, both worn), so the RULE is not in this word.
+	//
+	// ⚠️ And we send `flags = 1` for EVERY item - ListEntry/LiveAddEntry default it and no caller overrides - so
+	// nothing we emit carries bit 26 at all, yet the client still renders "Character Bound : Binds when Picked Up" on
+	// our server. **The binding display is driven by the RDB item TEMPLATE, client-side, not by the wire.**
+	//
+	// Which means this enum's eventual home is probably split: the RULE is per-TEMPLATE (an `Item` column, read from
+	// the RDB template at mint time) and only "has it bound yet" is per-instance. Do not wire it to the Flags bits.
+	// Tracked in Gitea #756, with the four template keys to diff and the LDB route (the tooltip strings are NOT in the
+	// exe string table, so they come from the LDB - whatever selects between them names the field).
 	//
 	public enum ItemBindingType
 	{

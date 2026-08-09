@@ -67,10 +67,10 @@ namespace Faolan.Core.Database.Tables
 
 		// Whether this item is BOUND to whoever holds it, and to what.
 		//
-		// ⚠️ Nothing sets it and nothing sends it yet - see ItemBindingType for the measurement. The carrier is bits
-		// 24/26/27 of the entry's Flags word (stat 0), and it BINDS ON PICKUP: a claimed item arrives with the bits
-		// already set, and equipping never sets them. It is a column because binding is per-INSTANCE ("this copy is
-		// bound, that copy is not"), which is precisely the class of fact the old address-keyed model had nowhere to put.
+		// ⚠️ Nothing sets it and nothing sends it yet - see ItemBindingType for the measurement. The client names TWO
+		// rules ("Binds when Picked Up" / "Binds when Equipped") and reads them from the RDB item TEMPLATE, not from
+		// the wire - we send flags = 1 for every item and the tooltip still says "Character Bound". So when this is
+		// populated the RULE probably belongs on Item (per-template) and only "has it bound yet" here (#756).
 		//
 		// Default None, so the column is inert until the decode lands - an item is tradeable unless something says
 		// otherwise, which is the safe side of the unknown (wrongly binding an item takes it away from a player).
