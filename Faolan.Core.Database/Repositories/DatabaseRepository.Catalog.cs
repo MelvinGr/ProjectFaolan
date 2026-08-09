@@ -37,6 +37,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Spell?> GetSpell(uint id);
 		Task<uint[]> SpellIdsOnLine(uint guiStackingLine);
 		Task<SpellEffect[]> GetSpellEffects();
+		Task<SpellAreaEffect[]> GetSpellAreaEffects();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
 		Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class);
@@ -264,6 +265,14 @@ namespace Faolan.Core.Database.Repositories
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.AsNoTracking().Where(s => s.GuiStackingLine == guiStackingLine).OrderBy(s => s.Id).Select(s => s.Id).ToArrayAsync();
+		}
+
+		// #772: every spell's AREA applications, read whole - a few thousand rows the importer owns, cached by
+		// SpellAreaCatalog because both consumers (the cast resolve and the world tick) are hot paths.
+		public async Task<SpellAreaEffect[]> GetSpellAreaEffects()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.SpellAreaEffects.AsNoTracking().OrderBy(a => a.SpellId).ThenBy(a => a.Sequence).ToArrayAsync();
 		}
 
 		// The server-acted spell effects (pet summons, triggered procs). Read whole in run order - a few dozen rows,

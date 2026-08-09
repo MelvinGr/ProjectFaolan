@@ -101,6 +101,13 @@ namespace Faolan.Importer.Rdb
 		// above it: Guardian 20401-20406, Halberdier 20407-20410, Barbarian 18401-18409, Ranger 39401-39412.
 		private const uint ArchetypeBlockWidth = 8;
 
+		// Key 170 on the area-targeting kinds is the target CAP, named by the client's own tooltip format string:
+		// LDB 1093636[18] is `%s %.2fm%s radius up to %d%s targets`, one string pairing the radius (key 11) with this
+		// count. `Life Leech` carries 11=5 170=12 against an in-client "5.00m radius up to 12 targets" (#773).
+		// ⚠️ Scoped to the area kinds. 170 also appears on `Disarm` and `InterpolatedHit`, where it means something
+		// else entirely - a GameActionStat_e key's meaning is per-TYPE.
+		private const int KeyMaxTargets = 170;
+
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
 		// 132 - the mana cost, carried RAW because the client reads it in two modes: a PERCENTAGE of the caster's
@@ -215,7 +222,7 @@ namespace Faolan.Importer.Rdb
 			var toAdd = new List<Spell>();
 			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
 			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
-			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
+			var statEffects = new Dictionary<uint, Dictionary<(uint Stat, uint Period), (uint Kind, int Amount, LevelRamp? Ramp)>>();
 
 			// Every spell record this run PARSED - the scope the stat-effect delete runs over, which is deliberately
 			// wider than the set that still HAS effects (#701).
@@ -241,6 +248,7 @@ namespace Faolan.Importer.Rdb
 			var unparsedElements = 0;
 			var recordsWithUnparsed = 0;
 			var unparsedSamples = new List<string>();
+			var areaEffects = new Dictionary<uint, List<SpellAreaEffect>>();
 			long totalBodyBytes = 0;
 			long elementBytes = 0;
 			var kindsSeen = new SortedSet<uint>();
@@ -390,6 +398,28 @@ namespace Faolan.Importer.Rdb
 						if (element.Value(GameActionTypes.KeyRadius) is { } radius)
 							areaRadius = Math.Max(areaRadius, radius);
 
+						// #772: the area application WHOLE, one row per element, rather than the single radius the
+						// parent column can hold. A spell states several - `Gangrenous Stench` two (one instant, one
+						// every 4 s), `Flesh to Worms` five - and the one a collapse would drop is the aura.
+						// `Fixed2d6` is the PERIOD in centiseconds; 0 means the area is applied once, at cast.
+						if (element.Value(GameActionTypes.KeySpell) is { } appliedSpell && appliedSpell != 0 && appliedSpell != entry.Id)
+						{
+							var list = areaEffects.TryGetValue(entry.Id, out var existingAreas)
+								? existingAreas
+								: areaEffects[entry.Id] = [];
+
+							list.Add(new SpellAreaEffect
+							{
+								SpellId = entry.Id,
+								Sequence = (uint)list.Count,
+								Kind = element.Kind,
+								EffectSpellId = appliedSpell,
+								RadiusMetres = element.Value(GameActionTypes.KeyRadius) ?? 0,
+								MaxTargets = element.Value(KeyMaxTargets) ?? 0,
+								PeriodCentiseconds = element.Fixed2d6
+							});
+						}
+
 						// ⚠️ The same element also names WHAT to apply inside that radius, and dropping it is why a
 						// castable with no duration of its own was sent to the client as its own buff. `Life Leech`
 						// (220979) carries `FilteredAreaFormula(88=220980, 11=5)`: the castable states cast time, mana
@@ -450,9 +480,12 @@ namespace Faolan.Importer.Rdb
 				var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body.AsSpan(12));
 				if (mods.Count > 0)
 				{
-					var deltas = new Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>();
+					// ⚠️ Keyed on (stat, PERIOD), not on the stat alone. A spell states the same stat twice when it does
+					// the thing instantly AND over time - `Daggamalt` heals 405 HP at once and 67.5 HP/s for 60 s - and
+					// collapsing those onto one key threw one of the two away, arbitrarily. See SpellStatEffect.
+					var deltas = new Dictionary<(uint Stat, uint Period), (uint Kind, int Amount, LevelRamp? Ramp)>();
 					foreach (var m in mods)
-						deltas[m.StatId] = (m.Kind, (int)m.WireAmount, m.Ramp); // last write wins on a repeated stat
+						deltas[(m.StatId, m.PeriodCentiseconds)] = (m.Kind, (int)m.WireAmount, m.Ramp);
 					statEffects[entry.Id] = deltas;
 				}
 
@@ -598,14 +631,29 @@ namespace Faolan.Importer.Rdb
 			var stale = await db.SpellStatEffects.Where(e => affected.Contains(e.SpellId)).ToListAsync();
 			if (stale.Count > 0)
 				db.SpellStatEffects.RemoveRange(stale);
+
+			// #772: same delete-then-insert scoped to every record PARSED, for the same reason as the stat effects -
+			// keying the delete off the RESULTS would let a spell whose area list becomes empty keep its old rows for
+			// ever, so a change that REMOVES bad data would leave the bad data sitting there.
+			var staleAreas = await db.SpellAreaEffects.Where(a => affected.Contains(a.SpellId)).ToListAsync();
+			if (staleAreas.Count > 0)
+				db.SpellAreaEffects.RemoveRange(staleAreas);
+			var areaRows = 0;
+			foreach (var (_, rows) in areaEffects)
+				foreach (var row in rows)
+				{
+					db.SpellAreaEffects.Add(row);
+					areaRows++;
+				}
 			var effectRows = 0;
 			foreach (var (spellId, deltas) in statEffects)
-			foreach (var (statId, effect) in deltas)
+			foreach (var (key, effect) in deltas)
 			{
 				db.SpellStatEffects.Add(new SpellStatEffect
 				{
 					SpellId = spellId,
-					StatId = (CharacterStatId)statId,
+					StatId = (CharacterStatId)key.Stat,
+					PeriodCentiseconds = key.Period,
 					EffectKind = effect.Kind,
 					Amount = effect.Amount,
 					// Null on every kind but the interpolated family (#599).
@@ -648,11 +696,11 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered).",
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows.",
 				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
-				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count);
+				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
-				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered");
+				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows");
 		}
 
 		/// <summary>

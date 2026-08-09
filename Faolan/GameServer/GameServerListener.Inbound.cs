@@ -2369,6 +2369,18 @@ namespace Faolan.GameServer
 					? casterHandle
 					: targetHandle, casterHandle, spellId << 8);
 				await _combat.SpendCasterMana(client, spellId);
+
+				// #772: the spell's INSTANT areas - "apply spell X to up to N entities within R metres". Distinct from
+				// the ground-AoE branch above, which is aimed at a reticle; these are self-centred, which is what the
+				// client's own "Hostile Self Centered Area Spell" targeting line means. `Life Leech` is the whole
+				// mechanic in one row (220980 to 12 targets within 5 m) - the castable carries no damage of its own,
+				// so until the area elements were decoded (#772) casting it did nothing to anyone.
+				foreach (var area in await _spellAreas.InstantAreas(spellId))
+				{
+					var hit = await _combat.ApplySpellArea(client, casterHandle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
+					Logger.LogInformation("Cast {Spell} applied area effect {Effect} to {Hit} target(s) within {Radius}m.", spellId, area.EffectSpellId, hit, area.RadiusMetres);
+				}
+
 				if (targetHandle != 0 && targetHandle != casterHandle)
 					await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
 			}

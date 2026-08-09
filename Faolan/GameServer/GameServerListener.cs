@@ -196,6 +196,7 @@ namespace Faolan.GameServer
 		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect
 		// table. See Combat/SpellEffectService.cs.
 		private readonly SpellEffectService _spellEffects;
+		private readonly SpellAreaCatalog _spellAreas;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
@@ -324,6 +325,7 @@ namespace Faolan.GameServer
 			// instead of from spell ids hardcoded into the cast path. Reaches the wire through ISpellEffectOutbound,
 			// which this listener implements (GameServerListener.Buffs.cs).
 			_spellEffects = new SpellEffectService(database, this, logger);
+			_spellAreas = new SpellAreaCatalog(database);
 			// #140: the fatality burst. The buffs that PROC on a fatality are SpellEffect rows now, so this owns only
 			// the roll + the two Fatality ids every captured burst carries.
 			_fatality = new FatalityService(logger, this, _spellEffects);

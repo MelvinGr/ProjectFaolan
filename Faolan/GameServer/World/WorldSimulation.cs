@@ -110,6 +110,9 @@ namespace Faolan.GameServer.World
 
 		private readonly IWorldOutbound _output;
 
+		// Last aura application per (buff, area) - see TickAuras for why it is not WorldEntity.LastDotTick.
+		private readonly Dictionary<(uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = new Dictionary<(uint, uint), DateTimeOffset>();
+
 		private Task _tickTask = Task.CompletedTask;
 		public ConcurrentDictionary<INetworkClient, WorldEntity> Players { get; } = new ConcurrentDictionary<INetworkClient, WorldEntity>();
 
@@ -1031,6 +1034,7 @@ namespace Faolan.GameServer.World
 						await TickKillChains();
 						await TickBuffExpiry();
 						await TickDots();
+						await TickAuras();
 
 						// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
 						// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
@@ -1241,6 +1245,66 @@ namespace Faolan.GameServer.World
 			return buff.DotIntervalMs > 0
 				? buff.DotIntervalMs
 				: DotTickSeconds * 1000;
+		}
+
+		// #772: the AURA - a buff that re-applies an effect to everyone around its holder, every period, for as long
+		// as it is up. `Gangrenous Stench` is the shape: the cast puts a 25 s buff on the CASTER, and that buff hits a
+		// 7 m radius every 4 s. The maintainer's framing of the mechanic, which is what separates it from everything else here:
+		// the spell applies an effect to SELF, and that effect applies to enemies nearby - where `Life Leech` applies
+		// to enemies once, at cast, and is done.
+		//
+		// ⚠️ This is a mechanic the server had NO form of. `TickDots` ticks a DoT on the entity that OWNS the buff;
+		// nothing walked a buff's radius applying an effect to OTHERS. So every aura in the game was inert - the buff
+		// icon appeared and did nothing, which is exactly what Gangrenous Stench did.
+		//
+		// The period is per AREA, not per buff (a spell may state several with different periods), so the stamp is
+		// keyed by both. `LastDotTick` is deliberately not reused: a spell can carry a DoT AND an aura, and sharing one
+		// stamp would make each suppress the other's cadence.
+		private async Task TickAuras()
+		{
+			var now = DateTimeOffset.UtcNow;
+			foreach (var pair in Players)
+			{
+				var entity = pair.Value;
+				var client = pair.Key;
+
+				var vitals = entity.Vitals;
+				if (vitals == null || vitals.IsDead)
+					continue;
+
+				foreach (var buff in entity.ActiveBuffs.Values)
+				{
+					// The buff id is the WIRE form ((base << 8) | rank); the catalog is keyed by the base.
+					var areas = await _output.AuraAreasFor(buff.BuffId >> 8);
+					if (areas.Count == 0)
+						continue;
+
+					foreach (var area in areas)
+					{
+						var key = (buff.BuffId, area.Sequence);
+						if (_auraTicks.TryGetValue(key, out var last) && (now - last).TotalMilliseconds < area.PeriodCentiseconds * 10)
+							continue;
+
+						_auraTicks[key] = now;
+
+						// God mode blocks harm, and an aura is harm the holder is emitting rather than taking - but the
+						// same reasoning as TickDots applies to the RECIPIENTS, and ApplySpellArea goes through
+						// ApplyNpcDamage, which owns that check for the targets. Nothing extra is needed here.
+						var hit = await _output.ApplySpellArea(client, entity.Handle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
+						if (hit > 0)
+							_logger.LogDebug("Aura from buff 0x{Buff:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, area.EffectSpellId, hit, area.RadiusMetres);
+					}
+				}
+			}
+
+			// A buff that ended leaves its stamp behind; drop the ones whose buff is gone so this cannot grow without
+			// bound across a long session.
+			if (_auraTicks.Count > 0)
+			{
+				var live = Players.Values.SelectMany(e => e.ActiveBuffs.Keys).ToHashSet();
+				foreach (var key in _auraTicks.Keys.Where(k => !live.Contains(k.BuffId)).ToList())
+					_auraTicks.Remove(key);
+			}
 		}
 
 		private async Task TickDots()

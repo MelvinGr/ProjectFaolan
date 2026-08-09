@@ -423,6 +423,46 @@ namespace Faolan.GameServer.Combat
 		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
 		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
 		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
+		// #772: applies one of a spell's AREA effects - "apply spell X to up to N entities within R metres of the
+		// caster". The two shapes share this entirely and differ only in WHO calls it:
+		//   * an INSTANT area (`SpellAreaEffect.PeriodCentiseconds == 0`) is applied once, by the cast path;
+		//   * an AURA (period > 0) is applied by the world tick, every period, for as long as the buff that owns it
+		//     is up - `Gangrenous Stench` is a 25 s self-buff whose aura hits a 7 m radius every 4 s.
+		//
+		// ⚠️ The damage is the EFFECT spell's, not the castable's. That distinction is the whole of #772: 221070 is
+		// the thing you press (cast time, mana, recast) and 221069 is the thing that lands. Resolving the castable
+		// here would apply the wrong record's numbers - and for a pure carrier like `Life Leech`, no numbers at all.
+		//
+		// Centred on the CASTER rather than a reticle, which is what "Hostile Self Centered Area Spell" means in the
+		// client's own targeting-mode line; a ground-targeted blast is `ResolveGroundAoe` and keeps its reticle.
+		public async Task<int> ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || radius <= 0)
+				return 0;
+
+			var casterLevel = client.Session.Character.Level;
+			var damage = CombatResolver.ResolveSpellDamage(effectSpellId, casterLevel, player.MagicDamageFor(effectSpellId), player.SpellBoost(effectSpellId));
+
+			// The cap the client renders as "up to N targets" (SpellAreaEffect.MaxTargets). 0 = the element stated
+			// none, so everything in range is hit - not "nothing", which is what treating 0 as the cap would mean.
+			var inRange = _sim
+				.World.ZoneForEntity(player)
+				.EntitiesInRange(player.Position, radius, casterHandle)
+				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
+				.Select(e => e.Handle);
+
+			var victims = (maxTargets > 0 ? inRange.Take((int)maxTargets) : inRange).ToList();
+
+			foreach (var handle in victims)
+			{
+				await ApplyNpcDamage(client, handle, damage, $"area effect {effectSpellId} from 0x{casterHandle:X8}");
+				await SendSpellDamageNumber(client, handle, casterHandle, damage, effectSpellId);
+			}
+
+			return victims.Count;
+		}
+
 		private async Task<int> ApplyAoeTick(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int tickDamage)
 		{
 			var player = _sim.PlayerWorldEntity(client);

@@ -118,14 +118,26 @@ namespace Faolan.Tests
 			Assert.Equal(33700, ranks[4].Amount);
 		}
 
+		// ⭐ A potion heals TWICE - instantly, and then over time - and the record says so in two `Hit` elements on the
+		// SAME stat, told apart by the element's 0x2d6 period (the maintainer's reading, confirmed 2026-08-10):
+		//     0x2d5=1,  0x2d6=0    27 = 40500     405 HP, at once
+		//     0x2d5=-1, 0x2d6=100  27 = 6750      67.5 HP every second, for the row's 60 s duration
+		// The spell row corroborates independently: DurationMs 60000, DotIntervalMs 1000, DotDelta 6750.
+		//
+		// ⚠️ This used to assert a SINGLE row at 40500, and that held only by accident: the element scan could see one
+		// of the two (#772) and the importer keyed repeats on the stat id alone, so one silently overwrote the other.
+		// When the scan was fixed the surviving value flipped to 6750 - the potion's heal changing by 6x for no reason
+		// a player could observe. Both rows are kept now (the key carries the period), so this asserts the MECHANIC.
 		[Fact]
-		public void TheShippedCatalog_CarriesAHealthPotionThatActuallyHeals()
+		public void TheShippedCatalog_CarriesAHealthPotionThatHealsAtOnceAndOverTime()
 		{
-			var potions = Query("SELECT s.Name, e.Amount FROM Items i JOIN Spells s ON s.Id = i.OnUseSpell " +
-				"JOIN SpellStatEffects e ON e.SpellId = s.Id WHERE i.Name = 'Daggamalt' AND e.StatId = 27");
+			var instant = Query("SELECT s.Name, e.Amount FROM Items i JOIN Spells s ON s.Id = i.OnUseSpell " +
+				"JOIN SpellStatEffects e ON e.SpellId = s.Id WHERE i.Name = 'Daggamalt' AND e.StatId = 27 AND e.PeriodCentiseconds = 0");
+			var overTime = Query("SELECT s.Name, e.Amount FROM Items i JOIN Spells s ON s.Id = i.OnUseSpell " +
+				"JOIN SpellStatEffects e ON e.SpellId = s.Id WHERE i.Name = 'Daggamalt' AND e.StatId = 27 AND e.PeriodCentiseconds = 100");
 
-			var potion = Assert.Single(potions);
-			Assert.Equal(40500, potion.Amount); // 405 HP at the vitals scale
+			Assert.Equal(40500, Assert.Single(instant).Amount); // 405 HP at the vitals scale, immediately
+			Assert.Equal(6750, Assert.Single(overTime).Amount); // 67.5 HP a second thereafter
 		}
 
 		// ⭐ The invariant the key-addressed read establishes (#701): every stored row's KIND carries a stat key, so

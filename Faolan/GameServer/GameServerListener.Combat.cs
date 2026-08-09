@@ -1,5 +1,6 @@
 using Faolan.Core.Constants;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -97,6 +98,16 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
 			return CombatService.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
+		}
+
+		Task<int> IWorldOutbound.ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets)
+		{
+			return _combat.ApplySpellArea(client, casterHandle, effectSpellId, radius, maxTargets);
+		}
+
+		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.AuraAreasFor(uint spellId)
+		{
+			return _spellAreas.AuraAreas(spellId);
 		}
 
 		// IEnvironmentOutbound (#495/#504). The StatDamageIIR ENVIRONMENTAL form - no caster, no spell, and NO paired

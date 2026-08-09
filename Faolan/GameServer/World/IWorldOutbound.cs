@@ -165,5 +165,15 @@ namespace Faolan.GameServer.World
 		// statValue = the player's resulting HealthCurrent, delta the per-tick change, type the damage-school flag,
 		// caster the NPC, spellBaseId the wire id >> 8. Paired with PushVitals for the bar move. #274.
 		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
+
+		// #772: apply a spell's AREA - "spell `effectSpellId` to up to `maxTargets` entities within `radius` metres of
+		// the caster" - and answer how many it reached. The tick's half of the aura: a buff whose spell states a
+		// periodic area re-applies it through here every period, for as long as the buff is up. The cast path calls
+		// the same op on CombatService directly for the instant form.
+		Task<int> ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets);
+
+		// The AURA definitions for a spell, if any - `SpellAreaEffect` rows with a non-zero period. Reached through
+		// the port rather than giving the simulation its own database handle, same as every other lookup it needs.
+		Task<IReadOnlyList<SpellAreaEffect>> AuraAreasFor(uint spellId);
 	}
 }

@@ -45,11 +45,13 @@ namespace Faolan.Tests
 		public void AreaRadius_IsLiftedFromTheAreaTargetingElement(uint spellId, float expected)
 			=> Assert.Equal(expected, (float)Scalar($"SELECT CAST(AreaRadius * 100 AS INTEGER) FROM Spells WHERE Id = {spellId}") / 100f);
 
-		// Deathly Blizzard states a channel interval and NO area. That is a real answer, not a gap in the import:
-		// its blast is server-side, so the ground-AoE path falls back to CombatService.GroundAoeRadiusUnits.
+		// ⚠️ This used to assert Deathly Blizzard has NO area, and reasoned from that absence that "its blast is
+		// server-side". The absence was the element scan's, not the record's: it carries an area element that the
+		// leaf-only anchor could not see (#772), and the radius is 5 m like its siblings. A conclusion drawn from a
+		// parser's silence is only as good as the parser.
 		[Fact]
-		public void AreaRadius_IsAbsentForASpellWhoseAreaIsServerSide()
-			=> Assert.Equal(0u, Scalar("SELECT CAST(AreaRadius AS INTEGER) FROM Spells WHERE Id = 144526"));
+		public void AreaRadius_IsLiftedForASpellWhoseElementWasPreviouslyInvisible()
+			=> Assert.Equal(5u, Scalar("SELECT CAST(AreaRadius AS INTEGER) FROM Spells WHERE Id = 144526"));
 
 		[Fact]
 		public void AreaRadius_IsCarriedByOverAThousandSpells_AndNoneAtAnAbsurdWidth()
@@ -57,7 +59,16 @@ namespace Faolan.Tests
 			// A sanity bound rather than an exact count (the catalog grows): the radius is METRES, so a four-digit
 			// one would mean the unit was misread - the splash triple's radius, by contrast, is metres x100.
 			Assert.True(Scalar("SELECT COUNT(*) FROM Spells WHERE AreaRadius > 0") > 1000);
-			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM Spells WHERE AreaRadius > 500"));
+
+			// ⚠️ The bound was `> 500 == 0` and it was calibrated on a partial parse (#772). Five spells legitimately
+			// exceed it: `Earthling` and `Apocalypse` at 100,000 m - a radius that IS the world, which is what an
+			// apocalypse should be - `Anoki` at 800, and two `XX Unstable Energy Knockback`, whose `XX` prefix is the
+			// catalog's own dev marker. So the sanity bound moves to where a real misread would still be caught (the
+			// splash triple's radius is metres x100, so a unit slip lands in the thousands on ordinary spells) while
+			// the handful of deliberately world-sized ones are named rather than excluded by a number.
+			Assert.Equal(5u, Scalar("SELECT COUNT(*) FROM Spells WHERE AreaRadius > 500"));
+			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM Spells WHERE AreaRadius > 500 AND Name NOT LIKE 'XX %' " +
+				"AND Name NOT IN ('Earthling', 'Apocalypse', 'Anoki')"));
 		}
 
 		// The set is a deliberate SUBSET of the 17 types carrying a Radius key - a radius is only a blast radius

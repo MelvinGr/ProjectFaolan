@@ -3499,6 +3499,34 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Spells");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffect", b =>
+                {
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MaxTargets")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PeriodCentiseconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("RadiusMetres")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SpellId", "Sequence");
+
+                    b.ToTable("SpellAreaEffects");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
                 {
                     b.Property<uint>("SpellId")
@@ -3547,6 +3575,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("StatId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("PeriodCentiseconds")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Amount")
                         .HasColumnType("INTEGER");
 
@@ -3562,7 +3593,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("LowLevel")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("SpellId", "StatId");
+                    b.HasKey("SpellId", "StatId", "PeriodCentiseconds");
 
                     b.ToTable("SpellStatEffects");
                 });
@@ -5396,6 +5427,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("SpellId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>

@@ -261,7 +261,7 @@ namespace Faolan.Core.Rdb
 					at += 2 + length;
 				}
 
-				elements.Add(new Element(off, kind, [.. values], [.. texts], at - off));
+				elements.Add(new Element(off, kind, [.. values], [.. texts], at - off, W(body, fixedAt), W(body, fixedAt + 4)));
 			}
 
 			return elements;
@@ -302,7 +302,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6));
 			}
 
 			return mods;
@@ -349,7 +349,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6));
 			}
 
 			return mods;
@@ -365,7 +365,7 @@ namespace Faolan.Core.Rdb
 				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp));
+				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp, e.Fixed2d6));
 			}
 
 			return mods;
@@ -389,7 +389,10 @@ namespace Faolan.Core.Rdb
 		// a consumer that applies it flat under-grants everyone above that level (Gitea #599). It carries the whole
 		// ramp, low endpoint included, so a caller never has to pair it back up with `WireAmount` (and cannot get the
 		// signedness wrong doing so: the low value is signed and `WireAmount` is not).
-		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null);
+		// `PeriodCentiseconds` is the element's 0x2d6: 0 = the record applies ONCE, non-zero = it repeats on that
+		// cadence. Carried because the two are different mechanics on the same stat - `Daggamalt` heals 405 HP
+		// instantly and 67.5 HP every 100 cs - and a reader that drops it cannot tell them apart (#772).
+		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null, uint PeriodCentiseconds = 0);
 
 		/// <summary>
 		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order
@@ -403,7 +406,10 @@ namespace Faolan.Core.Rdb
 		///         (`--report feat-effect-widths`, Gitea #595).
 		///     </para>
 		/// </summary>
-		public readonly record struct Element(int Offset, uint Kind, uint[] Values, string?[] Texts, int WidthBytes)
+		// ⚠️ `Fixed2d5`/`Fixed2d6` are the first two of the element's four fixed ints, carried because they are NOT
+		// padding: on an area-targeting kind `Fixed2d6` is the AURA PERIOD in centiseconds (Gangrenous Stench's
+		// "every 4 seconds" is 400), and treating those words as a signature is what hid every aura until #772.
+		public readonly record struct Element(int Offset, uint Kind, uint[] Values, string?[] Texts, int WidthBytes, uint Fixed2d5 = 0, uint Fixed2d6 = 0)
 		{
 			/// <summary>The registered type, or null when the kind is not a GameAction the client knows.</summary>
 			public GameActionType? Type => GameActionTypes.Get(Kind);
