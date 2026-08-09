@@ -1573,6 +1573,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("BagExtraSlots")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("Can")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
@@ -1593,6 +1596,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("MinDamage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MoreFlags")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -1636,6 +1642,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Bound")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Container")
