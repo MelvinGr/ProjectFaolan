@@ -88,9 +88,9 @@ namespace Faolan.Tests
 				Position = new Vector3(1000, 0, 1000)
 			});
 
-			// The living NPC pulses its idle heartbeat (#225) but produces no respawn/loot effect; a player produces
-			// none. Filter the heartbeat out - the invariant here is "no lifecycle effect for a living NPC or a player".
-			Assert.DoesNotContain(world.Tick(100.0), e => e.Type != WorldTickEffectType.NpcHeartbeat);
+			// Neither a living NPC nor a player produces a lifecycle effect. Nothing to filter: the living NPC here
+			// carries no ambient animations, so the tick is genuinely silent for it (#225/#766).
+			Assert.Empty(world.Tick(100.0));
 		}
 
 		[Fact]

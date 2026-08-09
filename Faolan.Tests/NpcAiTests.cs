@@ -126,7 +126,7 @@ namespace Faolan.Tests
 			npc.MarkDead();
 			zone.Add(npc);
 
-			Assert.DoesNotContain(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat);
+			Assert.DoesNotContain(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcAmbientAnimation);
 		}
 
 		[Fact]
@@ -181,15 +181,17 @@ namespace Faolan.Tests
 		[Fact]
 		public void LiveNpc_EmitsHeartbeat_OncePerInterval()
 		{
-			// #225: a live NPC pulses its idle heartbeat on its own cadence (HeartbeatIntervalSeconds), not every base
-			// tick and not before the interval elapses. Non-hostile so no aggro/move effects muddy the assertion.
+			// #225/#766: an ordinary NPC's idle behaviour is now the ambient ANIMATION, on its own per-entity clock -
+			// there is no per-tick heartbeat pulse to fire at all. Non-hostile so no aggro/move effects muddy it.
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			var npc = NpcTemplate(1, 0, 0, hostile: false);
+			npc.AmbientAnimations = [new AmbientAnimation(62171, 200, 10)];
 			zone.Add(npc);
 
-			Assert.DoesNotContain(world.Tick(0.2), e => e.Type == WorldTickEffectType.NpcHeartbeat); // before the interval
-			Assert.Single(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcHeartbeat && e.Entity == npc); // after
+			Assert.Single(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcAmbientAnimation && e.Entity == npc);
+			// ...and the next is not due until this one has finished (2s) plus the pause it then stands for.
+			Assert.DoesNotContain(world.Tick(1.0), e => e.Type == WorldTickEffectType.NpcAmbientAnimation);
 		}
 
 		[Fact]
@@ -442,11 +444,11 @@ namespace Faolan.Tests
 			Assert.Equal(npc.SpawnPosition, npc.MoveFrom);
 		}
 
-		// The idle heartbeat (#225) fires for every live NPC on its own cadence, so the "no aggro/attack happened"
-		// assertions filter it out - they care that no COMBAT effect was produced, not that the tick was silent.
+		// The ambient idle animation (#766) fires on each NPC's own clock, so the "no aggro/attack happened" assertions
+		// filter it out - they care that no COMBAT effect was produced, not that the tick was silent.
 		private static IEnumerable<WorldTickEffect> NonHeartbeat(IReadOnlyList<WorldTickEffect> effects)
 		{
-			return effects.Where(e => e.Type != WorldTickEffectType.NpcHeartbeat);
+			return effects.Where(e => e.Type != WorldTickEffectType.NpcAmbientAnimation);
 		}
 
 		private static WorldEntity NpcTemplate(uint handle, float x, float z, uint level = 1, bool hostile = true)

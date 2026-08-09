@@ -16,6 +16,13 @@
 > the world conversation (matching retail's ~1206-packet steady stream that parts 4–7 never noticed) — 1834 packets,
 > conversation provably alive — did NOT make the client poll a mid-session spawn. So conversation liveness is not the
 > gate; the playfield-token match is. (Parts 1–7 kept below as the investigation record; part 3 was right.)
+>
+> ⚠️ **Correction to the parenthesis, 2026-08-10:** there is no "retail steady stream" to match. Those ~1,206 records
+> are `BehaviorId.BccAction`, and 1,250 of that capture's 1,353 go to ONE actor — the necromancer's Nemedian
+> Deathstalker pet — in bursts of ~60 inside a single second. Across the corpus retail sends this record **p50 once
+> per actor** (37,965 over 7,969 actors). See the ambient section of
+> [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md). It does not change this page's
+> conclusion, which is about the token, not the stream.
 
 > **CONVERGED CONCLUSION (2026-06-16, after the Ghidra + offline-capture deep-dive in parts 2–7 below) — SUPERSEDED, see the SOLVED banner above.**
 > The selective mid-session drop is a **remote-reference resolution failure** in the client: `n3InfoItemRemote::

@@ -28,11 +28,6 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
 		}
 
-		Task IWorldOutbound.BroadcastNpcHeartbeat(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcHeartbeat(npc);
-		}
-
 		Task IWorldOutbound.BroadcastNpcAmbientAnimation(WorldEntity npc)
 		{
 			return _broadcaster.BroadcastNpcAmbientAnimation(npc);

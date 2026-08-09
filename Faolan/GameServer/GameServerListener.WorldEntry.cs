@@ -363,10 +363,18 @@ namespace Faolan.GameServer
 			var ack1 = body.ReadUInt32();
 			var characterId = body.ReadUInt32();
 
-			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
+			var viewer = _simulation.PlayerWorldEntity(client);
+			viewer?.Confirmed.Add(requestId);
 
 			if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
 				await SendSpawnCheckResponse(client, requestId);
+
+			// #225: and this is where the "this entity is alive and idling" assert belongs - ONCE, to the client that has
+			// just told us it built the dynel. Retail sends p50 1 per actor (37,965 records over 7,969 actors); the pulse
+			// this replaces sent one per NPC per second, which is where #716's 119.6 BCC/s came from. Sending it here
+			// rather than from the tick is also what makes the Confirmed gate structural instead of a check.
+			if (viewer != null && _simulation.World.ZoneForEntity(viewer).TryGet(requestId, out var confirmed) && !confirmed.IsPlayer && !confirmed.IsLoot)
+				await _broadcaster.SendNpcIdleAssert(client, confirmed);
 
 			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
 			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,

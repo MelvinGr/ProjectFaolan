@@ -39,10 +39,10 @@ namespace Faolan.GameServer.World
 		// finishes loading). Kept on to exercise real combat death + the death/release screen (#214).
 		private const bool NpcAutoAttackEnabled = true;
 
-		// #225: stream the continuous idle heartbeat (short-form BehaviorControlCenterIIR) for live NPCs so they keep
-		// playing their idle animation instead of freezing. Confirmed-gated in the broadcaster (never hits a loading
-		// client). A kill-switch for the in-client pass in case the cadence needs disabling rather than just tuning.
-		private const bool NpcHeartbeatEnabled = true;
+		// #766: play each creature's ambient idle animations (BehaviorId.Emote) so a standing NPC looks alive rather than
+		// frozen on its spawn pose. Confirmed-gated in the broadcaster (never hits a loading client). A kill-switch for
+		// the in-client pass, in case the animations want disabling rather than just re-timing.
+		private const bool NpcAmbientAnimationEnabled = true;
 
 		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
 		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
@@ -944,21 +944,12 @@ namespace Faolan.GameServer.World
 									break;
 								}
 
-								case WorldTickEffectType.NpcHeartbeat:
-								{
-									// The idle-behavior pulse - ungated (fidelity, not combat), like NpcPatrol/NpcFollow; the
-									// Confirmed gate in the broadcaster keeps it off a still-loading client (#225).
-									if (NpcHeartbeatEnabled)
-										await _output.BroadcastNpcHeartbeat(effect.Entity);
-									break;
-								}
-
-								case WorldTickEffectType.NpcAmbientAnimation:
+									case WorldTickEffectType.NpcAmbientAnimation:
 								{
 									// #766: the ambient idle animation - a citizen leaning on a wall rather than standing
 									// to attention. Cosmetic, so ungated like the heartbeat above; the tick already picked
 									// which animation and how long it runs.
-									if (NpcHeartbeatEnabled)
+									if (NpcAmbientAnimationEnabled)
 										await _output.BroadcastNpcAmbientAnimation(effect.Entity);
 									break;
 								}

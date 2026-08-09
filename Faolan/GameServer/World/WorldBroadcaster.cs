@@ -514,21 +514,27 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC arrived home and stopped moving: send a StopIIR (final position + facing) to every viewer that sees it,
-		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
-		public async Task BroadcastNpcHeartbeat(WorldEntity npc)
+		// The "this entity is alive and idling" assert (#225): a short-form BehaviorControlCenterIIR (BehaviorId.BccAction)
+		// naming the one fixed idle behaviour, sent to the client that has just CONFIRMED building this NPC's dynel.
+		//
+		// ⚠️ ONCE per entity per viewer, which is what retail does and is not what this used to do. It was streamed as a
+		// per-NPC ~1/s heartbeat - and #716 then had to cap the aggregate, because in Old Tarantia that was 119.6
+		// BCC/s at one client. Measured over the corpus (`--report ambient-animation`): 37,965 records over 7,969
+		// actors, **p50 1 record per actor**, p90 2. Retail asserts it as an entity comes into view and stops.
+		//
+		// The "continuous ~10/s per rendered entity" #225 was filed on was ONE actor in one capture - the necromancer's
+		// Nemedian Deathstalker pet, which takes 1,250 of that capture's 1,353 records in bursts (60 inside one second,
+		// p50 gap 0.000s). Generalising that actor to every entity is what produced the flood. What genuinely recurs for
+		// an ordinary NPC is the ambient ANIMATION, a different command - see BroadcastNpcAmbientAnimation (#766).
+		//
+		// Confirmed-gated by construction (the caller is the confirm), because a record for a Known-but-not-Confirmed
+		// handle hits the pcDynel-NULL loader crash - the hang the original heartbeat experiment ran into.
+		public Task SendNpcIdleAssert(INetworkClient recipient, WorldEntity npc)
 		{
-			// The short-form BehaviorControlCenterIIR idle pulse (#225), carrying the NPC's monotonic per-entity tick. The
-			// codec output is the bare IIR record (no length prefix), so it rides WorldIir.Send - the same framing as the
-			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
-			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
-			var record = BehaviorControlCenterCodec.Build(BehaviorAnimations.Heartbeat(npc.Handle, ++npc.HeartbeatTick));
+			ArgumentNullException.ThrowIfNull(recipient);
+			ArgumentNullException.ThrowIfNull(npc);
 
-			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
-			{
-				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
-					await WorldIir.Send(viewer.Client, record);
-			}
+			return WorldIir.Send(recipient, BehaviorControlCenterCodec.Build(BehaviorAnimations.Heartbeat(npc.Handle, ++npc.HeartbeatTick)));
 		}
 
 		// The NPC performs one of its creature's ambient idle animations (#766): a BehaviorId.Emote record naming the

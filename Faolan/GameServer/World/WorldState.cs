@@ -146,24 +146,6 @@ namespace Faolan.GameServer.World
 		// range; the exact factor is ours, only the fact that it must exceed GreetingRange matters.
 		public const float GreetingForgetRange = GreetingRange * 1.5f;
 
-		// The idle-heartbeat pulse (#225): a live NPC (re-)asserts its short-form BehaviorControlCenterIIR so the client
-		// keeps playing its idle animation instead of freezing. The broadcast is gated to Confirmed viewers, so it never
-		// fires at a still-loading client (the hang the earlier experiment hit).
-		//
-		// ⚠️ This interval is the PULSE, not the aggregate. It used to be applied to every live NPC on the same tick,
-		// which made the wire rate scale with the zone's population: 1/s x ~120 visible NPCs in Old Tarantia measured at
-		// 119.6 BCC/s to a single client, against a retail median of 0.93/s over the 91 corpus captures of >=60s (p90
-		// 2.35, max 40.78 - and that max is an 89s resurrect burst, not a floor). ~130x the median (#716).
-		//
-		// So the budget below caps the AGGREGATE and the pulse rotates through the population by handle: every NPC still
-		// heartbeats, just on a period that grows with how many there are. Interim - retail's real subject/cadence is
-		// not pinned yet (0.93/s with dozens of NPCs in view is plainly not per-entity), and deriving it is #225's
-		// remaining work. This only stops the flood.
-		private const double HeartbeatIntervalSeconds = 1.0;
-
-		// #716: the target aggregate BCC rate, in pulses per second per zone - retail's p90 (2.35/s), rounded down.
-		private const int HeartbeatsPerSecond = 2;
-
 		// #766: how long a creature STANDS between two ambient idle animations, on top of the animation's own length.
 		// Capture-measured over 22,696 consecutive pairs (`--report ambient-animation`): p10 0.1s, p50 2.2s, p90 19.0s.
 		//
@@ -184,13 +166,8 @@ namespace Faolan.GameServer.World
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService? _terrain;
 		private readonly TickAccumulator _chatter = new TickAccumulator(ChatterCheckSeconds);
-		private readonly TickAccumulator _heartbeat = new TickAccumulator(HeartbeatIntervalSeconds);
 
 		private uint _nextPlayfieldToken = 0x00A00000;
-
-		// #716: which slice of the population this heartbeat pulse belongs to; advances once per pulse so the shards
-		// take turns. Unsigned so the wrap is defined.
-		private uint _heartbeatPhase;
 
 		public WorldState(TerrainService? terrain = null)
 		{
@@ -258,24 +235,10 @@ namespace Faolan.GameServer.World
 		{
 			List<WorldTickEffect> effects = [];
 
-			// #225: fire the idle heartbeat on its own cadence (once per HeartbeatIntervalSeconds), not every base tick.
-			// Computed once per Tick, then applied inside the entity loop below.
-			var heartbeatDue = _heartbeat.Advance(deltaSeconds, out _);
 			var chatterDue = _chatter.Advance(deltaSeconds, out _);
-			if (heartbeatDue)
-				_heartbeatPhase++; // #716: next slice of the population takes this pulse
 
 			foreach (var zone in _zones.Values) // Parralell?
 			{
-				// #716: how many pulses it takes to cover this zone once, so the AGGREGATE stays at HeartbeatsPerSecond
-				// however many NPCs are standing in it. Sharding by handle (rather than by position in the iteration)
-				// keeps an entity in the same slice from pulse to pulse - zone.Entities is a ConcurrentDictionary, whose
-				// order is not stable, so a positional round-robin would skip and repeat entities at random.
-				var heartbeatShards = heartbeatDue
-					? (uint)Math.Max(1, zone.Entities.Count(e => e is { IsLoot: false, IsPlayer: false }) / Math.Max(1, HeartbeatsPerSecond))
-					: 1u;
-				var heartbeatShard = _heartbeatPhase % heartbeatShards;
-
 				foreach (var entity in zone.Entities)
 				{
 					if (entity.IsLoot)
@@ -327,11 +290,7 @@ namespace Faolan.GameServer.World
 						continue;
 					}
 
-					// #225: past here the entity is a LIVE NPC. Pulse its idle heartbeat when due, independent of whether
-					// it also moves this tick (retail streams the heartbeat continuously alongside any MoveTask).
-					if (heartbeatDue && entity.Handle % heartbeatShards == heartbeatShard)
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcHeartbeat));
-
+					// Past here the entity is a LIVE NPC.
 					// #766: the AMBIENT IDLE ANIMATION - a citizen leaning on a wall, scratching, looking round. Unlike the
 					// heartbeat above this is per-entity and self-timed: the animation's own length plus the pause the
 					// creature stands for afterwards, because retail never starts one before the last has finished.

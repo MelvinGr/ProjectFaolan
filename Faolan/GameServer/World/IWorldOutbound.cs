@@ -24,13 +24,8 @@ namespace Faolan.GameServer.World
 		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
 		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
 
-		// Broadcast an NPC's idle heartbeat (short-form BehaviorControlCenterIIR 0x642CD3D6) to the players who have it
-		// CONFIRMED, so it keeps playing its idle animation instead of freezing (#225). Confirmed-gated (not Known) so it
-		// is never sent to a still-loading client - the pcDynel-NULL hang the earlier heartbeat experiment hit.
-		Task BroadcastNpcHeartbeat(WorldEntity npc);
-
 		// Broadcast the ambient idle ANIMATION the tick picked for this NPC (BehaviorId.Emote, #766) to the players who
-		// have it CONFIRMED - same gating and same reason as the heartbeat above.
+		// have it CONFIRMED - a still-loading viewer has no dynel to play it on.
 		Task BroadcastNpcAmbientAnimation(WorldEntity npc);
 
 		// Broadcast a defender's directional-combat shield rose (CombatShieldIIR 0xCFFD0519) to the players who can see
