@@ -369,10 +369,12 @@ bind-on-pickup test is bit 26 of `AcgItemData_t::GetInterpolatedItem(quad)[+0xC8
 `Flags` word — `InventoryGame_c::AddTemplateItem` copies it straight into stat 0, and retail's arrivals match the
 template's own `Flags` 174 times out of 179. On that reading `Bindings of Dark Terror` (3762969, template `Flags`
 `0x04000001`) binds on pickup, yet its in-client GM tooltip renders *"Binds when Equipped"* with no `Character
-Bound` prefix, which the disassembled branch only reaches when the pickup predicate returned **false**. Either the
-interpolated item's flags are not template1's verbatim (ACG composition — #752), or `GetInterpolatedItem` simply
-failed to resolve the quad OUR server sends, since we ship `flags = 1` and flatten `template2` onto `template1`.
-The two are told apart by one in-client look once the real `Flags` word is on the wire.
+Bound` prefix, which the disassembled branch only reaches when the pickup predicate returned **false**. Two
+explanations were open: the interpolated item's flags are not template1's verbatim (ACG composition — #752), or
+`GetInterpolatedItem` failed to resolve the degraded quad our server sent at the time (`flags = 1`, `template2`
+flattened onto `template1`). **Neither survives as stated.** #756 put the real `Flags` word on the wire and #752
+the real template pair, and this template carries `template2 == template1` anyway, so there is no composition to
+do. One in-client look now settles whether the tooltip still renders wrong.
 
 ### The gem/slot colour match
 **Tracked: Gitea #754.** [V0: the gem/slot COLOUR match - the client asserts on "Invalid gem slot colour" and the

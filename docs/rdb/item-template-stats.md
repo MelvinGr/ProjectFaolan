@@ -105,10 +105,12 @@ equip is the server setting that bit on the equipped cell.
 ⚠️ **One template contradicts the pickup half and is not resolved.** `Bindings of Dark Terror` (3762969) carries
 bit 26 in its template, so it should read as bind-on-pickup, yet its in-client GM tooltip says *"Binds when
 Equipped"* with no `Character Bound` prefix — which per the disassembled branch requires
-`FUN_014d5210` to have returned **false**. That render was on OUR server, where every item ships `flags = 1` and
-`template2` is flattened onto `template1` (#752), so the likely cause is `AcgItemData_t::GetInterpolatedItem`
-failing to resolve the quad we send (its `iVar1 == 0` path returns false). Re-check in-client once the real `Flags`
-word is on the wire. `[V0: whether an interpolated ACG item's flags can differ from template1's]`
+`FUN_014d5210` to have returned **false**. That render was on OUR server while it still shipped `flags = 1` and a
+`template2` flattened onto `template1`, so the standing explanation was `AcgItemData_t::GetInterpolatedItem`
+failing to resolve the degraded quad we sent (its `iVar1 == 0` path returns false). **Both degradations are gone** —
+the real `Flags` word since #756 and the real template pair since #752 — and this template has
+`template2 == template1` regardless, so ACG composition cannot account for it either. What is left is one in-client
+re-check. `[V0: whether an interpolated ACG item's flags can differ from template1's]`
 
 ⚠️ **The field ids ARE wire stat ids** — this page said "NOT wire stat ids" until #626 showed the spell
 record's are, and the two share several numbers (287, 294). Resolved against the client's own stat-name table
