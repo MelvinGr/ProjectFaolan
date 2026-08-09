@@ -159,11 +159,24 @@ so today every online friend renders as whatever that id happens to name.
 
 
 ### What `npc_type` 1 and 2 mean
-**Tracked: Gitea #508.** [V0: what npc_type 1 and 2 mean] `NpcStats.npc_type` (field 14) is the NPC kind that
-drives the nameplate rank, and **3 is the boss/elite rank the client draws skulls next to** — identified from the
-annotation `talked to npc keira (skulls next to name. like king conan)`, whose two NPCs both carry 3, and
-corroborated by the 56-row roster that value selects. **4** is equally clear from behaviour: 534 of its 897 rows
-are shop vendors and 513 have a conversation, i.e. ordinary interactive NPCs.
+**Tracked: Gitea #508.** [V0: what npc_type 1 and 2 mean] `NpcStats.npc_type` (field 14) is the NPC kind, and one
+of the inputs to the nameplate's rank decoration. **4** is clear from behaviour: 534 of its 897 rows are shop
+vendors and 513 have a conversation, i.e. ordinary interactive NPCs.
+
+⚠️ **This entry used to say "3 is the boss/elite rank the client draws skulls next to". That was over-claimed and
+is retracted.** The evidence is one annotation — `talked to npc keira (skulls next to name. like king conan)` —
+and Keaira and King Conan do both carry 3. That is sound for those **two** NPCs; extending it to all 59 rows is
+not. The roster contains `Tamed Puma` and `Pleasurable Company` (a pet and a Tortage civilian), `Mama Bear`,
+`Yeti` and `Decaying Corpse`, and its health spans 12,600 to 300,000,000 within the single value. A skull rank
+that includes a tamed pet is not a skull rank.
+
+So 3 is a superset of — or merely correlated with — whatever the client reads to draw a skull, and the real
+selector is unpinned. What is known: the client models **three** tiers, shipping `MiniBoss` and `Boss` tokens,
+separate `EvtDeathMiniBoss` / `EvtDeathFullBoss` script events, and separate `miniboss_icon` / `boss_icon`
+nameplate icons beside a `SkullLeft`/`SkullRight` widget pair. Those widgets are built in the target-window
+builder (`FUN_0163b370`, stored at `+0x13b`/`+0x13c`); their VISIBILITY is set elsewhere, and that writer is the
+thing to find. There is also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been checked
+against.
 
 The two small groups are not separated. **1** (55 rows) is cleanly non-interactive — zero vendors, zero
 conversations, mostly hostile trash — so "plain creature" fits, but nothing rules out a narrower meaning.

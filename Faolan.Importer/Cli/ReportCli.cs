@@ -454,6 +454,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "rdb-word-scan":
+				{
+					RdbWordScan(RdbDir(), arg);
+					return 0;
+				}
+
 				case "region-stat-census":
 				{
 					RegionStatCensus(RdbDir());

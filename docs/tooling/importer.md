@@ -225,6 +225,9 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
 `class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
+`rdb-word-scan` (every RDB record containing a given 32-bit word, by type - the scan our property readers CANNOT do,
+since they all bound a field id to <= 2000 and anything above is invisible to them by construction. LOCAL records
+only unless `:cdn` is passed, because a CDN entry is an HTTP fetch and a whole-RDB sweep would pull ~250k of them),
 `acg-pair` (#752: every ProtoAcgItem in the dumps, tabulated by how template2 relates to template1, with BOTH halves
 of each differing pair decrypted and diffed field by field - they differ only in LEVEL, so the pair is a
 low/high endpoint range),

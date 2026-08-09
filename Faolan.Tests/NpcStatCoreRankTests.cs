@@ -7,7 +7,12 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// `NpcStatCore.NpcType` is the client's `npc_type` (NpcStats field 14) - the NPC kind that decides the nameplate
-	// rank decoration, where 3 is the boss/elite rank the client draws skulls next to (#508).
+	// rank decoration (#508).
+	//
+	// ⚠️ The pin below is on TWO NPCs and that is ALL it establishes. The claim "3 is the skull rank" was retracted:
+	// the same value covers `Tamed Puma` and `Pleasurable Company`, so it is broader than the skull. Keaira and King
+	// Conan carrying 3 remains a real, annotation-backed fact worth gating - it just does not generalise to the
+	// other 57. See NpcStatCore.NpcType and docs/protocol/gaps.md.
 	//
 	// It is already emitted by the live spawn path, so the only way this regresses is through the DATA: a NULL
 	// silently drops the rank and the boss renders as an ordinary mob, with nothing anywhere to say so. That is the
@@ -16,7 +21,7 @@ namespace Faolan.Tests
 	public class NpcStatCoreRankTests
 	{
 		// The two NPCs the chat annotation compares - "talked to npc keira (skulls next to name. like king conan)".
-		// They are the whole basis for reading 3 as the skull rank, so if either stops being 3 the identification
+		// They are the whole basis for connecting 3 to the skull at all, so if either stops being 3 the reading
 		// itself is what broke, not just one row.
 		private const uint KeairaTemplateId = 15090;
 		private const uint KingConanTemplateId = 1917;

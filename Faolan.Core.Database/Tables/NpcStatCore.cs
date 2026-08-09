@@ -110,27 +110,42 @@ namespace Faolan.Core.Database.Tables
 		public uint? Disposition { get; set; }
 		public uint? TemplateId { get; set; }
 
-		// The client's own `npc_type` (NpcStats field 14) - the NPC's KIND, and the field that decides the nameplate
-		// rank decoration: **3 is the boss/elite rank the client draws SKULLS next to** (#508).
+		// The client's own `npc_type` (NpcStats field 14) - the NPC's KIND, which is one of the inputs to the
+		// nameplate's rank decoration (#508).
 		//
-		// Identified from the chat-annotated gameplay capture, which says `talked to npc keira (skulls next to name.
-		// like king conan)`. Keaira (template 15090) and King Conan (1917) are the pair that annotation compares, and
-		// they are the ONLY thing it names - both carry npc_type 3. The 56 rows sharing that value then read as a
-		// roster of exactly what the marker is for: Harbinger of Kao, Wulfhere, Hadrathus, Thunder River Demon Lord,
-		// Verdandi the Ghost King, The Ravager, Saddur, Ape King, Commander Vakarr/Ramn/Magni, Yeti, Mama Bear.
+		// ⚠️ **It is NOT "the skull rank", and this comment used to say it was.** The identification came from one
+		// chat annotation - `talked to npc keira (skulls next to name. like king conan)` - and Keaira (template
+		// 15090) and King Conan (1917) do both carry npc_type 3. That is real evidence for those TWO NPCs and it was
+		// then generalised to all 59 rows sharing the value, which does not survive reading the roster: it contains
+		// `Tamed Puma` and `Pleasurable Company` (a PET and a Tortage civilian), `Mama Bear`, `Yeti` and
+		// `Decaying Corpse`, and its health spans 12,600 to 300,000,000 inside the one value. Melvin, who has played
+		// the game, says the skull is a special rank carried by CERTAIN npcs and that a 59-row list is far too long.
+		//
+		// So 3 is a superset of, or merely correlated with, whatever the client actually reads to draw a skull. The
+		// client models at least three tiers - it ships `MiniBoss` and `Boss` tokens, SEPARATE `EvtDeathMiniBoss` /
+		// `EvtDeathFullBoss` script events, and separate `miniboss_icon` / `boss_icon` nameplate icons beside a
+		// `SkullLeft`/`SkullRight` widget pair - and nothing here has been mapped to those. There is also an
+		// unimported `Difficulty` stat (1398 / 0x576) that no NPC record has been checked for.
+		//
+		// ⚠️ Do NOT build loot, XP or difficulty on `npc_type == 3` meaning boss until the selector is pinned: find
+		// what the client reads to show `SkullLeft`/`SkullRight` and to choose between the two icons. The widgets are
+		// constructed in the target-window builder (`FUN_0163b370`, stored at `+0x13b`/`+0x13c`); their VISIBILITY is
+		// set elsewhere and that writer is the answer.
 		//
 		// The four observed values, characterised by what each group can DO rather than by guessing at names:
 		//   1 (55)  plain creatures - ZERO are vendors and ZERO have a conversation; mostly hostile trash
 		//   2 (10)  a small named group, mixing Tortage destiny NPCs (Delia, Sakumbe, Valerius) with named enemies
 		//           (Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf Iceblade) - see the V0 below
-		//   3 (56)  named bosses / elites - the SKULL rank; 27 of 56 hostile, only 3 have any conversation
+		//   3 (59)  named/special NPCs, bosses among them - but see the warning above; NOT simply "the skull rank"
 		//   4 (897) ordinary interactive NPCs - 534 are shop vendors and 513 have a conversation
 		//
 		// ⚠️ NULL would silently drop the rank, so every NPC renders unranked - which is why NpcStatCoreRankTests
 		// gates the column as fully populated rather than trusting that it happens to be. Nothing here needed
-		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreColumns.ToNpcStats), so the
-		// skull was always reaching the client; the field was simply undocumented, which is why #508 read as missing
-		// plumbing. Types 1 vs 2 are not fully separated - [V0: what npc_type 1 and 2 mean].
+		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreColumns.ToNpcStats), so
+		// whatever it drives was always reaching the client; the field was simply undocumented, which is why #508
+		// read as missing plumbing. Types 1 vs 2 are not separated - [V0: what npc_type 1 and 2 mean]. One lead: 2's
+		// members (Taskmaster Olaf, Arnulf Iceblade, Pict Chief, Argus the Thief, Crow Nightblade; 98k-937k health)
+		// look like MINI-bosses next to 3's up-to-300M, which would match the client's two boss tiers - unproven.
 		public uint? NpcType { get; set; }
 		public uint? NpcFlags { get; set; }
 		public uint? Normalset { get; set; }
