@@ -178,10 +178,18 @@ reached from the client's switch without reference to the annotation. It selects
 those eight are `npc_type == 4` (ordinary interactive NPCs), which is what finally rules out the npc_type reading.
 See `NpcStatCore.Normalset`.
 
-The client also models **three** boss tiers - it ships `MiniBoss` and `Boss` tokens, separate `EvtDeathMiniBoss` /
-`EvtDeathFullBoss` script events and separate `miniboss_icon` / `boss_icon` nameplate icons - and none of those has
-been mapped to a stat. There is also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been
-checked against.
+**What normalset MEANS is a creature RANK, not an appearance set.** The nameplate builder `FUN_011d8b00` branches
+on `GetStat(0xCD, 0) == 4` and resolves the LDB category-100 token `Pray`, whose English text is **"Prey"** — and
+every normalset-4 NPC we hold is a harmless critter (Badger, Chicken, Hen, Moose, Old Mouser), agreeing with the
+client without being consulted. A third reader, `FUN_0163fff0`, sorts the value into four portrait tiers: `2` → 0;
+`{10, 38, 39, 42}` → 1; `{15, 22, 26, 48, 51}` → 2; everything else → 3.
+
+**The three boss tiers are a SEPARATE field, and not a stat.** The same builder reads a non-stat member — dynel
+`+0x330` dereferenced at `+0x18`, valued 1, 2 or 3 — and picks the LDB texts **"Minion"**, **"Mini Boss"** and
+**"Boss"**, all rendered in one place on the nameplate (confirmed in-client: Minion appears in the same spot as
+Mini Boss and Boss). The client's own stat-name table has no minion/boss entry, so no stat carries this. Where the
+member is filled from is open — [V0: where the client's Minion/MiniBoss/Boss nameplate rank comes from]. There is
+also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been checked against.
 
 The two small groups are not separated. **1** (55 rows) is cleanly non-interactive — zero vendors, zero
 conversations, mostly hostile trash — so "plain creature" fits, but nothing rules out a narrower meaning.

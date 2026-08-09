@@ -171,9 +171,30 @@ namespace Faolan.Core.Database.Tables
 		// NULL, so an unharvested NPC cannot show a skull whatever it should do. Of the 15 skull-bearing values only
 		// 8 and 15 occur in our data; the other 13 are unseen rather than unused.
 		//
-		// ⚠️ What normalset MEANS beyond this is undecoded - the name suggests an appearance/animation set, and the
-		// skull may be a consequence of the set rather than its purpose. [V0: what npc normalset selects besides the
-		// nameplate skull]
+		// **What it MEANS: a creature RANK, not an appearance set.** The name reads like an animation/appearance set
+		// and that guess used to sit here; the client disproves it. The nameplate builder (`FUN_011d8b00`) branches
+		// on `GetStat(0xCD, 0) == 4` and, when it matches, resolves the LDB category-100 token `Pray` - whose English
+		// text is **"Prey"**. Our own rows agree without being consulted: every normalset-4 NPC we have is a harmless
+		// critter (Badger, Chicken, Hen, Moose, Old Mouser). An animation set does not have a member called Prey.
+		//
+		// The groups, characterised by their members rather than by guessing at names:
+		//
+		//      1 (38)  beasts and trash - Attack Dog, Bear Cub, Crow Harrier, Atzel Smuggler
+		//      2 (41)  strong/named mixed - Abyssal Keeper, Ancient Crocodile, Ape King, Ares the Pyromancer
+		//      3 (12)  named humanoids - Argus the Thief, Delia, Eerika of the Maidens, Pict Chief
+		//      4 (16)  PREY (client-named) - Badger, Chicken, Hen, Moose, Old Mouser
+		//      8 ( 4)  SKULL - the four Wolf Pict leaders (Arena Master, Warlord, Master Tracker, Shaman)
+		//     15 ( 4)  SKULL - King Conan, Keaira, Frostfather, Wheel of Pain
+		//     16/17/28 casters and demons  ·  32/40 guards and townsfolk  ·  9/13/30/45 assorted
+		//
+		// A third reader classifies the value four ways for the target portrait (`FUN_0163fff0`): 2 -> 0;
+		// {10, 38, 39, 42} -> 1; {15, 22, 26, 48, 51} -> 2; everything else -> 3.
+		//
+		// ⚠️ **The Minion / Mini Boss / Boss labels are NOT this field, and not a stat at all.** The same nameplate
+		// builder takes them from a non-stat member - dynel `+0x330` dereferenced at `+0x18`, valued 1, 2 or 3 - and
+		// the client's own stat-name table has no minion/boss entry to read them from. Their LDB texts are "Minion",
+		// "Mini Boss" and "Boss". Where that member is filled from is open. [V0: where the client's Minion/MiniBoss/
+		// Boss nameplate rank comes from]
 		public uint? Normalset { get; set; }
 		public uint? SuperFamily { get; set; }
 		public uint? ProfessionName { get; set; }
