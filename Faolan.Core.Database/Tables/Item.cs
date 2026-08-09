@@ -61,6 +61,29 @@ namespace Faolan.Core.Database.Tables
 		// yet, not a general gap. This comment used to claim the opposite ("mostly 0 for capture-harvested items"),
 		// which is what stopped anyone looking at the column when the emitter was sending 1.
 		public byte Level { get; set; }
+
+		// The template's `Flags` word - RDB item-template property field **0**, the client's own name for it - and it
+		// is the item's BIRTH `stat_list` stat-0 value, not a derived column. `InventoryGame_c::AddTemplateItem` copies
+		// this dword straight into a newly created item's stat 0, and retail's server does the same: of the 179
+		// captured DispatchAddItem arrivals, 174 carry EXACTLY this value, and four of the five differences are only
+		// bit 4 (0x10, a delivery-path bit the client itself ORs in on mail/AH hand-overs).
+		//
+		// ⭐ **Bit 26 (0x04000000) is BOUND.** A template carrying it produces items that exist bound from the moment
+		// they are created - which is what the client's tooltip calls "Binds when Picked Up" (1,267 of 4,741
+		// templates). Bind-on-EQUIP is a separate, computed rule over fields 177/499/30 and is not in this word.
+		// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:46:44 and 09:47:00 catch one binding:
+		//  stat 0 goes 0x00000001 -> 0x04000001 across an equip]
+		//
+		// ⚠️ Read with ItemTemplateProperties, NOT TryReadPropertyField - field 0 sits in the property table's FIRST
+		// descending run and that reader takes the longest run and rejects fieldId 0, so it cannot see this at all.
+		// See docs/rdb/item-template-stats.md.
+		//
+		// ⚠️ NULLABLE, and that is load-bearing: 65 templates genuinely carry `Flags = 0`, so 0 cannot double as
+		// "we have not read a template for this item". 61 of the shipped items have no readable/decryptable RDB entry
+		// at all; they get NULL and the emitter falls back (see SnapshotItems.DefaultFlags) rather than claiming the
+		// template said zero.
+		public uint? Flags { get; set; }
+
 		public int? MaxDamage { get; set; }
 
 		// The weapon's inherent MIN/MAX damage - RDB item-template property fields 286 (0x11E) / 285 (0x11D), decoded

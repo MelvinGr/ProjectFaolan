@@ -22,6 +22,11 @@ namespace Faolan.Importer.Rdb
 	public static class RdbItemImporter
 	{
 		private const uint BagPropertyField = 104; // = ContainerKind.Bag (0x68)
+
+		// Property field 0 is the client's `Flags` word - the item's birth stat-0 value (#756). Bit 26 is BOUND, so a
+		// template carrying it mints items that are already bound: the client's "Binds when Picked Up".
+		private const uint FlagsPropertyField = 0;
+		private const uint BoundFlag = 1u << 26;
 		private const uint MarkerItem = 1000000;
 
 		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
@@ -133,6 +138,7 @@ namespace Faolan.Importer.Rdb
 				qualitiesAdded = 0,
 				statsAdded = 0,
 				bagsAdded = 0,
+				flagsAdded = 0,
 				weaponDamageAdded = 0;
 			var firstSampleShown = false;
 
@@ -186,6 +192,18 @@ namespace Faolan.Importer.Rdb
 				{
 					item.SearchCategory = category;
 					categoriesAdded++;
+				}
+
+				// The template's `Flags` word - property field 0, the item's BIRTH stat-0 value, whose bit 26 is the
+				// BOUND flag (#756). Read through ItemTemplateProperties, which walks the WHOLE property table:
+				// TryReadPropertyField below cannot reach field 0 at all (it takes the longest strictly-decreasing run
+				// and rejects fieldId 0, and field 0 lives at the end of the FIRST run). Measured against the dumps,
+				// 174 of 179 captured DispatchAddItem arrivals carry exactly this value.
+				var properties = ItemTemplateProperties.Parse(template.AsSpan(12));
+				if (properties.Fields.TryGetValue(FlagsPropertyField, out var flags) && flags != item.Flags)
+				{
+					item.Flags = flags;
+					flagsAdded++;
 				}
 
 				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
@@ -298,11 +316,20 @@ namespace Faolan.Importer.Rdb
 			// The *Bonus columns were set on tracked Item entities above, so they save with everything else. (The old
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
-			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0)
+			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0 ||
+			    flagsAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
+
+			if (flagsAdded > 0)
+			{
+				// ⚠️ `i.Flags is { } f && ...`, NOT `(i.Flags & BoundFlag) != 0`: `Flags` is `uint?`, and a LIFTED
+				// `!= 0` is TRUE for null - so the short form counted all 61 items with no readable template as bound.
+				var bound = items.Count(i => i.Flags is { } f && (f & BoundFlag) != 0);
+				Console.WriteLine($"  Flags (field 0) set on {flagsAdded} item(s); {bound} of them are BOUND on pickup (bit 26, #756).");
+			}
 
 			if (weaponDamageAdded > 0)
 				Console.WriteLine($"  weapon min/max damage (fields 286/285) set on {weaponDamageAdded} item(s).");

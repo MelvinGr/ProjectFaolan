@@ -20,6 +20,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItems
 	{
+		// What to send as stat 0 when `Item.Flags` is NULL - i.e. when no RDB template was readable for the item, so
+		// there is no measured word to send. `1` is the value every item shipped before #756 and the one bit 4,676 of
+		// the 4,741 readable templates carry, so it is the least-wrong fallback; it is NOT a decoded default, and an
+		// item that reaches it renders as unbound whatever its template would have said.
+		private const uint DefaultFlags = 1;
+
 		// Builds the bare per-item entry (ProtoInventoryGameEntry, i.e. InventoryListEntry.item without the Pos
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
@@ -102,17 +108,32 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The typed form, used directly by FullCharacterRoots' generated containers. The world-entry snapshot
 		// entry carries the fixed (flags, recordId, count) stat triple.
 		//
+		// ⭐ `flags` is the TEMPLATE's own `Flags` word (`Item.Flags`, RDB property field 0), not a caller's choice.
+		// It used to be a `flags = 1` default parameter that no caller ever passed - the third time that exact shape
+		// has shipped a wrong constant here, after `level = 1` on this same entry and the dead `level` on
+		// GrantItemToBackpack. Retail's value is measurable and it is this column: 174 of the 179 captured
+		// DispatchAddItem arrivals carry EXACTLY their template's Flags (#756, `--report item-binding`).
+		//
+		// ⚠️ Bit 26 is BOUND, so sending the real word is also what makes "Character Bound : Binds when Picked Up"
+		// render for the 1,267 templates that mint bound. The per-INSTANCE half - an item that binds when EQUIPPED,
+		// which the server marks by re-sending stat 0 with bit 26 on the equipped cell - is not stored yet and will
+		// land with the equip behaviour that needs it.
+		//
+		// A NULL `Item.Flags` means no template was readable for that item (61 of the shipped rows), NOT that the
+		// template said zero - 65 templates genuinely carry 0, which is why the column is nullable. Those fall back
+		// to DefaultFlags.
+		//
 		// That triple is the SNAPSHOT's shape and it is a good match for retail's: of 8,479 captured snapshot
 		// entries, 100% carry StaticInstance(0x17), 95% Flags(0x00) and 93% StackSize(0x1A), and the rest of the
 		// stats are sparse (Duration on 16%, ItemSource on 5 entries total). The LIVE add is a different shape -
 		// see LiveAddEntry (#722).
-		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1,
+		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash,
 			string? creatorName = null, IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], creatorName, sockets)
+				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, item.Flags ?? DefaultFlags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], creatorName, sockets)
 			};
 		}
 
@@ -153,12 +174,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// (1,2,5,7,13,15,16,19) and guessing is worse than omitting - a wrong provenance is a false claim, a missing
 		// one is a gap. Decoding it needs each add correlated with the c2s action that produced it; grouping by
 		// capture is too coarse, since values 2, 7 and 15 all appear within the same sessions. Tracked separately.
-		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, string? creatorName = null,
+		public static ProtoInventoryGameEntry LiveAddEntry(ulong itemId, ulong recordId, ulong count, Item item, uint hash, string? creatorName = null,
 			IEnumerable<ItemInstanceSocket>? sockets = null)
 		{
 			return InventoryEntry(itemId, item, hash,
 			[
-				new ItemStat(0, (uint)flags),
+				new ItemStat(0, item.Flags ?? DefaultFlags),
 				new ItemStat((uint)CharacterStatId.Duration, NoExpiry),
 				new ItemStat(23, (uint)recordId),
 				new ItemStat(26, (uint)count)

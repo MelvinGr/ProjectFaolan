@@ -304,3 +304,18 @@ What this does NOT yet give us: which reference templates bracket a given item, 
 the two. That is no longer needed for item STATS — those are read straight out of each template's own record region
 (above) — but it is still the mechanism behind the class attribute BASE, which arrives as a per-class template the
 client interpolates at the character's level. Open work: Gitea #444.
+
+### What we ship (2026-08-09)
+
+`Item.Flags` carries the harvested word — **4,688 of 4,749** items, **1,267** of them minting bound; it is
+**nullable**, because 65 templates genuinely carry `0` and 61 items have no readable RDB entry, so a `0` cannot
+also mean "unread". `SnapshotItems` sends it as stat 0 on both the snapshot entry and the live add, falling back
+to `1` only for the null case. The `flags = 1` default parameter that no caller ever passed is gone — the third
+time that exact shape shipped a wrong constant on this message.
+
+Not shipped yet: the per-INSTANCE half. An item that binds when EQUIPPED needs the server to set bit 26 on the
+equipped cell and re-send stat 0 (the message the capture above shows), and somewhere to persist that it has
+bound. `ItemInstance.Binding` was **deleted** rather than repurposed — the decode says the per-instance state is
+one bit, not the three-valued enum that column modelled — so the storage lands with the equip behaviour that
+needs it. Gated by `ItemFlagsTests`; measured by `--report item-binding`.
+
