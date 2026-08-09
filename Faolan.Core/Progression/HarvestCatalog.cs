@@ -117,7 +117,10 @@ namespace Faolan.Core.Progression
 			new(3935343, "Lead Deposit", 3927913), // Lead      - same off-band id space as Birch
 			new(3935344, "Nickel Deposit", null), // no item named Nickel ships
 			new(3935345, "Chromium Deposit", null), // no item named Chromium ships
-			new(3935373, "Pyrite Lode", null), // no item named Pyrite ships
+			// Pyrite was in the gap list until 2026-08-09: item 3927918 shipped all along but NAMELESS, so the gap
+			// check (which matches on the name) could not see it. `rdb-items` decrypting its template is what made it
+			// findable - the same off-band id space as Birch and Lead, one row further along.
+			new(3935373, "Pyrite Lode", 3927918), // Pyrite
 			new(3935374, "Bismuth Lode", null), // no item named Bismuth ships
 			new(3935375, "Mithrite Lode", null) // no item named Mithrite ships
 		}.ToImmutableDictionary(n => n.DisplayId);

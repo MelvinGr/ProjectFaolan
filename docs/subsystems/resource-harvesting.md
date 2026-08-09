@@ -180,13 +180,16 @@ Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandst
 - **The rare cross-drop.** A copper node paid out **tin** — a resource from a different node type — into its own
   resource slot at 18:39:57, beside the copper stack it was filling. So the yield is a roll against a table, not
   a fixed node→resource mapping, and `HarvestCatalog.Resources` models only the fixed part.
-- **Eleven node types have no resource item in `faolan.db`** — `Elm Tree`, `Ironwood`, `Greenstone Formation`,
-  `Marble`, `Slate Rock`, `Nickel Deposit`, `Chromium Deposit`, `Pyrite Lode`, `Bismuth Lode`, `Mithrite Lode`.
+- **Ten node types have no resource item in `faolan.db`** — `Elm Tree`, `Ironwood`, `Greenstone Formation`,
+  `Marble`, `Slate Rock`, `Nickel Deposit`, `Chromium Deposit`, `Bismuth Lode`, `Mithrite Lode`.
   They are listed in `HarvestCatalog.Nodes` with a **null** resource rather than omitted, so they render, deplete
   and name themselves correctly but pay out nothing; inventing an id would hand out the wrong resource.
   `HarvestCatalogTests` fails if an import ever supplies one, so the gap cannot quietly become permanent.
-- **`Sandstone` and `Lead Deposit`** were in the same gap until #734 and are not any more: both have a shipped
-  item (161207, 3927913) and were only missing because the name key never reached them.
+- **`Sandstone`, `Lead Deposit` and `Pyrite Lode`** were in the same gap and are not any more. The first two have
+  a shipped item (161207, 3927913) and were only missing because the name key never reached them. ⭐ `Pyrite`
+  (3927918) is subtler: the item shipped all along but **NAMELESS**, so a gap check that matches on the NAME could
+  not see it — it only became findable once `rdb-items` decrypted its template. A row can be present and still
+  invisible to a name-keyed test.
 - **`Birch Tree`** yields Birch **3927910**, outside the `1611xx` band every other resource sits in. Included
   because the row is structurally identical, but it is the one entry whose id space does not corroborate it.
 
