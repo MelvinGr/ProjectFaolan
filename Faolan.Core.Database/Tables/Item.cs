@@ -280,7 +280,23 @@ namespace Faolan.Core.Database.Tables
 		// potion, food, drink, Double XP potion, ...). The BASE spell id (Spells.Id); the wire ApplySpell id is
 		// base<<8. NULL = not a use-a-spell consumable. Harvested from captures (CaptureItemUseImporter pairs the item's
 		// TemplateActionIIR 0x6C300937 with the adjacent ApplySpell 0x6B87E316); the scalable long-term source is the
-		// RDB item-template on-use field (undecoded). Drives GameServerListener.UseInventoryItem (data, not a per-id switch).
+		// RDB item-template on-use field. Drives GameServerListener.UseInventoryItem (data, not a per-id switch).
+		//
+		// ⭐ **That RDB field is LOCATED** (2026-08-09): it is the third word of a little-endian `[2][9][value]`
+		// triplet in the template's TAIL, past the display-name string where `ItemTemplateProperties` stops. Found by
+		// supervised search - dump the 12 templates whose on-use spell we already harvested, look for the known spell
+		// id, and read what precedes it. It is `[2][9]` in 9 of the 12, at a different offset in each:
+		//
+		//     Raw Beets  @209:  02 00 00 00 | 09 00 00 00 | 28 b9 01 00   -> 112936  "Hearty Meal"
+		//     Moonspill  @253:  02 00 00 00 | 09 00 00 00 | 27 c0 02 00   -> 180263  "Mana Potion Effect 10"
+		//
+		// ⚠️ **NOT yet a sufficient extractor, so nothing imports it.** The same `[2][9]` triplet appears on items
+		// with no on-use effect at all - Quilted Pants carries `[2][9][712801]` - so the tag does not by itself mean
+		// "on-use spell". What separates them is measured but unexplained: all 12 known on-use values resolve in
+		// `Spells`, and 0 of 12 sampled non-consumable values do. Filtering on "the value is a known Spells.Id" would
+		// recover all 12 controls, but it is a heuristic over a half-read grammar and would silently miss any item
+		// whose spell our catalog lacks. The tail's record structure needs finishing first.
+		// [V0: what distinguishes an on-use [2][9] from the others in the item-template tail]
 		public uint? OnUseSpell { get; set; }
 
 		// For a RESOURCE BAG item (equipped in the resource-bag slot, equip slot 26): the extra RESOURCE-container slots
