@@ -518,6 +518,16 @@ namespace Faolan.Importer.Captures
 					throw new InvalidOperationException($"Conversation node id 0x{n.Id:X8} is not unique: '{n.NpcName} ({n.NpcTemplateId}) {n.ContentKey}' collides with '{byId[n.Id]}'.");
 			}
 
+			// ⚠️ TravelDestinations FK a node and DO cascade, so the delete below takes them with it - and the nodes
+			// then come straight back under the SAME derived ids, so nothing about the trip has actually stopped being
+			// true. Snapshot them here and put them back after the rebuild (#763).
+			//
+			// This matters because the two halves of that table have different sources. `travel-wiring` re-harvests
+			// the CAPTURED trips right after this, so those survived by luck; the `{teleportplayer}` directive trips
+			// come from `rdb-dialogue-teleports`, which is OPT-IN and needs an RdbDir - so a default
+			// `--skip characters` run destroyed four rows nothing in that run could rebuild, and the loss was silent.
+			var travelBefore = await db.TravelDestinations.AsNoTracking().ToListAsync();
+
 			// The rebuild drops the WIRING before the screens: an edge names two nodes, and the model deliberately does
 			// not cascade its inbound end (see DatabaseContext), so deleting a node underneath a live edge is a foreign
 			// key violation rather than a silent orphan.
@@ -598,6 +608,27 @@ namespace Faolan.Importer.Captures
 			}
 
 			await db.SaveChangesAsync();
+
+			// Put the travel rows back on the screens that came back (#763). Keyed by the node id, which is DERIVED
+			// from the screen's content - so a screen that still exists is the same screen, and the trip it sold is
+			// still the trip it sells. A row whose screen did NOT survive the fold is genuinely dangling and is
+			// dropped, counted, not silently swallowed.
+			var travelRestored = 0;
+			foreach (var t in travelBefore)
+			{
+				if (!nodeIds.Contains(t.FromNodeId))
+					continue;
+
+				db.TravelDestinations.Add(t);
+				travelRestored++;
+			}
+
+			if (travelRestored > 0)
+				await db.SaveChangesAsync();
+
+			var travelLost = travelBefore.Count - travelRestored;
+			if (travelLost > 0)
+				graph.Report.Add($"{travelLost} travel destination(s) sat on a screen that did not survive the fold - dropped");
 
 			var dropped = graph.Edges.Count - edges + (graph.Entries.Count - entries);
 			if (dropped > 0)
