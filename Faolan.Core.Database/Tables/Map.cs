@@ -116,7 +116,24 @@ namespace Faolan.Core.Database.Tables
 		// It is not an obvious sequence either: of the 39 captures carrying more than one MapChange, ordering them by
 		// frame gives 0,1,2,… in exactly ONE - captures begin at 2 or 3, repeat a value, and go 3 -> 0 - so a
 		// per-session counter is ruled out too. Every one of the 151 is s2c, so direction does not explain it.
-		// Undecoded; it is per-ENTRY state of some kind, and this column is the wrong shape for it.
+		//
+		// Re-measured 2026-08-09 over ALL 132 dumps, which hold **218** of these bodies rather than 151. Two results:
+		//
+		// ⭐ It is far more stable than "per-ENTRY" suggests: within one capture AND one map it is **constant in 174
+		//   of 187 groups**. So it is per-SESSION-per-map state, not per-packet noise - which is a much narrower
+		//   target than this comment used to describe.
+		// ⚠️ Still not pinned, and these are now ruled out BY MEASUREMENT, so do not re-walk them:
+		//   * a counter mod 4 - 0 of the 49 multi-MapChange captures step +1 (re-confirming the note above);
+		//   * arrival ordinal - the nth MapChange of a capture shows the same 0/1/2/3 mix at every n;
+		//   * TIME OF DAY or weather, the reading its position suggests (it is the last word of a scene blob whose
+		//     other members are nearClip/farClip). Correlated against the GameTimeIIR nearest each of 215 records,
+		//     all four values span the whole 0-24h day with medians 7.2/9.4/10.6/11.3. Dead.
+		//   * the instance-owner shape - a lean, not a rule: personal instances carry 0 in 29 of 32, shared in 78 of
+		//     138. Suggestive that 0 means "no extra scene selection", nothing more.
+		//
+		// The distribution: 0 on 135 of 218, and 1/2/3 near-equal at 27/27/29. Maps 1020 and 4020 NEVER carry 0;
+		// 1004, 1092, 2003, 2020, 2090, 2094, 4000, 4022, 4579 and 5009 carry ONLY 0.
+		// [V0: what the PlayfieldFIIR scene blob's last word selects]
 		//
 		// Left in place because it is what we send and changing it is a live wire change on the map-change path; 529
 		// of the 530 rows carry the default 3 (Old Tarantia is 0), so today it is effectively still the constant it

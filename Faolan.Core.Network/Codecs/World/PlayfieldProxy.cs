@@ -43,6 +43,18 @@ namespace Faolan.Core.Network.Codecs.World
 	//                              decisively: entering the Amphitheatre of Karutonia (1092) as a group carries team
 	//                              0x000F08DB here, the exact id DispatchYouJoinedTeam had just announced and that the
 	//                              `~Team` channel subscribed to seconds earlier.
+	//   (0, <characterId>)         ⚠️ a FOURTH shape - added 2026-08-09. "Only ever three shapes" was measured over
+	//                              183 bodies; sweeping all 132 dumps finds 218, and 47 of them carry ownerType 0
+	//                              with a NON-zero owner. Every one is map 4010 (the Tortage beach island) in a
+	//                              create/login capture, and the id is the player's own character id - 35022073 in
+	//                              `Barbarian-create`, which appears in 482 packets of that trace including
+	//                              `SendCharacterSettings` and `LoginConnectReady`. So the beach is a personal
+	//                              instance that names its owner WITHOUT the type-2 tag.
+	//
+	//                              Our builder already emits exactly this: BuildMapChange sends
+	//                              `(PlayfieldFieldA ?? 0, character.Id)` whenever the map is instanced, so nothing
+	//                              is wrong in the code - only in this note. It matters because reading the pair as
+	//                              "type 2 means personal" makes 4010 look SHARED, and it is not.
 	//
 	// So "whose copy of this playfield is this" is answered by these two words, and Map.PlayfieldFieldA storing a 2
 	// per map stays correct for those three maps precisely because they are always personally owned.
