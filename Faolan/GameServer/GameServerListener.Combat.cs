@@ -1,8 +1,6 @@
 using Faolan.Core.Constants;
-using System;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
@@ -121,49 +119,6 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
 		{
 			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
-		}
-
-		// Starts the CLIENT's cooldown sweep for a spell that just went off (#767). The client holds the number itself -
-		// its tooltip renders "Recast: 30 seconds" for Life Leech off the same `SetSpellRecastTime` element the importer
-		// reads - but the only thing that ARMS its per-spell timer (FUN_007e1080, "GameCode/Magic/Recast") is a
-		// GameAction handler. Its own cast path arms nothing but the GCD constants (0.5/1.0/2.0 s), so with no
-		// GameAction the countdown simply never starts, which is exactly the reported bug: the number is in the
-		// tooltip and the button is never greyed.
-		//
-		// ⚠️ This is the ONE thing the six "working" spells never had either. They are not on cooldown - they are the
-		// six with `DurationMs > 0`, so the ApplySpell we send lands a real buff and the client blocks a re-cast while
-		// its own effect is up. Every failing spell has `DurationMs == 0`, gets a duration-0 ApplySpell (#371: an
-		// instant, no icon, untracked) and so has nothing blocking it. That is a buff-bar artifact wearing a
-		// cooldown's clothes, and it is why the split looked per-spell and unexplainable: the recast has never worked
-		// for ANY spell. Sent here, at the site that already arms the server's own timer, it is uniform by
-		// construction - every spell with a recast, buff or no buff.
-		//
-		// ⚠️ NOT captured: retail sends no recast GameAction at all (0 across all 132 dumps, counting sub-records -
-		// 2,095 elements, 15 types, none of the four recast types). So the client must normally arm this locally from
-		// the spell's own RDB element, through the same handler. We do not have that local call site pinned, so this
-		// drives the handler from the wire instead - the same element the client would have applied to itself, with
-		// the value it already agrees on. If retail's client turns out to arm locally on some signal we already send,
-		// this becomes redundant rather than wrong.
-		private static Task SendRecastArm(INetworkClient client, Spell spell, long castBeganAt)
-		{
-			// Measured from the cast BEGIN, matching the server-side timer above and the client's own behaviour (a
-			// 2.0 s Smite with a 1.0 s recast is re-requested 2.43 s after the begin - valid only if the recast ran
-			// from the begin). The client starts counting when it receives this, so send what is LEFT, not the base.
-			var elapsedCs = (Environment.TickCount64 - castBeganAt) / 10;
-			var remainingCs = spell.RecastCentiseconds - elapsedCs;
-			if (remainingCs <= 0)
-				return Task.CompletedTask; // the cast outlasted its own recast - already ready, nothing to arm
-
-			// Line-scoped where the spell has a line, so all five Chill ranks share one timer - the same grouping the
-			// server's own `recastGroup` uses, and what SetSpellLineRecastTime means.
-			var action = spell.GuiStackingLine != 0
-				? SpellRecastActions.SetSpellLineRecastTime(spell.GuiStackingLine, (uint)remainingCs)
-				: SpellRecastActions.SetSpellRecastTime(spell.Id, (uint)remainingCs);
-
-			// `trailer: true` - GameActionListCodec's default is false only for the construct-only builder this
-			// replaces; every captured body carries the ReadSubClass [u8][u32] and without it the client reads past
-			// the record.
-			return SendWorldRecord(client, GameActionListCodec.Build(client.Session.Character.Id, action, trailer: true));
 		}
 
 		// Delivers a completed melee combo (#139). Every step of a combo is an ordinary damaging swing - the corpus

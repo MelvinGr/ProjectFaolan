@@ -257,20 +257,48 @@ those carries `cs = 0`. Life Leech holds 3000 cs = the 30 s its in-client toolti
 places, all in `HandleBccCastSpell`, all writing `Session.SpellReadyAt` — a server-side dictionary. Nothing wrote
 it to a packet.
 
-### The fix
+### ⛔ We do NOT send a recast element, and a version that did was reverted
 
-`SendRecastArm` (`GameServerListener.Combat.cs`) sends a `SetSpellRecastTime` / `SetSpellLineRecastTime` element
-in a `GameActionListIIR`, from the site in `Resolve()` that already arms the server's own timer — so it is
-uniform by construction: every spell with a recast, buff or no buff. Line-scoped where the spell has a
-`GuiStackingLine` (all five Chill ranks share one timer), per-spell otherwise, matching the server's own
-`recastGroup`. The value sent is what REMAINS after the cast time, because the server measures the recast from
-the cast BEGIN while the client starts counting on receipt.
+Sending `SetSpellRecastTime` on cast makes the cooldown appear and passes in-client. It was still **wrong and is
+reverted**: retail sends no recast GameAction, so shipping one is inventing behaviour the captures contradict.
+"It works" is not evidence about retail. See the `retail_leads_never_invent_a_packet` agent memory.
 
-⚠️ **This is not captured behaviour.** Retail sends no recast GameAction at all, so the client must normally arm
-this locally from the spell's own RDB element — the elements are on the spell object, and the only per-spell arm
-(`FUN_007e1080`) is reachable from the `SetSpellRecastTime` handler, which is exactly the element type the record
-carries. That local call site is **not pinned**. Driving the same handler from the wire delivers the element the
-client would have applied to itself, carrying a value it already agrees with (its own tooltip). If the local arm
-is later found to hang off a signal we already send, this becomes redundant rather than wrong.
+The real mechanism is the LOCAL arm, and it is not yet pinned. What the RE has established so far:
+
+- **`FUN_008b0f50` (the `SetSpellRecastTime` handler) has ZERO direct callers** — it is a virtual, reached
+  through the GameAction element's Apply slot. So the element is applied by the generic machinery, and the
+  question is what feeds that machinery the spell's own elements.
+- **`FUN_008b0f50` bails out silently on a state check**, before reading anything:
+  ```c
+  if (*(int *)(param_1 + 0x1b0) != 2) { return; }   // no arm, no log
+  ```
+  `param_1` is the caster/player object (in the sibling `FUN_007e1230`, `param_1 + 0x30` is that object's spell
+  list). A silent no-op on a state word matches the symptom exactly. What `+0x1b0` is has NOT been identified —
+  287 object-field writes to that offset exist and none is attributable without the class.
+- **`FUN_007e1230` (the line handler) carries no such guard.** It walks the spell list at `+0x30`, matches the
+  line with `FUN_00768f90`, and arms each match with base + delta.
+- The client's own cast path is `CoreMagicHolder::CastMagicSpell` (strings incl. *"CastMagicSpell Apply Spell
+  effect from caster"*), which is where a locally-applied element would come from.
+
+### The instrument that settles it
+
+The client logs this path itself, and both channel names are verbatim-verified against `AgeOfConan.exe`:
+
+| channel | what it prints |
+|---|---|
+| `GameCode/Magic/Recast` | `Setting recast timer on spell: <id> For player: <p> to: <cs>` |
+| `GameCode/GameAction/SetSpellRecastTime` | `Modifying the recast timer by : <x>` · `The recast timer is already set to a higher value (spell = …)` · `SetSpellRecastTimeGameAction refers to nonexistant spell : <id>` |
+
+```zsh
+dotnet run --project Faolan.ClientLauncher -- --console --patch-universeaddr \
+  --debug-channels GameCode/Magic/Recast,GameCode/GameAction/SetSpellRecastTime -u faolan -p any -c <char>
+```
+
+Cast a spell that has a recast, then read `AgeOfConan.log`. The three outcomes are disjoint and each names the
+next step: **silence** = the element is never applied (the `+0x1b0` guard, or `CastMagicSpell` never reaches the
+apply) · **"nonexistant spell"** = the client cannot resolve the id we granted · **"Setting recast timer"** = it
+arms and something downstream clears it.
+
+Open work tracked in Gitea #271 / #767.
 
 Open work tracked in Gitea #271 / #767.
