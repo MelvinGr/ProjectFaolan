@@ -163,19 +163,58 @@ combo drives (`Combos.GameActionId`).
 cooldown, none is named by a `SetSpellRecastTime` element and none sits on a line a `SetSpellLineRecastTime`
 element targets. A combo's reuse time and a spell's recast are two different facts in two different places.
 
-## The server gate
+## ~~The server gate~~ — REMOVED. Retail has no such gate (#767)
 
-`HandleBccCastSpell` refuses a cast whose recast group is still armed, and does it by **sending nothing at all**.
-That is not laziness about the reply, it is the only honest option: retail's client will not *send* a cast that is
-on cooldown — its own recast timer blocks the button — so retail's server has no captured answer to one, and any
-reply we chose here would be invented. Sending no echo-ack is also self-consistent, because the echo-ack is
-precisely what makes the client enter the channel state; without it the cast neither bars nor resolves.
+⚠️ **This section used to say the server refuses an on-cooldown cast by sending nothing, and called that "the only
+honest option" because "retail's server has no captured answer to one". Both halves were wrong, and the gate is
+gone.**
 
-The group is the one the client itself arms: the spell's GUI stacking line where it has one (so all five `Chill`
-ranks share the 4 s), the spell id otherwise. It is armed **when the spell goes off**, not when the cast begins —
-an interrupted cast costs no cooldown — and lives on the session, so a relog re-arms nothing.
+The premise was that retail's client never sends a cast on cooldown. Measured over the dumps — filtering c2s
+`0x642cd3d6` to **BEGINs** (state word `3`; state `2` is the CANCEL, and counting those as re-casts is what makes
+this look the other way) — the corpus holds **2,131 begins, 9 of them sent while the spell was still on its
+recast**. So the client does send them, rarely. And retail's answer to **six of those nine** is `(4, 10)` —
+begin-echo then COMPLETE, byte-identical to an ordinary cast:
+
+| spell | recast | re-sent after | reply |
+|---|---|---|---|
+| Dread Archmage: Blood Arcanist | 22 s | 5.29 s | `(4, 10, 4)` |
+| Deathless Acolyte: Magus | 22 s | 4.75 s | `(4, 10)` |
+| Ancient Soul | 60 s | 9.59 s | `(4, 10)` |
+| Gangrenous Stench | 60 s | 4.99 s | `(4, 4, 7)` |
+| Waves of Flame (Rank 1) | 4 s | 0.39 s | `(4, 7)` |
+| Chill (Rank 5) | 4 s | 0.12 s | `(5,)` |
+
+**Retail simply casts them.** The recast is a CLIENT concern: the client reads it from its own RDB and blocks its
+own button, and on the rare occasion it sends anyway the server obliges. (The three odd replies on the three
+shortest gaps are unexplained — 3 samples, could be a fast-resend path or a move-interrupt landing in the window.)
+
+⚠️ **And refusing in silence BREAKS THE CLIENT.** No echo-ack means the cast bar sticks at 100%, the client stays
+in the channel state, and every later cast is dropped. Reproduced in-client: *"after casting ancient soul, i cant
+cast anymore"*, with `CastSpell REFUSED spell=0x3E338F (Ancient Soul): 16764 ms of its 6000 cs recast left` in the
+log at that moment.
+
+The recast is still **armed** on the session — the timer is real and is wanted for the client-side signal work
+below — it just gates nothing. The group is the spell's GUI stacking line where it has one (so all five `Chill`
+ranks share the 4 s), the spell id otherwise; armed when the spell goes off, so an interrupted cast costs nothing,
+and a relog re-arms nothing.
 
 ## What is still open
+
+⚠️ **The live bug: the client's cooldown does not display for many spells (#767).** Per-spell and consistent —
+Flesh to Worms (R5), Gangrenous Stench, Freeze (R2), Tome of Epithur, Ghoulish Feast (R3) and Quell the Ether (R5)
+show a cooldown and cannot be spammed; Chill (R5), Lifestrike (R5), Life Leech, Gelid Bones (R5), Ancient Soul,
+Dread Archmage and Cannibalism show nothing and can be.
+
+**Our data is not the problem.** `SpellRecastTests.ObservedTooltips` carries values transcribed from RETAIL
+TOOLTIPS on a level-80 necromancer, and three of the failing spells are in it: Chill (R5) 4 s, Lifestrike (R5)
+12 s, Life Leech 30 s. Retail shows a cooldown for exactly the spells our client does not, on the same numbers.
+
+Six readings have been tested and falsified: over-attribution from `SetSpellLineRecastTime`; "needs a direct
+`SetSpellRecastTime`" (Tome of Epithur works without one, Ancient Soul fails with one); "direct AND non-zero
+line"; the bar casting a different id (it does not); line membership; and spell-id magnitude (144673 fails,
+144677 works). The next probe is a packet-for-packet diff of a working cast against a failing one, and
+`SpellRecastActions.ChangeRecastTime` — already built and round-trip tested, never sent by anything — is the
+leading suspect for the missing signal.
 
 Whether the CLIENT gates too. Retail never sends a recast GameAction and the client's cast path arms only the GCD
 constants, so the client must read this same base locally at cast time — the elements are right there on the spell

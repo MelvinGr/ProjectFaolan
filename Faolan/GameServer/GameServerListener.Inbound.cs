@@ -2179,12 +2179,32 @@ namespace Faolan.GameServer
 			// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
 			var isGroundCast = CastGroundTargetScan.TryReadPosition(actionTrailer, out var groundTarget) && args.Target == null;
 
-			// #271: the recast gate. Retail's client will not SEND a cast that is still on cooldown - its own
-			// recast timer blocks the button - so retail's server has no captured answer to one, and this refuses
-			// by sending NOTHING rather than by inventing a reply. No echo-ack means the client never enters the
-			// channel state, so the cast neither bars nor resolves (the ack is what makes it channel at all - see
-			// the cast-begin ack below). The spell's own base recast is `Spell.RecastCentiseconds`, off the
-			// record's SetSpellRecastTime / SetSpellLineRecastTime element (docs/re/spell-recast-source.md).
+			// #767: THERE IS NO SERVER-SIDE RECAST GATE, because retail does not have one. This used to refuse a cast
+			// whose recast was still running, by sending NOTHING - and both halves of that were wrong.
+			//
+			// Measured over the dumps, filtering c2s 0x642cd3d6 to BEGINs (state word 3; state 2 is the cancel, and
+			// counting those as re-casts is what made the first pass of this look the other way): the corpus holds
+			// 2,131 begins, 9 of them sent while the spell was still on its recast. Retail's reply to SIX of the nine
+			// is `(4, 10)` - begin-echo then COMPLETE, byte-identical to an ordinary cast. Dread Archmage: Blood
+			// Arcanist (22 s recast) completed at 5.29 s, Deathless Acolyte: Magus (22 s) at 4.75 s, Ancient Soul
+			// (60 s) at 9.59 s. Retail simply casts them.
+			//
+			// So the recast is a CLIENT concern: the client reads it from its own RDB and blocks its own button, and
+			// on the rare occasion it sends anyway, the server obliges. The old comment's reasoning ("the client will
+			// not SEND one, so there is no captured answer") had the first half roughly right - 9 in 2,131 - and the
+			// second half exactly backwards: there are captured answers, and they say "cast it".
+			//
+			// ⚠️ And refusing in silence BREAKS THE CLIENT. No echo-ack means the cast bar sticks at 100%, the client
+			// stays in the channel state, and every later cast is dropped: in-client, "after casting ancient soul, i
+			// cant cast anymore" - the server log showing `CastSpell REFUSED ... 16764 ms of its 6000 cs recast left`
+			// at that exact moment.
+			//
+			// The recast is still ARMED below, because the timer itself is real and #767 wants it for the client-side
+			// signal that should start the countdown (the client's own timer is not running - "the countdown is not
+			// even visible"). It just does not gate anything here.
+			//
+			// The spell's base recast is `Spell.RecastCentiseconds`, off the record's SetSpellRecastTime /
+			// SetSpellLineRecastTime element (docs/re/spell-recast-source.md).
 			var spell = await Database.GetSpell(spellId);
 			// The group the client itself arms: a line-scoped recast covers every rank at once, which is what
 			// SetSpellLineRecastTime means and why all five Chill ranks share one 4 s timer. 0 = the spell has no
@@ -2196,9 +2216,10 @@ namespace Faolan.GameServer
 				: 0;
 			if (recastGroup != 0 && client.Session.SpellReadyAt.TryGetValue(recastGroup, out var readyAt) && Environment.TickCount64 < readyAt)
 			{
-				Logger.LogInformation("CastSpell REFUSED spell=0x{Spell:X} ({Name}): {Remaining} ms of its {Recast} cs recast left.",
+				// Logged, not refused - see above. Worth keeping because it is how we will tell whether the
+				// client-side countdown has started working once #767 lands.
+				Logger.LogInformation("CastSpell spell=0x{Spell:X} ({Name}) arrived {Remaining} ms into its {Recast} cs recast - retail casts it, so we do too (#767).",
 					spellId, spell!.Name, readyAt - Environment.TickCount64, spell.RecastCentiseconds);
-				return;
 			}
 
 			// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
