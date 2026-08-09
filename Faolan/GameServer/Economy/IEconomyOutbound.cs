@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
@@ -46,5 +47,10 @@ namespace Faolan.GameServer.Economy
 		// cannot reach it. Removes exactly `count` - a stack larger than what is asked for is decremented, never
 		// cleared. See GameServerListener.Outbound.cs TakeItemsFromInventory.
 		Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count);
+
+		// A gem went into a socket (#754): DispatchAddToItemSlot naming the cell that RECEIVED it, then an ordinary
+		// DispatchRemoveItem for the cell the gem left. Retail sends exactly these two and does NOT re-send the
+		// socketed item's container entry, so the client updates the item in place from the first message.
+		Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot);
 	}
 }

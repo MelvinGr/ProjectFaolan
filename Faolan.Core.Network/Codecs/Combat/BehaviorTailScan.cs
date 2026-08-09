@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Economy;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -22,6 +23,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return tail.Length >= sizeof(uint)
 				? tail.ReadU32Be(tail.Length - sizeof(uint))
 				: 0;
+		}
+
+		// The TRADESKILL request in a `0x27` tail (#754). Unlike everything else here this is a real DECODE rather
+		// than a named read - the tail's leading byte discriminates a craft from a socketing and each has its own
+		// payload - so the grammar lives in `TradeskillCommandCodec` and this is the entry point, keeping the
+		// listener's tail reads going through one seam instead of two.
+		public static TradeskillCommand Tradeskill(ReadOnlySpan<byte> tail)
+		{
+			return TradeskillCommandCodec.Parse(tail);
 		}
 
 		// The moved item's TEMPLATE handle on an equip/unequip interact: the first word of the trailing struct that

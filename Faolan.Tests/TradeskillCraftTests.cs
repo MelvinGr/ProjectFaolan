@@ -182,6 +182,16 @@ namespace Faolan.Tests
 				return Task.FromResult<int?>(0);
 			}
 
+			// What a successful SOCKET asked the wire to say (#754): the cell that received the gem, which socket, and
+			// the cell the gem left.
+			public List<(uint TargetSlot, uint SocketIndex, uint GemTemplate, uint GemSlot)> Socketed { get; } = [];
+
+			public Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+			{
+				Socketed.Add((targetSlot, socket.SocketIndex, socket.GemItemId, gemSlot));
+				return Task.CompletedTask;
+			}
+
 			public Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0) => Task.CompletedTask;
 			public Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason) => Task.CompletedTask;
 

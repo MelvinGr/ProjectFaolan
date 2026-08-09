@@ -136,6 +136,22 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Can { get; set; }
 
+		// How many GEM SOCKETS this item has - template property field 114, which the client's own stat table names
+		// `NumGemSlots` and its tooltip reads directly (the GemSlots line is gated on `getProp(0x72) > 0`). The bound
+		// is FOUR: there are four `GemSlot<N>` fields, four `GemSlot<N>Color` fields and four `ItemSlot<N>ACG` stat
+		// pairs, so the corpus' socket indices 0/1/2 were a capture limit rather than the game's (#754).
+		//
+		// 647 templates declare one: 612 with a single socket, 14 with two, 12 with three, 9 with four - the
+		// four-slot ones being high-end weapons. The per-slot COLOURS corroborate the count independently (a 4-slot
+		// weapon declares four distinct colours, a 3-slot item three and a zero).
+		//
+		// ⚠️ An item CAN legitimately hold MORE gems than this. Three of the five templates the dumps show sockets on
+		// carry three gems while declaring one, and those are retail items left over from an older version whose slot
+		// counts were later reduced - the client has a `GemOverflow` token, a `GemOverflowInfo` explainer and a
+		// clickable `<a href="gemoverflow">` link for exactly that state. So this bounds what may be ADDED; it does
+		// not describe what an existing item holds.
+		public uint GemSlots { get; set; }
+
 		// Whether wearing this item BINDS it to the character - the client's own predicate, transcribed from
 		// `ItemInfoView`'s FUN_014d51a0 (#756):
 		//

@@ -61,6 +61,11 @@ namespace Faolan.GameServer
 			return SendUpdateCash(client, balanceTin, reason);
 		}
 
+		Task IEconomyOutbound.SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+		{
+			return SendGemSocketed(client, container, targetSlot, socket, gemSlot);
+		}
+
 		Task<uint> IEconomyOutbound.TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return TakeItemsFromInventory(client, itemTemplateId, count);
@@ -782,6 +787,20 @@ namespace Faolan.GameServer
 		private static Task SendFeedback(INetworkClient client, FeedbackPayload payload)
 		{
 			return WorldIir.Send(client, FormatFeedbackCodec.Build(client.Session.Character.Id, payload));
+		}
+
+		// A gem went into a socket (#754). Retail's answer to the socketing request is exactly two messages:
+		// DispatchAddToItemSlot for the cell that RECEIVED the gem, then DispatchRemoveItem for the cell the gem
+		// left. The socketed item's own container entry is NOT re-sent - the client updates it in place from the
+		// first message, which is why nothing here rebuilds the inventory.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8248 - both in the same frame]
+		private async Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+		{
+			var charId = client.Session.Character.Id;
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), AddToItemSlotCodec.Method,
+				AddToItemSlotCodec.Build(container, charId, targetSlot, socket)));
+
+			await SendRemoveItem(client, container, gemSlot);
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).

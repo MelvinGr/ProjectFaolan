@@ -150,8 +150,39 @@ template and the client derives its effect from the gem's own template:
   limit rather than the game's.
 - **live**: `DispatchAddToItemSlot` (GameCharInterface 0x1D) carries the same pair for one socket, followed by
   an ordinary `DispatchRemoveItem` for the gem leaving the bag. The socketed item's container entry is NOT
-  re-sent. The c2s trigger is BCC behaviour `0x27`. ⚠️ That is the same behaviour id recorded elsewhere as
-  `Tradeskill` with a `[flag][recipeId][count]` trailer, so `0x27` carries at least two trailer shapes.
+  re-sent — the client updates it in place.
+
+### Socketing a gem (#754)
+
+The c2s trigger is BCC behaviour **`0x27` `Tradeskill`** — the client's own registered command class, carrying
+**two** operations discriminated by the tail's leading byte:
+
+| byte | operation | payload |
+|---|---|---|
+| `0x01` | craft from a recipe | `[u32 recipeId][u32 quantity]` |
+| `0x02` | socket a gem | `[u32 container][u32 charInstance][u32 slot]` ×2 — **target first, gem second** |
+
+⚠️ The args do **not** discriminate: `bcc_action_id` is 49340 on both and only `commandqueue_client_id` differs.
+That matters because `MoveEquippedToFromInventory` *does* split its directions on the action id, so the obvious
+place to look is the wrong one. The address order is settled by the replies, not by reading order —
+`DispatchAddToItemSlot` names the first, `DispatchRemoveItem` the second.
+
+`TradeskillCommandCodec` decodes the tail (reached through `BehaviorTailScan.Tradeskill`, the one seam for tail
+reads); `AddToItemSlotCodec` writes the 84-byte reply, whose trailing 68 bytes are a `ProtoAcgItem`'s fields with
+the protobuf framing taken off.
+
+**The rule**, applied by `TradeskillService.Socket` before anything is written, because socketing **consumes** the
+gem: the item must declare `Item.GemSlots > 0` (`NumGemSlots`, template field 114 — 647 templates do), and the gem
+goes in the first free index below that count. A refusal is **silent**, like a refused craft — retail answers a
+successful tradeskill and says nothing otherwise.
+
+⚠️ An item may already hold **more** gems than it declares: retail reduced some slot counts in a later patch and
+the old items kept their gems, which the client itself calls `GemOverflow` (it ships a token, an explainer and a
+clickable link for the state). So the count bounds what may be **added** and deliberately does not judge what is
+already there.
+
+`[V0: the gem/slot COLOUR match - the client asserts on "Invalid gem slot colour" and the stat table names
+GemSlot1Color..GemSlot4Color (694-697) against the gem's own GemColor (698), but neither is stored yet]`
 
 Stored as `ItemInstanceSocket` `(ItemInstanceId, SocketIndex) -> GemItemId`, and emitted back by
 `SnapshotItems`. The socket CONTENTS are the truth; the stats are derived — which is why sockets are their own

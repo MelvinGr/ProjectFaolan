@@ -31,6 +31,9 @@ namespace Faolan.Importer.Rdb
 		// already Item.Quality): 177 "More Flags" and 30 "Can". See Item.BindsOnEquip.
 		private const uint MoreFlagsPropertyField = 177;
 		private const uint CanPropertyField = 30;
+
+		// `NumGemSlots` - how many gems the item can take (#754).
+		private const uint GemSlotsPropertyField = 114;
 		private const uint MarkerItem = 1000000;
 
 		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
@@ -144,6 +147,7 @@ namespace Faolan.Importer.Rdb
 				bagsAdded = 0,
 				flagsAdded = 0,
 				bindFieldsAdded = 0,
+				gemSlotsAdded = 0,
 				weaponDamageAdded = 0;
 			var firstSampleShown = false;
 
@@ -221,6 +225,14 @@ namespace Faolan.Importer.Rdb
 					item.MoreFlags = moreFlags;
 					item.Can = can;
 					bindFieldsAdded++;
+				}
+
+				// How many gem sockets the item has - `NumGemSlots`, what bounds a socketing request (#754).
+				var gemSlots = properties.Fields.GetValueOrDefault(GemSlotsPropertyField);
+				if (gemSlots != item.GemSlots)
+				{
+					item.GemSlots = gemSlots;
+					gemSlotsAdded++;
 				}
 
 				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
@@ -334,11 +346,14 @@ namespace Faolan.Importer.Rdb
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
 			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0 ||
-			    flagsAdded > 0 || bindFieldsAdded > 0)
+			    flagsAdded > 0 || bindFieldsAdded > 0 || gemSlotsAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
 				Console.WriteLine($"  bag capacities (field 104) set on {bagsAdded} item(s).");
+
+			if (gemSlotsAdded > 0)
+				Console.WriteLine($"  NumGemSlots (field 114) set on {gemSlotsAdded} item(s); {items.Count(i => i.GemSlots > 0)} are socketable (#754).");
 
 			if (flagsAdded > 0 || bindFieldsAdded > 0)
 			{

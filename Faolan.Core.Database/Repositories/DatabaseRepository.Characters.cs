@@ -148,6 +148,19 @@ namespace Faolan.Core.Database.Repositories
 		/// </summary>
 		Task<bool> BindCharacterItem(uint itemInstanceId);
 
+		/// <summary>
+		///     Puts a GEM into one socket of an item and CONSUMES the gem's own instance, in one transaction (#754).
+		///     Returns the new socket with its gem template loaded, or null when either instance is gone or that
+		///     socket index is already taken.
+		///     <para>
+		///         The RULES - is the item socketable, is there a free index, does the colour match - are NOT decided
+		///         here; <c>TradeskillService.Socket</c> applies them. This is the write, and it is one transaction
+		///         because the two halves must not come apart: a socket without the gem removed duplicates it, and a
+		///         gem removed without the socket destroys it.
+		///     </para>
+		/// </summary>
+		Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socketIndex, uint gemInstanceId);
+
 		/// <summary>Sets an existing stack's size. Returns false when the cell is empty.</summary>
 		Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count);
 
@@ -1049,7 +1062,41 @@ namespace Faolan.Core.Database.Repositories
 		// So the destination's occupant is PARKED at a slot no real cell uses, then the source moves in, then the parked
 		// row takes the source's old cell - three statements, inside ONE transaction so a failure between them cannot
 		// strand an item at the parking slot.
-		public async Task<bool> BindCharacterItem(uint itemInstanceId)
+public async Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socketIndex, uint gemInstanceId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var target = await ctx.ItemInstances.Include(i => i.Sockets).FirstOrDefaultAsync(i => i.Id == itemInstanceId);
+			var gem = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.Id == gemInstanceId);
+			if (target == null || gem == null || target.Id == gem.Id)
+				return null;
+
+			// The unique key is (ItemInstanceId, SocketIndex), so a taken index would throw at SaveChanges with
+			// nothing naming it. Refuse it here instead - the caller turns that into silence, which is what retail
+			// does for a refused tradeskill.
+			if (target.Sockets.Any(x => x.SocketIndex == socketIndex))
+				return null;
+
+			var socket = new ItemInstanceSocket
+			{
+				ItemInstanceId = target.Id,
+				SocketIndex = socketIndex,
+				GemItemId = gem.TemplateId
+			};
+			ctx.ItemInstanceSockets.Add(socket);
+
+			// The gem is CONSUMED. A stack loses one; the last one takes the row with it.
+			if (gem.Count > 1)
+				gem.Count--;
+			else
+				ctx.ItemInstances.Remove(gem);
+
+			await ctx.SaveChangesAsync();
+			await ctx.Entry(socket).Reference(x => x.Gem).LoadAsync();
+
+			return socket;
+		}
+
+				public async Task<bool> BindCharacterItem(uint itemInstanceId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var instance = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.Id == itemInstanceId);

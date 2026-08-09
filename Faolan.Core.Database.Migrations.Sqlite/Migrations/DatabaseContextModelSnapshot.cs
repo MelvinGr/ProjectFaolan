@@ -1586,6 +1586,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("Flags")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("GemSlots")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("Hash")
                         .HasColumnType("INTEGER");
 

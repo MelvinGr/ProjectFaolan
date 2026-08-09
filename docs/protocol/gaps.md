@@ -374,3 +374,12 @@ interpolated item's flags are not template1's verbatim (ACG composition — #752
 failed to resolve the quad OUR server sends, since we ship `flags = 1` and flatten `template2` onto `template1`.
 The two are told apart by one in-client look once the real `Flags` word is on the wire.
 
+### The gem/slot colour match
+**Tracked: Gitea #754.** [V0: the gem/slot COLOUR match - the client asserts on "Invalid gem slot colour" and the
+stat table names GemSlot1Color..GemSlot4Color (694-697) against the gem's own GemColor (698), but neither is stored
+yet] Socketing enforces the socket COUNT (`Item.GemSlots`, template field 114) and not the colour. The client
+validates both — it draws each slot in its colour and asserts on a mismatch in `ItemInfoView::UpdateFromItem` — so
+a stock client cannot send a mismatched pair and the gap only matters against a modified one. Closing it is two
+more harvested fields, not a decode: `--report gem-slots` already prints them (a 4-slot weapon declares
+`[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
+

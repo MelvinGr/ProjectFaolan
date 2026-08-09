@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Economy;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -61,6 +62,60 @@ namespace Faolan.GameServer.Economy
 			_database = database;
 			_outbound = outbound;
 			_logger = logger;
+		}
+
+		// Puts a GEM into a socket of another item (#754) - the `Tradeskill` command's second operation.
+		//
+		// Returns true when a gem was actually socketed. A refusal is SILENT, like a refused craft: retail answers a
+		// successful tradeskill and says nothing otherwise, so telling the client about a rejection would be
+		// inventing a message.
+		//
+		// ⚠️ Socketing CONSUMES the gem, which is why every rule is checked before the write rather than trusting the
+		// client to have only offered a legal combination. The client does validate - it draws the slots and their
+		// colours - so these are the defence against a modified one.
+		public async Task<bool> Socket(INetworkClient client, InventoryAddress target, InventoryAddress gem)
+		{
+			var character = client.Session.Character;
+			if (target.Container != gem.Container || target.Slot == gem.Slot)
+				return false; // both addresses are cells of the player's own bag in every captured socketing
+
+			var host = await _database.GetCharacterItemSlot(character.Id, target.Container, (int)target.Slot);
+			var stone = await _database.GetCharacterItemSlot(character.Id, gem.Container, (int)gem.Slot);
+			if (host == null || stone == null)
+			{
+				_logger.LogInformation("Socket refused: {Character} named {Container}[{Target}] + [{Gem}] and one of them is empty.", character.Name, target.Container, target.Slot,
+					gem.Slot);
+				return false;
+			}
+
+			// How many sockets the item HAS - `NumGemSlots`, template field 114. Zero means it takes no gems at all,
+			// and socketing into it would destroy the gem for nothing.
+			var slots = host.Template.GemSlots;
+			if (slots == 0)
+			{
+				_logger.LogInformation("Socket refused: {Item} has no gem sockets.", host.Template.Name);
+				return false;
+			}
+
+			// The first FREE index. An item may already hold more gems than it declares - retail reduced some slot
+			// counts in a later patch and the old items kept their gems, which the client itself calls GemOverflow -
+			// so this bounds what may be ADDED and deliberately does not judge what is already there.
+			var taken = host.Sockets.Select(x => x.SocketIndex).ToHashSet();
+			var index = Enumerable.Range(0, (int)slots).Select(i => (uint)i).Cast<uint?>().FirstOrDefault(i => !taken.Contains(i!.Value));
+			if (index == null)
+			{
+				_logger.LogInformation("Socket refused: {Item} has all {Slots} socket(s) filled ({Held} gem(s) held).", host.Template.Name, slots, host.Sockets.Count);
+				return false;
+			}
+
+			var socket = await _database.SocketGem(host.Id, index.Value, stone.Id);
+			if (socket == null)
+				return false;
+
+			await _outbound.SendGemSocketed(client, target.Container, target.Slot, socket, gem.Slot);
+			_logger.LogInformation("Socketed {Gem} into {Item} slot {Index} for {Character}.", stone.Template.Name, host.Template.Name, index.Value, character.Name);
+
+			return true;
 		}
 
 		// Runs one craft. Returns the recipe id to echo in DispatchTradeskillComplete, or null when nothing was made -

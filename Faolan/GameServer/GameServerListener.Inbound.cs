@@ -1813,28 +1813,49 @@ namespace Faolan.GameServer
 			}
 			else if (actionType == BehaviorId.Tradeskill)
 			{
-				// CRAFTING. Its trailer is NOT the [from][target] pair the rest of the switch reads - it is
-				// [u8 flag][u32 recipeId][u32 count], 9 bytes, so it has to be read before that pair consumes it
-				// misaligned. Capture: c2s at 18:45:25 carries `01 0000000F 00000001` = recipe 15, one of them, and
-				// the completion 5s later echoes the same 0x0F back.
-				// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 fr17374]
-				var craftFlag = body.Length - body.Position >= 1
-					? body.ReadByte()
-					: 0;
-				var recipeId = body.Length - body.Position >= sizeof(uint)
-					? body.ReadUInt32()
-					: 0;
-				var craftCount = body.Length - body.Position >= sizeof(uint)
-					? body.ReadUInt32()
-					: 1;
+				// TRADESKILL. Its tail is NOT the [from][target] pair the rest of the switch reads, and it is not one
+				// shape either: `0x27` is ONE registered command class carrying TWO operations, discriminated by the
+				// tail's leading byte (#754).
+				//
+				//   0x01  craft from a recipe          [u32 recipeId][u32 quantity]
+				//   0x02  combine two inventory items  [u32 container][u32 charInstance][u32 slot] x2
+				//
+				// ⚠️ The args do NOT discriminate: bcc_action_id is 49340 on both and only commandqueue_client_id
+				// differs, which matters because that IS how MoveEquippedToFromInventory splits its directions.
+				// [V2: ..._annotated_5 fr17374 (craft) and ..._annotated_8 fr8215 (socket)]
+				TradeskillCommand? request = null;
+				try
+				{
+					request = BehaviorTailScan.Tradeskill(body.ReadRemainingArray());
+				}
+				catch (CodecParseException e)
+				{
+					Logger.LogInformation("Tradeskill: unreadable tail ({Message}). {Args}", e.Message, args);
+				}
 
 				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-				Logger.LogInformation("Tradeskill: craft recipe {Recipe} x{Count} (flag {Flag}). {Args}", recipeId, craftCount, craftFlag, args);
 
-				// Retail answers a SUCCESSFUL craft with DispatchTradeskillComplete and nothing at all otherwise, so a
-				// refusal is silence here too - the client keeps the window open rather than being told it worked.
-				if (await _tradeskill.Craft(client, recipeId, craftCount) is { } craftedRecipe)
-					await SendTradeskillComplete(client, craftedRecipe);
+				// Retail answers a SUCCESSFUL tradeskill and says nothing at all otherwise, so a refusal is silence
+				// here too - for both operations. The client keeps its window open rather than being told it worked.
+				switch (request?.Action)
+				{
+					case TradeskillAction.Craft:
+					{
+						Logger.LogInformation("Tradeskill: craft recipe {Recipe} x{Count}. {Args}", request.RecipeId, request.Count, args);
+						if (await _tradeskill.Craft(client, request.RecipeId, request.Count) is { } craftedRecipe)
+							await SendTradeskillComplete(client, craftedRecipe);
+
+						break;
+					}
+
+					case TradeskillAction.Socket:
+					{
+						Logger.LogInformation("Tradeskill: socket {Container}[{Gem}] into [{Target}]. {Args}", request.Target.Container, request.Gem.Slot, request.Target.Slot, args);
+						await _tradeskill.Socket(client, request.Target, request.Gem);
+
+						break;
+					}
+				}
 			}
 			else
 			{
