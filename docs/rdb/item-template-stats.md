@@ -202,6 +202,33 @@ kind-as-GameAction-type reading and the name `CastNano` all already existed. A s
 `ItemTemplateStatModifiers.ParseRejected` and discarded. Reading them is a kind mapping, not new parsing.
 Open work tracked in Gitea #762.
 
+### A consumable also LOCKS a spell line — the potion cooldown (undecoded until now)
+
+Every drink that carries a `CastNano` also carries a **`CoreLockSpellLineTemplate`** element (kind 53124, keys
+39/66/67), and the two together are the whole potion mechanic:
+
+```
+Moonspill  (mana)     CoreLockSpellLineTemplate[80200, 60, 0]
+Daggamalt  (health)   CastNano[180250]; CoreLockSpellLineTemplate[80000, 60, 0]
+Devilsmead (health)   CastNano[180223]; CoreLockSpellLineTemplate[80000, 60, 0]
+Maulsmead  (stamina)  CastNano[180266]; CoreLockSpellLineTemplate[80100, 60, 0]
+```
+
+Key 39 is the **spell LINE to lock**, and it groups by the resource the potion restores — health `80000`,
+stamina `80100`, mana `80200` — so the three cooldowns are independent of each other. Key 66 is `60` on every
+one; key 67 is `0` on every one.
+
+⚠️ **The unit of `60` is inferred, not measured.** Seconds is the obvious reading (and matches how the potion
+cooldown behaves in the live game), but nothing here states it, and no capture in the corpus shows a second
+potion being refused. Treat it as "60 of something" until an in-client test pins it.
+
+**We implement none of this.** There is no shared-cooldown model at all — `Spells` has no line column (only
+`GuiStackingLine`), and none of `80000`/`80100`/`80200` appears anywhere in the database — so a player can drink
+health potions back to back. Open work tracked in Gitea #764.
+
+⚠️ Note `53116 LockSpellLine` exists in the catalog too, with an EMPTY key list. Whatever that variant is, it is
+not this one, and it should not be assumed to be the same mechanism read differently.
+
 ### Scale/divisibility proof + in-client ground truth
 
 Across all 3201 decrypted templates every vital `amount` is divisible by 100 and every attribute `amount` by
