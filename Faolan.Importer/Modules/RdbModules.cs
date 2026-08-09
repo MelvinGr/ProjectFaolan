@@ -127,7 +127,7 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var r = await RdbSpellImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
-			return new ImportResult($"{r.Seen} named records, {r.Inserted} new, {r.NamesSet} names, {r.CastTimesSet} cast times, {r.LevelsSet} levels, {r.Mounts} mounts, {r.EffectDurations} effect-catalog durations, {r.EffectLinks} effect links, {r.UnparsedElements} UNPARSED element heads{(r.UnparsedElements == 0 ? "" : ": " + r.UnparsedSamples)}.");
+			return new ImportResult($"{r.Seen} named records, {r.Inserted} new, {r.NamesSet} names, {r.CastTimesSet} cast times, {r.LevelsSet} levels, {r.Mounts} mounts, {r.EffectDurations} effect-catalog durations, {r.EffectLinks} effect links, {r.UnparsedElements} UNPARSED element heads; {r.UnparsedSamples}.");
 		}
 	}
 

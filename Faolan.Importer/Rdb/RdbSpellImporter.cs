@@ -241,6 +241,10 @@ namespace Faolan.Importer.Rdb
 			var unparsedElements = 0;
 			var recordsWithUnparsed = 0;
 			var unparsedSamples = new List<string>();
+			long totalBodyBytes = 0;
+			long elementBytes = 0;
+			var kindsSeen = new SortedSet<uint>();
+			var kindsUnregistered = new SortedSet<uint>();
 			var castTimesSet = 0;
 			var levelsSet = 0;
 			foreach (var entry in rdb.EntriesOfType(SpellDataType))
@@ -343,6 +347,15 @@ namespace Faolan.Importer.Rdb
 				// the whole of Gangrenous Stench's AoE was invisible this way, and no test could notice because every
 				// test asserted on the elements we DID parse. Counted per record and reported below, so the number is
 				// something a future change has to move deliberately rather than something it can quietly grow.
+				totalBodyBytes += body.Length - 12;
+				foreach (var el in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+				{
+					elementBytes += el.WidthBytes;
+					kindsSeen.Add(el.Kind);
+					if (GameActionTypes.Get(el.Kind) == null)
+						kindsUnregistered.Add(el.Kind);
+				}
+
 				var orphans = ItemTemplateStatModifiers.UnparsedElementHeads(body.AsSpan(12));
 				if (orphans.Count > 0)
 				{
@@ -635,10 +648,11 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}.",
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered).",
 				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
-				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples));
-			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements, string.Join(" | ", unparsedSamples));
+				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count);
+			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
+				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered");
 		}
 
 		/// <summary>
