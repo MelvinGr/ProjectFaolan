@@ -349,6 +349,19 @@ namespace Faolan.Importer.Extractors
 						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(itemType))
 							types[template.Value] = itemType;
 					}
+
+					// The GEMS socketed into this item are items too, and they are only ever seen HERE - a gem in a
+					// socket never appears as an inventory entry of its own once it has been slotted. That is why 9 of
+					// the 13 gem templates the corpus carries were missing from `Items` entirely: every other source
+					// walks top-level entries, so a socketed gem was invisible to all of them.
+					//
+					// `Record` rather than a direct assignment, because a gem CAN also be seen loose in a bag (before
+					// it is slotted) and the two sightings must merge on the never-downgrade rule instead of racing.
+					foreach (var (_, gem) in SnapshotRoot.SocketsOf(entry))
+					{
+						if (gem.Key1 is { } key && gem.Template1 != 0)
+							Record(map, gem.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, gem.Hash, gem.Level));
+					}
 				}
 			}
 

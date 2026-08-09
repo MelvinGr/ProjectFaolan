@@ -55,6 +55,26 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return container.InventoryId.Type;
 		}
 
+		// The GEMS socketed into this entry's item, as (socket index, the gem's own ProtoAcgItem).
+		//
+		// `slot_map` (field 4) is where a socket lives in the PERSISTENT form - the login snapshot restates every
+		// socketed item's full gem list, which is how a gemmed item survives a relog. Its live twin is
+		// `DispatchAddToItemSlot` (GameCharInterface 0x1D), which carries the same pair for one socket.
+		//
+		// ⚠️ The socket names the GEM BY TEMPLATE and carries no stat values: the client derives the gem's effect
+		// from the gem's own template. So this is the whole of a socket on the wire, and anything that stores one
+		// stores an item reference, never a stat list.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json frame 8248 (the live add);
+		//  1,187 slot_map blocks across 56 captures carry the persistent form]
+		public static IEnumerable<(uint Socket, ProtoAcgItem Gem)> SocketsOf(ProtoInventoryGame.InventoryListEntry entry)
+		{
+			foreach (var socket in entry.Item?.SlotMaps ?? [])
+			{
+				if (socket.Item != null)
+					yield return (socket.Slot, socket.Item);
+			}
+		}
+
 		// Decodes ONLY the inventory root out of a whole FullPlayerCharacterIIR record - the same structural split
 		// FullPlayerCharacterCodec.Parse does, stopping at the sub-class.
 		public static ProtoFullCharacterIIR Of(in ReadOnlySpan<byte> record)
