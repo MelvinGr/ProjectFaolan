@@ -222,6 +222,43 @@ mean the same thing, and neither may exist without the other (`ItemTemplatePairT
 344/344 and `template3 == 0` on every one, so the third slot is unused rather than undecoded. `--report acg-pair`
 re-derives it.
 
+### Mail attachments and auction-house escrow
+
+⚠️ **This used to destroy items.** A mail attachment carried a template id, the take minted a fresh item from it,
+and the seller's row was deleted outright — so **an auction-house sale delivered a gemless, crafterless copy**. It
+is the same bug #750 fixed for player trades, left live in the mail and AH paths because they were not looked at.
+
+`MailAttachment.EscrowedInstanceId` fixes it: the attachment points at the actual **row**, and a take HANDS IT OVER
+through the same choke point a trade uses. Where the item waits differs by how the mail arose, and both follow
+retail:
+
+| | where the item sits while the mail is unread |
+|---|---|
+| **player mail** | the SENDER's bank slot — it does not leave on send, and cancelling just clears the pending overlay |
+| **AH purchase** | the BUYER's `Mail` container (**114**), moved off the seller the instant the sale completes — which is what stops the seller taking it back out of their own bank |
+
+Container 114 is retail's: it registers that cell for the buyer immediately after `BuyItem`, before the mail is
+read.
+
+⚠️ **`EscrowedInstanceId` is nullable and both cases are real.** An importer-seeded listing has no seller character
+and never had an item row, so its purchase mail keeps a null escrow and still mints from the template. Everything a
+player causes carries a row. The `Template`/`Quantity`/`ItemLevel`/`ItemHash` columns stay beside it because they
+are what the wire entry carries, they are the only source when the escrow is null, and `ItemHash` genuinely is not
+the template's (an AH-delivered item sends 0).
+
+⚠️ **Cancelling a mail returns the escrow first and is REFUSED if it cannot** — a bought item lives in the buyer's
+mail container until taken, so deleting the mail on top of it would strand a paid-for row nothing can reach. And
+the take no longer clears the sender's bank cell when the row was handed over: the transfer already moved that row,
+so clearing by `(owner, container, slot)` would match whatever the sender has since put there.
+
+Gated by `MailEscrowTests`.
+
+### Loot bags
+
+Not part of this at all, despite #750's note grouping them with mail and AH. `MapLootEntries` is `(MapId,
+ItemTemplateId)` — a per-map loot **pool**, i.e. content data. A looted item has no per-instance history to
+preserve because it does not exist until it is granted.
+
 ### The guild bank vault (#654)
 
 A guild's shared item storage is **container kind 109**, and it is the one container on the wire whose

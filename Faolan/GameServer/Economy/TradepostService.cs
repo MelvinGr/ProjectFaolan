@@ -28,6 +28,11 @@ namespace Faolan.GameServer.Economy
 	{
 		// Bank-slot overlay flag values the client draws a listed / mail-pending cell from (captures F376/F398/F500).
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
+
+		// The cell an escrowed purchase waits in. Retail registered container 114 slot 0 for the buyer the instant
+		// the purchase completed, and a mail models ONE attachment today (Mail.SenderBankSlot is singular), so a
+		// single cell is all that is addressed.
+		private const int MailEscrowSlot = 0;
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
 
@@ -245,14 +250,31 @@ namespace Faolan.GameServer.Economy
 
 			var mail = await BuildPurchaseMail(character.Name!, listing);
 			mail.RealmId = character.RealmId; // #324: no cross-realm mail (recipient = buyer)
-			await _database.CreateMail(mail);
 			await _database.DeleteTradepostListing(saleId, character.RealmId);
 
-			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now - the sale removes it
-			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
+			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now. The sale ESCROWS it to
+			// the buyer - it moves out of the seller's bank into the buyer's Mail container (114), which is what
+			// retail registers the instant a purchase completes.
+			//
+			// ⚠️ It used to be DELETED here and re-minted from the template when the buyer took it, which destroyed
+			// the crafter and every socketed gem - the same bug #750 fixed for player trades, still live here. The
+			// row is handed over now, so a gemmed item arrives gemmed.
+			//
+			// Importer-seeded listings have no seller character and no backing row; their mail keeps a null escrow
+			// and the take mints from the template exactly as before.
 			var seller = await _database.GetCharacterByName(listing.SellerName, character.RealmId);
 			if (seller != null && seller.Id != character.Id)
-				await _database.SetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
+			{
+				var listed = await _database.GetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot);
+				if (listed != null && await _database.TransferCharacterItem(listed.Id, character.Id, ContainerKind.Mail, MailEscrowSlot) is { } escrowed)
+					mail.Attachments.First().EscrowedInstanceId = escrowed.Id;
+				else
+					await _database.SetCharacterItemSlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
+			}
+
+			// Written AFTER the escrow, so the attachment carries the instance it escrowed rather than being saved
+			// with a null and updated afterwards.
+			await _database.CreateMail(mail);
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
@@ -262,8 +284,12 @@ namespace Faolan.GameServer.Economy
 				listing.ItemId, listing.Price, mail.MailId, character.Money);
 		}
 
-		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
-		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
+		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403).
+		//
+		// ⚠️ An ESCROWED item is returned before the mail goes, and the delete is REFUSED if it cannot be. A bought
+		// item lives in the buyer's Mail container until they take it, so deleting the mail on top of it would strand
+		// a row nothing can reach - the item would be paid for and gone. A player mail needs nothing: its attachment
+		// never left the sender's bank, and cancelling only clears the pending overlay.
 		private async Task HandleCancelMail(INetworkClient client, FaolanStream body)
 		{
 			var character = client.Session.Character;
@@ -275,6 +301,18 @@ namespace Faolan.GameServer.Economy
 			var mail = await _database.GetMailByWireId(mailId);
 			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
 				await TradepostResponses.SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+
+			// Hand any escrowed row back to the canceller before the mail (and its attachment rows) go. Refusing on a
+			// full bag is the safe side: the mail staying is recoverable, an unreachable item is not.
+			if (mail?.Attachments?.FirstOrDefault(a => a.Escrowed != null) is { Escrowed: { } escrowed })
+			{
+				if (await _outbound.TransferItemToCharacter(character.Id, escrowed) == null)
+				{
+					_logger.LogInformation("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} kept so its escrowed item is not stranded.", character.Name, mailId);
+
+					return;
+				}
+			}
 
 			await _database.DeleteMail(mailId);
 			_logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
@@ -530,6 +568,11 @@ namespace Faolan.GameServer.Economy
 					// mail's ItemInstanceId = listing.SaleId. Only needs to be unique within the mail's attachments -
 					// TakeMailItem resolves the item by Template, not by this id.
 					ItemInstanceId = mail.MailId,
+
+					// The sender's own bank row, which STAYS in their bank until the recipient takes it (the escrow
+					// here is the bank slot, not a move). Recording it is what lets the take hand the row over
+					// instead of minting a copy and losing the crafter and gems.
+					EscrowedInstanceId = attached.Id,
 					Quantity = attached.Count == 0
 						? 1u
 						: attached.Count,
@@ -592,7 +635,11 @@ namespace Faolan.GameServer.Economy
 			// quest tab rather than the backpack, and the bag capacity accounts for the equipped bag's extra slots.
 			//
 			// The attachment's captured `ItemLevel` is passed because `Items.Level` cannot supply it yet (#725).
-			var slot = await _outbound.GrantItemToBackpack(client, attachment.Template, qty);
+			// HAND THE ROW OVER when there is one - the crafter and the socketed gems travel with it. Only an
+			// importer-seeded listing's mail has no row, and that one still mints from the template.
+			var slot = attachment.Escrowed != null
+				? await _outbound.TransferItemToCharacter(character.Id, attachment.Escrowed)
+				: await _outbound.GrantItemToBackpack(client, attachment.Template, qty);
 			if (slot == null)
 			{
 				_logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);
@@ -612,7 +659,11 @@ namespace Faolan.GameServer.Economy
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
 			// AH system mail has an empty sender (the listed item already left the seller's bank on buy), so skip it.
-			if (!string.IsNullOrEmpty(mail.SenderName))
+			//
+			// ⚠️ Skipped entirely when the row was HANDED OVER: the transfer already moved that very row out of the
+			// sender's bank into the recipient's bag, so clearing the bank cell by (owner, container, slot) would
+			// now match whatever the sender has since put there and delete an innocent item.
+			if (!string.IsNullOrEmpty(mail.SenderName) && attachment.Escrowed == null)
 			{
 				var sender = await _database.GetCharacterByName(mail.SenderName, mail.RealmId);
 				if (sender != null)

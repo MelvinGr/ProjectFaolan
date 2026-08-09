@@ -51,6 +51,11 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		public virtual Task<int?> TransferItemToCharacter(uint characterId, ItemInstance instance)
+		{
+			return Task.FromResult<int?>(0);
+		}
+
 		public virtual Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return Task.FromResult(count);

@@ -22,6 +22,26 @@ namespace Faolan.Core.Database.Tables
 		// longer name is the clearer one.
 		public ulong ItemInstanceId { get; set; }
 
+		// The actual ITEM ROW this attachment escrows, when there is one.
+		//
+		// ⚠️ Without it a mail DESTROYED per-instance state. The attachment carried a template id, the take minted a
+		// fresh item from it, and the crafter and every socketed gem were gone - the same bug #750 fixed for player
+		// trades, still live in the mail and auction-house paths. With it, a take HANDS THE ROW OVER.
+		//
+		// NULLABLE, and the two cases are real:
+		//   * a purchase mail from an IMPORTER-SEEDED listing has no backing row (those listings have no seller
+		//     character and never had an item), so its take still mints from the template as before;
+		//   * every mail a player causes carries one.
+		//
+		// The Template/Quantity/ItemLevel/ItemHash columns beside it are the WIRE fields and stay: they are what the
+		// mail entry carries, they are the only source when Escrowed is null, and `ItemHash` is genuinely not the
+		// template's (an AH-delivered item sends 0). Where Escrowed IS set it is the authority and those columns
+		// mirror it.
+		public uint? EscrowedInstanceId { get; set; }
+
+		[ForeignKey(nameof(EscrowedInstanceId))]
+		public virtual ItemInstance? Escrowed { get; set; }
+
 		// FK -> Mail.MailId, the wire id, which IS Mail's primary key. Same name, same number, same type as the
 		// mail's own id - deliberately, see the Mail class comment (#368).
 		public ulong MailId { get; set; }

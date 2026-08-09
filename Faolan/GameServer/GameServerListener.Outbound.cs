@@ -76,6 +76,11 @@ namespace Faolan.GameServer
 			return SendGuildBankMove(client, move);
 		}
 
+		Task<int?> IEconomyOutbound.TransferItemToCharacter(uint characterId, ItemInstance instance)
+		{
+			return ((ITradeOutbound)this).TransferItemToCharacter(characterId, instance);
+		}
+
 		Task<uint> IEconomyOutbound.TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return TakeItemsFromInventory(client, itemTemplateId, count);

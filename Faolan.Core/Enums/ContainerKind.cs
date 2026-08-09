@@ -19,6 +19,14 @@ namespace Faolan.Core.Enums
 		GuildBank = 109,
 		Shop = 111, // a vendor's wares (ShopContentCodec) - not a character container, like Loot
 		Resource = 112,
+
+		// A mail's ATTACHED item, escrowed for the RECIPIENT (#654-era work on #750's nullable owner). Retail
+		// registers this container for the buyer the instant an auction-house purchase completes, before the mail is
+		// even read - so a bought item leaves the seller immediately and waits here, which is what keeps the seller
+		// from taking it back out of their own bank.
+		// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:46:41.932 - SetItemStat container 114
+		//  slot 0 for the buyer, right after BuyItem]
+		Mail = 114,
 		Quest = 113,
 		Loot = 115
 	}

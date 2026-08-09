@@ -59,5 +59,10 @@ namespace Faolan.GameServer.Economy
 
 		// The echo that acknowledges a guild-bank item move: the six values the client asked for, back verbatim.
 		Task SendGuildBankMove(INetworkClient client, GuildBankMove move);
+
+		// HAND an existing item row to a character's backpack instead of minting one - the same choke point as
+		// GrantItemToBackpack (live add, quest routing, collect goals), except the instance MOVES, so its crafter,
+		// stack and socketed gems travel with it. Returns the bag slot, or null when the bag is full.
+		Task<int?> TransferItemToCharacter(uint characterId, ItemInstance instance);
 	}
 }

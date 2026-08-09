@@ -55,7 +55,12 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Mail?> GetMailByWireId(ulong mailId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
+			return await ctx.Mails
+				.Include(m => m.Attachments).ThenInclude(a => a.Item)
+				.Include(m => m.Attachments).ThenInclude(a => a.Escrowed!).ThenInclude(i => i.Template)
+				.Include(m => m.Attachments).ThenInclude(a => a.Escrowed!).ThenInclude(i => i.Sockets)
+				.AsSplitQuery()
+				.FirstOrDefaultAsync(m => m.MailId == mailId);
 		}
 
 		public async Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId)

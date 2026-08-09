@@ -1687,7 +1687,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("ItemInstances", t =>
                         {
-                            t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 109, 111, 112, 113, 115)");
+                            t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
 
                             t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
                         });
@@ -1789,6 +1789,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("EscrowedInstanceId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("ItemHash")
                         .HasColumnType("INTEGER");
 
@@ -1817,6 +1820,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EscrowedInstanceId");
 
                     b.HasIndex("MailId");
 
@@ -4643,6 +4648,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MailAttachment", b =>
                 {
+                    b.HasOne("Faolan.Core.Database.Tables.ItemInstance", "Escrowed")
+                        .WithMany()
+                        .HasForeignKey("EscrowedInstanceId");
+
                     b.HasOne("Faolan.Core.Database.Tables.Mail", "Mail")
                         .WithMany("Attachments")
                         .HasForeignKey("MailId")
@@ -4654,6 +4663,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasForeignKey("Template")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Escrowed");
 
                     b.Navigation("Item");
 
