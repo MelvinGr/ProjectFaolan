@@ -32,8 +32,24 @@ namespace Faolan.Core.Database.Tables
 		// The tradeskill RDB type of the record: 0xf4241 (1000001) or 0xf4242 (1000002).
 		public uint RdbType { get; set; }
 
-		// The record's opaque ref-id list (KEY2), 1 or 2 entries in every captured record: RefId0 is always present,
-		// RefId1 only when the list has two entries.
+		// The record's ref-id list (KEY2), 1 or 2 entries in every captured record. It is **the recipe's FEAT
+		// REQUIREMENTS**, not an opaque list: every one of the 18 distinct ids resolves in `FeatIdMaps.WireFeatId`,
+		// and through its `TemplateId` to a named tradeskill feat.
+		//
+		// `RefId0` is the crafting-skill feat that unlocks the recipe; `RefId1`, present only on the higher ranks, is
+		// the WORKSHOP tier it additionally needs. The whole shipped set:
+		//
+		//     321000/321001/321100  Weaponsmith Novice / Apprentice / Adept        -            9/18/18 recipes
+		//     321101/321200/321201  Weaponsmith Artisan / Expert / Master          Workshop I/II/III   18 each
+		//     321300/321301/321400  Armorsmith  Novice / Apprentice / Adept        -           44/44/104
+		//     321401/321500/321501  Armorsmith  Artisan / Expert / Master          Workshop I/II/III  104 each
+		//
+		// So the rule the data states is: from ARTISAN upward a recipe also requires a workshop, one tier per rank.
+		// ⚠️ Only Weaponsmith and Armorsmith are present - the other tradeskills are simply not in the captured
+		// records, not evidence that they work differently.
+		//
+		// Nothing gates on this yet: crafting does not check either feat. The names are kept as RefId0/RefId1 for
+		// now because renaming is a schema change; they should become `RequiredFeatId`/`RequiredWorkshopFeatId`.
 		public uint RefId0 { get; set; }
 
 		// The record's trailing u32 (@0x50) before the flag byte.
