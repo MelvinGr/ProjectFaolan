@@ -2308,7 +2308,10 @@ namespace Faolan.GameServer
 				// no captured repeat of a spell that HAS a recast (both repeat-cast spells in the corpus carry 0), so
 				// the begin-relative reading rests on the client's own behaviour rather than on a measured gap.
 				if (recastGroup != 0)
-					client.Session.SpellReadyAt[recastGroup] = castBeganAt + spell!.RecastCentiseconds * 10;
+					{
+						client.Session.SpellReadyAt[recastGroup] = castBeganAt + spell!.RecastCentiseconds * 10;
+						await SendSpellCooldown(client, spell, castBeganAt);
+					}
 
 				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 				// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3

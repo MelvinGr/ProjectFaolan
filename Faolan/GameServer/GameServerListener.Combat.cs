@@ -1,6 +1,8 @@
 using Faolan.Core.Constants;
+using System;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
@@ -119,6 +121,37 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
 		{
 			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
+		}
+
+		// Greys the spell's action-bar button and starts its cooldown sweep (#767) - `DispatchLockTemplate`, which is
+		// how retail states a recast and the reason ours never appeared: we sent none of the 992 the corpus carries.
+		//
+		// There is no recast GameAction on the wire (0 across all 132 dumps); the cooldown IS this message. Body is
+		// [u32 spellId][f32 seconds], and of the 741 captured bodies whose id resolves, 580 carry exactly the spell's
+		// own `RecastCentiseconds / 100` (the rest are partials - time LEFT, on a refresh).
+		//
+		// ⚠️ ONE PER SPELL IN THE LINE, not one for the cast. A `Contract of Protection` cast emits five bodies in a
+		// row - every rank on line 12 - each with the same 20.0. That is the wire form of `SetSpellLineRecastTime`,
+		// and it is why all five ranks of a spell grey together. So this resolves the line's membership rather than
+		// sending the cast id alone; a spell with no line locks only itself, matching `recastGroup`.
+		private async Task SendSpellCooldown(INetworkClient client, Spell spell, long castBeganAt)
+		{
+			// Measured from the cast BEGIN, matching the server-side timer: the client starts counting on receipt, so
+			// send what is LEFT rather than the base. A cast that outlasted its own recast is already ready.
+			var remainingCs = spell.RecastCentiseconds - (Environment.TickCount64 - castBeganAt) / 10;
+			if (remainingCs <= 0)
+				return;
+
+			var seconds = remainingCs / 100f;
+			var locked = spell.GuiStackingLine != 0
+				? await Database.SpellIdsOnLine(spell.GuiStackingLine)
+				: new[] { spell.Id };
+
+			foreach (var templateId in locked)
+				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
+
+			Logger.LogDebug("Locked {Count} template(s) for {Seconds:F2}s after casting {Spell} ('{Name}').", locked.Length, seconds, spell.Id, spell.Name);
 		}
 
 		// Delivers a completed melee combo (#139). Every step of a combo is an ordinary damaging swing - the corpus

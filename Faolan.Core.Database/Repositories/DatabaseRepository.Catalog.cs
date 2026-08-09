@@ -35,6 +35,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Recipe?> GetRecipe(uint id);
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
+		Task<uint[]> SpellIdsOnLine(uint guiStackingLine);
 		Task<SpellEffect[]> GetSpellEffects();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
@@ -251,6 +252,18 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
+		}
+
+		// Every spell sharing a GUI stacking LINE - the group a line-scoped recast covers, which retail locks one
+		// message per member of (#767: a `Contract of Protection` cast emits five `DispatchLockTemplate` bodies, one
+		// per rank of line 12). Ordered by id so the emitted sequence is stable rather than storage-dependent.
+		public async Task<uint[]> SpellIdsOnLine(uint guiStackingLine)
+		{
+			if (guiStackingLine == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Spells.AsNoTracking().Where(s => s.GuiStackingLine == guiStackingLine).OrderBy(s => s.Id).Select(s => s.Id).ToArrayAsync();
 		}
 
 		// The server-acted spell effects (pet summons, triggered procs). Read whole in run order - a few dozen rows,
