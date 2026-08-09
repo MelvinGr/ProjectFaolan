@@ -164,6 +164,16 @@ namespace Faolan.GameServer.World
 		// #716: the target aggregate BCC rate, in pulses per second per zone - retail's p90 (2.35/s), rounded down.
 		private const int HeartbeatsPerSecond = 2;
 
+		// #766: how long a creature STANDS between two ambient idle animations, on top of the animation's own length.
+		// Capture-measured over 22,696 consecutive pairs (`--report ambient-animation`): p10 0.1s, p50 2.2s, p90 19.0s.
+		//
+		// Drawn as an exponential with this median rather than uniformly, because the measured shape is one-sided - most
+		// pauses are short and a few are long, which a uniform draw inverts into "usually a middling wait". ⚠️ The
+		// exponential's own p90 is 7.3s against retail's 19.0s, so our tail is thinner than retail's: an NPC that
+		// occasionally stands about for half a minute is not reproduced. The median is the common case and it is what
+		// this matches.
+		public const double AmbientAnimationPauseMedianSeconds = 2.2;
+
 		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
 		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
 		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
@@ -321,6 +331,28 @@ namespace Faolan.GameServer.World
 					// it also moves this tick (retail streams the heartbeat continuously alongside any MoveTask).
 					if (heartbeatDue && entity.Handle % heartbeatShards == heartbeatShard)
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcHeartbeat));
+
+					// #766: the AMBIENT IDLE ANIMATION - a citizen leaning on a wall, scratching, looking round. Unlike the
+					// heartbeat above this is per-entity and self-timed: the animation's own length plus the pause the
+					// creature stands for afterwards, because retail never starts one before the last has finished.
+					//
+					// Only while STANDING and out of combat. That is retail's own split, not a guess about what looks
+					// right: 24,432 of the 25,750 attributable captured Emote records land on an actor with no MoveTask in
+					// the preceding 10s (`--report ambient-animation`). Playing an idle over a walk would fight the walk
+					// animation anyway.
+					if (entity.TickAmbientAnimation(deltaSeconds))
+					{
+						if (!IsStanding(zone, entity))
+						{
+							entity.ArmAmbientAnimation(AmbientAnimationPauseMedianSeconds); // busy - look again shortly
+						}
+						else if (AmbientAnimations.Pick(entity.AmbientAnimations, Random.Shared) is { } picked)
+						{
+							entity.AmbientAnimationPicked = picked;
+							entity.ArmAmbientAnimation(picked.DurationCentiseconds / 100.0 + ExponentialPause(AmbientAnimationPauseMedianSeconds));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAmbientAnimation));
+						}
+					}
 
 					// #20: while engaged, the defender moves one shield to another arc every 5-12s (the captured cadence),
 					// so the attacker has to keep re-aiming at the weakest arc. Per-entity timer, not a shared accumulator -
@@ -846,6 +878,32 @@ namespace Faolan.GameServer.World
 			var angle = handle % 3600 * (MathF.PI / 1800f); // 0..2π in 0.1° steps, deterministic per handle
 			var radius = 3f + handle % 3; // 3 / 4 / 5u rings
 			return (radius * MathF.Cos(angle), radius * MathF.Sin(angle));
+		}
+
+		// Whether `entity` is genuinely STANDING STILL this tick - the state an ambient idle animation belongs to (#766).
+		// Every way the tick can be moving or occupying it, in one place: mid-chase or mid-walk-home (`Moving`), engaged,
+		// escorting/following, walking a captured beat (a route walker only stands at the ends of it), or with a player
+		// close enough that this tick is about to make it chase.
+		//
+		// ⚠️ `Moving` alone is not enough, and that is not a detail: a ROUTE walk is model-only - it does not stream, so
+		// it never sets `Moving` - so gating on that flag would have every patroller in Old Tarantia stopping to scratch
+		// itself while walking down the street.
+		private bool IsStanding(Zone zone, WorldEntity entity)
+		{
+			if (entity.Moving || entity.InCombat || entity.Returning || entity.FollowTargetHandle != null)
+				return false;
+			if (entity.WalksRoute && !entity.RouteDwelling)
+				return false;
+
+			return !entity.Hostile || NearestPlayerInRange(zone, entity, NpcAggroRange) == null;
+		}
+
+		// A pause drawn from an exponential with the given MEDIAN - the shape the measured ambient-animation gaps have
+		// (mostly short, occasionally long). Clamped away from zero so a draw cannot schedule the next animation on the
+		// same tick. See AmbientAnimationPauseMedianSeconds for the measurement and for what this does not reproduce.
+		private static double ExponentialPause(double medianSeconds)
+		{
+			return Math.Max(0.1, -Math.Log(1.0 - Random.Shared.NextDouble()) * medianSeconds / Math.Log(2.0));
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at `speed` (keeping terrain Y),

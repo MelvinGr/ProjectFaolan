@@ -33,6 +33,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcHeartbeat(npc);
 		}
 
+		Task IWorldOutbound.BroadcastNpcAmbientAnimation(WorldEntity npc)
+		{
+			return _broadcaster.BroadcastNpcAmbientAnimation(npc);
+		}
+
 		Task IWorldOutbound.BroadcastShieldRose(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastShieldRose(entity);

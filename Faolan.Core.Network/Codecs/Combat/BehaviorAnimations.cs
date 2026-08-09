@@ -178,11 +178,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(actor, seq, (uint)BehaviorId.UseDynel, args, tail.ToArray());
 		}
 
-		// The continuous short-form "AI / idle behavior pulse" retail streams ~10/s for every rendered entity (#225).
-		// It is what keeps a standing creature playing its IDLE animation instead of freezing - without it our NPCs and
-		// pets stand static. NOT required for rendering (#23), pure fidelity + the seed of the simulation AI layer.
-		// Decoded byte-exact from the mount capture (frame 105); `tick` is a MONOTONIC per-stream counter, so the args
-		// length grows as its varint widens.
+		// The short-form "this entity is alive and idling" assert (#225): `BehaviorId.BccAction` carrying the one fixed
+		// idle animation and nothing else. It is what starts a standing creature's IDLE animation instead of leaving it
+		// frozen on its spawn pose. Decoded byte-exact from the mount capture (frame 105); `tick` is the per-actor
+		// `commandqueue_server_id`, which steps by 1 (29,246 of 29,996 captured steps), so the args length grows as its
+		// varint widens.
+		//
+		// ⚠️ It is NOT a heartbeat, however long this codebase treated it as one. Measured over the corpus's 37,965
+		// captured records (`--report ambient-animation`): 7,969 actors, and the records per actor are p50 **1**, p90 2.
+		// Retail asserts it once as an entity comes into view and then leaves it alone. What actually recurs is
+		// `AmbientEmote` below - a different command, with a different animation every time.
 		public static BehaviorControlCenterIIR Heartbeat(uint actor, uint tick)
 		{
 			var args = new CommandMessage
@@ -194,6 +199,34 @@ namespace Faolan.Core.Network.Codecs.Combat
 			}.ToProtobuf();
 
 			return new BehaviorControlCenterIIR(actor, NpcAttackAckSeq, (uint)BehaviorId.BccAction, args, []);
+		}
+
+		// The AMBIENT ANIMATION (#766): a standing NPC plays a random one of its creature's idle behaviours - a citizen
+		// leaning on a wall, scratching, looking round - as a `BehaviorId.Emote` with NO tail. This is what makes a
+		// street look inhabited rather than populated by statues, and it is the recurring ambient record retail
+		// actually sends: 25,778 captured over 2,909 actors, p50 3 records each (p90 15).
+		//
+		// `durationCentiseconds` is the animation's own length, and the client is told it: `activation_time` (field 12)
+		// is on 25,562 of the 25,778, and 76 of the 118 animation ids state exactly ONE value for it - the duration
+		// belongs to the ANIMATION, which is why it is stored beside the animation id rather than decided per send.
+		//
+		// The next ambient animation is scheduled for after this one FINISHES: over 22,696 consecutive pairs, the gap
+		// divided by the previous record's `activation_time`-as-centiseconds has p10 exactly 1.0 and falls below 0.9
+		// on 121 (0.5%). The creature then STANDS for a while - p10 0.1s, p50 2.2s, p90 19.0s - and plays another.
+		//
+		// Byte-exact against frame 90 of `NecroL80_..._chat-annotated-3` (actor 0x000304ED, animation 42115, 3580cs).
+		public static BehaviorControlCenterIIR AmbientEmote(uint actor, uint animationId, uint tick, uint durationCentiseconds)
+		{
+			var args = new CommandMessage
+			{
+				BccActionId = animationId,
+				CommandqueueServerId = tick,
+				Flags = 0x18,
+				ExecutionStatus = 0,
+				ActivationTime = durationCentiseconds
+			}.ToProtobuf();
+
+			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.Emote, args, []);
 		}
 
 		// The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/subsystems/combat.md, was

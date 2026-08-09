@@ -372,3 +372,39 @@ no-tail, 7x {1,3,5,6,12}+bound20, 4x {1,3,5,6,11,12}+bound20, 1x {1,3,5,6}+bound
 tail) AND the 0x0007 subtype (via `form: 0x0007` + `field4`); `BehaviorAnimations.ItemRegistration` builds the
 88-byte item-bound form (its trailing 3 u32 parameterized for the cutscene's non-zero state). All 90 cutscene
 records are now constructed byte-exact (the #234 golden harness locks them).
+
+## The two AMBIENT commands — what makes a standing NPC look alive (#766 / #225)
+
+`Emote` (0x05) and `BccAction` (0x07) are between them **63,743 of the corpus' 76,262 BCC records** — more than
+everything else on this channel put together. Both carry a `CommandMessage` and, per the table above, **no tail**,
+so a record is completely described by its command, its `bcc_action_id` and its timing. `--report
+ambient-animation` measures both.
+
+They are **not** two spellings of one thing, which is what this codebase assumed for a long time:
+
+| | `BccAction` 0x07 | `Emote` 0x05 |
+|---|---|---|
+| records / actors | 37,965 over 7,969 | 25,778 over 2,909 |
+| records per ACTOR | **p50 1**, p90 2 | p50 3, p90 15 |
+| seconds between one actor's | p50 0.0 (they arrive in a burst) | **p50 9.4** (p10 3.6, p90 36.9) |
+| `bcc_action_id` | 16 distinct, 41413 dominant | **126 distinct**, p50 3 per creature (max 21) |
+| `activation_time` | on 84 of 37,965 | on **25,562** of 25,778 |
+| while the actor is standing | 35,617 of 37,858 | 24,432 of 25,750 |
+
+So **`BccAction` is a one-shot assert** — retail states the fixed idle behaviour once as an entity comes into view
+and then leaves it alone. It was modelled here as a ~1/s *heartbeat* per visible NPC, which is a shape retail never
+sends (#716 capped the resulting flood; this is why it existed).
+
+**`Emote` is the recurring one**, and it is the ambient random animation: a citizen leaning on a wall, scratching,
+looking round. Its cadence is stated in the data rather than chosen by the sender — over 22,696 consecutive pairs
+of one actor's records, `gap / previous activation_time-as-centiseconds` has **p10 exactly 1.0** and falls below 0.9
+on 121 (0.5%), i.e. the next animation never starts before the last has finished. The creature then STANDS for
+p10 0.1s / **p50 2.2s** / p90 19.0s and plays another. `activation_time` is therefore the animation's own LENGTH,
+and it belongs to the animation: of the 118 ids, 76 state exactly one value and none states more than two.
+
+The animation ids are per creature and in the same space as `NpcStatCore.AnimIdleId` (41-42k, 62k, 126k, 216k).
+`Citizen` 14522 plays six of them, weighted — 62171 and 62172 about 570 times each against 182 for 62188.
+
+Built by `BehaviorAnimations.AmbientEmote` (byte-exact against frame 90 of `NecroL80_..._chat-annotated-3`), stored
+per creature type as `NpcAmbientAnimation` (harvested by the `npc-ambient-animations` module), and driven by
+`WorldState.Tick`.

@@ -68,6 +68,25 @@ table:
 Constant-everywhere fields (`Side`, `MovementMultiplier`, `Mount*`, the `*Blend` flags, `SpawnAnimation`
 which is zeroed on every fresh spawn) are hardcoded in the builder rather than stored.
 
+## Ambient idle animations (#766)
+
+The spawn body's `AnimIdleId` is the pose a creature HOLDS. What makes it look alive is separate and does not ride
+the spawn at all: retail streams a `BehaviorId.Emote` record every so often naming one of the creature's ambient
+animations — a citizen leaning on a wall, scratching, looking round.
+
+Those animations are **type-level**, stored per creature as `NpcAmbientAnimation` (`NpcTemplate.AmbientAnimations`)
+and harvested from the corpus by the `npc-ambient-animations` module: 767 rows over 222 creature types, 116 distinct
+animations. A type no capture ever caught idling has none and stands still — a borrowed animation may not even exist
+on another creature's skeleton.
+
+Each row carries the animation's own LENGTH (the record's `activation_time`, which the client is told) and how often
+retail was captured playing it. `WorldState.Tick` picks one WEIGHTED by that count while the NPC is genuinely
+standing — not chasing, walking a beat, following or engaged, which is retail's own split (24,432 of the 25,750
+attributable captured records land on an actor with no MoveTask in the preceding 10s) — and schedules the next for
+after this one finishes plus a short pause. See the ambient section of
+[behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) for the measurements and
+`BehaviorAnimations.AmbientEmote` for the record.
+
 ## The four per-spawn-event fields, and who corrects them (#605/#688/#689)
 
 `MovementMode`, `npc_stats.SpawnAnimation`, `Stats.BccState` and `Bcc.AnimIdleId` are **rolled per spawn

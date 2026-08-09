@@ -59,6 +59,10 @@ namespace Faolan.GameServer.World
 		// stepping. Only the ENDS pause - a patrol that stopped at every waypoint would twitch its way down the street.
 		private double _routeDwellRemaining;
 
+		// #766: seconds until this NPC's next ambient idle animation - the previous animation's own length plus the
+		// pause it then stands for. Zero on a fresh entity, so the first one is due immediately.
+		private double _ambientAnimationRemaining;
+
 		// Remaining time (seconds) until respawn while dead; meaningless when alive.
 		private double _respawnRemaining;
 
@@ -656,6 +660,16 @@ namespace Faolan.GameServer.World
 		// channel names the delivery - a tell has one recipient - and the line's `DetectedChar.name` slot names them.
 		public NpcChatterBark[] GreetingLines { get; set; } = null!;
 
+		// The AMBIENT IDLE ANIMATIONS this NPC's creature performs while standing about (#766), from
+		// NpcTemplate.AmbientAnimations at zone load - weighted, because a creature's common idle is common. Empty =
+		// no capture ever caught this creature idling, so it stands still rather than performing a guessed animation.
+		public IReadOnlyList<AmbientAnimation> AmbientAnimations { get; set; } = [];
+
+		// The animation the tick most recently PICKED, for the broadcaster to send. Set by the tick alongside the
+		// NpcAmbientAnimation effect, so the choice (and its stated duration) is made once rather than re-rolled on the
+		// wire side, where the two would disagree about what the client was told.
+		public AmbientAnimation? AmbientAnimationPicked { get; set; }
+
 		// ENCOUNTER-SCRIPT barks (`event`): fired by the scripted encounter's own proximity trigger (#502), never by
 		// the ambient tick. Kept apart from ChatterLines so the lure's cry for help cannot also come out on the clock.
 		public NpcChatterBark[] EncounterLines { get; set; } = null!;
@@ -996,11 +1010,32 @@ namespace Faolan.GameServer.World
 			return _patrolReissueRemaining <= 0;
 		}
 
+		// #766: counts down to this NPC's next ambient idle animation; true on the tick one is due. `Arm` schedules the
+		// next, which is the animation's own length plus the pause the creature then stands for - retail never starts
+		// one before the last has finished (see BehaviorAnimations.AmbientEmote).
+		public bool TickAmbientAnimation(double dt)
+		{
+			if (AmbientAnimations.Count == 0)
+				return false;
+
+			_ambientAnimationRemaining -= dt;
+			return _ambientAnimationRemaining <= 0;
+		}
+
+		public void ArmAmbientAnimation(double seconds)
+		{
+			_ambientAnimationRemaining = seconds;
+		}
+
 		// #703: pauses a route walker for `seconds` (the dwell at the end of a beat).
 		public void ArmRouteDwell(double seconds)
 		{
 			_routeDwellRemaining = seconds;
 		}
+
+		// #703: whether a route walker is currently PAUSED at the end of its beat rather than walking it. The one state in
+		// which a patroller is genuinely standing still, which is what #766's ambient animations need to know.
+		public bool RouteDwelling => _routeDwellRemaining > 0;
 
 		// #703: counts the route dwell down; true once the walk may step again (so an un-armed walker walks straight on).
 		public bool TickRouteDwell(double dt)

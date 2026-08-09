@@ -953,7 +953,17 @@ namespace Faolan.GameServer.World
 									break;
 								}
 
-								case WorldTickEffectType.EncounterBark:
+								case WorldTickEffectType.NpcAmbientAnimation:
+								{
+									// #766: the ambient idle animation - a citizen leaning on a wall rather than standing
+									// to attention. Cosmetic, so ungated like the heartbeat above; the tick already picked
+									// which animation and how long it runs.
+									if (NpcHeartbeatEnabled)
+										await _output.BroadcastNpcAmbientAnimation(effect.Entity);
+									break;
+								}
+
+							case WorldTickEffectType.EncounterBark:
 								{
 									// #502: the lure calls for help as a player closes. Cosmetic - it is the swap that
 									// matters - but it is the tell that the encounter is armed, and it is a real captured

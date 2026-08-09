@@ -30,6 +30,10 @@ namespace Faolan.Core.Database.Tables
 		[Key]
 		public uint TemplateId { get; set; }
 
+		// Ambient IDLE ANIMATIONS this NPC type performs while standing about (#766; see NpcAmbientAnimation). Empty
+		// for a type no capture ever caught idling - it then stands still rather than being given a guessed animation.
+		public virtual ICollection<NpcAmbientAnimation> AmbientAnimations { get; set; } = [];
+
 		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
 		public virtual ICollection<NpcChatter> Chatter { get; set; } = [];
 

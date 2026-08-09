@@ -2019,6 +2019,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbientAnimation", b =>
+                {
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("AnimationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("DurationCentiseconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Weight")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NpcTemplateId", "AnimationId");
+
+                    b.ToTable("NpcAmbientAnimations");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
                 {
                     b.Property<uint>("MapId")
@@ -4792,6 +4811,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Spell");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbientAnimation", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany("AmbientAnimations")
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NpcTemplate");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.QuestGoalDefinition", "Goal")
@@ -5711,6 +5741,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcTemplate", b =>
                 {
+                    b.Navigation("AmbientAnimations");
+
                     b.Navigation("Chatter");
 
                     b.Navigation("Equipment");

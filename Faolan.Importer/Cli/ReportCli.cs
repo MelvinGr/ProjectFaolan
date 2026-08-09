@@ -293,6 +293,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "ambient-animation":
+				{
+					AmbientAnimation(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "combo-swings":
 				{
 					await ComboSwings(NamedCapture.LoadAll(capturesDir), arg);

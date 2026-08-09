@@ -255,6 +255,10 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Spells)
 				.Include(n => n.NpcTemplate)
+				// #766: the creature's ambient idle animations. Lazy loading is off, so without this every NPC reads an
+				// EMPTY set and stands to attention - the exact symptom the ticket reported, one layer down.
+				.ThenInclude(t => t.AmbientAnimations)
+				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Chatter)
 				// And the bark's PARAMETER slots, or the session slot never reaches the wire (#691). Lazy loading is
 				// off, so without this `NpcChatterColumns.ToBark` reads an EMPTY `row.Parameters` and composes a

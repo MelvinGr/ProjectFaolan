@@ -29,6 +29,10 @@ namespace Faolan.GameServer.World
 		// is never sent to a still-loading client - the pcDynel-NULL hang the earlier heartbeat experiment hit.
 		Task BroadcastNpcHeartbeat(WorldEntity npc);
 
+		// Broadcast the ambient idle ANIMATION the tick picked for this NPC (BehaviorId.Emote, #766) to the players who
+		// have it CONFIRMED - same gating and same reason as the heartbeat above.
+		Task BroadcastNpcAmbientAnimation(WorldEntity npc);
+
 		// Broadcast a defender's directional-combat shield rose (CombatShieldIIR 0xCFFD0519) to the players who can see
 		// it, so the client draws the blue guard arcs over it and the attacker can aim at the weakest one (#20). Serves
 		// both sides: the tick's NPC rose, and a player's own rose relayed to the opponents who can see them (#620).

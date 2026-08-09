@@ -531,6 +531,26 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// The NPC performs one of its creature's ambient idle animations (#766): a BehaviorId.Emote record naming the
+		// animation the TICK picked and its own length, so the client both plays it and knows how long it runs. Same
+		// Confirmed gating as the heartbeat - the animation plays ON the dynel, so a still-loading viewer has nothing to
+		// play it on. No-op when the tick picked nothing (a creature with no captured animations never gets here).
+		public async Task BroadcastNpcAmbientAnimation(WorldEntity npc)
+		{
+			ArgumentNullException.ThrowIfNull(npc);
+			if (npc.AmbientAnimationPicked is not { } animation)
+				return;
+
+			var record = BehaviorControlCenterCodec.Build(
+				BehaviorAnimations.AmbientEmote(npc.Handle, animation.AnimationId, npc.NextBehaviorPhase(), animation.DurationCentiseconds));
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+					await WorldIir.Send(viewer.Client, record);
+			}
+		}
+
 		// The defender's shield rose changed (an NPC engaged or its shift timer moved a guard; a PLAYER moved one of
 		// theirs, #620): send the CombatShieldIIR to every viewer that has it CONFIRMED, the same gating as the
 		// heartbeat - the rose is drawn ON the dynel, so a still-loading client has nothing to draw it over.
@@ -1228,6 +1248,18 @@ namespace Faolan.GameServer.World
 					entity.ChatterLines = barks[BarkTrigger.Ambient].ToArray();
 					entity.GreetingLines = barks[BarkTrigger.Detection].ToArray();
 					entity.EncounterLines = barks[BarkTrigger.EncounterScript].ToArray();
+				}
+
+				// #766: the ambient idle ANIMATIONS this creature performs while standing about, weighted as retail was
+				// captured playing them. A type with none stands still - the honest gap, and the reason this is not
+				// defaulted to the type's single `AnimIdleId` (that is the pose it holds, not something it does).
+				if (npc.NpcTemplate.AmbientAnimations is { Count: > 0 } ambient)
+				{
+					entity.AmbientAnimations = ambient
+						.Select(a => new AmbientAnimation(a.AnimationId, a.DurationCentiseconds, a.Weight))
+						.ToArray();
+					// Staggered, so a street's worth of citizens do not all start an animation on the same tick.
+					entity.ArmAmbientAnimation(Random.Shared.NextDouble() * WorldState.AmbientAnimationPauseMedianSeconds * 4);
 				}
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative

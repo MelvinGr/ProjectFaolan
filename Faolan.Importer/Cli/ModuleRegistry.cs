@@ -18,7 +18,7 @@ namespace Faolan.Importer.Cli
 			new ListingsModule(), new StockPhrasesModule(), new ItemsModule(), new MapsModule(), new SpellsModule(), new StatDamageModule(), new SpellEffectsModule(), new AbilitiesModule(),
 			new StartingSpellsModule(),
 			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
-			new CharacterBankModule(), new CharacterSocketsModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new NpcDeathBehaviorsModule(), new NpcChatterModule(), new WorldObjectsModule(),
+			new CharacterBankModule(), new CharacterSocketsModule(), new ShopsModule(), new NpcsModule(), new NpcDispositionModule(), new NpcDeathBehaviorsModule(), new NpcAmbientAnimationsModule(), new NpcChatterModule(), new WorldObjectsModule(),
 			new WorldTeleportsModule(), new MapLootModule(), new QuestsModule(), new QuestWiringModule(), new TravelWiringModule(), new MountsModule(), // opt-in
 			new PetsModule(), // opt-in (#307)
 			new ConsumableUsesModule(), // consumable on-use spells -> Items.OnUseSpell

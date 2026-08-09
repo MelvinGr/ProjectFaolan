@@ -23,5 +23,16 @@ namespace Faolan.Tests
 			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.Heartbeat(0x00008322, 1));
 			Assert.Equal("642cd3d60000c350000083220004000000070000000a08c5c302180128183000", Convert.ToHexStringLower(bytes));
 		}
+
+		[Fact]
+		public void BuildAmbientEmote_MatchesCapture()
+		{
+			// #766: the recurring ambient animation, which is a DIFFERENT command from the heartbeat above -
+			// BehaviorId.Emote (0x05), a per-creature animation id rather than the one fixed idle, and the animation's
+			// own length in `activation_time`. Frame 90 of NecroL80_..._chat-annotated-3: actor 0x000304ED, animation
+			// 42115, tick 4, 3580 centiseconds.
+			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.AmbientEmote(0x000304ED, 42115, 4, 3580));
+			Assert.Equal("642cd3d60000c350000304ed0004000000050000000d0883c90218042818300060fc1b", Convert.ToHexStringLower(bytes));
+		}
 	}
 }

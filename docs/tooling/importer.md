@@ -80,6 +80,7 @@ Capture-sourced (default group, run in dependency order):
 | `character-bank` | `characters`, `items` |
 | `shops` | — |
 | `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
+| `npc-ambient-animations` (per-creature idle animations from the captured `Emote` records — #766) | — |
 | `world-objects` | — |
 | `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
@@ -246,6 +247,12 @@ puts each in, with the direction ability resolved — #661) ·
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`ambient-animation` (the two commands that make a standing NPC look alive — `BccAction` and `Emote`, 63,743 of the
+corpus' 76,262 BCC records — measured per ACTOR and per creature TYPE rather than per capture, which is the only
+way the question "what does ONE citizen receive, and how often" gets an answer. It is what separated the two:
+`BccAction` is a p50-1-per-actor assert, `Emote` the recurring ambient animation whose next occurrence the previous
+record's own `activation_time` times. `--report-arg <capture substring>` narrows to one capture; see the ambient
+section of [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md)),
 `player-actions` (every `PerformSpecialAction` 0x205A selector in the corpus, NAMED out of the `Abilities`
 catalog — the selector is the ability's grant `Slot` — with the server's answering BCC records and IIRs.
 `--report-arg <selector hex>` narrows to one and prints those answers in full, which is the spec a server-side
