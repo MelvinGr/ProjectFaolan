@@ -160,7 +160,12 @@ namespace Faolan.Core.Rdb
 			// which is the aura's period. So the anchor keeps its precision by matching the typeId's RANGE, the
 			// version word, and that trailing pair, and derives the sub-record run from `subCount` rather than
 			// assuming it away. `subCount` is bounded because an unbounded one turns a garbage word into a wild offset.
-			const uint maxSubRecords = 16;
+			// A sanity bound, not a grammar claim: an unbounded count turns a garbage word into a wild key offset. 64
+			// because the widest shipped element carries 40 (a `CastNano` listing ten spell ranks as two sub-records
+			// each - spell 1126058, subCount 20, tiling exactly 240 bytes into fixed ints [1][0][2][9] and its key).
+			// 16 was the first guess and it silently rejected 22 real elements; the accounting check below is what
+			// made that visible, and it is 0 at 64.
+			const uint maxSubRecords = 64;
 			const int subRecordWords = 3;
 
 			for (var off = 0; off + 32 <= body.Length; off++)

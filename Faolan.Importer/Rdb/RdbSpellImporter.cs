@@ -178,7 +178,7 @@ namespace Faolan.Importer.Rdb
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SetSpellLineRecastTimeKind = 53077;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts, int EffectDurations, int EffectLinks, int UnparsedElements)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts, int EffectDurations, int EffectLinks, int UnparsedElements, string UnparsedSamples)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
@@ -240,6 +240,7 @@ namespace Faolan.Importer.Rdb
 			var effectLinksSet = 0;
 			var unparsedElements = 0;
 			var recordsWithUnparsed = 0;
+			var unparsedSamples = new List<string>();
 			var castTimesSet = 0;
 			var levelsSet = 0;
 			foreach (var entry in rdb.EntriesOfType(SpellDataType))
@@ -347,6 +348,17 @@ namespace Faolan.Importer.Rdb
 				{
 					unparsedElements += orphans.Count;
 					recordsWithUnparsed++;
+					// The COUNT alone goes stale the moment someone has to act on it, so carry a few whole
+					// coordinates - spell, byte offset, type id and the words around it are what a decode starts from.
+					if (unparsedSamples.Count < 24)
+						foreach (var o in orphans)
+						{
+							if (unparsedSamples.Count >= 24)
+								break;
+
+							var tail = string.Join(",", Enumerable.Range(0, 6).Where(i => 12 + o + 16 + i * 4 + 4 <= body.Length).Select(i => body.ReadU32Le(12 + o + 16 + i * 4)));
+							unparsedSamples.Add($"spell {entry.Id} @{o} kind={body.ReadU32Le(12 + o)} sub={body.ReadU32Le(12 + o + 12)} then=[{tail}]");
+						}
 				}
 
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
@@ -623,9 +635,10 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s).",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed);
-			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
+				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples));
+			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements, string.Join(" | ", unparsedSamples));
 		}
 
 		/// <summary>
