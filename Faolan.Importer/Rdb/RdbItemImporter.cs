@@ -66,6 +66,11 @@ namespace Faolan.Importer.Rdb
 		// (Str=Int=10) in the snapshot for every char L1-L80 and NEVER updates them live (verified across every login
 		// capture + a level-up) - the client derives displayed attributes itself from class/level/feats + worn gear, so
 		// patching gear totals onto the wire would diverge from retail and double-count (#399 item 1, won't-do).
+		// The GameAction element that carries an item's on-use spell: `e_Type_GC_GameAction_CastNano` (key list [39]).
+		// "Nano" is Funcom's Anarchy Online word for a spell. See ItemTemplateStatModifiers and Gitea #762.
+		private const uint CastNanoKind = 53051;
+		private const int CastNanoSpellKey = 39;
+
 		private static readonly HashSet<uint> ApplicableStatIds =
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax, (uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution,
@@ -132,6 +137,11 @@ namespace Faolan.Importer.Rdb
 
 			var items = await db.Items.Include(i => i.StatModifiers).Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).ToListAsync();
 
+			// The on-use spell (below) is an FK to Spells, so a template naming a spell our catalog lacks must be
+			// SKIPPED rather than stored - an unresolvable id would fail the constraint, and silently pointing at
+			// nothing would be worse than leaving the item inert.
+			var knownSpells = (await db.Spells.Select(sp => sp.Id).ToListAsync()).ToHashSet();
+
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
@@ -148,7 +158,9 @@ namespace Faolan.Importer.Rdb
 				flagsAdded = 0,
 				bindFieldsAdded = 0,
 				gemSlotsAdded = 0,
-				weaponDamageAdded = 0;
+				weaponDamageAdded = 0,
+				onUseAdded = 0,
+				onUseUnknownSpell = 0;
 			var firstSampleShown = false;
 
 			foreach (var item in items)
@@ -285,6 +297,32 @@ namespace Faolan.Importer.Rdb
 				if (SyncStatModifiers(item, mods))
 					statsAdded++;
 
+				// The item's ON-USE SPELL (#762): a `CastNano` GameAction element - kind 53051, key 39 - whose payload
+				// is a Spells.Id. This is the scalable twin of CaptureItemUseImporter, which can only learn an on-use
+				// spell from a capture where somebody actually right-clicked the item.
+				//
+				// ⚠️ Only fills a GAP; a captured value always wins. The capture observed the spell the server really
+				// applied, while the template states what the item declares - and those disagree at least once
+				// (Totem of Origins: template 3763119 "Totem of Origins" vs captured 3981764 "Degeneration"), which is
+				// unresolved. Overwriting a captured value with the template's would silently rewrite ground truth.
+				foreach (var element in ItemTemplateStatModifiers.ParseElements(template.AsSpan(12)))
+				{
+					if (element.Kind != CastNanoKind || item.OnUseSpell != null)
+						continue;
+
+					if (element.Value(CastNanoSpellKey) is not { } spellId || spellId == 0)
+						continue;
+
+					if (!knownSpells.Contains(spellId))
+					{
+						onUseUnknownSpell++;
+						continue;
+					}
+
+					item.OnUseSpell = spellId;
+					onUseAdded++;
+				}
+
 				// Weapon MIN/MAX damage (docs/rdb/item-template-stats.md, #395): property fields 286 (0x11E) = min and
 				// 285 (0x11D) = max, decoded from the client's GUIGetMinDamage()/GUIGetMaxDamage(). Same strict property
 				// run as value/quality. Stored only when both are present and sane (min <= max, non-zero) - non-weapons
@@ -346,7 +384,7 @@ namespace Faolan.Importer.Rdb
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
 			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0 ||
-			    flagsAdded > 0 || bindFieldsAdded > 0 || gemSlotsAdded > 0)
+			    flagsAdded > 0 || bindFieldsAdded > 0 || gemSlotsAdded > 0 || onUseAdded > 0)
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
@@ -366,6 +404,10 @@ namespace Faolan.Importer.Rdb
 
 			if (weaponDamageAdded > 0)
 				Console.WriteLine($"  weapon min/max damage (fields 286/285) set on {weaponDamageAdded} item(s).");
+
+			if (onUseAdded > 0 || onUseUnknownSpell > 0)
+				Console.WriteLine($"  on-use spells (CastNano, kind 53051) set on {onUseAdded} item(s); " +
+					$"{onUseUnknownSpell} named a spell the catalog does not hold and were skipped (#762).");
 
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
 		}
