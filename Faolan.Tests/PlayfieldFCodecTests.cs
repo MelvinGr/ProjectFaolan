@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	// ⚠️ A pass here does NOT mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, four body
 	// words vary that BuildPlayfieldFiir wrote as constants. The two PER-MAP ones are now imported and sent from the
 	// Maps table (PlayfieldFieldA @30 and PlayfieldFieldC @95, which were wrong for six of the twelve captured maps).
-	// The other two - field58 @58 and fieldB @83 - vary WITHIN a map, so they are per-entry state, still supplied by
+	// The other two - field58 @58 and the blob's last word @83 - vary WITHIN a map, so they are per-entry state, still supplied by
 	// the caller as constants and still undecoded. Gitea #451.
 	//
 	// This golden uses a capture whose four words equal the values the create path supplies, which is exactly why it

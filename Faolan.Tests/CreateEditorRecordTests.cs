@@ -101,9 +101,9 @@ namespace Faolan.Tests
 		 InlineData(322.5f, 145.3113250732422f, 704.9000244140625f, 0x00000FAAu, 0x01316E71u, 6u, 0x01EA985Cu, 15f, 12.273988723754883f, 0x00000000u,
 			 "5d85bfc700000000000000000043a1400043114fb34430399a620000c79c00000faa0000000001316e71000000000000000600009c5001ea985c0000000000000000180000000101ea985c0000cb20417000004144624200000000ffffffffffffffff0000000700000000")]
 		// fa0 (Stygian Galley) and faa (Tortage Island) MapChange records from the create captures.
-		public void PlayfieldFiir_MatchesCapturedBytes(float x, float y, float z, uint mapId, uint charInstance, uint count, uint token, float nearClip, float farClip, uint flags, string expected)
+		public void PlayfieldFiir_MatchesCapturedBytes(float x, float y, float z, uint mapId, uint charInstance, uint count, uint token, float blobFloat1, float blobFloat2, uint flags, string expected)
 		{
-			Assert.Equal(expected, Convert.ToHexStringLower(PlayfieldFCodec.Build(new System.Numerics.Vector3(x, y, z), mapId, charInstance, count, token, nearClip, farClip, flags)));
+			Assert.Equal(expected, Convert.ToHexStringLower(PlayfieldFCodec.Build(new System.Numerics.Vector3(x, y, z), mapId, charInstance, count, token, blobFloat1, blobFloat2, flags)));
 		}
 
 		[Fact]

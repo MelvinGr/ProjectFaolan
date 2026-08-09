@@ -1846,13 +1846,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<uint>("PlayfieldBlobLastWord")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("PlayfieldCount")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("PlayfieldFieldA")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("PlayfieldFieldB")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("PlayfieldFieldC")

@@ -44,16 +44,18 @@ namespace Faolan.Core.Network.Codecs.World
 	// The two asserts name both classes for free: `iir\playfieldFIIR.cpp` and the base
 	// `IIR\n3playfieldfullupdateiir.cpp`.
 	//
-	// ⚠️ Our own Read/Write DO parse the blob into `NearClip`/`FarClip`/`BlobLastWord`, and that structure is real -
+	// ⚠️ Our own Read/Write DO parse the blob into `BlobFloat1`/`BlobFloat2`/`BlobLastWord`, and that structure is real -
 	// all 218 captured bodies decode and re-encode byte-exact. But it is structure the CLIENT does not look at, so
 	// do not reason from those names about behaviour, and do not expect changing them to alter anything on screen.
 	//
-	// ⚠️ **`NearClip`/`FarClip` are guessed names and the second one cannot be right.** Measured over all 218 bodies
+	// ⚠️ They were called `NearClip`/`FarClip` until 2026-08-09, and the second name could not be right. Measured
+	// over all 218 bodies
 	// in the dumps: the first float is **15.0 in every single one**, and the second ranges **0.053 .. 14.796**,
 	// always BELOW it. A far clip nearer than the near clip is not a camera. The second correlates with neither the
 	// in-game clock (r = -0.01 against GameTimeIIR's DayTimeSeconds over 215 records) nor wall-clock time mod 15
-	// (r = +0.13); it is spread uniformly across [0, 15). Renaming them needs the consumer above, so they keep the
-	// names they have - but do not reason from them. Our sender hardcodes the pair as (15.0, 7.111854), which
+	// (r = +0.13); it is spread uniformly across [0, 15). They are named by POSITION now, like `BlobLastWord`
+	// beside them - a name a later decode can replace, rather than one that asserts a camera. Our sender hardcodes
+	// the pair as (15.0, 7.111854), which
 	// matches retail exactly on the first and is a single frozen value where retail varies the second.
 	public static class PlayfieldFCodec
 	{
@@ -75,12 +77,12 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		public static byte[] Build(Vector3 position, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags,
+		public static byte[] Build(Vector3 position, uint mapId, uint charInstance, uint count, uint playfieldToken, float blobFloat1, float blobFloat2, uint flags,
 			uint sceneWord = 0u, uint blobLastWord = 0u, uint fieldA = 0u, uint fieldC = 7u)
 		{
 			return Build(new PlayfieldFIIR(position,
 				new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, OwnerType: fieldA),
-				sceneWord, nearClip, farClip, blobLastWord, fieldC, flags));
+				sceneWord, blobFloat1, blobFloat2, blobLastWord, fieldC, flags));
 		}
 
 		public static PlayfieldFIIR Parse(in ReadOnlySpan<byte> data)
@@ -107,8 +109,8 @@ namespace Faolan.Core.Network.Codecs.World
 			blob.ExpectU32Be(SceneBlobHead, "scene blob head");
 			var blobToken = blob.ReadU32Be(); // the token again, inside the blob
 			blob.ExpectU32Be(SceneBlobWord2, "scene blob word 2");
-			var nearClip = blob.ReadF32Be();
-			var farClip = blob.ReadF32Be();
+			var blobFloat1 = blob.ReadF32Be(); // 15.0 in all 218 captured bodies
+			var blobFloat2 = blob.ReadF32Be(); // 0.053 .. 14.796, always below it
 			var blobLastWord = blob.ReadU32Be(); // beach capture carries 0x3, retail Old Tarantia 0x0
 			blob.EnsureAtEnd();
 
@@ -120,13 +122,13 @@ namespace Faolan.Core.Network.Codecs.World
 			if (blobToken != proxy.InstanceToken)
 				throw CodecParseException.Unexpected(nameof(PlayfieldFCodec), r.Position, $"the scene blob to repeat the proxy's playfield token 0x{proxy.InstanceToken:X8}", $"0x{blobToken:X8}");
 
-			return new PlayfieldFIIR(position, proxy, sceneWord, nearClip, farClip, blobLastWord, fieldC, flags, classWord, handle, env);
+			return new PlayfieldFIIR(position, proxy, sceneWord, blobFloat1, blobFloat2, blobLastWord, fieldC, flags, classWord, handle, env);
 		}
 
 		internal static void Write(FaolanStream s, PlayfieldFIIR v)
 		{
 			using var blob = new FaolanStream();
-			blob.WriteUInt32(SceneBlobHead).WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.NearClip).WriteFloat(v.FarClip).WriteUInt32(v.BlobLastWord);
+			blob.WriteUInt32(SceneBlobHead).WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.BlobFloat1).WriteFloat(v.BlobFloat2).WriteUInt32(v.BlobLastWord);
 
 			s.WriteUInt32(Opcode).WriteUInt32(v.ClassWord).WriteUInt32(v.Handle).WriteByte(v.Env).WriteVector3(v.Position);
 			v.Proxy.Write(s);
@@ -138,7 +140,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// PlayfieldProxy - see there for what each of its slots means.
 	//
 	// ClassWord/Handle/Env are the IIR base carrier; the create-editor and world-entry paths both send them as 0.
-	public sealed record PlayfieldFIIR(Vector3 Position, PlayfieldProxy Proxy, uint SceneWord, float NearClip, float FarClip, uint BlobLastWord, uint FieldC, uint Flags,
+	public sealed record PlayfieldFIIR(Vector3 Position, PlayfieldProxy Proxy, uint SceneWord, float BlobFloat1, float BlobFloat2, uint BlobLastWord, uint FieldC, uint Flags,
 		uint ClassWord = 0, uint Handle = 0, byte Env = 0)
 	{
 		public uint MapId => Proxy.MapId;

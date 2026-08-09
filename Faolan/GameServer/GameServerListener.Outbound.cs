@@ -648,7 +648,7 @@ namespace Faolan.GameServer
 		// This is now a thin wrapper over the shared CreateEditorRecordBuilder.BuildPlayfieldFiir codec (the create-flow
 		// builds the SAME packet) - it just prepends the MapChange subop and sources the PER-MAP rule fields from the Map
 		// row (#308). The client keys per-area rules on this packet (mount permission = PlayfieldFlags); those fields are
-		// NOT universal (beach vs mainland differ), so they come from the DB (Map.PlayfieldCount/FieldB/Flags/Instanced), 		// defaulting to the beach values for un-sourced maps. Position is the character's entry transform (per-session);
+		// NOT universal (beach vs mainland differ), so they come from the DB (Map.PlayfieldCount/BlobLastWord/Flags/Instanced), 		// defaulting to the beach values for un-sourced maps. Position is the character's entry transform (per-session);
 		// nearClip 15.0 + the farClip float are camera params (left constant). `map` may be null (fresh/unmapped -> beach
 		// defaults).
 		// The word at body [55:59] (client obj+0x54). We send 1 for every map, which is what 97 of the 151 captured
@@ -663,7 +663,7 @@ namespace Faolan.GameServer
 				? character.Id
 				: 0u;
 			var count = map?.PlayfieldCount ?? 2u;
-			var fieldB = map?.PlayfieldFieldB ?? 3u;
+			var blobLastWord = map?.PlayfieldBlobLastWord ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
 			// #451: the two per-map words that used to be builder constants. The `??` defaults are those constants, so
 			// a map with no imported MapChange behaves exactly as before rather than silently getting a zero.
@@ -672,7 +672,7 @@ namespace Faolan.GameServer
 
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(PlayfieldFCodec.Build(new Vector3(character.PositionX, character.PositionY, character.PositionZ), character.MapId,
-					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, fieldB, fieldA, fieldC)));
+					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, fieldA, fieldC)));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared

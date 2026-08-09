@@ -18,7 +18,7 @@ namespace Faolan.Importer.Captures
 	// captured MapChange records every record for a given map carries the same three, with no exceptions. The
 	// hand-curated value was wrong for un-curated maps (e.g. Tarantia Noble District read as no-mount), and FieldA /
 	// FieldC were builder constants, wrong for six of the twelve captured maps.
-	// The OTHER Playfield* fields are deliberately NOT imported: the token and fieldB really are session/entry-volatile
+	// The OTHER Playfield* fields are deliberately NOT imported: the token and the blob's last word really are session/entry-volatile
 	// (a capture shows many distinct values for the SAME map), so they stay curated.
 	// Takes raw on-wire packet bytes (no pcap dependency).
 	public static class CaptureMapImporter
