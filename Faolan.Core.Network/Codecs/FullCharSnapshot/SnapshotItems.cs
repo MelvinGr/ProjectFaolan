@@ -150,10 +150,20 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// value as per-template; this is the emit half.)
 		//
 		// ⚠️ `template2`/`key2` are emitted as COPIES of template1/key1, which is what 8,445 of 8,479 captured entries
-		// carry - but not all of them: 34 top-level entries and 10 socket blocks carry `template2 = template1 + 1`
-		// with a SECOND, unrelated TEA key, while key3 still equals key1. So ProtoAcgItem has room for a second
-		// identity that our Items row (one template, one key) cannot express, and we flatten it. Tracked separately -
-		// do not read the copy as a decoded fact.
+		// carry - but the copy is OUR SIMPLIFICATION, not a wire fact. 34 top-level entries and 10 socket blocks carry
+		// `template2 = template1 + 1` with a second, unrelated TEA key (key3 still equals key1), and that pair is REAL:
+		// `key2` TEA-decrypts RDB item template `template2` to a valid record (`type=1000020 id=3976769
+		// marker=1000000`), while cross-pairing key1 with template2 yields garbage. Both halves of the Cabochon Azurite
+		// pair carry the SAME display name and differ in content (285 vs 306 bytes), so it is one item in two variants.
+		//
+		// The client names the whole family in its own stat table: `ACGItemTemplateID` (0x2BE) / `ACGItemTemplateID2`
+		// (0x2BF) / `ACGItemTemplateID3` (0x510) beside `ACGItemSeed` (0x2BC), `ACGItemLevel` (0x2BD),
+		// `ACGItemCategoryID` (0x2C0) and `ACGItemNano1..4` - i.e. a procedurally GENERATED item, composed from up to
+		// three templates plus a seed and a level. `ItemSlot1ACG1`/`ItemSlot1ACG2` .. `ItemSlot4ACG1`/`ItemSlot4ACG2`
+		// (0x2A3..0x2AA) say the same thing about SOCKETS: four slots, each naming its gem by an ACG id PAIR.
+		//
+		// Our Items row holds one template and one key, so it cannot express the pair. Tracked in Gitea #752 - do not
+		// read the copy as a decoded fact.
 		private static ProtoAcgItem Identity(Item item, uint hash)
 		{
 			var key = item.Key;
