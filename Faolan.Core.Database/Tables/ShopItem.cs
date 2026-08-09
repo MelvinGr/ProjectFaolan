@@ -29,7 +29,17 @@ namespace Faolan.Core.Database.Tables
 		public uint Count { get; set; }
 		public uint Pos { get; set; }
 
-		// The per-slot stat-356 value (replaces the bag's record-id stat 23; semantics unknown, varies per slot).
+		// Stat 356 is `Hash` in the client's own stat-name table (`CharacterStatId.Hash` = 0x164), and the value is a
+		// **printable 4-character code**, not a number - all 92 distinct values decode big-endian to ASCII: `9P6F`,
+		// `1OVJ`, `00XI`, `COTR`, `ZCM7`, ... That is the ACGHash token shape the wire uses elsewhere.
+		//
+		// ⚠️ The comment here used to read "semantics unknown, varies per slot", which is not what it does. It is
+		// many-to-many with the ware and groups them: 92 codes over 1,375 templates, one code (`1OVJ`) spanning 322
+		// templates, while 571 templates carry more than one across different shops. So it is neither a per-slot
+		// nonce nor the item's own identity - it names some FAMILY a ware belongs to. 81 of the 110 shops use a
+		// single code for their whole stock (up to 165 wares); the other 29 mix, and one 7-ware shop uses 7.
+		//
+		// Kept verbatim for byte-exact rebuilds either way. [V0: what ShopItem's stat-356 Hash 4CC groups]
 		public uint Stat356 { get; set; }
 
 		// The entry tail's level field (ProtoAcgItem.level; observed 1 or 40).
