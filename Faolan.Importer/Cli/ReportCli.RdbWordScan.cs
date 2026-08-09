@@ -23,11 +23,14 @@ namespace Faolan.Importer.Cli
 	// Both endiannesses are searched, because RDB payloads are little-endian while plenty of embedded wire records
 	// are big-endian, and getting that wrong turns a real hit into a false negative.
 	//
-	// ⚠️ **LOCAL records only, unless `:cdn` is passed.** `RdbReader.CanRead` returns true for a CDN-only entry the
-	// moment a mirror is configured, so a sweep over `rdb.Entries` does not read a file - it FETCHES a quarter of a
+	// ⚠️ **It reads CDN-backed records too, and that is SLOW.** `RdbReader.CanRead` is true for a CDN-only entry the
+	// moment a mirror is configured, so a sweep over `rdb.Entries` does not read files - it FETCHES a quarter of a
 	// million records over HTTP, one at a time. The first run of this report did exactly that and had to be killed.
-	// Every other report reaches CDN records deliberately, for a handful of ids; a whole-RDB scan is the one shape
-	// where that default is wrong, so it is inverted here and the cost is stated when you opt in.
+	//
+	// It still defaults to the full sweep, because the fast alternative answers a WEAKER question. The value of this
+	// report is its miss, and a local-only miss means "absent from the local packs", not "absent from the shipped
+	// game" - and for several types the CDN half IS most of the game. Pass `:local` for a quick partial pass; it
+	// says so in its own header when you do.
 	public static partial class ReportCli
 	{
 		private static void RdbWordScan(string rdbDir, string? arg)
@@ -51,7 +54,9 @@ namespace Faolan.Importer.Cli
 			var options = spec.Length == 2
 				? spec[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
 				: [];
-			var includeCdn = options.Any(o => o.Equals("cdn", StringComparison.OrdinalIgnoreCase));
+			// `:local` OPTS OUT of the CDN half. The default is the full sweep - see the class comment for why the
+			// slow answer is the right default here.
+			var localOnly = options.Any(o => o.Equals("local", StringComparison.OrdinalIgnoreCase));
 			var onlyType = options.Select(o => uint.TryParse(o, out var t2)
 					? t2
 					: (uint?)null)
@@ -60,7 +65,9 @@ namespace Faolan.Importer.Cli
 			using var rdb = OpenRdb(rdbDir);
 			Console.WriteLine($"rdb-word-scan: looking for {string.Join(", ", wanted.Select(w => $"0x{w:X8} ({w})"))}" +
 				(onlyType is { } ot ? $" in type {ot} only" : " across every record type") +
-				(includeCdn ? " INCLUDING CDN-only records (this FETCHES them over HTTP - slow)" : " (LOCAL records only; pass :cdn to include CDN-backed ones)"));
+				(localOnly
+					? " -- LOCAL RECORDS ONLY (:local): a miss here means 'not in the local packs', NOT 'not in the game'"
+					: " including CDN-backed records (fetched through the mirror - slow, and the reason a miss is meaningful)"));
 
 			// hits[word][type] = how many RECORDS of that type contain the word at least once.
 			var hits = wanted.ToDictionary(w => w, _ => new SortedDictionary<uint, int>());
@@ -74,8 +81,8 @@ namespace Faolan.Importer.Cli
 				if (onlyType is { } only && e.Type != only)
 					continue;
 
-				if (!e.IsLocal && !includeCdn)
-					continue; // see the class comment - a CDN entry is an HTTP fetch, not a read
+				if (localOnly && !e.IsLocal)
+					continue; // the caller asked for the fast partial pass; the header says so
 
 				if (!rdb.CanRead(e))
 					continue;
@@ -92,6 +99,12 @@ namespace Faolan.Importer.Cli
 				}
 
 				scanned++;
+				// A CDN-inclusive sweep runs for the better part of an hour and printed NOTHING until it finished, so
+				// a long run and a hung one looked identical. The tally is per 5000 records rather than on a timer -
+				// no clock, and it paces itself: the local packs fly past, the CDN half crawls, and the gap between
+				// two lines is the honest signal of which half it is in.
+				if (scanned % 5000 == 0)
+					Console.WriteLine($"  ... {scanned} records ({hits.Values.Sum(h => h.Values.Sum())} hits so far)");
 
 				// ONE aligned pass per record, matching every wanted word at once. The naive form (a full byte-wise
 				// search per word) is `records x words x bytes` and does not finish on a 400k-record RDB - this is
@@ -121,7 +134,7 @@ namespace Faolan.Importer.Cli
 				seenHere.Clear();
 			}
 
-			Console.WriteLine($"  {scanned} records read ({unreadable} unreadable){(includeCdn ? "" : "; CDN-only records SKIPPED")}.");
+			Console.WriteLine($"  {scanned} records read ({unreadable} unreadable){(localOnly ? "; CDN-only records SKIPPED" : "")}.");
 			foreach (var word in wanted)
 			{
 				var total = hits[word].Values.Sum();

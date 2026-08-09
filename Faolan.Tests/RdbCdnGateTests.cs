@@ -30,7 +30,13 @@ namespace Faolan.Tests
 		[
 			"RdbReader.cs", // the definition, plus ReadRaw's own local-vs-fetch dispatch and CanRead itself
 			"RdbAssetExtractor.cs", // DescribeMesh / DescribeResource: the "local" | "cdn" strings in the diagnostics
-			"ReportCli.cs" // the rdb-assets corpus summary's geomLocal/geomCdn + texLocal/texCdn tallies
+			"ReportCli.cs", // the rdb-assets corpus summary's geomLocal/geomCdn + texLocal/texCdn tallies
+
+			// rdb-word-scan sweeps the WHOLE RDB, so the CDN half is a quarter of a million HTTP fetches. It still
+			// defaults to fetching them - a miss has to mean "absent from the game", not "absent from the local
+			// packs" - and `IsLocal` is only consulted to honour an explicit `:local` opt-out, which the report
+			// prints in its own header. A coverage choice the caller made and can see, not a readability test.
+			"ReportCli.RdbWordScan.cs"
 		];
 
 		// A test that constructs one deliberately without a mirror (there is none to reach in the suite), plus this
