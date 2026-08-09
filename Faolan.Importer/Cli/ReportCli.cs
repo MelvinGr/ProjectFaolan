@@ -436,6 +436,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spawn-item-level":
+				{
+					SpawnItemLevel(NamedCapture.LoadAll(capturesDir), _options.Out);
+					return 0;
+				}
+
 				case "region-stat-census":
 				{
 					RegionStatCensus(RdbDir());

@@ -28,7 +28,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Key3 = key,
 					Template1 = item.Id,
 					Template2 = item.Id,
-					Level = 1,
+					// The item's own level, exactly as the snapshot entry carries it. Measured over the DUMPS (#755,
+					// `--report spawn-item-level`): 125,721 of 125,722 captured worn-item entries across 23,478
+					// character spawns carry EXACTLY their template's `Items.Level`, with zero disagreements and
+					// zero templates carrying two different levels; the one exception is an entry whose template is
+					// not in our catalog at all.
+					//
+					// It was hardcoded `1` until then, and the snapshot entry's identical 8,479/8,479 result was
+					// deliberately NOT assumed to transfer - this is a different message written by a different part
+					// of retail's server. It had to be measured, and the reason nobody noticed is in the histogram:
+					// level 1 is 108,819 of the 125,722 entries, so the constant was right 87% of the time.
+					Level = item.Level,
 					Hash = AcgHash.ForWire(item.Id, item.Hash)
 				}
 			};

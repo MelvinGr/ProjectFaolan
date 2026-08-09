@@ -166,6 +166,31 @@ namespace Faolan.Tests
 			Assert.True(AcgHash.IsWellFormed(entry.Item.Hash), $"minted {AcgHash.Token(entry.Item.Hash)} is not a token the client would accept");
 		}
 
+		// #755: the worn item's `level` on a SPAWN is its own `Items.Level`, not a constant.
+		//
+		// It was hardcoded `1`, and the snapshot entry's identical result was deliberately not assumed to transfer -
+		// this is a different message. Measured over the DUMPS instead: 125,721 of 125,722 captured worn-item entries
+		// across 23,478 spawns carry exactly their template's level, zero disagreements, and no template carries two.
+		//
+		// The theory asserts the DERIVATION rather than one number, because level 1 is 108,819 of those 125,722
+		// entries - a gate that only tried a level-1 item would pass against the old constant.
+		[Theory]
+		[InlineData((byte)1)]
+		[InlineData((byte)5)]
+		[InlineData((byte)63)]
+		[InlineData((byte)80)]
+		public void PlayerSpawnEquipment_SendsTheItemsOwnLevel(byte level)
+		{
+			var entry = Assert.Single(PlayerSpawnEquipment.BuildInventoryEntries(Worn((CharacterEquipmentSlot.Belt, new Item
+			{
+				Id = 0x99,
+				Name = "A Belt",
+				Level = level
+			}))));
+
+			Assert.Equal(level, entry.Item.Level);
+		}
+
 		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair
 		// (MainHandRight/OffHandRight) is 20/21 - NecroL80's crossbow/quiver slots. A swap here makes weapons
 		// silently not render (the bug this fixed: MainWeapon read MainHandRight).
