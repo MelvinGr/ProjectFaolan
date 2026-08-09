@@ -148,6 +148,32 @@ namespace Faolan.Core.Database.Tables
 		// look like MINI-bosses next to 3's up-to-300M, which would match the client's two boss tiers - unproven.
 		public uint? NpcType { get; set; }
 		public uint? NpcFlags { get; set; }
+		// The client's `normalset` (stat 205 / 0xCD) - and **this, not `npc_type`, is what draws the SKULLS** either
+		// side of a target's name (#508).
+		//
+		// `CharPortraitRight.xml` declares `SkullLeft`/`SkullRight` as two `PortraitGUI/little_skull.tga` bitmaps
+		// flanking `NameView`, both `WID_IGNORE_WHEN_HIDDEN`. The target-portrait updater (`FUN_0163eec0`) reads
+		// `GetStat(0xCD, 2)` and shows BOTH skulls for a fixed set of values, hiding them for everything else:
+		//
+		//     8, 14, 15, 19, 20, 22, 23, 24, 26, 46, 47, 48, 49, 50, 51   -> skulls
+		//     anything else                                               -> no skulls
+		//
+		// ⭐ Cross-checked against the chat annotation that started #508 - `talked to npc keira (skulls next to name.
+		// like king conan)`. Keaira and King Conan both carry normalset 15 and both fall in the set, arrived at from
+		// the client's own switch without reference to the annotation. Two independent sources, same answer.
+		//
+		// It selects EIGHT of our NPCs, which is what "a special rank for certain npcs" looks like - as against the
+		// 59 that `npc_type == 3` was wrongly credited with. Four of the eight (the Wolf Pict Arena Master, Warlord,
+		// Master Tracker and Shaman, all normalset 8) are `npc_type == 4`, i.e. ORDINARY interactive NPCs, which is
+		// what rules out any reading where the skull follows npc_type.
+		//
+		// ⚠️ Eight is a FLOOR, not the roster: only 222 of 1,194 templates carry a normalset at all and the rest are
+		// NULL, so an unharvested NPC cannot show a skull whatever it should do. Of the 15 skull-bearing values only
+		// 8 and 15 occur in our data; the other 13 are unseen rather than unused.
+		//
+		// ⚠️ What normalset MEANS beyond this is undecoded - the name suggests an appearance/animation set, and the
+		// skull may be a consequence of the set rather than its purpose. [V0: what npc normalset selects besides the
+		// nameplate skull]
 		public uint? Normalset { get; set; }
 		public uint? SuperFamily { get; set; }
 		public uint? ProfessionName { get; set; }

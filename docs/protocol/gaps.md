@@ -170,13 +170,18 @@ not. The roster contains `Tamed Puma` and `Pleasurable Company` (a pet and a Tor
 `Yeti` and `Decaying Corpse`, and its health spans 12,600 to 300,000,000 within the single value. A skull rank
 that includes a tamed pet is not a skull rank.
 
-So 3 is a superset of — or merely correlated with — whatever the client reads to draw a skull, and the real
-selector is unpinned. What is known: the client models **three** tiers, shipping `MiniBoss` and `Boss` tokens,
-separate `EvtDeathMiniBoss` / `EvtDeathFullBoss` script events, and separate `miniboss_icon` / `boss_icon`
-nameplate icons beside a `SkullLeft`/`SkullRight` widget pair. Those widgets are built in the target-window
-builder (`FUN_0163b370`, stored at `+0x13b`/`+0x13c`); their VISIBILITY is set elsewhere, and that writer is the
-thing to find. There is also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been checked
-against.
+**The skull selector is now PINNED, and it is not `npc_type` at all — it is `normalset` (stat 205 / `0xCD`).** The
+target-portrait updater `FUN_0163eec0` reads `GetStat(0xCD, 2)` and shows both `SkullLeft`/`SkullRight` bitmaps for
+`{8, 14, 15, 19, 20, 22, 23, 24, 26, 46, 47, 48, 49, 50, 51}`, hiding them otherwise. Cross-checked against the very
+annotation that started this ticket: Keaira and King Conan both carry normalset 15 and both fall in the set,
+reached from the client's switch without reference to the annotation. It selects **eight** of our NPCs, and four of
+those eight are `npc_type == 4` (ordinary interactive NPCs), which is what finally rules out the npc_type reading.
+See `NpcStatCore.Normalset`.
+
+The client also models **three** boss tiers - it ships `MiniBoss` and `Boss` tokens, separate `EvtDeathMiniBoss` /
+`EvtDeathFullBoss` script events and separate `miniboss_icon` / `boss_icon` nameplate icons - and none of those has
+been mapped to a stat. There is also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been
+checked against.
 
 The two small groups are not separated. **1** (55 rows) is cleanly non-interactive — zero vendors, zero
 conversations, mostly hostile trash — so "plain creature" fits, but nothing rules out a narrower meaning.
