@@ -75,6 +75,51 @@ namespace Faolan.Core.Rdb
 		}
 
 		/// <summary>
+		///     ⭐ The ACCOUNTING check: every position in <paramref name="body" /> that looks like the head of a
+		///     GameAction element but is NOT the offset of one <see cref="ParseElements" /> returned. Empty means the
+		///     scan accounted for every element in the record.
+		///     <para>
+		///         This exists because #772 was invisible for exactly as long as nothing asked the question. The old
+		///         anchor matched only LEAF elements, so `Gangrenous Stench` read 1 element out of 3 from a 754-byte
+		///         record - dropping what the spell applies, how far, to how many and how often - and the whole suite
+		///         stayed green, because every test asserted on the elements we DID parse. A gate that shares the
+		///         parser's blind spot is not a gate.
+		///     </para>
+		///     <para>
+		///         This is the RDB analogue of the codec rule that <c>Parse</c> ends in <c>EnsureAtEnd()</c>: account
+		///         for the data or say so. It cannot be an xUnit gate - `Faolan.Tests` runs from a plain clone with no
+		///         RDB (see CLAUDE.md "Capture data") - so it is surfaced by the IMPORTER, which is where the bytes
+		///         are, and its count rides the import summary rather than being silently dropped.
+		///     </para>
+		///     <para>
+		///         The head signature is deliberately the same one the scan itself anchors on minus the parts that
+		///         vary: a type id inside the client's asserted descriptor range with the version word <c>4</c> eight
+		///         bytes later. That pair is specific enough to be worth reporting - a coincidental hit needs a u32 in
+		///         a 286-wide window followed by an exact <c>4</c> - and any real false positive is itself worth
+		///         seeing rather than assuming away.
+		///     </para>
+		/// </summary>
+		public static IReadOnlyList<int> UnparsedElementHeads(ReadOnlySpan<byte> body)
+		{
+			var parsed = new HashSet<int>();
+			foreach (var e in ParseElements(body))
+				parsed.Add(e.Offset);
+
+			var orphans = new List<int>();
+			for (var off = 0; off + 12 <= body.Length; off++)
+			{
+				var kind = W(body, off);
+				if (kind < GameActionTypes.FirstId || kind > GameActionTypes.LastId || W(body, off + 8) != 4)
+					continue;
+
+				if (!parsed.Contains(off))
+					orphans.Add(off);
+			}
+
+			return orphans;
+		}
+
+		/// <summary>
 		///     Every GameAction element in the body, whole - kind plus one value per key of that kind's key list.
 		///     This is the primitive both readers above are expressed on; use it when a record's later slots matter
 		///     (a <c>SpellStatModifier</c> carries spell + stat + value + amount, and the pair readers see only the
@@ -95,13 +140,54 @@ namespace Faolan.Core.Rdb
 			// client happily applied a full list from the very same bytes. Byte-granular scanning recovers them exactly
 			// (Blackwolf Cap 0 -> 4 records, Con 50 / Int 50 = what the client applies) and changes nothing for the
 			// templates that were already aligned (Royal Signet stays 3, Fine Steelsilk Pants stays 6).
-			for (var off = 4; off + 24 <= body.Length; off++)
+			// ⚠️ An element may carry SUB-RECORDS, and the old anchor could not see one that did (#772). It demanded
+			// `subCount == 0` and the two fixed ints `[1][0]`, which is only the LEAF shape. `Gangrenous Stench`
+			// (221070) carries three elements and the old form matched exactly one:
+			//
+			//   @530 FilteredAreaFormula  subCount=2  fixed [1][0][2][9]     -> spell 221069, radius 7, targets 12
+			//   @606 FilteredAreaFormula  subCount=2  fixed [-1][400][2][9]  -> the same, applied every 400 cs
+			//   @682 SetSpellRecastTime   subCount=0  fixed [1][0][2][9]     -> the only one the old anchor found
+			//
+			// So the spell's whole AoE - what it applies, how far, to how many, and how often - was invisible, and
+			// with it every aura and every effect chain whose link is not a leaf element. The two 7/12 values are the
+			// "7.00m radius up to 12 targets" of the in-client tooltip, and 400 cs is its "every 4 seconds".
+			//
+			// The layout, recovered from those three and true of all of them:
+			//
+			//   [typeId][field][version=4][subCount][subCount x 3 words][0x2d5][0x2d6][0x2f2=2][0x2f5=9][values...]
+			//
+			// What is STABLE is the trailing `[2][9]` pair, not the leading `[1][0]` - @606 carries `[-1][400]` there,
+			// which is the aura's period. So the anchor keeps its precision by matching the typeId's RANGE, the
+			// version word, and that trailing pair, and derives the sub-record run from `subCount` rather than
+			// assuming it away. `subCount` is bounded because an unbounded one turns a garbage word into a wild offset.
+			const uint maxSubRecords = 16;
+			const int subRecordWords = 3;
+
+			for (var off = 0; off + 32 <= body.Length; off++)
 			{
-				if (W(body, off - 4) != 0 || W(body, off) != 4 || W(body, off + 4) != 0 || W(body, off + 8) != 1 || W(body, off + 12) != 0 || W(body, off + 16) != 2 ||
-				    W(body, off + 20) != 9)
+				var kind = W(body, off);
+				if (kind < GameActionTypes.FirstId || kind > GameActionTypes.LastId || W(body, off + 4) != 0 || W(body, off + 8) != 4)
 					continue;
 
-				var kind = off >= 8 ? W(body, off - 8) : 0;
+				var subCount = W(body, off + 12);
+				if (subCount > maxSubRecords)
+					continue;
+
+				// The four fixed ints sit AFTER the sub-record run, and NONE of them is constant. The old anchor
+				// demanded `[1][0][2][9]` and a first pass at this demanded the trailing `[2][9]`; both are wrong -
+				// they are the element's 0x2d5/0x2d6/0x2f2/0x2f5 VALUES, and across the spell catalog they take
+				// `[1][0][3][9]`, `[-1][300][3][9]`, `[0][0][100][0]`, `[0][0][18][0]` and more. `0x2d6` is where an
+				// aura's PERIOD lives (400 = every 4 s on Gangrenous Stench), so treating it as a signature byte was
+				// discarding a mechanic. What identifies an element is its TYPE plus the version word, which is
+				// specific enough on its own: a u32 inside the client's 286-wide asserted descriptor range with an
+				// exact `4` eight bytes later.
+				var fixedAt = off + 16 + (int)subCount * subRecordWords * 4;
+				if (fixedAt + 16 > body.Length)
+					continue;
+
+				// `off` below is kept as the anchor the old code used - the `version` word - so the value offset and
+				// the reported element offset/width stay exactly what every caller already expects for a leaf.
+				var valuesAt = fixedAt + 16;
 				// How many values follow is a property of the KIND, not a constant: an element carries exactly one
 				// u32 per key-list entry (docs/re/gameactionlist-grammar.md). An unregistered kind gets the two the
 				// old fixed-10-word reader assumed, which is all any caller of the pair readers below ever used.
@@ -136,7 +222,7 @@ namespace Faolan.Core.Rdb
 				var keys = type?.Keys ?? [GameActionTypes.KeyStat, GameActionTypes.KeyValue];
 				var values = new List<uint>(keys.Length);
 				var texts = new List<string?>(keys.Length);
-				var at = off + 24;
+				var at = valuesAt;
 				foreach (var key in keys)
 				{
 					// Read as many slots as the body HOLDS, not as many as the key list wants. Where an element is
@@ -170,7 +256,7 @@ namespace Faolan.Core.Rdb
 					at += 2 + length;
 				}
 
-				elements.Add(new Element(off - 8, kind, [.. values], [.. texts], at - (off - 8)));
+				elements.Add(new Element(off, kind, [.. values], [.. texts], at - off));
 			}
 
 			return elements;

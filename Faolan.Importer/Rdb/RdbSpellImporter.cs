@@ -178,7 +178,7 @@ namespace Faolan.Importer.Rdb
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SetSpellLineRecastTimeKind = 53077;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts, int EffectDurations)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts, int EffectDurations, int EffectLinks, int UnparsedElements)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
@@ -238,6 +238,8 @@ namespace Faolan.Importer.Rdb
 			var inserted = 0;
 			var namesSet = 0;
 			var effectLinksSet = 0;
+			var unparsedElements = 0;
+			var recordsWithUnparsed = 0;
 			var castTimesSet = 0;
 			var levelsSet = 0;
 			foreach (var entry in rdb.EntriesOfType(SpellDataType))
@@ -336,6 +338,17 @@ namespace Faolan.Importer.Rdb
 				// recast of ranks 1-4, and `Pestilential Blast` carries no element at all, which is exactly the 0 its
 				// retail tooltip shows. Only the two SETTERS are read; ChangeRecastTime / ChangeLineRecastTime are
 				// modifiers on a base the client already holds (docs/re/spell-recast-source.md).
+				// ⭐ #772: the ACCOUNTING check. An element the scan cannot see is a spell mechanic silently missing -
+				// the whole of Gangrenous Stench's AoE was invisible this way, and no test could notice because every
+				// test asserted on the elements we DID parse. Counted per record and reported below, so the number is
+				// something a future change has to move deliberately rather than something it can quietly grow.
+				var orphans = ItemTemplateStatModifiers.UnparsedElementHeads(body.AsSpan(12));
+				if (orphans.Count > 0)
+				{
+					unparsedElements += orphans.Count;
+					recordsWithUnparsed++;
+				}
+
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
 				{
 					// #640: a PET SUMMON spells itself out in the ScriptParams of its server-side-script element -
@@ -610,9 +623,9 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements.",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet);
-			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s).",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed);
+			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements);
 		}
 
 		/// <summary>
