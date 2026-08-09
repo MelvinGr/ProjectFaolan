@@ -32,6 +32,45 @@ namespace Faolan.Core.Database.Tables
 		// eagerly regardless; virtual only satisfies the proxy's all-navigations-virtual rule). See docs/re/spawn-dissection.md Phase 5.
 		public virtual ProtoDecryptionKey Key { get; set; } = new ProtoDecryptionKey();
 
+		// The item's SECOND template and its own key - the HIGH endpoint of a level range (#752).
+		//
+		// `ProtoAcgItem` carries `template1`/`template2` with a key each, and `AcgItemData_t::GetInterpolatedItem`
+		// takes both plus a level: the two templates are the LOW and HIGH endpoints of a scaling item and the entry's
+		// own `level` says where between them this copy sits. Measured over 13,368 captured ProtoAcgItems (344
+		// distinct pairs), the three that differ differ in NOTHING BUT LEVEL fields - `Cabochon Azurite` 50 -> 80,
+		// `Sanguine Radiant Sapphire` 75 -> 80, `Alchemist` 40 -> 49 - same display name, same everything else.
+		//
+		// ⚠️ NULL means "this item has no second endpoint that we have seen", and the emitters then send
+		// `template2 = template1`, which is what everything shipped before. It is NOT derivable: `template2 ==
+		// template1 + 1` on all three, but 341 of the 344 pairs have `template2 == template1`, so +1 would be wrong
+		// far more often than right. Only a capture can tell the two apart.
+		//
+		// ⚠️ `PairKey` is not optional decoration - it is what DECRYPTS the second template. Sending `TemplateId2`
+		// without it would be worse than flattening, because the client would have a template it cannot read. The
+		// two travel together or not at all, which is why an all-zero `PairKey` and a null `TemplateId2` mean the
+		// same thing. Cross-pairing the keys yields garbage headers, so it is genuinely its own key.
+		//
+		// ⚠️ Called `PairKey`, NOT `Key2`: `Key` is an owned quad whose SECOND WORD already maps to a column called
+		// `Key2`. A property named `Key2` sitting next to a column named `Key2` that means something else is a trap
+		// worth one rename. Its own columns are `PairKey1..4`.
+		//
+		// Three rows carry one today, and that is a CAPTURE limit rather than a game limit: any level-scaled item has
+		// a pair and we have only caught three.
+		public uint? TemplateId2 { get; set; }
+
+		public virtual ProtoDecryptionKey PairKey { get; set; } = new ProtoDecryptionKey();
+
+		// The pair as the wire wants it: the second endpoint when we have one, else the first repeated. One place,
+		// because three emitters need the same answer (the entry's own identity, a socketed gem's, and the
+		// ItemSlot<N>ACG1/ACG2 stat pair that restates the socket).
+		[NotMapped]
+		public uint WireTemplate2 => TemplateId2 ?? Id;
+
+		[NotMapped]
+		public ProtoDecryptionKey WireKey2 => TemplateId2 == null
+			? Key
+			: PairKey;
+
 		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
 		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse
 		// as Value (field 74). NULL when the template carries no field 499 (or the item was never RDB-imported) - the

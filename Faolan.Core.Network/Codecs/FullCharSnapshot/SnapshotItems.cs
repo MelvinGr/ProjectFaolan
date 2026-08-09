@@ -79,17 +79,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// The stat ids are 0x2A3 + 2N / 0x2A4 + 2N for socket N, and the table names FOUR slots
 			// (ItemSlot1..ItemSlot4), so socket index 3 has a home even though no captured item uses it.
 			//
-			// ⚠️ ACG1 and ACG2 both get the gem's `Items.Id`, because ACG1/ACG2 ARE template1/template2 and our Items row
-			// holds only one template (#752). That is the same flattening Identity() applies to the slot_map block, which
-			// is what matters here: the two forms of the socket still AGREE with each other, which is the invariant the
-			// corpus pins 898/898. A capture-accurate pair needs the model change, not a second guess in this method.
+			// ACG1/ACG2 ARE the gem's template1/template2, so they get exactly what Identity() puts in the slot_map
+			// block - which is what keeps the socket's two wire forms AGREEING, the invariant the corpus pins 898/898.
+			// Since #752 that is the real pair when the gem has a second endpoint (`Cabochon Azurite` 3976768/3976769
+			// is one) rather than the template repeated.
 			var socketStats = (sockets ?? [])
 				.Where(socket => socket.SocketIndex < MaxSockets)
 				.OrderBy(socket => socket.SocketIndex)
 				.SelectMany(socket => new[]
 				{
 					new ItemStat(ItemSlot1Acg1 + (2 * socket.SocketIndex), socket.Gem.Id),
-					new ItemStat(ItemSlot1Acg1 + (2 * socket.SocketIndex) + 1, socket.Gem.Id)
+					new ItemStat(ItemSlot1Acg1 + (2 * socket.SocketIndex) + 1, socket.Gem.WireTemplate2)
 				});
 
 			// ⚠️ ORDERED ascending by stat id, like every other stat list here - the order is load-bearing for
@@ -237,14 +237,20 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// read the copy as a decoded fact.
 		private static ProtoAcgItem Identity(Item item, uint hash)
 		{
-			var key = item.Key;
+			// template1/template2 are the LOW and HIGH endpoints of a level range and the entry's own `level` says
+			// where between them this copy sits - which is what AcgItemData_t::GetInterpolatedItem is named for
+			// (#752). Most items have no second endpoint and repeat the first, which is what WireTemplate2/WireKey2
+			// return; the three that do carry one now send it, with the key that decrypts it.
+			//
+			// ⚠️ key3 is key1, on every one of the 344 captured pairs, and template3 is 0 on all of them - so the
+			// third slot is unused rather than undecoded.
 			return new ProtoAcgItem
 			{
-				Key1 = key,
-				Key2 = key,
-				Key3 = key,
+				Key1 = item.Key,
+				Key2 = item.WireKey2,
+				Key3 = item.Key,
 				Template1 = item.Id,
-				Template2 = item.Id,
+				Template2 = item.WireTemplate2,
 				Level = item.Level,
 				Hash = hash
 			};

@@ -300,6 +300,10 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
+
+			// The item's SECOND template's key (#752) - the same 128-bit TEA key type, so the same owned mapping under
+			// its own prefix. Columns PairKey1..4; it cannot reuse OwnKey, whose columns are Key1..4.
+			modelBuilder.Entity<Item>().OwnsOne(i => i.PairKey, k => OwnNamedKey(k, "PairKey"));
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
 
 			// The LDB per-string decryption keys (#520) are the SAME 128-bit TEA key type, so they get the same owned

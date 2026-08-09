@@ -168,6 +168,29 @@ insert-only.
 ⚠️ `slot_map` was in the recovered schema from the start and was populated NOWHERE until #750, so every gemmed
 item silently lost its gems at world entry.
 
+### The item's two templates (#752)
+
+`ProtoAcgItem` carries `template1`/`template2` with a key each, and they are the **LOW and HIGH endpoints of a
+level range** — `AcgItemData_t::GetInterpolatedItem` takes both plus the entry's own `level` and works out where
+between them this copy sits. Measured over 13,368 captured ProtoAcgItems (344 distinct pairs), the three that
+differ differ in **nothing but level fields**, same display name and all:
+
+| pair | name | differs | the entry's `level` |
+|---|---|---|---|
+| 3904842 → 3904843 | Alchemist | `54`: 40 → 49 | 44 — inside |
+| 3976768 → 3976769 | Cabochon Azurite | `54`/`203`/`204`: 50 → 80 | 80 — the top |
+| 3983088 → 3983089 | Sanguine Radiant Sapphire | `54`/`203`/`204`: 75 → 80 | 75 — the bottom |
+
+Stored as `Item.TemplateId2` + `Item.PairKey`, and emitted by `SnapshotItems.Identity`. ⚠️ The key is not optional:
+the second template is TEA-encrypted under its **own** key, so sending `template2` without it would be worse than
+repeating `template1` — the client would hold a template it cannot read. Null template2 and an all-zero `PairKey`
+mean the same thing, and neither may exist without the other (`ItemTemplatePairTests`).
+
+⚠️ It is **not derivable**. `template2 == template1 + 1` on all three, but 341 of the 344 pairs have
+`template2 == template1`, so `+1` would be wrong far more often than right. Across all 344: `key3 == key1`
+344/344 and `template3 == 0` on every one, so the third slot is unused rather than undecoded. `--report acg-pair`
+re-derives it.
+
 ### Binding (#756)
 
 `Flags` — the entry's **stat 0** — carries the bound state in **bit 26**, and the wire was caught doing it:

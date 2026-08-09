@@ -62,6 +62,18 @@ namespace Faolan.Importer.Captures
 				if (ci.Level != 0)
 					item.Level = (byte)Math.Min(ci.Level, byte.MaxValue);
 
+				// The SECOND template and its own key (#752) - the high endpoint of a level-scaled item. On the same
+				// never-downgrade rule: only 3 of the 344 captured pairs carry one, and a source that saw the item
+				// without a pair must not erase one that did.
+				if (ci.Pair is { } pair)
+				{
+					item.TemplateId2 = pair.Template2;
+					item.PairKey.Key1 = pair.Key1;
+					item.PairKey.Key2 = pair.Key2;
+					item.PairKey.Key3 = pair.Key3;
+					item.PairKey.Key4 = pair.Key4;
+				}
+
 				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
 				// default Normal so a classification survives a later capture that holds the item in a bag.
 				if (types.TryGetValue(id, out var type) && type != ItemType.Normal)

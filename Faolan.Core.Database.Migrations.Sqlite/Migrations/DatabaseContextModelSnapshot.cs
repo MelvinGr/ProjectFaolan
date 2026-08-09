@@ -1618,6 +1618,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("SearchCategory")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("TemplateId2")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Type")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
@@ -4523,10 +4526,42 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                                 .HasForeignKey("ItemId");
                         });
 
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "PairKey", b1 =>
+                        {
+                            b1.Property<uint>("ItemId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("PairKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("PairKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("PairKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("PairKey4");
+
+                            b1.HasKey("ItemId");
+
+                            b1.ToTable("Items");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ItemId");
+                        });
+
                     b.Navigation("Key")
                         .IsRequired();
 
                     b.Navigation("OnUseSpellDefinition");
+
+                    b.Navigation("PairKey")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>

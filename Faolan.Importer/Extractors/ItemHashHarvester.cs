@@ -188,7 +188,7 @@ namespace Faolan.Importer.Extractors
 			if (acg?.Key1 == null || acg.Template1 == 0)
 				return;
 
-			Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level));
+			Record(into, acg.Template1, CapturedItem.From(acg));
 
 			// Only record the specific kinds (Quest/Resource); Normal items are left to the DB default so this never
 			// downgrades an item another source already classified.
@@ -232,7 +232,7 @@ namespace Faolan.Importer.Extractors
 				var quad = SnapshotRoot.IdentityQuadOf(entry);
 				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
-					Record(into, template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0, SnapshotRoot.LevelOf(entry) ?? 0));
+					Record(into, template.Value, CapturedItem.From(entry.Item!.ItemData!));
 			}
 		}
 
@@ -298,7 +298,7 @@ namespace Faolan.Importer.Extractors
 				if (acg?.Key1 == null || acg.Template1 == 0)
 					continue;
 
-				Record(into, acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level));
+				Record(into, acg.Template1, CapturedItem.From(acg));
 			}
 		}
 
@@ -319,7 +319,7 @@ namespace Faolan.Importer.Extractors
 				var item = a.Entry.ItemData;
 				var key = item?.Key1;
 				if (item is { Template1: not 0 } && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
-					Record(into, item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash, (uint)item.Level));
+					Record(into, item.Template1, CapturedItem.From(item));
 			}
 		}
 
@@ -343,7 +343,7 @@ namespace Faolan.Importer.Extractors
 
 					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
-						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash.Value, SnapshotRoot.LevelOf(entry) ?? 0);
+						map[template.Value] = CapturedItem.From(entry.Item!.ItemData!);
 						// Only classify from a container whose kind IS a real ItemType (Resource/Quest); the Bank (105)
 						// holds items of every kind in one container, so it must NOT stamp a type - leave the DB default.
 						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(itemType))
@@ -360,7 +360,7 @@ namespace Faolan.Importer.Extractors
 					foreach (var (_, gem) in SnapshotRoot.SocketsOf(entry))
 					{
 						if (gem.Key1 is { } key && gem.Template1 != 0)
-							Record(map, gem.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, gem.Hash, gem.Level));
+							Record(map, gem.Template1, CapturedItem.From(gem));
 					}
 				}
 			}
@@ -417,7 +417,7 @@ namespace Faolan.Importer.Extractors
 				if (template == 0 || hash == 0)
 					continue; // need both a template and a real hash to be buildable
 
-				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, hash, (uint)acg.Level);
+				into[template] = CapturedItem.From(acg);
 			}
 		}
 
@@ -452,6 +452,12 @@ namespace Faolan.Importer.Extractors
 			if (existing.Level == 0 && captured.Level != 0)
 				existing = existing with { Level = captured.Level };
 
+			// The PAIR fills on the same rule and for the same reason: most sources carry a ProtoAcgItem and can
+			// answer it, some (a claim row) cannot, and first-record-wins would lose it whenever a source that cannot
+			// happened to arrive first.
+			if (existing.Pair == null && captured.Pair != null)
+				existing = existing with { Pair = captured.Pair };
+
 			into[template] = existing;
 		}
 
@@ -465,6 +471,9 @@ namespace Faolan.Importer.Extractors
 
 			if (a.Level == 0)
 				a = a with { Level = b.Level };
+
+			if (a.Pair == null)
+				a = a with { Pair = b.Pair };
 
 			return a;
 		}
@@ -495,6 +504,33 @@ namespace Faolan.Importer.Extractors
 		// the identity quad, rather than only being copied onto the per-instance rows (#725).
 		//
 		// 0 means the source did not carry one - like Hash, it must never DOWNGRADE a level another source set.
-		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash, uint Level = 0);
+		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash, uint Level = 0, CapturedPair? Pair = null)
+		{
+			// Everything one ProtoAcgItem says about a template's identity, in one place. The nine construction sites
+			// below used to spell the quad out by hand; adding the PAIR to each would have been five more positional
+			// arguments at every one of them, and the sites that hold no ProtoAcgItem (a claim row, an AH listing)
+			// cannot answer it at all.
+			public static CapturedItem From(ProtoAcgItem acg)
+			{
+				return new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash, (uint)acg.Level, PairOf(acg));
+			}
+
+			// The SECOND template and its key (#752), recorded only when it is a REAL second one. 341 of the 344
+			// captured pairs have `template2 == template1`, and recording those would fill the column on every item
+			// with a value that says nothing - a null here is what makes `Item.TemplateId2` mean "there is a second
+			// endpoint", rather than "we saw an item".
+			//
+			// ⚠️ Requires key2 as well. The second template is TEA-encrypted under its own key (cross-pairing the
+			// keys yields garbage headers), so a pair without one is not a pair we can send.
+			private static CapturedPair? PairOf(ProtoAcgItem acg)
+			{
+				return acg.Template2 != 0 && acg.Template2 != acg.Template1 && acg.Key2 != null
+					? new CapturedPair(acg.Template2, acg.Key2.Key1, acg.Key2.Key2, acg.Key2.Key3, acg.Key2.Key4)
+					: null;
+			}
+		}
+
+		// The HIGH endpoint of a level-scaled item: its template and the key that decrypts it (#752).
+		public readonly record struct CapturedPair(uint Template2, uint Key1, uint Key2, uint Key3, uint Key4);
 	}
 }
