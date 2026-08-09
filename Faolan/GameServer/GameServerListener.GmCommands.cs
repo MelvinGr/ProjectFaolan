@@ -719,6 +719,12 @@ namespace Faolan.GameServer
 			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, stored);
 
 			await _bank.SendBank(client, bank);
+
+			// The GUILD vault rides the same open (#654): retail pushes DispatchGuildBankData in the SAME instant as
+			// the personal bank's slot registrations and DispatchOpenTradepost, unasked - there is no OpenGuildBank
+			// request on the wire at all. Before the open, for the same reason the bank is: a container that lands
+			// after the window exists renders empty on the first open.
+			await _guildBank.SendVault(client);
 			await TradepostResponses.SendOpenTradepost(client, accessPosition);
 			return bank.Items.Count;
 		}

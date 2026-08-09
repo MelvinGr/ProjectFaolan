@@ -66,6 +66,16 @@ namespace Faolan.GameServer
 			return SendGemSocketed(client, container, targetSlot, socket, gemSlot);
 		}
 
+		Task IEconomyOutbound.SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
+		{
+			return SendGuildBankData(client, vault);
+		}
+
+		Task IEconomyOutbound.SendGuildBankMove(INetworkClient client, GuildBankMove move)
+		{
+			return SendGuildBankMove(client, move);
+		}
+
 		Task<uint> IEconomyOutbound.TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
 		{
 			return TakeItemsFromInventory(client, itemTemplateId, count);
@@ -801,6 +811,21 @@ namespace Faolan.GameServer
 				AddToItemSlotCodec.Build(container, charId, targetSlot, socket)));
 
 			await SendRemoveItem(client, container, gemSlot);
+		}
+
+		// The GUILD BANK vault (#654), pushed as part of the banker open. The same container builder the personal
+		// bank uses, with the guild id where a character id would go.
+		private static Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankCodec.Method,
+				GuildBankCodec.Build(vault)));
+		}
+
+		// The echo acknowledging a guild-bank item move - the request's own six values, raw.
+		private static Task SendGuildBankMove(INetworkClient client, GuildBankMove move)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankMoveCodec.Method,
+				GuildBankMoveCodec.Build(move)));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).

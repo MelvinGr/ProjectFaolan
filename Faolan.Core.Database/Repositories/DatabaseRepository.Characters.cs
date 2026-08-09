@@ -161,6 +161,21 @@ namespace Faolan.Core.Database.Repositories
 		/// </summary>
 		Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socketIndex, uint gemInstanceId);
 
+		/// <summary>The GUILD BANK vault's contents (#654), template + sockets loaded, ordered by cell.</summary>
+		Task<IReadOnlyList<ItemInstance>> GetGuildBankItems(uint guildId);
+
+		/// <summary>
+		///     Moves one item between a member's own container and their guild's vault (#654), in either direction -
+		///     the wire has ONE symmetric message for both. Returns false when the source cell is empty, the
+		///     destination is occupied, or neither end is the vault.
+		///     <para>
+		///         The instance is UPDATED, never re-minted, so the crafter, the stack and the gems travel with it -
+		///         and OWNERSHIP moves with it: into the vault clears <c>OwnerCharacterId</c> and sets
+		///         <c>OwnerGuildId</c>, out of it does the reverse. Exactly one is ever set.
+		///     </para>
+		/// </summary>
+		Task<bool> MoveGuildBankItem(uint characterId, uint guildId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot);
+
 		/// <summary>Sets an existing stack's size. Returns false when the cell is empty.</summary>
 		Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count);
 
@@ -1051,18 +1066,47 @@ namespace Faolan.Core.Database.Repositories
 			return minted;
 		}
 
-		// A move is a column UPDATE on the item's own row, which is the entire reason location lives on the instance.
-		//
-		// ⚠️ A SWAP cannot be one batch. Two rows trading (container, slot) is a CYCLE under the UNIQUE
-		// (owner, container, slot) index - whichever UPDATE runs first collides with the row that has not moved yet -
-		// and EF says so rather than picking an order ("a circular dependency was detected in the data to be saved").
-		// SQLite would reject the intermediate state even if it did pick one: a unique index is enforced per statement,
-		// there is nothing to defer to the end of the transaction.
-		//
-		// So the destination's occupant is PARKED at a slot no real cell uses, then the source moves in, then the parked
-		// row takes the source's old cell - three statements, inside ONE transaction so a failure between them cannot
-		// strand an item at the parking slot.
-public async Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socketIndex, uint gemInstanceId)
+		public async Task<IReadOnlyList<ItemInstance>> GetGuildBankItems(uint guildId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			return await ctx.ItemInstances.AsNoTracking()
+				.Include(i => i.Template)
+				.Include(i => i.Sockets).ThenInclude(x => x.Gem)
+				.Where(i => i.OwnerGuildId == guildId && i.Container == ContainerKind.GuildBank)
+				.OrderBy(i => i.Slot)
+				.ToListAsync();
+		}
+
+		public async Task<bool> MoveGuildBankItem(uint characterId, uint guildId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot)
+		{
+			var intoVault = to == ContainerKind.GuildBank;
+			if (intoVault == (from == ContainerKind.GuildBank))
+				return false; // exactly one end is the vault; a bag-to-bag or vault-to-vault move is not this message
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var item = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.Container == from && i.Slot == fromSlot &&
+				(from == ContainerKind.GuildBank ? i.OwnerGuildId == guildId : i.OwnerCharacterId == characterId));
+			if (item == null)
+				return false;
+
+			// ⚠️ No SWAP here, unlike MoveCharacterItem. Both captured moves land in a FREE cell, so what retail does
+			// with an occupied one is unobserved - and a wrong guess costs somebody else's deposit. Refuse instead.
+			var occupied = await ctx.ItemInstances.AnyAsync(i => i.Container == to && i.Slot == toSlot &&
+				(intoVault ? i.OwnerGuildId == guildId : i.OwnerCharacterId == characterId));
+			if (occupied)
+				return false;
+
+			item.Container = to;
+			item.Slot = toSlot;
+			item.OwnerCharacterId = intoVault ? null : characterId;
+			item.OwnerGuildId = intoVault ? guildId : null;
+			await ctx.SaveChangesAsync();
+
+			return true;
+		}
+
+		public async Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socketIndex, uint gemInstanceId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var target = await ctx.ItemInstances.Include(i => i.Sockets).FirstOrDefaultAsync(i => i.Id == itemInstanceId);
@@ -1096,7 +1140,7 @@ public async Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socke
 			return socket;
 		}
 
-				public async Task<bool> BindCharacterItem(uint itemInstanceId)
+		public async Task<bool> BindCharacterItem(uint itemInstanceId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var instance = await ctx.ItemInstances.FirstOrDefaultAsync(i => i.Id == itemInstanceId);
@@ -1109,6 +1153,17 @@ public async Task<ItemInstanceSocket?> SocketGem(uint itemInstanceId, uint socke
 			return true;
 		}
 
+		// A move is a column UPDATE on the item's own row, which is the entire reason location lives on the instance.
+		//
+		// ⚠️ A SWAP cannot be one batch. Two rows trading (container, slot) is a CYCLE under the UNIQUE
+		// (owner, container, slot) index - whichever UPDATE runs first collides with the row that has not moved yet -
+		// and EF says so rather than picking an order ("a circular dependency was detected in the data to be saved").
+		// SQLite would reject the intermediate state even if it did pick one: a unique index is enforced per statement,
+		// there is nothing to defer to the end of the transaction.
+		//
+		// So the destination's occupant is PARKED at a slot no real cell uses, then the source moves in, then the parked
+		// row takes the source's old cell - three statements, inside ONE transaction so a failure between them cannot
+		// strand an item at the parking slot.
 		public async Task<bool> MoveCharacterItem(uint characterId, ContainerKind from, int fromSlot, ContainerKind to, int toSlot)
 		{
 			if (from == to && fromSlot == toSlot)

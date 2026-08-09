@@ -27,6 +27,7 @@ using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
+using Faolan.GameServer.Economy;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -370,6 +371,16 @@ namespace Faolan.GameServer
 					var move = MoveInventoryItemCodec.Parse(body.ReadRemainingArray()).Move;
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
+
+					// A move with the GUILD BANK vault (kind 109) on either end is the same drag, but it changes the
+					// item's OWNER rather than its cell - so it cannot go through PersistInventoryMove, whose every
+					// query is scoped to this character (#654). It also has a reply, which no ordinary move does.
+					if (GuildBankService.IsVaultMove(move))
+					{
+						await _guildBank.Move(client, move);
+
+						break;
+					}
 
 					// Persist the new slot positions so the player's bag arrangement survives logout (the world-entry
 					// snapshot rebuilds the bag from these CharacterInventory rows).

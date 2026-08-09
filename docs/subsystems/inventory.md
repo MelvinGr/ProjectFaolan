@@ -222,6 +222,39 @@ mean the same thing, and neither may exist without the other (`ItemTemplatePairT
 344/344 and `template3 == 0` on every one, so the third slot is unused rather than undecoded. `--report acg-pair`
 re-derives it.
 
+### The guild bank vault (#654)
+
+A guild's shared item storage is **container kind 109**, and it is the one container on the wire whose
+`inventory_id.instance` is a **GUILD id** rather than a character id.
+
+Stored in `ItemInstances` like every other item, with `OwnerGuildId` instead of `OwnerCharacterId` — #750's
+nullable owner finally being cashed in. **Exactly one of the two is set**, enforced by a
+`CK_ItemInstance_OneOwner` check constraint, and the guild's items are `Restrict` rather than `Cascade`: disbanding
+a guild with a stocked vault should fail loudly, not silently destroy everyone's deposits.
+
+A deposit **transfers ownership** — the depositor stops owning it, which is what makes it survive them leaving the
+guild. It is still an `UPDATE` of the same row, so the crafter, the stack and the socketed gems go in and come back
+out intact. ⚠️ We do not record WHO deposited an item: retail has a deposit log, but nothing in the capture carries
+one and inventing a column would model a feature we have not seen.
+
+| | |
+|---|---|
+| open | one banker interaction pushes the personal bank's slot registrations, `DispatchOpenTradepost` **and** `DispatchGuildBankData` in the same instant. There is no `OpenGuildBank` request on the wire at all |
+| move | an **ordinary `MoveInventoryItemIIR`** with the vault on one end → `DispatchMoveInventoryItemToOrFromGuildBank`, the same six values echoed back raw |
+
+⚠️ **The move is not a message of its own.** `0x2A8A1B49` looks novel in a dump and is just the inventory drag the
+client sends for any container-to-container move, so the listener routes on the **container**, not on a second
+opcode. The deposit and withdraw are that one message with its halves swapped — no direction flag — and the
+`DispatchMoveInventoryItemToGuildBank` (0x21) / `...FromGuildBank` (0x22) pair the method table names never appears.
+
+⚠️ The vault instance is **client-supplied**, so `GuildBankService` checks it against the character's own guild —
+without that a member could name another guild's vault and help themselves. An occupied destination is refused
+rather than swapped: both captured moves land in a free cell, so what retail does otherwise is unobserved and a
+wrong guess costs somebody else's deposit.
+
+The MONEY half is separate and lives on the CS tier (`GuildService`), because a balance change is pushed to every
+online member. Gated by `GuildBankVaultTests`.
+
 ### Binding (#756)
 
 `Flags` — the entry's **stat 0** — carries the bound state in **bit 26**, and the wire was caught doing it:

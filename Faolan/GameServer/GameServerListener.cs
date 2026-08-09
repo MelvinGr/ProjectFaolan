@@ -261,6 +261,7 @@ namespace Faolan.GameServer
 
 		// Crafting: turns a recipe's ingredients into its product. Reaches the wire through the same IEconomyOutbound
 		// grant/take ops the shop and bank use. See Economy/TradeskillService.cs.
+		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
 		private readonly SpellweaveService _spellweave;
@@ -345,6 +346,7 @@ namespace Faolan.GameServer
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
 			_tradepost = new TradepostService(database, logger, this); // auction house + mailbox (#200)
+			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);

@@ -199,22 +199,15 @@ namespace Faolan.Tests
 
 		// Records what a socketing asked the wire to say, so the test asserts on the TRANSACTION rather than bytes
 		// (the bytes have their own golden above).
-		private sealed class Recorder : IEconomyOutbound
+		private sealed class Recorder : NoOpEconomyOutbound
 		{
 			public List<(uint TargetSlot, uint SocketIndex, uint GemTemplate, uint GemSlot)> Socketed { get; } = [];
 
-			public Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+			public override Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
 			{
 				Socketed.Add((targetSlot, socket.SocketIndex, socket.GemItemId, gemSlot));
 				return Task.CompletedTask;
 			}
-
-			public Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null) =>
-				Task.FromResult<int?>(0);
-
-			public Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0) => Task.CompletedTask;
-			public Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason) => Task.CompletedTask;
-			public Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count) => Task.FromResult(count);
 		}
 	}
 }

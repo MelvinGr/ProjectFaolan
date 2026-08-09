@@ -167,13 +167,14 @@ namespace Faolan.Tests
 
 		// Records what the craft asked the wire/inventory side to do, so the test asserts on the TRANSACTION rather
 		// than on bytes: which template was granted to whom, and what was taken.
-		private sealed class RecordingEconomyOutbound : IEconomyOutbound
+		private sealed class RecordingEconomyOutbound : NoOpEconomyOutbound
 		{
 			public bool BagFull { get; set; }
 			public List<(uint Item, uint Count, string? Creator)> Granted { get; } = [];
+			public List<(uint TargetSlot, uint SocketIndex, uint GemTemplate, uint GemSlot)> Socketed { get; } = [];
 			public List<(uint Item, uint Count)> Taken { get; } = [];
 
-			public Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null)
+			public override Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null)
 			{
 				if (BagFull)
 					return Task.FromResult<int?>(null);
@@ -182,20 +183,13 @@ namespace Faolan.Tests
 				return Task.FromResult<int?>(0);
 			}
 
-			// What a successful SOCKET asked the wire to say (#754): the cell that received the gem, which socket, and
-			// the cell the gem left.
-			public List<(uint TargetSlot, uint SocketIndex, uint GemTemplate, uint GemSlot)> Socketed { get; } = [];
-
-			public Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
+			public override Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
 			{
 				Socketed.Add((targetSlot, socket.SocketIndex, socket.GemItemId, gemSlot));
 				return Task.CompletedTask;
 			}
 
-			public Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0) => Task.CompletedTask;
-			public Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason) => Task.CompletedTask;
-
-			public Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
+			public override Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
 			{
 				Taken.Add((itemTemplateId, count));
 				return Task.FromResult(count);

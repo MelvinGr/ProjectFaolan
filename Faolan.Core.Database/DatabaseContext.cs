@@ -424,6 +424,27 @@ namespace Faolan.Core.Database
 				i.Slot
 			}).IsUnique();
 
+			// The guild-bank vault's own cell uniqueness (#654). A SEPARATE index rather than a wider one, because
+			// SQLite treats NULLs as distinct: the character index above does not constrain guild-owned rows (their
+			// OwnerCharacterId is null), so without this two guild items could share a cell.
+			//
+			// The guild does NOT cascade-delete its items - Restrict. Disbanding a guild with a stocked vault should
+			// fail loudly rather than silently destroy everyone's deposits; what to do with them is a product
+			// decision nobody has made.
+			modelBuilder.Entity<ItemInstance>().HasOne(i => i.OwnerGuild).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ItemInstance>().HasIndex(i => new
+			{
+				i.OwnerGuildId,
+				i.Container,
+				i.Slot
+			}).IsUnique();
+
+			// EXACTLY ONE owner, enforced rather than merely documented. An item owned by both a character and a
+			// guild would be in two places at once and each unique index would police only its own half; an item
+			// owned by neither is unreachable by every read path there is. Both are bugs a comment does not stop.
+			modelBuilder.Entity<ItemInstance>().ToTable(t =>
+				t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)"));
+
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);

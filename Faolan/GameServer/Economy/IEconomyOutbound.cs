@@ -52,5 +52,12 @@ namespace Faolan.GameServer.Economy
 		// DispatchRemoveItem for the cell the gem left. Retail sends exactly these two and does NOT re-send the
 		// socketed item's container entry, so the client updates the item in place from the first message.
 		Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot);
+
+		// The GUILD BANK vault's contents (#654) - pushed unasked as part of opening the banker, alongside the
+		// personal bank. Its container's wire `instance` is the GUILD id, not a character's.
+		Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault);
+
+		// The echo that acknowledges a guild-bank item move: the six values the client asked for, back verbatim.
+		Task SendGuildBankMove(INetworkClient client, GuildBankMove move);
 	}
 }

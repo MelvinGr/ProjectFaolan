@@ -86,11 +86,27 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? CreatorName { get; set; }
 
-		// Null = the item is not in a character's possession. Nothing writes that yet (see decision 3).
+		// Null = the item is not in a character's possession - which since #654 is a state something actually
+		// reaches: a GUILD BANK item is owned by the guild, not by any member (see OwnerGuildId).
 		public uint? OwnerCharacterId { get; set; }
 
 		[ForeignKey(nameof(OwnerCharacterId))]
 		public virtual Character? OwnerCharacter { get; set; }
+
+		// The GUILD that owns this item, for the guild-bank vault (#654) - the container whose instance on the wire
+		// is the GUILD id rather than a character id, which is what decision 3 above was left open for.
+		//
+		// ⚠️ Exactly ONE of OwnerCharacterId / OwnerGuildId is set. A guild-bank item belongs to no member: it
+		// survives the member who deposited it leaving the guild, which is the whole point of a shared vault, so
+		// hanging it off a character would delete it with them (Character -> Items cascades).
+		//
+		// It gets its own UNIQUE (OwnerGuildId, Container, Slot) index for the same reason the character one exists -
+		// two items must not share a cell. The two indexes cannot be one: SQLite treats NULLs as distinct, so the
+		// character index does not constrain guild-owned rows at all.
+		public uint? OwnerGuildId { get; set; }
+
+		[ForeignKey(nameof(OwnerGuildId))]
+		public virtual Guild? OwnerGuild { get; set; }
 
 		// Position within the container. For Equipped it is the wire equip slot id (CharacterEquipmentSlot, vanity
 		// slots included at 1000 + the base slot).

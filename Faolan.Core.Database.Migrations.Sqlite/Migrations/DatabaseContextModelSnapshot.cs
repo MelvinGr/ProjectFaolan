@@ -1666,6 +1666,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("OwnerCharacterId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("OwnerGuildId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Slot")
                         .HasColumnType("INTEGER");
 
@@ -1679,9 +1682,14 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("OwnerCharacterId", "Container", "Slot")
                         .IsUnique();
 
+                    b.HasIndex("OwnerGuildId", "Container", "Slot")
+                        .IsUnique();
+
                     b.ToTable("ItemInstances", t =>
                         {
-                            t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
+                            t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 109, 111, 112, 113, 115)");
+
+                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
                         });
                 });
 
@@ -4574,6 +4582,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasForeignKey("OwnerCharacterId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("Faolan.Core.Database.Tables.Guild", "OwnerGuild")
+                        .WithMany()
+                        .HasForeignKey("OwnerGuildId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Faolan.Core.Database.Tables.Item", "Template")
                         .WithMany()
                         .HasForeignKey("TemplateId")
@@ -4581,6 +4594,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("OwnerCharacter");
+
+                    b.Navigation("OwnerGuild");
 
                     b.Navigation("Template");
                 });
