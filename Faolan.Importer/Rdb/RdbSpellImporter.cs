@@ -237,6 +237,7 @@ namespace Faolan.Importer.Rdb
 			var seen = 0;
 			var inserted = 0;
 			var namesSet = 0;
+			var effectLinksSet = 0;
 			var castTimesSet = 0;
 			var levelsSet = 0;
 			foreach (var entry in rdb.EntriesOfType(SpellDataType))
@@ -294,6 +295,7 @@ namespace Faolan.Importer.Rdb
 				var criticalChanceHundredths = fields.GetValueOrDefault(SpellCriticalChanceField);
 				var criticalDamageHundredths = fields.GetValueOrDefault(SpellCriticalDamageField);
 				var areaRadius = 0u; // metres, filled from the area-targeting elements below (#349)
+				var areaEffectSpell = 0u; // the spell that area applies - the element's KeySpell, see the loop below
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
 					: 0u; // centiseconds -> ms
@@ -345,8 +347,26 @@ namespace Faolan.Importer.Rdb
 					// #349: the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
 					// which is why the field run has none. Largest wins on a record carrying several (a cone plus a
 					// ring): the radius the spell can reach is the outer one.
-					if (GameActionTypes.AreaTargetKinds.Contains(element.Kind) && element.Value(GameActionTypes.KeyRadius) is { } radius)
-						areaRadius = Math.Max(areaRadius, radius);
+					if (GameActionTypes.AreaTargetKinds.Contains(element.Kind))
+					{
+						if (element.Value(GameActionTypes.KeyRadius) is { } radius)
+							areaRadius = Math.Max(areaRadius, radius);
+
+						// ⚠️ The same element also names WHAT to apply inside that radius, and dropping it is why a
+						// castable with no duration of its own was sent to the client as its own buff. `Life Leech`
+						// (220979) carries `FilteredAreaFormula(88=220980, 11=5)`: the castable states cast time, mana
+						// and recast, and 220980 is the record that actually lands - 6.5 s, ticking every 3 s. Applying
+						// the CASTABLE means a zero-duration buff, which the client REJECTS outright:
+						// `ERROR: GameCode.Magic - CoreMagicHolder::ActivateBuff 220979 remaining time 0` (in-client,
+						// 2026-08-09). Both halves of the tooltip come off this pair - the top block is the castable,
+						// the "Duration 6.5 seconds" block is the spell named here.
+						//
+						// First non-zero wins rather than largest: unlike a radius these are not comparable magnitudes,
+						// and a record carrying two area elements applies two different spells - which needs its own
+						// model, not a silent pick. Self-references are skipped (a spell is not its own effect).
+						if (areaEffectSpell == 0 && element.Value(GameActionTypes.KeySpell) is { } applied && applied != 0 && applied != entry.Id)
+							areaEffectSpell = applied;
+					}
 
 					var value = element.Value(GameActionTypes.KeyValue) ?? 0;
 					uint target;
@@ -415,6 +435,7 @@ namespace Faolan.Importer.Rdb
 						CriticalChanceHundredths = criticalChanceHundredths,
 						CriticalDamageHundredths = criticalDamageHundredths,
 						AreaRadius = areaRadius,
+						EffectSpell = areaEffectSpell,
 						DurationMs = durationMs,
 						Level = level,
 						GuiStackingOrder = stackingOrder,
@@ -462,6 +483,17 @@ namespace Faolan.Importer.Rdb
 				spell.CriticalDamageHundredths = criticalDamageHundredths;
 				spell.AreaRadius = areaRadius;
 				spell.DurationMs = durationMs;
+
+				// A CAPTURED effect link wins - it is what retail actually sent for that cast, and `CaptureSpellImporter`
+				// pairs cast to effect by identical name, which only covers same-name pairs. The RDB states the link on
+				// the area element for every AoE spell, so this fills the gap rather than replacing the capture. (The
+				// class comment above says EffectSpell "stays untouched"; that was true while the only source was
+				// captures, and the ordering - SpellsModule before RdbSpellsModule - would otherwise let this clobber it.)
+				if (spell.EffectSpell == 0 && areaEffectSpell != 0)
+				{
+					spell.EffectSpell = areaEffectSpell;
+					effectLinksSet++;
+				}
 
 				// The RDB leads on level, over both the scrapes and the captures (see LevelField).
 				if (level != 0 && spell.Level != level)
@@ -578,8 +610,8 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog.",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations);
 		}
 
