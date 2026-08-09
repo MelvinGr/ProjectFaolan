@@ -294,6 +294,11 @@ namespace Faolan.Core.Database.Tables
 		//
 		//     53051, 0, 4, 0, 1, 0, 2, 9, <spellId>
 		//
+		// ⚠️ That is NOT a new region - it is the stat-modifier record `ItemTemplateStatModifiers` already parses,
+		// whose leading word is an effect-KIND tag. A spell id sits far above the `statId < 0x1000` bound `Parse`
+		// applies, so a 53051 record lands in `ParseRejected` - the "same scan, opposite filter" whose note said only
+		// kind 53075 was decoded. 53051 is the second, so the plumbing to read it already exists.
+		//
 		// ⚠️ The `[2][9]` triplet alone is NOT the marker - it is a generic slot that also appears on items with no
 		// on-use effect (Quilted Pants carries `[2][9][712801]`), and so is the `4` before it. Only the 53051 key
 		// separates them, and 53051 sits in the same 53xxx family as the script params behind

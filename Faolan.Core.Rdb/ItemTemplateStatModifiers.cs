@@ -52,8 +52,21 @@ namespace Faolan.Core.Rdb
 		///     copy of the signature walk, so the two can never disagree about where a record IS, only about which
 		///     ones count.
 		///     <para>
-		///         The KIND is what says how to read one; only 53075 is decoded. See
+		///         The KIND is what says how to read one. TWO are decoded.
+		///     </para>
+		///     <para>
+		///         <b>53075</b> - a feat's spell modifier (a spell-LINE id, then the magnitude). See
 		///         <c>RdbFeatImporter.ParseSpellModifiers</c> and `--report feat-spell-modifiers`.
+		///     </para>
+		///     <para>
+		///         <b>53051</b> - an ITEM's ON-USE SPELL: the payload's first word is a <c>Spells.Id</c>, the spell a
+		///         consumable casts when it is right-clicked. Measured over 26 dumped templates, 12 with an on-use
+		///         spell harvested from captures and 14 without: 8 of the 12 controls recovered exactly, each
+		///         resolving to the right spell NAME (Raw Beets 112936 "Hearty Meal", Daggamalt 180250 "Health Potion
+		///         Effect 10", Double XP 4552864 "Double XP"), with ZERO false positives across the 14. Of the 4
+		///         misses both loot caches carry no spell in the template at all, Totem of Origins carries a different
+		///         spell than the capture recorded, and Moonspill carries its under another prefix. Not imported yet -
+		///         see <c>Item.OnUseSpell</c> and Gitea #762.
 		///     </para>
 		/// </summary>
 		public static IReadOnlyList<Modifier> ParseRejected(ReadOnlySpan<byte> body)
