@@ -362,3 +362,15 @@ debuffs and DoTs (`Pestilential Blast (Rank 6)`, `Flesh to Worms (Rank 5)`, `Mar
 `Poisoned`, `Ice Shackle`), which is a lead and not a rule — nothing we hold marks a spell hostile, and the
 sweep of the spell's own RDB 1040005 record (every head word, every property field, and every bit of both) finds
 nothing that separates the two populations. `--report buff-descriptor` prints the cross-tab.
+
+### Whether an interpolated ACG item's flags can differ from its template1's
+**Tracked: Gitea #756.** [V0: whether an interpolated ACG item's flags can differ from template1's] The client's
+bind-on-pickup test is bit 26 of `AcgItemData_t::GetInterpolatedItem(quad)[+0xC8]`, and that dword is the item's
+`Flags` word — `InventoryGame_c::AddTemplateItem` copies it straight into stat 0, and retail's arrivals match the
+template's own `Flags` 174 times out of 179. On that reading `Bindings of Dark Terror` (3762969, template `Flags`
+`0x04000001`) binds on pickup, yet its in-client GM tooltip renders *"Binds when Equipped"* with no `Character
+Bound` prefix, which the disassembled branch only reaches when the pickup predicate returned **false**. Either the
+interpolated item's flags are not template1's verbatim (ACG composition — #752), or `GetInterpolatedItem` simply
+failed to resolve the quad OUR server sends, since we ship `flags = 1` and flatten `template2` onto `template1`.
+The two are told apart by one in-client look once the real `Flags` word is on the wire.
+

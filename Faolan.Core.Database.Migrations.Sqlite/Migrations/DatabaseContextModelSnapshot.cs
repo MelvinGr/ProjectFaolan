@@ -1635,9 +1635,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Binding")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Container")
                         .HasColumnType("INTEGER");
 
@@ -1666,8 +1663,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("ItemInstances", t =>
                         {
-                            t.HasCheckConstraint("CK_ItemInstance_Binding", "Binding IN (0, 1, 2)");
-
                             t.HasCheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
                         });
                 });

@@ -430,6 +430,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "item-binding":
+				{
+					ItemBinding(NamedCapture.LoadAll(capturesDir), RdbDir());
+					return 0;
+				}
+
 				case "region-stat-census":
 				{
 					RegionStatCensus(RdbDir());

@@ -18,6 +18,98 @@ Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `Dispa
 After a short fixed header the body is an RDB **property table**: a run of `[fieldId u32][value u32]` pairs
 (LE) with **strictly DECREASING fieldId**.
 
+### ⚠️ It is SEVERAL descending runs, and the first one holds field 0 (#756)
+
+"A run" undersells it. A real template opens with three groups back to back, each descending on its own:
+
+```
+word 0    the SEARCH CATEGORY (30000 armor, 30023 cloak, ...) - not a field id
+then      76, 30, 0 | 298, 88 | 645, 644, 499, 496, 360, 148, 74, 54, 41, 21
+```
+
+`RdbItemImporter.TryReadPropertyField` takes the **longest** run and rejects `fieldId == 0`, so it can only ever
+see the last group — and field **0**, the client's `Flags` word, sits at the end of the *first* one, where
+"strictly decreasing" holds and the `== 0` guard is what throws it away. `ItemTemplateProperties.Parse`
+(`Faolan.Core.Rdb`) walks the whole table instead and returns every pair, strings included.
+
+A **string** value is `[fieldId][0x21][len u16][flags u16][len bytes, padded to a word]` — field 21 is the display
+name — and it **terminates** the table. What follows is the record's fixed regions (asset refs, the `[2][9]`
+records), which are not pairs but are full of words that pass a "`<= 2000`, could be a field id" test. Walking past
+the name does not stop, it *drifts*: it gave 200-odd templates a `Flags` of `0xE2000000` / `0x0007E200` /
+`0x0BD30000` — the list-framing words `0x7E2` and `0xBD3` at three byte alignments, the trap CLAUDE.md warns about.
+Stopping at the string removed every one of them (`--report item-binding`, 4688 of 4741 templates carry field 0).
+
+### Field 0 `Flags` is the item's BIRTH stat-0 word
+
+The client proves the link itself: `InventoryGame_c::AddTemplateItem` (`FUN_0076e9f0`) reads the loaded template's
+flags dword and writes it straight into the new item's **stat 0**, masking out bit 11 and OR-ing in bit 4 when its
+fourth argument is zero. Measured against the dumps, retail's server does the same — of **179** captured
+`DispatchAddItem` arrivals, **174 carry exactly their template's `Flags`**, and four of the five differences are
+*only* bit 4 (`0x10`), on mail/AH deliveries, which is the bit `AddTemplateItem` itself sets. The one genuine
+exception is a claim redemption (`Exemplar's Cache` 5063647: wire `0x05000000`, template `0x00000000`).
+
+| bit | templates carrying it | meaning |
+|---|---|---|
+| 0 | 4676 | set on virtually everything; unexplained |
+| 24 | 197 | only ever seen alongside bit 26 |
+| **26** | **1267** | **BOUND** — see [item binding](#item-binding-756) |
+| 27 | 256 | co-occurs with 26; unexplained |
+| 1 / 2 / 5 / 8 / 9 / 12 | 95 / 21 / 2 / 31 / 8 / 1 | unexplained |
+
+## Item binding (#756)
+
+The client names its own three tooltip lines. They are LDB **category 100** tokens whose token *names* sit
+consecutively in the exe's `InventoryGUI\ItemInfoView.cpp` string block:
+
+```
+CurrentlyEquipped · DropsInPvP · BoundToCharacter · BindsOnPickup · BindsOnEquip · NotCancelable ·
+CanNotBeUnbound · GemSlots
+
+elf28("BoundToCharacter") = 202900962 -> LDB[100] "Character Bound"
+elf28("BindsOnPickup")    = 174799584 -> LDB[100] "Binds when Picked Up"
+elf28("BindsOnEquip")     =  45924736 -> LDB[100] "Binds when Equipped"
+```
+
+⚠️ None of those three STRINGS is in the exe's string table and none of the three token IDs appears as a literal
+either — the client passes the token NAME and hashes it at runtime. Inverting `Elf28` over the exe's strings is
+what recovers them; a `ConstScan` on the id finds nothing.
+
+`ItemInfoView::UpdateFromItem` (`FUN_014d5980`) picks between them with two predicates:
+
+| | how the client computes it |
+|---|---|
+| **binds on EQUIP** (`FUN_014d51a0`) | `getProp(177) & 0x20` **\|\|** (`getProp(499) > 1` **&&** `getProp(30) & 0x04`) |
+| **binds on PICKUP** (`FUN_014d5210`) | `AcgItemData_t::GetInterpolatedItem(quad)[+0xC8] >> 26 & 1` — bit 26 of the `Flags` word |
+| **is bound NOW** | the item's own flag test, `vt+0xA0` with `0x04000000` — i.e. **wire stat 0 bit 26** |
+
+Field 177 is `More Flags`, 30 is `Can` and 499 is `Power Level` (the quality tier) in the client's own stat-name
+table. In practice the `MoreFlags` clause fires on **0** templates and the quality clause on **2014** of 4741;
+within it the `Can` bit is near-universal (3854 templates) and `PowerLevel > 1` is the discriminator (2374), so
+the rule is really *"better than Common, and flagged equippable"*.
+
+### The bound flag caught in the act
+
+`[V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json 09:46:44 and 09:47:00]` — an annotated capture
+in which the player narrates both halves in `/say`:
+
+```
+09:46:44.757  DispatchSetItemStat  bag(104) slot 8      stat 0 = 0x00000001     "unbound: [Imbued Frayed Circlet]"
+09:47:00.842  DispatchSetItemStat  equipped(101) slot 2 stat 0 = 0x04000001     "just eqpuied item, it is now bound"
+```
+
+Template 3721359's own `Flags` is `0x00000001` — so it arrived carrying exactly its template's word, and the
+server re-sent stat 0 with **bit 26** added when it went on. That is the whole mechanism: `Flags` bit 26 is the
+bound flag, an item whose TEMPLATE already carries it is born bound (= "binds when picked up"), and binding on
+equip is the server setting that bit on the equipped cell.
+
+⚠️ **One template contradicts the pickup half and is not resolved.** `Bindings of Dark Terror` (3762969) carries
+bit 26 in its template, so it should read as bind-on-pickup, yet its in-client GM tooltip says *"Binds when
+Equipped"* with no `Character Bound` prefix — which per the disassembled branch requires
+`FUN_014d5210` to have returned **false**. That render was on OUR server, where every item ships `flags = 1` and
+`template2` is flattened onto `template1` (#752), so the likely cause is `AcgItemData_t::GetInterpolatedItem`
+failing to resolve the quad we send (its `iVar1 == 0` path returns false). Re-check in-client once the real `Flags`
+word is on the wire. `[V0: whether an interpolated ACG item's flags can differ from template1's]`
+
 ⚠️ **The field ids ARE wire stat ids** — this page said "NOT wire stat ids" until #626 showed the spell
 record's are, and the two share several numbers (287, 294). Resolved against the client's own stat-name table
 (LDB category 615, `--report ldb-stat-names`), 15 of the 18 ids listed here name something, and every name
