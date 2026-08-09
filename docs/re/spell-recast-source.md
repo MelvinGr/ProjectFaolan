@@ -257,7 +257,59 @@ those carries `cs = 0`. Life Leech holds 3000 cs = the 30 s its in-client toolti
 places, all in `HandleBccCastSpell`, all writing `Session.SpellReadyAt` — a server-side dictionary. Nothing wrote
 it to a packet.
 
-### ⛔ We do NOT send a recast element, and a version that did was reverted
+### ⭐ THE COOLDOWN IS `DispatchLockTemplate` — SOLVED, in-client verified
+
+The recast is not a GameAction on the wire at all (0 across all 132 dumps, sub-records included). It is
+**`GameCharInterface.DispatchLockTemplate` (0x204E)** — the message that greys a bar button and runs its sweep —
+and we sent **none** of the 992 the corpus carries. The opcode existed in the enum and was named in exactly one
+comment; nothing built it.
+
+Every captured body is 8 bytes:
+
+```
+[u32 templateId][f32 secondsRemaining]          the float BIG-endian
+
+0002fa65 41a00000  ->  195173 'Contract of Protection (Rank 1)', 20.0 s
+```
+
+Of the 741 bodies whose id resolves against `Spells`, **580 (78.3%) carry exactly that spell's
+`RecastCentiseconds / 100`**. The other 161 are partials against the same spell (15.143 / 15.254 / 15.76 where the
+recast is 20.0) — the time LEFT rather than the base, the same restore shape a long buff's duration takes (#601).
+
+⚠️ **One per spell in the LINE, not one for the cast.** A `Contract of Protection` cast emits five bodies in a
+row — 195173 / 195178 / 195179 / 195180 / 1151248, every rank of line 12 — each carrying the same 20.0. That is
+the wire form of `SetSpellLineRecastTime` and why all ranks grey together.
+
+The 251 bodies whose id is absent from `Spells` are **abilities and combos**: "template" is the client's word for
+the thing on the bar, not specifically a spell.
+
+Built by `LockTemplateCodec`, sent by `SendSpellCooldown` from the site in `Resolve()` that already arms the
+server's own timer, carrying what REMAINS after the cast time. **In-client PASS 2026-08-09.**
+
+### The two bugs found on the way, both real and both fixed
+
+1. **A duration-0 ApplySpell POISONS the cast.** We sent one on every cast; the client answers
+   `ERROR: CoreMagicHolder::ActivateBuff <id> remaining time 0` and aborts, losing the spell's own GameActions.
+   Retail sends an ApplySpell only for a spell that has something to apply: of 5,423 s2c MagicBuffIIR bodies,
+   5,416 carry a spell with a real duration and the 7 that do not are buffs whose duration is missing on OUR side.
+2. **`StatDamage.SpellBaseId` was `base >> 8`.** The client said so on every spell hit —
+   `GetMagicSpell failed to load spell with id 14321` (= Chill's 3666380 >> 8). Retail sends **0** there: 3,059 of
+   3,061 records, and all 50 with the stat id we use.
+
+### ⚠️ What is NOT yet matched: the CADENCE
+
+The messages and their contents match retail. **When** they are sent does not, and neither gap is closed:
+
+| | retail | ours |
+|---|---|---|
+| casts followed by a `LockTemplate` naming the cast spell or its line | 87% of buff casts, **41%** of nuke casts | **100%** of casts with a recast |
+| BCC cast records per cast | 7–14 | 2 (begin echo + complete) |
+
+The `LockTemplate` figures are attribution-based (the body must name the cast spell or a line sibling), not mere
+proximity — but the window is 45 packets, so a long cast can fall outside it. Retail is plainly more selective
+than we are and the rule is unknown; a cancelled cast costing no cooldown is the obvious candidate.
+
+### ⛔ A version that INVENTED a recast element was reverted
 
 Sending `SetSpellRecastTime` on cast makes the cooldown appear and passes in-client. It was still **wrong and is
 reverted**: retail sends no recast GameAction, so shipping one is inventing behaviour the captures contradict.
