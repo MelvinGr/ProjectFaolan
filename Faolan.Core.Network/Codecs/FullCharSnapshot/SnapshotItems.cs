@@ -220,21 +220,24 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// anything to decode here - the column was already right and the emitter simply ignored it. (#725 settled the
 		// value as per-template; this is the emit half.)
 		//
-		// ⚠️ `template2`/`key2` are emitted as COPIES of template1/key1, which is what 8,445 of 8,479 captured entries
-		// carry - but the copy is OUR SIMPLIFICATION, not a wire fact. 34 top-level entries and 10 socket blocks carry
-		// `template2 = template1 + 1` with a second, unrelated TEA key (key3 still equals key1), and that pair is REAL:
-		// `key2` TEA-decrypts RDB item template `template2` to a valid record (`type=1000020 id=3976769
-		// marker=1000000`), while cross-pairing key1 with template2 yields garbage. Both halves of the Cabochon Azurite
-		// pair carry the SAME display name and differ in content (285 vs 306 bytes), so it is one item in two variants.
+		// ⚠️ `template2`/`key2` are a REAL SECOND item template and the key that decrypts it, NOT a copy of the first
+		// (#752). `key2` TEA-decrypts RDB item template `template2` to a valid record (`type=1000020 id=3976769
+		// marker=1000000`) while cross-pairing key1 with template2 yields garbage, so the binding is `keyN` <->
+		// `templateN` exactly. Both halves of a pair carry the SAME display name and differ ONLY in their level fields
+		// (Cabochon Azurite: 285 vs 306 bytes, fields 54/203/204 reading 50 vs 80) - one item in two variants, whose
+		// templates are the LOW and HIGH endpoints of a level range with the entry's own `level` saying where between
+		// them this copy sits. That is what `AcgItemData_t::GetInterpolatedItem` is named for and what it does.
+		//
+		// Most items have no second endpoint and genuinely repeat the first - 341 of the 344 captured pairs - which is
+		// what `Item.WireTemplate2`/`WireKey2` return when `TemplateId2` is null. The three that carry one send it out
+		// of `Item.TemplateId2` + `Item.PairKey`, and the key is not optional: a second template without the key that
+		// decrypts it would leave the client holding a template it cannot read.
 		//
 		// The client names the whole family in its own stat table: `ACGItemTemplateID` (0x2BE) / `ACGItemTemplateID2`
 		// (0x2BF) / `ACGItemTemplateID3` (0x510) beside `ACGItemSeed` (0x2BC), `ACGItemLevel` (0x2BD),
 		// `ACGItemCategoryID` (0x2C0) and `ACGItemNano1..4` - i.e. a procedurally GENERATED item, composed from up to
 		// three templates plus a seed and a level. `ItemSlot1ACG1`/`ItemSlot1ACG2` .. `ItemSlot4ACG1`/`ItemSlot4ACG2`
 		// (0x2A3..0x2AA) say the same thing about SOCKETS: four slots, each naming its gem by an ACG id PAIR.
-		//
-		// Our Items row holds one template and one key, so it cannot express the pair. Tracked in Gitea #752 - do not
-		// read the copy as a decoded fact.
 		private static ProtoAcgItem Identity(Item item, uint hash)
 		{
 			// template1/template2 are the LOW and HIGH endpoints of a level range and the entry's own `level` says
@@ -242,8 +245,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// (#752). Most items have no second endpoint and repeat the first, which is what WireTemplate2/WireKey2
 			// return; the three that do carry one now send it, with the key that decrypts it.
 			//
-			// ⚠️ key3 is key1, on every one of the 344 captured pairs, and template3 is 0 on all of them - so the
-			// third slot is unused rather than undecoded.
+			// ⚠️ key3 is key1 on every one of the 13,368 captured SIGHTINGS (not merely the 344 distinct pairs - the
+			// report counts per sighting precisely so a later copy of an already-seen pair cannot hide a difference),
+			// and template3 is 0 on all of them. So the third slot is UNUSED rather than undecoded, and `Item` needs
+			// no third key: a Key3 column would hold a byte-identical duplicate of `Key`. If a non-zero template3 is
+			// ever captured that inverts, for the same reason `PairKey` exists - templateN is encrypted under keyN,
+			// so a third template would need its own key too.
+			//
+			// key2 differs from key1 on 65 of those sightings, which is exactly the 36 + 28 + 1 sightings of the three
+			// differing pairs - so the key differs precisely when the template does, with no third case.
 			return new ProtoAcgItem
 			{
 				Key1 = item.Key,
