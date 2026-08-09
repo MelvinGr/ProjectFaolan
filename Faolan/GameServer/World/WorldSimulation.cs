@@ -1290,9 +1290,12 @@ namespace Faolan.GameServer.World
 						// God mode blocks harm, and an aura is harm the holder is emitting rather than taking - but the
 						// same reasoning as TickDots applies to the RECIPIENTS, and ApplySpellArea goes through
 						// ApplyNpcDamage, which owns that check for the targets. Nothing extra is needed here.
+						// ⚠️ Logged even when it reaches NOTHING. Guarding this on `hit > 0` made a tick that found no
+						// targets indistinguishable from a tick that never ran, and that is exactly the question asked
+						// of it first ("the aura only fired twice" - it had fired six times and killed everything in
+						// range by the third).
 						var hit = await _output.ApplySpellArea(client, entity.Handle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
-						if (hit > 0)
-							_logger.LogDebug("Aura from buff 0x{Buff:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, area.EffectSpellId, hit, area.RadiusMetres);
+						_logger.LogDebug("Aura from buff 0x{Buff:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, area.EffectSpellId, hit, area.RadiusMetres);
 					}
 				}
 			}
