@@ -157,9 +157,9 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Items & economy
 
-- ✅ **Inventory** — containers, equipping, moving items, and starting gear
-- 🟡 **"Created by" on crafted items** — survives a relog, a move and a stack split; a WORN item loses it
-  (#727, #733)
+- ✅ **Inventory** — containers, equipping, moving items, and starting gear. An item is a row of its own, so
+  moving it never loses anything attached to it (#750)
+- ✅ **"Created by" on crafted items** — survives a relog, a move, a stack split and being WORN (#727, #733)
 - ✅ **The full economy** — vendors (the shop window opens on use), bank storage, the auction house (list and buy),
   and mail carrying money and item attachments
 - ✅ **Item claims** — the account claim/redeem window, including infinite and multi-charge claims (#359)
@@ -175,7 +175,8 @@ we've seen_, and names the gaps). Regenerate with
   and item storage are unhandled (#132, #654)
 - 🟡 **Crafting** — the recipe book, and making a recipe: materials consumed, product granted with its
   crafter's name. Professions and ranks are not modelled, so nothing gates who may craft what (#148, #735)
-- ⬜ Gem socketing (#311)
+- 🟡 **Gem socketing** — a gemmed item keeps its gems: they are stored per item, restored in the login snapshot
+  and named on the wire. Socketing one YOURSELF is not accepted yet (#311, #750, #754)
 
 ### Social & guilds
 
