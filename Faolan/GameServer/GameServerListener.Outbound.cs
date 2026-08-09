@@ -44,9 +44,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, ulong level, string? creatorName)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, string? creatorName)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, level, creatorName);
+			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, creatorName);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
@@ -185,16 +185,18 @@ namespace Faolan.GameServer
 		// INSTANCE carries one - 165/165 DispatchAddItem entries, 8,479/8,479 snapshot entries, 2,734/2,734 shop
 		// wares - while only the template ADVERTS (AH listings, mail attachments, claim lists) carry 0. A trade
 		// offer names an instance, so it carries the token (#723).
-		async Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
+		// `windowSlot` is the TRADE WINDOW position, not an inventory cell - it addresses the offer on both players'
+		// screens. The offered INSTANCE is passed in rather than looked up, because neither of the two things this
+		// method knows can find it: `recipientId` is whoever is being TOLD (the partner, for the `mine: false` half),
+		// and `windowSlot` is not a bag slot. Resolving it from those two was wrong in both directions.
+		async Task ITradeOutbound.SendTradeItem(uint recipientId, ItemInstance offered, uint windowSlot, uint count, bool mine)
 		{
-			// The offered item's own instance id, so the offer names the same thing the offerer's inventory does. A
-			// captured-only cell (no instance behind it) falls back to 0, which is what the template ADVERTS carry.
-			var offered = await Database.GetCharacterItemSlot(recipientId, ContainerKind.Bag, (int)slot);
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(offered?.Id ?? 0), item, AcgHash.ForWire(item.Id, item.Hash),
+			var item = offered.Template;
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(offered.Id), item, AcgHash.ForWire(item.Id, item.Hash),
 			[
-				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, slot)),
+				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, windowSlot)),
 				new SnapshotItems.ItemStat(26, count)
-			], sockets: offered?.Sockets);
+			], sockets: offered.Sockets);
 
 			await SendTradeRpc(recipientId, mine
 				? GameCharInterfaceMethods.DispatchTradeAddedItem
@@ -254,6 +256,15 @@ namespace Faolan.GameServer
 			// quest-container routing and AdvanceCollectGoals (#726).
 			return ClientForCharacter(characterId) is { } client
 				? await GrantItemToBackpack(client, itemTemplateId, count)
+				: null;
+		}
+
+		// The HAND-OVER form: the same delivery, except `transferring` MOVES instead of a new instance being minted, so
+		// the item keeps its identity, its crafter and its gems (#750).
+		async Task<int?> ITradeOutbound.TransferItemToCharacter(uint characterId, ItemInstance instance)
+		{
+			return ClientForCharacter(characterId) is { } client
+				? await GrantItemToBackpack(client, instance.TemplateId, instance.Count, transferring: instance)
 				: null;
 		}
 
@@ -364,7 +375,14 @@ namespace Faolan.GameServer
 		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
 		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
 		// slot index means nothing.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1, string? creatorName = null)
+		//
+		// `transferring` turns this from a MINT into a HAND-OVER: the delivery, the slot search, the live add, the
+		// quest-container routing and AdvanceCollectGoals are all identical, but the named instance MOVES into the found
+		// cell instead of a new one being created. That is what a player trade is, and re-minting there silently
+		// destroyed the item's crafter and its socketed gems. It is a parameter rather than a second method precisely so
+		// the choke point stays ONE path - InventoryGrantChokePointTests exists to stop a delivery growing its own.
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null,
+			ItemInstance? transferring = null)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -395,18 +413,23 @@ namespace Faolan.GameServer
 			if (slot == null)
 				return null;
 
-			// The MINTED instance: this is a grant, so the item comes into existence here and its id is what the live add
-			// and the next login's snapshot both name it by (#750). The two used to agree via a formula over
-			// (instance, kind, slot); they agree by identity now.
-			var minted = await Database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
+			// The instance the client is about to be told about, and the id the live add and the next login's snapshot
+			// both name it by (#750). The two used to agree via a formula over (instance, kind, slot); they agree by
+			// identity now. A GRANT mints it here; a HAND-OVER moves the existing one, keeping everything hanging off it.
+			var delivered = transferring != null
+				? await Database.TransferCharacterItem(transferring.Id, characterId, kind, slot.Value)
+				: await Database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
+			if (delivered == null)
+				return null;
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
 			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
-			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(minted!.Id),
-				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), creatorName: creatorName);
+			var entry = SnapshotItems.LiveAddEntry(FullCharacterRoots.ItemId(delivered.Id),
+				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, AcgHash.ForWire(item.Id, item.Hash), creatorName: delivered.CreatorName,
+				sockets: delivered.Sockets);
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
 			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got

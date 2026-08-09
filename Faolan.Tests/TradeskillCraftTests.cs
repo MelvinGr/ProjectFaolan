@@ -173,7 +173,7 @@ namespace Faolan.Tests
 			public List<(uint Item, uint Count, string? Creator)> Granted { get; } = [];
 			public List<(uint Item, uint Count)> Taken { get; } = [];
 
-			public Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, ulong level = 1, string? creatorName = null)
+			public Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null)
 			{
 				if (BagFull)
 					return Task.FromResult<int?>(null);

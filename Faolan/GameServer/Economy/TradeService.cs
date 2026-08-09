@@ -108,12 +108,12 @@ namespace Faolan.GameServer.Economy
 			}
 
 			// The message carries no quantity, so the WHOLE stack goes on the table.
-			side.Items[destPos] = new OfferedItem(itemPos, offer.Template, offer.Count);
+			side.Items[destPos] = new OfferedItem(itemPos, offer, offer.Count);
 			session.ResetAccepts();
 
 			var partnerId = session.Other(characterId).CharacterId;
-			await _outbound.SendTradeItem(characterId, offer.Template, destPos, offer.Count, true);
-			await _outbound.SendTradeItem(partnerId, offer.Template, destPos, offer.Count, false);
+			await _outbound.SendTradeItem(characterId, offer, destPos, offer.Count, true);
+			await _outbound.SendTradeItem(partnerId, offer, destPos, offer.Count, false);
 		}
 
 		// c2s RemoveTradeItem (0x2069): take an item back off the table. The mirror of AddItem - the same two s2c halves
@@ -198,24 +198,29 @@ namespace Faolan.GameServer.Economy
 		// the previous iteration just wrote. And the explicit `SendItemGranted` is gone: the grant pushes its own
 		// live add, so keeping both would have delivered each item to the client twice.
 		//
-		// ORDER MATTERS: grant first, clear second. If the grant fails - receiver offline, or their bag is full - the
-		// giver still holds the item, which is the stated intent. Clearing first would destroy it.
+		// A trade HANDS the item over: TransferItemToCharacter moves the instance to the receiver, so the crafter, the
+		// stack and the socketed GEMS travel with it (#750). It used to grant a fresh instance from the template and
+		// then clear the giver's cell - which deleted the giver's row and cascaded its sockets, so the receiver got a
+		// gemless copy with no crafter. Nothing revealed it because before #750 an item HAD no per-instance state to
+		// lose, and the offer window is built from the real instance, so it was advertising gems the exchange would
+		// not deliver.
+		//
+		// No clear-the-source step any more: the move IS the transfer, and there is no window in which the item exists
+		// twice. A failed transfer (receiver offline, bag full) leaves it with the giver untouched, which is the same
+		// intent the old grant-first/clear-second ordering was protecting - now structural rather than an ordering rule.
 		private async Task Exchange(TradeSide from, TradeSide to)
 		{
 			foreach (var (_, offered) in from.Items)
 			{
-				var slot = await _outbound.GrantItemToCharacter(to.CharacterId, offered.Item.Id, offered.Count);
-				if (slot == null)
+				if (await _outbound.TransferItemToCharacter(to.CharacterId, offered.Instance) == null)
 				{
-					_logger.LogWarning("Trade: {To:X8} could not receive {Item}; it stays with {From:X8}.", to.CharacterId, offered.Item.Name, from.CharacterId);
+					_logger.LogWarning("Trade: {To:X8} could not receive {Item}; it stays with {From:X8}.", to.CharacterId, offered.Instance.Template.Name, from.CharacterId);
 					continue;
 				}
 
-				await _database.SetCharacterItemSlot(from.CharacterId, ContainerKind.Bag, (int)offered.ItemPos, null);
-
-				// ...and TELL the giver's client. Moving the row is not enough: the client renders what it last knew,
-				// so without this a traded-away item sits visibly in the giver's bag until relog - the DB was right
-				// and the game looked broken. (The receiver's side is the grant's own live add.)
+				// TELL the giver's client. Moving the row is not enough: the client renders what it last knew, so
+				// without this a traded-away item sits visibly in the giver's bag until relog - the DB was right and
+				// the game looked broken. (The receiver's side is the transfer's own live add.)
 				await _outbound.SendItemRemoved(from.CharacterId, offered.ItemPos);
 			}
 
@@ -267,7 +272,9 @@ namespace Faolan.GameServer.Economy
 
 
 		// ItemPos is the giver's BAG slot; the dictionary key is the window slot it was offered into.
-		private sealed record OfferedItem(uint ItemPos, Item Item, uint Count);
+		// The offered ITEM INSTANCE, not just its template: the offer message names it by its own id and restates its
+		// sockets, and the exchange MOVES this exact row to the receiver (#750).
+		private sealed record OfferedItem(uint ItemPos, ItemInstance Instance, uint Count);
 
 		private sealed class TradeSide(uint characterId)
 		{

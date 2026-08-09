@@ -53,7 +53,33 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				});
 			}
 
-			foreach (var stat in stats)
+			// ⚠️ A socket is stated TWICE on the wire, and both halves have to be sent. Besides slot_map, the entry's
+			// stat_list carries the gem as the PAIR `ItemSlotNACG1`/`ItemSlotNACG2` - the client's own stat names for a
+			// socket slot's two ACG ids, which are exactly the gem's template1/template2 (see Identity).
+			//
+			// Measured over all 898 slot_map blocks in the corpus slice: the two forms AGREE 898/898, with zero
+			// disagreements and zero cases of one present without the other. So they are not alternatives - retail sends
+			// both, every time.
+			//
+			// The stat ids are 0x2A3 + 2N / 0x2A4 + 2N for socket N, and the table names FOUR slots
+			// (ItemSlot1..ItemSlot4), so socket index 3 has a home even though no captured item uses it.
+			//
+			// ⚠️ ACG1 and ACG2 both get the gem's `Items.Id`, because ACG1/ACG2 ARE template1/template2 and our Items row
+			// holds only one template (#752). That is the same flattening Identity() applies to the slot_map block, which
+			// is what matters here: the two forms of the socket still AGREE with each other, which is the invariant the
+			// corpus pins 898/898. A capture-accurate pair needs the model change, not a second guess in this method.
+			var socketStats = (sockets ?? [])
+				.Where(socket => socket.SocketIndex < MaxSockets)
+				.OrderBy(socket => socket.SocketIndex)
+				.SelectMany(socket => new[]
+				{
+					new ItemStat(ItemSlot1Acg1 + (2 * socket.SocketIndex), socket.Gem.Id),
+					new ItemStat(ItemSlot1Acg1 + (2 * socket.SocketIndex) + 1, socket.Gem.Id)
+				});
+
+			// ⚠️ ORDERED ascending by stat id, like every other stat list here - the order is load-bearing for
+			// byte-exactness, and the socket ids (0x2A3+) sort after every bookkeeping stat the callers pass.
+			foreach (var stat in stats.Concat(socketStats).OrderBy(s => s.Stat))
 			{
 				entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 				{
@@ -181,6 +207,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// The value retail puts in Duration on an item that does not expire: 1,497 of 1,528 captured sightings.
 		public const uint NoExpiry = uint.MaxValue;
+
+		// `ItemSlot1ACG1` (0x2A3) - the first of the eight socket stat ids, which run in (ACG1, ACG2) pairs for four
+		// slots up to `ItemSlot4ACG2` (0x2AA). Named by the client's own stat table.
+		private const uint ItemSlot1Acg1 = 0x2A3;
+
+		// Four socket slots, per that table. The corpus only ever shows indices 0/1/2, so three sockets is a CAPTURE
+		// limit and four is the game's; a socket beyond the fourth has no stat id to go in and is dropped rather than
+		// scribbling over ItemSlot4ACG2's neighbour.
+		private const uint MaxSockets = 4;
 
 		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
 		// fixed triple (ListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,

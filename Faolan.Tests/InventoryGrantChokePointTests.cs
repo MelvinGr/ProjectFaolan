@@ -52,10 +52,11 @@ namespace Faolan.Tests
 				(2, "ESCROW only - moving a listed item out of the seller's BANK on sell, and out of the sender's bank "
 				    + "once a mail is taken. The take itself routes through GrantItemToBackpack (#720)."),
 
-			["Faolan/GameServer/Economy/TradeService.cs"] =
-				(1, "player-to-player trade: clears the GIVER's slot. The receiver's half was the second call here and "
-				    + "was a grant skipping the choke point - the #720 defect in the other delivery path; it now goes "
-				    + "through ITradeOutbound.GrantItemToCharacter (#726).")
+			// ⚠️ TradeService is deliberately ABSENT: it mints nothing and clears nothing. A trade HANDS the item over
+			// (ITradeOutbound.TransferItemToCharacter -> the same choke point, moving the instance instead of minting), so
+			// there is no giver-side clear to write either. It used to have two calls - a grant that skipped the choke
+			// point (the #720 defect in the other delivery path, fixed by #726) and the giver's clear, which #750 removed
+			// with the re-mint it belonged to.
 		};
 
 		[Fact]

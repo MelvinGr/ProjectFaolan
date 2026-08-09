@@ -116,7 +116,7 @@ namespace Faolan.GameServer.Economy
 
 			// The product first, so a full bag refuses the craft with the materials still in it.
 			var productItem = await _database.GetItem(product.ItemId);
-			var slot = await _outbound.GrantItemToBackpack(client, product.ItemId, count, level: (ulong)(productItem?.Level ?? 1), creatorName: character.Name);
+			var slot = await _outbound.GrantItemToBackpack(client, product.ItemId, count, creatorName: character.Name);
 			if (slot == null)
 			{
 				_logger.LogInformation("Craft refused: {Character}'s bag is full, so recipe {Recipe} was not crafted (materials kept).", character.Name, recipeId);

@@ -139,6 +139,17 @@ namespace Faolan.Core.Database.Repositories
 
 		/// <summary>Sets an existing stack's size. Returns false when the cell is empty.</summary>
 		Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count);
+
+		/// <summary>
+		///     HANDS an item to another character: the same instance, re-owned into their cell, so its crafter, stack and
+		///     socketed gems travel with it (#750). Returns the instance, or null when it no longer exists or the target
+		///     cell is occupied - in which case NOTHING has moved and the item is still where it was.
+		///     <para>
+		///         ⚠️ This is what a player TRADE is, and it must not be a delete-plus-mint. Re-minting deleted the
+		///         giver's row (cascading its sockets) and handed the receiver a gemless copy with no crafter.
+		///     </para>
+		/// </summary>
+		Task<ItemInstance?> TransferCharacterItem(uint instanceId, uint toCharacterId, ContainerKind container, int slot);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths);
 
@@ -1040,6 +1051,27 @@ namespace Faolan.Core.Database.Repositories
 		// is a wire slot index and those are non-negative, so it cannot collide with one; the transaction is what
 		// guarantees nothing is ever observed sitting here.
 		private const int ParkedSlot = -1;
+
+		public async Task<ItemInstance?> TransferCharacterItem(uint instanceId, uint toCharacterId, ContainerKind container, int slot)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var instance = await ctx.ItemInstances.Include(i => i.Template).Include(i => i.Sockets).ThenInclude(x => x.Gem).FirstOrDefaultAsync(i => i.Id == instanceId);
+			if (instance == null)
+				return null;
+
+			// Refuse rather than overwrite. The caller found a FREE cell, so an occupied one means the receiver's
+			// inventory changed underneath us - and the alternative to refusing is destroying whatever is in it. The
+			// UNIQUE (owner, container, slot) index would catch it anyway, as an exception at SaveChanges; catching it
+			// here means the caller gets "it did not move" and the giver keeps the item.
+			if (await ctx.ItemInstances.AnyAsync(i => i.OwnerCharacterId == toCharacterId && i.Container == container && i.Slot == slot))
+				return null;
+
+			instance.OwnerCharacterId = toCharacterId;
+			instance.Container = container;
+			instance.Slot = slot;
+			await ctx.SaveChangesAsync();
+			return instance;
+		}
 
 		public async Task<bool> SetCharacterItemCount(uint characterId, ContainerKind container, int slot, uint count)
 		{

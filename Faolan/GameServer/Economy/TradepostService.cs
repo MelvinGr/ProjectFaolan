@@ -592,7 +592,7 @@ namespace Faolan.GameServer.Economy
 			// quest tab rather than the backpack, and the bag capacity accounts for the equipped bag's extra slots.
 			//
 			// The attachment's captured `ItemLevel` is passed because `Items.Level` cannot supply it yet (#725).
-			var slot = await _outbound.GrantItemToBackpack(client, attachment.Template, qty, level: attachment.ItemLevel);
+			var slot = await _outbound.GrantItemToBackpack(client, attachment.Template, qty);
 			if (slot == null)
 			{
 				_logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);

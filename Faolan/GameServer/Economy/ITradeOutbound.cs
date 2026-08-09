@@ -24,7 +24,7 @@ namespace Faolan.GameServer.Economy
 		///     s2c DispatchTradeAddedItem (0x2070) when <paramref name="mine" />, else DispatchTradePartnerAddedItem
 		///     (0x206F) - the same body, and which opcode depends only on whose side of the table the item is on.
 		/// </summary>
-		Task SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine);
+		Task SendTradeItem(uint recipientId, ItemInstance offered, uint windowSlot, uint count, bool mine);
 
 		/// <summary>
 		///     s2c DispatchTradeRemovedItem (0x2074) when <paramref name="mine" />, else DispatchTradePartnerRemovedItem
@@ -68,5 +68,19 @@ namespace Faolan.GameServer.Economy
 		///     </para>
 		/// </summary>
 		Task<int?> GrantItemToCharacter(uint characterId, uint itemTemplateId, uint count);
+
+		/// <summary>
+		///     HANDS an existing item to another character - the same first-free-cell delivery and live
+		///     DispatchAddItem as <see cref="GrantItemToCharacter" />, except the instance MOVES rather than a fresh one
+		///     being minted, so its crafter, its stack and its socketed GEMS come with it (#750). Returns the slot, or
+		///     null when they are offline or their bag is full (in which case the item has not moved).
+		///     <para>
+		///         A trade is the one delivery that is a HAND-OVER rather than a creation, and re-minting was silently
+		///         destroying per-instance state: the giver's row was deleted, cascading its sockets, and the receiver
+		///         got a gemless copy without a crafter. It went unnoticed because before #750 there was no
+		///         per-instance state for a trade to lose.
+		///     </para>
+		/// </summary>
+		Task<int?> TransferItemToCharacter(uint characterId, ItemInstance instance);
 	}
 }
