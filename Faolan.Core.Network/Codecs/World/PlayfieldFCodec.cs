@@ -27,6 +27,34 @@ namespace Faolan.Core.Network.Codecs.World
 	// Neither `sceneWord` nor the blob's last word is semantically pinned - `sceneWord` is 0 on maps 4020/4022 and 1
 	// on 1000/1010/2000/2010/2040/3000/5007/11040 while 4000 and 4010 carry both, and `blobLastWord` takes 0/1/2/3
 	// within a single map - so both are still passed through. [V0 on their meaning; V1 on the framing.]
+	//
+	// ⚠️ **The blob is an OPAQUE PASS-THROUGH: the client copies it in and echoes it back, and never reads a field
+	// out of it.** That is why nothing about its contents correlates with anything.
+	//
+	//   read  `FUN_013d0a20`: stores position (obj+0x24/+0x28/+0x2C), calls the proxy reader, stores `sceneWord`
+	//         (obj+0x54), then hands the length-prefixed blob to `FUN_00cbf5d0` - the generic `BinaryStream.cpp`
+	//         sub-stream COPIER - which parks the bytes in an embedded stream at **obj+0x5C**.
+	//   write `FUN_013d0aa0`: the exact mirror, ending in `FUN_00cbf550`, which emits those bytes verbatim.
+	//
+	// Every other value in this body lands in a named slot. The blob's do not, and **nothing else in the class
+	// touches obj+0x5C** - not the base reader/writer, not any of the four vtable siblings around the reader
+	// (`008f30f0` returns obj+0x90, `008f3740` is the writer, `008f38a0` forwards to `008f3190`). The class exposes
+	// no accessor to it either, so there is no obvious route for an outside consumer.
+	//
+	// The two asserts name both classes for free: `iir\playfieldFIIR.cpp` and the base
+	// `IIR\n3playfieldfullupdateiir.cpp`.
+	//
+	// ⚠️ Our own Read/Write DO parse the blob into `NearClip`/`FarClip`/`BlobLastWord`, and that structure is real -
+	// all 218 captured bodies decode and re-encode byte-exact. But it is structure the CLIENT does not look at, so
+	// do not reason from those names about behaviour, and do not expect changing them to alter anything on screen.
+	//
+	// ⚠️ **`NearClip`/`FarClip` are guessed names and the second one cannot be right.** Measured over all 218 bodies
+	// in the dumps: the first float is **15.0 in every single one**, and the second ranges **0.053 .. 14.796**,
+	// always BELOW it. A far clip nearer than the near clip is not a camera. The second correlates with neither the
+	// in-game clock (r = -0.01 against GameTimeIIR's DayTimeSeconds over 215 records) nor wall-clock time mod 15
+	// (r = +0.13); it is spread uniformly across [0, 15). Renaming them needs the consumer above, so they keep the
+	// names they have - but do not reason from them. Our sender hardcodes the pair as (15.0, 7.111854), which
+	// matches retail exactly on the first and is a single frozen value where retail varies the second.
 	public static class PlayfieldFCodec
 	{
 		public const uint Opcode = (uint)IirTypes.PlayfieldFIIR;
