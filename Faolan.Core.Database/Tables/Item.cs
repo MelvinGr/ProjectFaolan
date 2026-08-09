@@ -290,13 +290,29 @@ namespace Faolan.Core.Database.Tables
 		//     Raw Beets  @209:  02 00 00 00 | 09 00 00 00 | 28 b9 01 00   -> 112936  "Hearty Meal"
 		//     Moonspill  @253:  02 00 00 00 | 09 00 00 00 | 27 c0 02 00   -> 180263  "Mana Potion Effect 10"
 		//
-		// ⚠️ **NOT yet a sufficient extractor, so nothing imports it.** The same `[2][9]` triplet appears on items
-		// with no on-use effect at all - Quilted Pants carries `[2][9][712801]` - so the tag does not by itself mean
-		// "on-use spell". What separates them is measured but unexplained: all 12 known on-use values resolve in
-		// `Spells`, and 0 of 12 sampled non-consumable values do. Filtering on "the value is a known Spells.Id" would
-		// recover all 12 controls, but it is a heuristic over a half-read grammar and would silently miss any item
-		// whose spell our catalog lacks. The tail's record structure needs finishing first.
-		// [V0: what distinguishes an on-use [2][9] from the others in the item-template tail]
+		// ⭐ The record is keyed, and **the key is 53051**: the full little-endian run is
+		//
+		//     53051, 0, 4, 0, 1, 0, 2, 9, <spellId>
+		//
+		// ⚠️ The `[2][9]` triplet alone is NOT the marker - it is a generic slot that also appears on items with no
+		// on-use effect (Quilted Pants carries `[2][9][712801]`), and so is the `4` before it. Only the 53051 key
+		// separates them, and 53051 sits in the same 53xxx family as the script params behind
+		// `rdb_script_params_carry_server_side_facts`.
+		//
+		// Measured over 26 dumped templates - 12 with a captured on-use spell, 14 without:
+		//   * 8 of the 12 controls recovered exactly, each resolving to the right spell name;
+		//   * **0 false positives** - not one of the 14 non-consumables yields a value, which is what the earlier
+		//     `[2][9]` and `kind == 4` readings both failed;
+		//   * of the 4 misses, `Contender's Cache` and `Exemplar's Cache` do not carry their spell in the template
+		//     at all (loot caches, a different mechanism), `Totem of Origins` carries 3763119 ("Totem of Origins")
+		//     where the capture recorded 3981764 ("Degeneration"), and `Moonspill` carries its spell under a
+		//     different prefix.
+		//
+		// ⚠️ Still not imported. This was found with a byte-pattern search, not a walk: `ItemTemplateProperties` is a
+		// PREFIX read that stops at the display-name string, and the honest fix is to teach it the tail's record
+		// grammar rather than to grep for a key. A whole-corpus count also needs a dump-all pass -
+		// `--only items --dry-run --dump-templates` does not reach the RDB path. Gitea #762.
+		// [V0: the item-template tail's full record grammar - what the 53xxx keys enumerate]
 		public uint? OnUseSpell { get; set; }
 
 		// For a RESOURCE BAG item (equipped in the resource-bag slot, equip slot 26): the extra RESOURCE-container slots
