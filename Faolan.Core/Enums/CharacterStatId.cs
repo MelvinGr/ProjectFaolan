@@ -273,7 +273,7 @@ namespace Faolan.Core.Enums
 		CurrentMovementMode = 0x0AD,
 		DeathEffectXp = 0x40B,
 		ChosenGod = 0x0A9,
-		Unknown12 = 0x534,
+		ExpandBankInventory = 0x534,
 		NanoInterval = 0x16B,
 		Unknown15 = 0x163,
 		MurderPoints = 0x449,
@@ -319,20 +319,20 @@ namespace Faolan.Core.Enums
 		PetPoints = 0x1C8,
 		Unknown48 = 0x14B,
 		Money = 0x03D,
-		Unknown50 = 0x575,
+		PvPMatchesAbandonedSeasonal = 0x575,
 		MinigamesAbandoned = 0x560,
-		Unknown52 = 0x573,
+		PvPSiegeMatchesLostSeasonal = 0x573,
 		SiegeLosses = 0x29F,
-		Unknown54 = 0x56E,
+		PvPSiegeMatchesWonSeasonal = 0x56E,
 		SiegeWins = 0x29E,
-		Unknown56 = 0x571,
-		Unknown57 = 0x56B,
-		Unknown58 = 0x570,
-		Unknown59 = 0x56A,
-		Unknown60 = 0x569,
+		PvPCTFMatchesLostSeasonal = 0x571,
+		PvPCTFMatchesWonSeasonal = 0x56B,
+		PvPAnnihilationMatchesLostSeasonal = 0x570,
+		PvPAnnihilationMatchesWonSeasonal = 0x56A,
+		PvPFatalitiesSeasonal = 0x569,
 		Fatalities = 0x564,
-		Unknown62 = 0x567,
-		Unknown63 = 0x566,
+		PvPTotalDeathsSeasonal = 0x567,
+		PvPTotalKillsSeasonal = 0x566,
 
 		// ---- Named from the CLIENT's own stat-name table, LDB category 615 (`--report ldb-stat-names`). ----
 		// These are the stats the FEAT catalog modifies (FeatEffect) that nothing else had made us name: items touch
@@ -463,13 +463,16 @@ namespace Faolan.Core.Enums
 		// Confirmed by the client: its item-tooltip builder resolves this word through
 		// `GetLocalisedString(615, stat)` - LDB category 615 is `0x267`, the literal it pushes at 014a2714 - so the
 		// name the client would print for the id is the name it has.
-		// ⚠️ The CLIENT calls stat 8 `TimeExist`, not `Duration` - recovered from its own stat-name table
-		// (docs/re/aoc-client-stat-names.tsv, `DumpStatNameTable.java`). The distinction is not cosmetic: the client
-		// also ships `OldTimeExist` at 0x188, so "duration" is our word for a pair the client names precisely, and
-		// reading 8 as "how long a BUFF lasts" is what the name invited. It is "how long the thing EXISTS" - which is
-		// why it reads correctly on an item's no-expiry stat and why a `Set` of it (GameAction 53026, 100 rows) does
-		// NOT match the carrier's own `Spell.DurationMs` (16 of 100 agree even allowing a centisecond scale). #711.
-		TimeExist = 0x008,
+		// ⚠️ `Duration` is the name LDB category 615 gives stat 8, and 615 is the right source: it is the DISPLAY name,
+		// shipped in seven languages, and it is what the client's own tooltip prints. The exe's static stat-name table
+		// and LDB 633 call it `TimeExist` instead - those carry INTERNAL identifiers and are not a safe citation for
+		// semantics (#625). `1037` is the proof: 615 says `Knockback Resistance` in all seven languages while 633/the
+		// exe table say `Weight`, and our KnockbackService depends on that reading.
+		//
+		// Separately, and independent of the name: a `Set` of this stat (GameAction 53026, 100 rows) does NOT set the
+		// carrier's own `Spell.DurationMs` - 16 of 100 agree even allowing a centisecond scale, and there is zero
+		// overlap with the 335 spells carrying a summon. What it does set is open in #711.
+		Duration = 0x008,
 		SpellCriticalDamage = 0x081,
 		ManaCost = 0x084,
 		SpellCriticalChance = 0x093,

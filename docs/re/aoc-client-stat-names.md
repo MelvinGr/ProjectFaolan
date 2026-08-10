@@ -153,3 +153,40 @@ invisible until religion is modelled server-side.
 
 **The general rule:** the stat-name table tells you what an id IS called, not that the client does anything with
 it. Before treating a named id as decodable from the binary, check that something READS it.
+
+
+## ⚠️ This table is an INTERNAL name list, and LDB 615 outranks it for meaning (#625)
+
+The client carries **three** name sources for a stat id, and they are not interchangeable:
+
+| source | what it is |
+| --- | --- |
+| **LDB category 615** | the **DISPLAY** name — localized, shipped in seven languages, and what the client's own tooltip prints |
+| **LDB category 633** | an **INTERNAL** identifier list, English only |
+| **this table** (the exe's static descriptors) | also internal, and a MIX — it sides with 633 sometimes and with 615 others |
+
+Measured over the 341 ids that carry both a 615 and a 633 name: **263 agree (77%) and 78 disagree.** Most
+disagreements are cosmetic (`Default Position` / `DefaultPos`, `Bonus XP` / `XPBonus`), but some are a different
+claim entirely:
+
+| id | LDB 615 (display) | 633 / this table (internal) |
+| ---: | --- | --- |
+| `1037` | **Knockback Resistance** | `Weight` |
+| `147` | **Spell Critical Chance** | `MaxSneak` |
+| `120` | **Money** | `PickPocketCash` |
+| `8` | **Duration** | `TimeExist` |
+| `294` | **Casting Time (Seconds)** | `ItemDelay` |
+| `129` | **Spell Critical Damage** | `SpellCriticalModifier` |
+
+⭐ **`1037` is the case that settles which source wins.** `CharacterStatId.KnockbackResistance` is live code —
+`KnockbackService` reads it and `BuffStatEffects` honours it — and 615 names it *Knockback Resistance* in all
+seven languages while this table says `Weight`. Renaming toward the internal name would have been a regression,
+and `147` (*Spell Critical Chance* vs `MaxSneak`) shows the internal list can be flatly wrong about a field's
+identity rather than merely terser.
+
+**So: cite LDB 615 for what a stat MEANS.** This table's value is coverage, not authority — it names the
+`1000000+` range and the `0x545..0x593` run that 615 does not reach at all, and for an id 615 never names it is
+the only AoC-era evidence there is. Where they disagree and the id is user-facing, 615 is the answer.
+
+⚠️ It also still carries **Anarchy Online** vocabulary in places (`NanoFocusLevel` for `355`, where this table
+says `LastPvPXP`), which is a second reason not to treat an internal name as a decode result.

@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SpellStatModifier_RejectsAndCounts_AMagnitudeThatIsAGameActionTypeId()
 		{
-			var body = Template(SpellStatModifier, [238, (uint)CharacterStatId.TimeExist, SpellStatModifier, 0]);
+			var body = Template(SpellStatModifier, [238, (uint)CharacterStatId.Duration, SpellStatModifier, 0]);
 
 			Assert.Empty(ItemTemplateStatModifiers.ParseSpellStatModifiers(body, out var misSliced));
 			Assert.Equal(1, misSliced);
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SpellStatModifier_IsNotReadAsAGrant()
 		{
-			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.TimeExist, 250, 0]);
+			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.Duration, 250, 0]);
 
 			Assert.Empty(RdbFeatImporter.ParseSpellGrants(body));
 		}

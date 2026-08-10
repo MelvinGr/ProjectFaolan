@@ -53,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
 		private static readonly (CharacterStatId Id, uint Value)[] StatList2Half =
 		[
-			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.NanoInterval, 0x0), (CharacterStatId.Timestamp, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC),
+			(CharacterStatId.ExpandBankInventory, 0x0), (CharacterStatId.NanoInterval, 0x0), (CharacterStatId.Timestamp, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC),
 			(CharacterStatId.MurderPoints, 0x0), (CharacterStatId.ShieldAllocation, 0x6F), (CharacterStatId.FeatResets, 0x0), (CharacterStatId.XpKillRange, 0x8), (CharacterStatId.HealthCurrent, 0x2648),
 			(CharacterStatId.HealthMax, 0x2328), (CharacterStatId.Intelligence, 0xA), (CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.ManaMax, 0x0), (CharacterStatId.ManaCurrent, 0x0),
 			(CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Icon, 0x0), (CharacterStatId.Mesh, 0x0),
@@ -63,11 +63,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.PowerSessionRemaining, 0x14), (CharacterStatId.SkillPoints, 0x0), (CharacterStatId.Skulk, 0x0), (CharacterStatId.RunSpeed, 0x0), (CharacterStatId.Perception, 0x0),
 			(CharacterStatId.Hiding, 0x0), (CharacterStatId.Resilence, 0x0), (CharacterStatId.TrapDisarm, 0x0), (CharacterStatId.Climbing, 0x0), (CharacterStatId.MagicalResist, 0x64),
 			(CharacterStatId.MagicRating, 0x64), (CharacterStatId.AttackRating, 0x64), (CharacterStatId.DefenseRating, 0x64), (CharacterStatId.MemorizeDelay, 0x0), (CharacterStatId.ElderFrostSpecialization, 0x0),
-			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.PetPoints, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Money, 0x0), (CharacterStatId.Unknown50, 0x0),
-			(CharacterStatId.MinigamesAbandoned, 0x0), (CharacterStatId.Unknown52, 0x0), (CharacterStatId.SiegeLosses, 0x0), (CharacterStatId.Unknown54, 0x0), (CharacterStatId.SiegeWins, 0x0),
-			(CharacterStatId.Unknown56, 0x0), (CharacterStatId.CaptureSkullLosses, 0x0), (CharacterStatId.Unknown57, 0x0), (CharacterStatId.CaptureSkullWins, 0x0), (CharacterStatId.Unknown58, 0x0),
-			(CharacterStatId.AnnihilationLosses, 0x0), (CharacterStatId.Unknown59, 0x0), (CharacterStatId.AnnihilationWins, 0x0), (CharacterStatId.Unknown60, 0x0), (CharacterStatId.Fatalities, 0x0),
-			(CharacterStatId.Unknown62, 0x0), (CharacterStatId.Deaths, 0x0), (CharacterStatId.Unknown63, 0x0), (CharacterStatId.Kills, 0x0)
+			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.PetPoints, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Money, 0x0), (CharacterStatId.PvPMatchesAbandonedSeasonal, 0x0),
+			(CharacterStatId.MinigamesAbandoned, 0x0), (CharacterStatId.PvPSiegeMatchesLostSeasonal, 0x0), (CharacterStatId.SiegeLosses, 0x0), (CharacterStatId.PvPSiegeMatchesWonSeasonal, 0x0), (CharacterStatId.SiegeWins, 0x0),
+			(CharacterStatId.PvPCTFMatchesLostSeasonal, 0x0), (CharacterStatId.CaptureSkullLosses, 0x0), (CharacterStatId.PvPCTFMatchesWonSeasonal, 0x0), (CharacterStatId.CaptureSkullWins, 0x0), (CharacterStatId.PvPAnnihilationMatchesLostSeasonal, 0x0),
+			(CharacterStatId.AnnihilationLosses, 0x0), (CharacterStatId.PvPAnnihilationMatchesWonSeasonal, 0x0), (CharacterStatId.AnnihilationWins, 0x0), (CharacterStatId.PvPFatalitiesSeasonal, 0x0), (CharacterStatId.Fatalities, 0x0),
+			(CharacterStatId.PvPTotalDeathsSeasonal, 0x0), (CharacterStatId.Deaths, 0x0), (CharacterStatId.PvPTotalKillsSeasonal, 0x0), (CharacterStatId.Kills, 0x0)
 		];
 
 		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes
