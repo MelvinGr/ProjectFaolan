@@ -47,10 +47,6 @@ namespace Faolan.GameServer.Combat
 		// from StatDamage (the same IIR that renders incoming DoT numbers on the player), NOT DamageResult.
 		private const uint SpellDamageStatId = 0x0A;
 
-		// What retail puts in StatDamageIIR's `SpellBaseId`: nothing. 3,059 of the corpus's 3,061 records carry 0, and
-		// the two that do not name an id absent from the spell catalog. Named rather than inlined so the next reader
-		// finds the measurement instead of an unexplained literal - see SendSpellDamageNumber (#767).
-		private const uint RetailSpellBaseId = 0;
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
 		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
 
@@ -894,7 +890,7 @@ namespace Faolan.GameServer.Combat
 			// is worse than none.
 			return vitals == null
 				? Task.CompletedTask
-				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, RetailSpellBaseId);
+				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, CombatResolver.RetailSpellBaseId);
 		}
 
 		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR

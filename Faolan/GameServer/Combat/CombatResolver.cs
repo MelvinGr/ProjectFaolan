@@ -123,6 +123,15 @@ namespace Faolan.GameServer.Combat
 		// retail's own tweak-table coefficients) is the real path.
 		public const uint ArmorHalfMitigation = 2000;
 
+		// What retail puts in `StatDamageIIR.SpellBaseId`: nothing. Measured over the corpus - **3,059 of 3,061 records
+		// carry 0**, and it is total for every stat id we send (all 50 with statId 10, all 2,892 with statId 0, all 119
+		// with statId 5); the two exceptions name an id absent from the whole spell catalog.
+		//
+		// Both emitters go through this one constant (the spell-cast hit, #767, and the DoT tick, #770) so they cannot
+		// drift apart again - the DoT path was left passing `buff.BuffId >> 8` when the cast path was fixed, precisely
+		// because that IS a real spell id and so produced no client error to notice.
+		public const uint RetailSpellBaseId = 0;
+
 		// TWK_ArmorAbilityModifier / TWK_TargetPerLevelArmor from the client's own tweak table (RDB 1000516,
 		// docs/rdb/client-tweak-table.md). NOT tunable guesses - these are retail's values.
 		public const double ArmorAbilityModifier = 2.0;

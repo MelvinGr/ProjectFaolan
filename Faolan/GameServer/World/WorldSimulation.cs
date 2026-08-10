@@ -1343,7 +1343,12 @@ namespace Faolan.GameServer.World
 						continue;
 
 					vitals.ApplyHealthDelta(buff.DotDelta);
-					await _output.SendStatDamage(client, entity.Handle, vitals.Health, buff.DotDelta, buff.DotType, buff.CasterHandle, buff.BuffId >> 8);
+					// #770: `SpellBaseId` is ZERO, like every other StatDamageIIR retail sends (see
+					// CombatResolver.RetailSpellBaseId). This used to pass `buff.BuffId >> 8` - the DoT's own spell id -
+					// which is why it survived the #767 fix to the cast path: that IS a real id, so the client loads it
+					// without complaint and nothing ever looked wrong. It is simply not what retail states.
+					await _output.SendStatDamage(client, entity.Handle, vitals.Health, buff.DotDelta, buff.DotType, buff.CasterHandle,
+						CombatResolver.RetailSpellBaseId);
 					await _output.PushVitals(client, vitals);
 
 					if (vitals.IsDead)
