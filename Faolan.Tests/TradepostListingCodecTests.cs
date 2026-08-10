@@ -99,10 +99,11 @@ namespace Faolan.Tests
 						Key2 = 0x2678c056,
 						Key3 = 0xe2fd8092,
 						Key4 = 0xf17b5c5a
-					}
+					},
+					// #749: the wire's `Level` comes off the joined TEMPLATE now, not a per-listing column.
+					Level = 1
 				},
 				Template = 0x3e0a97,
-				ItemLevel = 1,
 				ItemHash = 0
 			};
 		}

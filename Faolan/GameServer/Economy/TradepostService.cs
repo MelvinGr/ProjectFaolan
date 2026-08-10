@@ -194,7 +194,6 @@ namespace Faolan.GameServer.Economy
 					? 1
 					: listing.Quantity,
 				Template = listing.Template, // the key lives in Items (FK on Template); no inline copy
-				ItemLevel = listing.ItemLevel,
 				ItemHash = listing.ItemHash,
 				TrailerWord = MailConstants.AttachmentTrailerWord,
 				TrailerClass = MailConstants.EndpointClass,
@@ -466,7 +465,6 @@ namespace Faolan.GameServer.Economy
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = 0,
 				Template = listed.TemplateId, // the key lives in Items (FK on Template); no inline copy
-				ItemLevel = listed.Template.Level,
 				ItemHash = listed.Template.Hash
 			};
 			await _database.CreateTradepostListing(listing);
@@ -577,7 +575,6 @@ namespace Faolan.GameServer.Economy
 						? 1u
 						: attached.Count,
 					Template = attached.TemplateId, // the key lives in Items (FK on Template); no inline copy
-					ItemLevel = attached.Template.Level,
 					ItemHash = attached.Template.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,
@@ -634,7 +631,6 @@ namespace Faolan.GameServer.Economy
 			// It also picks up two behaviours this path never had: a QUEST item arriving by mail now routes to the
 			// quest tab rather than the backpack, and the bag capacity accounts for the equipped bag's extra slots.
 			//
-			// The attachment's captured `ItemLevel` is passed because `Items.Level` cannot supply it yet (#725).
 			// HAND THE ROW OVER when there is one - the crafter and the socketed gems travel with it. Only an
 			// importer-seeded listing's mail has no row, and that one still mints from the template.
 			var slot = attachment.Escrowed != null

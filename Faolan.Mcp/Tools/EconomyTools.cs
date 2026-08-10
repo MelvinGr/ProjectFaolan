@@ -78,7 +78,6 @@ namespace Faolan.Mcp.Tools
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
 				Template = item.Id, // the key lives in Items (FK on Template); no inline copy
-				ItemLevel = item.Level,
 				ItemHash = item.Hash
 			};
 
@@ -198,7 +197,6 @@ namespace Faolan.Mcp.Tools
 						? 1u
 						: count,
 					Template = item.Id, // the key lives in Items (FK on Template); no inline copy
-					ItemLevel = item.Level,
 					ItemHash = item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,

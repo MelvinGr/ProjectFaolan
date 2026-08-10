@@ -62,11 +62,12 @@ namespace Faolan.Core.Database.Tables
 		public uint Handle { get; set; }
 		public uint ItemHandle { get; set; }
 		public uint ItemHash { get; set; }
-		public uint ItemLevel { get; set; }
 
 		public uint Quantity { get; set; }
 
-		// ProtoAcgItem Template1/Template2 (equal in the capture) and the Level/Hash tail.
+		// ProtoAcgItem Template1/Template2 (equal in the capture) and the Hash tail. The wire's `Level` is NOT here: it
+		// is `Items.Level` for this template, read through TemplateItem (#749). No template in 8,644 captured sightings
+		// carries two different levels, so a per-listing copy stored nothing the template does not.
 		public uint Template { get; set; }
 		public uint Timestamp { get; set; }
 

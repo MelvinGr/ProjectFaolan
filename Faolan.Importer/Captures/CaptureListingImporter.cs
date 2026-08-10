@@ -93,8 +93,8 @@ namespace Faolan.Importer.Captures
 				// fill and a legacy one to correct. Never downgrade to 0, same rule as the hash.
 				if (await db.Items.FirstOrDefaultAsync(i => i.Id == tmpl) is { } existing)
 				{
-					if (src.ItemLevel != 0)
-						existing.Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue);
+					if (src.TemplateItem.Level != 0)
+						existing.Level = src.TemplateItem.Level;
 
 					continue;
 				}
@@ -103,7 +103,7 @@ namespace Faolan.Importer.Captures
 				{
 					Id = tmpl,
 					Name = "",
-					Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue),
+					Level = src.TemplateItem.Level,
 					Type = ItemType.Normal,
 					Hash = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
 					Key = (ProtoDecryptionKey)src.TemplateItem.Key.Clone() // carried on the transient nav from ToListing
@@ -155,7 +155,6 @@ namespace Faolan.Importer.Captures
 					existing.EntryFlags = e.EntryFlags;
 					existing.Timestamp = e.Timestamp;
 					existing.Template = e.Template;
-					existing.ItemLevel = e.ItemLevel;
 					existing.ItemHash = e.ItemHash;
 					updated++;
 				}
@@ -208,10 +207,13 @@ namespace Faolan.Importer.Captures
 				// listing (only the Template FK column persists - the row resolves its real Items row on reload).
 				TemplateItem = new Item
 				{
-					Key = key
+					Key = key,
+					// #749: the wire's `Level` rides the transient nav rather than a column on the listing. It is a
+					// per-TEMPLATE fact (no template in 8,644 captured sightings carries two levels), and this is the
+					// only thing that ever read it - HarvestItems below, seeding/correcting `Items.Level`.
+					Level = (byte)Math.Min(item.Level, byte.MaxValue)
 				},
 				Template = item.Template1,
-				ItemLevel = item.Level,
 				ItemHash = item.Hash
 			};
 		}

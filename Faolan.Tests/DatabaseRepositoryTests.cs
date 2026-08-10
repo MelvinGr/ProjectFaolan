@@ -710,8 +710,7 @@ namespace Faolan.Tests
 						Price = 25,
 						Quantity = 1,
 						ItemId = 0x7530,
-						Template = 0x3E0A97,
-						ItemLevel = 5
+						Template = 0x3E0A97
 					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}

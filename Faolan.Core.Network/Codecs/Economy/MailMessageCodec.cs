@@ -154,8 +154,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		// The attachment as the wire ProtoInventoryGameEntry (item_id = the instance id, stat_list = {26: qty},
 		// item_data = the instance's ProtoAcgItem). The item's TEA key is per-TEMPLATE and lives in Items, reached
-		// through the Item nav (FK on Template) - Include it before building. The Template/Level/ItemHash tail still
-		// comes off the row.
+		// through the Item nav (FK on Template) - Include it before building, which #749 makes load-bearing for a second
+		// reason: `Level` now comes off that joined row too, since it is per-TEMPLATE and never per-attachment.
 		public static MailAttachmentEntry ToEntry(MailAttachment a)
 		{
 			ArgumentNullException.ThrowIfNull(a);
@@ -171,7 +171,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 					Key3 = key,
 					Template1 = a.Template,
 					Template2 = a.Template,
-					Level = a.ItemLevel,
+					Level = a.Item!.Level, // #749: per-TEMPLATE, off the joined row (thrown for above) - never a per-attachment copy
 					Hash = a.ItemHash
 				}
 			};
@@ -228,12 +228,17 @@ namespace Faolan.Core.Network.Codecs.Economy
 			{
 				ItemInstanceId = a.ItemInstanceId,
 				Quantity = qty,
+				// #749: the wire's `Level` is a per-TEMPLATE fact (no template in 8,644 captured sightings carries two),
+				// so it rides the TRANSIENT Item nav rather than a column on the attachment - the same shape
+				// CaptureListingImporter uses to carry a listing's level into `Items`. That also keeps the row
+				// round-trip byte-exact: the build reads `Item.Level`, and a parse that dropped it would rebuild a
+				// level-0 attachment.
 				Item = new Item
 				{
-					Key = key
+					Key = key,
+					Level = (byte)Math.Min(item.Level, byte.MaxValue)
 				},
 				Template = item.Template1,
-				ItemLevel = item.Level,
 				ItemHash = item.Hash,
 				TrailerWord = a.TrailerWord,
 				TrailerClass = a.TrailerClass,

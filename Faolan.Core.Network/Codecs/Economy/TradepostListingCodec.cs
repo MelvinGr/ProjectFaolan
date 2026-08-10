@@ -139,8 +139,12 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItems emits, with the
 		// AH-specific stat set). The listed instance's TEA key is per-TEMPLATE and lives in Items, reached through the
-		// TemplateItem nav (FK on Template) - Include it before building. The Template/Level/ItemHash tail still comes
-		// off the listing row (ItemHash is the captured wire value, 0 for AH, not Items.Hash).
+		// TemplateItem nav (FK on Template) - Include it before building.
+		//
+		// #749: `Level` comes off that same joined template rather than from a per-listing copy. The level is strictly
+		// per-TEMPLATE - across 8,644 captured inventory sightings not one template carries two different levels
+		// (#725) - so a copy on the listing held nothing the template does not, and the column is gone. `ItemHash`
+		// stays on the row and is NOT `Items.Hash`: it is the captured wire value, and an AH-delivered item sends 0.
 		public static ProtoInventoryGameEntry Entry(TradepostListing listing)
 		{
 			var key = (listing.TemplateItem ?? throw new InvalidOperationException(
@@ -156,7 +160,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 					Key3 = key,
 					Template1 = listing.Template,
 					Template2 = listing.Template,
-					Level = listing.ItemLevel,
+					Level = listing.TemplateItem.Level,
 					Hash = listing.ItemHash
 				}
 			};

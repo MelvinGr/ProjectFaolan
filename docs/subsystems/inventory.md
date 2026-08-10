@@ -242,9 +242,17 @@ read.
 
 ⚠️ **`EscrowedInstanceId` is nullable and both cases are real.** An importer-seeded listing has no seller character
 and never had an item row, so its purchase mail keeps a null escrow and still mints from the template. Everything a
-player causes carries a row. The `Template`/`Quantity`/`ItemLevel`/`ItemHash` columns stay beside it because they
-are what the wire entry carries, they are the only source when the escrow is null, and `ItemHash` genuinely is not
-the template's (an AH-delivered item sends 0).
+player causes carries a row. The `Template`/`Quantity`/`ItemHash` columns stay beside it because they are what the
+wire entry carries, they are the only source when the escrow is null, and `ItemHash` genuinely is not the template's
+(an AH-delivered item sends 0).
+
+`ItemLevel` is **not** among them (#749). The level is strictly per-TEMPLATE — across 8,644 captured inventory
+sightings not one template carries two different levels — so a per-instance copy stored nothing `Items.Level` does
+not, on either `MailAttachment` or `TradepostListing`. Both codecs read it through the joined row they were already
+required to `Include` for the item's TEA key, and the byte-exact goldens on both are what made the swap safe to
+attempt: one of them fired immediately on a transient row whose nav carried no level, which is how the parse learned
+to carry it there. `MailAttachments` lost its AUTOINCREMENT surrogate in the same pass for
+`(MailId, ItemInstanceId)` — the wire's own identity for the block, and the table was still empty.
 
 ⚠️ **Cancelling a mail returns the escrow first and is REFUSED if it cannot** — a bought item lives in the buyer's
 mail container until taken, so deleting the mail on top of it would strand a paid-for row nothing can reach. And

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -8,7 +9,13 @@ namespace Faolan.Core.Database.Tables
 	// itemInstanceId, stat_list = {26: qty}, item_data = the item's ProtoAcgItem). Identity fields mirror
 	// TradepostListing (the AH delivers the listed instance via mail). Decoded from the NecroL80 get-mail capture
 	// (#1607, 754 B vs the 629 B no-attachment base); MailMessageCodec builds it byte-exact.
-	public class MailAttachment : BaseEntity
+	//
+	// #749: keyed NATURALLY on (MailId, ItemInstanceId), not by a store-generated surrogate. The model conventions
+	// forbid one on a table the importer delete+reinserts, and the pair IS the wire's own identity for the block - the
+	// entry repeats `ItemInstanceId` as its `ProtoInventoryGameEntry.ItemId`, and one mail cannot carry the same
+	// instance twice. Done while the table was still EMPTY, which is the cheapest this will ever be.
+	[PrimaryKey(nameof(MailId), nameof(ItemInstanceId))]
+	public class MailAttachment
 	{
 		// --- the item INSTANCE identity (the entry's ProtoAcgItem)
 		// The item's TEA key is per-TEMPLATE and lives once in Items; this attachment references it by Template (hard
@@ -33,10 +40,12 @@ namespace Faolan.Core.Database.Tables
 		//     character and never had an item), so its take still mints from the template as before;
 		//   * every mail a player causes carries one.
 		//
-		// The Template/Quantity/ItemLevel/ItemHash columns beside it are the WIRE fields and stay: they are what the
-		// mail entry carries, they are the only source when Escrowed is null, and `ItemHash` is genuinely not the
-		// template's (an AH-delivered item sends 0). Where Escrowed IS set it is the authority and those columns
-		// mirror it.
+		// The Template/Quantity/ItemHash columns beside it are the WIRE fields and stay: they are what the mail entry
+		// carries, they are the only source when Escrowed is null, and `ItemHash` is genuinely not the template's (an
+		// AH-delivered item sends 0). Where Escrowed IS set it is the authority and those columns mirror it.
+		//
+		// `ItemLevel` is NOT among them any more (#749): the level is per-TEMPLATE - no template in 8,644 captured
+		// sightings carries two - so it is read through the `Item` nav rather than copied per attachment.
 		public uint? EscrowedInstanceId { get; set; }
 
 		[ForeignKey(nameof(EscrowedInstanceId))]
@@ -50,7 +59,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual Mail Mail { get; set; } = null!;
 
 		public uint ItemHash { get; set; }
-		public uint ItemLevel { get; set; }
 
 		public uint Quantity { get; set; } // entry stat 26
 		public uint Template { get; set; }

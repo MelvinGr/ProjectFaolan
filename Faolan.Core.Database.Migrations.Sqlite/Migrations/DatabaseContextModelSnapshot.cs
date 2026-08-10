@@ -1810,23 +1810,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MailAttachment", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<ulong>("MailId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("ItemInstanceId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint?>("EscrowedInstanceId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("ItemHash")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ulong>("ItemInstanceId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("ItemLevel")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ulong>("MailId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Quantity")
@@ -1844,11 +1837,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("TrailerWord")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("MailId", "ItemInstanceId");
 
                     b.HasIndex("EscrowedInstanceId");
-
-                    b.HasIndex("MailId");
 
                     b.HasIndex("Template");
 
@@ -3687,9 +3678,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("ItemId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("ItemLevel")
                         .HasColumnType("INTEGER");
 
                     b.Property<ulong>("Price")
