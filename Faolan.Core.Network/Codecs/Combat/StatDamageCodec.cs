@@ -116,6 +116,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public sealed record StatDamageIIR(
 		uint Handle,
 		byte Env,
+
+		// ⚠️ NOT the stat's value after the hit, whatever the name suggests. On the ENVIRONMENTAL form it is the
+		// damage MAGNITUDE - the same number `Delta` carries, negated: 41 of the 1,884 negative-health records in
+		// the corpus have `StatValue == -Delta`, and the environmental population is exactly those 41. On the 1,843
+		// combat ones it is something else.
+		//
+		// ⭐ Worth knowing because it looks like a free health pool. Reading a fall's `before` as
+		// `StatValue + damage` makes every fall cost exactly 50% of it, which is arithmetic rather than a finding
+		// (#515) - the health pool for a fall genuinely has to come from the separate `StatUpdateIIR` stream.
 		uint StatValue,
 		uint StatId,
 		uint Count,
