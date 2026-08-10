@@ -1,4 +1,4 @@
-using System.Linq;
+using System;
 using System.Numerics;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.Combat;
@@ -25,9 +25,9 @@ namespace Faolan.Tests
 
 			Assert.Equal(MoveTaskNodes.ModeFormation, node.Mode);
 			Assert.Equal(0x00031C7Au, node.Formation6[1]);
-			Assert.Equal(1f, System.BitConverter.UInt32BitsToSingle(node.Formation6[2]));
-			Assert.Equal(0f, System.BitConverter.UInt32BitsToSingle(node.Formation6[3]));
-			Assert.Equal(-3f, System.BitConverter.UInt32BitsToSingle(node.Formation6[4]));
+			Assert.Equal(1f, BitConverter.UInt32BitsToSingle(node.Formation6[2]));
+			Assert.Equal(0f, BitConverter.UInt32BitsToSingle(node.Formation6[3]));
+			Assert.Equal(-3f, BitConverter.UInt32BitsToSingle(node.Formation6[4]));
 			Assert.Equal(6u, node.Formation6[5]);
 		}
 

@@ -108,7 +108,7 @@ every captured record of it (166 / 32 / 2). The demon/large-caster animation (`1
 hold still: 280 on 30 of its 52 records, then 240, 160, 816, 176, 360, 592 and 120. Nothing in the record or its
 actor separates them, so the modal value is what we send. Close it by finding what a 816 or a 120 has in common —
 the creature TEMPLATE behind the handle is the first thing to check, since one animation is shared by many
-creatures and a per-creature length would explain the spread exactly. Tracked in Gitea #742.
+creatures and a per-creature length would explain the spread exactly. Tracked in Gitea #781.
 `[V0: what varies field12 on 17036]`
 
 ### What selects the 128031 death animation
@@ -118,7 +118,7 @@ own annotation *"got incinerated by lava"* — inside the normal annotation lag 
 annotation two minutes earlier maps to an ordinary 41877 death, so an environmental death appears to play its
 own animation. Two records is not enough to wire a rule on and nothing selects it today. Close it with a capture
 of a second environmental death (lava, drowning, a fall) — or of a fatality, which is the other candidate for a
-"special" death. Tracked in Gitea #742.
+"special" death. Tracked in Gitea #781.
 `[V0: what selects the 128031 death animation]`
 
 ---

@@ -83,6 +83,7 @@ Capture-sourced (default group, run in dependency order):
 | `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
 | `npc-placements` (pool the stationary spawn rows the corpus proves are one NPC seen twice — #718) | — |
 | `npc-ambient-animations` (per-creature idle animations from the captured `Emote` records — #766) | — |
+| `npc-follow-pairs` (which creature TYPE walks with which, from the captured mode-07 formation MoveTasks — #741) | — |
 | `world-objects` | — |
 | `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
@@ -252,6 +253,12 @@ puts each in, with the direction ability resolved — #661) ·
 spawn into the login BURST and MID-SESSION, which is the class of predictor a field census cannot see. ⛔ It
 FALSIFIED the ticket's own hypothesis - 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not
 mean "this entity is arriving"),
+`follow-pairs` (#741: every NPC-follows-NPC binding the corpus carries — the mode-07 formation MoveTasks — with
+both ends resolved to creature NAMES and the offsets each follower held. Grouped by creature PAIR, because the
+formation is only visible as a GROUP: the four `Black Dragon Guard Patroller`s behind one captain each hold a
+different corner of a 3x3 grid with their own slot index, which is what proves the offset is a vector-plus-slot
+and not the single scalar it was read as. It also prints what the merge WOULD store and the residue naming a
+creature the DB does not hold, so the harvest's completeness is visible rather than assumed),
 `spawn-duplicates` (is a cluster of near-identical STATIONARY spawns one NPC harvested twice, or a genuinely tight
 retail placement? #718/#765. The verdict comes from `StationaryPlacementResolver` — the same code the
 `npc-placements` import stamps `PlacementId` from — so the report cannot show a verdict the importer would not act

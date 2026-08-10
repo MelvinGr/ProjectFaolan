@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -88,7 +89,7 @@ namespace Faolan.Tests
 			Assert.All(spells.Values.Where(s => s.RecastCentiseconds == 0).Take(50), s => Assert.False(SpellCooldownPolicy.Locks(s)));
 		}
 
-		private static async Task<System.Collections.Generic.Dictionary<uint, Spell>> Spells()
+		private static async Task<Dictionary<uint, Spell>> Spells()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			return await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, TestContext.Current.CancellationToken);
