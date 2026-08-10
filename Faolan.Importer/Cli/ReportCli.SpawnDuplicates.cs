@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Interfaces;
+using Faolan.Core.Database.Tables;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,68 @@ namespace Faolan.Importer.Cli
 				                  + $"{(c.Verdict == StationaryPlacementResolver.Verdict.OneWalked ? $"placement=0x{c.PlacementKey():X8} " : "")}"
 				                  + $"ids={string.Join(",", c.Rows.Select(r => r.Id))}");
 			}
+
+			CrossMapDuplicates(rows, await db.Maps.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Name ?? "?"));
+		}
+
+		// ⭐ The duplicate class the section above STRUCTURALLY cannot see (#728). `StationaryPlacementResolver`
+		// groups by `(MapId, NpcTemplateId, ClassId)`, so two records of one NPC filed under two map ids are never
+		// compared - and a map's SUB-AREAS are separate playfield ids sharing one coordinate space, which is exactly
+		// how that happens.
+		//
+		// ⚠️ This finds candidates, not duplicates. Two playfields can legitimately hold the same creature at the
+		// same spot - Tortage day and night are two maps over one city - so the discrimination (#718's concurrency
+		// test) is a separate question and this deliberately does not attempt it. What it does is put a number on
+		// the class: which map PAIRS overlap, how much of the smaller map is involved, and whether the twins agree
+		// on the columns a re-harvest of the same NPC would agree on.
+		private static void CrossMapDuplicates(IReadOnlyList<NpcSpawn> rows, IReadOnlyDictionary<uint, string> maps)
+		{
+			var pairs = new Dictionary<(uint A, uint B), List<(NpcSpawn A, NpcSpawn B)>>();
+			foreach (var byTemplate in rows.GroupBy(r => r.NpcTemplateId))
+			{
+				var list = byTemplate.ToList();
+				for (var i = 0; i < list.Count; i++)
+				for (var j = i + 1; j < list.Count; j++)
+				{
+					var (a, b) = list[i].MapId < list[j].MapId ? (list[i], list[j]) : (list[j], list[i]);
+					if (a.MapId == b.MapId || Vector3.Distance(a.Position, b.Position) > StationaryPlacementResolver.ClusterRadius)
+						continue;
+
+					if (!pairs.TryGetValue((a.MapId, b.MapId), out var bucket))
+						pairs[(a.MapId, b.MapId)] = bucket = [];
+
+					bucket.Add((a, b));
+				}
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"⭐ CROSS-MAP candidates - the same template within {StationaryPlacementResolver.ClusterRadius}u under two DIFFERENT map ids (#728),");
+			Console.WriteLine("   which the clustering above cannot see because it groups by (MapId, template, class):");
+			if (pairs.Count == 0)
+			{
+				Console.WriteLine("   none");
+				return;
+			}
+
+			foreach (var ((a, b), bucket) in pairs.OrderByDescending(p => p.Value.Count))
+			{
+				var onA = bucket.Select(p => p.A.Id).Distinct().Count();
+				var onB = bucket.Select(p => p.B.Id).Distinct().Count();
+				var totalB = rows.Count(r => r.MapId == b);
+				// ⭐ Level and Health are what a SECOND harvest of the same NPC reproduces; a genuinely different
+				// population at the same spot is free to differ. So the agreement rate is the discriminator that
+				// costs no captures - 100% reads as one placement recorded twice, anything less as two populations.
+				var agree = bucket.Count(p => p.A.Level == p.B.Level && p.A.Health == p.B.Health);
+				Console.WriteLine($"   map {a,-5} {Trim(maps.GetValueOrDefault(a, "?"), 28),-28} <-> {b,-5} {Trim(maps.GetValueOrDefault(b, "?"), 28),-28}"
+				                  + $" pairs={bucket.Count,-4} spawns {onA}/{onB} of {totalB} on the smaller"
+				                  + $"  level+health agree {agree}/{bucket.Count}"
+				                  + $"  templates={bucket.Select(p => p.A.NpcTemplateId).Distinct().Count()}");
+			}
+		}
+
+		private static string Trim(string s, int max)
+		{
+			return s.Length > max ? s[..max] : s;
 		}
 
 		private static int Count(Dictionary<StationaryPlacementResolver.Verdict, List<StationaryPlacementResolver.Cluster>> byVerdict,
