@@ -389,9 +389,17 @@ carry. It is not the vanity slots either, which is worth recording because they 
 DemoL80's Canvas Belt (+4 Con) and Northfur Cloak (+23 Con) would add 216 health, overshooting by 143, so excluding
 them is right. Feats were ruled out separately (#589).
 
-Which weapon set was actually drawn is **not recoverable from the corpus**: the swap is observable (the server
-stamps the newly-active main slot on a `SwitchWeaponsButton`) but a login carries no such event, and the client
-derives its own display from the equipment container. So the 177 → 73 is arithmetic that fits, not a measurement.
+Which weapon set was actually drawn is **not recoverable from the corpus**, and that is now MEASURED rather than
+asserted (`--report weapon-set-drawn`, #588). The swap is observable — the server stamps the newly-active main slot
+on a `SwitchWeaponsButton` — but a login carries no such event, and the obvious second route does not work either:
+a spawn's worn list is what every other client renders the character from, so if it carried one set at a time it
+would state the answer. It does not. Across the 10,990 captured spawns carrying a weapon slot, **138 carry a
+primary (6/8) and a secondary (20/21) at once**, and DemoL80's own spawns are among them (`[6, 20, 21]`). The list
+is the whole equipment container, exactly as the client-side-display reading says.
+
+⚠️ The same report explains why NecroL80 landing exactly validates nothing: **NecroL80's spawns carry slot 6 and
+nothing else**, so she owns no second set and the `Primary` default is right for her by construction. So the
+177 → 73 is arithmetic that fits, not a measurement.
 [V3: CharacterMaxStatsTests.EveryClass_AtLevelOne_ReproducesItsCapturedSheet]
 [V3: EntityVitalsGearTests.AssassinL23_AtLevel23_MatchesTheCapturedRetailPools]
 

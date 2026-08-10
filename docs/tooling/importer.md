@@ -279,6 +279,10 @@ dumps every record of one phase in full),
 its own capture's spawns. It is what settled that `field12` is the CREATURE's animation length and not the
 animation's: on 17036, 22 creatures, 22 carrying one value each and none carrying two — #781. Reports the
 unresolved actors separately, since an unresolved population is the one thing that could fake either answer),
+`weapon-set-drawn` (does a captured spawn's worn list say which of the two weapon SETS is drawn? No — 138 of the
+10,990 armed spawns carry a primary and a secondary slot at once, so the list is the whole equipment container.
+`--report-arg <name>` breaks it down per character, which is what shows DemoL80 carrying both and NecroL80 carrying
+only a primary — #588),
 `ambient-animation` (the two commands that make a standing NPC look alive — `BccAction` and `Emote`, 63,743 of the
 corpus' 76,262 BCC records — measured per ACTOR and per creature TYPE rather than per capture, which is the only
 way the question "what does ONE citizen receive, and how often" gets an answer. It is what separated the two:

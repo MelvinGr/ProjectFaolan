@@ -301,6 +301,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #588/#400: does a captured spawn's worn list state which weapon SET is drawn?
+				case "weapon-set-drawn":
+				{
+					WeaponSetDrawn(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "follow-pairs":
 				{
 					FollowPairs(NamedCapture.LoadAll(capturesDir));
