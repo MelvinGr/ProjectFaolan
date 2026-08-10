@@ -553,10 +553,30 @@ The 13 rulesets, columns `[1]`, `[5..7]`, `[9..13]` and `[15..19]` being zero on
 ```
 
 `[4]` is `[3] × 200` wherever both are set, so one is derived from the other (6 / 1200 and 12 / 2400 read as a
-duration in two units). ⚠️ `[14]` is a reference of some kind — `269317` twice, `144407` and `4230307` once each
-— and it resolves to **nothing**: not a `Spells` or `Items` row, and `--report rdb-id` finds **0 entries** for
-any of the three anywhere in the RDB index. So it is not a resource id, and naming it needs the accessor's
-consumers rather than the table.
+duration in two units). ⚠️ Ruleset **1** — the ordinary open-world one — also carries `[3] = 6` with `[4] = 0`,
+so `[3]` is not minigame-specific and neither column is named here. `[14]` is a reference of some kind —
+`269317` twice, `144407` and `4230307` once each — and it resolves to **nothing**: not a `Spells` or `Items`
+row, and `--report rdb-id` finds **0 entries** for any of the three anywhere in the RDB index. So it is not a
+resource id, and naming it needs the accessor's consumers rather than the table.
+
+### ⭐ What the rulesets turn out to BE, read through the playfields that use them
+
+Resolving every playfield id against `Maps` partitions the 13 rulesets along exactly the PvP zone types
+(Gitea #146 / #503):
+
+| ruleset | used by |
+|---:|---|
+| **7** | the default — 186 playfields, and its row is all-zero |
+| **1** (alternate **8**) | the 36 ordinary open-world zones: Conall's Valley, Field of the Dead, the Tarantia districts, Khopshef, Kheshatta, the Khitai zones, Thunder River, … |
+| **6** | `Border Kingdoms, Cimmerian End` (11040), `Border Kingdoms, Aquilonian End` (12070), `Border to Kush` (13050), `Massive Pvp Test` (89), `Minigames (General)` (38) — **the massive-PvP ruleset** |
+| **4 / 5 / 13** | **only the five minigame playfields**, via 1000512, and nothing in 1000509 names them |
+| **2** | `Lacheish Plains PvP` (1041), `Hiving Heaven` |
+| **11** | `The Pit Master's Arena (Fighting Pits)` (1043) |
+| **12** | `Khemi's Sparring Arena`, `Coils of the Serpent`, `Feast Hall`, `Council Forum`, `Ritual Chambers`, `The Lion's Maw` |
+
+⚠️ Three playfields that look like they belong here are in **neither** table: `5003 PvP - TEAM DEATHMATCH`,
+`5200 PvP CTF 1` and `5100 Border Kingdoms - Massive PvP`. The shipped rules cover the five live minigame maps
+and the Border Kingdoms ends, not those.
 
 ## Decoded: 1065103 `PvPConRating_c` — a per-LEVEL con rating, and the shipped file neutralises itself
 
