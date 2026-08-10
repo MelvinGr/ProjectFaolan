@@ -113,7 +113,7 @@ namespace Faolan.Importer.Cli
 			var ldb = LdbStringIndex.EnglishPlaintext(rdb);
 			var ctx = new TooltipContext(rdb, ldb, null);
 
-			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0;
+			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0, stringBytes = 0, withText = 0;
 			long elements = 0, rendered = 0;
 			// #789: how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
 			// selects - the only way to say what the flag MEANS is to look at which spells wear it.
@@ -169,8 +169,14 @@ namespace Faolan.Importer.Cli
 						shownNameless++;
 				}
 
-				var fields = RdbSpellImporter.ReadIncreasingFields(body);
+				var fields = RdbSpellImporter.ReadIncreasingFields(body, out var afterRun);
 				fieldBytes += fields.Count * 8;
+				// #632: the record's own name + description sit immediately after the run, and were a large slice of
+				// what that ticket measured as "never looked at".
+				var block = RdbSpellImporter.ReadStringBlock(body, afterRun);
+				stringBytes += block.Bytes;
+				if (block.Bytes > 0)
+					withText++;
 				foreach (var field in fields.Keys)
 					fieldCounts[field] = fieldCounts.GetValueOrDefault(field) + 1;
 
@@ -200,10 +206,11 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			var accounted = elementBytes + fieldBytes + listBytes;
+			var accounted = elementBytes + fieldBytes + listBytes + stringBytes;
 			Console.WriteLine($"spell-tooltip census over {records} records of RDB {SpellTemplateType}");
 			Console.WriteLine($"  record bytes inside a parsed region : {accounted:N0} / {bodyBytes:N0} = {(bodyBytes == 0 ? 0 : 100.0 * accounted / bodyBytes):0.0}%"
-			                  + $"   ({elementBytes:N0} in elements, {listBytes:N0} in their list headers, {fieldBytes:N0} in the property run)");
+			                  + $"   ({elementBytes:N0} in elements, {listBytes:N0} in their list headers, {fieldBytes:N0} in the property run,"
+			                  + $" {stringBytes:N0} in the name/description block on {withText:N0} records)");
 			Console.WriteLine($"  property-run field ids read         : {SpellFieldsRead.Count(f => fieldCounts.ContainsKey(f.Key))} / {fieldCounts.Count}");
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
 			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
@@ -307,8 +314,18 @@ namespace Faolan.Importer.Cli
 			var fields = RdbSpellImporter.ReadIncreasingFields(body);
 			var elements = ItemTemplateStatModifiers.ParseElements(body);
 
+			// ⭐ #632: the record carries its OWN name and description, and for the 1,594 spells LDB 50210 has no name
+			// for it is the only one there is - `Hellfire Stream` (8600) renders as "spell 8600" out of the LDB. The
+			// LDB still wins where it has one: it is the LOCALISED string and this is the raw authoring name.
+			RdbSpellImporter.ReadIncreasingFields(body, out var runEnd);
+			var inline = RdbSpellImporter.ReadStringBlock(body, runEnd);
+			if (name.StartsWith("spell ", StringComparison.Ordinal) && inline.Name.Length > 0)
+				name = $"{inline.Name} [from the record]";
+
 			Console.WriteLine($"{pad}{name} ({spellId})");
 			var description = ctx.Ldb.GetValueOrDefault((LdbStringIndex.SpellDescriptionCategory, spellId));
+			if (string.IsNullOrWhiteSpace(description) && inline.Description.Length > 0)
+				description = inline.Description;
 			if (!string.IsNullOrWhiteSpace(description))
 				foreach (var line in description.Replace("\r", "").Split('\n'))
 					Console.WriteLine($"{pad}  \"{line}\"");
@@ -887,11 +904,14 @@ namespace Faolan.Importer.Cli
 			// is what says which of two identical-looking elements belong to the same list.
 			var lists = ItemTemplateStatModifiers.ParseElementLists(record.AsSpan(12));
 			var listBytes = lists.Count * 12;
-			var accounted = elementBytes + fieldBytes + listBytes;
+			// #632: the record's own name + description, immediately after the property run.
+			RdbSpellImporter.ReadIncreasingFields(record.AsSpan(12), out var afterRun);
+			var text = RdbSpellImporter.ReadStringBlock(record.AsSpan(12), afterRun);
+			var accounted = elementBytes + fieldBytes + listBytes + text.Bytes;
 
 			yield return "--";
 			yield return $"record {body} B body: {elements.Count} element(s) in {lists.Count} list(s) {elementBytes} B + {listBytes} B header "
-			             + $"+ {fields.Count} property field(s) {fieldBytes} B "
+			             + $"+ {fields.Count} property field(s) {fieldBytes} B + {text.Bytes} B name/description "
 			             + $"= {accounted} B ({(body == 0 ? 0 : 100.0 * accounted / body):0.#}%), {body - accounted} B unaccounted";
 
 			var unparsed = ItemTemplateStatModifiers.UnparsedElementHeads(record.AsSpan(12));

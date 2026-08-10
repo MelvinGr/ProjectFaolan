@@ -3,6 +3,38 @@
 RDB type **1040005** (the spell catalog, 21,502 records) is a 12-byte header followed by a run of
 `[fieldId u32][value u32]` LE pairs in strictly INCREASING field order. 111 distinct field ids occur.
 
+## ⭐ What the rest of a record is (#632)
+
+That run is only ~13% of a record, and #632 was filed on the other ~87% having "never been looked at". It is
+four things, and the accounting now reaches **81.6%** of all 8.2 MB (was 64.4%):
+
+| region | bytes over the catalog | where it is decoded |
+|---|---:|---|
+| the element lists | 3,785,151 | [`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) |
+| the **name + description block** | 1,167,952 | below |
+| the property run | 1,526,224 | this page |
+| the element-list headers | 249,504 | `[2][listId][(n+1) * 0x3F1]`, #785 |
+
+### The name/description block
+
+It sits **immediately after the property run** — which is why the ascending-run reader stops in front of it: the
+next two field ids carry TEXT rather than a u32.
+
+```
+[u32 21][u32 33][u16 nameLength][u16 descriptionLength][name][description]
+```
+
+LATIN1, unterminated, back to back. A zero description length is normal; a zero name length is not. 19,449 of
+the 21,502 records carry one, and `RdbSpellImporter.ReadStringBlock` reads it.
+
+⭐ It is the record's OWN text rather than the LDB's, which matters for the **1,594 spells LDB category 50210
+has no name for**: `Hellfire Stream` (8600) renders as *"spell 8600"* out of the LDB and the record says
+`Hellfire Stream`, with its full description. `--report spell-tooltip` falls back to it and marks the line
+`[from the record]`.
+
+⚠️ What is left after all four is a **60-byte fixed head** and a recurring **32-byte `[22][36][0x7E2]…` block**
+that also appears between element lists. On `Hellfire Stream` those two are the whole of the remaining 92 bytes.
+
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: **45 of the 111** already have a client name, most
 of them out of the `GameAction_*` / LDB-615 runs.

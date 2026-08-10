@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -1023,13 +1024,24 @@ namespace Faolan.Importer.Rdb
 
 		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
+			return ReadIncreasingFields(body, out _);
+		}
+
+		/// <summary>
+		///     The property run, plus the byte offset just PAST it - which is where the record's string block starts
+		///     (see <see cref="ReadStringBlock" />).
+		/// </summary>
+		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body, out int endOffset)
+		{
 			var words = body.Length / 4;
 			var best = new Dictionary<uint, uint>();
+			endOffset = 0;
 			for (var start = 0; start + 1 < words; start++)
 			{
 				uint last = 0;
 				var haveLast = false;
 				var cur = new Dictionary<uint, uint>();
+				var end = start * 4;
 				for (var j = start; j + 1 < words; j++)
 				{
 					var fid = body.ReadU32Le(j * 4);
@@ -1040,13 +1052,61 @@ namespace Faolan.Importer.Rdb
 					last = fid;
 					haveLast = true;
 					j++; // consumed the value word too
+					end = (j + 1) * 4;
 				}
 
 				if (cur.Count > best.Count)
+				{
 					best = cur;
+					endOffset = end;
+				}
 			}
 
 			return best;
 		}
+
+		/// <summary>
+		///     ⭐ The record's own NAME and DESCRIPTION, which sit immediately after the property run (#632).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The block is <c>[u32 21][u32 33][u16 nameLength][u16 descriptionLength][name][description]</c> —
+		///         two field ids, then two lengths, then the two payloads back to back, LATIN1 and unterminated. A
+		///         description of length 0 is normal; a name of length 0 is not.
+		///     </para>
+		///     <para>
+		///         It is a large slice of the region #632 measured as never looked at — 190 of `Hellfire Stream`'s
+		///         1,338 body bytes — and it is the record's own text rather than the LDB's, which matters for the
+		///         1,594 spells LDB category 50210 has no name for. `Hellfire Stream` (8600) is one of them: the LDB
+		///         renders it as "spell 8600" and the record says `Hellfire Stream`.
+		///     </para>
+		///     <para>
+		///         ⚠️ Returns <c>Bytes = 0</c> rather than guessing when the shape does not hold (33 of 400 sampled
+		///         records), which is a property-run detection that landed somewhere else, not a second grammar.
+		///     </para>
+		/// </remarks>
+		internal static (string Name, string Description, int Bytes) ReadStringBlock(ReadOnlySpan<byte> body, int afterRun)
+		{
+			if (afterRun <= 0 || afterRun + 12 > body.Length)
+				return ("", "", 0);
+
+			if (body.ReadU32Le(afterRun) != StringBlockNameField || body.ReadU32Le(afterRun + 4) != StringBlockDescriptionField)
+				return ("", "", 0);
+
+			int nameLength = body.ReadU16Le(afterRun + 8);
+			int descriptionLength = body.ReadU16Le(afterRun + 10);
+			if (nameLength == 0 || afterRun + 12 + nameLength + descriptionLength > body.Length)
+				return ("", "", 0);
+
+			var name = Encoding.Latin1.GetString(body.Slice(afterRun + 12, nameLength));
+			var description = Encoding.Latin1.GetString(body.Slice(afterRun + 12 + nameLength, descriptionLength));
+			return (name, description, 12 + nameLength + descriptionLength);
+		}
+
+		// The two field ids the string block opens with. 21 is the NAME slot and 33 the DESCRIPTION one, in the same
+		// id space as the property run - they are simply the fields whose values are text rather than a u32, which is
+		// why the ascending-run reader stops in front of them.
+		private const uint StringBlockNameField = 21;
+		private const uint StringBlockDescriptionField = 33;
 	}
 }
