@@ -244,6 +244,11 @@ the `Flags` bit census, and the wire's arrival `Flags` from the DUMPS against th
 [item-template-stats](../rdb/item-template-stats.md) binding section is measured with),
 `bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
 puts each in, with the direction ability resolved — #661) ·
+`ldb-search` (which LDB strings the client ships whose TEXT contains a substring, with the id that names them —
+`--report-arg [<category>:]<substring>`, e.g. `50200:Ironwood`. The direction every other LDB tool cannot go: when
+the question is *"does the client ship an item called Ironwood, and at what id"* the name is all there is to go on.
+⚠️ Not `rdb-search`, which despite the name only greps MESH manifest source paths. Hits are grouped by
+(category, id) with the distinct texts across pages, because a category ships once per LANGUAGE),
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),

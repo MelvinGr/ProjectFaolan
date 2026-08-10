@@ -85,6 +85,24 @@ namespace Faolan.Core.Progression
 		///     cannot pay out, because no matching item exists in <c>faolan.db</c> — listed rather than omitted, so the
 		///     gap is visible here instead of living in a test allowlist, and so the server can name the node correctly
 		///     when it refuses. Inventing an id would hand out the wrong resource.
+		///     <para>
+		///         ⚠️ Each null nevertheless names its item ID, and that is not a guess: the client's own item-name LDB
+		///         (category 50200, plaintext) puts the whole family in one contiguous block —
+		///         Slate 3927907, Marble 3927908, Greenstone 3927909, <b>Birch 3927910</b>, Elm 3927911,
+		///         Ironwood 3927912, <b>Lead 3927913</b>, Nickel 3927914, Chromium 3927915, <b>Pyrite 3927918</b>,
+		///         Mithrite 3927920, Bismuth 3927927. The three we already hold sit INSIDE that run, which is what
+		///         corroborates it. Reproduce with <c>--report ldb-search --report-arg 50200:Ironwood</c> (#746).
+		///     </para>
+		///     <para>
+		///         So the gap is NOT "the client does not ship them". Every one of the nine has an RDB item template at
+		///         its id (type 1000020, ~140 B, local) — it is <b>encrypted</b>, and the TEA key is the item's own
+		///         <c>ProtoDecryptionKey</c>, which only ever arrives on the WIRE. No capture holds these resources, so
+		///         there is no key and the template stays opaque (Gitea #203). What is missing from a row is exactly
+		///         what only the template states: <c>Level</c>, which is per-TIER and reaches the wire in the harvest's
+		///         loot-chat message (Copper 20, Iron 40, Gold 60), and the ACG <c>Hash</c>. Filling either from the
+		///         family's average would be the invention this list exists to avoid; wiring one is a one-line change
+		///         the moment a capture supplies its key.
+		///     </para>
 		/// </summary>
 		public static readonly ImmutableDictionary<uint, HarvestNode> Nodes = new HarvestNode[]
 		{
@@ -98,15 +116,15 @@ namespace Faolan.Core.Progression
 			// different capture. Included because it is structurally the same kind of row (Value 0, no description,
 			// hashed, name matches the node exactly), but it is the one entry whose id space does not corroborate it.
 			new(3935376, "Birch Tree", 3927910), // Birch
-			new(3935377, "Elm Tree", null), // no item named Elm ships
-			new(3935378, "Ironwood", null), // no item named Ironwood ships
+			new(3935377, "Elm Tree", null), // Elm is item 3927911 - no row, see the id block below
+			new(3935378, "Ironwood", null), // Ironwood is item 3927912
 			// --- Stone --------------------------------------------------------------------------------------------
 			new(3237641, "Sandstone", 161207), // Sandstone
 			new(3237642, "Granite Rock", 161206), // Granite   - measured
 			new(3237644, "Basalt Rock", 161205), // Basalt
-			new(3935379, "Greenstone Formation", null), // no item named Greenstone ships
-			new(3935380, "Marble", null), // no item named Marble ships
-			new(3935381, "Slate Rock", null), // no item named Slate ships
+			new(3935379, "Greenstone Formation", null), // Greenstone is item 3927909
+			new(3935380, "Marble", null), // Marble is item 3927908
+			new(3935381, "Slate Rock", null), // Slate is item 3927907
 			// --- Metal --------------------------------------------------------------------------------------------
 			new(3237648, "Copper Node", 161197), // Copper
 			new(3237652, "Iron Node", 161196), // Iron      - measured
@@ -115,14 +133,14 @@ namespace Faolan.Core.Progression
 			new(3237657, "Electrum Vein", 161201), // Electrum
 			new(3237659, "Gold Vein", 161200), // Gold
 			new(3935343, "Lead Deposit", 3927913), // Lead      - same off-band id space as Birch
-			new(3935344, "Nickel Deposit", null), // no item named Nickel ships
-			new(3935345, "Chromium Deposit", null), // no item named Chromium ships
+			new(3935344, "Nickel Deposit", null), // Nickel is item 3927914
+			new(3935345, "Chromium Deposit", null), // Chromium is item 3927915
 			// Pyrite was in the gap list until 2026-08-09: item 3927918 shipped all along but NAMELESS, so the gap
 			// check (which matches on the name) could not see it. `rdb-items` decrypting its template is what made it
 			// findable - the same off-band id space as Birch and Lead, one row further along.
 			new(3935373, "Pyrite Lode", 3927918), // Pyrite
-			new(3935374, "Bismuth Lode", null), // no item named Bismuth ships
-			new(3935375, "Mithrite Lode", null) // no item named Mithrite ships
+			new(3935374, "Bismuth Lode", null), // Bismuth is item 3927927
+			new(3935375, "Mithrite Lode", null) // Mithrite is item 3927920
 		}.ToImmutableDictionary(n => n.DisplayId);
 
 		/// <summary>

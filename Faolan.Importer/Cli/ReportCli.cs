@@ -77,6 +77,12 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			if (report == "ldb-search")
+			{
+				LdbSearch(RdbDir(), arg ?? "");
+				return 0;
+			}
+
 			// RDB + DB, no corpus: the ambient-bark catalog's readable set (#331).
 			if (report == "npc-chatter")
 			{

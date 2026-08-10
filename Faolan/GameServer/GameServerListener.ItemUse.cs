@@ -48,8 +48,19 @@ namespace Faolan.GameServer
 			// internal name retail itself gets wrong - the silver vein ships as "Martial Ring", a copper node as
 			// "Vitalic Bronze-studded Armbands" - so keying on it left those rows silently inert. `Name` here is the
 			// LDB name the player actually sees, which is also what the messages below should say.
-			if (HarvestCatalog.NodeFor(node.Row.DisplayCategory, node.Row.DisplayId) is not { ResourceItemId: { } resourceId } harvest)
+			if (HarvestCatalog.NodeFor(node.Row.DisplayCategory, node.Row.DisplayId) is not { } harvest)
+				return; // not a harvest node at all - some other destructible the player clicked
+
+			// #746: a node type whose resource has no item row. Nine of the 25 shipped types are in this state, and it
+			// is not something a player can be expected to infer from a click that does nothing - so say it, the same
+			// way the exhausted and bag-full refusals do. Never silent: the alternative reads as a broken node.
+			if (harvest.ResourceItemId is not { } resourceId)
+			{
+				Logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} has no resource item in the catalog, so {Player} was granted nothing (Gitea #746/#203).",
+					harvest.Name, node.Handle, character.Name);
+				await _agentServerDispatcher.CharacterSay(node.Handle, $"({harvest.Name}: not yet harvestable)", [character.Id]);
 				return;
+			}
 
 			var name = harvest.Name;
 

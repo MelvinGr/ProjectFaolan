@@ -180,11 +180,32 @@ Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandst
 - **The rare cross-drop.** A copper node paid out **tin** — a resource from a different node type — into its own
   resource slot at 18:39:57, beside the copper stack it was filling. So the yield is a roll against a table, not
   a fixed node→resource mapping, and `HarvestCatalog.Resources` models only the fixed part.
-- **Ten node types have no resource item in `faolan.db`** — `Elm Tree`, `Ironwood`, `Greenstone Formation`,
+- **Nine node types have no resource item in `faolan.db`** — `Elm Tree`, `Ironwood`, `Greenstone Formation`,
   `Marble`, `Slate Rock`, `Nickel Deposit`, `Chromium Deposit`, `Bismuth Lode`, `Mithrite Lode`.
   They are listed in `HarvestCatalog.Nodes` with a **null** resource rather than omitted, so they render, deplete
-  and name themselves correctly but pay out nothing; inventing an id would hand out the wrong resource.
-  `HarvestCatalogTests` fails if an import ever supplies one, so the gap cannot quietly become permanent.
+  and name themselves correctly but pay out nothing (and now SAY so, rather than doing nothing on a click);
+  inventing an id would hand out the wrong resource. `HarvestCatalogTests` fails if an import ever supplies one, so
+  the gap cannot quietly become permanent.
+
+  ⭐ **The gap is not "the client does not ship them", and each one's item ID is now pinned.** The client's own
+  item-name LDB (category 50200, plaintext) puts the whole family in one contiguous block, with the three we
+  already hold *inside* the run — which is what corroborates it:
+
+  | id | resource | | id | resource |
+  |---:|---|---|---:|---|
+  | 3927907 | Slate | | 3927913 | **Lead** ✓ |
+  | 3927908 | Marble | | 3927914 | Nickel |
+  | 3927909 | Greenstone | | 3927915 | Chromium |
+  | 3927910 | **Birch** ✓ | | 3927918 | **Pyrite** ✓ |
+  | 3927911 | Elm | | 3927920 | Mithrite |
+  | 3927912 | Ironwood | | 3927927 | Bismuth |
+
+  Reproduce with `--report ldb-search --report-arg 50200:Ironwood`. Every one of the nine also HAS an RDB item
+  template at its id (type 1000020, ~140 B, local) — it is **encrypted**, and the TEA key is the item's own
+  `ProtoDecryptionKey`, which only ever arrives on the wire. No capture holds these resources, so there is no key
+  (Gitea #203). What a row is missing is exactly what only the template states: `Level`, which is per-TIER and
+  reaches the wire in the loot-chat message (Copper 20, Iron 40, Gold 60), and the ACG `Hash`. Wiring one is a
+  one-line change the moment a capture supplies its key.
 - **`Sandstone`, `Lead Deposit` and `Pyrite Lode`** were in the same gap and are not any more. The first two have
   a shipped item (161207, 3927913) and were only missing because the name key never reached them. ⭐ `Pyrite`
   (3927918) is subtler: the item shipped all along but **NAMELESS**, so a gap check that matches on the NAME could

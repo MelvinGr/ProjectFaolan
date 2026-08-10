@@ -180,5 +180,43 @@ namespace Faolan.Tests
 			Assert.True(resolvable.Count == 0,
 				"These nodes now HAVE a grantable resource item - give them a ResourceItemId instead of null: " + string.Join(", ", resolvable));
 		}
+
+		// #746: and the same check by ID, which is the one that will actually fire. Each null now NAMES its item id off
+		// the client's plaintext item-name LDB (`--report ldb-search --report-arg 50200:Ironwood`), so what stands
+		// between the node and a payout is only the encrypted TEMPLATE - and a template becomes readable the moment a
+		// capture supplies the item's key (#203). At that point an `Items` row appears at the id and this fails, which
+		// is the cue to wire it.
+		//
+		// The name check above cannot see that: an imported row can arrive before `rdb-ldb-names` has given it a name,
+		// which is exactly how Pyrite sat unnoticed - item 3927918 shipped all along, nameless, so a name match found
+		// nothing while the payout was available the whole time.
+		[Fact]
+		public async Task TheKnownResourceIds_StillHaveNoItemRow()
+		{
+			// The contiguous LDB block, with the three we hold left out. Ordered by id so the run is visible.
+			var pinned = new (uint ItemId, string Resource)[]
+			{
+				(3927907, "Slate"), (3927908, "Marble"), (3927909, "Greenstone"), (3927911, "Elm"),
+				(3927912, "Ironwood"), (3927914, "Nickel"), (3927915, "Chromium"), (3927920, "Mithrite"),
+				(3927927, "Bismuth")
+			};
+
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var arrived = new List<string>();
+			foreach (var (itemId, resource) in pinned)
+			{
+				if (await db.Items.AnyAsync(i => i.Id == itemId, ct))
+					arrived.Add($"{resource} ({itemId})");
+			}
+
+			Assert.True(arrived.Count == 0,
+				"These resources now have an Items row - wire them into HarvestCatalog.Nodes instead of null: " + string.Join(", ", arrived));
+
+			// ...and the three that ARE wired must stay, so this pair of gates cannot both pass vacuously.
+			foreach (var itemId in new uint[] { 3927910, 3927913, 3927918 })
+				Assert.True(await db.Items.AnyAsync(i => i.Id == itemId, ct), $"resource item {itemId} (Birch / Lead / Pyrite) has gone from the DB");
+		}
 	}
 }
