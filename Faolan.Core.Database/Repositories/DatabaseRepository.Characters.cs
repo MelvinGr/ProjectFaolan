@@ -19,7 +19,6 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character[]> GetFriends(uint characterId);
 		Task<uint[]> GetFriendWatchers(uint characterId);
 		Task<bool> RemoveFriend(uint characterId, uint friendCharacterId);
-		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<int> ClearCharacterFeats(uint characterId);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
 		Task<bool> DeleteCharacter(uint characterId);
@@ -92,6 +91,15 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
+
+		// #748: grant a tag (an achievement, or an item-shop "bundle shown" flag - one id space). False = already held.
+		Task<bool> AddCharacterTag(uint characterId, uint tagId);
+
+		// The achievement a tag id names, or null for an id the client's catalog does not carry (LDB 55701).
+		Task<Achievement?> GetAchievement(uint tagId);
+
+		// Achievements whose NAME contains `nameSubstring`, capped at `limit` - a 4,095-entry catalog needs a lookup.
+		Task<Achievement[]> FindAchievements(string nameSubstring, int limit);
 		Task<Character[]> GetCharactersByAccount(uint id);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
@@ -337,11 +345,14 @@ namespace Faolan.Core.Database.Repositories
 			return true;
 		}
 
-		public async Task AddCharacterTag(uint characterId, uint tagId)
+		// #748: returns FALSE when the character already held the tag. It used to return nothing, which was fine while
+		// it had no callers at all - the tag subsystem's missing middle - and is not: `DispatchAddTag` is an AWARD, so
+		// re-awarding a held tag pops the client's banner again. The caller needs to know.
+		public async Task<bool> AddCharacterTag(uint characterId, uint tagId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			if (await ctx.CharacterTags.AnyAsync(t => t.CharacterId == characterId && t.TagId == tagId))
-				return;
+				return false;
 
 			ctx.CharacterTags.Add(new CharacterTag
 			{
@@ -349,6 +360,7 @@ namespace Faolan.Core.Database.Repositories
 				TagId = tagId
 			});
 			await ctx.SaveChangesAsync();
+			return true;
 		}
 
 		public async Task<int> ClearCharacterFeats(uint characterId)
@@ -751,6 +763,19 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
+		}
+
+		public async Task<Achievement?> GetAchievement(uint tagId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Achievements.FirstOrDefaultAsync(a => a.Id == tagId);
+		}
+
+		public async Task<Achievement[]> FindAchievements(string nameSubstring, int limit)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = (nameSubstring ?? "").ToLowerInvariant();
+			return await ctx.Achievements.Where(a => a.Name.ToLower().Contains(lowered)).OrderBy(a => a.Id).Take(limit).ToArrayAsync();
 		}
 
 		// The account's PLAYABLE characters - a nameless row is a create in progress, never something to list. That was

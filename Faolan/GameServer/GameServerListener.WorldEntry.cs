@@ -41,7 +41,15 @@ namespace Faolan.GameServer
 		// browser never opens. The gating tag ids were recovered from the RDB shop scripts (393/395/396/2239/2240/2287-
 		// 2298): 6617-6620 are the i<1 bundles, 7316 + 7416-7421 the i>0 bundles. Purely cosmetic "seen" flags - safe to
 		// force on a private server that has no Funcom store.
-		// TODO: Confirm
+		//
+		// ⚠️ Left EMPTY, and that is now a decision rather than an unconfirmed guess. The corpus CONFIRMS 6617 is a real
+		// tag of this family: retail awards it with `DispatchAddTag` in three captures (a guild-invite session, a
+		// group/trade session, a beach-to-Tortage run), and it is the one captured tag id of fourteen that resolves to
+		// NOTHING in the achievement catalog (LDB 55701) - see #748. So the id and its kind are settled.
+		//
+		// What is NOT retail is pre-seeding them at world entry. Retail awards the flag when the bundle has actually
+		// been shown; stamping it into every login snapshot is our own suppression, which is why it stays off until
+		// somebody decides the upsell is worth suppressing that way.
 		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)

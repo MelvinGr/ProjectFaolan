@@ -142,6 +142,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("AccountClaims");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Achievement", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Achievements");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.AppearanceChoice", b =>
                 {
                     b.Property<byte>("Race")

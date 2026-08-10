@@ -27,6 +27,7 @@ namespace Faolan.Core.Database
 		DbSet<FeatPrereq> FeatPrereqs { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
+		DbSet<Achievement> Achievements { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
 
 		DbSet<AppearanceSexOption> AppearanceSexOptions { get; }
@@ -135,6 +136,7 @@ namespace Faolan.Core.Database
 		public DbSet<FeatPrereq> FeatPrereqs { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
+		public DbSet<Achievement> Achievements { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
 
 		public DbSet<AppearanceSexOption> AppearanceSexOptions { get; set; }
@@ -294,6 +296,7 @@ namespace Faolan.Core.Database
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).
 			modelBuilder.Entity<Ability>().Property(a => a.Id).ValueGeneratedNever();
+			modelBuilder.Entity<Achievement>().Property(a => a.Id).ValueGeneratedNever(); // the client's TAG id (#748)
 			modelBuilder.Entity<Feat>().Property(f => f.Id).ValueGeneratedNever(); // the RDB template id, the same id space the wire uses
 			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter (#646)
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();

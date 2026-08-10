@@ -30,7 +30,7 @@ namespace Faolan.Importer.Cli
 			// and a combo's reuse time (the combo XML's own `cooldown`, RdbComboImporter). See Gitea #296.
 			new StarterSpellLevelsModule(), // capture-sourced, and the create kit is a LIST, not a level query
 			// --- rdb modules (opt-in, require --rdb) ---
-			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
+			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbAchievementsModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
 			new RdbMapsModule(), new RdbRespawnsModule(), new RdbQuestCatalogModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new RdbQuestTextModule(), new RdbDialogueTeleportsModule(), new RdbRegionsModule(), new ClassAttributeBaseModule(), new ClassComboScalingModule(),
 			// --- corrections that must outrank an rdb module ---
 			// LAST on purpose: rdb-spells writes Spells.DurationMs unconditionally, so a capture-sourced duration for

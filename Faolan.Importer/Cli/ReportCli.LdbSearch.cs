@@ -6,7 +6,9 @@ using System.Linq;
 namespace Faolan.Importer.Cli
 {
 	// `--report ldb-search --report-arg [<category>:]<substring>`: which LDB strings the client ships whose TEXT
-	// contains a substring, with the id that names them.
+	// contains a substring, with the id that names them. `--report-arg id:<n>` goes the other way and prints what
+	// EVERY category holds at one id, which is how an opaque wire id gets a name when its category is not known
+	// (a tag, a title, a nameplate label).
 	//
 	// The lookup that was missing. Every other LDB tool answers "what is the string at this id" - which is the
 	// direction the runtime needs, and the wrong one for a content gap: when the question is *"does the client ship an
@@ -21,10 +23,17 @@ namespace Faolan.Importer.Cli
 	{
 		private static void LdbSearch(string rdbDir, string arg)
 		{
+			if ((arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase)
+			    && uint.TryParse(arg![3..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var wantedId))
+			{
+				LdbById(rdbDir, wantedId);
+				return;
+			}
+
 			var (category, needle) = Split(arg);
 			if (string.IsNullOrWhiteSpace(needle))
 			{
-				Console.WriteLine("ldb-search: --report-arg is [<category>:]<substring>, e.g. \"50200:Ironwood\" or just \"Ironwood\".");
+				Console.WriteLine("ldb-search: --report-arg is [<category>:]<substring> (e.g. \"50200:Ironwood\") or id:<n>.");
 				return;
 			}
 
@@ -64,6 +73,40 @@ namespace Faolan.Importer.Cli
 				// The other languages, when they differ - one line each, so a hit in the wrong language is obvious.
 				foreach (var (text, count) in ordered.Skip(1))
 					Console.WriteLine($"  {"",8}  {"",9}  {count,5}    (also) {text}");
+			}
+		}
+
+		// What every category holds at ONE id - the reverse lookup. An id alone does not say which category it belongs
+		// to, so this prints all of them and lets the reader judge: a tag id landing in a category of achievement names
+		// and nowhere else is the answer, and one landing in six unrelated categories is a collision.
+		private static void LdbById(string rdbDir, uint id)
+		{
+			using var rdb = OpenRdb(rdbDir);
+
+			// category -> the distinct texts at this id, with how many pages (i.e. languages) carried each.
+			var hits = new Dictionary<uint, Dictionary<string, int>>();
+			var pages = 0;
+			foreach (var (_, category, strings) in LdbPagesOf(rdb))
+			{
+				pages++;
+				if (!strings.TryGetValue(id, out var value) || value == null)
+					continue;
+
+				if (!hits.TryGetValue(category, out var texts))
+					hits[category] = texts = [];
+
+				texts[value] = texts.GetValueOrDefault(value) + 1;
+			}
+
+			Console.WriteLine($"ldb id {id} (0x{id:X}): present in {hits.Count} categor(ies) over {pages} TDC2 page(s)");
+			Console.WriteLine();
+			Console.WriteLine("  category  pages  text");
+			foreach (var (category, texts) in hits.OrderBy(h => h.Key))
+			{
+				var ordered = texts.OrderByDescending(t => t.Value).ToList();
+				Console.WriteLine($"  {category,8}  {ordered.Sum(t => t.Value),5}  {ordered[0].Key}");
+				foreach (var (text, count) in ordered.Skip(1))
+					Console.WriteLine($"  {"",8}  {count,5}    (also) {text}");
 			}
 		}
 

@@ -379,6 +379,7 @@ namespace Faolan.GameServer
 				["hurt"] = HurtCommand,
 				["additem"] = AddItemCommand,
 				["removeitem"] = RemoveItemCommand,
+				["tag"] = TagCommand,
 				["claim"] = _claims.ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
@@ -687,6 +688,64 @@ namespace Faolan.GameServer
 
 		// .removeitem <slot>  - the inverse of .additem: clear the calling character's bag cell `slot` (persisted
 		// CharacterInventory row) and push the live DispatchRemoveItem (0x201F) so it disappears without a relog.
+		// `.tag <id>` / `.tag <name substring>` - award an achievement (#748). The retail TRIGGERS are per-achievement
+		// content nobody has mapped yet (a vista, a kill streak, a first pet), so this is the standard GM bootstrap for
+		// a feature whose real trigger is not wired: it exercises the whole path - persist, award, and the client's own
+		// banner - against a catalog entry rather than a made-up id.
+		//
+		// No argument lists what the character already holds, which is the other half of checking this works: the award
+		// is a one-shot event and the SNAPSHOT is what carries the set on a relog.
+		private async Task TagCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var argument = (arguments ?? "").Trim();
+			if (argument.Length == 0)
+			{
+				var held = await Database.GetCharacterTags(characterId);
+				if (held.Length == 0)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "No tags. Usage: .tag <id> | .tag <name substring>");
+					return;
+				}
+
+				var named = new List<string>();
+				foreach (var tag in held.OrderBy(t => t))
+					named.Add($"{tag} ({(await Database.GetAchievement(tag))?.Name ?? "unnamed"})");
+
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"{held.Length} tag(s): {string.Join(", ", named)}");
+				return;
+			}
+
+			// An id, or a name to look up - a 4,095-entry catalog is not something to search by hand.
+			if (!uint.TryParse(argument, out var tagId))
+			{
+				var matches = await Database.FindAchievements(argument, 6);
+				if (matches.Length == 0)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"No achievement matches '{argument}'.");
+					return;
+				}
+
+				if (matches.Length > 1)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"{matches.Length} matches: {string.Join(", ", matches.Select(a => $"{a.Id} {a.Name}"))}");
+					return;
+				}
+
+				tagId = matches[0].Id;
+			}
+
+			var (granted, achievement) = await GrantTag(client, tagId);
+			var name = achievement is null
+				? "not in the achievement catalog - an item-shop flag, or an id the catalog is short of"
+				: $"'{achievement.Name}'{(achievement.Description is { } d ? $" - {d}" : "")}";
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, granted
+				? $"Awarded tag {tagId}: {name}"
+				: $"Already held tag {tagId}: {name}");
+		}
+
 		private async Task RemoveItemCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;

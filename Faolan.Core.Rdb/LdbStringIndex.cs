@@ -30,6 +30,13 @@ namespace Faolan.Core.Rdb
 	{
 		public const uint ItemDescriptionCategory = 50201; // tooltip descriptions, keyed by item template id
 		public const uint ItemNameCategory = 50200;
+
+		// The ACHIEVEMENT catalog (#748), keyed by the id the wire calls a TAG (`DispatchAddTag`): 55701 the title,
+		// 55700 what earns it. Verified against every tag the corpus awards - 7917 is "Seeing Red" / "Achieve a kill
+		// streak.", 716 "Old Tarantia Docks" (a vista). A third category, 55702, exists and is sparse (716 has "???");
+		// nothing reads it yet.
+		public const uint AchievementDescriptionCategory = 55700;
+		public const uint AchievementNameCategory = 55701;
 		public const uint Magic = 0x32434454; // "TDC2" little-endian
 		public const uint SpellDescriptionCategory = 50211; // spell tooltip descriptions, keyed by SPELL id
 		public const uint SpellNameCategory = 50210;

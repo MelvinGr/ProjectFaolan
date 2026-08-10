@@ -99,6 +99,8 @@ names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`,
 `rdb-spells` (the spell catalog + the 155-row mount catalog, [mounts.md](../subsystems/mounts.md)),
 `rdb-abilities`,
+`rdb-achievements` (the achievement catalog behind `DispatchAddTag` — LDB 55701 titles + 55700 descriptions,
+keyed by TAG id; see [achievements.md](../subsystems/achievements.md)),
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
 `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — discovery pads, quest goal regions, area
 banners and the lava hazards; depends on `rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
@@ -252,7 +254,9 @@ on. ⚠️ The test is a HANDLE sighted at two of the cluster's positions, NOT a
 both": a creature that moves is re-streamed within one session, so reading it per-capture inverts the answer.
 `--report-arg <name substring>` narrows to one creature),
 `ldb-search` (which LDB strings the client ships whose TEXT contains a substring, with the id that names them —
-`--report-arg [<category>:]<substring>`, e.g. `50200:Ironwood`. The direction every other LDB tool cannot go: when
+`--report-arg [<category>:]<substring>`, e.g. `50200:Ironwood`; `--report-arg id:<n>` goes the other way and prints
+what EVERY category holds at one id, which is how an opaque wire id gets a name when its category is unknown — it is
+what identified LDB 55701/55700 as the achievement catalog behind `DispatchAddTag`, #748. The direction every other LDB tool cannot go: when
 the question is *"does the client ship an item called Ironwood, and at what id"* the name is all there is to go on.
 ⚠️ Not `rdb-search`, which despite the name only greps MESH manifest source paths. Hits are grouped by
 (category, id) with the distinct texts across pages, because a category ships once per LANGUAGE),
