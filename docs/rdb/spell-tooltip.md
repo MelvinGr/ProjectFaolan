@@ -224,12 +224,30 @@ resolve there as plain label NOUNS rather than sentences:
 name, so there is no category-170 sentence to find. Absent by construction, like the 206 kinds that reach the
 switch's default.
 
-### `ConeFormula` (53259): the slot order
+### The SLOT ORDER is the branch's key-read order (#782)
+
+A sentence's argument order is the order its branch reads the record's keys — `MOV ECX,<statKey>;
+CALL 0x0077a510`, in address order. All sixteen branches that still had an unfilled sentence are read out into
+`docs/re/gameaction-tooltip-slots.tsv`, beside the record's own declared key list so the two can be compared.
+
+⭐ **On 14 of the 16 the branch takes a SUBSET of the declared list, IN LIST ORDER** — so for those the key list
+is a safe stand-in and no per-branch read is needed. Two independent controls say the extraction is right: `53002`
+and `53250` reproduce their `statKeys` column exactly, and `53046` comes out as `[722, 793, 755, 756, 1123]`,
+character-for-character the key list #711 documents from the other direction.
+
+⚠️ **`53259` `ConeFormula` is the measured counterexample, and it is the one the ticket nominated as the obvious
+easy first.** Its branch reads `733` **before** `1245`, where the record declares `1245` first. Both slots are
+`%.2f`, so binding by the key list would swap the arc angle and the radius **silently** — a cone rendered as
+*"5.00 degree arc, 60.00m radius"* instead of *"60.00 degree arc, 5.00m radius"*. **So the key list is not a safe
+substitute for reading the branch**, and the 14 above are a measured majority rather than a rule.
 
 Its branch is `0x014a2316`, reached by a `JZ` off `CMP EAX,0xd00b` rather than through the jump table (which is
-why it is not in the composed switch dump). Read in order, it takes three GameAction keys —
-**`0x463` (1123), `0x2dd` (733), `0x4dd` (1245)** — and fills the sentence's two `%s` unit slots with an **empty
-string** and the **`ValueModUnitMeters`** token.
+why it is not in the composed switch dump). It fills the sentence's two `%s` unit slots with an **empty string**
+and the **`ValueModUnitMeters`** token.
+
+Two more exceptions worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
+corroborating the existing note that this branch *"reads all four slots plus key 32"* — and **`53249`** reads
+**no keys**, so its two magnitudes come from somewhere other than a `GetIntStat` and remain open.
 
 ⚠️ The `FLD float ptr [0x02d25e34]` / `[0x02d25e54]` pair that sits between those reads is **not** a scale
 constant: both globals are `0.0` in the image, i.e. runtime-initialised defaults being pushed as arguments. The

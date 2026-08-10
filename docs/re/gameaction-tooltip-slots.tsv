@@ -1,0 +1,34 @@
+# GameAction kind -> the ORDER its branch of FUN_0149e450 reads the record's keys in, which IS the order the
+# localised sentence's slots bind (#782). Recovered by disassembling each branch and taking its
+# `MOV ECX,<statKey>; CALL 0x0077a510` sequence in address order.
+#
+# `statKeys` is the record's own declared key list (docs/re/gameaction-keylists.tsv) - carried here so the two can
+# be compared, which is the whole point:
+#
+# ⭐ On 14 of the 16 branches read, the branch takes a SUBSET of the declared list IN LIST ORDER, so for those the
+#    key list is a safe stand-in for the slot order.
+# ⚠️ 53259 `ConeFormula` is the measured COUNTEREXAMPLE: it reads 733 BEFORE 1245 where the record declares 1245
+#    first. Both slots are `%.2f`, so binding by the key list would swap the arc angle and the radius SILENTLY -
+#    a cone rendered as '5.00 degree arc, 60.00m radius' instead of '60.00 degree arc, 5.00m radius'. The key list
+#    is therefore NOT a safe substitute for reading the branch, and this is the one kind the ticket nominated as
+#    the obvious easy first.
+# ⚠️ 53007 reads key 754, which its record does not declare at all - corroborating the existing note that this
+#    branch 'reads all four slots plus key 32'.
+# ⚠️ 53249 reads NO keys: its magnitudes come from somewhere other than a GetIntStat, so its two slots are still open.
+kind	branch	readOrder	statKeys	tokens
+53002	014a0ae6	722,724,759,794	722,724,759,794	
+53007	014a0b99	722,761,723,794,754	722,761,723,794	HitPercentHeal,HitPercentDamage,OnTarget,HitPercentHealStatByOtherStat,HitPercentDamageStatByOtherStat
+53031	014a02b4	761	1219,761	
+53045	0149e4c0	722,761	722,761	GameActionGroup_Skills
+53046	0149eaed	722,793,755,756,1123	722,793,755,756,1123	AddAbsorbEndSpell
+53069	014a02b4	761	723,761	
+53070	0149f69e	1123,1268,1269	1123,1268,723,1151,1269,796	OnSelf,OnTarget,TimesPerMinute
+53170	014a103e	1256,794	1256,1254,1258,794,1253	PerSecond
+53189	014a1b52	789,790,761	789,746,790,761	AddPercentSkillModifierSameStat,AddPercentSkillModifierDifferentStat
+53209	014a1817	789,790	1219,789,790	UpgradeCombo_DecreaseDamage,UpgradeCombo_DecreaseCooldown
+53211	0149f3f7	1123,1268	1123,1268,1219,1151,1269,796	ChanceOf,OnSelf,OnTarget
+53212	0149ec8e	1123,1268,1269	1123,1268,1219,1151,1269	AddComboProcBoth,AddComboProcSelf,AddComboProcOther
+53223	0149fdda	722,761	722,761	
+53249	014a08f0		733,1270	ValueModUnitMeters,ColumnAddTargetsWithDistance
+53250	014a1da2	1219,1119,789,790,791,792	1219,1119,789,790,791,792	OpeningComboAttack,DecreaseComboDPS,DecreaseComboCriticalChance,DecreaseComboHateAdjustment,ChangeComboDamageType
+53259	014a2316	1123,733,1245	1123,1244,1245,733	ValueModUnitMeters
