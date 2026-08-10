@@ -62,7 +62,9 @@ c2s 0x2091 RequestTeamInvite            [member][u16 0]
 c2s 0x2003 TeamInvite                   [ProtoID32 target][0][0][1]
 s2c 0x2001 DispatchTeamInvite           [member][u16 0]
 s2c 0x200A DispatchYouInvitedToTeam     [member]
+s2c 0x200B DispatchInviteWithInviterFactionPoints  [member inviter][str message][FactionsList]   <- see below
 s2c 0x209F DispatchReplyTeamInvite      [member][u16 0][u8 0]
+c2s 0x2093 RequestTeamInviteWithInviterFactionPoints [inviter][str message][FactionsList]
 c2s 0x2008 AcceptTeamInvite             [ProtoID32 inviter]        (CS tier)
 s2c 0x200E DispatchYouJoinedTeam        [ProtoID32 team][ProtoID32 leader][ListFrame(n)][member × n][loot 18 B]
 s2c 0x2013 DispatchTeamJoin             [ProtoID32 team][member]
@@ -121,6 +123,27 @@ One record per member — the joiner *and* the members already in the team — t
 
 The chat server independently gains a `~Team` channel on both clients the moment the group forms, and drops it on
 leave, which makes a cheap end-to-end check.
+
+### ⭐ `FactionsList` — the invite that carries the inviter's STANDING (#310)
+
+The faction variant of the invite pair exists in this build and carries a whole standing set. Its reader
+(`FUN_0133d5b0`) names its three fields in its own bail-out strings — *"stream bad after `'inviter'`"*, then
+`'message'`, then `'factionPoints'` — so the read order is fixed, and the third field's reader
+(`FUN_004d59a0`) gives the container:
+
+```
+FactionsList = [u32 (count + 1) * 0x3F1]  then count × { [u32 factionId][u32 points] }
+```
+
+⭐ It is an ordinary **`ListFrame`** — the reader divides by `0x3F1` and rejects a remainder — over `[key][value]`
+pairs, and the caller builds a 0x18-byte red-black-tree sentinel, so it is a **`std::map<u32,u32>`** the same way
+the Massive-PvP board is (a u32 key before each element). Nothing new to model: `ListFrame` plus a pair.
+
+That was the last unrecovered wire shape in #310; the two standing pushes (`DispatchApplyFactionRank` 0x4F,
+`DispatchApplyFactionPoints` 0x50) are plain two-scalar bodies.
+
+⚠️ **Zero occurrences in the corpus**, and this client ships none of the twelve Khitai faction identities, so
+there is nothing to fill a `FactionsList` with. The shape is recovered; the content is not in this build.
 
 ## Player trade
 
