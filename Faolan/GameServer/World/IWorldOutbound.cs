@@ -192,5 +192,10 @@ namespace Faolan.GameServer.World
 		// The AURA definitions for a spell, if any - `SpellAreaEffect` rows with a non-zero period. Reached through
 		// the port rather than giving the simulation its own database handle, same as every other lookup it needs.
 		Task<IReadOnlyList<SpellAreaEffect>> AuraAreasFor(uint spellId);
+
+		// #784: the CHAIN edges of a spell - its `CastNano` rows, "when this lands, also run X" on the SAME subject.
+		// The twin of `AuraAreasFor` off the same table, split by the row's kind rather than by its period, because a
+		// chain edge is not an area at all (`SpellAreaCatalog`).
+		Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId);
 	}
 }

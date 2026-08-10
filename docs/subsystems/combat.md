@@ -1719,3 +1719,40 @@ spread at one victim however many it had reached.
 the emitter is an infected mob: a bleed that lands the killing blow has to name a killer the XP/loot lifecycle
 can pay. If that player has gone, the buff is dropped rather than left ticking for nobody.
 [V3: NpcBuffTickTests.AnInfectedMob_EmitsTheEffectsOwnArea_CentredOnItself]
+
+### Walking the chain (#784)
+
+#783 imported the `CastNano` edge and stopped there, so `3963058` was reachable in the database and nowhere
+else. Both places a spell LANDS now walk it, on the **same subject** the carrier landed on:
+
+| landing | walker |
+| --- | --- |
+| a cast, a self-buff, a spell effect on the player | `GameServerListener.ApplyChainedSpells` (off `ApplySpell`) |
+| an area's effect landing on a mob | `WorldSimulation.ApplyEffectToEntity` |
+
+⚠️ **The walk needs a termination guard, and not defensively — the shipped catalog does not terminate
+without one.** Over the 10,676 chain rows the graph contains **56 cycles**
+(`145503 → 4940266 → 4220203 → 117806 → 145503` is one) and reaches a depth of **12**. `SpellChainWalk` is the
+guard, and its two bounds answer different questions:
+
+- the **visited set** terminates the walk, and is also the right semantics — the same buff landing twice on one
+  subject is a re-apply, which `SendMagicBuffIir` already treats as a replace rather than a stack (#274);
+- **`MaxApplications`** (32) bounds the fan-out. Closure sizes are a median of 2 and a p90 of 10, but the
+  largest is 78 (spell `3475257`), and one landing does not get to emit 78 `ApplySpell` carriers. Truncation is
+  logged naming the carrier rather than silently accepted.
+
+Three things the walk deliberately does:
+
+- **a zero-duration carrier still chains.** "No `ApplySpell`" is a statement about the CARRIER's icon (#767),
+  not about whether it landed — an instant nuke chaining a 30 s debuff is the ordinary shape.
+- **a victim already carrying the effect does not re-run it.** An aura re-emits its area every period; nothing
+  new landed there, so re-walking would re-assert the chained debuff every tick.
+- **a carrier with a separate `EffectSpell` walks BOTH records' edges.** They are two records with two element
+  lists, and 232 carriers of that shape state edges of their own; the visited set collapses the 22 that chain
+  straight to their own effect spell.
+
+⚠️ **A chain edge's PERIOD is not honoured.** 486 rows carry a non-zero `0x2d6`, which on an area element is
+the aura cadence — but on a chain edge it fits "re-run every N" and "run once after N" equally well, and
+nothing has been read that decides. The edge runs ONCE when the carrier lands, which is the reading that cannot
+over-apply; open in **#786**.
+[V3: SpellChainWalkTests.AnEffectLandingOnAMob_AlsoLandsTheSpellItsChainEdgeNames]

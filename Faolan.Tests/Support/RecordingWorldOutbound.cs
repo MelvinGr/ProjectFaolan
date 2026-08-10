@@ -20,9 +20,11 @@ namespace Faolan.Tests.Support
 		public List<(uint SourceHandle, uint EffectSpellId, float Radius, uint MaxTargets)> Areas { get; } = [];
 		public List<uint> InterestResolves { get; } = [];
 
-		// What ApplySpellArea answers with, and what a spell's aura areas are - set by the test that needs them.
+		// What ApplySpellArea answers with, and what a spell's aura areas / #784 chain edges are - set by the test that
+		// needs them.
 		public IReadOnlyList<uint> AreaVictims { get; set; } = [];
 		public Dictionary<uint, IReadOnlyList<SpellAreaEffect>> Auras { get; } = [];
+		public Dictionary<uint, IReadOnlyList<SpellAreaEffect>> Chains { get; } = [];
 
 		public Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
@@ -52,6 +54,13 @@ namespace Faolan.Tests.Support
 		{
 			return Task.FromResult(Auras.TryGetValue(spellId, out var areas)
 				? areas
+				: []);
+		}
+
+		public Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId)
+		{
+			return Task.FromResult(Chains.TryGetValue(spellId, out var links)
+				? links
 				: []);
 		}
 

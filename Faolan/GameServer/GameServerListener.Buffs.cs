@@ -155,9 +155,17 @@ namespace Faolan.GameServer
 		// s2c MagicBuffIIR tails are 54 bytes (x1938) and 0 (x982, the END twin) - a 50-byte tail NEVER occurs.
 		// The old 50-byte "short form" was our own invention; the client's MagicBuffIIR_c::ReadSubClass runs 4 bytes off
 		// the end of it and rejects the record ("datasize left in stream=4, raw=76"), so nothing rendered (#274).
-		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
+		//
+		// `chain` is the #784 `CastNano` walk in progress, and is null at every ORIGINAL landing - a cast, a self-buff,
+		// a spell effect. It is non-null only when this call IS a chain edge, which is what stops the walk from
+		// re-entering a spell it has already applied to this subject.
+		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, SpellChainWalk? chain = null)
 		{
 			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
+
+			// Seed the walk with the record that is landing here, so an edge pointing back at it terminates.
+			chain ??= new SpellChainWalk();
+			chain.TryEnter(spell?.Id ?? spellId >> 8);
 
 			// A cast spell can carry no effect of its own and name a SEPARATE record that is the actual buff - the
 			// castable is the trigger, the EffectSpell is what lands. Frozen Hatred is the proven case (#434): the
@@ -171,6 +179,15 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
 				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.ApplyNow(effect.Id, effect.DurationMs / 10, CasterLevel(client)));
 				await ApplyPoolEffects(client, applyTo, effect.Id);
+
+				// BOTH records' chain edges (#784). The carrier is what was cast and the effect is what landed, they are
+				// two records with two element lists, and 232 carriers of this shape state edges of their own. The
+				// visited set collapses the 22 that chain straight to their own effect spell, so the union costs
+				// nothing where the two overlap.
+				await ApplyChainedSpells(client, applyTo, applyFrom, spell.Id, chain);
+				if (chain.TryEnter(effect.Id))
+					await ApplyChainedSpells(client, applyTo, applyFrom, effect.Id, chain);
+
 				return;
 			}
 
@@ -202,11 +219,45 @@ namespace Faolan.GameServer
 			{
 				Logger.LogDebug("Cast {Spell} has no duration and no effect spell - no ApplySpell sent (retail sends none; a zero-duration one aborts the client's ActivateBuff and eats the spell's recast).", spellId >> 8);
 				await ApplyPoolEffects(client, applyTo, spellId >> 8); // an INSTANT pool move still lands (#702)
+
+				// ⚠️ The chain still runs. "No ApplySpell" is a statement about the CARRIER's icon, not about whether it
+				// landed - an instant nuke that chains a 30 s debuff is the ordinary shape, and returning here would
+				// drop exactly the edge #784 is about.
+				await ApplyChainedSpells(client, applyTo, applyFrom, spellId >> 8, chain);
 				return;
 			}
 
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client)));
 			await ApplyPoolEffects(client, applyTo, spellId >> 8);
+			await ApplyChainedSpells(client, applyTo, applyFrom, spellId >> 8, chain);
+		}
+
+		// #784: the `CastNano` (53051) chain - "when this spell lands, ALSO run X", on the SAME subject. Distinct from
+		// the AREA elements beside it in the same table, which pick their own targets by radius; a chain edge states no
+		// radius at all, which is why reading one as an area swept a 0 m circle and reached nobody.
+		//
+		// This is the mechanic `Gangrenous Stench` was missing its headline half of: 221069 lands on a victim and its
+		// chain edge runs 3963058 `Physical Wrack` at the same victim - the -10% Slashing/Piercing/Crushing/Poison the
+		// in-client tooltip shows. #783 imported the edge and stopped there; nothing walked it.
+		//
+		// ⚠️ A chain edge's PERIOD is deliberately NOT honoured. 486 of the rows carry a non-zero 0x2d6, which on an
+		// AREA element is the aura cadence, but nothing has been read that says a chain edge means "re-run every N" -
+		// and the alternative reading (a delay before the single run) fits the word equally well. The column is carried
+		// faithfully by the importer precisely so the question stays askable; until something answers it, the edge runs
+		// ONCE when the carrier lands, which is the reading that cannot over-apply. See #786.
+		private async Task ApplyChainedSpells(INetworkClient client, uint applyTo, uint applyFrom, uint carrierBase, SpellChainWalk chain)
+		{
+			foreach (var link in await _spellAreas.ChainedSpells(carrierBase))
+			{
+				if (!chain.TryEnter(link.EffectSpellId))
+					continue;
+
+				Logger.LogDebug("Spell {Carrier} chains {Chained} onto 0x{Target:X8}.", carrierBase, link.EffectSpellId, applyTo);
+				await ApplySpell(client, applyTo, applyFrom, link.EffectSpellId << 8, chain);
+			}
+
+			if (chain.Truncated)
+				Logger.LogWarning("Spell {Carrier}'s chain hit the {Cap}-application cap and was truncated.", carrierBase, SpellChainWalk.MaxApplications);
 		}
 
 		// The INSTANT pool move a landing spell carries (#702) - a heal, a mana restore, a stamina refill. Applied

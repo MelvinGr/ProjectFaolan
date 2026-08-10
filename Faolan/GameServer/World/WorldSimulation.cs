@@ -1375,37 +1375,64 @@ namespace Faolan.GameServer.World
 		// Land an effect spell on ONE non-player victim: the ApplySpell carrier so the client draws the icon on it,
 		// and a tracked `ActiveBuff` so the tick can count it down, bleed its DoT and emit its own areas. The mirror
 		// of what `ApplyNpcCast` does for a debuff an NPC puts on a player.
-		private async Task ApplyEffectToEntity(INetworkClient client, uint victimHandle, uint casterHandle, uint effectSpellId)
+		private async Task ApplyEffectToEntity(INetworkClient client, uint victimHandle, uint casterHandle, uint effectSpellId, SpellChainWalk? chain = null)
 		{
 			if (PlayerWorldEntity(client) is not { } player || !World.ZoneForEntity(player).TryGet(victimHandle, out var victim) || victim.IsPlayer || victim.IsDead)
 				return;
 
+			// Seed the #784 chain walk with the record landing here, so an edge pointing back at it terminates. Null at
+			// an original landing (an area applying its effect); non-null only when this call IS a chain edge.
+			chain ??= new SpellChainWalk();
+			chain.TryEnter(effectSpellId);
+
 			var spell = await _database.GetSpell(effectSpellId);
 			var durationMs = spell?.DurationMs ?? 0;
-			if (durationMs == 0)
-				return; // an INSTANT: retail sends no ApplySpell for a zero-duration spell, and one aborts the client's ActivateBuff (#767)
-
 			var wireId = effectSpellId << 8;
 
-			// Already carrying it: leave the live one counting down rather than re-sending the apply. Re-applying on
-			// every period is what STACKS icons on the client (#274) - retail re-applies an effect only after the
-			// previous one has ended - and the area's damage lands either way.
-			if (victim.ActiveBuffs.ContainsKey(wireId))
-				return;
-
-			var (dotDelta, dotType, dotIntervalMs) = await DotEffect(effectSpellId);
-			var now = DateTimeOffset.UtcNow;
-			victim.ActiveBuffs[wireId] = new ActiveBuff(wireId, casterHandle, now, durationMs / 1000f)
+			// A zero duration is an INSTANT: retail sends no ApplySpell for one, and one aborts the client's
+			// ActivateBuff (#767). It still LANDED, so its chain runs below - the icon is what is skipped, not the
+			// effect.
+			if (durationMs > 0)
 			{
-				DotDelta = dotDelta,
-				DotType = dotType,
-				DotIntervalMs = dotIntervalMs,
-				LastDotTick = now
-			};
+				// Already carrying it: leave the live one counting down rather than re-sending the apply. Re-applying on
+				// every period is what STACKS icons on the client (#274) - retail re-applies an effect only after the
+				// previous one has ended - and the area's damage lands either way.
+				//
+				// ⚠️ The chain is skipped with it, deliberately: nothing NEW landed on this victim, so re-running the
+				// edge would re-assert the chained debuff on every aura period.
+				if (victim.ActiveBuffs.ContainsKey(wireId))
+					return;
 
-			TrackBuffedEntity(victim);
-			await _output.SendSpellApplication(client, victim.Handle, casterHandle, wireId, durationMs / 10);
-			_logger.LogDebug("Effect {Effect} applied to {Npc} (0x{Handle:X8}) for {Duration}ms by 0x{Caster:X8}.", effectSpellId, victim.Name, victim.Handle, durationMs, casterHandle);
+				var (dotDelta, dotType, dotIntervalMs) = await DotEffect(effectSpellId);
+				var now = DateTimeOffset.UtcNow;
+				victim.ActiveBuffs[wireId] = new ActiveBuff(wireId, casterHandle, now, durationMs / 1000f)
+				{
+					DotDelta = dotDelta,
+					DotType = dotType,
+					DotIntervalMs = dotIntervalMs,
+					LastDotTick = now
+				};
+
+				TrackBuffedEntity(victim);
+				await _output.SendSpellApplication(client, victim.Handle, casterHandle, wireId, durationMs / 10);
+				_logger.LogDebug("Effect {Effect} applied to {Npc} (0x{Handle:X8}) for {Duration}ms by 0x{Caster:X8}.", effectSpellId, victim.Name, victim.Handle, durationMs, casterHandle);
+			}
+
+			// #784: the `CastNano` chain - "this landed, so also run X" on the SAME victim, with no radius of its own.
+			// `Gangrenous Stench`'s 221069 reaching `Physical Wrack` 3963058 is the headline case, and the reason the
+			// spell's tooltip effect did nothing until now. The period on a chain edge is not honoured - see
+			// GameServerListener.ApplyChainedSpells for why, and #786.
+			foreach (var link in await _output.ChainedSpellsFor(effectSpellId))
+			{
+				if (!chain.TryEnter(link.EffectSpellId))
+					continue;
+
+				_logger.LogDebug("Effect {Effect} chains {Chained} onto {Npc} (0x{Handle:X8}).", effectSpellId, link.EffectSpellId, victim.Name, victim.Handle);
+				await ApplyEffectToEntity(client, victim.Handle, casterHandle, link.EffectSpellId, chain);
+			}
+
+			if (chain.Truncated)
+				_logger.LogWarning("Effect {Effect}'s chain hit the {Cap}-application cap on {Npc} and was truncated.", effectSpellId, SpellChainWalk.MaxApplications, victim.Name);
 		}
 
 		// #776: the world tick for buffs on NON-PLAYER entities. `TickBuffExpiry`, `TickDots` and `TickAuras` all walk
