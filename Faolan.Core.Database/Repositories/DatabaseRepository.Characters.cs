@@ -42,6 +42,13 @@ namespace Faolan.Core.Database.Repositories
 
 		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
+
+		// The whole feat graph's single-prerequisite edges - what the tradeskill ladders are walked out of (#735).
+		Task<Dictionary<uint, uint>> GetSingleFeatPrereqs();
+
+		// Every wire id a character's spawn scaffold carries in `CharacterSkills`. The TRADESKILL professions ride
+		// this list (#735), which is why it is read as ids rather than through the slot it sits in.
+		Task<uint[]> GetCharacterSkillIds(uint characterId);
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 
 		/// <summary>
@@ -541,6 +548,12 @@ namespace Faolan.Core.Database.Repositories
 				.ToDictionary(i => (CharacterEquipmentSlot)i.Slot);
 		}
 
+		public async Task<uint[]> GetCharacterSkillIds(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterSkills.AsNoTracking().Where(s => s.CharacterId == characterId).Select(s => s.SkillId).ToArrayAsync();
+		}
+
 		public async Task<uint[]> GetCharacterFeats(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -697,6 +710,20 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var rows = await ctx.FeatPrereqs.Where(p => wanted.Contains(p.WireFeatId)).OrderBy(p => p.Sequence).ToArrayAsync();
 			return rows.GroupBy(p => p.WireFeatId).ToDictionary(g => g.Key, g => g.Select(p => p.RequiresWireFeatId).ToArray());
+		}
+
+		// The SINGLE-prerequisite edges of the whole feat graph, as feat -> the one feat it requires (#735). The
+		// tradeskill ladders are recovered by walking these, and a walk cannot ask for the ids it has not reached yet -
+		// which is why this loads the graph rather than taking a wanted set like the method above.
+		//
+		// Cheap enough to do so: 5,501 edges, of which only 12 feats carry more than one requirement, and those are
+		// skipped rather than picked from - a rung of a ladder has exactly one rung below it, so a multi-prerequisite
+		// feat is by construction not one.
+		public async Task<Dictionary<uint, uint>> GetSingleFeatPrereqs()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx.FeatPrereqs.AsNoTracking().ToArrayAsync();
+			return rows.GroupBy(p => p.WireFeatId).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.First().RequiresWireFeatId);
 		}
 
 		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)

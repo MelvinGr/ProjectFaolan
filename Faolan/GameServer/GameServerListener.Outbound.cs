@@ -610,7 +610,11 @@ namespace Faolan.GameServer
 		private async Task SendCraftingRecipeBook(INetworkClient client)
 		{
 			var handle = client.Session.Character.Id;
-			var rows = await Database.GetRecipes();
+
+			// #735: only what the character has TRAINED for. A fresh character has learned no profession and so gets
+			// an EMPTY book, which is retail - the book is what a profession buys. The gate is the recipe's own
+			// `RequiredFeatId` against the character's rank on that profession's ladder; see TradeskillService.
+			var rows = await _tradeskill.BookFor(handle, await Database.GetRecipes());
 			var records = rows.Select(RecipeRecords.FromRow).ToList();
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,

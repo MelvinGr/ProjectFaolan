@@ -106,47 +106,62 @@ would close the client's window on an item it never received.
 
 ## Open / follow-ups
 
-- ⚠️ **Nothing GATES crafting on a profession.** In retail a character must LEARN a tradeskill profession, which
-  comes in ranks, and that is what gates the book — a fresh character has none. We serve the catalog **whole** to
-  every character that asks, recipes carry no profession/tier attribution, and `TradeskillService.Craft` checks
-  only the catalog and the materials. So nothing stops a level-1 character crafting a master-tier recipe.
+- ⭐ **The profession model, and the gate it drives (#735).** A profession is a **linear chain of feats in
+  `FeatPrereqs`**, seven ranks deep — each rank names the one below it as its single prerequisite — and eleven of
+  them ship, which is exactly AoC's five crafting plus six gathering:
 
-  The professions themselves **are** persisted and **are** sent correctly. They ride the **spawn scaffold's
-  feat/ability list** — `CharacterSkills`, the `[u8 rank][u32 id]` groups after the entry table — imported per
-  character from that character's own capture and replayed verbatim, which is why an imported character's
-  professions match retail exactly. So the gap is the MEANING, not the data: which ids are professions, what the
-  rank byte counts, and which recipes each profession covers.
+  | | roots (wire feat id of the Novice rung) |
+  |---|---|
+  | crafting | Weaponsmith `321000` · Armorsmith `321300` · Alchemy `321600` · Architect `321900` · Gemcutter `322200` |
+  | gathering | Woodcutting `323200` · Mining `323300` · Prospecting `323400` · Stonecutting `323500` · Weaver `327200` · Skinner `327500` |
 
-  **The professions are the `CharacterSkills` rows whose `Rank` byte is 65–75 (`0x41`–`0x4B`)** — the spawn
-  scaffold's feat/ability list, imported per character and replayed verbatim. That byte is the **profession
-  id**: AoC has 5 crafting + 6 gathering professions, and 65–75 is exactly 11 slots.
+  Every one of the 603 recipes states the rung it needs in `RequiredFeatId`, and all of them resolve onto the
+  Weaponsmith and Armorsmith ladders — which is the finding the book itself carries: **our "catalog" is ONE
+  character's book**, harvested from that character's `TradeskillReplyIIR`, so it holds their two professions and
+  no others.
 
-  Pinned against three in-client sheets, including a single-profession control:
+  `TradeskillLadders` walks the chains; `TradeskillService.BookFor` filters the book to the rank the character has
+  reached and `HasProfessionFor` gates the craft. A character who has trained nothing gets an **empty book**, which
+  is retail — the book is what a profession buys. `.tradeskill <profession> [rank]` is the GM bootstrap standing in
+  for the (uncaptured) trainer conversation.
 
-  | character | professions in-client | rows |
-  |---|---|---|
-  | AssassinL23 (assassin) | Miner only | one row, **slot 75** |
-  | NecroL80 (necro) | 2 crafting + all 6 gathering | slots **65, 66** + **70–75** |
-  | DemoL80 (demo) | 2 *different* crafting + all 6 gathering | slots **67, 68** + **70–75** |
+  ⚠️ **The RANK is the chain DEPTH, never the feat's NAME.** All six of Gemcutter's trained ranks are named
+  `Gemcutter Novice` in the shipped feat table — a fault in the client's own data — so a name-derived rank gives
+  that profession seven Novices and no ladder at all.
 
-  Slots **70–75 are the gathering six in the client's own list order** — Prospector, Weaver, Skinner,
-  Stonecutter, Woodcutter, Miner — which the control fixes at the end: AssassinL23's only profession is Miner and
-  his only row is slot 75. Slots **65–69 are the five crafting professions**, one slot each: NecroL80's
-  Weaponsmith + Armorsmith occupy `{65, 66}` and DemoL80's Alchemist + Gemcutter `{67, 68}`, so the slot is the
-  profession rather than a per-character sequence number. (Which of each pair is which is not resolved, and 69
-  has not been seen.)
+  ⚠️ **A character holds SEVERAL rungs of one ladder, not one.** `AddCharacterFeats` keeps the highest rank per
+  `id / 100` BASE and a crafting ladder spans three bases (Weaponsmith 3210 / 3211 / 3212), so a Grandmaster holds
+  `321001`, `321101`, `321202` — and holds **neither** `321000` (the rung 9 recipes name) **nor** `321201`.
+  Membership tests against the recipe's own `RequiredFeatId` hide most of a character's book from them; compare
+  depths.
 
-  ⚠️ **The TIER is NOT in this table.** Two professions carry a byte-identical `SkillId` at different tiers:
+  ⚠️ **The WORKSHOP requirement is not enforced.** 366 of the 603 recipes also carry a `RequiredWorkshopFeatId`
+  (artisan rank and up, one workshop tier per rank), and a workshop is a guild-city BUILDING and where the
+  character is standing — not a feat they train. Blocked on a guild-city model; see Gitea #761.
+  [V3: TradeskillProfessionTests.TheElevenProfessionLadders_WalkOutOfTheShippedPrereqEdges]
 
-  | slot | profession | `SkillId` | NecroL80 | DemoL80 |
-  |---|---|---|---|---|
-  | 72 | Skinner | `328908` | Master | **Novice** |
-  | 73 | Stonecutter | `326000` | Master | **Apprentice** |
+- ⭐ **Retail's own record of a learned tradeskill is `CharacterSkills`, and it carries the RANK.** The professions
+  ride the **spawn scaffold's feat/ability list** — the `[u8 rank][u32 id]` groups after the entry table —
+  imported per character from that character's own capture. **`SkillId` IS a wire feat id**, so it resolves
+  straight onto a ladder, tier included. `TradeskillService.ProfessionsOf` reads this list and `CharacterFeats`
+  together and takes the deepest rung either reaches.
 
-  So neither the `Rank` byte (it is the slot) nor the `SkillId` encodes Novice…Grandmaster, and the id's
-  trailing `base*100 + rank` digits are not it either — NecroL80's two Grandmaster crafts read tails `02` and
-  `05`. The tier is recorded somewhere else entirely and is still unlocated.
-  [V0: what records a learned tradeskill]
+  | | resolved from the scaffold |
+  |---|---|
+  | NecroL80 | Armorsmith Grandmaster, Woodcutting Master, Stonecutting Master, Skinner Master, Mining Master, Prospecting Master |
+  | DemoL80 | Gemcutter Grandmaster, Woodcutting Apprentice, Stonecutting Apprentice, Skinner Novice, Mining Novice, Prospecting Adept |
+
+  ⚠️ **The earlier reading of this table — "slot 65–75 IS the profession id, and the TIER is not in here" — was a
+  POSITIONAL mis-read and is falsified.** Two of the slots carry ids that are not professions at all and are
+  IDENTICAL on both characters (`328908` → `Expert Bandaging`, `326000` → `Destiny Quest`); filing those under
+  whichever profession their slot was believed to be is what produced "two professions carry a byte-identical
+  SkillId at different tiers", and hence "the tier is recorded somewhere else". Resolve the ID, never the slot:
+  the slot is not stable across characters either (Woodcutting sits at 66 on one and 67 on the other).
+  [V3: TradeskillProfessionTests.AnImportedCharactersScaffold_CarriesTheirProfessionsAndRanks]
+
+- ⚠️ **The LEARN path itself is still uncaptured.** No capture teaches a profession — both annotated crafting
+  sessions are L80s who already had one — so the trainer conversation and the rank-up rule are not built, and
+  `.tradeskill` stands in for them.
 
 - `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
   gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).

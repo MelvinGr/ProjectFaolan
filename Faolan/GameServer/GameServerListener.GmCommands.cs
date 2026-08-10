@@ -391,6 +391,7 @@ namespace Faolan.GameServer
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
 				["time"] = TimeCommand,
+				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand
 			};
 		}
@@ -1239,6 +1240,65 @@ namespace Faolan.GameServer
 		// set and mirrors it on the live entity so the login-time gear-stat aggregation (which counts only the active
 		// set's weapons) uses it. NB this drives the MODEL only - the cross-player swap RELAY needs the real BCC payload,
 		// so exercise that with the retail weapon-swap key against a live viewer.
+		// .tradeskill [<profession> [<rank>]]  - train a tradeskill profession (#735). No argument reports what the
+		// character has trained and what each profession's ladder looks like.
+		//
+		// This is the standard GM bootstrap for a feature whose RETAIL trigger is not wired: the learn path is a
+		// trainer conversation and no capture shows one, so nothing here can be built from the corpus. What IS
+		// retail is everything downstream - the ladder, the rank, and the recipe book the rank buys - so a GM grant
+		// puts a character in a state the rest of the system reads exactly as it would a trained one.
+		//
+		// Trains the whole chain UP TO the named rank, because that is what a character who reached it holds: each
+		// rung names the one below it as its prerequisite. `AddCharacterFeats` collapses the rows per base and keeps
+		// the highest of each, so the stored set is the same 3 rows retail's would be.
+		private async Task TradeskillCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var words = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			var ladders = await _tradeskill.Ladders();
+
+			if (words.Length == 0)
+			{
+				var trained = await _tradeskill.ProfessionsOf(characterId);
+				var lines = ladders.Select(l => trained.TryGetValue(l.Name, out var rank)
+					? $"{l.Name}: {l.RankName(rank)} ({l.RankFeatIds.Length} rank(s) on its ladder)"
+					: $"{l.Name}: -").ToList();
+
+				lines.Add($"Usage: .tradeskill <profession> [{string.Join('|', TradeskillLadders.RankNames)}]");
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. lines]));
+				return;
+			}
+
+			var ladder = ladders.FirstOrDefault(l => l.Name.Equals(words[0], StringComparison.OrdinalIgnoreCase));
+			if (ladder == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					ChatMarkup.Color("red", $"No tradeskill profession '{words[0]}'. Known: {string.Join(", ", ladders.Select(l => l.Name))}."));
+				return;
+			}
+
+			// Default to the top of the ladder rather than to Novice: a GM asking for a profession by name almost
+			// always wants to exercise the whole book, and the narrow case is the one worth typing out.
+			var wanted = ladder.RankFeatIds.Length - 1;
+			if (words.Length > 1)
+			{
+				var named = TradeskillLadders.RankNames.IndexOf(words[1]);
+				if (named < 0 || named >= ladder.RankFeatIds.Length)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						ChatMarkup.Color("red", $"No rank '{words[1]}' on {ladder.Name}. Known: {string.Join(", ", TradeskillLadders.RankNames.Take(ladder.RankFeatIds.Length))}."));
+					return;
+				}
+
+				wanted = named;
+			}
+
+			var trainedCount = await Database.AddCharacterFeats(characterId, ladder.RankFeatIds.Take(wanted + 1));
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Trained {ladder.Name} to {ladder.RankName(wanted)} ({trainedCount} feat row(s) written). Reopen the crafting window to see the book.");
+			Logger.LogInformation("GM: {Character} trained {Profession} to {Rank}.", client.Session.Character.Name, ladder.Name, ladder.RankName(wanted));
+		}
+
 		private async Task WeaponSetCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
