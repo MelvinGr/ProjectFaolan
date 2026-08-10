@@ -224,26 +224,31 @@ resolve there as plain label NOUNS rather than sentences:
 name, so there is no category-170 sentence to find. Absent by construction, like the 206 kinds that reach the
 switch's default.
 
-### The SLOT ORDER is the branch's key-read order (#782)
+### Which keys each branch reads — and why that is NOT the slot order (#782)
 
-A sentence's argument order is the order its branch reads the record's keys — `MOV ECX,<statKey>;
-CALL 0x0077a510`, in address order. All sixteen branches that still had an unfilled sentence are read out into
-`docs/re/gameaction-tooltip-slots.tsv`, beside the record's own declared key list so the two can be compared.
+Every branch that still had an unfilled sentence is disassembled into
+`docs/re/gameaction-tooltip-slots.tsv`: the keys it fetches (`MOV ECX,<statKey>; CALL 0x0077a510`, in address
+order) beside the record's own declared key list. On every kind measured the branch fetches a strict SUBSET of the
+declared list, and three controls say the extraction is right — `53002` and `53250` reproduce their `statKeys`
+column exactly, and `53046` comes out as `[722, 793, 755, 756, 1123]`, character-for-character the key list #711
+documents from the other direction.
 
-⭐ **On 14 of the 16 the branch takes a SUBSET of the declared list, IN LIST ORDER** — so for those the key list
-is a safe stand-in and no per-branch read is needed. Two independent controls say the extraction is right: `53002`
-and `53250` reproduce their `statKeys` column exactly, and `53046` comes out as `[722, 793, 755, 756, 1123]`,
-character-for-character the key list #711 documents from the other direction.
+⚠️ **What it does NOT give you is the argument order, and the obvious shortcut is wrong.** The branch fetches its
+keys into stack locals and then APPENDS them from those locals in a different order: `53259`'s fetches sit at
+`0x2317` / `0x2374` / `0x23c4` while its appends read `[ESP+0x10]`, `[ESP+0x18]` and `[ESP+0x50]`.
 
-⚠️ **`53259` `ConeFormula` is the measured counterexample, and it is the one the ticket nominated as the obvious
-easy first.** Its branch reads `733` **before** `1245`, where the record declares `1245` first. Both slots are
-`%.2f`, so binding by the key list would swap the arc angle and the radius **silently** — a cone rendered as
-*"5.00 degree arc, 60.00m radius"* instead of *"60.00 degree arc, 5.00m radius"*. **So the key list is not a safe
-substitute for reading the branch**, and the 14 above are a measured majority rather than a rule.
+`53259` `ConeFormula` is the case that falsifies it, and it has independent ground truth. Its element is
+`88=<spell> 212=-60 213=120 11=6`, and `SpellAreaEffects.RadiusMetres` for the same spell is **6** — key 11. So
+the radius slot takes key 11 and the arc takes key 213, the OPPOSITE of the fetch order. Binding by fetch order
+would render `Wave of Life` as *"6.00 degree arc, 120.00m radius"*. Filling these sentences therefore needs the
+local-to-slot trace, which that file deliberately does not claim to contain.
 
-Its branch is `0x014a2316`, reached by a `JZ` off `CMP EAX,0xd00b` rather than through the jump table (which is
-why it is not in the composed switch dump). It fills the sentence's two `%s` unit slots with an **empty string**
-and the **`ValueModUnitMeters`** token.
+⚠️ **`53259` and `53273` are different branches, and only one of them is unbindable.** An existing note groups
+both cone kinds under `0x014a28f9` — the branch that fetches the CHARACTER (`FUN_006f03b0`), adds her own cone to
+the record's and prints the difference. The second dispatch table (`SUB EAX,0xd013`, tables `0x14a324c` /
+`0x14a323c`) shows that address belongs to **`53273` alone**; `53259` dispatches to `0x014a2316` off the
+`CMP EAX,0xd00b` / `JZ`, and that branch never touches the character. So the live-state objection is `53273`'s,
+not ConeFormula's.
 
 Two more exceptions worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"* — and **`53249`** reads
