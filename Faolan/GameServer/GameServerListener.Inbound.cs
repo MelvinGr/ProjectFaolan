@@ -1158,6 +1158,20 @@ namespace Faolan.GameServer
 					var characterId = body.ReadUInt32();
 					var entering = body.ReadByte() != 0;
 
+					// #780: an in-world achievement VISTA is the one case where this opcode really is what its name
+					// says - the client bracketing a cinematic it is running itself - and the bool is the whole
+					// discriminator. Handled first, and it consumes the packet: a mid-session cinematic must not also
+					// re-arm the login handshake's follow-up.
+					if (client.Session.ActiveVista is { } scene)
+					{
+						if (entering)
+							await OnVistaCinematicEntered(client, scene);
+						else
+							await OnVistaCinematicLeft(client, scene);
+
+						break;
+					}
+
 					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end); the LOGIN flow happens to use
 					// it as its ready trigger, which makes "should this arm the follow-up?" a per-mode question rather
 					// than a property of the packet (#432).
@@ -2492,6 +2506,14 @@ namespace Faolan.GameServer
 
 						break; // inert (no active collect quest) still swallows the use - don't open a window on a brick
 					}
+
+					// An achievement VISTA (#780) takes the whole interaction: it plays its own gesture + camera
+					// fly-through and must not also run the door open-animation. Beside the harvest below because it
+					// is the same shape - a column-driven object whose use is a whole scripted sequence.
+					// 0x0003 is the client's BEGIN phase, the same one the teleport branch above acts on - a use that
+					// arrives twice must not start two scenes.
+					if (behaviorType == 0x0003 && _broadcaster.VistaAt(client, target) is { } vista && await TryStartAchievementVista(client, vista))
+						break;
 
 					// A resource NODE (#494) is harvested, not opened: it yields a stack of its matching resource
 					// and must not also play the door open-animation, so it takes the whole interaction.

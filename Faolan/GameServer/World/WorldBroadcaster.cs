@@ -1436,6 +1436,20 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
+		// The achievement VISTA the player clicked, or null when the object is not one (#780). A query, like
+		// HarvestNodeAt above, so the listener owns the send sequence and the tag award the way it already owns the
+		// harvest grant.
+		public LiveWorldObject? VistaAt(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
+				return null;
+
+			return VistaCatalog.VistaFor(live.Row.DisplayCategory, live.Row.DisplayId) != null
+				? live
+				: null;
+		}
+
 		// Remove an EXHAUSTED harvest node from the live world for everyone who can see it, without touching its row.
 		//
 		// Deliberately NOT DeleteWorldObjectForPlayer: that deletes the row, which would make a harvested node gone for

@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Threading;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Progression;
 
 namespace Faolan.Core.Network
 {
@@ -123,6 +124,11 @@ namespace Faolan.Core.Network
 		bool IsUnnamedCreatePhase { get; }
 		bool PostMorphBurstSent { get; set; }
 		bool SeatedHoldConfirmed { get; set; }
+
+		// #780: the achievement VISTA the player is currently watching, or null. Set when a vista object is used and
+		// cleared when the CLIENT reports it has left the cinematic - the whole scene is bracketed by the client's own
+		// CinematicTransition pair, so this is what the leave half resolves against.
+		ActiveVistaScene? ActiveVista { get; set; }
 
 
 		// True once this connection has completed world entry (the burst-less world entry, the only entry path).
@@ -270,6 +276,11 @@ namespace Faolan.Core.Network
 	// destination map's default spawn, exactly as it does without a box.
 	public sealed record PendingTravelConfirm(uint ThreadCtxId, ulong Cookie, uint DestinationMapId, Vector3? ArrivalPosition);
 
+	// The achievement vista scene a player is inside (#780): the catalog row plus the LIVE handle of the object they
+	// used. The handle is what the camera action attaches to and what the lid records address, and it is per-zone-load
+	// state, so it belongs on the session rather than on the catalog row.
+	public sealed record ActiveVistaScene(AchievementVista Vista, uint ObjectHandle, uint ObjectClass);
+
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public uint PlayfieldChannelId { get; set; }
@@ -320,6 +331,7 @@ namespace Faolan.Core.Network
 		// double-send) gets the hold-assert that COMMITS the pose - without answering request #2 the sit-down plays
 		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
 		public bool SeatedHoldConfirmed { get; set; }
+		public ActiveVistaScene? ActiveVista { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] PendingCastArgs { get; set; } = null!;
 

@@ -112,7 +112,30 @@ and awards an achievement, and the whole trigger chain is captured in one 50-sec
 `CinematicTransition` is `[u32 0xC350][u32 player][u8 state]`, `01` entering and `00` leaving; the three in this
 capture bracket the scene exactly.
 
-⚠️ **Not modelled yet.** The records are all ones we already build (`GameActionListCodec` carries the action tail,
-`GrantTag` awards the achievement), so the wiring is small — what is missing is the per-object DATA: which world
-object is a vista, its params string and its tag. One row is proven, which is a start and not a table.
-Open work tracked in Gitea #780.
+### What the server sends (#780)
+
+Wired end to end, and every record is byte-exact against the capture (`Faolan.Tests/AchievementVistaTests.cs`):
+
+| our step | record | built by |
+|---|---|---|
+| the use | `SimpleDynelVisualChangeIIR` `SetBaseAnim "object_opened"` | `SimpleDynelVisualChanges.SetBaseAnim` |
+| " | `BccIIR` `ObjectInteraction`, the 5 s `social_item_accept_2` gesture + the feedback remoteformat | `BehaviorAnimations.PlayerViewVista` |
+| the gesture's blend later | `MagicBuffIIR` apply, **casterless** | `MagicBuffDatas.ApplyNowNoCaster` |
+| " | `GameActionListIIR` **0xD00C** `StartClientSideScryScriptWithParams` | `VistaScryActions.Start` |
+| client says it ENTERED | `SimpleDynelVisualChangeIIR` `SetBaseAnim "object_closed"` | — |
+| client says it LEFT | `ScryScriptIIR "EndPath"`, `GameActionListIIR` **0xCFEF**, the buff's END twin, `DispatchAddTag` | `VistaScryActions.Stop` / `GrantTag` |
+
+Two things about it are worth writing down:
+
+- **Only the gesture is on a timer.** `PathDuration` is told to the client and never used by the server: the scene
+  ends when the client reports it has left the cinematic. A player who skips out early is handled by construction, and
+  a client that never reports leaving simply never gets the tag — which is what the capture shows too.
+- **The stop's tail is two bytes shorter than an empty start's.** `StopScryScript`'s descriptor key list is `ScriptID`
+  alone, with no `ScriptParams` behind it, so reading it as "the start with a zero length prefix" eats two bytes of the
+  `ReadSubClass` trailer. The captured pair is 21 and 79 tail bytes.
+
+⚠️ **One row of DATA is proven and only one** (`VistaCatalog`): the camera path, its duration, the scry script, the
+scene buff and the tag are per-object CONTENT, and the corpus holds one instance — the Old Tarantia Docks viewpoint,
+`WorldObjects` 1546994545 on map 2000. Its three RDB ids sit in one contiguous block with its display string (script
+4998682, buff 4998650, display 4998751), which is what a second vista's block would look like; nothing derives one.
+Open work — a second captured vista — tracked in Gitea #780.

@@ -58,6 +58,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private const uint SitAnimAction = 42052;
 		private const uint StandAnimAction = 42053;
 
+		// The achievement VISTA's object action (#780). It reuses the chair-sit animation ACTION id - the gesture is
+		// content, `social_item_accept_2`, and the action id only says which animation TABLE slot plays it - and its
+		// blend is the whole reason the camera does not start at once: retail's `StartClientSideScryScriptWithParams`
+		// lands 5.04 s after this record, i.e. when the gesture ends.
+		private const uint VistaAnimAction = SitAnimAction;
+		private const string VistaAnimName = "social_item_accept_2";
+
+		// How long that gesture runs - the record's blend, and therefore how long the camera start waits.
+		public const float VistaGestureSeconds = 5.0f;
+		private const float VistaBlend = VistaGestureSeconds;
+
+		// The object class the vista remoteformat names - the client's own word for the mechanism (capture:
+		// startobjectaction(7)|interaction(2)|GenericAchievementVista).
+		private const string VistaObjectClass = "GenericAchievementVista";
+
 		// The caster's component-ADD gesture on each weave add - a begin/complete pair carrying the added element
 		// (frames 1657/1658): behaviorId 4, args {f1=AddAction, f3=5, f5=8, f6=0, f10=SpellTarget{caster}},
 		// tail [1][element][0x01][0][0][0][completeFlag].
@@ -316,6 +331,24 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static string SitRemoteformat(string objectClass, string key = "")
 		{
 			return $"<remoteformat token=\"startobjectaction(33)|turnon_execute(4)|{objectClass}\" category=\"50026\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
+		}
+
+		// The achievement VISTA's object action (#780): the player plays a five-second "accept" gesture at the
+		// viewpoint, and the camera fly-through starts when it ends. Same record as the bench sit - it is the same
+		// `startobjectaction` mechanism - with the vista's own animation, phase and blend. Byte-exact vs f4029.
+		public static BehaviorControlCenterIIR PlayerViewVista(uint actor, uint targetHandle, string remoteformat)
+		{
+			return ObjectActionAnimation(actor, VistaAnimAction, 5, 0, EntityClass.SimpleDynel, targetHandle, VistaAnimName, 2, 0, VistaBlend, remoteformat, 0x01);
+		}
+
+		// The vista feedback remoteformat. The CLIENT names the mechanism here - `GenericAchievementVista` - which is
+		// what says retail has a content PATTERN for viewpoints rather than one scripted object. `actionIndex` is the
+		// object's own action slot and appears twice, in the token and as the record's one string parameter; `key` is
+		// the localized action key, empty for the same reason as the sit's.
+		public static string VistaRemoteformat(uint actionIndex, string key = "")
+		{
+			return $"<remoteformat token=\"startobjectaction({actionIndex})|interaction(2)|{VistaObjectClass}\" category=\"50026\" key=\"{key}\" knubot=\"0\"  >" +
+				$"<parameter value=\"{actionIndex};\" name=\"String\" /></remoteformat>";
 		}
 
 		public static BehaviorControlCenterIIR SpellweaveComponentAdd(uint caster, uint elementBaseId, bool complete)

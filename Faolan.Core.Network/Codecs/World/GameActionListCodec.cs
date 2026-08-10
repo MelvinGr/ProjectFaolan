@@ -139,7 +139,11 @@ namespace Faolan.Core.Network.Codecs.World
 		// so decoding it stays the caller's step (TravelActionCodec.Parse) - but the mapping from the type word to the
 		// codec that reads it belongs beside the word that selects it, not copied into every caller. It sits on the
 		// VALUE rather than on the codec because a codec's surface is Build and Parse and nothing else (#530 rule 1).
-		// 0xD00D is the only tail decoded so far: the move-the-player action behind local travel (#514).
+		// 0xD00D is the move-the-player action behind local travel (#514).
 		public bool IsTravelAction => DynelHandle == TravelActionCodec.TypeId;
+
+		// The achievement VISTA's camera pair (#780) - a start and a stop, two GameAction types with two different
+		// tails, which is why this is a membership test rather than an equality.
+		public bool IsVistaAction => DynelHandle is VistaScryActionCodec.StartTypeId or VistaScryActionCodec.StopTypeId;
 	}
 }
