@@ -1,0 +1,209 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
+using Faolan.GameServer.Combat;
+using Faolan.GameServer.World;
+using Faolan.Tests.Support;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
+
+namespace Faolan.Tests
+{
+	// #776: the world tick for buffs sitting on a NON-PLAYER entity.
+	//
+	// The gap these gate: `TickBuffExpiry`, `TickDots` and `TickAuras` all walk `Players`, so a debuff a player put on
+	// a MOB had nothing to expire it, nothing to bleed it and nothing to emit its own areas. `Gangrenous Stench` is
+	// the reported case - the aura ran, dealt its initial damage and then did nothing, because the 9.5s effect record
+	// its area names never actually landed on anybody. An applied buff with no tick behind it is also the never-
+	// expiring orphan icon #274 fixed on the player side, so the two halves have to ship together.
+	public class NpcBuffTickTests
+	{
+		private const uint MapId = 4010; // Tortage Beach
+		private const uint PlayerHandle = 0x01316e68;
+		private const uint MobHandle = 0x01400001;
+		private const uint EffectSpell = 221069; // Gangrenous Stench's effect record
+		private const uint EffectWireId = EffectSpell << 8;
+
+		// A DoT on a mob bleeds it, through the caster's client so the kill lifecycle can pay them.
+		[Fact]
+		public async Task ADotOnAMob_BleedsItOnTheTick_AttributedToTheCaster()
+		{
+			var (sim, output, _, mob) = Harness();
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-5), 30f, dotDelta: -7, dotIntervalMs: 1000));
+
+			await sim.TickNpcBuffs();
+
+			var tick = Assert.Single(output.DotTicks);
+			Assert.Equal(MobHandle, tick.NpcHandle);
+			Assert.Equal(PlayerHandle, tick.CasterHandle);
+			Assert.Equal(-7, tick.Delta);
+			Assert.Equal(EffectSpell, tick.SpellId); // the BASE id, not the wire form
+		}
+
+		// ...and only on its own cadence: a tick inside the interval is not a second bleed. Without this the 10 Hz
+		// world loop would apply a 1s DoT ten times a second.
+		[Fact]
+		public async Task ADotOnAMob_DoesNotBleedTwiceInsideItsInterval()
+		{
+			var (sim, output, _, mob) = Harness();
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 2000) with { LastDotTick = DateTimeOffset.UtcNow });
+
+			await sim.TickNpcBuffs();
+			await sim.TickNpcBuffs();
+
+			Assert.Empty(output.DotTicks);
+		}
+
+		// The expiry half: a lapsed effect sends the retail END TWIN so the client drops the icon, and leaves the
+		// registry. This is the orphan-icon failure of #274, one entity over.
+		[Fact]
+		public async Task AnExpiredEffect_SendsTheEndTwinAndLeavesTheRegistry()
+		{
+			var (sim, output, _, mob) = Harness();
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-20), 9.5f));
+
+			await sim.TickNpcBuffs();
+
+			var removal = Assert.Single(output.Removals);
+			Assert.Equal(MobHandle, removal.ApplyTo); // mirrors the apply: applyTo = the affected entity...
+			Assert.Equal(PlayerHandle, removal.ApplyFrom); // ...applyFrom = the caster
+			Assert.Equal(EffectWireId, removal.SpellId);
+			Assert.Empty(mob.ActiveBuffs);
+		}
+
+		// The chain #776 is really about: the effect record states an area of ITS OWN, so an infected mob spreads it
+		// to its neighbours - centred on the MOB, not on the player who started it.
+		[Fact]
+		public async Task AnInfectedMob_EmitsTheEffectsOwnArea_CentredOnItself()
+		{
+			var (sim, output, _, mob) = Harness();
+			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
+
+			await sim.TickNpcBuffs();
+
+			var area = Assert.Single(output.Areas);
+			Assert.Equal(MobHandle, area.SourceHandle); // the emitter is the mob the debuff sits on
+			Assert.Equal(221068u, area.EffectSpellId);
+			Assert.Equal(4f, area.Radius);
+		}
+
+		// The same emission again inside the period is not a second one - the stamp is per (holder, buff, area).
+		[Fact]
+		public async Task AnInfectedMob_DoesNotReEmitInsideThePeriod()
+		{
+			var (sim, output, _, mob) = Harness();
+			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
+
+			await sim.TickNpcBuffs();
+			await sim.TickNpcBuffs();
+
+			Assert.Single(output.Areas);
+		}
+
+		// TWO mobs carrying the same effect each emit their own area on the same tick. The stamp used to be keyed by
+		// (buff, area) alone, so the second holder's emission was swallowed as "already ticked this period" - the
+		// spread would have stalled at one mob however many it had reached.
+		[Fact]
+		public async Task TwoMobsCarryingTheSameEffect_BothEmit()
+		{
+			var (sim, output, client, mob) = Harness();
+			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+
+			var second = new WorldEntity(MobHandle + 1, MapId, false, "Rotted Corpse", null!);
+			sim.World.Place(second, MapId, Vector3.Zero, Quaternion.Identity);
+
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
+			Track(sim, second, Buff(DateTimeOffset.UtcNow, 9.5f));
+
+			await sim.TickNpcBuffs();
+
+			Assert.Equal(2, output.Areas.Count);
+			Assert.Equal([MobHandle, MobHandle + 1], output.Areas.Select(a => a.SourceHandle).Order());
+			Assert.NotNull(client);
+		}
+
+		// A caster who has gone (logged out, changed playfield) takes their debuffs with them: there is no client left
+		// to render an end twin at, and no one a kill it lands could be paid to. Dropped silently rather than left
+		// bleeding a mob for a player who is not there.
+		[Fact]
+		public async Task AnEffectWhoseCasterIsGone_IsDroppedWithoutTicking()
+		{
+			var (sim, output, client, mob) = Harness();
+			sim.Players.TryRemove(client, out _);
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
+
+			await sim.TickNpcBuffs();
+
+			Assert.Empty(output.DotTicks);
+			Assert.Empty(output.Removals);
+			Assert.Empty(mob.ActiveBuffs);
+		}
+
+		// A dead mob's buffs go with it. Its kill lifecycle has already run, so a bleed that kept ticking would pay
+		// the XP a second time - and a corpse renders no icon to remove.
+		[Fact]
+		public async Task ADeadMob_LeavesTheRegistryWithoutTicking()
+		{
+			var (sim, output, _, mob) = Harness();
+			mob.Vitals = EntityVitals.FromMax(100, 0, 0);
+			mob.Vitals.ApplyHealthDelta(-1000);
+			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
+
+			await sim.TickNpcBuffs();
+
+			Assert.True(mob.IsDead);
+			Assert.Empty(output.DotTicks);
+			Assert.Empty(mob.ActiveBuffs);
+		}
+
+		private static ActiveBuff Buff(DateTimeOffset appliedAt, float durationSeconds, int dotDelta = 0, uint dotIntervalMs = 0)
+		{
+			return new ActiveBuff(EffectWireId, PlayerHandle, appliedAt, durationSeconds)
+			{
+				DotDelta = dotDelta,
+				DotIntervalMs = dotIntervalMs,
+				LastDotTick = appliedAt
+			};
+		}
+
+		private static SpellAreaEffect Area(uint effectSpellId, uint radius, uint periodCentiseconds)
+		{
+			return new SpellAreaEffect
+			{
+				SpellId = EffectSpell,
+				Sequence = 0,
+				EffectSpellId = effectSpellId,
+				RadiusMetres = radius,
+				MaxTargets = 12,
+				PeriodCentiseconds = periodCentiseconds
+			};
+		}
+
+		private static void Track(WorldSimulation sim, WorldEntity mob, ActiveBuff buff)
+		{
+			mob.ActiveBuffs[buff.BuffId] = buff;
+			sim.TrackBuffedEntity(mob);
+		}
+
+		private static (WorldSimulation Sim, RecordingWorldOutbound Output, RecordingNetworkClient Client, WorldEntity Mob) Harness()
+		{
+			var output = new RecordingWorldOutbound();
+			var sim = new WorldSimulation(output, null!, null!, NullLogger.Instance);
+
+			var client = new RecordingNetworkClient(PlayerHandle);
+			var player = new WorldEntity(PlayerHandle, MapId, true, "Caster", client);
+			sim.Players[client] = player;
+			sim.World.Place(player, MapId, Vector3.Zero, Quaternion.Identity);
+
+			var mob = new WorldEntity(MobHandle, MapId, false, "Rotted Corpse", null!);
+			sim.World.Place(mob, MapId, Vector3.Zero, Quaternion.Identity);
+
+			return (sim, output, client, mob);
+		}
+	}
+}

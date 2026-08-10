@@ -110,8 +110,15 @@ namespace Faolan.GameServer.World
 
 		private readonly IWorldOutbound _output;
 
-		// Last aura application per (buff, area) - see TickAuras for why it is not WorldEntity.LastDotTick.
-		private readonly Dictionary<(uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = new Dictionary<(uint, uint), DateTimeOffset>();
+		// Last aura application per (holder, buff, area) - see TickAuras for why it is not WorldEntity.LastDotTick, and
+		// #776 for why the HOLDER is in the key: since a mob can carry an area-emitting debuff, two entities holding
+		// the same buff would otherwise share one stamp and each suppress the other's cadence.
+		private readonly Dictionary<(uint Holder, uint BuffId, uint Sequence), DateTimeOffset> _auraTicks = new Dictionary<(uint, uint, uint), DateTimeOffset>();
+
+		// #776: the NON-PLAYER entities currently carrying a buff, so the tick can find them without walking every
+		// zone. Written where a buff lands on one and pruned by the tick as they empty, die or despawn - in practice a
+		// handful of mobs mid-fight, never the world.
+		private readonly ConcurrentDictionary<uint, WorldEntity> _buffedEntities = new ConcurrentDictionary<uint, WorldEntity>();
 
 		private Task _tickTask = Task.CompletedTask;
 		public ConcurrentDictionary<INetworkClient, WorldEntity> Players { get; } = new ConcurrentDictionary<INetworkClient, WorldEntity>();
@@ -1036,6 +1043,7 @@ namespace Faolan.GameServer.World
 						await TickBuffExpiry();
 						await TickDots();
 						await TickAuras();
+						await TickNpcBuffs(); // #776: the same three jobs - expire, bleed, emit - for buffs sitting on a MOB
 
 						// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
 						// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers
@@ -1273,42 +1281,196 @@ namespace Faolan.GameServer.World
 				if (vitals == null || vitals.IsDead)
 					continue;
 
-				foreach (var buff in entity.ActiveBuffs.Values)
-				{
-					// The buff id is the WIRE form ((base << 8) | rank); the catalog is keyed by the base.
-					var areas = await _output.AuraAreasFor(buff.BuffId >> 8);
-					if (areas.Count == 0)
-						continue;
-
-					foreach (var area in areas)
-					{
-						var key = (buff.BuffId, area.Sequence);
-						if (_auraTicks.TryGetValue(key, out var last) && (now - last).TotalMilliseconds < area.PeriodCentiseconds * 10)
-							continue;
-
-						_auraTicks[key] = now;
-
-						// God mode blocks harm, and an aura is harm the holder is emitting rather than taking - but the
-						// same reasoning as TickDots applies to the RECIPIENTS, and ApplySpellArea goes through
-						// ApplyNpcDamage, which owns that check for the targets. Nothing extra is needed here.
-						// ⚠️ Logged even when it reaches NOTHING. Guarding this on `hit > 0` made a tick that found no
-						// targets indistinguishable from a tick that never ran, and that is exactly the question asked
-						// of it first ("the aura only fired twice" - it had fired six times and killed everything in
-						// range by the third).
-						var hit = await _output.ApplySpellArea(client, entity.Handle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
-						_logger.LogDebug("Aura from buff 0x{Buff:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, area.EffectSpellId, hit, area.RadiusMetres);
-					}
-				}
+				await EmitAuraAreas(entity, client, now);
 			}
 
 			// A buff that ended leaves its stamp behind; drop the ones whose buff is gone so this cannot grow without
-			// bound across a long session.
+			// bound across a long session. Mobs count too since #776 - an infected one emits its own areas.
 			if (_auraTicks.Count > 0)
 			{
-				var live = Players.Values.SelectMany(e => e.ActiveBuffs.Keys).ToHashSet();
-				foreach (var key in _auraTicks.Keys.Where(k => !live.Contains(k.BuffId)).ToList())
+				var live = Players.Values.Concat(_buffedEntities.Values).SelectMany(e => e.ActiveBuffs.Keys.Select(id => (e.Handle, id))).ToHashSet();
+				foreach (var key in _auraTicks.Keys.Where(k => !live.Contains((k.Holder, k.BuffId))).ToList())
 					_auraTicks.Remove(key);
 			}
+		}
+
+		// The periodic half of one entity's buffs: for every buff it carries that states a periodic area, re-apply
+		// that area if its period has elapsed. Shared by the player aura tick and the #776 mob tick, because the
+		// mechanic does not care who holds the buff - `Gangrenous Stench` is a player self-buff whose area lands a
+		// debuff on mobs, and THAT debuff states an area of its own that spreads from the mob it is sitting on.
+		//
+		// Each emission is attributed to the buff's own caster, so a mob carrying debuffs from two players emits each
+		// one for the player who put it there. `holderClient` is the fallback for a buff whose caster is not a
+		// connected player - the holder themselves, which is what a player carrying an NPC-cast area debuff wants,
+		// and null for a mob (there the caster is the only credit there is).
+		private async Task EmitAuraAreas(WorldEntity holder, INetworkClient? holderClient, DateTimeOffset now)
+		{
+			foreach (var buff in holder.ActiveBuffs.Values.ToArray())
+			{
+				// The buff id is the WIRE form ((base << 8) | rank); the catalog is keyed by the base.
+				var areas = await _output.AuraAreasFor(buff.BuffId >> 8);
+				if (areas.Count == 0)
+					continue;
+
+				var client = ClientForHandle(buff.CasterHandle) ?? holderClient;
+				if (client == null)
+					continue;
+
+				foreach (var area in areas)
+				{
+					var key = (holder.Handle, buff.BuffId, area.Sequence);
+					if (_auraTicks.TryGetValue(key, out var last) && (now - last).TotalMilliseconds < area.PeriodCentiseconds * 10)
+						continue;
+
+					_auraTicks[key] = now;
+
+					// God mode blocks harm, and an aura is harm the holder is emitting rather than taking - but the
+					// same reasoning as TickDots applies to the RECIPIENTS, and ApplySpellArea goes through
+					// ApplyNpcDamage, which owns that check for the targets. Nothing extra is needed here.
+					// ⚠️ Logged even when it reaches NOTHING. Guarding this on `hit > 0` made a tick that found no
+					// targets indistinguishable from a tick that never ran, and that is exactly the question asked
+					// of it first ("the aura only fired twice" - it had fired six times and killed everything in
+					// range by the third).
+					var hit = await ApplyAreaEffect(client, holder.Handle, buff.CasterHandle, area);
+					_logger.LogDebug("Aura from buff 0x{Buff:X8} on 0x{Holder:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, holder.Handle,
+						area.EffectSpellId, hit, area.RadiusMetres);
+				}
+			}
+		}
+
+		// #776: apply one of a spell's AREA elements WHOLE - the damage to everything in range, and then the effect
+		// itself on each of them. `ApplySpellArea` used to be the entire operation and it only ever dealt the damage,
+		// which is why `Gangrenous Stench` hit for its initial number and then did nothing: the 9.5 s effect record
+		// the area names never landed on anybody, so it had no DoT to bleed, no stat deltas to apply, and its own
+		// 4 m/3 s area was never reached.
+		//
+		// `sourceHandle` is what the area radiates from (the buff's holder); `casterHandle` is who gets the credit
+		// and is the player for the whole chain, even where the emitter is an infected mob - a bleed that finishes a
+		// mob has to name a killer the XP/loot lifecycle can pay.
+		public async Task<int> ApplyAreaEffect(INetworkClient client, uint sourceHandle, uint casterHandle, SpellAreaEffect area)
+		{
+			var victims = await _output.ApplySpellArea(client, sourceHandle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
+			foreach (var handle in victims)
+				await ApplyEffectToEntity(client, handle, casterHandle, area.EffectSpellId);
+
+			return victims.Count;
+		}
+
+		// Land an effect spell on ONE non-player victim: the ApplySpell carrier so the client draws the icon on it,
+		// and a tracked `ActiveBuff` so the tick can count it down, bleed its DoT and emit its own areas. The mirror
+		// of what `ApplyNpcCast` does for a debuff an NPC puts on a player.
+		private async Task ApplyEffectToEntity(INetworkClient client, uint victimHandle, uint casterHandle, uint effectSpellId)
+		{
+			if (PlayerWorldEntity(client) is not { } player || !World.ZoneForEntity(player).TryGet(victimHandle, out var victim) || victim.IsPlayer || victim.IsDead)
+				return;
+
+			var spell = await _database.GetSpell(effectSpellId);
+			var durationMs = spell?.DurationMs ?? 0;
+			if (durationMs == 0)
+				return; // an INSTANT: retail sends no ApplySpell for a zero-duration spell, and one aborts the client's ActivateBuff (#767)
+
+			var wireId = effectSpellId << 8;
+
+			// Already carrying it: leave the live one counting down rather than re-sending the apply. Re-applying on
+			// every period is what STACKS icons on the client (#274) - retail re-applies an effect only after the
+			// previous one has ended - and the area's damage lands either way.
+			if (victim.ActiveBuffs.ContainsKey(wireId))
+				return;
+
+			var (dotDelta, dotType, dotIntervalMs) = await DotEffect(effectSpellId);
+			var now = DateTimeOffset.UtcNow;
+			victim.ActiveBuffs[wireId] = new ActiveBuff(wireId, casterHandle, now, durationMs / 1000f)
+			{
+				DotDelta = dotDelta,
+				DotType = dotType,
+				DotIntervalMs = dotIntervalMs,
+				LastDotTick = now
+			};
+
+			TrackBuffedEntity(victim);
+			await _output.SendSpellApplication(client, victim.Handle, casterHandle, wireId, durationMs / 10);
+			_logger.LogDebug("Effect {Effect} applied to {Npc} (0x{Handle:X8}) for {Duration}ms by 0x{Caster:X8}.", effectSpellId, victim.Name, victim.Handle, durationMs, casterHandle);
+		}
+
+		// #776: the world tick for buffs on NON-PLAYER entities. `TickBuffExpiry`, `TickDots` and `TickAuras` all walk
+		// `Players`, so a debuff a player put on a MOB had nothing to expire it, nothing to bleed it and nothing to
+		// emit its own areas - it counted down on the client to 0 and stuck there for ever, which is exactly the
+		// orphan-icon failure #274 fixed on the player side.
+		//
+		// Everything here is attributed to `buff.CasterHandle`'s player: if they have gone (logged out, changed
+		// playfield), the buff is dropped rather than left ticking, because there is no client left to render its end
+		// or to be paid for a kill it lands.
+		// Registers a non-player entity whose `ActiveBuffs` the tick below has to service. The only writer is the
+		// effect-application path above; it is a separate method so the registry stays private and so a test can put
+		// an entity in front of one tick pass without a database behind it.
+		internal void TrackBuffedEntity(WorldEntity entity)
+		{
+			_buffedEntities[entity.Handle] = entity;
+		}
+
+		internal async Task TickNpcBuffs()
+		{
+			if (_buffedEntities.IsEmpty)
+				return;
+
+			var now = DateTimeOffset.UtcNow;
+			foreach (var (handle, entity) in _buffedEntities.ToArray())
+			{
+				// Dead, despawned or clean: it leaves the registry. A corpse renders no icon, and a DoT that kept
+				// ticking into a kill lifecycle that has already run would pay the XP twice.
+				if (entity.ActiveBuffs.IsEmpty || entity.IsDead || !World.ZoneForEntity(entity).TryGet(handle, out _))
+				{
+					entity.ActiveBuffs.Clear();
+					_buffedEntities.TryRemove(handle, out _);
+					continue;
+				}
+
+				// Expire first, in one snapshot pass, for the same reason TickBuffExpiry does it that way.
+				foreach (var expired in entity.TakeExpiredBuffs(now))
+				{
+					if (ClientForHandle(expired.Value.CasterHandle) is { } owner)
+						await _output.SendBuffRemoval(owner, entity.Handle, expired.Value.CasterHandle, expired.Key);
+
+					_logger.LogDebug("Effect 0x{Buff:X8} expired on {Npc} (0x{Handle:X8}).", expired.Key, entity.Name, entity.Handle);
+				}
+
+				foreach (var buff in entity.ActiveBuffs.Values.ToArray())
+				{
+					var owner = ClientForHandle(buff.CasterHandle);
+					if (owner == null)
+					{
+						entity.ActiveBuffs.TryRemove(buff.BuffId, out _);
+						continue;
+					}
+
+					if (buff.DotDelta != 0 && (now - buff.LastDotTick).TotalMilliseconds >= IntervalOf(buff))
+					{
+						buff.LastDotTick = now;
+						await _output.ApplyNpcDotTick(owner, entity.Handle, buff.CasterHandle, buff.DotDelta, buff.BuffId >> 8);
+						if (entity.IsDead)
+							break; // the bleed landed the killing blow; the sweep above retires it next tick
+					}
+				}
+
+				// The chain: an effect record can state an area of its OWN, so an infected mob spreads it to its
+				// neighbours. Same op the player aura uses, centred on the mob.
+				if (!entity.IsDead)
+					await EmitAuraAreas(entity, null, now);
+			}
+		}
+
+		// The connected player whose world entity carries `handle`, or null if nobody does (they logged out, or the
+		// handle is a mob's). The reverse of PlayerWorldEntity, and the tick's way back to a client from a buff's
+		// recorded caster.
+		private INetworkClient? ClientForHandle(uint handle)
+		{
+			foreach (var pair in Players)
+			{
+				if (pair.Value.Handle == handle)
+					return pair.Key;
+			}
+
+			return null;
 		}
 
 		private async Task TickDots()

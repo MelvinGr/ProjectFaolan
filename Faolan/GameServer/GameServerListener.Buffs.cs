@@ -466,7 +466,13 @@ namespace Faolan.GameServer
 			// Removing it here makes every path agree, and is a no-op for the two that already did it (the tick's
 			// expiry sweep takes the buff out of the dictionary before it sends, `CancelBuff` needs the entry first to
 			// read its caster).
-			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedSpellId, out _);
+			//
+			// ⚠️ Only when the removal is ABOUT the player. Since #776 this op also ends a debuff on a MOB, and an
+			// unconditional deregister would then reach into the player's registry with the mob's spell id and drop a
+			// buff of theirs that happens to share it. The world tick removes the mob's entry itself, the same way the
+			// player expiry sweep does.
+			if (_simulation.PlayerWorldEntity(client) is { } self && self.Handle == applyTo)
+				self.ActiveBuffs.TryRemove(appliedSpellId, out _);
 
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // form 1 = the "end" twin of the applied buff id
 			var body = MagicBuffCodec.Build(applyTo, applyFrom, endId, []);

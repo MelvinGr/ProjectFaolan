@@ -431,20 +431,41 @@ namespace Faolan.GameServer.Combat
 		//
 		// Centred on the CASTER rather than a reticle, which is what "Hostile Self Centered Area Spell" means in the
 		// client's own targeting-mode line; a ground-targeted blast is `ResolveGroundAoe` and keeps its reticle.
-		public async Task<int> ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets)
+		//
+		// ⚠️ This is the DAMAGE half only. Landing the effect itself on each victim - the icon, the DoT, its own
+		// areas - is `WorldSimulation.ApplyAreaEffect`, which is why this answers WHO was hit rather than how many
+		// (#776). Splitting it that way keeps the buff registry with the world model, which owns it.
+		public async Task<IReadOnlyList<uint>> ApplySpellArea(INetworkClient client, uint sourceHandle, uint effectSpellId, float radius, uint maxTargets)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || radius <= 0)
-				return 0;
+				return [];
 
 			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(effectSpellId, casterLevel, player.MagicDamageFor(effectSpellId), player.SpellBoost(effectSpellId));
 
+			// The area radiates from whoever HOLDS it, and that is not always the player: the #776 chain re-emits an
+			// area from the INFECTED MOB (Gangrenous Stench's 221069 spreads 221068 to everything within 4 m of the
+			// mob it is ticking on), and centring that on the caster would spray it from the wrong point. For a
+			// player's own cast or aura `sourceHandle` IS the player, so this resolves to exactly what it used to.
+			//
+			// A source that does not resolve in the player's own zone reaches NOBODY rather than falling back to the
+			// player: an emitter in another instance is not a reason to blast the area out of the player instead.
+			// The player themselves is the one exception, since a caster is not always in the zone's entity table.
+			var zone = _sim.World.ZoneForEntity(player);
+			var source = zone.TryGet(sourceHandle, out var holder)
+				? holder
+				: sourceHandle == player.Handle
+					? player
+					: null;
+
+			if (source == null)
+				return [];
+
 			// The cap the client renders as "up to N targets" (SpellAreaEffect.MaxTargets). 0 = the element stated
 			// none, so everything in range is hit - not "nothing", which is what treating 0 as the cap would mean.
-			var inRange = _sim
-				.World.ZoneForEntity(player)
-				.EntitiesInRange(player.Position, radius, casterHandle)
+			var inRange = zone
+				.EntitiesInRange(source.Position, radius, sourceHandle)
 				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
 				.Select(e => e.Handle);
 
@@ -452,11 +473,26 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var handle in victims)
 			{
-				await ApplyNpcDamage(client, handle, damage, $"area effect {effectSpellId} from 0x{casterHandle:X8}");
-				await SendSpellDamageNumber(client, handle, casterHandle, damage, effectSpellId);
+				await ApplyNpcDamage(client, handle, damage, $"area effect {effectSpellId} from 0x{sourceHandle:X8}");
+				await SendSpellDamageNumber(client, handle, sourceHandle, damage, effectSpellId);
 			}
 
-			return victims.Count;
+			return victims;
+		}
+
+		// #776: one DoT tick against a NON-PLAYER entity - the bleed a player's debuff leaves on a mob. Runs through
+		// the same `ApplyNpcDamage` a cast does, so a tick that finishes the mob runs the whole kill lifecycle (XP,
+		// corpse/loot, kill-quest credit) and credits the player who applied the debuff rather than nobody.
+		//
+		// A positive delta (a heal-over-time) is a no-op here: NPC pools have no heal path, and quietly re-using the
+		// damage one with a flipped sign would resurrect a corpse mid-lifecycle.
+		public async Task ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId)
+		{
+			if (delta >= 0)
+				return;
+
+			await ApplyNpcDamage(client, npcHandle, -delta, $"DoT from spell {spellId} (0x{casterHandle:X8})",
+				() => SendSpellDamageNumber(client, npcHandle, casterHandle, -delta, spellId));
 		}
 
 		private async Task<int> ApplyAoeTick(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int tickDamage)

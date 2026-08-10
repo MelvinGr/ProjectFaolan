@@ -166,10 +166,24 @@ namespace Faolan.GameServer.World
 		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
 
 		// #772: apply a spell's AREA - "spell `effectSpellId` to up to `maxTargets` entities within `radius` metres of
-		// the caster" - and answer how many it reached. The tick's half of the aura: a buff whose spell states a
-		// periodic area re-applies it through here every period, for as long as the buff is up. The cast path calls
-		// the same op on CombatService directly for the instant form.
-		Task<int> ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets);
+		// `sourceHandle`" - and answer WHICH entities it reached. The tick's half of the aura: a buff whose spell
+		// states a periodic area re-applies it through here every period, for as long as the buff is up.
+		//
+		// ⚠️ It returns the victim HANDLES, not a count, because the damage is only half of applying an area (#776):
+		// the caller has to put the effect itself on each victim, and it needs to know who they were. `sourceHandle`
+		// is what the area radiates FROM, which is not always the player - see WorldSimulation.ApplyAreaEffect.
+		Task<IReadOnlyList<uint>> ApplySpellArea(INetworkClient client, uint sourceHandle, uint effectSpellId, float radius, uint maxTargets);
+
+		// #776: the ApplySpell (MagicBuffIIR) carrier for a buff landing on someone OTHER than the caster - the effect
+		// a player's area puts on the mobs around it. applyTo != applyFrom, so the listener sends + relays it and
+		// registers nothing: the world model owns a non-player entity's buff registry, and it is the tick above that
+		// counts one down.
+		Task SendSpellApplication(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId, uint durationCentiseconds);
+
+		// #776: one damage-over-time tick against a NON-PLAYER entity - the health move plus its floating StatDamage
+		// number, through the same kill lifecycle a spell hit uses (XP, corpse, quest credit) so a bleed a player
+		// started can land the killing blow. `delta` is the DISPLAY-scale per-tick change and is negative for harm.
+		Task ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId);
 
 		// The AURA definitions for a spell, if any - `SpellAreaEffect` rows with a non-zero period. Reached through
 		// the port rather than giving the simulation its own database handle, same as every other lookup it needs.

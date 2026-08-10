@@ -2375,9 +2375,13 @@ namespace Faolan.GameServer
 				// client's own "Hostile Self Centered Area Spell" targeting line means. `Life Leech` is the whole
 				// mechanic in one row (220980 to 12 targets within 5 m) - the castable carries no damage of its own,
 				// so until the area elements were decoded (#772) casting it did nothing to anyone.
+				//
+				// Through the SIMULATION rather than straight at CombatService: applying an area is the damage AND
+				// the effect itself landing on each victim (#776), and the buff registry that second half writes to
+				// belongs to the world model.
 				foreach (var area in await _spellAreas.InstantAreas(spellId))
 				{
-					var hit = await _combat.ApplySpellArea(client, casterHandle, area.EffectSpellId, area.RadiusMetres, area.MaxTargets);
+					var hit = await _simulation.ApplyAreaEffect(client, casterHandle, casterHandle, area);
 					Logger.LogInformation("Cast {Spell} applied area effect {Effect} to {Hit} target(s) within {Radius}m.", spellId, area.EffectSpellId, hit, area.RadiusMetres);
 				}
 

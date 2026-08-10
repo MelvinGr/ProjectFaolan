@@ -1555,3 +1555,50 @@ Each record is `[spellId][kind][sourceHandle][stamp][timerTotal][timerRemaining]
 What is left of #677 is therefore only the server-side half it also named: NPC-cast buffs are not tracked across
 the streaming boundary, so today there is nothing to put in the list. The WIRE side needs no decode.
 [V3: SpawnBuffRecordTests.RetailAttachesBuffsToTheSPAWN_NotAFanOutAfterIt]
+
+## An AREA is a chain, not a blast (#772/#776)
+
+A spell's `SpellAreaEffects` rows say "apply spell `EffectSpellId` to up to `MaxTargets` entities within
+`RadiusMetres`", optionally on a `PeriodCentiseconds` cadence. The row names **another spell**, so the mechanic
+is recursive by construction, and `Gangrenous Stench` is the whole of it in three records:
+
+| record | duration | what it states |
+| --- | --- | --- |
+| `221070` the CASTABLE | 25 s | two areas, both 7 m / 12 targets, applying `221069` — one at cast (period 0) and one every 4 s |
+| `221069` the EFFECT | 9.5 s | one area, 4 m, applying `221068` every 3 s |
+| `221068` | 1 s | the damage record at the end of the chain |
+
+The client's tooltip states both levels ("Area Of Effect: … 7.00m radius up to 12 targets" and "Effect over
+time: … 4.00m radius every 3 seconds"), so the tiers are the client's own reading, not ours.
+
+**Applying an area is two jobs, and only the first existed.** `CombatService.ApplySpellArea` dealt the effect
+spell's damage to everyone in range and stopped there, so the effect record never LANDED on anybody:
+
+- no damage-over-time on the victim (`221069` is a 9.5 s record);
+- none of its stat effects (`Modify 840 = -5%` damage, the three `TempChangeSkill` invulnerabilities);
+- and the chain stopped dead, because nothing was holding `221069` for its own 4 m / 3 s area to fire from.
+
+So `WorldSimulation.ApplyAreaEffect` owns the whole operation: `ApplySpellArea` answers WHICH entities were
+hit, and each of them then gets the effect itself — the `ApplySpell` carrier so the client draws the icon on
+the mob, plus a tracked `ActiveBuff` carrying its duration and DoT.
+
+⚠️ **The second job is worthless without a tick behind it.** `TickBuffExpiry`, `TickDots` and `TickAuras` all
+walk `Players`, so a buff sitting on a MOB had nothing to expire it, bleed it or emit its areas — which is the
+never-expiring orphan icon #274 fixed on the player side, one entity over. `TickNpcBuffs` is that half: it
+services a small registry of the non-player entities currently carrying a buff (written where one lands,
+pruned as they empty, die or despawn), and
+
+- expires with the retail end twin, so the icon goes;
+- bleeds the DoT through the same `ApplyNpcDamage` a cast uses, so a tick that finishes the mob runs the whole
+  kill lifecycle and credits the player who applied the debuff;
+- emits the effect's own areas, **centred on the mob** — which is what makes the plague spread from whatever it
+  is sitting on rather than from the caster.
+
+⚠️ **The aura stamp is keyed by the HOLDER as well as by (buff, area).** Two entities carrying the same effect
+otherwise share one stamp and each suppresses the other's cadence — with mobs in the picture that stalls a
+spread at one victim however many it had reached.
+
+⚠️ **Everything is attributed to `ActiveBuff.CasterHandle`'s player, all the way down the chain**, even where
+the emitter is an infected mob: a bleed that lands the killing blow has to name a killer the XP/loot lifecycle
+can pay. If that player has gone, the buff is dropped rather than left ticking for nobody.
+[V3: NpcBuffTickTests.AnInfectedMob_EmitsTheEffectsOwnArea_CentredOnItself]

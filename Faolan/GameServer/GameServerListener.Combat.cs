@@ -100,9 +100,22 @@ namespace Faolan.GameServer
 			return CombatService.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
 		}
 
-		Task<int> IWorldOutbound.ApplySpellArea(INetworkClient client, uint casterHandle, uint effectSpellId, float radius, uint maxTargets)
+		Task<IReadOnlyList<uint>> IWorldOutbound.ApplySpellArea(INetworkClient client, uint sourceHandle, uint effectSpellId, float radius, uint maxTargets)
 		{
-			return _combat.ApplySpellArea(client, casterHandle, effectSpellId, radius, maxTargets);
+			return _combat.ApplySpellArea(client, sourceHandle, effectSpellId, radius, maxTargets);
+		}
+
+		// #776: the apply carrier for a buff landing on someone else. Goes through SendMagicBuffIir like every other
+		// ApplySpell we send - so the viewers around the target get it too - and because applyTo != applyFrom that
+		// path registers nothing, which is right: the world tick owns a mob's buff registry.
+		Task IWorldOutbound.SendSpellApplication(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId, uint durationCentiseconds)
+		{
+			return SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, CasterLevel(client)));
+		}
+
+		Task IWorldOutbound.ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId)
+		{
+			return _combat.ApplyNpcDotTick(client, npcHandle, casterHandle, delta, spellId);
 		}
 
 		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.AuraAreasFor(uint spellId)
