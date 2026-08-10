@@ -48,6 +48,11 @@ namespace Faolan.GameServer.World
 		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
 		private const double AmbientMaintainIntervalSeconds = 15.0;
 
+		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and
+		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 150 u range, so a second's granularity is two
+		// units of travel, and the pass costs one distance check per entity in the player's zone.
+		private const double InterestSweepIntervalSeconds = 1.0;
+
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
 		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
@@ -830,6 +835,7 @@ namespace Faolan.GameServer.World
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
 			var regen = new TickAccumulator(RegenIntervalSeconds);
 			var ambientMaintain = new TickAccumulator(AmbientMaintainIntervalSeconds);
+			var interestSweep = new TickAccumulator(InterestSweepIntervalSeconds);
 			var healthReport = new TickAccumulator(SlowTickReportSeconds);
 			var lastTimestamp = Stopwatch.GetTimestamp();
 			var consecutiveFailures = 0;
@@ -1058,6 +1064,16 @@ namespace Faolan.GameServer.World
 						// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 						if (regen.Advance(dt, out var regenElapsed))
 							await RegenerateConnectedPlayers(regenElapsed);
+
+						// #778: the interest pass nobody else drives - the one for a player who is standing still while the
+						// world walks past them. Every other pass is triggered by the PLAYER moving, entering or changing
+						// quests, so without this an NPC that walked out of range stayed frozen on their screen for ever
+						// and one that walked in never appeared.
+						if (interestSweep.Advance(dt, out _))
+						{
+							foreach (var client in Players.Keys)
+								await _output.ResolveInterest(client);
+						}
 
 						// #363: keep the ambient spawn-group pools at strength (respawn killed members). No-op when disabled.
 						if (ambientMaintain.Advance(dt, out _))

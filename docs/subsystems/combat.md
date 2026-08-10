@@ -459,6 +459,27 @@ gentler behaviour. The measurement is worth having; imitating it is a fidelity-v
 obvious win. `--report dynel-cycle` prints all of the above.
 `InterestManager` is still radius-based — changing it is open work on #529.
 
+### The pass a standing player never got (#778)
+
+Every interest pass was driven by the PLAYER — `BroadcastPlayerMove` (they moved), `BroadcastPlayerEntry` (they
+arrived), `RefreshQuestVisibility` (their quests changed). Nothing was driven by the **subject** moving, and
+`BroadcastNpcMove` only sends to viewers who already hold the handle. So for a player standing still, an NPC
+that walked out of the 150 u range kept its last-rendered position for ever (no `n3ToClientQuit`), and one that
+walked in was invisible until they next moved.
+
+⚠️ **It cannot hang off the NPC's own move effect**, which is the obvious fix. A ROUTE walker emits no per-step
+effect at all: since #716 the beat is issued to the client once and walked *there*, and the server only advances
+its model. The entities most in need of this are exactly the ones with no move to hook — which is also why #703
+turned a rare problem into a routine one, a single Old Tarantia beat running up to 98 waypoints.
+
+So the world tick re-runs each connected player's own pass on a 1 s accumulator
+(`WorldSimulation.InterestSweepIntervalSeconds` → `WorldBroadcaster.ResolveInterest`). `moveBody: null` makes it
+Spawn/Despawn only — the movement itself already rides `BroadcastNpcMove` or the issued patrol — and the mover
+arguments are left null because they drive world-OBJECT streaming, and a static object cannot walk into range.
+A subject walking at ~2.2 u/s covers two units per sweep, so the granularity is far finer than the boundary it
+is testing, and the cost is one distance check per entity in the player's zone.
+[V3: StandingPlayerInterestTests.AnNpcThatWalkedOutOfRange_IsDespawnedForAStandingPlayer]
+
 ## NPC counter-attack animation ack (decoded 2026-06-15)
 
 When an NPC swings at the player, retail sends a second `BehaviorControlCenterIIR` (0x642CD3D6) whose

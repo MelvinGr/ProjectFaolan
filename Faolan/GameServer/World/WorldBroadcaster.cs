@@ -227,6 +227,33 @@ namespace Faolan.GameServer.World
 			await DispatchInterest(events, null, client, entity);
 		}
 
+		// #778: re-run one player's interest pass with NOTHING having changed on their side - the world tick calls it on
+		// a slow cadence so that entities which moved THEMSELVES are streamed in and out.
+		//
+		// Every other interest pass is driven by the player: BroadcastPlayerMove (they moved), BroadcastPlayerEntry
+		// (they arrived), RefreshQuestVisibility (their quests changed). Nothing was driven by the SUBJECT moving, and
+		// `BroadcastNpcMove` only sends to viewers who already hold the handle - so for a player standing still, an NPC
+		// that walked out of range froze at its last rendered position for ever, and one that walked in was invisible
+		// until the player next moved. #703 made that routine rather than rare: a route walker travels its whole beat,
+		// and an Old Tarantia beat runs up to 98 waypoints.
+		//
+		// ⚠️ It cannot hang off the NPC's own move effect, which is what the obvious fix would be. A ROUTE walker emits
+		// no per-step effect at all - the beat is issued to the client once and walked THERE (#716), and the server only
+		// advances its model - so the entities most in need of this are exactly the ones with no move to hook.
+		//
+		// `moveBody: null` makes this Spawn/Despawn only; the movement itself already rides BroadcastNpcMove / the
+		// issued patrol. The mover arguments are left null on purpose: they only drive world-OBJECT streaming, and a
+		// static object cannot walk into range.
+		public async Task ResolveInterest(INetworkClient client)
+		{
+			var entity = _sim.PlayerWorldEntity(client);
+			if (entity == null)
+				return;
+
+			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, true);
+			await DispatchInterest(events, null);
+		}
+
 		// Loads a map's static world objects into its zone ONCE, the world-object twin of EnsureZoneNpcs (#424). Before
 		// this the entry path re-queried them per world entry, which is also how a missing `Include(o => o.Words)`
 		// managed to ship invisible doors, vines and destructibles (ef9b59de) - one load per zone is one place to get

@@ -57,6 +57,10 @@ namespace Faolan.GameServer.World
 		// no loot bag can be built for the map.
 		Task ConvertCorpseToLoot(WorldEntity npc);
 
+		// #778: re-run one player's interest pass with nothing having changed on their side, so entities that moved
+		// THEMSELVES are streamed in and out for a player standing still. See WorldBroadcaster.ResolveInterest.
+		Task ResolveInterest(INetworkClient client);
+
 		// #363: top up the ambient spawn-group pools of every loaded zone to their MaxCount (respawn killed members).
 		// Called on a slow cadence from the sim tick; no-op unless the ambient spawner is enabled.
 		Task MaintainAmbientPools();

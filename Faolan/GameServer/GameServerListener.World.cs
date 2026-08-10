@@ -58,6 +58,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcPatrol(npc);
 		}
 
+		Task IWorldOutbound.ResolveInterest(INetworkClient client)
+		{
+			return _broadcaster.ResolveInterest(client);
+		}
+
 		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
 		// send + the world-entry replay) -----------------------------------------------------------------------------
 		Task IWorldOutbound.BroadcastNpcRespawn(WorldEntity npc)

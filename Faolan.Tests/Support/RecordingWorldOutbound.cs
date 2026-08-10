@@ -18,6 +18,7 @@ namespace Faolan.Tests.Support
 		public List<(uint ApplyTo, uint ApplyFrom, uint WireSpellId, uint DurationCentiseconds)> Applications { get; } = [];
 		public List<(uint NpcHandle, uint CasterHandle, int Delta, uint SpellId)> DotTicks { get; } = [];
 		public List<(uint SourceHandle, uint EffectSpellId, float Radius, uint MaxTargets)> Areas { get; } = [];
+		public List<uint> InterestResolves { get; } = [];
 
 		// What ApplySpellArea answers with, and what a spell's aura areas are - set by the test that needs them.
 		public IReadOnlyList<uint> AreaVictims { get; set; } = [];
@@ -52,6 +53,12 @@ namespace Faolan.Tests.Support
 			return Task.FromResult(Auras.TryGetValue(spellId, out var areas)
 				? areas
 				: []);
+		}
+
+		public Task ResolveInterest(INetworkClient client)
+		{
+			InterestResolves.Add(client.Session.Character?.Id ?? 0);
+			return Task.CompletedTask;
 		}
 
 		public Task BroadcastEntityFade(WorldEntity entity)
