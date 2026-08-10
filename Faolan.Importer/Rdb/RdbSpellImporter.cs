@@ -116,11 +116,11 @@ namespace Faolan.Importer.Rdb
 		// client's own tooltip path (#629); see Spell.ManaCost for the decompiled function.
 		private const uint ManaCostField = 0x084;
 
-		// Byte 52 of the record - word 13, its FLAGS word, and the one the client keeps at `spell + 0xC8`. Bit 2 says
-		// how to read the mana cost: set = a percent of the caster's pool, clear = an absolute cost in wire hundredths
-		// (#630, Spell.ManaCostIsPercent). It is NOT a property-table field - it sits in the fixed struct ahead of the
-		// ascending run, which is why three sweeps over that run found nothing.
-		private const int FlagsWordOffset = 52;
+		// The FLAGS word's mana bit: set = a percent of the caster's pool, clear = an absolute cost in wire hundredths
+		// (#630, Spell.ManaCostIsPercent). It is NOT a property-table field - it sits in the head ahead of the
+		// ascending run, which is why three sweeps over that run found nothing. ⚠️ That word is located by
+		// `ReadFlagsWord`, RELATIVE to the run: it was a fixed `record byte 52` until #632 measured the head as
+		// variable-length, and the fixed form read 0 on 936 records.
 		private const int ManaCostIsPercentBit = 2;
 
 		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount CREATURE the summon
@@ -296,7 +296,7 @@ namespace Faolan.Importer.Rdb
 
 				seen++;
 
-				var fields = ReadIncreasingFields(body.AsSpan(12));
+				var fields = ReadIncreasingFields(body.AsSpan(12), out var runStart, out _);
 				var castTime = fields.TryGetValue(CastTimeField, out var cs)
 					? (ushort)Math.Min(cs * 10, ushort.MaxValue)
 					: (ushort)0;
@@ -341,8 +341,7 @@ namespace Faolan.Importer.Rdb
 				var manaCost = fields.TryGetValue(ManaCostField, out var mc) && mc <= ushort.MaxValue
 					? (ushort)mc
 					: (ushort)0;
-				var manaCostIsPercent = body.Length >= FlagsWordOffset + 4 &&
-				                        (body.ReadU32Le(FlagsWordOffset) >> ManaCostIsPercentBit & 1) == 1;
+				var manaCostIsPercent = (ReadFlagsWord(body.AsSpan(12), runStart) >> ManaCostIsPercentBit & 1) == 1;
 
 				// #627: a record carrying field 186 IS a mount summon, and the value is the creature it seats the
 				// player on. Collected here rather than in a pass of its own precisely because it is a column lift
@@ -1057,7 +1056,14 @@ namespace Faolan.Importer.Rdb
 		/// </remarks>
 		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body, out int endOffset)
 		{
+			return ReadIncreasingFields(body, out _, out endOffset);
+		}
+
+		/// <inheritdoc cref="ReadIncreasingFields(System.ReadOnlySpan{byte}, out int)" />
+		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body, out int startOffset, out int endOffset)
+		{
 			endOffset = 0;
+			startOffset = 0;
 			var fields = new Dictionary<uint, uint>();
 
 			var anchor = -1;
@@ -1095,10 +1101,36 @@ namespace Faolan.Importer.Rdb
 
 				fields[fid] = body.ReadU32Le(p + 4);
 				lowest = fid;
+				startOffset = p;
 			}
 
 			return fields;
 		}
+
+		/// <summary>
+		///     ⭐ The record's FLAGS word - bit 2 is the mana-cost mode (#629/#630) and bit 24 the hide-from-tooltip
+		///     bit (#789). It sits **five words before the property run**, not at a fixed offset (#632).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The head's tail is `[flags][298][0][88][0]` immediately in front of the run, and `298`/`88` are
+		///         constant over the whole catalog - which is what pins the position relative to the run rather than
+		///         to the record start.
+		///     </para>
+		///     <para>
+		///         ⚠️ The head is VARIABLE-LENGTH - 60 bytes on 20,538 records, 52 on 959 and 44 on 5 - so the old
+		///         fixed `record byte 52` lands on the wrong word for the short ones. It returned **0 for 936
+		///         records**, which forced their mana cost to read as absolute and their hide bit to read as clear,
+		///         whatever the record said.
+		///     </para>
+		/// </remarks>
+		internal static uint ReadFlagsWord(ReadOnlySpan<byte> body, int runStart)
+		{
+			return runStart >= FlagsWordBeforeRun ? body.ReadU32Le(runStart - FlagsWordBeforeRun) : 0;
+		}
+
+		// Five words: [flags][298][0][88][0], then the run.
+		private const int FlagsWordBeforeRun = 20;
 
 		// The field-id ceiling the run is bounded by. Not a grammar claim - the real ids top out around 900 - but a
 		// word that large is the head rather than a property, and it is what stops the backward walk.

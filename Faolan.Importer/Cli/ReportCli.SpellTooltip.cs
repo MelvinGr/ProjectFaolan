@@ -143,11 +143,12 @@ namespace Faolan.Importer.Cli
 				var body = record.AsSpan(12);
 				bodyBytes += body.Length;
 
+				var fields = RdbSpellImporter.ReadIncreasingFields(body, out var runStart, out var afterRun);
+
 				var spellName = ctx.SpellName(entry.Id);
 				var ranked = spellName.Contains("(Rank ", StringComparison.Ordinal);
 				var nameless = spellName.StartsWith("spell ", StringComparison.Ordinal);
-				if (record.Length >= ManaFlagsWordOffset + 4
-				    && (record.ReadU32Le(ManaFlagsWordOffset) >> HiddenFromTooltipBit & 1) == 1)
+				if ((RdbSpellImporter.ReadFlagsWord(body, runStart) >> HiddenFromTooltipBit & 1) == 1)
 				{
 					hidden++;
 					if (ranked)
@@ -169,7 +170,6 @@ namespace Faolan.Importer.Cli
 						shownNameless++;
 				}
 
-				var fields = RdbSpellImporter.ReadIncreasingFields(body, out var afterRun);
 				fieldBytes += fields.Count * 8;
 				// #632: the record's own name + description sit immediately after the run, and were a large slice of
 				// what that ticket measured as "never looked at".
@@ -236,7 +236,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   \"{ctx.SentenceFor(kind)}\"");
 
 			Console.WriteLine();
-			Console.WriteLine($"  spells carrying the hide-from-tooltip bit (word 13 bit {HiddenFromTooltipBit}, #789): {hidden:N0} / {records:N0}"
+			Console.WriteLine($"  spells carrying the hide-from-tooltip bit (flags bit {HiddenFromTooltipBit}, #789): {hidden:N0} / {records:N0}"
 			                  + $" = {(records == 0 ? 0 : 100.0 * hidden / records):0.0}%");
 			Console.WriteLine($"    named \"(Rank N)\"       : {hiddenRanked,6:N0} / {hidden:N0} flagged = {(hidden == 0 ? 0 : 100.0 * hiddenRanked / hidden):0.0}%"
 			                  + $"   against {shownRanked:N0} / {shown:N0} = {(shown == 0 ? 0 : 100.0 * shownRanked / shown):0.0}% of the rest");
@@ -314,7 +314,7 @@ namespace Faolan.Importer.Cli
 			// ⚠️ ONE scan. `ReadIncreasingFields` is quadratic in the record's word count (it restarts the ascending
 			// walk at every offset), so the run end is taken from this call and threaded down rather than re-derived
 			// where it is needed.
-			var fields = RdbSpellImporter.ReadIncreasingFields(body, out var runEnd);
+			var fields = RdbSpellImporter.ReadIncreasingFields(body, out var runStart, out var runEnd);
 			var elements = ItemTemplateStatModifiers.ParseElements(body);
 
 			// ⭐ #632: the record carries its OWN name and description, and for the 1,594 spells LDB 50210 has no name
@@ -334,8 +334,7 @@ namespace Faolan.Importer.Cli
 
 			// ⚠️ The mana mode is in the record's FLAGS word, not in the property run - three sweeps over the run
 			// found nothing before #630 pinned it at word 13 of the whole record, header included.
-			var manaIsPercent = record.Length >= ManaFlagsWordOffset + 4 &&
-			                    (record.ReadU32Le(ManaFlagsWordOffset) >> ManaCostIsPercentBit & 1) == 1;
+			var manaIsPercent = (RdbSpellImporter.ReadFlagsWord(body, runStart) >> ManaCostIsPercentBit & 1) == 1;
 
 			foreach (var line in HeaderLines(fields, elements, manaIsPercent))
 				Console.WriteLine($"{pad}  {line}");
@@ -951,7 +950,6 @@ namespace Faolan.Importer.Cli
 		// The record's FLAGS word (word 13, whole record, header included) and the bit that says how to read the mana
 		// cost - see RdbSpellImporter, which owns the decode (#630).
 		private const int ManaCostIsPercentBit = 2;
-		private const int ManaFlagsWordOffset = 52;
 
 		/// <summary>
 		///     Bit 24 of that same flags word: the client's HIDE-FROM-TOOLTIP flag on a spell (#789).
@@ -960,8 +958,13 @@ namespace Faolan.Importer.Cli
 		///     <para>
 		///         `FUN_014a3b30(spellId)` loads the referenced spell through `SpellTemplate_t::GetMagicSpell` and
 		///         returns `*(byte*)(spell + 0xCB) &amp; 1`. ⭐ `+0xCB` is byte 3 of the dword at `+0xC8`, which is the
-		///         SAME flags word #629/#630 already reads bit 2 of for the mana mode — the client keeps record word
-		///         13 there. So the flag needed no new field: it is bit 24 of a word we were already reading.
+		///         SAME flags word #629/#630 already reads bit 2 of for the mana mode. So the flag needed no new
+		///         field: it is bit 24 of a word we were already reading.
+		///     </para>
+		///     <para>
+		///         ⚠️ That word is located by `RdbSpellImporter.ReadFlagsWord`, five words BEFORE the property run -
+		///         not at a fixed record offset. The head is variable-length, and the fixed form read 0 on 936
+		///         records, which forced their bit clear whatever the record said (#632).
 		///     </para>
 		///     <para>
 		///         Two branches consult it, and neither is cosmetic. `ConeFormula` calls it on key 88 and, when set,
@@ -1180,8 +1183,8 @@ namespace Faolan.Importer.Cli
 					return false;
 				}
 
-				return record.Length >= ManaFlagsWordOffset + 4
-				       && (record.ReadU32Le(ManaFlagsWordOffset) >> HiddenFromTooltipBit & 1) == 1;
+				RdbSpellImporter.ReadIncreasingFields(record.AsSpan(12), out var runStart, out _);
+				return (RdbSpellImporter.ReadFlagsWord(record.AsSpan(12), runStart) >> HiddenFromTooltipBit & 1) == 1;
 			}
 
 			public string StatName(uint statId)

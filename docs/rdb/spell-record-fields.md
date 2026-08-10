@@ -38,8 +38,28 @@ has no name for**: `Hellfire Stream` (8600) renders as *"spell 8600"* out of the
 `Hellfire Stream`, with its full description. `--report spell-tooltip` falls back to it and marks the line
 `[from the record]`.
 
-⚠️ What is left after all four is a **60-byte fixed head** and a recurring **32-byte `[22][36][0x7E2]…` block**
-that also appears between element lists. On `Hellfire Stream` those two are the whole of the remaining 92 bytes.
+### ⭐ The head, and why its length matters
+
+The head is **variable**: 60 bytes on 20,538 records, 52 on 959 and 44 on 5. Read against the property run's
+start, the last five words are constant in shape —
+
+```
+[flags][298][0][88][0]   then the property run
+```
+
+— and `298` / `88` hold catalog-wide, which is what pins the FLAGS word to `runStart - 20`. Everything earlier is
+`[51051 magic][a][15][23][b][76][0][30][c][0]`, where `15`, `23`, `76`, `0`, `30` and `0` are catalog-wide
+constants and the optional `[76][0]` pair is what makes the short head short. Four words carry data (`a`: 6
+distinct values, `b`: 26, `c`: 14, and the flags word: 1,364).
+
+⚠️ **The flags word was read at a FIXED `record byte 52` until #632**, and the head being variable-length means
+that lands on the wrong word for the short ones — it returned **0 on 936 records**, forcing their mana cost to
+read as absolute and their hide-from-tooltip bit to read as clear whatever the record said. Fixing it moved 20
+spells' `ManaCostIsPercent` and 78 spells into the hidden set. `RdbSpellImporter.ReadFlagsWord` is the one place
+that locates it.
+
+⚠️ What is left is the head's four data words and a recurring **32-byte `[22][36][0x7E2]…` block** that also
+appears between element lists. On `Hellfire Stream` those are the whole of the remaining 92 bytes.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the
