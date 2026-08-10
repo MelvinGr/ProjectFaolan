@@ -35,6 +35,30 @@ namespace Faolan.Tests
 			Assert.Equal(new[] { "broadcastcycle", "conversation1", "conversation2", "event", "eventactions", "sendtell" }, byChannel);
 		}
 
+		[Fact]
+		public void EveryHARVESTEDLine_SitsOnAnAmbientChannel()
+		{
+			// #717: a harvested line is exactly a row with no `key=` - the bark category is plaintext, so the LDB
+			// harvest has no key to record and an all-zero FormatKey is how the two provenances are told apart (a
+			// CAPTURED bark always has one; NpcChatterCodec.ToRow throws rather than producing a zero).
+			//
+			// On a CONDITIONAL channel the script's own state picks the line, so a random pick from its siblings says
+			// something the condition would have excluded. `RenownCrier/sendtell` is the proof: 18 lines, 13 of them
+			// stages of a guild-advertising transaction. And the harvest's slot-free filter SELECTS AGAINST the NPC's
+			// own lines there - all 13 carry a slot, so the one that got through was `10` "Excuse me, I wanted to ask
+			// you something.", which the crier then greeted a player with in-client.
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var harvested = db
+				.NpcChatter.Include(c => c.Parameters)
+				.AsNoTracking()
+				.AsEnumerable()
+				.Where(c => c.FormatKey.Key1 == 0 && c.FormatKey.Key2 == 0 && c.FormatKey.Key3 == 0 && c.FormatKey.Key4 == 0)
+				.ToList();
+
+			Assert.NotEmpty(harvested); // the harvest is the point of #331 - a vacuous pass would mean it stopped running
+			Assert.All(harvested, c => Assert.Equal(BarkTrigger.Ambient, NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(c))));
+		}
+
 		[Theory]
 		[InlineData("conversation1", BarkTrigger.Ambient)] // RenownBystanderLovers / RenownBystanderChild - overheard idle chatter
 		[InlineData("conversation2", BarkTrigger.Ambient)] // RenownBystanderWomen / RenownBystanderLovers
@@ -76,18 +100,27 @@ namespace Faolan.Tests
 			}
 		}
 
-		// And the asymmetry itself, pinned: an addressed bark is never ambient, but an unaddressed one may still be a
-		// tell. If a re-harvest ever puts a session slot on a `conversation*` line, the test above fails and this one
-		// says what the rule was.
+		// The crier's greeting, and why there is exactly ONE of it.
+		//
+		// This used to assert TWO tells, and cited the second - SayInChat 10, carrying no session slot - as the corpus'
+		// evidence that an unaddressed bark can still be a tell. It was not a captured line at all: the corpus only ever
+		// caught him saying 57, and 10 came from #331's LDB sibling harvest. Resolved against the client, 10 reads
+		// "Excuse me, I wanted to ask you something." out of a `sendtell` set that is otherwise a guild-advertising
+		// transaction, and in-client he greeted a player with it (#717). Harvesting a conditional channel is what put it
+		// there, and the harvest no longer does.
+		//
+		// The one-way rule TriggerOf implements is unchanged - the CHANNEL states the cue, a session slot only confirms
+		// it - but the corpus no longer holds a counter-example to the converse, so nothing here claims one.
 		[Fact]
-		public void TheCrier_HasAnAddressedAndAnUnaddressedTell()
+		public void TheCrier_HasOneTell_AndItIsADDRESSED()
 		{
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var tells = db.NpcChatter.AsNoTracking().Include(c => c.Parameters).Where(c => c.Channel == "sendtell").ToList();
 
-			Assert.Equal(2, tells.Count);
-			Assert.All(tells, t => Assert.Equal(BarkTrigger.Detection, NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(t))));
-			Assert.Single(tells, t => t.Parameters.Any(p => RemoteFormatSession.IsSessionBarkSlot(p.Name)));
+			var tell = Assert.Single(tells);
+			Assert.Equal(57u, tell.SayInChat);
+			Assert.Equal(BarkTrigger.Detection, NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(tell)));
+			Assert.Contains(tell.Parameters, p => RemoteFormatSession.IsSessionBarkSlot(p.Name));
 		}
 
 		[Fact]

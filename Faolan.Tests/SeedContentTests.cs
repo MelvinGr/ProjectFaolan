@@ -1099,6 +1099,11 @@ namespace Faolan.Tests
 		// The second assertion is the one that matters. `RenownBystanderLovers` is one conversation shared by the
 		// Nobleman and the Noblewoman, and its lines interleave the two speakers - so harvesting it would put her lines
 		// in his mouth. If a keyless Lovers row ever appears, the single-speaker guard has been lost.
+		//
+		// #717 added a THIRD guard and lowered the count from 9 to 8: the harvest only fills AMBIENT channels now. A
+		// conditional channel's siblings belong to the script's states, and the crier's `sendtell` set proved it - 18
+		// lines, 13 of them stages of a guild-advertising transaction, and the slot-free filter selected against his own
+		// lines to leave "Excuse me, I wanted to ask you something." as a greeting.
 		[Fact]
 		public async Task HarvestedBarks_AreInTheSeed_AndNoTwoHanderGroupWasHarvested()
 		{
@@ -1108,7 +1113,7 @@ namespace Faolan.Tests
 			var barks = await db.NpcChatter.AsNoTracking().ToListAsync(ct);
 			var harvested = barks.Where(b => b.FormatKey.IsEmpty).ToList();
 
-			Assert.True(harvested.Count >= 9, $"The seed carries {harvested.Count} harvested bark(s); the sweep yields 9 across the single-speaker groups.");
+			Assert.True(harvested.Count >= 8, $"The seed carries {harvested.Count} harvested bark(s); the sweep yields 8 across the single-speaker AMBIENT groups.");
 			Assert.True(barks.Count > harvested.Count, "Every bark is keyless - the CAPTURED lines have lost their keys.");
 
 			// The two-hander must never be harvested onto either speaker.
@@ -1118,6 +1123,9 @@ namespace Faolan.Tests
 
 			// A harvested line must never carry a template slot: its wire form would need a <parameter> nobody fills.
 			Assert.All(harvested, b => Assert.DoesNotContain("{", b.Group, StringComparison.Ordinal));
+
+			// #717: and never a CONDITIONAL channel, where the script's state picks the line rather than a random draw.
+			Assert.All(harvested, b => Assert.DoesNotContain(b.Channel, new[] { "sendtell", "eventactions", "event" }));
 		}
 
 		// #303: the abilities a LEVELLED character earns reach all twelve classes, not just the four the corpus has a

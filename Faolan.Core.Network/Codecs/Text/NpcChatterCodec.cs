@@ -124,7 +124,13 @@ namespace Faolan.Core.Network.Codecs.Text
 				ChannelCount = bark.ChannelCount,
 				Group = bark.Group,
 				Category = bark.Category,
-				FormatKey = LdbKey.Decode(bark.Key) ?? new ProtoDecryptionKey(),
+				// A CAPTURED bark always carries a decodable `key=` - all 25 in the corpus do, escapes and all. So a
+				// failed decode here is a parse defect, and it THROWS rather than coercing to an all-zero key (#717).
+				// The coercion it replaces was unreachable-but-silent: the importer's byte-exact round-trip would have
+				// caught it, since a zero key rebuilds a different `key=` string - but it would have said "not
+				// round-trippable" rather than "the key did not decode", which is a much worse place to start.
+				FormatKey = LdbKey.Decode(bark.Key)
+				            ?? throw new CodecParseException($"NpcChatter bark {bark.Group}/{bark.Channel}({bark.SayInChat}) carries a key that is not an LdbKey: \"{bark.Key}\""),
 				Knubot = bark.Knubot
 			};
 
@@ -171,10 +177,16 @@ namespace Faolan.Core.Network.Codecs.Text
 		//
 		// The session slot corroborates this, but ONE WAY only, and the difference is why the channel is what gets
 		// switched on. Every bark carrying a slot (`DetectedChar.name`, `Target.Name`) is non-ambient - it names a
-		// player, so something had to pick that player - and no ambient bark carries one. The converse is false: the
-		// crier has TWO `sendtell` lines and only one names anybody (SayInChat 57; SayInChat 10 is an unaddressed
-		// tell). A tell still has exactly one recipient, so it is still said on detection. The channel states the CUE;
-		// the slot only decides whether the body has to be built per-recipient (see Addressed).
+		// player, so something had to pick that player - and no ambient bark carries one. The converse does not follow:
+		// a tell has exactly one recipient whether or not it names them, so an unaddressed tell would still be said on
+		// detection. The channel states the CUE; the slot only decides whether the body has to be built per-recipient
+		// (see Addressed).
+		//
+		// ⚠️ This paragraph used to cite the crier's SayInChat 10 as the corpus' unaddressed tell. It was not a captured
+		// line - the corpus only holds 57 - but a #331 LDB sibling, and a wrong one: it reads "Excuse me, I wanted to ask
+		// you something." out of a `sendtell` set that is otherwise a guild-advertising transaction, and in-client he
+		// greeted a player with it. The harvest no longer touches conditional channels (#717), so the corpus now holds no
+		// counter-example, and none is claimed.
 		//
 		// ⚠️ The corpus holds only these six channel values (25 rows / 8 NPC types). An unknown channel falls to
 		// Ambient deliberately: a bark on a clock is a cosmetic line at the wrong moment, while a bark wired to a cue

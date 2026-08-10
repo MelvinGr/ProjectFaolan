@@ -188,8 +188,19 @@ namespace Faolan.Importer.Modules
 			// <parameter> filled from live server state, and adding the row without it would put an unrenderable bark
 			// in an NPC's mouth.
 			//
+			// ⚠️ AMBIENT channels only (#717). On a CONDITIONAL channel the script's own state picks the line, so a
+			// random pick from its siblings says something the condition would have excluded. `RenownCrier/sendtell` is
+			// the proof: 18 lines, of which 13 are stages of a guild-advertising TRANSACTION ("For only 20 silver,
+			// {DetectedGuildName} can benefit from my influence", "...for another {AdvertiseMinutes} minutes"). Worse,
+			// the slot-free filter above SELECTS AGAINST the NPC's own lines there - all 13 carry a slot, so the one
+			// line that got through was `10` "Excuse me, I wanted to ask you something.", which is not a thing the
+			// crier says on noticing you at all. In-client he greeted with it, which is how this was found.
+			//
 			// The row's FormatKey stays EMPTY, and that is correct rather than a gap: the key is only read when a
-			// string is marked encrypted, and this category is not (see BarkCatalog). A harvested line needs no key.
+			// string is marked encrypted, and this category is not - `--report npc-chatter` prints
+			// "category 50015 (sayinchat): flags=0 -> PLAINTEXT: no key needed". A harvested line needs no key, and a
+			// zero key is therefore how a harvested row is TOLD APART from a captured one (see NpcChatterCodec.ToRow,
+			// which now throws rather than producing one).
 			if (catalog is { IsPlaintext: true })
 			{
 				var speakers = captured
@@ -202,6 +213,12 @@ namespace Faolan.Importer.Modules
 					{
 						if (speakers.GetValueOrDefault((suffix.Group, suffix.Channel, suffix.ChannelCount)) != 1)
 							continue; // a two-hander - see above
+
+						// #717: a conditional channel's siblings belong to the script's STATES, not to a random pick.
+						// Asked through the same TriggerOf the runtime dispatches on, so the harvest and the send cannot
+						// disagree about which channels are ambient.
+						if (NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(byKey.Values.First(r => r.Channel == suffix.Channel && r.Group == suffix.Group))) != BarkTrigger.Ambient)
+							continue;
 
 						foreach (var (sayInChat, text) in catalog.Lines(suffix.Channel, suffix.ChannelCount, suffix.Group))
 						{

@@ -193,11 +193,17 @@ standing there for ten minutes, or to nobody at all — and the Damsel's cry for
 encounter trigger and again on the clock.
 
 The session slot corroborates the split but runs **one way only**: every bark carrying one (`DetectedChar.name`,
-`Target.Name`) is non-ambient, and no ambient bark carries one — but the converse is false. The crier has *two*
-`sendtell` lines and only `SayInChat` 57 names anybody; `SayInChat` 10 is an unaddressed tell. A tell still has
-exactly one recipient, so it is still said on detection. Hence the channel is the discriminator and the slot only
-decides whether the body must be built per-recipient (`NpcChatterBarks.Addressed`, #691).
-[V3: NpcBarkTriggerTests.TheCrier_HasAnAddressedAndAnUnaddressedTell]
+`Target.Name`) is non-ambient, and no ambient bark carries one — but the converse does not follow. A tell has exactly
+one recipient whether or not it names them, so an unaddressed tell would still be said on detection. Hence the channel
+is the discriminator and the slot only decides whether the body must be built per-recipient
+(`NpcChatterBarks.Addressed`, #691). [V3: NpcBarkTriggerTests.TheCrier_HasOneTell_AndItIsADDRESSED]
+
+⚠️ This paragraph used to cite the crier's `SayInChat` 10 as the corpus' unaddressed tell. **It was never a captured
+line** — the corpus holds only 57. It came from the #331 LDB sibling harvest, and resolved against the client it reads
+*"Excuse me, I wanted to ask you something."* out of a `sendtell` set that is otherwise a guild-advertising
+transaction (18 lines, 13 of them mid-sale). In-client the crier greeted a player with it. The harvest therefore fills
+**ambient channels only** (#717): on a conditional channel the script's state picks the line, and the harvest's
+slot-free filter selects *against* the NPC's own lines there, since those are exactly the ones carrying slots.
 
 Detection state is per NPC (`WorldEntity.GreetedPlayers`): a player is greeted once on arrival and forgotten again
 only after leaving `WorldState.GreetingForgetRange`, which is deliberately wider than `GreetingRange` so someone
