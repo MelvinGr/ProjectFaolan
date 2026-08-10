@@ -311,13 +311,15 @@ namespace Faolan.Importer.Cli
 			}
 
 			var body = record.AsSpan(12);
-			var fields = RdbSpellImporter.ReadIncreasingFields(body);
+			// ⚠️ ONE scan. `ReadIncreasingFields` is quadratic in the record's word count (it restarts the ascending
+			// walk at every offset), so the run end is taken from this call and threaded down rather than re-derived
+			// where it is needed.
+			var fields = RdbSpellImporter.ReadIncreasingFields(body, out var runEnd);
 			var elements = ItemTemplateStatModifiers.ParseElements(body);
 
 			// ⭐ #632: the record carries its OWN name and description, and for the 1,594 spells LDB 50210 has no name
 			// for it is the only one there is - `Hellfire Stream` (8600) renders as "spell 8600" out of the LDB. The
 			// LDB still wins where it has one: it is the LOCALISED string and this is the raw authoring name.
-			RdbSpellImporter.ReadIncreasingFields(body, out var runEnd);
 			var inline = RdbSpellImporter.ReadStringBlock(body, runEnd);
 			if (name.StartsWith("spell ", StringComparison.Ordinal) && inline.Name.Length > 0)
 				name = $"{inline.Name} [from the record]";
@@ -360,7 +362,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			foreach (var line in AccountingLines(ctx, record, fields, elements))
+			foreach (var line in AccountingLines(ctx, record, fields, elements, inline.Bytes))
 				Console.WriteLine($"{pad}  {line}");
 		}
 
@@ -891,7 +893,7 @@ namespace Faolan.Importer.Cli
 		// How much of the record the tooltip above actually consumed. The three regions are the fixed head, the
 		// ascending property run, and the element list; anything left over is bytes nobody has looked at (#632).
 		private static IEnumerable<string> AccountingLines(TooltipContext ctx, byte[] record, Dictionary<uint, uint> fields,
-			IReadOnlyList<ItemTemplateStatModifiers.Element> elements)
+			IReadOnlyList<ItemTemplateStatModifiers.Element> elements, int textBytes)
 		{
 			var body = record.Length - 12;
 			var elementBytes = elements.Sum(e => e.WidthBytes);
@@ -904,14 +906,13 @@ namespace Faolan.Importer.Cli
 			// is what says which of two identical-looking elements belong to the same list.
 			var lists = ItemTemplateStatModifiers.ParseElementLists(record.AsSpan(12));
 			var listBytes = lists.Count * 12;
-			// #632: the record's own name + description, immediately after the property run.
-			RdbSpellImporter.ReadIncreasingFields(record.AsSpan(12), out var afterRun);
-			var text = RdbSpellImporter.ReadStringBlock(record.AsSpan(12), afterRun);
-			var accounted = elementBytes + fieldBytes + listBytes + text.Bytes;
+			// #632: the record's own name + description, immediately after the property run. Measured by the caller,
+			// which already has the run end.
+			var accounted = elementBytes + fieldBytes + listBytes + textBytes;
 
 			yield return "--";
 			yield return $"record {body} B body: {elements.Count} element(s) in {lists.Count} list(s) {elementBytes} B + {listBytes} B header "
-			             + $"+ {fields.Count} property field(s) {fieldBytes} B + {text.Bytes} B name/description "
+			             + $"+ {fields.Count} property field(s) {fieldBytes} B + {textBytes} B name/description "
 			             + $"= {accounted} B ({(body == 0 ? 0 : 100.0 * accounted / body):0.#}%), {body - accounted} B unaccounted";
 
 			var unparsed = ItemTemplateStatModifiers.UnparsedElementHeads(record.AsSpan(12));
