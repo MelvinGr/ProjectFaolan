@@ -339,5 +339,6 @@ for, so it never appears — the same shape as `Knockback`'s key 191.
 ⭐ **A spell can suppress its own tooltip line.** The presence test is not `id != 0` but
 `id != 0 && (spell->0xCB & 1) == 0` — `FUN_014a3b30` loads the referenced spell through
 `SpellTemplate_t::GetMagicSpell` and returns one bit of it. The same predicate gates `ConeFormula`, which draws
-**nothing at all** when its effect spell has the bit set. We do not yet know which stored field carries it, so
-the renderer uses `id != 0`; that can only draw a line retail omits, never a wrong number in one.
+**nothing at all** when its effect spell has the bit set. Which stored field populates that byte is open work,
+tracked in Gitea #789; until then the renderer uses `id != 0`, which can only draw a line retail omits, never a
+wrong number in one.

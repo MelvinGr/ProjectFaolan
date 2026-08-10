@@ -456,8 +456,8 @@ namespace Faolan.Importer.Cli
 
 				// ⚠️ Presence here is `id != 0` where the client's is `id != 0 && (spell->0xCB & 1) == 0` - a HIDDEN
 				// bit on the referenced spell (`FUN_014a3b30`, the same predicate that makes `ConeFormula` draw
-				// nothing at all). We do not know which stored field carries that bit, so this renders a side retail
-				// would sometimes suppress. It can only draw a line retail omits, never a wrong number in one.
+				// nothing at all). Which stored field carries that bit is open work (#789), so this renders a side
+				// retail would sometimes suppress. It can only draw a line retail omits, never a wrong number in one.
 				var self = onSelf != 0 ? $"{ctx.SpellName(onSelf)} ({onSelf})" : null;
 				var target = onTarget != 0 ? $"{ctx.SpellName(onTarget)} ({onTarget})" : null;
 
