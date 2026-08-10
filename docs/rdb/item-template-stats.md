@@ -146,6 +146,9 @@ ids listed in it and nothing otherwise (the suffix string at `01fbcf18` is liter
 in that list; 972 is not.** A crit chance is a percentage; a `+1 Strength` is not, so 971 was never the amount of
 an attribute bonus.
 
+That helper is now transcribed whole — `StatUnitSuffix` (#775), the twin of `StatDisplayScale`; see
+[`spell-tooltip.md`](spell-tooltip.md) for why the two are genuinely different tables.
+
 That reading is gone from the import. **Nothing replaces it:** 972 names an attribute but states no amount — it
 reads like the spell record's `ScalingAttribute`, i.e. what the weapon scales OFF rather than a bonus it grants —
 and 971/973 are crit stats whose wire scale is unmeasured, so emitting them would be inventing a number. Field 972

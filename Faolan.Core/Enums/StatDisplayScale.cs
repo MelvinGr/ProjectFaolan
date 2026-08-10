@@ -51,6 +51,13 @@ namespace Faolan.Core.Enums
 	///         ⚠️ A divisor of 1 means the client prints the raw integer - it takes a different formatter, so "×1" is a
 	///         genuine answer here and not the absent-from-the-table default it used to be.
 	///     </para>
+	///     <para>
+	///         ⚠️ <b>This is only half of rendering a value.</b> The other half is the UNIT the client writes after it,
+	///         which is a DIFFERENT function over a DIFFERENT id set - <see cref="StatUnitSuffix" />, transcribed from
+	///         <c>FUN_01119f20</c> (#775). Neither is a function of the other: <c>0x001 HealthMax</c> is a ÷100 that
+	///         draws nothing and <c>0x348 DamageMultiplier</c> a ÷1 that draws <c>%</c>. It also answers the note on
+	///         <c>0x0177 FatalityChance</c> below - its trailing percent sign is that suffix, not a scale.
+	///     </para>
 	/// </remarks>
 	public static class StatDisplayScale
 	{

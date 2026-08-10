@@ -144,6 +144,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB only, no corpus: a spell's in-client TOOLTIP rendered out of our own decode, chain and all - the
+			// end-to-end gate on the spell record (#775). --report-arg <spellId>[,<id>...][@<casterLevel>].
+			if (report == "spell-tooltip")
+			{
+				SpellTooltip(RdbDir(), arg);
+				return 0;
+			}
+
 			// One encrypted string, from a key pasted out of a capture: --report-arg <category>:<id>:<wire key>.
 			if (report == "ldb-decrypt")
 			{
@@ -4081,23 +4089,11 @@ namespace Faolan.Importer.Cli
 				.ToArray();
 			// What each importer actually consumes today, so the report can say READ vs unread rather than just
 			// enumerating. Keep in step with the importers; a field that moves here without moving there is exactly
-			// the drift this report exists to surface.
-			// ⚠️ Keep this in step with RdbSpellImporter's `*Field` constants - it is a hand-maintained list, and it
-			// had DRIFTED: it claimed 79 (icon), 129, 321 and 551 were read when nothing reads any of them, which
-			// inflated "read by the importer" from 13 to 17 and hid four gaps behind a green-looking column (#633).
-			// The names on 129 and 551 were wrong too - the client calls them SpellCriticalDamage and StackingOrder.
-			// It drifts the OTHER way too: 447 was imported by #349 and never added here, so the report was calling a
-			// read field unread.
+			// the drift this report exists to surface. The SPELL half lives on SpellFieldsRead (shared with
+			// `--report spell-tooltip`, which is the per-spell view of this census) - see its remarks for the drift
+			// this arrangement is meant to make impossible.
 			var read = type == SpellTemplateType
-				? new Dictionary<uint, string>
-				{
-					[8] = "duration", [123] = "rank", [125] = "level", [128] = "spell line (#590)",
-					[132] = "mana cost, mode from the flags word (#629/#630)", [186] = "mount creature (#627)",
-					[287] = "range", [294] = "cast time", [447] = "channeling interval (#349)",
-					[347] = "splash radius (#626)", [348] = "splash damage (#626)", [349] = "splash max targets",
-					[499] = "mount quality (#627)", [847] = "scaling attribute (#592)",
-					[129] = "spell critical damage (#633)", [147] = "spell critical chance (#633)"
-				}
+				? SpellFieldsRead
 				: new Dictionary<uint, string> { [74] = "value", [104] = "bag", [499] = "quality", [972] = "primary attribute", [1331] = "resource bag" };
 
 			using var rdb = OpenRdb(rdbDir);

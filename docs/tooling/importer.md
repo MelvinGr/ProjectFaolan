@@ -390,7 +390,12 @@ with its remaining time (#601), while an EXCESS cannot be a remainder and is the
 `--report-arg <name substring or id>` drills one spell and prints each apply with its capture and offset),
 `spell-refs` (`--report-arg <spellId>[,...]`: every spell record whose GameAction element region NAMES the given
 spell, printed by key — the inverse of `spell-template`. A buff whose own record is nearly empty has its mechanics
-stated by whatever APPLIES it, and that applier is only findable by scanning the corpus for the id), … — the report's
+stated by whatever APPLIES it, and that applier is only findable by scanning the corpus for the id),
+`spell-tooltip` (`--report-arg <spellId>[,...][@<casterLevel>]`: the spell's in-client TOOLTIP rendered out of our
+own decode — the effect CHAIN followed, each element turned into the client's own LDB sentence, each magnitude
+through the client's divisor and unit suffix, and an accounting line saying how much of the record that consumed.
+`--report-arg census` scores the same renderer over all 21,502 records instead of printing one. RDB only, no
+corpus. See [`../rdb/spell-tooltip.md`](../rdb/spell-tooltip.md), #775), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

@@ -1,0 +1,34 @@
+# The TOKEN names the client's item/spell tooltip builder (FUN_0149e450) looks LDB category 170 up by.
+# Recovered by tools/ghidra/DumpTooltipTokens.java; `ldbId` is Elf28.Of(token), which is how a token keys the LDB.
+# All 30 hash onto an id category 170 actually ships - see docs/rdb/spell-tooltip.md.
+callSite	tokenAddr	token	ldbId
+0149e718	0x208d1bc	GameActionGroup_Skills	253163267
+0149e855	0x208d1d4	IncreaseAOERadius	22958195
+0149e885	0x208d1e8	DecreaseAOERadius	21274739
+0149ec0e	0x208d1fc	AddAbsorbEndSpell	226182908
+0149ecf8	0x208d210	AddComboProcBoth	54499416
+0149ee3b	0x208d238	AddComboProcOther	67518962
+0149f0a4	0x208d224	AddComboProcSelf	53515990
+0149f246	0x208d2d0	PercentChance	240580757
+0149f321	0x208d2ec	TimesPerMinute	117759957
+0149f44d	0x208d308	ChanceOf	243572422
+0149f4f0	0x208d31c	OnSelf	90414118
+0149f60a	0x208d324	OnTarget	61376676
+0149f9ef	0x1fc75bc	ValueModUnitMeters	11340835
+014a01aa	0x208d380	IncreasesHitPercent	256237844
+014a09d5	0x208d3e0	ColumnAddTargetsWithDistance	243591253
+014a0c01	0x208d400	HitPercentHeal	214837020
+014a0cb3	0x208d410	HitPercentDamage	241982229
+014a0d9b	0x208d424	HitPercentHealStatByOtherStat	71088740
+014a1120	0x208d464	PerSecond	127652996
+014a14df	0x208d470	AbsorbShield	65494692
+014a1888	0x208d49c	UpgradeCombo_DecreaseDamage	248531685
+014a1968	0x208d4d8	UpgradeCombo_DecreaseCooldown	239053278
+014a1a95	0x208d4f8	ModifyAsRating	220690567
+014a1b87	0x208d508	AddPercentSkillModifierSameStat	199802468
+014a1e7c	0x208d57c	IncreaseComboDPS	243704851
+014a1ed8	0x208d590	DecreaseComboDPS	243600147
+014a2004	0x208d5c0	DecreaseComboCriticalChance	226291349
+014a2143	0x208d5f8	DecreaseComboHateAdjustment	15470980
+014a2241	0x208d614	ChangeComboDamageType	201643925
+014a2633	0x208d3bc	IncreaseItemDelay	29583529
