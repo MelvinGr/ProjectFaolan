@@ -8,7 +8,6 @@ using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Tests.Support;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Tests
@@ -102,10 +101,10 @@ namespace Faolan.Tests
 				db.Database.ExecuteSqlRaw("PRAGMA wal_checkpoint(TRUNCATE);");
 			}
 
-			// Disposing the context returns its connection to Microsoft.Data.Sqlite's POOL rather than closing it, so
-			// the file (and any -wal/-shm) stays open and the move can fail or copy a locked, mid-checkpoint file.
-			SqliteConnection.ClearAllPools();
-
+			// The context above is disposed by its `using`, and `Options` opens these databases with `Pooling=False`, so
+			// that really closes the connection and the move below sees an unlocked, checkpointed file. This used to
+			// call `SqliteConnection.ClearAllPools()` for the same effect - see Delete for why reaching into a
+			// process-global pool from a parallel test run was the wrong tool.
 			try
 			{
 				File.Move(building, path);
@@ -169,10 +168,18 @@ namespace Faolan.Tests
 		// A writable throwaway SQLite database at `path` (typically a temp file). Routed through the shared
 		// UseFaolanDatabase (SQLite - the test fixture is always SQLite, see above) so it inherits the right migrations
 		// assembly + settings. Opt into lazy-loading proxies for the few tests that need them.
+		//
+		// ⚠️ `Pooling=False`, and that is not a performance detail. Disposing a context otherwise RETURNS its connection
+		// to Microsoft.Data.Sqlite's pool rather than closing it, so the file stays open and `Delete` below cannot
+		// remove it - which is why Delete used to reach for `SqliteConnection.ClearAllPools()`. That call is
+		// PROCESS-GLOBAL, and xUnit runs test classes in PARALLEL: one class finishing its cleanup disposed the pooled
+		// connection another class was mid-query on, and the suite failed intermittently with
+		// `ObjectDisposedException: SQLitePCL.sqlite3` in whichever test happened to be running. Not pooling in the
+		// first place removes both the leak and the cross-test reach.
 		public static DbContextOptions<DatabaseContext> Options(string path, bool lazyLoadingProxies = false)
 		{
 			var builder = new DbContextOptionsBuilder<DatabaseContext>();
-			builder.UseFaolanDatabase(FaolanDbProvider.Sqlite, $"Data Source={path}");
+			builder.UseFaolanDatabase(FaolanDbProvider.Sqlite, $"Data Source={path};Pooling=False");
 			if (lazyLoadingProxies)
 				builder.UseLazyLoadingProxies();
 
@@ -191,13 +198,15 @@ namespace Faolan.Tests
 		// ⚠️ `File.Delete(path)` alone LEAKS. These databases run in WAL mode, so SQLite writes `<path>-wal` and
 		// `<path>-shm` beside the main file, and deleting only the file leaves those behind - 3,856 orphaned `-wal`
 		// files totalling 2.0 GB had accumulated in /tmp, which is a RAMDISK here, and filled it until the whole
-		// suite failed with ENOSPC. The pool is cleared first because disposing a context RETURNS its connection to
-		// Microsoft.Data.Sqlite's pool rather than closing it, so the files stay open and the delete silently fails.
+		// suite failed with ENOSPC. Deleting all three is what closes that.
 		//
-		// BuildFixture above already does this dance; the per-test cleanups did not.
+		// ⚠️ It does NOT clear the connection pool any more. `SqliteConnection.ClearAllPools()` is process-global and
+		// xUnit runs test classes in PARALLEL, so one class's cleanup disposed the pooled connection another class was
+		// mid-query on - an intermittent `ObjectDisposedException: SQLitePCL.sqlite3` landing on whichever test was
+		// unlucky. `Options` opens these databases with `Pooling=False` instead, so a disposed context really closes its
+		// connection and there is no pool to reach into.
 		public static void Delete(string path)
 		{
-			SqliteConnection.ClearAllPools();
 			foreach (var file in new[] { path, $"{path}-wal", $"{path}-shm" })
 			{
 				try
