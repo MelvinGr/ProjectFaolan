@@ -286,8 +286,8 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B) and
 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Decoded past their shape: 1000505, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513, 1000517,
-1000518, 1000080/1000081 and 1065103 - see the sections below. The rest are counts and strides only, and open
+Decoded past their shape: 1000043, 1000505, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
+1000517, 1000518, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
@@ -501,6 +501,59 @@ mechanism — with a default per hair type and a table of exceptions per (hair t
 Nothing imports it. It is client-side appearance: the client already loads both tables and owns the mesh swap, and
 the server never names a hair mesh. Recorded here because #469 asks what the tables ARE, and because these two were
 the only ones with no name at all.
+
+## ⭐ Decoded: 1065101 + 1000043 `FeatClassTable_c` — the feat-tree registry, and the ALTERNATE ADVANCEMENT trees
+
+Two tables of the `FeatClassTable_c` cluster, and together they are the **whole feat-tree structure** — including
+the AA trees Gitea #150 had been unable to find anywhere.
+
+```
+1065101   49 records   [u32 treeId][u32 classId][u32 0][u32 0]
+1000043 9916 records   [u32 featId][u32 classId][u32 levelGate][u32 lineId][u32 0][u32 treeId][u32 rank]…
+```
+
+`1065101` is the **registry**: 48 trees plus one zero row, and exactly **4 trees per class** across the twelve
+playable `ConanClass` values. `1000043` is the **membership**, and its own `classId` agrees with the registry's
+on every row.
+
+### ⭐ Twelve of the 48 are the AA trees, and they separate on three independent axes
+
+| | the other 36 | trees `1000177`–`1000190` |
+|---|---|---|
+| rows | 54–88 | **240**, every one |
+| line ids | 120,000–431,901 | **≥ 1,020,000** |
+| level gates | 10 / 15 / 20 / 25 / 30 | **20 and 80** |
+
+⭐ **80 is the level cap**, which is exactly what post-80 progression means — and there are twelve of them, one
+per playable class:
+
+```
+1000177 DarkTemplar   1000178 Guardian     1000179 Conqueror    1000180 Barbarian
+1000181 BearShaman    1000182 Demonologist 1000183 Assassin     1000184 Necromancer
+1000186 TempestOfSet  1000188 HeraldOfXotli 1000189 PriestOfMitra 1000190 Ranger
+```
+
+### ⭐⭐ And each AA tree's 240 lines reproduce the client's three PERK LINES, from the data
+
+The client asserts `"PerkLine is not 1, 2 or 3 on spell id %d"` and names them `PerkGeneral` / `PerkArchetype` /
+`PerkClass` (#150). Bucketing each tree's line ids by prefix and asking **who else has the same set** produces
+exactly that, with no fitting:
+
+| bucket | lines | shared by | reads as |
+|---|---:|---|---|
+| `144xxxx` | **105** | all **12** classes | `PerkLine 1` — **General** |
+| `140xxxx` | **62** | the **3** classes of one archetype — Assassin/Barbarian/Ranger, Conqueror/DarkTemplar/Guardian, BearShaman/PriestOfMitra/TempestOfSet, Demonologist/HeraldOfXotli/Necromancer | `PerkLine 2` — **Archetype** |
+| `10xxxxx` | **73** | **one** class (`102xxxx` Guardian, `107xxxx` DarkTemplar, `112xxxx` Barbarian, …) | `PerkLine 3` — **Class** |
+
+`105 + 62 + 73 = 240`. ⭐ The four archetype groups are AoC's own Rogue / Soldier / Priest / Mage, three classes
+each, recovered here from nothing but which line ids two trees have in common.
+
+⚠️ **Which bucket is PerkLine 1 versus 3 is an inference** from the client's naming (`1 = PerkGeneral`,
+`3 = PerkClass`) laid over the sharing structure. The structure is measured; the numbering is read onto it.
+
+⚠️ **The perk NAMES are not reachable.** `1000043`'s `featId` column matches **neither** `Feats.Id` nor
+`FeatIdMaps.WireFeatId` — 0 of 9,916 in both — so it is a third id space, and nothing we hold names the 240
+lines. That, not the tree structure, is what #150 is now blocked on.
 
 ## Decoded: 1000509 / 1000510 / 1000512 `PlayfieldPvPData_c` — playfield → PvP RULESET
 

@@ -108,6 +108,26 @@ namespace Faolan.Importer.Cli
 					_ = encrypted ? eNone++ : pNone++;
 			}
 
+			// ⭐ #150: the client picks an ALTERNATE-ADVANCEMENT tree by "the first feat tree whose id is > 999999"
+			// (`FUN_01506a60`, log tag `GUI/AAFeatPlanner`). So the reserved range is a thing the LDB can be asked
+			// about directly: if AA content ships in this build, its names sit above that line in some category.
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ ids at or above {AaReservedIdFloor:N0} - the AA/perk reserved range (#150):");
+			var anyAbove = false;
+			foreach (var (category, ids) in byCategory.OrderBy(c => c.Key))
+			{
+				var above = ids.Where(i => i >= AaReservedIdFloor).ToList();
+				if (above.Count == 0)
+					continue;
+
+				anyAbove = true;
+				var sample = above.OrderBy(i => i).Take(4).Select(i => $"{i}=\"{Trim(ldb[(category, i)], 34)}\"");
+				Console.WriteLine($"     cat {category,-8} {above.Count,7:N0} id(s)   {string.Join("  ", sample)}");
+			}
+
+			if (!anyAbove)
+				Console.WriteLine("     none in any category");
+
 			Console.WriteLine();
 			Console.WriteLine("  ⭐ and against the ENCRYPTION, which knows nothing about the LDB:");
 			Console.WriteLine($"     named by 50200 : {e200,7:N0} encrypted   {p200,7:N0} plaintext");
@@ -118,5 +138,9 @@ namespace Faolan.Importer.Cli
 		// RDB 1000020 - the ONE type that holds item, feat and ability templates, which is why the kind has to come
 		// from outside the record.
 		private const uint TemplateType = 1000020;
+
+		// The client's own AA cut-off: `FUN_01506a60` picks a class's alternate-advancement tree as the first feat
+		// tree whose id is GREATER than 999,999 (#150).
+		private const uint AaReservedIdFloor = 1_000_000;
 	}
 }
