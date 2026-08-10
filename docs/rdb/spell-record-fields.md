@@ -106,6 +106,30 @@ records** — which is what a bit that IS a predicate looks like, and the yardst
 ⚠️ **A rare bit scores high against a rare predicate for free** — both are mostly false, so they agree on every
 record that has neither. Read the `set` column before the percentages; the report says so itself.
 
+### ⭐ The first two words are a virtual KEY, so `a` is a member field
+
+`0xC76B` (51051) appears **exactly once** in `AgeOfConan.exe`, in `FUN_0076bef0`:
+
+```c
+void FUN_0076bef0(undefined4 *out) {   // slot 23 of the vtable at 0x01fc7f74
+    out[0] = 0xc76b;                   // the class's TYPE TAG
+    out[1] = this->[0x3c];             // -> the record's word 1, `a`
+}
+```
+
+It is referenced only from that vtable, so it is a virtual accessor that writes a two-word KEY — and the record
+opens with exactly those two words. Three things follow:
+
+- `0xC76B` is the **class's type tag**, not a file magic;
+- **`a` is a genuine member field at `+0x3C`**, surfaced through that accessor — not a count, not a version and
+  not a length, which is what the corpus correlations could not settle on their own;
+- the class sits in the same module as the GameActionData accessors (slot 17 is `FUN_0077a740`, next door to the
+  `FUN_0077a510` int-stat getter every element read goes through).
+
+⭐ **The next step is named**: sweep who else overrides **slot 23**. Each overrider writes its own type tag, so
+the set of tags says what the key IS, and a sibling class whose tag we already recognise names the field
+(`name_a_virtual_slot_by_who_overrides_it`).
+
 ⚠️ What is left is not bytes but MEANINGS: head word `a` and the flags word's unnamed bits. `a` takes 6 values and
 SPLITS the catalog sensibly — `a=2` is almost never trainable (6 of 2,066) and its records are named `Horror`,
 `Exhausted`, `Death Penalty`, i.e. internal effect records, while `a=4`/`a=5` are castables with high cast-time
