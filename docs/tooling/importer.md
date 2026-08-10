@@ -247,6 +247,10 @@ the `Flags` bit census, and the wire's arrival `Flags` from the DUMPS against th
 [item-template-stats](../rdb/item-template-stats.md) binding section is measured with),
 `bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
 puts each in, with the direction ability resolved — #661) ·
+`spawn-animation` (#607: is `npc_stats.spawn_animation` a property of the spawn EVENT? Partitions every captured NPC
+spawn into the login BURST and MID-SESSION, which is the class of predictor a field census cannot see. ⛔ It
+FALSIFIED the ticket's own hypothesis - 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not
+mean "this entity is arriving"),
 `spawn-duplicates` (is a cluster of near-identical STATIONARY spawns one NPC harvested twice, or a genuinely tight
 retail placement? #718/#765. The verdict comes from `StationaryPlacementResolver` — the same code the
 `npc-placements` import stamps `PlacementId` from — so the report cannot show a verdict the importer would not act

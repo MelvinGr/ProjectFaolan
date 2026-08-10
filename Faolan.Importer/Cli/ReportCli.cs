@@ -305,6 +305,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spawn-animation":
+				{
+					SpawnAnimation(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "spawn-duplicates":
 				{
 					await SpawnDuplicates(NamedCapture.LoadAll(capturesDir), arg);
