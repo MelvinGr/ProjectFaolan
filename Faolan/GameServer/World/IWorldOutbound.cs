@@ -197,5 +197,10 @@ namespace Faolan.GameServer.World
 		// The twin of `AuraAreasFor` off the same table, split by the row's kind rather than by its period, because a
 		// chain edge is not an area at all (`SpellAreaCatalog`).
 		Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId);
+
+		// The chain edges that re-run on a CADENCE while the carrier's buff is up (#786) - `Repeats == -1` plus a
+		// non-zero interval. Separate from `ChainedSpellsFor` because the cast path wants every edge exactly once and
+		// the tick wants only the repeating ones.
+		Task<IReadOnlyList<SpellAreaEffect>> RepeatingChainsFor(uint spellId);
 	}
 }

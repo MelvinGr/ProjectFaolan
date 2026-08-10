@@ -424,7 +424,8 @@ namespace Faolan.Importer.Rdb
 								EffectSpellId = appliedSpell,
 								RadiusMetres = element.Value(GameActionTypes.KeyRadius) ?? 0,
 								MaxTargets = element.Value(KeyMaxTargets) ?? 0,
-								PeriodCentiseconds = element.Fixed2d6
+								PeriodCentiseconds = element.Fixed2d6,
+								Repeats = (int)element.Fixed2d5
 							});
 						}
 
@@ -469,7 +470,10 @@ namespace Faolan.Importer.Rdb
 							// The element's own 0x2d6, carried faithfully like every other link's - but ⚠️ a consumer
 							// must not read a periodic CHAIN as an aura: an aura re-applies an area, and this row has
 							// no area to re-apply. `SpellAreaCatalog` splits on the kind before it splits on the period.
-							PeriodCentiseconds = element.Fixed2d6
+							PeriodCentiseconds = element.Fixed2d6,
+							// ⭐ And the other half of the pair (#786): an interval alone cannot say whether it is a
+							// cadence or a delay, and `Repeats` can - -1 re-runs, 1 runs once after it.
+							Repeats = (int)element.Fixed2d5
 						});
 					}
 

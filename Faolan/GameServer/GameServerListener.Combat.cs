@@ -123,6 +123,11 @@ namespace Faolan.GameServer
 			return _spellAreas.AuraAreas(spellId);
 		}
 
+		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.RepeatingChainsFor(uint spellId)
+		{
+			return _spellAreas.RepeatingChains(spellId);
+		}
+
 		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.ChainedSpellsFor(uint spellId)
 		{
 			return _spellAreas.ChainedSpells(spellId);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -61,6 +62,15 @@ namespace Faolan.Tests.Support
 		{
 			return Task.FromResult(Chains.TryGetValue(spellId, out var links)
 				? links
+				: []);
+		}
+
+		// The cadence half of the same map (#786) - filtered here rather than held in a second dictionary, so a test
+		// that seeds `Chains` cannot disagree with itself about which of them repeat.
+		public Task<IReadOnlyList<SpellAreaEffect>> RepeatingChainsFor(uint spellId)
+		{
+			return Task.FromResult(Chains.TryGetValue(spellId, out var links)
+				? (IReadOnlyList<SpellAreaEffect>)links.Where(l => l.PeriodCentiseconds > 0 && l.Repeats == -1).ToList()
 				: []);
 		}
 

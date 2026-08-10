@@ -240,11 +240,16 @@ namespace Faolan.GameServer
 		// chain edge runs 3963058 `Physical Wrack` at the same victim - the -10% Slashing/Piercing/Crushing/Poison the
 		// in-client tooltip shows. #783 imported the edge and stopped there; nothing walked it.
 		//
-		// ⚠️ A chain edge's PERIOD is deliberately NOT honoured. 486 of the rows carry a non-zero 0x2d6, which on an
-		// AREA element is the aura cadence, but nothing has been read that says a chain edge means "re-run every N" -
-		// and the alternative reading (a delay before the single run) fits the word equally well. The column is carried
-		// faithfully by the importer precisely so the question stays askable; until something answers it, the edge runs
-		// ONCE when the carrier lands, which is the reading that cannot over-apply. See #786.
+		// ⭐ A chain edge's PERIOD is now READ, and #786's two candidate readings both turned out to be right - for
+		// different rows. The client names the pair in one log line (`"Fixing broken gameaction data, Duration was 0
+		// while Interval was N"`, FUN_0089b390), so 0x2d6 is the INTERVAL and 0x2d5 the DURATION, and the DURATION is
+		// a repeat COUNT: -1 unbounded, 1 once, a thin tail of 2..40. Of the 483 edges carrying an interval, 263 state
+		// -1 (a cadence) and 220 state 1 (so there the interval is a DELAY).
+		//
+		// This path still runs every edge ONCE when the carrier lands, which is right for both halves - it is the
+		// first run. The cadence half then re-runs from the aura tick (`WorldSimulation.EmitAuraAreas`); the delay
+		// half is unwired, because a delayed single run needs a one-shot timer the tick does not have and firing it
+		// early is the only alternative.
 		private async Task ApplyChainedSpells(INetworkClient client, uint applyTo, uint applyFrom, uint carrierBase, SpellChainWalk chain)
 		{
 			foreach (var link in await _spellAreas.ChainedSpells(carrierBase))

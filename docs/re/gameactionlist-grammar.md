@@ -609,6 +609,43 @@ so *reading* `descriptor+0xc` out of the image returns zeros. What that rules ou
 reading the initialiser that writes it. `DumpGameActionKeyLists.java` walks `FUN_008bdf40`'s stores instead and
 reaches all 260, against the 68 the live Frida dump got.
 
+## ⭐ The four fixed ints: `0x2d5` is DURATION and `0x2d6` is INTERVAL (#786)
+
+The element's four always-present values are read positionally (`[0x2d5][0x2d6][0x2f2][0x2f5]`), and the first
+two are named by the client itself. `FUN_0089b390` reads `0x2d6`, finds `0x2d5` zero, and logs:
+
+```
+"Fixing broken gameaction data, Duration was 0 while Interval was " <0x2d6> ". Setting Duration to 1"
+```
+
+So `0x2d5` = **Duration**, `0x2d6` = **Interval** — and they are read as a pair. The executor `FUN_00869f90`
+confirms the pairing: it runs an element inline only when neither is set, and schedules it otherwise —
+
+```
+0086a286  MOV ECX,0x2d6 ; CALL 0x0077a510 ; TEST EAX,EAX ; JG  -> schedule
+0086a297  MOV ECX,0x2d5 ; CALL 0x0077a510 ; CMP EAX,1    ; JG  -> schedule
+```
+
+i.e. `interval > 0 || duration > 1`.
+
+⭐ **Duration is a repeat COUNT, not a time.** Over the whole catalog it takes `1` (run once, 56,769 elements),
+`-1` (unbounded, 4,389 of the 5,039 elements that carry an interval) and a thin tail of small integers — 2, 3, 4,
+5 … 40. Nothing takes a centisecond-shaped value.
+
+### What that settles about a chain edge
+
+`CastNano` links that carry an interval split cleanly, and **both readings #786 proposed are right, for different
+rows**:
+
+| | rows | meaning |
+|---|---:|---|
+| `Repeats == -1` | 263 | a **cadence** — re-run every N while the carrier is up |
+| `Repeats == 1` | 220 | runs **once**, so the interval is a **delay** |
+| 2 / 4 / 9 | 3 | that many runs |
+
+The interval alone could not have answered it; the duration word, which nothing was reading, is the
+discriminator. `SpellAreaEffect.Repeats` carries it.
+
 ## ⭐ An RDB spell record holds SEVERAL of these lists, and its elements carry CRITERIA (#785)
 
 The reader chain above is the WIRE one, but the RDB spell template (`1040005`) stores the same shape — and it

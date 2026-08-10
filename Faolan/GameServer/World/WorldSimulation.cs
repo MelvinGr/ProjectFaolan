@@ -1351,6 +1351,30 @@ namespace Faolan.GameServer.World
 					_logger.LogDebug("Aura from buff 0x{Buff:X8} on 0x{Holder:X8} applied {Effect} to {Hit} target(s) within {Radius}m.", buff.BuffId, holder.Handle,
 						area.EffectSpellId, hit, area.RadiusMetres);
 				}
+
+				// ⭐ #786: a `CastNano` chain edge can state a cadence too, and 263 of them do. It is NOT an area - it
+				// re-runs on the HOLDER, with no radius - so it shares the tick and the `_auraTicks` stamp (the key
+				// carries the row's own Sequence, so the two kinds cannot collide) but not `ApplyAreaEffect`.
+				//
+				// ⚠️ Only the `Repeats == -1` half is here. The other 220 interval-carrying edges state `Repeats == 1`,
+				// which runs ONCE after a delay, and a delay needs a one-shot timer this tick does not have; running
+				// them here would turn a single delayed cast into a permanent cadence, which is the over-apply #784
+				// refused to guess at.
+				foreach (var edge in await _output.RepeatingChainsFor(buff.BuffId >> 8))
+				{
+					var key = (holder.Handle, buff.BuffId, edge.Sequence);
+					if (_auraTicks.TryGetValue(key, out var lastChain) && (now - lastChain).TotalMilliseconds < edge.PeriodCentiseconds * 10)
+						continue;
+
+					_auraTicks[key] = now;
+
+					// The same re-apply guard as every other landing: a holder still carrying the chained effect keeps
+					// the live one counting down rather than re-asserting it, which is retail's own "re-apply only
+					// after the previous has ended" (#274). So the cadence is a REFRESH schedule, not a stack.
+					await ApplyEffectToEntity(client, holder.Handle, buff.CasterHandle, edge.EffectSpellId);
+					_logger.LogDebug("Chain from buff 0x{Buff:X8} on 0x{Holder:X8} re-ran {Effect} (every {Period} cs).", buff.BuffId, holder.Handle,
+						edge.EffectSpellId, edge.PeriodCentiseconds);
+				}
 			}
 		}
 
@@ -1420,8 +1444,8 @@ namespace Faolan.GameServer.World
 
 			// #784: the `CastNano` chain - "this landed, so also run X" on the SAME victim, with no radius of its own.
 			// `Gangrenous Stench`'s 221069 reaching `Physical Wrack` 3963058 is the headline case, and the reason the
-			// spell's tooltip effect did nothing until now. The period on a chain edge is not honoured - see
-			// GameServerListener.ApplyChainedSpells for why, and #786.
+			// spell's tooltip effect did nothing until now. Every edge runs ONCE here; the ones that state a CADENCE
+			// re-run from the aura tick instead (#786, `EmitAuraAreas`).
 			foreach (var link in await _output.ChainedSpellsFor(effectSpellId))
 			{
 				if (!chain.TryEnter(link.EffectSpellId))

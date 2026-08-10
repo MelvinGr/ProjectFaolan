@@ -67,6 +67,34 @@ namespace Faolan.Core.Database.Tables
 		public uint MaxTargets { get; set; }
 
 		// The AURA period in CENTISECONDS - the element's 0x2d6. 0 means this area is applied ONCE, at cast.
+		//
+		// ⭐ The client NAMES this word. `FUN_0089b390` logs "Fixing broken gameaction data, Duration was 0 while
+		// Interval was <this>. Setting Duration to 1" - so 0x2d6 is the INTERVAL and 0x2d5 is the DURATION, and the
+		// two are read together (#786).
 		public uint PeriodCentiseconds { get; set; }
+
+		/// <summary>
+		///     ⭐ How many times the element runs - the element's <c>0x2d5</c>, the word the client's own repair
+		///     message calls the DURATION. <c>-1</c> is unbounded (#786).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         It is a COUNT, not a time: over the whole catalog it takes <c>1</c> (run once), <c>-1</c>
+		///         (repeat while the carrier lasts) and a thin tail of small integers - 2, 3, 4, 5 … 40 - and
+		///         `FUN_00869f90` schedules an element rather than running it inline when
+		///         <c>interval &gt; 0 || duration &gt; 1</c>.
+		///     </para>
+		///     <para>
+		///         ⭐ It is also what settles what a PERIOD means on a chain edge, which #786 could not answer from
+		///         the interval alone: <b>both readings are right, for different rows</b>. Of the `CastNano` links
+		///         that carry an interval, <b>265 have <c>Repeats == -1</c></b> - a genuine cadence, re-run every N -
+		///         and <b>245 have <c>Repeats == 1</c></b>, which runs ONCE, so there the interval is a DELAY. Three
+		///         more state a small count.
+		///     </para>
+		///     <para>
+		///         ⚠️ Signed, and stored signed. Reading it as unsigned turns the unbounded case into 4.29 billion.
+		///     </para>
+		/// </remarks>
+		public int Repeats { get; set; }
 	}
 }

@@ -57,6 +57,32 @@ namespace Faolan.GameServer.Combat
 			return (await ForSpell(spellId)).Where(a => !IsArea(a)).ToList();
 		}
 
+		/// <summary>
+		///     The chain edges that re-run on a CADENCE while `spellId`'s buff is up (#786) - the tick's half of
+		///     <see cref="ChainedSpells" />.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         ⭐ <c>Repeats</c> is what splits them, and without it an interval cannot be read at all. The client
+		///         names both words in one log line - <c>"Fixing broken gameaction data, Duration was 0 while Interval
+		///         was N"</c> - and its executor schedules an element rather than running it inline when
+		///         <c>interval &gt; 0 || duration &gt; 1</c>.
+		///     </para>
+		///     <para>
+		///         Of the 483 chain edges that carry an interval, <b>263 state <c>Repeats == -1</c></b> and belong
+		///         here; the other 220 state <c>Repeats == 1</c>, so they run ONCE and their interval is a DELAY -
+		///         which the cast path already does, minus the wait. That half needs a one-shot timer and is not
+		///         wired.
+		///     </para>
+		/// </remarks>
+		public async Task<IReadOnlyList<SpellAreaEffect>> RepeatingChains(uint spellId)
+		{
+			return (await ForSpell(spellId)).Where(a => !IsArea(a) && a.PeriodCentiseconds > 0 && a.Repeats == UnboundedRepeats).ToList();
+		}
+
+		// The `Repeats` value that means "for as long as the carrier lasts" - the element's 0x2d5 read signed.
+		private const int UnboundedRepeats = -1;
+
 		// Whether this link targets an AREA - which is a property of the GameAction that stated it, not of its radius.
 		// Asking the radius instead would file a `CastNano` as a degenerate area and an area element that happens to
 		// state 0 as a chain edge, and both readings are wrong for the same reason.

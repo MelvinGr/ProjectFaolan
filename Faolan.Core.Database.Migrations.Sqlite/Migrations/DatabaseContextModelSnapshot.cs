@@ -3575,6 +3575,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("RadiusMetres")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Repeats")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("SpellId", "Sequence");
 
                     b.ToTable("SpellAreaEffects");

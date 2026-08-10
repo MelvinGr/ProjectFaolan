@@ -136,5 +136,34 @@ namespace Faolan.Tests
 			Assert.All(rows.Where(a => a.RadiusMetres > 0), a => Assert.InRange(a.RadiusMetres, 1u, 100000u));
 			Assert.All(rows.Where(a => a.PeriodCentiseconds > 0), a => Assert.InRange(a.PeriodCentiseconds, 10u, 360000u));
 		}
+
+		// ⭐ #786: an INTERVAL alone cannot say whether a chain edge is a cadence or a delay - `Repeats` can, and the
+		// shipped rows split cleanly on it. The client names both words in one line: "Fixing broken gameaction data,
+		// Duration was 0 while Interval was N. Setting Duration to 1" (FUN_0089b390).
+		[Fact]
+		public async Task AChainEdgesInterval_IsACadenceOrADelayAccordingToRepeats()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var edges = await db.SpellAreaEffects.AsNoTracking()
+				.Where(a => a.Kind == CastNanoKind && a.PeriodCentiseconds > 0)
+				.ToListAsync(TestContext.Current.CancellationToken);
+
+			// Both populations are real and neither is a rounding error, which is the whole finding: reading the
+			// interval one way would have been wrong for roughly half the rows.
+			Assert.InRange(edges.Count(a => a.Repeats == -1), 200, 400);
+			Assert.InRange(edges.Count(a => a.Repeats == 1), 150, 350);
+
+			// A repeat count is -1, 1, or a small integer - never a duration in centiseconds, which is what the word's
+			// name would otherwise suggest.
+			Assert.All(edges, a => Assert.InRange(a.Repeats, -1, 64));
+
+			// And an edge with NO interval always runs once, so the two columns cannot disagree.
+			var oneShot = await db.SpellAreaEffects.AsNoTracking()
+				.Where(a => a.Kind == CastNanoKind && a.PeriodCentiseconds == 0)
+				.ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.NotEmpty(oneShot);
+			Assert.All(oneShot, a => Assert.Equal(1, a.Repeats));
+		}
 	}
 }
