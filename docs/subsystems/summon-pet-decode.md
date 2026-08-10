@@ -177,6 +177,41 @@ silently dropped; they grow with `NpcTemplates`, i.e. with the corpus.
 ⚠️ `pointCost` (the pet-point budget a pet occupies) and `petBuff` are lifted onto `Spell` and **nothing reads
 them yet** — pet points are not modelled.
 
+## A live pet costs retail 50 packets a second, forever — and it is a retail DEFECT (#777)
+
+`Nemedian Deathstalker` (template 14321, the necromancer's pet) takes **26,832 of the corpus' 37,965
+`BccAction` records**, where the median actor takes **one**. #225 read that as a world heartbeat and #777 as a
+burst. It is neither. Measured per actor, with the record's own args field 3 as the check:
+
+| capture | actor | records | span | rate | counter | anim |
+|---|---|---:|---:|---:|---|---|
+| `..._casting-combat` | `0x0004f022` | 4,192 | 84.8 s | **49.4/s** | 1 … 4,192, **step +1 with no gaps** | 41413 |
+| `..._casting-combat` | `0x0004f028` | 3,479 | 70.7 s | **49.2/s** | 42 … 3,520, step +1 | 41413 |
+| `..._actions-described-in-chat` | `0x0003d310` | 3,724 | 75.2 s | **49.5/s** | 1 … 3,724, step +1 | 41413 |
+| `..._mount_move_dismount` | `0x000286d5` | 1,190 | 22.4 s | **53.1/s** | 1,918 … 3,107, step +1 | 41413 |
+
+So it is a **metronome, not a burst**: an unbroken ~50 Hz stream that starts at the frame the pet's
+`FA015807` spawn arrives and does not stop until the capture ends. Every record is byte-identical bar the
+counter — the same fixed idle animation `41413` every other actor gets *once* — and it is uncorrelated with
+movement, combat, casting or any c2s pet command. The step-`+1`-with-no-gaps counter across thousands of
+records also proves nothing is being dropped: this is the whole stream, not a sample of a faster one.
+
+Three things follow:
+
+- **The rate is EVERY OTHER retail server frame.** Retail's frame loop is independently measured at a
+  99.34 Hz ceiling from the 4,243 captured `GameServerStats` readouts
+  ([`../protocol/02-rpc.md`](../protocol/02-rpc.md)), and ~49.5 Hz is half of it to within the sampling error.
+  So this is not a throttle or a timer — it is the pet's brain running on a two-frame cadence and putting its
+  decision on the wire every time.
+- **A controlled entity re-issues its default command every tick.** The counter is a per-entity command-queue
+  index that starts at 1 when the entity is created (`0x0004f028` first appears at 42, i.e. ~0.84 s of ticks
+  before its spawn record reached the client; the mount capture's pet is at 1,918, having been summoned ~38 s
+  before the window). An ambient NPC's brain script asserts once and stops; a *summoned* one never stops.
+- ⚠️ **Do not reproduce it.** A record that says nothing new 50 times a second, per pet, is a defect — the same
+  class of thing as the server heap the spawn scaffold leaks ([`../re/retail-server-heap-leak.md`](../re/retail-server-heap-leak.md)).
+  We send a pet's idle assert once, which is what the other 7,968 captured actors get, and that is the right
+  behaviour rather than a gap.
+
 ## Follow-up (#307) to make it retail-accurate
 
 Items 1-3 landed with the MVP above: the summon SPELL fires the spawn (`SpellEffects` rows of kind `SummonPet`
