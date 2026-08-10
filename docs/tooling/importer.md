@@ -80,6 +80,7 @@ Capture-sourced (default group, run in dependency order):
 | `character-bank` | `characters`, `items` |
 | `shops` | — |
 | `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
+| `npc-placements` (pool the stationary spawn rows the corpus proves are one NPC seen twice — #718) | — |
 | `npc-ambient-animations` (per-creature idle animations from the captured `Emote` records — #766) | — |
 | `world-objects` | — |
 | `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
@@ -244,6 +245,12 @@ the `Flags` bit census, and the wire's arrival `Flags` from the DUMPS against th
 [item-template-stats](../rdb/item-template-stats.md) binding section is measured with),
 `bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
 puts each in, with the direction ability resolved — #661) ·
+`spawn-duplicates` (is a cluster of near-identical STATIONARY spawns one NPC harvested twice, or a genuinely tight
+retail placement? #718/#765. The verdict comes from `StationaryPlacementResolver` — the same code the
+`npc-placements` import stamps `PlacementId` from — so the report cannot show a verdict the importer would not act
+on. ⚠️ The test is a HANDLE sighted at two of the cluster's positions, NOT a distance and NOT "the same capture saw
+both": a creature that moves is re-streamed within one session, so reading it per-capture inverts the answer.
+`--report-arg <name substring>` narrows to one creature),
 `ldb-search` (which LDB strings the client ships whose TEXT contains a substring, with the id that names them —
 `--report-arg [<category>:]<substring>`, e.g. `50200:Ironwood`. The direction every other LDB tool cannot go: when
 the question is *"does the client ship an item called Ironwood, and at what id"* the name is all there is to go on.

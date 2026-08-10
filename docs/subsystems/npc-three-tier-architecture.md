@@ -68,6 +68,30 @@ table:
 Constant-everywhere fields (`Side`, `MovementMultiplier`, `Mount*`, the `*Blend` flags, `SpawnAnimation`
 which is zeroed on every fresh spawn) are hardcoded in the builder rather than stored.
 
+## One placement, several sightings (`PlacementId`, #713/#718)
+
+A captured spawn is keyed on `MapId` + exact XYZ, so **every sighting of a creature that is not exactly where it was
+last time mints another placement**. Two mechanisms identify the redundant rows, and neither is a distance:
+
+- **A patroller** (#713) is identified by its harvested **beat**. Rows sharing a `PatrolRoute.PlacementKey` are one
+  patroller seen in different sessions — 1,045 route-carrying spawns are 812 placements.
+- **A stationary NPC** (#718) has no beat, and its position is *nearly* stable, so a sighting a few centimetres off
+  still mints a row. The test is the **HANDLE**: two real placements are two entities and retail mints two handles,
+  while one NPC harvested twice is one entity at two moments — so a single handle sighted at two of a cluster's
+  positions *walked* between them. `StationaryPlacementResolver`, run by the `npc-placements` module and printed by
+  `--report spawn-duplicates`. 9 clusters, 23 rows.
+
+⚠️ **Proximity proves nothing, and neither does "identical in every other column".** Retail really places same-name
+NPCs a metre apart — Black Dragon Guards flanking a Tarantia doorway, a pack of Enraged Boars — and those rows are
+identical in every column by construction. Of 191 candidate clusters within 5u, **181 are two real placements**. And
+"the same capture saw both positions" inverts the answer, because a creature that moves is re-streamed by interest
+within one session: read per-capture, the corpus calls the three Scruffys of #765 two real placements; read per
+handle, one handle stood on two of them.
+
+Nothing is deleted either way. The redundant rows are the placement's **variant pool** — what differs between them
+is exactly what retail re-rolls per spawn (level, the morph table, all seven equipment slots) — and
+`WorldBroadcaster` stands up ONE entity per pool, drawing which row it renders as at random.
+
 ## Ambient idle animations (#766)
 
 The spawn body's `AnimIdleId` is the pose a creature HOLDS. What makes it look alive is separate and does not ride

@@ -965,6 +965,41 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Patrol placements: {bySpawn.Count} route-carrying spawn(s) -> {pools} placement(s) (#713).");
 		}
 
+		// #718/#765: stamps `PlacementId` on the STATIONARY spawn clusters the corpus proves are one placement seen
+		// twice - the case #713's route key cannot reach, because these NPCs have no beat.
+		//
+		// The decision is `StationaryPlacementResolver`'s and the reasoning lives there; the short version is that the
+		// test is a HANDLE, not a distance. Retail genuinely places same-name NPCs a metre apart (181 of 191 candidate
+		// clusters are two real placements), so a tolerance would collapse the world's guard pairs; but one handle
+		// sighted at two of a cluster's positions WALKED between them, and that is one entity.
+		//
+		// Nothing is deleted, exactly as on the patrol side: the redundant rows are the placement's VARIANT POOL, and
+		// the world stands one entity up drawing its level/morphs/equipment from the group.
+		//
+		// Returns how many rows were pooled (cluster size minus one, summed).
+		public static async Task<int> ImportStationaryPlacements(DatabaseContext db, IReadOnlyList<NamedCapture> captures)
+		{
+			var routed = await db.PatrolNodes.Select(p => p.NpcSpawnId).Distinct().ToHashSetAsync();
+			var rows = await db.NpcSpawns.ToListAsync();
+
+			var pooled = 0;
+			var clusters = 0;
+			foreach (var cluster in StationaryPlacementResolver.Resolve(rows, routed, captures)
+				         .Where(c => c.Verdict == StationaryPlacementResolver.Verdict.OneWalked))
+			{
+				var key = cluster.PlacementKey();
+				foreach (var row in cluster.Rows)
+					row.PlacementId = key;
+
+				clusters++;
+				pooled += cluster.Rows.Count - 1;
+			}
+
+			await db.SaveChangesAsync();
+			Console.WriteLine($"Stationary placements: {clusters} cluster(s) proved to be one NPC seen twice -> {pooled} row(s) pooled (#718).");
+			return pooled;
+		}
+
 		// How much of a route an observation carries: total nodes, then total waypoints as the tiebreak. Used only to
 		// pick between two captures of the SAME spawn - see ImportPatrolPaths.
 		private static (int Nodes, int Waypoints) RouteWeight(MoveTaskNode task)
