@@ -38,6 +38,44 @@ category actually ships, with no misses** — `docs/re/gameaction-tooltip-tokens
 ⚠️ The hash is 28 bits, so a match is evidence and not proof (see `Elf28`). 30 for 30 against a 130-entry
 category is far past coincidence; a single new token is not.
 
+### …and a THIRD way: a kind can borrow another kind's sentence
+
+`FUN_0149e450`'s dispatch is two MSVC index+target table pairs (`0x14a2e90`/`0x14a2de8` over `0xCF0A..0xD002`,
+`0x14a324c`/`0x14a323c` over `0xD013..0xD025`). **49 of the 260 registered types reach a branch of their own;
+the other 211 fall to the default and the client draws nothing for them.** Every branch is transcribed in
+[`../re/gameaction-tooltip-dispatch.tsv`](../re/gameaction-tooltip-dispatch.tsv) with its alias, its tokens and
+the order it reads its slots in.
+
+Some branches open with a literal `MOV ECX,<another type id>` before the category-170 fetch — they draw
+themselves with a *different* type's sentence. That is `GameActionTooltip.SentenceKinds`, and it is why several
+very common kinds looked like they had none at all:
+
+| kind | draws itself as | elements |
+|---|---|---:|
+| `InterpolatedModify` 53220 | `Modify` 53045 | 3,596 |
+| `SpellLineStatModifier` 53062 + 53098/53099/53283/53285 | `SpellStatModifier` 53054 | 1,156 + |
+| `InterpolatedTempChangeSkill` 53221 | `TempChangeSkill` 53110 | 152 |
+| `ChangeLineRecastTime` 53069 | `ChangeRecastTime` 53031 | 5 |
+
+The interpolated ones are the instructive case: the branch reads keys 174/175/0, lerps them against the caster's
+stat `0x3C5` (Apprentice Level), and hands the RESOLVED number to the flat twin's sentence. The ramp never
+appears in the text.
+
+### ⭐ And a sentence can be chosen by the element's own VALUES
+
+Two families pick their string from what they carry, which is why "which sentence" cannot be answered before the
+slots are read:
+
+- **the damage/heal family** — `Hit` 53002, `SpecialHit` 53196, `InterpolatedHit` 53219 — goes through
+  `FUN_0149aa30(buf, stat, min, max, flag)`, whose head IS the rule:
+  `stat == 0x1B Health ? (min < 0 ? DamageHealth : HealHealth) : DamageOtherStat`, i.e. *"%s points of %s"*,
+  *"Heals %s"* or *"Removes %s points of %s"*. The value slot is the RANGE `min-max`, which is why these carry
+  two magnitudes where every other modifier carries one. The `%s %s %s` sitting at 53002's own type id is not
+  what the client draws.
+- **the hit-percent pair** — `ChangeHitPercent` 53030 and `ChangeLineHitPercent` 53075 — reads key 39 and picks
+  `IncreasesHitPercent` when positive, `DecreasesHitPercent` otherwise, rendering the value ×0.01 with a `%`
+  (branch `0x014a018c`, the float at `0x01f2800c` is literally `0.01`).
+
 The format grammar is printf plus two things printf has no notion of, both handled by `LdbFormat`:
 
 - `#N` before a conversion selects **argument N** rather than the next in sequence — the German and Korean
@@ -96,16 +134,21 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 5,311,375 / 8,241,205 = 64.4%   (3,785,151 in elements, 1,526,224 in the property run)
 property-run field ids read         : 16 / 111
-elements rendered as a sentence     : 33,471 / 61,840 = 54.1%
+elements rendered as a sentence     : 45,961 / 61,840 = 74.3%
 ```
 
 The two failure modes are counted separately, because they are different work:
 
-- **no sentence at all** — 20,777 elements over 96 kinds, led by `InterpolatedHit` (4,167), `InterpolatedModify`
-  (3,596) and `DPSHit` (2,660). These are rendered from branch-specific TOKENS (`IncreaseAOERadius`-style), so
-  finishing them is a matter of mapping the tooltip builder's jump table to its branches;
-- **a sentence whose slots are not bound** — 7,592 elements over 19 kinds, led by `HitPercentage`
-  (`%s %s by %d%% of %s %s`) and `Hit` (`%s %s %s`).
+- **no sentence at all** — 11,281 elements over 90 kinds, led by `DPSHit` (2,660),
+  `StartServerSideScryScriptWithParams` (1,597) and `StartParticleEffect` (1,182). Most of these are types the
+  tooltip's dispatch sends to its DEFAULT, i.e. the client draws nothing for them either;
+- **a sentence whose slots are not bound** — 4,598 elements over 14 kinds, led by `HitPercentage`
+  (`%s %s by %d%% of %s %s`, whose branch also selects by value) and the two cone kinds.
+
+⚠️ **The cone kinds are deliberately unbound, and the reason generalises.** `%.2f%s degree arc, %.2fm%s radius`
+reads like two slots off the element and is not: branch `0x014a28f9` fetches the CHARACTER, adds keys 11 and 213
+to the cone she already has, clamps, and prints the DIFFERENCE. The element states a DELTA. Binding it to the raw
+slots renders `Cyclone of Steel` as "4.00 degree arc, 2.00m radius" — plausible, and wrong.
 
 Nothing half-binds: a sentence with a conversion the binder cannot fill prints as its raw key list instead, and
 `LdbFormat.TryApply` fails rather than leaving a stray `%s` in a line that would otherwise read as confident.

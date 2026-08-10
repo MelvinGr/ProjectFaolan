@@ -10,11 +10,16 @@
 //
 // elf28("IncreaseAOERadius") == 22958195, which is the shipped "Increases the area of effect by %d meters".
 //
-//   FN=0149e450 CATEGORY=aa /opt/ghidra/support/analyzeHeadless <proj> aoc -process AgeOfConan.exe \
+//   FN=0149e450 /opt/ghidra/support/analyzeHeadless <proj> aoc -process AgeOfConan.exe \
 //     -noanalysis -scriptPath tools/ghidra -postScript DumpTooltipTokens.java
 //
-// FN defaults to the tooltip builder and CATEGORY to 0xAA; both are hex, no 0x. Output feeds
+// FN defaults to the tooltip builder; hex, no 0x. Also worth running over the shared value formatters the builder
+// CALLS (FUN_0149aa30, the damage/heal range), which carry tokens of their own. Output feeds
 // docs/re/gameaction-tooltip-tokens.tsv.
+//
+// ⚠️ It anchors on the GETTER CALL, not on the `PUSH 0xaa`. Two branches can share one category push and then load
+// different tokens (`IncreasesHitPercent` / `DecreasesHitPercent` at 0x014a01aa), so a per-push window reports the
+// first of the pair and silently drops the second.
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.*;
@@ -26,11 +31,13 @@ public class DumpTooltipTokens extends GhidraScript {
     // instructions of the push in every shipped call site; a wider window starts picking up the NEXT branch's.
     private static final int WINDOW = 12;
 
+    // The by-TOKEN localised-string getters. Both take the token pointer in a register and the category on the
+    // stack; which one a branch uses is a calling-convention detail, not a semantic one.
+    private static final long[] GETTERS = { 0x0060ec00L, 0x0060f2f0L };
+
     @Override public void run() throws Exception {
         String fn = System.getenv("FN");
-        String category = System.getenv("CATEGORY");
         long entry = Long.parseLong(fn == null ? "0149e450" : fn.trim(), 16);
-        long wanted = Long.parseLong(category == null ? "aa" : category.trim(), 16);
 
         Function f = getFunctionContaining(toAddr(entry));
         if (f == null) { println("no fn"); return; }
@@ -41,27 +48,37 @@ public class DumpTooltipTokens extends GhidraScript {
 
         for (int i = 0; i < body.size(); i++) {
             Instruction in = body.get(i);
-            if (!in.getMnemonicString().equals("PUSH") || scalarOf(in) == null || scalarOf(in).getUnsignedValue() != wanted)
+            if (!in.getMnemonicString().equals("CALL") || !isGetter(in))
                 continue;
 
             String token = null;
             String at = null;
-            // Forwards first: the pointer load normally follows the category push.
-            for (int step = 1; step <= WINDOW && token == null; step++) {
-                for (int j : new int[] { i + step, i - step }) {
-                    if (j < 0 || j >= body.size()) continue;
-                    Scalar s = scalarOf(body.get(j));
-                    if (s == null || s.getUnsignedValue() < 0x400000) continue;
-                    String text = stringAt(toAddr(s.getUnsignedValue()));
-                    if (text == null) continue;
-                    token = text;
-                    at = "0x" + Long.toHexString(s.getUnsignedValue());
-                    break;
-                }
+            // The token pointer is the nearest preceding immediate that resolves to a printable string.
+            for (int j = i - 1; j >= 0 && j > i - WINDOW && token == null; j--) {
+                Scalar s = scalarOf(body.get(j));
+                if (s == null || s.getUnsignedValue() < 0x400000) continue;
+                String text = stringAt(toAddr(s.getUnsignedValue()));
+                if (text == null) continue;
+                token = text;
+                at = "0x" + Long.toHexString(s.getUnsignedValue());
             }
 
             println(in.getAddress() + "\t" + (at == null ? "-" : at) + "\t" + (token == null ? "-" : token));
         }
+    }
+
+    private boolean isGetter(Instruction call) {
+        Scalar s = scalarOf(call);
+        if (s == null) {
+            // A CALL to a resolved function shows as a reference rather than a scalar operand.
+            for (var ref : call.getReferencesFrom())
+                for (long g : GETTERS)
+                    if (ref.getToAddress().getOffset() == g) return true;
+            return false;
+        }
+        for (long g : GETTERS)
+            if (s.getUnsignedValue() == g) return true;
+        return false;
     }
 
     private Scalar scalarOf(Instruction in) {

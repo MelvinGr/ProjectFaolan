@@ -1,0 +1,59 @@
+# How the client's tooltip builder FUN_0149e450 renders each GameAction element (#782).
+# 49 of the 260 registered types reach a branch; the other 211 fall to the default and are drawn as nothing.
+# aliasSentence = the TYPE ID whose LDB-170 string this branch fetches with a literal `MOV ECX,<id>` (blank = its own).
+# tokens        = the token names it fetches instead/as well, keyed into LDB 170 by elf28(token).
+# slotOrder     = the key indices it reads, in the order it reads them (via GetIntStat(GameActionStat_e)).
+typeId	name	branch	aliasSentence	tokens	slotOrder
+53012	Skill	0x0149e4c0		GameActionGroup_Skills	0;39
+53045	Modify	0x0149e4c0		GameActionGroup_Skills	0;39
+53032	AOERadiusModification	0x0149e855		IncreaseAOERadius;DecreaseAOERadius	11
+53027	ItemText	0x0149e8f5			39
+53162	NanoResistance	0x0149e942			152;39
+53046	AddAbsorb	0x0149eaed		AddAbsorbEndSpell	0;70;33;34;88
+53212	AddComboProc	0x0149ec8e		AddComboProcBoth;AddComboProcOther	88;236;237
+53213	AddProc	0x0149eecd		AddComboProcBoth;AddComboProcSelf;AddComboProcOther;PercentChance;TimesPerMinute	88;236;117;66;237
+53211	AddSpellProc	0x0149f3f7		ChanceOf;OnSelf;OnTarget	88;236
+53070	AddSpellLineProc	0x0149f69e		OnSelf;OnTarget;TimesPerMinute	88;236;237
+53087	AreaFormula	0x0149f940		ValueModUnitMeters	88;11
+53088	FilteredAreaFormula	0x0149fa9f		ValueModUnitMeters	88;11;170
+53051	CastNano	0x0149fc71			39
+53061	BCCCastSpell	0x0149fc71			39
+53223	CastingLevelModifier	0x0149fdda			0;39
+53182	SpecialAbility	0x0149fe5c			
+53176	DisplayLearnAbility	0x0149febb			1;187
+53030	ChangeHitPercent	0x014a018c		IncreasesHitPercent	39
+53075	ChangeLineHitPercent	0x014a018c		IncreasesHitPercent	39
+53031	ChangeRecastTime	0x014a02b4	53031		39
+53069	ChangeLineRecastTime	0x014a02b4	53031		39
+53037	Charmed	0x014a0311			
+53019	Spell	0x014a0331			39
+53084	ColumnFormula	0x014a0688		ValueModUnitMeters	88;170
+53249	ColumnAddTargets	0x014a08f0		ValueModUnitMeters;ColumnAddTargetsWithDistance	
+53121	Feared	0x014a0adc			
+53002	Hit	0x014a0ae6			0;2;37;71
+53196	SpecialHit	0x014a0ae6			0;2;37;71
+53007	HitPercentage	0x014a0b99		HitPercentHeal;HitPercentDamage;OnTarget;HitPercentHealStatByOtherStat	0;39;1;71;32
+53225	InheritedWeaponAttack	0x014a0f23			
+53170	InheritedComboAttack	0x014a103e		PerSecond	224;71
+53219	InterpolatedHit	0x014a115f		OnTarget	0;71;32
+53220	InterpolatedModify	0x014a12c6	53045		174;175;0
+53221	InterpolatedTempChangeSkill	0x014a13ca	53110	AbsorbShield	174;175;0
+53217	Knockback	0x014a1542	53217		238;191
+53227	ResurrectTarget	0x014a1594	53227		188
+53129	Root	0x014a15cd			
+53026	Set	0x014a15ed	53026		0;39
+53122	Stun	0x014a16a1			
+53066	TeamFormula	0x014a16c1			88
+53224	TeamPropagatedBuff	0x014a1745			88
+53209	UpgradeCombo	0x014a1817		UpgradeCombo_DecreaseDamage;UpgradeCombo_DecreaseCooldown	66;67
+53067	ModifyAsRating	0x014a1a2e		ModifyAsRating	0;39
+53189	AddPercentSkillModifier	0x014a1b52		AddPercentSkillModifierSameStat	66;67;39
+53250	ChangeInheritedWeaponAttack	0x014a1da2		IncreaseComboDPS;DecreaseComboDPS;DecreaseComboCriticalChance;DecreaseComboHateAdjustment;ChangeComboDamageType;ValueModUnitMeters	187;84;66;67;68;69;88;11;213
+53054	SpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53062	SpellLineStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53098	TargetSpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53099	TargetSpellLineStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53283	GlobalSpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53285	GlobalTargetSpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
+53273	AttackAddTargets	0x014a28f9		ValueModUnitMeters	11;213
+53267	Fatality	0x014a2ab7			

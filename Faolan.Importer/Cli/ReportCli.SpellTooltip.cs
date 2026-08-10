@@ -148,14 +148,13 @@ namespace Faolan.Importer.Cli
 					elements++;
 					elementBytes += element.WidthBytes;
 
-					var format = ctx.SentenceFor(element.Kind);
+					var (format, args) = Sentence(ctx, element);
 					if (format == null)
 					{
 						noSentence[element.Kind] = noSentence.GetValueOrDefault(element.Kind) + 1;
 						continue;
 					}
 
-					var args = BindArgs(ctx, element);
 					if (args != null && LdbFormat.TryApply(format, args, out _))
 						rendered++;
 					else
@@ -333,8 +332,7 @@ namespace Faolan.Importer.Cli
 		{
 			var type = element.Type;
 			var typeName = type?.Name ?? $"kind {element.Kind}";
-			var format = ctx.SentenceFor(element.Kind);
-			var args = BindArgs(ctx, element);
+			var (format, args) = Sentence(ctx, element);
 
 			// The element's 0x2d6 is the AURA PERIOD in centiseconds when it is set - a repeating element and a
 			// one-shot element are the same kind with the same keys, and the difference is only there (#772).
@@ -353,6 +351,100 @@ namespace Faolan.Importer.Cli
 			yield return format == null
 				? $"?? {typeName}  {raw}{period}   [no LDB 170 sentence for this type]"
 				: $"?? {typeName}  {raw}{period}   [\"{format}\" - slot binding not established]";
+		}
+
+		/// <summary>
+		///     The sentence the client draws this element with, and the arguments it feeds it. A null format means the
+		///     client ships none; null args mean this kind's slot binding is not established.
+		/// </summary>
+		/// <remarks>
+		///     Kept as ONE function because the two halves are not independent: the <c>Hit</c> family's sentence is
+		///     CHOSEN BY ITS VALUES (health vs another stat, damage vs heal - see
+		///     <see cref="GameActionTooltip.HitSentenceToken" />), so "which string" cannot be answered before the
+		///     slots are read. Splitting them is what would force a guess (#782).
+		/// </remarks>
+		private static (string? Format, object?[]? Args) Sentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			// The damage/heal family - `Hit`, `SpecialHit` and `InterpolatedHit`, all four keys of the first two being
+			// (Stat, min, max, flag). The `%s %s %s` sitting at their own type id is NOT what the client draws; the
+			// three token sentences below are (branch 0x014a0ae6 -> FUN_0149aa30).
+			if (element.Kind is HitKind or SpecialHitKind or InterpolatedHitKind)
+				return HitSentence(ctx, element);
+
+			// The hit-percent pair, whose sentence is likewise chosen by the SIGN of its magnitude. The
+			// `Change hit percent for %d by %d%%` sitting at 53030's own id is not what the client draws either
+			// (branch 0x014a018c): it reads key 39, picks `IncreasesHitPercent` when positive and
+			// `DecreasesHitPercent` otherwise, and renders the value x0.01 with a `%` - hundredths of a percent, the
+			// same unit `Amount` carries elsewhere.
+			if (element.Kind is ChangeHitPercentKind or ChangeLineHitPercentKind)
+			{
+				if (element.Value(GameActionTypes.KeyValue) is not { } raw)
+					return (null, null);
+
+				var percent = (int)raw;
+				var token = percent > 0 ? "IncreasesHitPercent" : "DecreasesHitPercent";
+				var format = ctx.SentenceForToken(token);
+				return (format, format == null ? null : [$"{percent * 0.01:0.##}%"]);
+			}
+
+			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
+		}
+
+		// `Hit` / `SpecialHit` carry their two magnitudes flat; `InterpolatedHit` ramps each of them over the caster's
+		// level, which is the same four-slot ramp shape the interpolated modifiers use, doubled: (168 @172 -> 169 @173)
+		// is the LOW magnitude and (170 @172 -> 171 @173) the high one. Gangrenous Stench's tick states -5840..-7140 at
+		// level 75 and -6220..-7610 at 80, which is what pins which pair is which.
+		private static (string? Format, object?[]? Args) HitSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var stat = element.Value(GameActionTypes.KeyStat);
+			if (stat is null or 0)
+				return (null, null);
+
+			int min, max;
+			if (element.Kind == InterpolatedHitKind)
+			{
+				var lowLevel = element.Value(KeyRampLowLevel);
+				var highLevel = element.Value(KeyRampHighLevel);
+				var minLow = element.Value(KeyHitMinLow);
+				var minHigh = element.Value(KeyHitMinHigh);
+				var maxLow = element.Value(KeyHitMaxLow);
+				var maxHigh = element.Value(KeyHitMaxHigh);
+				if (lowLevel is null || highLevel is null || minLow is null || minHigh is null || maxLow is null || maxHigh is null)
+					return (null, null);
+
+				// Without a caster level there is no single number to draw, so the ramp prints as its two ENDPOINTS
+				// rather than being resolved at an invented level.
+				if (ctx.Level is not { } level)
+				{
+					var endpoints = $"{ctx.Range(stat.Value, (int)minLow.Value, (int)maxLow.Value)} at level {lowLevel} .. "
+					                + $"{ctx.Range(stat.Value, (int)minHigh.Value, (int)maxHigh.Value)} at level {highLevel}";
+					return HitFormat(ctx, stat.Value, (int)minLow.Value, [endpoints, ctx.StatName(stat.Value)]);
+				}
+
+				min = new LevelRamp((int)minLow.Value, (int)minHigh.Value, lowLevel.Value, highLevel.Value).ValueAt(level);
+				max = new LevelRamp((int)maxLow.Value, (int)maxHigh.Value, lowLevel.Value, highLevel.Value).ValueAt(level);
+			}
+			else
+			{
+				var minValue = element.Value(KeyHitMin);
+				var maxValue = element.Value(KeyHitMax);
+				if (minValue is null || maxValue is null)
+					return (null, null);
+
+				min = (int)minValue.Value;
+				max = (int)maxValue.Value;
+			}
+
+			return HitFormat(ctx, stat.Value, min, [ctx.Range(stat.Value, min, max), ctx.StatName(stat.Value)]);
+		}
+
+		// The three token sentences and their argument shape. `Heals %s` takes the range alone; the other two take the
+		// range and the stat.
+		private static (string? Format, object?[]? Args) HitFormat(TooltipContext ctx, uint statId, int min, object?[] args)
+		{
+			var token = GameActionTooltip.HitSentenceToken(statId, min);
+			var format = ctx.SentenceForToken(token);
+			return (format, format == null ? null : args);
 		}
 
 		// The arguments the client's own tooltip branch feeds its format string, per kind. Null = this kind's binding
@@ -390,6 +482,43 @@ namespace Faolan.Importer.Cli
 
 					var targets = element.Value(KeyAreaMaxTargets);
 					return targets is null ? null : [effect, (double)radius.Value, "", (int)targets.Value, ""];
+				}
+
+				// ⚠️ The CONE kinds (`ConeFormula` 53259, `AttackAddTargets` 53273) are deliberately NOT bound, and
+				// the reason is worth keeping: their sentence `%.2f%s degree arc, %.2fm%s radius` looks like two
+				// slots read straight off the element, and it is not. Branch 0x014a28f9 fetches the CHARACTER
+				// (`FUN_006f03b0`), adds key 11 and key 213 to the cone she already has, clamps the result and prints
+				// the DIFFERENCE. So the element states a DELTA and the drawn number needs live state this report does
+				// not have - binding it to the raw slots would print "4.00 degree arc" for `Cyclone of Steel`. See
+				// #782.
+
+				// `Team Formula %s` / `Team effect %s` - one slot, and the branch reads exactly key 88.
+				case TeamFormulaKind:
+				case TeamPropagatedBuffKind:
+				{
+					var teamSpell = element.Value(GameActionTypes.KeySpell);
+					return teamSpell is null ? null : [$"{ctx.SpellName(teamSpell.Value)} ({teamSpell.Value})"];
+				}
+
+				// `Resurrect target with %d% health` - one conversion, and the branch (0x014a1594) reads one slot.
+				case ResurrectTargetKind:
+				{
+					var health = element.Value(KeyResurrectHealth);
+					return health is null ? null : [(int)health.Value];
+				}
+
+				// `#1{1:Increases | Decreases} your #2%s by #3%d` - the sentence itself pins all three: a sign
+				// selector, the stat's name and an integer magnitude, and the branch (0x014a1a2e) reads exactly
+				// (Stat, Value). ⚠️ `%d`, so the magnitude is the RAW rating - not run through the display scale.
+				case ModifyAsRatingKind:
+				{
+					var ratingStat = element.Value(GameActionTypes.KeyStat);
+					var ratingValue = element.Value(GameActionTypes.KeyValue);
+					if (ratingStat is null or 0 || ratingValue is null)
+						return null;
+
+					var signed = (int)ratingValue.Value;
+					return [signed > 0 ? 1 : 0, ctx.StatName(ratingStat.Value), Math.Abs(signed)];
 				}
 
 				// `Perform effect %s`
@@ -522,8 +651,31 @@ namespace Faolan.Importer.Cli
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
 		private const uint AreaFormulaKind = 53087;
 		private const uint CastNanoKind = 53051;
+		private const uint ChangeHitPercentKind = 53030;
+		private const uint ChangeLineHitPercentKind = 53075;
 		private const uint FilteredAreaFormulaKind = 53088;
+		private const uint HitKind = 53002;
+		private const uint ModifyAsRatingKind = 53067;
+		private const uint ResurrectTargetKind = 53227;
+		private const uint TeamFormulaKind = 53066;
+		private const uint TeamPropagatedBuffKind = 53224;
+
+		// `ResurrectTarget`'s only payload slot - the health percentage the target comes back at.
+		private const int KeyResurrectHealth = 188;
+		private const uint InterpolatedHitKind = 53219;
 		private const uint SetSpellRecastTimeKind = 53226;
+		private const uint SpecialHitKind = 53196;
+
+		// The `Hit` family's magnitude slots. ⚠️ Per-TYPE names, like every unnamed key: 170 is the target CAP on the
+		// area kinds and the high magnitude's LOW endpoint here.
+		private const int KeyHitMax = 37;
+		private const int KeyHitMaxHigh = 171;
+		private const int KeyHitMaxLow = 170;
+		private const int KeyHitMin = 2;
+		private const int KeyHitMinHigh = 169;
+		private const int KeyHitMinLow = 168;
+		private const int KeyRampHighLevel = 173;
+		private const int KeyRampLowLevel = 172;
 
 		// Everything one rendering needs that is not the record: the RDB, the English LDB, and the caster level a
 		// level ramp resolves against.
@@ -555,13 +707,37 @@ namespace Faolan.Importer.Cli
 			/// </remarks>
 			public string? SentenceFor(uint kind)
 			{
-				if (Ldb.TryGetValue((LdbGameActionFormatCategory, kind), out var byId))
+				// ⭐ A kind may draw itself with ANOTHER type's sentence, and several of the most common ones do -
+				// `InterpolatedModify` renders through `Modify`, the whole spell-stat-modifier family through
+				// `SpellStatModifier`. See GameActionTooltip.SentenceKinds (#782).
+				if (Ldb.TryGetValue((LdbGameActionFormatCategory, GameActionTooltip.SentenceKind(kind)), out var byId))
 					return byId;
 
 				var name = GameActionTypes.Get(kind)?.Name;
-				return name != null && Ldb.TryGetValue((LdbGameActionFormatCategory, Elf28.Of(name)), out var byToken)
-					? byToken
-					: null;
+				return name != null ? SentenceForToken(name) : null;
+			}
+
+			/// <summary>The sentence keyed by a TOKEN NAME - see <see cref="SentenceFor" />'s remarks.</summary>
+			public string? SentenceForToken(string token)
+			{
+				return Ldb.GetValueOrDefault((LdbGameActionFormatCategory, Elf28.Of(token)));
+			}
+
+			/// <summary>
+			///     A magnitude RANGE as the client draws one - `FUN_0149a700`'s `min-max`, through each endpoint's
+			///     display scale.
+			/// </summary>
+			/// <remarks>
+			///     ⚠️ Drawn as a MAGNITUDE, not signed: the client's hit branch takes the absolute value when the low
+			///     endpoint is negative, because the sentence around it already says "points of" or "Removes". Signing
+			///     it here would render "-58--71 points of Health".
+			/// </remarks>
+			public string Range(uint statId, int min, int max)
+			{
+				var scale = StatDisplayScale.Of(statId);
+				var (low, high) = min < 0 ? (-min, -max) : (min, max);
+				var suffix = StatUnitSuffix.SuffixOf(statId);
+				return $"{low / (double)scale:0.##}-{high / (double)scale:0.##}{suffix}";
 			}
 
 			/// <summary>
