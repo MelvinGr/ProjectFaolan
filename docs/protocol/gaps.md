@@ -85,6 +85,21 @@ struct. Tracked in Gitea #147.
 
 ---
 
+## Player stats
+
+### What else makes retail re-send the combat rating quad
+The four ids — `AttackRating` 0x398, `DefenseRating` 0x39A, `MagicRating` 0x39B, `MagicalResist` 0x39D — carry one
+level-derived number (`400 x level - 300`, exact on all 2,100 captured records, #685), and retail restates them in
+bursts of four with a corpus-wide MEDIAN gap of 10.4 s (278 bursts over 132 dumps). Two of the occasions are now
+measured and the server sends the quad on both: a LEVEL-UP (15 of 18 captured `NewLevelIIR` events draw a burst, 11
+within 0.1 s) and the COMBAT TOGGLE (13 of 13 captured `PerformSpecialAction` 0x4E2 presses, 0.31-1.61 s later).
+Most bursts follow neither, so what triggers the rest is open — a stat-sheet recompute is the obvious candidate, and
+gear changes are the obvious thing to measure next. The VALUE is settled; the full cadence is not.
+Tracked in Gitea #505.
+`[V0: what else makes retail re-send the quad]`
+
+---
+
 ## World objects
 
 ### What selects a harvest node's regrowth step

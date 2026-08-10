@@ -34,9 +34,18 @@ namespace Faolan.Core.Progression
 	///         cannot weave - so the weave was simply where one capture happened to hold them.
 	///     </para>
 	///     <para>
-	///         [V0: what makes retail RE-send the quad. It arrives in bursts of four with irregular 5-35 s gaps (32
-	///         bursts in a 15-minute capture), mostly alone in their own packets, so it is event-driven rather than a
-	///         timer - a stat-sheet recompute is the obvious candidate. The VALUE is settled; the cadence is not.]
+	///         <b>Two of the occasions retail re-sends it on are now measured</b>, and the server sends it on both
+	///         (#505/#685): a <b>LEVEL-UP</b> (15 of the 18 captured <c>NewLevelIIR</c> events draw a burst, 11 of them
+	///         within 0.1 s - inside the ding burst itself), and the <b>COMBAT TOGGLE</b> (13 of 13 captured
+	///         <c>PerformSpecialAction</c> 0x4E2 presses draw one 0.31-1.61 s later). The toggle is causal rather than
+	///         adjacent: the corpus-wide median gap between bursts is 10.4 s, so 13 for 13 inside a 2 s window is not
+	///         coincidence - and mechanically a sheathe/draw changes the active weapon, so the ratings are restated.
+	///         The four ids always go out in the <see cref="Stats" /> order below.
+	///     </para>
+	///     <para>
+	///         [V0: what ELSE makes retail re-send the quad. Bursts arrive every ~10 s in a live capture and most
+	///         follow neither occasion above, mostly alone in their own packets, so it is event-driven rather than a
+	///         timer - a stat-sheet recompute is the obvious candidate. The VALUE is settled; the full cadence is not.]
 	///     </para>
 	/// </remarks>
 	public static class CombatRatingCurve

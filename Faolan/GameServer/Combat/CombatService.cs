@@ -793,6 +793,14 @@ namespace Faolan.GameServer.Combat
 					await SendWorldPacket(killer, ComboBookCodec.Build(instance, combo.Id));
 			}
 
+			// The rating QUAD is LEVEL-DERIVED (`400 x level - 300`, #685), so the ding invalidates the copy the login
+			// snapshot carried - and retail restates it right here: 15 of the 18 captured `NewLevelIIR` events are
+			// followed by a quad burst, 11 of them within 0.1 s, i.e. inside this same burst. Without it a character's
+			// four combat ratings read the level they logged in at until the next relog.
+			var rating = CombatRatingCurve.For(character.Level);
+			foreach (var stat in CombatRatingCurve.Stats)
+				await SendWorldPacket(killer, StatCodec.Build(StatIirs.ForCharacter(instance, (uint)stat, rating)));
+
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
 				await SendWorldPacket(killer,
 					FormatFeedbackCodec.Build(instance, new AttributeChanged(attributeId, amount)));

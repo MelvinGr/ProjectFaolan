@@ -148,8 +148,8 @@ returns 0 entries for each) or a row in `Spells` / `Abilities` / `Items`. They a
 A per-class map like `StartingData.SearchStanceAction` would therefore be a borrowed id playing the wrong
 sheathe animation — the same trap that map's own comment warns about, one key over.
 
-**What IS class-independent and buildable: retail re-pushes the RATING QUAD.** Every press is followed ~0.7–1.3 s
-later by four `StatIIR` records on the player's own handle:
+**What IS class-independent and buildable — and is now what the server answers: retail re-pushes the RATING QUAD.**
+Every press is followed by four `StatIIR` records on the player's own handle, in this order:
 
 ```
 0x0398 Attack Rating   0x039A Defense Rating   0x039B Magic Rating   0x039D Magical Resist
@@ -158,7 +158,18 @@ later by four `StatIIR` records on the player's own handle:
 all carrying `0x7BD4` = 31700 for the level-80 necromancer (NecroL80) — exactly `400 × 80 − 300`, the #685 quad. Which is
 mechanically what a sheathe/draw IS: the active weapon changes, so the ratings are restated. That half needs no
 invented id, because the formula is already ours.
+
+⭐ **And it is causal, not adjacency.** All **13 of 13** captured 0x4E2 presses draw a burst **0.31–1.61 s** later,
+against a corpus-wide **median gap of 10.4 s** between bursts (278 bursts over 132 dumps) — a 2 s window would catch
+~19 % of presses by chance, so 13 for 13 is not one. The same sweep settles a second occasion: **15 of the 18 captured
+`NewLevelIIR` events** are followed by a burst, **11 within 0.1 s**, i.e. inside the ding burst itself.
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json f15416/f15442]
+
+`GameServerListener.SendCombatRatings` sends it on both, so a sheathe, an XP ding and `.level` all restate the quad.
+The level-up half was a correctness gap rather than fidelity: the value is level-derived and the quad rode **only** the
+login snapshot, so a character who dinged read the level they logged in at until the next relog.
+
+⚠️ Two occasions, not THE rule — most bursts follow neither, so `[V0: what else makes retail re-send the quad]` stands.
 
 ## The implemented stances
 
@@ -297,9 +308,9 @@ which asserts both halves: the three reach twelve classes, and the class kit doe
 ## Code
 
 - `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing. It answers the
-  spellweave toggle, Path of Asura, **search** and **hide**; every other selector is still logged and dropped, so
-  those stances never visibly take even though the client sent them.
-- `GameServerListener.Outbound.cs` — `PerformSearchStance` / `ToggleSneakHide`.
+  spellweave toggle, Path of Asura, **search**, **hide**, **rest** and the **combat toggle** (the rating quad half
+  of it); crouch and dash are still logged and dropped, because neither is pinned by the corpus.
+- `GameServerListener.Outbound.cs` — `PerformSearchStance` / `ToggleSneakHide` / `SendCombatRatings`.
 - `BehaviorAnimations.SearchStance` / `SneakHideEnter` / `SneakHideExit` — the records, byte-exact
   (`PlayerStanceCodecTests`).
 - `StartingData.SearchStanceAction` / `SneakHideEnterAction` / `SneakHideExitAction` — the per-class animation.

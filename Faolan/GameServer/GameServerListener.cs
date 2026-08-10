@@ -81,6 +81,11 @@ namespace Faolan.GameServer
 		private const uint SneakHideSpecialAction = 0x068;
 		private const uint RestSpecialAction = 0x06A;
 
+		// The COMBAT TOGGLE - sheathe / draw (#505). Its `Transition` animation action is per WEAPON and nothing we
+		// hold maps a weapon to one, so the animation is deliberately NOT sent; what IS derivable is the half retail
+		// pairs with it, the rating quad (see SendCombatRatings).
+		private const uint CombatToggleSpecialAction = 0x4E2;
+
 		// How long the `Resting` channel runs. NOT a number chosen here: it is the Spells row for 3164147 `Resting`
 		// ("Recovering health, mana, energy, and stamina"), whose 20,500 ms cast time is exactly the 2050
 		// centiseconds retail puts in the rest behaviour record.

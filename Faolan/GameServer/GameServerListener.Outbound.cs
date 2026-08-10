@@ -23,6 +23,7 @@ using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Progression;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
@@ -1036,6 +1037,30 @@ namespace Faolan.GameServer
 		string? IApprenticeOutbound.NameOf(uint characterId)
 		{
 			return ClientForCharacter(characterId)?.Session.Character.Name;
+		}
+
+		// The level-scaled rating QUAD (#685) - AttackRating / DefenseRating / MagicRating / MagicalResist, four
+		// player-addressed StatIIRs carrying one number, in the wire order the corpus sends them.
+		//
+		// It rides the login snapshot (`SnapshotStatSheet`), and until now that was the ONLY place it ever went - so a
+		// character who dinged read the level it logged in at until the next relog. Retail restates it, and the corpus
+		// names two of the occasions outright:
+		//
+		//   - a LEVEL-UP. 15 of the 18 captured `NewLevelIIR` events are followed by a quad burst, 11 of them within
+		//     0.1 s, i.e. inside the ding burst itself. That one is a correctness fix, not fidelity: the value is
+		//     `400 x level - 300` and the level just changed.
+		//   - the COMBAT TOGGLE (#505). 13 of 13 captured 0x4E2 presses draw a burst 0.31-1.61 s later, against a
+		//     median burst interval of 10.4 s across the corpus - so it is causal, not adjacency. Mechanically it is
+		//     what a sheathe/draw IS: the active weapon changes, so the ratings are restated.
+		//
+		// ⚠️ Those are two occasions, not THE rule: bursts arrive every ~10 s in a live capture and most of them
+		// follow neither. [V0: what makes retail re-send the quad] stands - what is settled is the VALUE.
+		private static async Task SendCombatRatings(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var rating = CombatRatingCurve.For(character.Level);
+			foreach (var stat in CombatRatingCurve.Stats)
+				await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(character.Id, (uint)stat, rating)));
 		}
 
 		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed

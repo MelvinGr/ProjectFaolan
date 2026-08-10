@@ -839,6 +839,12 @@ namespace Faolan.GameServer
 					.SetLevel(level)
 					.SetExperience(level, character.Experience),
 				client.Session.Character.Id);
+
+			// The rating quad is level-derived (#685), so `.level` invalidates it in BOTH directions - which is why
+			// this sits here rather than inside the increase-only branch below. The XP-driven ding restates it too
+			// (CombatService.PushLevelUp).
+			await SendCombatRatings(client);
+
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
 			if (level > previousLevel)

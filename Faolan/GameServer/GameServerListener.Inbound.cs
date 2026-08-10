@@ -1488,6 +1488,16 @@ namespace Faolan.GameServer
 							await PerformRestCast(client);
 							break;
 						}
+
+						// The COMBAT TOGGLE (#505). Retail answers with a `Transition` record AND the rating quad; we
+						// send only the quad, because the record's animation action is per WEAPON and none of the five
+						// captured ids is an RDB record, a spell or an ability - so a per-class map would be a borrowed
+						// id playing the wrong sheathe. Sending a subset of what retail sends beats inventing the rest.
+						case CombatToggleSpecialAction:
+						{
+							await SendCombatRatings(client);
+							break;
+						}
 					}
 
 					break;
