@@ -608,3 +608,65 @@ above. The reasoning that produced it is still worth keeping, because it is a tr
 so *reading* `descriptor+0xc` out of the image returns zeros. What that rules out is reading the DATA — not
 reading the initialiser that writes it. `DumpGameActionKeyLists.java` walks `FUN_008bdf40`'s stores instead and
 reaches all 260, against the 68 the live Frida dump got.
+
+## ⭐ An RDB spell record holds SEVERAL of these lists, and its elements carry CRITERIA (#785)
+
+The reader chain above is the WIRE one, but the RDB spell template (`1040005`) stores the same shape — and it
+stores **more than one list per record**, which is invisible to anything that streams the element region.
+
+### The list header
+
+Each group of elements is introduced by a 12-byte header immediately before its first element:
+
+```
+[u32 2][u32 listId][u32 (count + 1) * 0x3F1]
+```
+
+That third word is `FUN_00870500`'s own count word, the one whose assert reads *"Streaming in spell list with N
+elements"* — so this is not a new framing, it is the list reader's framing appearing once per group.
+`ItemTemplateStatModifiers.ParseElementLists` walks it; `--report spell-element-lists` scores it:
+
+```
+records whose lists TILE exactly  : 19,076 / 19,413 = 98.26%
+elements inside a framed list     : 60,895 / 61,840 = 98.47%
+lists per record                  : 1 x 17,746   2 x 1,309   3 x 19   4 x 2
+list ids                          : 0 x 18,738   20 x 1,142   33 x 502   31 x 33   29/14 x 6   30/5 x 1
+```
+
+⚠️ The list ID is carried, **not** interpreted. It skews hard by kind — `0` is the bulk (57,580 elements),
+`20` is `StopParticleEffect` / `Fatality` / `CastNano`, `33` is `SetSpellRecastTime` and the area/cone formulas —
+which reads like a trigger (on-expiry, on-hit), but nothing has pinned that, so no consumer branches on it.
+
+⚠️ The remaining 1.74% break on a second structure, not on the header: a recurring 32-byte block
+`[22][36][0x7E2][3][0x7E2][0][id][93]` that sits BETWEEN lists (twice in `Spirit of the Bear (Rank 1)` 146262)
+and once at the end of `Hellfire Stream` 8600. Undecoded.
+
+### The sub-records are CRITERIA — and they are what an "exact duplicate" really is
+
+`FUN_00899a60`'s per-element sub-record reader is `FUN_006e9f20`. It reads **three u32s**, bounds the third to
+`0..0x401`, and on failure logs
+
+```
+"invalid criterion id/value/operator ("
+```
+
+so the triple is `[id][value][operator]`, in that order — a CONDITION on the element. `Element.Criteria` is the
+typed view.
+
+⭐ **This dissolves #785.** That ticket was filed on *"a spell record states the same GameAction element TWICE,
+verbatim"* — 1,117 elements whose decoded slots repeat another element of the same record. Reading their criteria:
+
+```
+byte-identical incl. their criteria :   130
+the same effect under different conditions : 987
+across two different LISTS          :    42
+```
+
+So the overwhelming majority were never duplicated data — they are the same effect under different criteria, and a
+reader that stops at the decoded slots cannot tell them apart. `AddProc` at `1006601@480` is the clean case: its
+twin's criteria are identical except that the operators `93` and `103` are swapped between two ids.
+
+Across the catalog: **74,593 criteria over 42 ids and 50 operators**. Half of them (37,540) carry **no operand** —
+`[0][0][op]` — which cannot be a comparison, so those operators are combiners and the whole thing reads like a
+postfix requirement expression. Suggestive rather than settled; the id and operator vocabularies are undecoded and
+tracked separately.

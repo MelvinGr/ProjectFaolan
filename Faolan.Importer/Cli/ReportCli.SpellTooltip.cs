@@ -113,7 +113,7 @@ namespace Faolan.Importer.Cli
 			var ldb = LdbStringIndex.EnglishPlaintext(rdb);
 			var ctx = new TooltipContext(rdb, ldb, null);
 
-			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0;
+			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0;
 			long elements = 0, rendered = 0;
 			// #789: how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
 			// selects - the only way to say what the flag MEANS is to look at which spells wear it.
@@ -174,6 +174,9 @@ namespace Faolan.Importer.Cli
 				foreach (var field in fields.Keys)
 					fieldCounts[field] = fieldCounts.GetValueOrDefault(field) + 1;
 
+				// The element-list headers (#785) - 12 bytes each, and decoded, so they count as accounted for.
+				listBytes += ItemTemplateStatModifiers.ParseElementLists(body).Count * 12;
+
 				foreach (var element in ItemTemplateStatModifiers.ParseElements(body))
 				{
 					elements++;
@@ -197,10 +200,10 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			var accounted = elementBytes + fieldBytes;
+			var accounted = elementBytes + fieldBytes + listBytes;
 			Console.WriteLine($"spell-tooltip census over {records} records of RDB {SpellTemplateType}");
 			Console.WriteLine($"  record bytes inside a parsed region : {accounted:N0} / {bodyBytes:N0} = {(bodyBytes == 0 ? 0 : 100.0 * accounted / bodyBytes):0.0}%"
-			                  + $"   ({elementBytes:N0} in elements, {fieldBytes:N0} in the property run)");
+			                  + $"   ({elementBytes:N0} in elements, {listBytes:N0} in their list headers, {fieldBytes:N0} in the property run)");
 			Console.WriteLine($"  property-run field ids read         : {SpellFieldsRead.Count(f => fieldCounts.ContainsKey(f.Key))} / {fieldCounts.Count}");
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
 			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
@@ -879,10 +882,16 @@ namespace Faolan.Importer.Cli
 			// LONGEST ascending run and a body may hold shorter ones before it, which is why this is a span and not a
 			// claim about where the run sits.
 			var fieldBytes = fields.Count * 8;
-			var accounted = elementBytes + fieldBytes;
+			// The 12-byte `[2][listId][(n + 1) * 0x3F1]` header in front of each element group (#785). Counted here
+			// because it IS decoded now - leaving it out reported the record as less accounted-for than it is, and it
+			// is what says which of two identical-looking elements belong to the same list.
+			var lists = ItemTemplateStatModifiers.ParseElementLists(record.AsSpan(12));
+			var listBytes = lists.Count * 12;
+			var accounted = elementBytes + fieldBytes + listBytes;
 
 			yield return "--";
-			yield return $"record {body} B body: {elements.Count} element(s) {elementBytes} B + {fields.Count} property field(s) {fieldBytes} B "
+			yield return $"record {body} B body: {elements.Count} element(s) in {lists.Count} list(s) {elementBytes} B + {listBytes} B header "
+			             + $"+ {fields.Count} property field(s) {fieldBytes} B "
 			             + $"= {accounted} B ({(body == 0 ? 0 : 100.0 * accounted / body):0.#}%), {body - accounted} B unaccounted";
 
 			var unparsed = ItemTemplateStatModifiers.UnparsedElementHeads(record.AsSpan(12));

@@ -586,6 +586,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spell-element-lists":
+				{
+					SpellElementLists(RdbDir(), arg);
+					return 0;
+				}
+
 				case "rdb-field-coverage":
 				{
 					RdbFieldCoverage(RdbDir(), arg, _options.Out);

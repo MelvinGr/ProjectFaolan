@@ -262,11 +262,93 @@ namespace Faolan.Core.Rdb
 					at += 2 + length;
 				}
 
-				elements.Add(new Element(off, kind, [.. values], [.. texts], at - off, W(body, fixedAt), W(body, fixedAt + 4)));
+				// ⭐ The SUB-RECORD run is carried, not dropped (#785). It is what distinguishes two elements that
+				// state the same effect: of the 1,285 elements that repeat another element of the same record with
+				// identical decoded slots, 1,003 differ HERE and only 282 are byte-identical. A reader that stops at
+				// the decoded slots reports all 1,285 as duplicated data.
+				var subs = new uint[subCount * subRecordWords];
+				for (var s = 0; s < subs.Length; s++)
+					subs[s] = W(body, off + 16 + s * 4);
+
+				elements.Add(new Element(off, kind, [.. values], [.. texts], at - off, W(body, fixedAt), W(body, fixedAt + 4), subs));
 			}
 
 			return elements;
 		}
+
+		/// <summary>
+		///     ⭐ The element region is not ONE list - it is a sequence of count-framed lists, and this is the split
+		///     (Gitea #785). Each group is introduced by a 12-byte header <c>[2][listId][(count + 1) * 0x3F1]</c>
+		///     sitting immediately before its first element.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The frame is the client's ordinary list count word - the same <c>(n + 1) * 0x3F1</c> the wire uses
+		///         (see <c>ListFrame</c>), which is why <c>0x7E2</c> (one element) and <c>0xBD3</c> (two) kept turning
+		///         up as "constants" in the 12 bytes between elements.
+		///     </para>
+		///     <para>
+		///         ⭐ This is what an "element stated TWICE, verbatim" is: the twins are in DIFFERENT lists.
+		///         <c>Hellfire Stream</c> (8600) holds four - list <c>0</c> with its five level bands plus the
+		///         <c>CastNano</c> and the recast, lists <c>29</c> and <c>30</c> with one <c>Modify</c> each, and list
+		///         <c>31</c> with two more bands that repeat list 0's first two value for value. Reading the region as
+		///         one stream makes those look like duplicated data; they are two lists that happen to share an entry.
+		///     </para>
+		///     <para>
+		///         ⚠️ The list ID is carried, not interpreted. List <c>0</c> is the bulk (57,579 of 59,705 elements)
+		///         and the other ids skew hard by kind - <c>20</c> is <c>StopParticleEffect</c> / <c>Fatality</c> /
+		///         <c>CastNano</c>, <c>33</c> is <c>SetSpellRecastTime</c> / the area+cone formulas - which reads like
+		///         a TRIGGER (on-expiry, on-hit) but nothing has pinned that, so no consumer branches on it yet.
+		///     </para>
+		/// </remarks>
+		public static IReadOnlyList<ElementList> ParseElementLists(ReadOnlySpan<byte> body)
+		{
+			var elements = ParseElements(body);
+			var lists = new List<ElementList>();
+
+			var i = 0;
+			while (i < elements.Count)
+			{
+				var head = elements[i].Offset - ListHeaderBytes;
+				if (head < 0 || W(body, head) != ListHeaderTag)
+					break;
+
+				var frame = W(body, head + 8);
+				if (frame == 0 || frame % ListFrameUnit != 0)
+					break;
+
+				// The frame states (count + 1); a count that overruns what was parsed means this header is not one,
+				// so the walk stops rather than inventing a group. Callers get the lists it could account for and
+				// compare `Sum(Count)` against `ParseElements(body).Count` to see whether it accounted for all.
+				var count = (int)(frame / ListFrameUnit) - 1;
+				if (count <= 0 || i + count > elements.Count)
+					break;
+
+				var members = new List<Element>(count);
+				for (var j = i; j < i + count; j++)
+					members.Add(elements[j]);
+
+				lists.Add(new ElementList(head, W(body, head + 4), members));
+				i += count;
+			}
+
+			return lists;
+		}
+
+		/// <summary>One count-framed group of elements: where its header sits, its id, and its members (#785).</summary>
+		public readonly record struct ElementList(int Offset, uint Id, IReadOnlyList<Element> Elements);
+
+		/// <summary>
+		///     One condition on an element, named by the client's own assert - `invalid criterion id/value/operator`
+		///     (<c>FUN_006e9f20</c>, which bounds the operator to <c>0..0x401</c>).
+		/// </summary>
+		public readonly record struct Criterion(uint Id, uint Value, uint Operator);
+
+		// The element-list header: `[2][listId][(count + 1) * 0x3F1]`, 12 bytes immediately before the group's first
+		// element. `2` is constant across every shipped list header in the spell catalog.
+		private const int ListHeaderBytes = 12;
+		private const uint ListHeaderTag = 2;
+		private const uint ListFrameUnit = 0x3F1;
 
 		/// <summary>
 		///     The records that really are a modifier of the CARRIER's own stats, read BY KEY rather than by position
@@ -414,8 +496,55 @@ namespace Faolan.Core.Rdb
 		// ⚠️ `Fixed2d5`/`Fixed2d6` are the first two of the element's four fixed ints, carried because they are NOT
 		// padding: on an area-targeting kind `Fixed2d6` is the AURA PERIOD in centiseconds (Gangrenous Stench's
 		// "every 4 seconds" is 400), and treating those words as a signature is what hid every aura until #772.
-		public readonly record struct Element(int Offset, uint Kind, uint[] Values, string?[] Texts, int WidthBytes, uint Fixed2d5 = 0, uint Fixed2d6 = 0)
+		public readonly record struct Element(
+			int Offset,
+			uint Kind,
+			uint[] Values,
+			string?[] Texts,
+			int WidthBytes,
+			uint Fixed2d5 = 0,
+			uint Fixed2d6 = 0,
+			uint[]? SubRecords = null)
 		{
+			/// <summary>
+			///     The element's CRITERIA as flat words, three per criterion - the region between the sub-record count
+			///     and the four fixed ints. Empty when the element carries none. See <see cref="Criteria" /> for the
+			///     typed view.
+			/// </summary>
+			public uint[] SubRecords { get; } = SubRecords ?? [];
+
+			/// <summary>
+			///     ⭐ The element's CRITERIA - the conditions under which it applies (#785).
+			/// </summary>
+			/// <remarks>
+			///     <para>
+			///         The client NAMES them. `FUN_00899a60`'s sub-record reader is `FUN_006e9f20`, which reads three
+			///         u32s, bounds the third to <c>0..0x401</c>, and on failure logs
+			///         <c>"invalid criterion id/value/operator ("</c> - so the triple is
+			///         <c>[id][value][operator]</c>, in that order.
+			///     </para>
+			///     <para>
+			///         ⭐ This is what makes an apparent duplicate not one. Of the 1,117 elements whose decoded slots
+			///         repeat another element of the same record, <b>987 differ only here</b> - they are the same
+			///         effect under different conditions, not the same effect stated twice. `AddProc` at
+			///         <c>1006601@480</c> is the clean case: its twin's criteria are identical except that the
+			///         operators <c>93</c> and <c>103</c> are SWAPPED between two ids.
+			///     </para>
+			///     <para>
+			///         ⚠️ The id space and the operator space are NOT decoded - nothing yet says what criterion 150 is
+			///         or what operator 1 tests. Carried so a consumer can tell two elements apart; no engine branches
+			///         on one.
+			///     </para>
+			/// </remarks>
+			public IEnumerable<Criterion> Criteria
+			{
+				get
+				{
+					for (var i = 0; i + 2 < SubRecords.Length; i += 3)
+						yield return new Criterion(SubRecords[i], SubRecords[i + 1], SubRecords[i + 2]);
+				}
+			}
+
 			/// <summary>The registered type, or null when the kind is not a GameAction the client knows.</summary>
 			public GameActionType? Type => GameActionTypes.Get(Kind);
 
