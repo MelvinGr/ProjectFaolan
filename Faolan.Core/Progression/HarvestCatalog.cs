@@ -122,41 +122,45 @@ namespace Faolan.Core.Progression
 		/// </summary>
 		public static readonly ImmutableDictionary<uint, HarvestNode> Nodes = new HarvestNode[]
 		{
-			// --- Cloth --------------------------------------------------------------------------------------------
+			// --- Cloth (Weaver, cloth_tier1) ----------------------------------------------------------------------
 			new(3237565, "Cotton Shrub", 161192), // Cotton
-			// --- Wood ---------------------------------------------------------------------------------------------
-			new(3237645, "Ash Tree", 161225), // Ash
-			new(3237646, "Yew Tree", 161218), // Yew
-			new(3237647, "Oak Tree", 161213), // Oak       - measured
+			// --- Wood (Woodcutting) -------------------------------------------------------------------------------
+			new(3237645, "Ash Tree", 161225), // Ash        - wood_tier1
+			new(3237646, "Yew Tree", 161218), // Yew        - wood_tier2
+			new(3237647, "Oak Tree", 161213), // Oak        - wood_tier3, measured
 			// ⚠️ Birch sits at 3927910, OUTSIDE the 1611xx band every other resource is in - it was harvested from a
 			// different capture. Included because it is structurally the same kind of row (Value 0, no description,
 			// hashed, name matches the node exactly), but it is the one entry whose id space does not corroborate it.
-			new(3935376, "Birch Tree", 3927910), // Birch
-			new(3935377, "Elm Tree", null), // Elm is item 3927911 - no row, see the id block below
-			new(3935378, "Ironwood", null), // Ironwood is item 3927912
-			// --- Stone --------------------------------------------------------------------------------------------
-			new(3237641, "Sandstone", 161207), // Sandstone
-			new(3237642, "Granite Rock", 161206), // Granite   - measured
-			new(3237644, "Basalt Rock", 161205), // Basalt
-			new(3935379, "Greenstone Formation", null), // Greenstone is item 3927909
-			new(3935380, "Marble", null), // Marble is item 3927908
-			new(3935381, "Slate Rock", null), // Slate is item 3927907
-			// --- Metal --------------------------------------------------------------------------------------------
-			new(3237648, "Copper Node", 161197), // Copper
-			new(3237652, "Iron Node", 161196), // Iron      - measured
-			new(3237653, "Duskmetal Node", 161195), // Duskmetal
-			new(3237656, "Silver Vein", 161202), // Silver
-			new(3237657, "Electrum Vein", 161201), // Electrum
-			new(3237659, "Gold Vein", 161200), // Gold
-			new(3935343, "Lead Deposit", 3927913), // Lead      - same off-band id space as Birch
-			new(3935344, "Nickel Deposit", null), // Nickel is item 3927914
-			new(3935345, "Chromium Deposit", null), // Chromium is item 3927915
+			new(3935376, "Birch Tree", 3927910), // Birch   - wood_tier1
+			new(3935377, "Elm Tree", null), // Elm is item 3927911 - no row, see the id block below (wood_tier2)
+			new(3935378, "Ironwood", null), // Ironwood is item 3927912 (wood_tier3)
+			// --- Stone (Stonecutting) -----------------------------------------------------------------------------
+			new(3237641, "Sandstone", 161207), // Sandstone - stone_tier1
+			new(3237642, "Granite Rock", 161206), // Granite - stone_tier2, measured
+			new(3237644, "Basalt Rock", 161205), // Basalt   - stone_tier3
+			new(3935379, "Greenstone Formation", null), // Greenstone is item 3927909 (stone_tier3)
+			// ⭐ THE ONE PROVEN REQUIREMENT (#779): retail refused a Stonecutting APPRENTICE this node and named
+			// `Stonecutting Adept` (feat template 894305) as what was missing. Every other row's requirement is
+			// deliberately null - see <see cref="HarvestNode.RequiredFeatId" />.
+			new(3935380, "Marble", null, 894305), // Marble is item 3927908 (stone_tier2)
+			new(3935381, "Slate Rock", null), // Slate is item 3927907 (stone_tier1)
+			// --- Metal (Mining) -----------------------------------------------------------------------------------
+			new(3237648, "Copper Node", 161197), // Copper  - iron_tier1
+			new(3237652, "Iron Node", 161196), // Iron      - iron_tier2, measured
+			new(3237653, "Duskmetal Node", 161195), // Duskmetal - iron_tier3
+			new(3935343, "Lead Deposit", 3927913), // Lead  - iron_tier1, same off-band id space as Birch
+			new(3935344, "Nickel Deposit", null), // Nickel is item 3927914 (iron_tier2)
+			new(3935345, "Chromium Deposit", null), // Chromium is item 3927915 (iron_tier3)
+			// --- Precious metal (Prospecting) ---------------------------------------------------------------------
+			new(3237656, "Silver Vein", 161202), // Silver  - gold_tier1
+			new(3237657, "Electrum Vein", 161201), // Electrum - gold_tier2
+			new(3237659, "Gold Vein", 161200), // Gold      - gold_tier3
 			// Pyrite was in the gap list until 2026-08-09: item 3927918 shipped all along but NAMELESS, so the gap
 			// check (which matches on the name) could not see it. `rdb-items` decrypting its template is what made it
 			// findable - the same off-band id space as Birch and Lead, one row further along.
-			new(3935373, "Pyrite Lode", 3927918), // Pyrite
-			new(3935374, "Bismuth Lode", null), // Bismuth is item 3927927
-			new(3935375, "Mithrite Lode", null) // Mithrite is item 3927920
+			new(3935373, "Pyrite Lode", 3927918), // Pyrite - gold_tier1
+			new(3935374, "Bismuth Lode", null), // Bismuth is item 3927927 (gold_tier2)
+			new(3935375, "Mithrite Lode", null) // Mithrite is item 3927920 (gold_tier3)
 		}.ToImmutableDictionary(n => n.DisplayId);
 
 		/// <summary>
@@ -200,8 +204,34 @@ namespace Faolan.Core.Progression
 	}
 
 	/// <summary>
-	///     One harvest node TYPE: the LDB 50200 id the client resolves its name through, that name, and the item a
-	///     swing grants (null when no such item ships — see <see cref="HarvestCatalog.Nodes" />).
+	///     One harvest node TYPE: the LDB 50200 id the client resolves its name through, that name, the item a
+	///     swing grants (null when no such item ships — see <see cref="HarvestCatalog.Nodes" />), and the gathering
+	///     rank it demands.
 	/// </summary>
-	public sealed record HarvestNode(uint DisplayId, string Name, uint? ResourceItemId);
+	/// <param name="RequiredFeatId">
+	///     The feat TEMPLATE id (a <c>Feats.Id</c>) a character must have reached for retail to let them harvest this
+	///     node, or null when no capture states one — in which case the node is ungated, which is what the server did
+	///     for every node before #779.
+	///     <para>
+	///         ⚠️ <b>Exactly one row is non-null, and filling the rest would be an invention.</b> Retail's refusal
+	///         (<c>FeatRequired</c>, naming the missing feat) appears twice in the whole corpus and both times it is
+	///         the same node and the same feat: Marble → <c>Stonecutting Adept</c>. The obvious extrapolation — read
+	///         the rank off the node's ART TIER — does not survive contact with the data: the client's own mesh names
+	///         group the 25 node types into <b>five families × three tiers</b>, each tier shared by exactly TWO node
+	///         types (<c>006468_resource_stone_tier2_node2</c> is the mesh of BOTH Granite Rock and Marble), so the
+	///         tier cannot separate the pair, and only one member of one pair has a measured requirement. The family
+	///         does name the PROFESSION cleanly (wood → Woodcutting, stone → Stonecutting, iron → Mining, gold →
+	///         Prospecting, cloth → Weaver), which is why each row above carries its family and tier as a comment;
+	///         that is the scaffold the remaining 24 rows drop into the moment another refusal is captured.
+	///     </para>
+	///     <para>
+	///         The bounds the corpus does give, for whoever fills these in: <b>NecroL80</b> holds Master on every
+	///         gathering ladder and harvested Granite, Oak, Iron, Copper, Silver, Electrum, Gold, Basalt and Ironsilk,
+	///         so all nine are ≤ Master (loose). <b>DemoL80</b> holds Prospecting Adept / Stonecutting Apprentice /
+	///         Woodcutting Apprentice / Mining Novice and harvested <b>Pyrite</b>, so gold_tier1 is ≤ Adept — and was
+	///         refused Marble at Apprentice, which is the equality above.
+	///         [V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json]
+	///     </para>
+	/// </param>
+	public sealed record HarvestNode(uint DisplayId, string Name, uint? ResourceItemId, uint? RequiredFeatId = null);
 }

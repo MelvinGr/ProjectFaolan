@@ -46,6 +46,11 @@ namespace Faolan.Core.Database.Repositories
 		// The whole feat graph's single-prerequisite edges - what the tradeskill ladders are walked out of (#735).
 		Task<Dictionary<uint, uint>> GetSingleFeatPrereqs();
 
+		// The WIRE feat id of an RDB feat TEMPLATE id, or null when the template has no wire id at all. The two id
+		// spaces are bridged by FeatIdMaps; this is the direction a requirement stated as a template id needs, which
+		// is how retail's own `FeatRequired` refusal names a feat (#779).
+		Task<uint?> GetWireFeatId(uint templateFeatId);
+
 		// Every wire id a character's spawn scaffold carries in `CharacterSkills`. The TRADESKILL professions ride
 		// this list (#735), which is why it is read as ids rather than through the slot it sits in.
 		Task<uint[]> GetCharacterSkillIds(uint characterId);
@@ -719,6 +724,17 @@ namespace Faolan.Core.Database.Repositories
 		// Cheap enough to do so: 5,501 edges, of which only 12 feats carry more than one requirement, and those are
 		// skipped rather than picked from - a rung of a ladder has exactly one rung below it, so a multi-prerequisite
 		// feat is by construction not one.
+		// The TEMPLATE -> WIRE hop, one feat at a time. Null when the template carries no wire id (58 of the client's
+		// 1,510 spell-granting feats are in that state), which is a real answer and not a lookup failure: a feat with
+		// no wire id can never appear in a character's feat list, so nothing can have trained it.
+		public async Task<uint?> GetWireFeatId(uint templateFeatId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var map = await ctx.FeatIdMaps.AsNoTracking().FirstOrDefaultAsync(m => m.TemplateId == templateFeatId);
+
+			return map?.WireFeatId;
+		}
+
 		public async Task<Dictionary<uint, uint>> GetSingleFeatPrereqs()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

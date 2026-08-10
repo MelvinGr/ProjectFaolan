@@ -160,6 +160,28 @@ namespace Faolan.GameServer.Economy
 			return ranks.TryGetValue(owning.Name, out var held) && held >= owning.RankOfFeat(recipe.RequiredFeatId)!.Value;
 		}
 
+		// Whether the character has trained far enough for a requirement stated as a feat TEMPLATE id (#779). That is
+		// the id space retail's own refusal speaks: the `FeatRequired` feedback names `Feats.Id` 894305, not the wire
+		// id 323502 the character's feat list carries, so the template -> wire hop happens here rather than at the
+		// call site.
+		//
+		// Same DEPTH comparison as the recipe gate above and the same benefit-of-the-doubt rule: a requirement whose
+		// feat sits on no ladder we recovered is ALLOWED, because that is a gap in what we walked out of the feat
+		// graph rather than a statement that the character may not do it.
+		public async Task<bool> HasReachedFeat(uint characterId, uint templateFeatId)
+		{
+			if (await _database.GetWireFeatId(templateFeatId) is not { } wireFeatId)
+				return true;
+
+			var ladders = await Ladders();
+			var owning = ladders.FirstOrDefault(l => l.RankOfFeat(wireFeatId) != null);
+			if (owning == null)
+				return true;
+
+			var ranks = await ProfessionsOf(characterId);
+			return ranks.TryGetValue(owning.Name, out var held) && held >= owning.RankOfFeat(wireFeatId)!.Value;
+		}
+
 		// Puts a GEM into a socket of another item (#754) - the `Tradeskill` command's second operation.
 		//
 		// Returns true when a gem was actually socketed. A refusal is SILENT, like a refused craft: retail answers a

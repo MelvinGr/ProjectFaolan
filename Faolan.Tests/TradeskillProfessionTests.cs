@@ -190,6 +190,46 @@ namespace Faolan.Tests
 			Assert.Equal(603, catalog.Count); // the rest is Weaponsmith, which they have not trained
 		}
 
+		// #779: the GATHERING gate. Retail refused a Stonecutting APPRENTICE a Marble node and named `Stonecutting
+		// Adept` (feat TEMPLATE id 894305) as what was missing, so the rank one below the requirement must refuse and
+		// the requirement itself must pass. The template -> wire hop is the point: 894305 is not a wire feat id and a
+		// gate that compared it against the character's own feat list would pass everybody.
+		[Theory]
+		[InlineData("Apprentice", false)] // exactly the capture: the rank the refused player held
+		[InlineData("Novice", false)]
+		[InlineData("Adept", true)]
+		[InlineData("Grandmaster", true)]
+		public async Task TheGatheringGate_RefusesBelowTheNamedRank(string rank, bool allowed)
+		{
+			var (service, characterId) = await Trained("Stonecutting", rank);
+			var marble = HarvestCatalog.Nodes.Values.Single(n => n.Name == "Marble");
+
+			Assert.Equal(894305u, marble.RequiredFeatId);
+			Assert.Equal(allowed, await service.HasReachedFeat(characterId, marble.RequiredFeatId!.Value));
+		}
+
+		// A character who has trained no gathering profession at all is refused, which is the whole point of the gate -
+		// and every OTHER node stays ungated, because the corpus states one requirement and only one.
+		[Fact]
+		public async Task AnUntrainedCharacterIsRefusedTheOneGatedNode_AndNothingElseIsGated()
+		{
+			var (service, characterId) = await Trained(null, null);
+
+			Assert.False(await service.HasReachedFeat(characterId, 894305));
+			Assert.Single(HarvestCatalog.Nodes.Values, n => n.RequiredFeatId != null);
+		}
+
+		// The benefit-of-the-doubt default, stated so it cannot be lost: a requirement naming a feat that is on no
+		// ladder we walked is ALLOWED. That is a gap in the recovered graph, not a statement about the character.
+		[Fact]
+		public async Task ARequirementOffEveryLadder_IsAllowed()
+		{
+			var (service, characterId) = await Trained(null, null);
+
+			Assert.True(await service.HasReachedFeat(characterId, 4242424)); // no such feat template
+			Assert.True(await service.HasReachedFeat(characterId, 328908)); // Expert Bandaging - a real feat, no ladder
+		}
+
 		private static async Task<System.Collections.Immutable.ImmutableArray<TradeskillLadder>> Ladders()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));

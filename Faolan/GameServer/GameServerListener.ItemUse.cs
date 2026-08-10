@@ -4,6 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.GameServer.World;
@@ -53,18 +54,36 @@ namespace Faolan.GameServer
 			if (HarvestCatalog.NodeFor(node.Row.DisplayCategory, node.Row.DisplayId) is not { } harvest)
 				return; // not a harvest node at all - some other destructible the player clicked
 
+			var name = harvest.Name;
+
+			// #779: the GATHERING gate, and it goes FIRST because it is the only refusal here that is retail's own -
+			// retail turns a player away who has not trained the rank and says WHICH feat is missing rather than "you
+			// cannot do that", as one FormatFeedbackIIR carrying the `FeatRequired` remoteformat with the feat's
+			// template id in it. It also has to precede the #746 branch below, because the one node whose requirement
+			// the corpus states (Marble) is also one of the nine with no resource item - checking that first would
+			// answer a rank refusal with our own placeholder and the gate would never run at all.
+			//
+			// ⚠️ Only ONE node type carries a requirement (see HarvestCatalog.HarvestNode.RequiredFeatId): the corpus
+			// states exactly one, and deriving the other 24 from the tier ordering is the invention that catalog exists
+			// to avoid. Every other node stays ungated, which is the behaviour that shipped before this gate.
+			if (harvest.RequiredFeatId is { } requiredFeat && !await _tradeskill.HasReachedFeat(character.Id, requiredFeat))
+			{
+				Logger.LogInformation("Harvest: {Player} has not trained feat {Feat}, so '{Node}' 0x{Handle:X8} was refused.", character.Name, requiredFeat, name, node.Handle);
+				await SendFeedback(client, new FeatRequired(requiredFeat));
+
+				return;
+			}
+
 			// #746: a node type whose resource has no item row. Nine of the 25 shipped types are in this state, and it
 			// is not something a player can be expected to infer from a click that does nothing - so say it, the same
 			// way the exhausted and bag-full refusals do. Never silent: the alternative reads as a broken node.
 			if (harvest.ResourceItemId is not { } resourceId)
 			{
 				Logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} has no resource item in the catalog, so {Player} was granted nothing (Gitea #746/#203).",
-					harvest.Name, node.Handle, character.Name);
-				await _agentServerDispatcher.CharacterSay(node.Handle, $"({harvest.Name}: not yet harvestable)", [character.Id]);
+					name, node.Handle, character.Name);
+				await _agentServerDispatcher.CharacterSay(node.Handle, $"({name}: not yet harvestable)", [character.Id]);
 				return;
 			}
-
-			var name = harvest.Name;
 
 			if (!node.IsHarvestable)
 			{

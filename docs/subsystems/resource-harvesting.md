@@ -164,6 +164,64 @@ for each. That raised the catalog from 13 node types to the **25** that actually
 The node name maps straight to the resource, and most of the family already ships (161190-161225: Ironsilk, Silk,
 Cotton, Duskmetal, Iron, Copper, Gold, Electrum, Silver, Basalt, Granite, Sandstone, Oak, Yew, Ash).
 
+## The GATHERING gate: retail names the missing feat (#779)
+
+Harvesting is gated on a gathering profession and RANK, independently of the crafting gate, and retail's refusal
+is captured. A Stonecutting **Apprentice** swung at a **Marble** node and got back one `FormatFeedbackIIR`
+carrying the `FeatRequired` remoteformat:
+
+```
+<remoteformat token="FeatRequired" category="100" key="Sb!&U1?)arPM1B&*4,vG" knubot="0"  >
+  <parameter value="7;<remoteformat id="894305" category="50220" key="@nH]c)u[%1Jqk,UbTNHs" knubot="0"  ></remoteformat>" />
+</remoteformat>
+```
+
+`894305` is `Feats.Id` 894305 = **Stonecutting Adept** — so the refusal *names the missing feat* rather than
+saying "you cannot do that", and the player's own annotation 12 s later says the same thing in words (*"tried to
+mine marbel. but need Adept stonecutting"*). `FeatRequiredCodec` builds it byte-exact
+(`FeatRequiredCodecTests`), framed with typeFlags 0 / footer 1 — the FIFO-banner defaults.
+[V2: demol80-demonologist_login_gameplay_annotated_1.tshark.json fr5644/fr5726]
+
+⭐ **It generalises to any feat.** Both `key` attributes are LDB *decryption* keys, which normally means a
+different string needs a different key — but category 50220 is **plaintext** (`--report ldb-search --report-arg
+id:894305` resolves it in all seven shipped languages, no key involved), so the captured nonces are reusable
+verbatim and the id is the only thing that varies.
+
+`HarvestCatalog.HarvestNode.RequiredFeatId` carries the requirement and `TradeskillService.HasReachedFeat` does
+the comparison — by ladder DEPTH, after the template → wire hop through `FeatIdMaps`, because 894305 is a
+template id and the character's own feat list speaks wire ids.
+
+### Only ONE node's requirement is known, and the tier does not give the rest
+
+The obvious extrapolation is to read the rank off the node's tier. It does not work, and the client's own art
+says why. Every node's `WorldObjects.GeometryAssetId` resolves to a `harvesting_tradeskill\NNNNNN_resource_
+<family>_tier<N>_node<M>.max` mesh (`--report rdb-search --report-arg resource_`), which groups the 25 shipped
+node types into **five families × three tiers, two node types per tier**:
+
+| family → profession | tier 1 | tier 2 | tier 3 |
+|---|---|---|---|
+| `wood` → Woodcutting | Ash Tree · Birch Tree | Yew Tree · Elm Tree | Oak Tree · Ironwood |
+| `stone` → Stonecutting | Sandstone · Slate Rock | Granite Rock · **Marble** | Basalt Rock · Greenstone Formation |
+| `iron` → Mining | Copper Node · Lead Deposit | Iron Node · Nickel Deposit | Duskmetal Node · Chromium Deposit |
+| `gold` → Prospecting | Silver Vein · Pyrite Lode | Electrum Vein · Bismuth Lode | Gold Vein · Mithrite Lode |
+| `cloth` → Weaver | Cotton Shrub | — | — |
+
+`006468_resource_stone_tier2_node2` is the mesh of **both** Granite Rock and Marble, so the tier cannot separate
+the pair — and only one member of one pair has a measured requirement. (`node<M>` is the DEPLETION stage, not a
+tier: a regrowing wood node is `ChangeMesh`'d `node3 → node2 → node1` as it fills.) The family half *is* clean
+and names each node's profession, which is the scaffold the remaining 24 rows drop into the moment another
+refusal is captured. Everything else stays ungated, which is the behaviour that shipped before the gate.
+
+The bounds the corpus does give:
+
+| character | gathering ranks | harvested | says |
+|---|---|---|---|
+| `NecroL80` | Master on all six | Granite, Oak, Iron, Copper, Silver, Electrum, Gold, Basalt, Ironsilk | all ≤ Master (loose) |
+| `DemoL80` | Prospecting Adept, Stonecutting/Woodcutting Apprentice, Mining Novice | **Pyrite** | gold tier 1 ≤ Adept |
+| `DemoL80` | Stonecutting **Apprentice** | *refused* Marble | stone tier 2 (new) **= Adept** |
+
+`FeatRequired` occurs exactly **twice** in the whole 132-capture corpus, and both are this same node and feat.
+
 ## What is not modelled
 
 - **Regrowth in place**, now that the cadence is measured: an exhausted node still despawns and comes back
