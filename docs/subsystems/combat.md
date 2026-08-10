@@ -1219,9 +1219,14 @@ while a DoT is a flat constant that ignores both level and pool: `Rend` at −54
 
 **A DoT's cadence is measured, not read.** The record carries no period, so consecutive ticks of one spell on
 one target are one tick train and the gap between them *is* that spell's interval — harvested by the
-`dot-effects` importer module into `Spell.DotIntervalMs`. 53 of the 84 DoT spells in the corpus have one;
+`dot-effects` importer module into `Spell.DotIntervalMs`. 55 of the 84 DoT spells in the corpus have one;
 values are round half-seconds from 500 ms to 11 s, peaking at 1 s (16 spells) and 2 s (14). A spell with no
 measured interval ticks at the 2 s fallback, which is the median of the measured set.
+
+The other 29 are not unmeasured because nobody looked — the estimator REFUSES them (fewer than three usable gaps,
+or gaps too ragged to establish a cadence), and refusing is the right outcome: a wrong interval silently misprices
+every tick of that spell, while no interval falls back to a documented default. Re-running the module widens this
+as the corpus grows, so **new combat captures are what moves it, not new code** (#524).
 
 The round-half-second **snap** is corrective, not cosmetic, and that is measured rather than assumed: over the
 measured set the raw estimate sits a mean of **−0.05%** from the value it snaps to — no bias in either direction —
@@ -1242,6 +1247,20 @@ the tail, and the tight cluster at the bottom is then measured against a number 
 estimator's leading rule is a **tight-cluster** one — the first tight (±5%) cluster walking upwards, provided that
 cluster still **contains the shortest observed gap** — with the concentration-around-the-median test answering only
 where that declines (#657, #660).
+
+⚠️ **The known limit is the HARMONIC case, and it is not fixable from gaps** (#524). A spell whose ticks are mostly
+unseen has no short gaps left to reveal its fundamental, so its gaps concentrate on a *multiple* of the true
+period — indistinguishable from a genuinely slower tick. `Aura: Fire Weave` is the one train in the corpus that
+looks like this: 17 gaps clustering at 0.92 / 1.23 / 1.53 / 1.84, spaced by roughly 0.3 s.
+
+**A harmonic/GCD estimator was tested against a null and rejected.** Sweeping candidate periods is degenerate on
+its own — the smaller the candidate, the better it fits, because every gap is within *p*/2 of some multiple — so
+the residual has to be read against chance: residuals of unrelated data are ~U(−*p*/2, *p*/2), i.e.
+rms = *p*/√12. Against that null the best fit these 17 gaps admit is a ratio of **0.656** (at 155 ms), while the
+identical sweep over random gaps spanning the same range gives a median best of **0.701** and reaches **0.577**
+in 5% of trials. So the observed fit sits inside the noise: **the gaps contain no recoverable fundamental**, and a
+harmonic estimator would be fitting the sweep's own degeneracy. The measured 1500 ms stands as the only supported
+value — the 500 ms an earlier hand scan recorded is not supported by these gaps either, nothing sitting near it.
 
 The proviso is what makes the cluster rule safe: a tight cluster with other gaps *below* it is a harmonic, not the
 period, so the walk stops once its window leaves the bottom behind. Without it the rule reads 4000 ms off a ragged
