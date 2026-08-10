@@ -117,6 +117,49 @@ does nothing and says so, where a wrong id would silently open a trance on the w
 [V2: DemoL80_mage-demonologist_login_randomActions.tshark.json]
 [V2: NecroL80_mage-necromancer_login_spellweaving.tshark.json]
 
+### The combat toggle (`0x4E2`) is decoded, and it is per WEAPON — not per class
+
+13 presses over 6 captures, answered by **15** player `Transition` records (`--report player-actions
+--report-arg 4E2`), which is the best-evidenced of the unimplemented selectors by a wide margin — crouch draws 2
+answers from 10 presses, dash 1 from 7.
+
+**⭐ The record's 20-byte tail is a `(from, to)` STANCE PAIR, and the two action ids of a pair are its two
+directions.** Every sighting:
+
+| action | tail (first two words) | seen in |
+|---|---|---|
+| `48898` | `1 → 4` | Strie (assassin) f248, Hoxxling (HoX) f12362, NecroL80 f2177 |
+| `48899` | `4 → 1` | Hoxxling f12346 |
+| `41954` | `1 → 4` | Hakotep (HoX) f4054 |
+| `130458` | `31 → 27` | NecroL80 f15416 — **mounted** |
+| `130581` | `27 → 31` | NecroL80 f15442 — **mounted** |
+
+So sheathe and draw are two ids of one pair, the tail states which stance is being left and entered, and being
+MOUNTED is a different pair entirely (the mammoth annotation is 18 s earlier in the same capture). The rest of
+the record is stable: form `0x0004`, slot 1 `Transition`, `flags 8`, `status 0`.
+
+⚠️ **The action id is NOT per class**, which is what stops this being a copy of the search/hide implementation.
+`Hakotep_hox_login_gameplay0` and `Hoxxling_mage-heraldofxotli_login_gameplay` are both Heralds of Xotli and
+answer with **different** ids (41954 vs 48898), while 48898 is shared by an assassin, a Herald of Xotli and a
+necromancer. The only thing left that it can key on is the equipped WEAPON, and nothing we hold maps a weapon to
+an animation action: none of 48898 / 48899 / 41954 / 130458 / 130581 is an RDB record id (`--report rdb-id`
+returns 0 entries for each) or a row in `Spells` / `Abilities` / `Items`. They are internal animation-system ids.
+
+A per-class map like `StartingData.SearchStanceAction` would therefore be a borrowed id playing the wrong
+sheathe animation — the same trap that map's own comment warns about, one key over.
+
+**What IS class-independent and buildable: retail re-pushes the RATING QUAD.** Every press is followed ~0.7–1.3 s
+later by four `StatIIR` records on the player's own handle:
+
+```
+0x0398 Attack Rating   0x039A Defense Rating   0x039B Magic Rating   0x039D Magical Resist
+```
+
+all carrying `0x7BD4` = 31700 for the level-80 necromancer (NecroL80) — exactly `400 × 80 − 300`, the #685 quad. Which is
+mechanically what a sheathe/draw IS: the active weapon changes, so the ratings are restated. That half needs no
+invented id, because the formula is already ours.
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json f15416/f15442]
+
 ## The implemented stances
 
 **Search**, **hide** and **rest** are answered; the others are not yet — and for **crouch** and **dash** that is
