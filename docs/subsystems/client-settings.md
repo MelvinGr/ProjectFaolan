@@ -132,15 +132,31 @@ one RDB type **1000020**, and `0` on the `1010201` entry. The last two words are
 `[0, 0, -0.12, 1]` in its last row — a small Z offset — which is what identifies the layout as row-major with
 translation in the last row rather than an unused field.
 
+### ⭐ The attachment `flags`: bit 2 says the transform is real
+
+The eight attachment entries in the corpus carry three values — `5`, `11`, `33` — and **bit 2 (`0x04`) is the
+only bit that separates the entries with a real matrix from the ones with an identity**:
+
+| flags | bits | entries | matrix |
+|---:|---|---:|---|
+| `5` | 0,**2** | 3 | a translation (`-0.12`, `-0.06`, `-0.06` in the last row) |
+| `11` | 0,1,3 | 1 | identity |
+| `33` | 0,5 | 4 | identity |
+
+Bit 0 is set on all three, bit 1 and bit 3 only on `11`, bit 5 only on `33`; bit 2 partitions the set exactly,
+and "the transform slot is meaningful" is what a flags bit next to a matrix would carry. So the transform is
+**opt-in**, which also answers why most matrices are identity: they are unset fields, not neutral transforms.
+
+⚠️ Eight entries is a small sample and the bit is inferred from the partition, not from the client's reader. It
+is the reading to build on and the first thing to re-check if a built record is rejected.
+
 ### What is not decoded
 
-Two words, and their positions are now exact:
+One word: **the single `u32` between the slot list and the named list** — `0`, `0`, `18`, `1018` across the four
+payloads, so it carries a value rather than terminating anything, and the slot list's length has to be found by
+locating the named list rather than read from a count.
 
-- **the attachment `flags`** — `33` on every `1010201` entry, `5` or `11` on the `1010030` ones;
-- **the single `u32` between the slot list and the named list** — `0`, `0`, `18`, `1018` across the four, so it
-  carries a value rather than terminating anything, and the slot list's length has to be found by locating the
-  named list rather than read from a count.
-
-Those two are what stand between reading a preview and BUILDING one, and a record the client rejects would be
-worse than the current no-preview state — which retail itself produces for a freshly created character.
-Open work tracked in Gitea.
+⚠️ **That is the whole remaining obstacle to a builder, and it is not the binding one.** Acceptance is an
+in-client round-trip — the client has to take the record and draw the pose — and a record it REJECTS is worse
+than the current no-preview state, which is what retail itself produces for a freshly created character. So the
+builder is gated on a client run rather than on more decode. Open work tracked in Gitea.
