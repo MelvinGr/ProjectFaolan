@@ -336,7 +336,12 @@ namespace Faolan.GameServer.World
 					// leaves the zone or logs out.
 					if (entity.FollowTargetHandle is { } followTargetHandle)
 					{
-						if (!zone.TryGet(followTargetHandle, out var leader) || !leader.IsPlayer)
+						// ⚠️ The leader may be an NPC (#741). It used to have to be a player, which is what made
+						// `giner & scruffy should be chasing each other` impossible to express: an ambient
+						// formation-follow is one creature bound to ANOTHER CREATURE's movement, and binding one here
+						// simply cleared itself on the next tick. A DEAD npc leader does drop the binding - a
+						// formation has nothing to hold onto once its leader is a corpse.
+						if (!zone.TryGet(followTargetHandle, out var leader) || (!leader.IsPlayer && leader.IsDead))
 						{
 							entity.FollowTargetHandle = null;
 							EndMove(entity, true, WorldTickEffectType.NpcFollow);
@@ -347,11 +352,15 @@ namespace Faolan.GameServer.World
 						// exact spot, so multiple pets fan out instead of stacking (#307). The slot is deterministic
 						// from the handle (stable, no per-tick jitter) and settles at a tighter stop so it holds its
 						// place. Escort/quest followers (Casilda, OwnerHandle == 0) keep the exact-follow path (#262).
-						var isPet = entity.OwnerHandle != null;
-						var (ox, oz) = isPet
+						//
+						// An ambient FORMATION follower takes the same slot treatment, and for the same reason retail
+						// does: the four `Black Dragon Guard Patroller`s behind one captain each hold their own corner
+						// of a 3x3 grid rather than standing in his back.
+						var inFormation = entity.OwnerHandle != null || !leader.IsPlayer;
+						var (ox, oz) = inFormation
 							? FollowFormationOffset(entity.Handle)
 							: (0f, 0f);
-						var stop = isPet
+						var stop = inFormation
 							? PetFollowSlotStop
 							: FollowStopRange;
 						var fdx = leader.Position.X + ox - entity.Position.X;

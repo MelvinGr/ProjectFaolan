@@ -1143,6 +1143,7 @@ namespace Faolan.GameServer.World
 
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
 			string? labelSample = null;
+			var followers = new Dictionary<WorldEntity, HashSet<uint>>(); // #741: follower -> the leader TYPES it may bind to
 			foreach (var npc in spawnRows)
 			{
 				// #528/#501: this type only exists inside a triggered spawn, so a row for it is not a creature standing
@@ -1310,8 +1311,15 @@ namespace Faolan.GameServer.World
 				// definition is keyed by (map, type) rather than by one spot.
 				ArmEncounter(entity, encounters.GetValueOrDefault(npc.NpcTemplateId));
 
+				// #741: the creature TYPES this one walks with, kept until every entity is in the zone - a follower is
+				// bound to a LIVE leader, so the binding cannot be made while the leader may not be loaded yet.
+				if (npc.NpcTemplate.Follows is { Count: > 0 } follows)
+					followers[entity] = follows.Select(f => f.LeaderTemplateId).ToHashSet();
+
 				zone.Add(entity);
 			}
+
+			BindFormationFollowers(zone, followers);
 
 			await LoadAmbientSpawns(mapId, instanceId, zone);
 
@@ -2154,6 +2162,59 @@ namespace Faolan.GameServer.World
 		// then respawns the deficit at a free point. Built WHOLE from the creature TYPE (TryBuildFromType, the pet path).
 		// Worked example - Tortage beach (4010): the four T_Crocodile-* areas become four Crocodile pools (8/7/8/11)
 		// that each hold that many crocs roaming their stretch of shore, refilled as the player kills them.
+		// #741: bind each formation FOLLOWER to the nearest live leader of a type it walks with. Retail expresses this
+		// as a MoveTaskIIR whose task names the other creature's handle, so it is a per-PLACEMENT binding built out of
+		// a per-TYPE rule - which is exactly what the DB holds (NpcFollowPair) and what cannot be resolved until every
+		// entity is in the zone.
+		//
+		// NEAREST, and within FormationBindRange: a map carries several groups of the same two types (five separate
+		// `Nemedian Deathstalker` groups in one capture, four `Ginger`/`Scruffy` pairs across three), so binding to
+		// "any leader of that type" would march a follower across the zone to the wrong one. The range is ours, not
+		// retail's - the corpus states the pairing, never a maximum distance - so it is set at the leash territory a
+		// patroller already works in rather than invented smaller.
+		//
+		// A leader that is itself a follower is fine (nothing in the corpus chains, but nothing forbids it); a
+		// follower that finds no leader in range simply keeps its own behaviour.
+		// How far a formation follower will look for its leader at zone load. OURS, not retail's - the corpus states
+		// which creature walks with which and never a maximum distance - so it is the leash territory a patroller
+		// already works in rather than a smaller invented number.
+		private const float FormationBindRange = WorldState.NpcLeashRange;
+
+		private void BindFormationFollowers(Zone zone, Dictionary<WorldEntity, HashSet<uint>> followers)
+		{
+			if (followers.Count == 0)
+				return;
+
+			var bound = 0;
+			foreach (var (follower, leaderTemplates) in followers)
+			{
+				WorldEntity? nearest = null;
+				var nearestDist = FormationBindRange * FormationBindRange;
+				foreach (var candidate in zone.Entities)
+				{
+					if (candidate == follower || candidate.IsPlayer || !leaderTemplates.Contains(candidate.NpcTemplateId))
+						continue;
+
+					var dx = candidate.Position.X - follower.Position.X;
+					var dz = candidate.Position.Z - follower.Position.Z;
+					var dist = dx * dx + dz * dz;
+					if (dist >= nearestDist)
+						continue;
+
+					nearestDist = dist;
+					nearest = candidate;
+				}
+
+				if (nearest == null)
+					continue;
+
+				follower.FollowTargetHandle = nearest.Handle;
+				bound++;
+			}
+
+			_logger.LogDebug("World: #741 bound {Bound} of {Total} formation follower(s) to a leader within {Range}u.", bound, followers.Count, FormationBindRange);
+		}
+
 		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
 		{
 			var areas = await _database.GetResolvedSpawnAreas(mapId);

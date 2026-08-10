@@ -49,22 +49,28 @@ namespace Faolan.Core.Network.Codecs.World
 		// and re-sent as the leader's own path is re-sent (#741).
 		//
 		// This is what the maintainer's "giner & scruffy should be chasing each other" annotation names: in
-		// NecroL80_..._annotated_1, `Ginger` 0x31C7A gets a 694-byte mode-04 patrol with 52 waypoints, and 0x31CFD gets
-		// a 55-byte mode-07 naming 0x31C7A as its target with an offset of -4.5 - re-issued together every ~15 s. So
-		// the ambient NPC-vs-NPC chase is NOT a scripted behaviour: it is an ordinary MoveTask retargeted at the
-		// other NPC's handle, which is the cheap half of that ticket.
+		// NecroL80_..._annotated_1, `Ginger` 0x31C7A gets a 690-byte mode-04 path and 0x31CFD (`Scruffy`) gets a
+		// 51-byte mode-07 naming 0x31C7A as its target - re-issued together, and Scruffy's own from-position is
+		// within 1.3-3.1 units of Ginger's every time. So the ambient NPC-vs-NPC chase is NOT a scripted behaviour
+		// and it is not mutual either: one NPC walks a path and the other is BOUND to it.
 		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_1.tshark.json frames 1349 / 1521 / 2500 / 2836]
 		//
-		// ⚠️ The offset is ONE captured value on ONE pair, so it is a parameter here rather than a constant. What
-		// remains unmodelled is the DATA - which NPC follows which - not the wire.
-		public static MoveTaskNode Formation(uint targetHandle, float offset)
+		// ⭐ The six words are `[u32 class][u32 leaderHandle][f32 offsetX][f32 offsetY][f32 offsetZ][u32 slot]`, and
+		// the FORMATION is what proves the split: the four `Black Dragon Guard Patroller`s that follow their
+		// `Black Dragon Guard Captain Patroller` carry offsets on a 3x3 grid - x in {-1, 0, +1}, z in {0, -1, -3} -
+		// each with its own slot INDEX in the last word, running 0..7. Scruffy's is `(0, 0, -4.5)` slot 0, i.e.
+		// 4.5 units directly behind. offsetY is 0 in all 170 captured records.
+		//
+		// That is what retired the earlier reading of a single scalar "offset" in word 4: it happened to be right for
+		// Scruffy and wrong for the 55 records whose displacement is on X instead.
+		public static MoveTaskNode Formation(uint targetHandle, Vector3 offset, uint slot = 0)
 		{
 			return new MoveTaskNode
 			{
 				Mode = ModeFormation,
 				Formation6 =
 				[
-					EntityClass.Character, targetHandle, 0, 0, BitConverter.SingleToUInt32Bits(offset), 0
+					EntityClass.Character, targetHandle, Bits(offset.X), Bits(offset.Y), Bits(offset.Z), slot
 				]
 			};
 		}

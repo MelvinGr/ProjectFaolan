@@ -179,9 +179,9 @@ them yet** — pet points are not modelled.
 
 ## A live pet costs retail 50 packets a second, forever — and it is a retail DEFECT (#777)
 
-`Nemedian Deathstalker` (template 14321, the necromancer's pet) takes **26,832 of the corpus' 37,965
-`BccAction` records**, where the median actor takes **one**. #225 read that as a world heartbeat and #777 as a
-burst. It is neither. Measured per actor, with the record's own args field 3 as the check:
+`Nemedian Deathstalker` (template 14321) takes **26,832 of the corpus' 37,965 `BccAction` records**, where the
+median actor takes **one**. #225 read that as a world heartbeat and #777 as a burst. It is neither. Measured per
+actor, with the record's own args field 3 as the check:
 
 | capture | actor | records | span | rate | counter | anim |
 |---|---|---:|---:|---:|---|---|
@@ -207,6 +207,10 @@ Three things follow:
   index that starts at 1 when the entity is created (`0x0004f028` first appears at 42, i.e. ~0.84 s of ticks
   before its spawn record reached the client; the mount capture's pet is at 1,918, having been summoned ~38 s
   before the window). An ambient NPC's brain script asserts once and stops; a *summoned* one never stops.
+- ⚠️ **It is not the capturing player's pet**, though both tickets assumed so — which is why this sits under a
+  "not modelled" heading rather than in the pet lifecycle. The only `PetIIR` in that capture names a *different*
+  handle as the player's pet, and three of the four measured actors are in captures with no ownership record at
+  all. What is provable is the TEMPLATE: all four are 14321, and nothing else in the corpus behaves this way.
 - ⚠️ **Do not reproduce it.** A record that says nothing new 50 times a second, per pet, is a defect — the same
   class of thing as the server heap the spawn scaffold leaks ([`../re/retail-server-heap-leak.md`](../re/retail-server-heap-leak.md)).
   We send a pet's idle assert once, which is what the other 7,968 captured actors get, and that is the right

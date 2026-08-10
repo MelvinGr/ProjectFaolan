@@ -80,6 +80,7 @@ namespace Faolan.Core.Database
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<Mount> Mounts { get; }
 		DbSet<NpcAmbientAnimation> NpcAmbientAnimations { get; }
+		DbSet<NpcFollowPair> NpcFollowPairs { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcChatterParameter> NpcChatterParameter { get; }
 		DbSet<NpcAmbush> NpcAmbushes { get; }
@@ -189,6 +190,7 @@ namespace Faolan.Core.Database
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<Mount> Mounts { get; set; }
 		public DbSet<NpcAmbientAnimation> NpcAmbientAnimations { get; set; }
+		public DbSet<NpcFollowPair> NpcFollowPairs { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcChatterParameter> NpcChatterParameter { get; set; }
 		public DbSet<NpcAmbush> NpcAmbushes { get; set; }
@@ -564,6 +566,11 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.TriggerWorldObject).WithMany().OnDelete(DeleteBehavior.SetNull);
 
 			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
+			// #741: BOTH ends point at NpcTemplate, so the pairing has to be named explicitly - EF cannot tell which
+			// FK backs which navigation on its own. Cascade from the FOLLOWER (its rows are its own) and Cascade from
+			// the LEADER too: a pair whose leader is gone describes nothing.
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Follows).WithOne(f => f.FollowerTemplate).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcFollowPair>().HasOne(f => f.LeaderTemplate).WithMany().OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 

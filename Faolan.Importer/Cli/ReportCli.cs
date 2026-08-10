@@ -293,6 +293,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "follow-pairs":
+				{
+					FollowPairs(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "bcc-attack-tail":
 				{
 					BccAttackTail(NamedCapture.LoadAll(capturesDir));

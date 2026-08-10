@@ -258,6 +258,10 @@ namespace Faolan.Core.Database.Repositories
 				// #766: the creature's ambient idle animations. Lazy loading is off, so without this every NPC reads an
 				// EMPTY set and stands to attention - the exact symptom the ticket reported, one layer down.
 				.ThenInclude(t => t.AmbientAnimations)
+				// #741: the creature TYPES this one walks with. Same reason as the line above - lazy loading is off, so
+				// without this every follower reads an EMPTY set and keeps its own path.
+				.Include(n => n.NpcTemplate)
+				.ThenInclude(t => t.Follows)
 				.Include(n => n.NpcTemplate)
 				.ThenInclude(t => t.Chatter)
 				// And the bark's PARAMETER slots, or the session slot never reaches the wire (#691). Lazy loading is
@@ -276,7 +280,7 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Words)
 				.Where(n => n.MapId == mapId && (forClass == null || n.ClassId == null || n.ClassId == forClass))
-				// SEVEN collection navigations off one root. As a single query that is one JOIN whose row count is their
+				// EIGHT collection navigations off one root. As a single query that is one JOIN whose row count is their
 				// PRODUCT - every morph repeated once per equipment slot per spell per chatter line per patrol word - and
 				// EF then dedups it client-side. It cost 2.3s to return Tortage beach's 95 spawns, which is the bulk of
 				// the first-entry stall on a map (the zone load is memoized, so it is paid once per map per process).

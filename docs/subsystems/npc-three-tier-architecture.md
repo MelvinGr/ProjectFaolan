@@ -111,6 +111,51 @@ after this one finishes plus a short pause. See the ambient section of
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) for the measurements and
 `BehaviorAnimations.AmbientEmote` for the record.
 
+## NPC-follows-NPC: the ambient formation (#741)
+
+*"giner & scruffy should be chasing each other"* names a behaviour we had nothing for. The wire says it is **not a
+chase and not mutual**: `Ginger` gets an ordinary multi-waypoint path and `Scruffy` gets a `MoveTaskIIR` whose task
+is a **FormationMoveTask** naming Ginger's handle, and Scruffy's own from-position lands within 1.3–3.1 units of
+Ginger's every time. One creature leads; the other is bound to it.
+[V2: NecroL80_mage-necromancer_login_gameplay_annotated_1.tshark.json frames 1349 / 1521 / 2500 / 2836]
+
+The record's six words are `[class][leaderHandle][offsetX][offsetY][offsetZ][slot]`
+([movetask-grammar.md](../re/movetask-grammar.md)). 170 of them over 21 captures give **8 creature-type pairs**:
+
+| follower | leader | records |
+|---|---|---:|
+| Enslaved Demon | Nemedian Deathstalker | 78 |
+| Black Dragon Guard Patroller | Black Dragon Guard Captain Patroller | 25 |
+| Scruffy | Ginger | 25 |
+| Nemedian Defender | Nemedian Deathstalker | 12 |
+| Slave of Acheron | Black Ring Hellsworn | 10 |
+| Summoned Incubus | Black Ring Stormcaller | 10 |
+| Slave of Acheron | Black Ring Defender | 9 |
+| Summoned Succubus | Black Ring Pyromancer | 1 |
+
+They are stored as `NpcFollowPair`, keyed by the TYPE at **both** ends and harvested by the `npc-follow-pairs`
+module (`--report follow-pairs` prints the survey). ⚠️ Both ends, not a `FollowsTemplateId` column on the follower:
+`Slave of Acheron` was captured behind *two* different leader types, and a single column would have to pick one and
+silently drop the other.
+
+⚠️ **The offset is per-INSTANCE and is deliberately not stored.** The four `Black Dragon Guard Patroller`s behind
+one captain each hold a different corner of a 3×3 grid with their own slot index; stamping one of them on the type
+would stack every follower of that type in the same spot. The runtime derives its own slot from the follower's
+handle instead — the same deterministic fan-out a player's pets already use.
+
+At zone load `WorldBroadcaster.BindFormationFollowers` binds each follower to the **nearest** live leader of a type
+it walks with, within `FormationBindRange`. Nearest matters: a map carries several groups of the same two types
+(five separate `Nemedian Deathstalker` groups in one capture, four `Ginger`/`Scruffy` pairs across three), so
+binding to "any leader of that type" would march a follower across the zone. The range is **ours** — the corpus
+states the pairing and never a maximum distance — so it is set at the leash territory a patroller already works in.
+
+`WorldState.Tick` then runs the existing companion-follow step. The one thing that had to change there is that the
+leader may now be an NPC: the branch required `leader.IsPlayer` and cleared any other binding on the next tick,
+which is precisely why this was inexpressible. A leader that dies or leaves the zone still releases its followers.
+
+⚠️ **Not modelled:** re-binding when a leader respawns (the follower simply keeps its own behaviour until the next
+zone load), and chains (nothing in the corpus has a follower that is itself a leader).
+
 ## The four per-spawn-event fields, and who corrects them (#605/#688/#689)
 
 `MovementMode`, `npc_stats.SpawnAnimation`, `Stats.BccState` and `Bcc.AnimIdleId` are **rolled per spawn

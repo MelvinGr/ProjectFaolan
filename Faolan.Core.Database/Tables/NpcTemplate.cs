@@ -34,6 +34,10 @@ namespace Faolan.Core.Database.Tables
 		// for a type no capture ever caught idling - it then stands still rather than being given a guessed animation.
 		public virtual ICollection<NpcAmbientAnimation> AmbientAnimations { get; set; } = [];
 
+		// The creature TYPES this one walks with (#741; see NpcFollowPair). Empty for the overwhelming majority -
+		// a creature with no captured formation-follow keeps its own path (or stands where it was placed).
+		public virtual ICollection<NpcFollowPair> Follows { get; set; } = [];
+
 		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).
 		public virtual ICollection<NpcChatter> Chatter { get; set; } = [];
 

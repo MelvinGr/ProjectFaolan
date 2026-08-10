@@ -2194,6 +2194,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("NpcEquipment");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcFollowPair", b =>
+                {
+                    b.Property<uint>("FollowerTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("LeaderTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FollowerTemplateId", "LeaderTemplateId");
+
+                    b.HasIndex("LeaderTemplateId");
+
+                    b.ToTable("NpcFollowPairs");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcMorph", b =>
                 {
                     b.Property<uint>("NpcTemplateId")
@@ -4976,6 +4991,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("NpcTemplate");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcFollowPair", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "FollowerTemplate")
+                        .WithMany("Follows")
+                        .HasForeignKey("FollowerTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "LeaderTemplate")
+                        .WithMany()
+                        .HasForeignKey("LeaderTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FollowerTemplate");
+
+                    b.Navigation("LeaderTemplate");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcMorph", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
@@ -5759,6 +5793,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Chatter");
 
                     b.Navigation("Equipment");
+
+                    b.Navigation("Follows");
 
                     b.Navigation("Morphs");
 

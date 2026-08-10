@@ -37,7 +37,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFormation_IsByteIdenticalToTheCapturedChase()
 		{
-			// subop, class, follower, u16 0, its position | mode 0x07 | the LEADER's class + handle | [0][0][-4.5f][0]
+			// subop, class, follower, u16 0, its position | mode 0x07 | the LEADER's class + handle |
+			// the formation offset (0, 0, -4.5) and slot 0 - Scruffy holds 4.5 units directly behind Ginger.
 			const string captured = "96c467400000c35000031cfd000044548e5b42cafa5f43fe15c9" +
 			                        "07" +
 			                        "0000c35000031c7a" +
@@ -46,7 +47,7 @@ namespace Faolan.Tests
 			// The position words verbatim, rather than decimal literals - a float printed to 7 digits and re-parsed
 			// does not always land on the same bits, and this gate is about the bits.
 			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x00031CFD, 0x44548E5B, 0x42CAFA5F, 0x43FE15C9,
-				MoveTaskNodes.Formation(0x00031C7A, -4.5f)));
+				MoveTaskNodes.Formation(0x00031C7A, new Vector3(0f, 0f, -4.5f))));
 
 			Assert.Equal(captured, Convert.ToHexStringLower(built));
 		}

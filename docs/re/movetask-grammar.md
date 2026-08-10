@@ -28,7 +28,7 @@ can be a *list* of nested moves, which is why the captured bodies span 49–370 
 | 4  | **ListMoveTask**    | `FUN_00a3fcd0` | `[…hdr…][u8 count][ factory × count ]` — **recursive** |
 | 5  | (0x30 obj)          | `FUN_00a461d0` | — |
 | 6  | (0x34 obj)          | `FUN_00a46340` | — |
-| 7  | (0x28 obj)          | `FUN_00a46440` | — |
+| 7  | **FormationMoveTask** | `FUN_00a46440` | `[u32 0xC350][u32 leaderHandle][f32 x][f32 y][f32 z][u32 slot]` |
 | 8  | approach-target     | `FUN_00a46590` | `[u32 0xC350][u32 targetHandle][u8 1][9 zero bytes]` |
 | 9  | (0x1c obj)          | `FUN_00a465f0` | — |
 | 10 | SetPosMoveTask      | `FUN_00a47…`   | `[float x7]` = pos(3) + quaternion(4) |
@@ -77,7 +77,30 @@ All mode-1/5/6/7 leaves are now field-mapped (`DumpMoveTaskLeafReaders.java` + `
 |---|---|---|
 | 5 | BallisticMoveTask | base header + `[float x7][u8 flag]` (`FUN_00a49540`) |
 | 6 | AnimatedMoveTask   | nothing — `FUN_00a4a2b0` returns 1 |
-| 7 | FormationMoveTask  | `[float x6]`, no header (`FUN_00a4a9d0`) |
+| 7 | FormationMoveTask  | `[float x6]`, no header (`FUN_00a4a9d0`) — see below |
+
+### FormationMoveTask (mode 7) — the six words, from the wire (#741)
+
+The client reader gives six words with no header; the corpus names them. 170 records over 21 captures:
+
+```
+[u32 0x0000C350]   the leader's entity class
+[u32 leaderHandle] the entity this one walks with
+[f32 offsetX][f32 offsetY][f32 offsetZ]   where it holds, relative to the leader
+[u32 slot]         its index in the formation
+```
+
+**The formation is what proves the split.** The four `Black Dragon Guard Patroller`s that follow one
+`Black Dragon Guard Captain Patroller` sit on a 3×3 grid — x ∈ {−1, 0, +1}, z ∈ {0, −1, −3} — each carrying its
+own slot index, and the eight combinations run **0..7** exactly. `offsetY` is 0 in all 170 records.
+
+That retired an earlier reading of word 4 as a single scalar "offset": it is right for `Scruffy`, whose
+`(0, 0, −4.5)` puts it 4.5 units directly behind `Ginger`, and wrong for the 55 records whose displacement is
+on X instead.
+
+This is the wire form of AMBIENT NPC-vs-NPC movement. It is **not a chase and not mutual**: one creature keeps
+an ordinary multi-waypoint path and the other is bound to it. Harvested per creature-type pair by the
+`npc-follow-pairs` module (`--report follow-pairs`); see `docs/subsystems/npc-three-tier-architecture.md`.
 
 The PathMoveTask finalizer `FUN_00a3e400` = `[u8 bool][7 u32]` (a fixed 29 B; its sibling `FUN_00a3e510` only
 validates the spline and reads nothing), so both PathMoveTask branches end with it.
