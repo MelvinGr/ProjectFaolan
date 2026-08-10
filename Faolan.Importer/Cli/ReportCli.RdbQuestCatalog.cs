@@ -125,6 +125,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("      fields shaped for exactly that, are empty (census above). The ROW ORDER is scored below.");
 
 			await StepOrderCheck(catalog);
+			await LineRewardCheck(catalog);
 
 			if (wanted.Count > 0)
 			{
@@ -202,6 +203,111 @@ namespace Faolan.Importer.Cli
 
 		// Does the catalog's own ROW ORDER give the step order within a quest line?
 		//
+		// #759: is `Quest_c` @+0xf0/@+0xf8 the LINE's reward? The catalog is the only place that can answer it - it
+		// gives a quest LINE exactly one `xp_reward`/`cash_reward` pair, keyed by `MainQuest.template_id`, which IS our
+		// `QuestLineId` (the hash cross-check above is what establishes that identity).
+		//
+		// Three things are printed, because the question has three parts and only the middle one had been asked:
+		//
+		//   1. does the carrier's @+0xf0 EQUAL its line's catalog xp_reward, and @+0xf8 the cash_reward;
+		//   2. is a line's value repeated on its other captured steps (the constancy the line reading predicts);
+		//   3. WHERE in the line the carrier sits, against the captured `JournalSequence`.
+		//
+		// ⚠️ Part 2 needs a sibling that was actually CAPTURED. A step with `HasSnapshotRecord = 0` carries 0 because
+		// no snapshot ever held it, which says nothing - counting those as disagreement would falsify the reading with
+		// missing data.
+		private static async Task LineRewardCheck(QuestGiverList catalog)
+		{
+			await using var db = OpenDb();
+			var quests = db.QuestDefinitions
+				.Select(q => new { q.QuestId, q.QuestLineId, q.JournalSequence, q.FieldF0, q.FieldF8, q.HasSnapshotRecord })
+				.AsEnumerable()
+				.ToList();
+
+			var byLine = quests.GroupBy(q => q.QuestLineId).ToDictionary(g => g.Key, g => g.ToList());
+			var lines = catalog.MainQuests.GroupBy(m => m.TemplateId).ToDictionary(g => g.Key, g => g.First());
+
+			int carriers = 0, xpAgree = 0, cashAgree = 0, noChapter = 0, chapterSilent = 0;
+			int repeated = 0, contradicted = 0, first = 0, last = 0, middle = 0, unordered = 0;
+			var rows = new List<string>();
+
+			foreach (var carrier in quests.Where(q => q.FieldF0 != 0).OrderBy(q => q.QuestLineId))
+			{
+				carriers++;
+				if (!lines.TryGetValue(carrier.QuestLineId, out var chapter))
+				{
+					noChapter++;
+					continue;
+				}
+
+				if (chapter.XpReward == 0 && chapter.CashReward == 0)
+					chapterSilent++;
+
+				var xpOk = chapter.XpReward == carrier.FieldF0;
+				var cashOk = chapter.CashReward == carrier.FieldF8;
+				xpAgree += xpOk ? 1 : 0;
+				cashAgree += cashOk ? 1 : 0;
+
+				// Constancy, over the siblings a snapshot actually captured.
+				var siblings = byLine[carrier.QuestLineId].Where(q => q.QuestId != carrier.QuestId && q.HasSnapshotRecord).ToList();
+				repeated += siblings.Count(q => q.FieldF0 == carrier.FieldF0);
+				contradicted += siblings.Count(q => q.FieldF0 != carrier.FieldF0);
+
+				// Position, only where every step of the line carries a captured sequence.
+				var steps = byLine[carrier.QuestLineId];
+				if (steps.Count > 1 && steps.All(q => q.JournalSequence > 0))
+				{
+					var order = steps.OrderBy(q => q.JournalSequence).Select(q => q.QuestId).ToList();
+					if (order[0] == carrier.QuestId)
+						first++;
+					else if (order[^1] == carrier.QuestId)
+						last++;
+					else
+						middle++;
+				}
+				else
+				{
+					unordered++;
+				}
+
+				if (rows.Count < 12)
+				{
+					rows.Add($"    line {carrier.QuestLineId,-6} quest {carrier.QuestId,-6} @f0 {carrier.FieldF0,-8} @f8 {carrier.FieldF8,-8}" +
+					         $"  catalog xp {chapter.XpReward,-8} cash {chapter.CashReward,-8}  {(xpOk ? "xp=" : "xp≠")}{(cashOk ? " cash=" : " cash≠")}");
+				}
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("--- Quest_c @+0xf0/@+0xf8 vs the catalog's LINE reward (#759) ---");
+			if (carriers == 0)
+			{
+				Console.WriteLine("  no shipped quest carries @+0xf0 - import the capture corpus first.");
+				return;
+			}
+
+			Console.WriteLine($"  {carriers} quest(s) carry the pair; {noChapter} sit on a line the catalog does not hold, " +
+			                  $"{chapterSilent} on a line whose catalog reward is 0");
+			Console.WriteLine($"  @+0xf0 == MainQuest.xp_reward    {xpAgree,4} / {carriers}");
+			Console.WriteLine($"  @+0xf8 == MainQuest.cash_reward  {cashAgree,4} / {carriers}");
+			Console.WriteLine($"  constancy across CAPTURED siblings: {repeated} repeat the value, {contradicted} carry a different one");
+			Console.WriteLine($"  carrier position in its line (fully-ordered lines only): first {first}, last {last}, middle {middle}; {unordered} line(s) not fully ordered");
+			foreach (var r in rows)
+				Console.WriteLine(r);
+
+			// WHERE the catalog's reward field actually lives. It is populated on 23 of 2,181 lines, so "the carrier's
+			// line has no catalog reward" could be a coverage artefact rather than a disagreement - printing the whole
+			// populated set is what tells the two apart, and it is short enough to print in full.
+			var paying = catalog.MainQuests.Where(m => m.XpReward != 0 || m.CashReward != 0).DistinctBy(m => m.TemplateId).OrderBy(m => m.TemplateId).ToList();
+			Console.WriteLine($"  the catalog's own reward field, in full ({paying.Count} line(s) of {lines.Count}):");
+			foreach (var m in paying)
+			{
+				var ours = byLine.TryGetValue(m.TemplateId, out var steps) ? steps.Count : 0;
+				var carrier = ours == 0 ? null : steps!.FirstOrDefault(q => q.FieldF0 != 0);
+				Console.WriteLine($"    line {m.TemplateId,-6} xp {m.XpReward,-8} cash {m.CashReward,-8} '{m.Name}'  " +
+				                  $"(we hold {ours} step(s), @+0xf0 carrier {(carrier == null ? "none" : carrier.QuestId.ToString())})");
+			}
+		}
+
 		// No FIELD does: `Quest.tier` and `Quest.start_new_tier` are zero on all 5042 rows. But a protobuf's repeated
 		// field preserves the order it was written in, and the journal has to get its order from SOMEWHERE the client
 		// can read offline - the completed-quest journal renders the steps of a line in order with no server input
