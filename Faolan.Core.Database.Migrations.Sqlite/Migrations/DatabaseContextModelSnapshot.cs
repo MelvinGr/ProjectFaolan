@@ -994,6 +994,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("NpcClass")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("ParentId")
                         .HasColumnType("INTEGER");
 

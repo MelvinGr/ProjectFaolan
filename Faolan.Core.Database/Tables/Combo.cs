@@ -23,6 +23,19 @@ namespace Faolan.Core.Database.Tables
 		public int Quality { get; set; } // XML `quality`
 		public int Stamina { get; set; } // XML `stamina`
 
+		// ⭐ The NPC combat CLASS this row belongs to (XML `npcclass`), as a <see cref="Core.Enums.ConanClass" />
+		// value - and the client states it, so the family is not parsed out of the name (#675).
+		//
+		// It is present on exactly the 68 `combo_npc_*` rows and on nothing else, which is what makes it the NPC
+		// combo catalog's own index. **-1 means the row is the GENERIC set** - the nine `combo_npc_generic_*` rows,
+		// which belong to no class - and that is a different statement from null, which is a row that says nothing.
+		//
+		// ⚠️ Two rows the NAME mis-attributes, which is the reason to carry this at all:
+		// `combo_npc_conqueror_dual_1_blood_for_aid` and `..._life_reaper` are `npcclass=31` **Dark Templar**, and
+		// `combo_npc_heimdall_fatality_1` / `_2` are `npcclass=18` **Barbarian**. The corpus corroborates the second
+		// one 3 of 3: every actor that swung a heimdall fatality also swung barbarian rows.
+		public int? NpcClass { get; set; }
+
 		// The input action sequence that performs the combo, comma-separated (e.g. "CombatUpperRight,CombatUpperLeft"),
 		// from the child <action name="..."/> elements in order.
 		[MaxLength(128)]

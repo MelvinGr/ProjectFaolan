@@ -83,6 +83,9 @@ namespace Faolan.Importer.Rdb
 				row.Cooldown = (int)ParseUint(combo, "cooldown");
 				row.Stamina = (int)ParseUint(combo, "stamina");
 				row.Criteria = (int)ParseUint(combo, "criteria");
+				// ⭐ Signed, and the sign carries meaning: `-1` is the generic set. So this is parsed rather than run
+				// through `ParseUint`, which would fold it to 0 and make a generic row look like class 0 (#675).
+				row.NpcClass = int.TryParse((string?)combo.Attribute("npcclass"), out var npcClass) ? npcClass : null;
 				row.Quality = (int)ParseUint(combo, "quality");
 				row.Animation = (string?)combo.Attribute("animation") ?? "";
 				row.Actions = string.Join(",", combo.Elements("action").Select(a => (string?)a.Attribute("name")).Where(n => !string.IsNullOrEmpty(n)));

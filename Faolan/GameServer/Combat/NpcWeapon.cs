@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using Faolan.Core.Database.Interfaces;
+using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Combat
 {
@@ -120,14 +121,21 @@ namespace Faolan.GameServer.Combat
 		// `combo_npc_ranger_{bow,crossbow}_*` is the ONLY family at those weapon criteria (26 and 32), there is no
 		// `combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows. THROWN (30019)
 		// is deliberately absent - no `combo_npc_*_thrown_*` row exists, so a javelin mob throws plain.
-		public static string? ClassComboFamily(IEnumerable<INpcEquipment>? equipment)
+		//
+		// ⚠️ The CLIENT states each row's class in the combo XML (`Combo.NpcClass`), and it does NOT state a weapon
+		// requirement for the assassin family - `combo_npc_assassin_*` carries no `criteria` attribute at all, the
+		// way `bear_shaman` / `dark_templar` / `hox` do not. So `Dagger -> assassin` is a CAPTURE correlation (8 of 8
+		// dagger-armed templates swing it) presented as a weapon rule, and a dagger-armed non-assassin would swing
+		// the wrong family. `Polearm` / `Bow` / `Crossbow` are on firmer ground: their rows DO state criteria 25 / 26
+		// / 32, and at each of those criteria the class family is unique. #675.
+		public static (string NamePrefix, ConanClass Class)? ClassComboFamily(IEnumerable<INpcEquipment>? equipment)
 		{
 			return CategoryIn(equipment, MainHandPos) switch
 			{
-				Dagger   => "combo_npc_assassin_",
-				Polearm  => "combo_npc_guardian_polearm_",
-				Bow      => "combo_npc_ranger_bow_",
-				Crossbow => "combo_npc_ranger_crossbow_",
+				Dagger   => ("combo_npc_assassin_", ConanClass.Assassin),
+				Polearm  => ("combo_npc_guardian_polearm_", ConanClass.Guardian),
+				Bow      => ("combo_npc_ranger_bow_", ConanClass.Ranger),
+				Crossbow => ("combo_npc_ranger_crossbow_", ConanClass.Ranger),
 				_        => null
 			};
 		}

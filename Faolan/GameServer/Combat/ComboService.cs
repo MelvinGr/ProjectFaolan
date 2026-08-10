@@ -176,6 +176,11 @@ namespace Faolan.GameServer.Combat
 		// The gate is `Combos.Level` verbatim, which IS the family name's trailing number: across the 30 captured
 		// class-family rows no actor ever swings one above its own level, and a level-75 mob still swings the rank-1
 		// row, so this is a ceiling and not a bracket. Resolved ONCE per NPC at zone load, like the generic id.
+		//
+		// ⭐ The name prefix picks the rows and the CLIENT'S OWN `npcclass` vetoes any whose stated class contradicts
+		// it (#675) - `combo_npc_conqueror_dual_1_life_reaper` says Dark Templar and `combo_npc_heimdall_fatality_1`
+		// says Barbarian, so a name is not the family. A row that states NOTHING is kept: the veto is a correction,
+		// never a narrowing, and one row (`combo_npc_assassin_death_whirlwind`) carries no `npcclass` at all.
 		public async Task<uint[]> NpcClassComboIds(IEnumerable<INpcEquipment>? equipment, uint level)
 		{
 			if (NpcWeapon.ClassComboFamily(equipment) is not { } family)
@@ -183,7 +188,9 @@ namespace Faolan.GameServer.Combat
 
 			var catalog = _catalog ??= await LoadCatalog();
 			return catalog.Values
-				.Where(e => e.Combo.Level <= level && e.Combo.Name.StartsWith(family, StringComparison.Ordinal))
+				.Where(e => e.Combo.Level <= level
+				            && e.Combo.Name.StartsWith(family.NamePrefix, StringComparison.Ordinal)
+				            && (e.Combo.NpcClass == null || e.Combo.NpcClass == (int)family.Class))
 				.Select(e => e.Combo.Id)
 				.Order()
 				.ToArray();

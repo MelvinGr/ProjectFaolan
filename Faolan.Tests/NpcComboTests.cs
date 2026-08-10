@@ -6,6 +6,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
 using Faolan.Core.Extensions;
@@ -219,20 +220,25 @@ namespace Faolan.Tests
 		// swings are by dagger-wielders and all 8 dagger-armed templates swing the family; likewise 61 swings and 5
 		// templates for the polearm guardians.
 		[Theory]
-		[InlineData(NpcWeapon.Dagger, "combo_npc_assassin_")]
-		[InlineData(NpcWeapon.Polearm, "combo_npc_guardian_polearm_")]
-		[InlineData(NpcWeapon.Bow, "combo_npc_ranger_bow_")]
-		[InlineData(NpcWeapon.Crossbow, "combo_npc_ranger_crossbow_")]
-		public async Task AWeaponThatAnswersTheArchetype_ResolvesItsClassFamily(uint main, string family)
+		[InlineData(NpcWeapon.Dagger, "combo_npc_assassin_", ConanClass.Assassin)]
+		[InlineData(NpcWeapon.Polearm, "combo_npc_guardian_polearm_", ConanClass.Guardian)]
+		[InlineData(NpcWeapon.Bow, "combo_npc_ranger_bow_", ConanClass.Ranger)]
+		[InlineData(NpcWeapon.Crossbow, "combo_npc_ranger_crossbow_", ConanClass.Ranger)]
+		public async Task AWeaponThatAnswersTheArchetype_ResolvesItsClassFamily(uint main, string family, ConanClass @class)
 		{
-			Assert.Equal(family, NpcWeapon.ClassComboFamily(Equip(main, 0)));
+			Assert.Equal((family, @class), NpcWeapon.ClassComboFamily(Equip(main, 0)));
 
 			var ids = await Service().NpcClassComboIds(Equip(main, 0), 80);
 			Assert.NotEmpty(ids);
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var names = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => c.Name).ToList();
-			Assert.All(names, n => Assert.StartsWith(family, n, System.StringComparison.Ordinal));
+			var rows = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass }).ToList();
+			Assert.All(rows, r => Assert.StartsWith(family, r.Name, System.StringComparison.Ordinal));
+			// ⭐ And the CLIENT agrees with the name on every row that speaks (#675) - the veto never fires here,
+			// which is the point: it exists for the two rows whose name says Conqueror and whose `npcclass` says
+			// Dark Templar, and neither is in a wired bucket.
+			Assert.All(rows, r => Assert.True(r.NpcClass == null || r.NpcClass == (int)@class,
+				$"{r.Name} states npcclass {r.NpcClass}, not {(int)@class}"));
 		}
 
 		// ⚠️ The buckets that stay UNANSWERED, pinned so a later "tidy up the rest" pass has to face the evidence

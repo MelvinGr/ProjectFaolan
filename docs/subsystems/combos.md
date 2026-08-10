@@ -535,17 +535,55 @@ combo's name carries a weapon token, its `Criteria` is that weapon's, with no co
 | 30 | dagger | 30015 | generic |
 | 32 | crossbow | 30018 | **ranger**_crossbow — *no generic row* |
 | 52 | dual-wield | — | generic, **barbarian**_dual, **conqueror**_dual |
-| 0 | none | — | assassin, bear_shaman, dark_templar, hox, heimdall |
+| 0 | none | — | assassin, bear_shaman, dark_templar, hox, and the **barbarian** heimdall fatalities |
 
 **The trailing number is `Combos.Level`, a CEILING.** Across the 30 captured class-family swings no actor ever
 swings a row above its own level, and a level-75 mob still swings the rank-1 row — so a higher-level NPC's
 eligible set *contains* a lower one's rather than replacing it.
 
+### ⭐ The client STATES each row's class — `npcclass`
+
+The combo XML carries an `npcclass` attribute, imported as `Combos.NpcClass`. It is present on **exactly the 68
+`combo_npc_*` rows and on nothing else**, and its values are `ConanClass` verbatim: 18 Barbarian, 20 Guardian,
+22 Conqueror, 29 Bear Shaman, 31 Dark Templar, 34 Assassin, 39 Ranger, 43 Herald of Xotli — plus **`-1` for the
+nine generic rows**, which is a statement ("belongs to no class") rather than an absence.
+
+⚠️ **It disagrees with the NAME on four rows, which is the reason to carry it:**
+
+| row | the name says | `npcclass` says |
+|---|---|---|
+| `combo_npc_conqueror_dual_1_life_reaper` | Conqueror | **31 Dark Templar** |
+| `combo_npc_conqueror_dual_1_blood_for_aid` | Conqueror | **31 Dark Templar** |
+| `combo_npc_heimdall_fatality_1` / `_2` | a family of its own | **18 Barbarian** |
+
+⭐ The corpus corroborates the second one **3 of 3**: every actor that swung a heimdall fatality (Argus the Thief,
+Crocodile Pict Raider, Wharf Rat Thug) also swung barbarian rows. `combo_npc_blackone_execute` likewise files
+under 43 Herald of Xotli, and one row — `combo_npc_assassin_death_whirlwind` — carries no `npcclass` at all.
+
+`ComboService.NpcClassComboIds` uses it as a **veto** over the name prefix rather than as the selector: a row
+whose stated class contradicts the family is dropped, a row that states nothing is kept. That is a correction and
+never a narrowing, which matters because of that one silent row.
+
+⚠️ **And it reframes the weapon evidence.** The four families that carry NO weapon criteria at all — `assassin`,
+`bear_shaman`, `dark_templar`, `hox` — are exactly the ones the client does not gate on a weapon. So `dagger →
+assassin` is a CAPTURE correlation (8 of 8 dagger-armed templates) wearing the shape of a weapon rule, and a
+dagger-armed non-assassin would swing the wrong family. `polearm` / `bow` / `crossbow` are on firmer ground: their
+rows do state criteria 25 / 26 / 32 and at each of those the class family is unique.
+
 **The archetype itself is a per-NPC property and is not recoverable in general.** Everything we hold cuts across
 the eight observed families — `Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`,
-`CarsGroup`, `Flags`, and `ProfessionType` (null on all but one actor). The client ships **no NPC-template
-catalog** to read it from (RDB 1000020 has no record for the combat actors' template ids), and all 31
-combo-swinging templates have **zero `NpcSpell` rows**, so the two routes #675 named are both dead.
+`CarsGroup`, `Flags`, `Bcc` (constant 12488 on every one), and `ProfessionType` (null on all but one actor); a
+purity sweep of **every** `NpcStatCore` column against the 33 class-family templates beats the majority-class
+baseline only on columns whose cardinality buys it for free (`TemplateId` 33 distinct values scores 1.000, and
+`HeadMesh` 26 values scores 0.818). The client ships **no NPC-template catalog** to read it from (RDB 1000020 has
+no record for the combat actors' template ids).
+
+⚠️ **`NpcSpells` is not "zero rows" — that claim was wrong** — but it is not a route either. 22 of the 33
+class-family templates carry one, and the sets look strikingly family-pure (17 of the 20 distinct spell ids appear
+on exactly one family). That purity is **free**: the whole table is 63 rows over 33 of 1,194 templates and each id
+sits on 1–5 templates, so a spell id is very nearly a template id — the same artefact that makes `TemplateId`
+score 1.000 above. It would name the archetype for the templates a capture already names it for, and for nothing
+else.
 
 **Two buckets are answered anyway, because they have exactly one class family.** Measured per SPAWN rather than
 per type — one handle in one capture holds one loadout, which is the cut that matters:
