@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,749 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,761 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -32,7 +32,7 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 110/118 greeted dialogue NPCs imported (93.2%)
 - **Vendor shops** — 75/75 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,961/77,631 decrypted, **6.4% of the total encrypted**. Keys held per category: 4,696 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,973/77,631 decrypted, **6.4% of the total encrypted**. Keys held per category: 4,708 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -119,9 +119,11 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as
   is equipping and unequipping. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** — ticks damage with floating numbers at the blast radius the client states for the
-  spell (1,023 have one), a default otherwise; the per-tick cadence is still approximate (#349)
+  spell (2,459 have one), a default otherwise; the per-tick cadence is still approximate (#349)
 - 🟡 **Buff stat effects** — per-stat bonuses and penalties apply and come back off on expiry, cancel or death;
-  flat ones add, percentage ones scale. Awaiting an in-client check of the values (#367, #435, #436, #450)
+  flat ones add, percentage ones scale, and a spell that states its numbers once per level band resolves to the
+  band the carrier is in. 25,611 effects over 10,570 spells. Awaiting an in-client check of the values (#367,
+  #435, #436, #450, #783)
 - 🟡 **Spellweaving** (necromancer and demonologist) — built and playable. The energy-bar drain is the last piece,
   and Priest of Mitra / Tempest of Set are unmapped for want of a capture (#141, #505)
 - 🟡 **Directional combat** — an NPC opens its blue shield rose on engaging and shifts a guard between arcs on a
@@ -130,7 +132,7 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Fatalities** — the roll, both fatality buffs and the necromancer's Frozen Hatred proc all work in-client;
   the finishing-move animation never plays (#140, #440)
 - 🟡 **Spell cooldowns** — a cast still on cooldown is refused, line-scoped the way retail's is, so every rank of
-  a spell shares one timer; 3,703 spells carry a base recast read off their own record. Pending in-client
+  a spell shares one timer; 3,899 spells carry a base recast read off their own record. Pending in-client
   verification (#271)
 
 ### Character progression
@@ -139,7 +141,7 @@ we've seen_, and names the gaps). Regenerate with
   for all twelve classes; combos stick across relogs
 - ✅ **Attributes** — Strength/Constitution/Intelligence/Wisdom/Dexterity from the per-class, per-level base plus
   gear and buffs, so regen and mitigation get real inputs. Verified in-client at all eighty levels (#444)
-- 🟡 **Feats** — 19,777 feats imported with trees, ranks and tooltips, 23,321 stat effects and a 5,501-edge
+- 🟡 **Feats** — 19,777 feats imported with trees, ranks and tooltips, 23,033 stat effects and a 5,501-edge
   prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget, and
   named specs each keep their own build. Missing: per-feat cost and tier, each class's tree layout, and the retail
   training trigger — so training runs off a GM command. The decoded feat modifiers are not imported yet (#251,
