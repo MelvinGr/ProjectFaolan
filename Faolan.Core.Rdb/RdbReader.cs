@@ -221,6 +221,20 @@ namespace Faolan.Core.Rdb
 			return buf;
 		}
 
+		/// <summary>
+		///     Whether this entry is TEA-ENCRYPTED (an <c>RDBH</c> wrapper) and so needs a per-template key, rather
+		///     than being readable with none.
+		/// </summary>
+		/// <remarks>
+		///     Asked of a whole type it is a census the record's own header cannot give: the RDBH header carries no
+		///     category tag, so the split is the closest thing to a KIND the bytes state. #415 pairs it with the LDB
+		///     name category, which states the kind from outside, and the two agree.
+		/// </remarks>
+		public bool IsEncrypted(Entry e)
+		{
+			return IsRdbh(ReadRaw(e));
+		}
+
 		public static bool IsRdbh(ReadOnlySpan<byte> raw)
 		{
 			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';

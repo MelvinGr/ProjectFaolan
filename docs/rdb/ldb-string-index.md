@@ -96,9 +96,45 @@ resource id itself — there is no indirection through a separate "name id":
 
 **`50200` and `50220` are two halves of one id space, not name vs. polished-name.** They overlap in exactly
 **4** of 96,209 ids, and on all 4 they carry the *same* string (`126183` → "Zealot: HP Regeneration (1)" in
-both). Between them they name **95,895 of the 98,048** item templates. `50220`'s half is the
-training/proficiency items ("Basic Cloth Armor", "Equip: Cloth Armor", "1HB Damage and Combos 40-60"); every one
-of our named catalog items fell in `50200`'s half, and **none** in `50220`'s.
+both). Between them they name **95,894 of the 98,048** type-1000020 templates.
+
+### ⭐ …and the halves split by KIND: `50200` is ITEMS, `50220` is FEATS (#415)
+
+⚠️ **This section used to call both halves "item names", and the observation that gave it away was already
+written down here**: `50220`'s half was described as *"the training/proficiency items — `Basic Cloth Armor`,
+`Equip: Cloth Armor`, `1HB Damage and Combos 40-60`"*, and *"every one of our named catalog items fell in
+`50200`'s half, and none in `50220`'s"*. Those are not items. `Feats.Id` **7124** *is* `Basic Cloth Armor`, and
+7126–7128 are `Equip: Cloth Armor`. RDB 1000020 holds items, feats **and** abilities in one id space, and the
+two categories are how the client tells the first two apart.
+
+`--report ldb-name-categories` measures it over every row of every catalog rather than over samples:
+
+| cat | ids | Items | Feats | Abilities | Spells |
+|---|---:|---|---|---|---|
+| `50200` | 76,841 | **4,753 / 4,761** | 4 / 19,777 | 0 | 1 |
+| `50201` | 4,254 | 640 / 4,761 | 0 | 0 | 10 |
+| `50220` | 19,359 | **0 / 4,761** | **19,163 / 19,777** | 0 | 0 |
+| `50210` | 20,337 | 0 | 0 | **265 / 265** | 19,446 / 20,848 |
+
+⭐ **And a second, independent witness agrees**: the RDB's own encryption. An `RDBH` entry is TEA-encrypted and
+needs a per-template key; a non-RDBH one needs none. Nothing about the LDB pages knows anything about that, and
+yet the two splits line up almost exactly —
+
+```
+named by 50200 :  76,258 encrypted       288 plaintext
+named by 50220 :       0 encrypted    19,344 plaintext     <- not one exception
+named by neither:  1,373 encrypted       785 plaintext
+```
+
+So **1000020 is the ITEM templates (encrypted, named by 50200) plus the FEAT templates (plaintext, named by
+50220)**, and that is why the feat importer reads "the plaintext templates" while items need a harvested key.
+
+⚠️ It also retires "per-category %-of-total is impossible because the RDBH header carries no category tag". The
+header does not carry it; the **LDB name category does**, for all 98,048 entries and with no key. The item
+denominator is 76,546, not 98,048 — so the catalog gap #415 tracks is against that number.
+
+⭐ `50210` names all **265** abilities as well as the spells, so abilities are named in the 1040005-keyed
+category and not in either 1000020 one.
 
 So `LDB[50200][item.Id]` on the English page **is** the localized, player-facing name — it is not shadowed by a
 polished name elsewhere. Cross-checking the English page (226593) against the French one (226589): **84 %** of

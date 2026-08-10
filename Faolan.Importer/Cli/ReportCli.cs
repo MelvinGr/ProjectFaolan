@@ -763,6 +763,12 @@ namespace Faolan.Importer.Cli
 				// (category, id) - as opposed to the default raw printable-run scan below, whose bracketed number is
 				// a run ordinal and NOT an id. Confusing the two sent one investigation into page-base arithmetic on
 				// numbers that were never in the id space; this is the form that answers "what id is this text".
+				case "ldb-name-categories":
+				{
+					await LdbNameCategories(RdbDir());
+					return 0;
+				}
+
 				case "ldb-strings" when (arg ?? "").StartsWith("id:", StringComparison.OrdinalIgnoreCase):
 				{
 					// `id:<text>` searches by VALUE; `id:#<number>` searches by the id itself. The second is what tells
