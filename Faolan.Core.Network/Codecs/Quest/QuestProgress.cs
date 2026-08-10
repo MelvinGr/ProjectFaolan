@@ -129,6 +129,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 				: InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)).FirstOrDefault();
 		}
 
+		// The UseItem goal for `itemId` (#522): the first (in PLAY order) UseItem goal whose TrailingRefId is that item.
+		// The same shape as MatchingCollectGoal and deliberately a SEPARATE type - a collect is satisfied by holding
+		// the item, a use by consuming it, and the one shipped Use goal is an item the quest giver HANDS you, so
+		// counting its arrival would solve the objective before the player did anything.
+		public static QuestGoalDefinition? MatchingUseGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
+		{
+			return itemId == 0
+				? null
+				: InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.UseItem && g.TrailingRefId == itemId)).FirstOrDefault();
+		}
+
 		// The NPC TEMPLATE a goal targets, or null when it has not been resolved to one (#521). Two sources, and they
 		// never disagree - the second is where the first came from wherever both exist:
 		//

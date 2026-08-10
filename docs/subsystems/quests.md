@@ -28,6 +28,14 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 | `Escort` | the `UseObject` handler, on the object that plays the escortee's farewell | `TrailingRefId` — the escortee's template, resolved from `ConversationNode.TriggerWorldObjectId`, see below |
 | `ReachArea` | the move handler, per accepted move | the goal's **region** if it has one, else a 40-unit radius around its map marker |
 | `CollectItem` | **any item reaching the inventory** | `TrailingRefId == item template id` |
+| `UseItem` | `UseInventoryItem`, on the right-click that applies the item's own effect | `TrailingRefId == item template id` |
+
+⚠️ **`UseItem` is not `CollectItem` with a different name, and the difference is load-bearing.** A collect is
+satisfied by *holding* the item; a use, by *consuming* it. The one shipped `Use` goal — *"Use the Vial to Capture
+Gas"* (11252, item 4349109 `Po-Sha Potency Vial`) — is an item the quest giver **hands over**, so counting its
+arrival would complete the objective before the player did anything. `UntypedByArrival` in the importer excludes
+the kind from the arrival rule for exactly that reason; this is the trigger on the other side of that exclusion
+(#522).
 
 ### The goal carries its own KIND tag
 

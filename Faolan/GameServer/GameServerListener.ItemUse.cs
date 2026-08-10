@@ -216,6 +216,11 @@ namespace Faolan.GameServer
 			if (item.OnUseSpell is { } spellBase && spellBase != 0)
 			{
 				await UseConsumable(client, item, slot, spellBase);
+				// #522: a `Use the <item>` quest objective ticks off the USE, not off the item arriving - the one
+				// shipped Use goal is an item the quest giver hands over, so counting its arrival would solve the
+				// objective before the player did anything. After the effect, so an item that is both a consumable
+				// and an objective does both.
+				await _questProgression.AdvanceUseGoals(client, item.Id);
 				return;
 			}
 

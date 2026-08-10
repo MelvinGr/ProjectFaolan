@@ -225,6 +225,56 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 999)); // no collect goal for that item
 			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 0)); // no item -> no match (never the TalkToNpc goal)
 		}
+
+		// #522: a `Use` objective is solved by USING the item, not by holding it - and the two matchers must not see
+		// each other's goals. The shipped case is the one that makes the separation load-bearing: the vial is HANDED
+		// to the player by the quest giver, so a collect matcher firing on it would complete the objective the moment
+		// it arrived.
+		[Fact]
+		public void MatchingUseGoal_ByItemId_UseTypeOnly()
+		{
+			var goals = new[]
+			{
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 11252,
+					GoalType = QuestGoalType.UseItem,
+					TrailingRefId = 4349109 // Po-Sha Potency Vial
+				},
+				new QuestGoalDefinition
+				{
+					Sequence = 2,
+					GoalId = 3495,
+					GoalType = QuestGoalType.CollectItem,
+					TrailingRefId = 193400
+				}
+			};
+
+			Assert.Equal(11252u, QuestProgress.MatchingUseGoal(goals, 4349109)?.GoalId);
+			Assert.Null(QuestProgress.MatchingUseGoal(goals, 193400)); // the COLLECT goal's item is not a use goal
+			Assert.Null(QuestProgress.MatchingUseGoal(goals, 0));
+			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 4349109)); // ...and the reverse
+		}
+
+		// The shipped row itself, so the typing rule cannot silently stop firing: `Use the Vial to Capture Gas`
+		// (quest 17234) must stay typed UseItem against the item the client's own reference names.
+		[Fact]
+		public async Task ShippedUseGoal_IsTypedAgainstAnItemWeHold()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var goal = await db.QuestGoalDefinitions.FirstOrDefaultAsync(g => g.GoalId == 11252, ct);
+			Assert.NotNull(goal);
+			Assert.Equal(QuestGoalType.UseItem, goal!.GoalType);
+			Assert.Equal(4349109u, goal.TrailingRefId);
+
+			// The guard the typing rule applies: a use goal pointing at an item nobody can obtain is a silently
+			// uncompletable objective.
+			Assert.True(await db.Items.AnyAsync(i => i.Id == goal.TrailingRefId, ct),
+				"the Use goal's item left the catalog - the objective is now uncompletable rather than inert");
+		}
 		[Fact]
 		public void CanHandIn_DeliveryNeedsTheItemInHand_OthersUnaffected()
 		{

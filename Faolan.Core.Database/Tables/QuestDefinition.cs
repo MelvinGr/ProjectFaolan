@@ -418,7 +418,24 @@ namespace Faolan.Core.Database.Tables
 		Escort = 3, // escort the TargetName NPC to a destination
 		ReachArea = 4, // reach a map location - solved when the player moves within range of the goal's (MapId, MarkerX, MarkerY) point (no TargetName; e.g. Shipwrecked's "Enter the jungle", #262)
 		CollectItem = 5, // collect N of the item in TrailingRefId, one per interaction with a quest-pickup world object (QuestItemEffect); e.g. Shipwrecked V's "get 3 stone bricks" (item 193400), #262
-		Kill = 6 // kill the NPC in TrailingRefId (a 51000 npc_template reference), or the TargetName NPC
+		Kill = 6, // kill the NPC in TrailingRefId (a 51000 npc_template reference), or the TargetName NPC
+
+		/// <summary>
+		///     USE the item in <see cref="QuestGoalDefinition.TrailingRefId" /> (an LDB 50200 item reference) -
+		///     solved by right-clicking it out of a bag, which is the one thing the goal's own row states (#522).
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Deliberately NOT a <see cref="CollectItem" />. The kind's verb is `Use`, and the corpus' single
+		///     goal - *"Use the Vial to Capture Gas"* (11252, item 4349109 `Po-Sha Potency Vial`) - is one the player
+		///     is HANDED and then has to use, so counting its arrival would complete the objective the moment the
+		///     quest giver passed it over. The trigger is the use itself.
+		///     <para>
+		///         The item's own on-use effect is unaffected: the goal ticks off the same `UseInventoryItem` choke
+		///         point that applies the consumable's spell, after it, so an item that is both a consumable and a
+		///         quest objective does both.
+		///     </para>
+		/// </remarks>
+		UseItem = 7
 	}
 
 	public enum QuestTextSlot

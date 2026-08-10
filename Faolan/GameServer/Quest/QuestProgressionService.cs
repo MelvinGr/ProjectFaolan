@@ -296,6 +296,16 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.CollectItem, null!, itemTemplateId, Math.Max(1u, count));
 		}
 
+		// The player USED an item out of a bag - advance any active UseItem goal asking for it (#522). Fired from
+		// `UseInventoryItem`, the one right-click choke point, AFTER the item's own effect has been applied, so an
+		// item that is both a consumable and a quest objective does both.
+		//
+		// One use is one tick regardless of the stack: a stack of five vials is five uses, not one worth five.
+		public Task AdvanceUseGoals(INetworkClient client, uint itemTemplateId)
+		{
+			return Advance(client, QuestGoalType.UseItem, null!, itemTemplateId);
+		}
+
 		// Advance the goal of `triggerType`/`targetName` for each of the player's active quests. #357: a quest can have
 		// several goals, so the trigger ticks the MATCHING goal (not always goal[0]); the quest only completes once EVERY
 		// goal has reached its required count. A tick that leaves the quest incomplete (this goal not yet done, or a
@@ -332,6 +342,7 @@ namespace Faolan.GameServer.Quest
 				{
 					QuestGoalType.Kill        => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
 					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
+					QuestGoalType.UseItem     => QuestProgress.MatchingUseGoal(def.Goals, targetTemplateId ?? 0),
 					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0, npcTemplateId),
 					QuestGoalType.Escort      => QuestProgress.MatchingEscortGoal(def.Goals, targetTemplateId ?? 0),
 					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName, npcTemplateId)

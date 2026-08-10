@@ -1629,6 +1629,7 @@ namespace Faolan.Importer.Captures
 			await TypeKillGoalsFromCatalogName(db);
 			await TypeKillGoalsFromKind(db);
 			await TypeInvestigateGoalsAsReach(db);
+			await TypeUseGoalsFromKind(db);
 			await TypeLocationGoalsFromTrailingCategory(db);
 			await DeriveQuestIndexFromLine(db);
 			await SeedQuestWorldEffects(db);
@@ -2212,6 +2213,51 @@ namespace Faolan.Importer.Captures
 			{
 				await db.SaveChangesAsync();
 				Console.WriteLine($"Typed {typed} goal(s) Kill from the client's own kill verb (#522).");
+			}
+		}
+
+		// #522: a `Use` goal is solved by USING the item its typed reference names - the verb is the trigger, and the
+		// row states everything needed for it (`TrailingCategory` 50200 = an item, `TrailingRefId` = which one).
+		//
+		// One goal corpus-wide: *"Use the Vial to Capture Gas"* (11252, quest 17234), reference 4349109
+		// `Po-Sha Potency Vial` - an item we DO hold, and one that carries an on-use spell, so the whole path exists.
+		//
+		// ⚠️ It must not be typed `CollectItem`, which is what `TypeItemGoalsFromTrailingCategory` would otherwise do
+		// with an item reference: the vial is HANDED to the player by the quest giver, so counting its arrival solves
+		// the objective before the player has used it. `UntypedByArrival` already excludes the kind for exactly that
+		// reason; this is the trigger that was missing on the other side of that exclusion.
+		//
+		// ⚠️ Guarded on the item EXISTING in our catalog, and the guard is load-bearing rather than defensive: a use
+		// goal pointing at an item nobody can obtain is a silently-uncompletable objective, which is worse than a
+		// visibly inert one (the same rule the marker guards next door apply).
+		private static async Task TypeUseGoalsFromKind(DatabaseContext db)
+		{
+			var goals = await db.QuestGoalDefinitions.Where(g => g.Separator == (uint)QuestGoalKind.Use).ToListAsync();
+
+			var typed = 0;
+			var noItem = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal) && goal.GoalType != QuestGoalType.CollectItem)
+					continue; // hand-reviewed or already given a better type
+
+				if (goal is not { TrailingRefId: > 0 } || goal.TrailingCategory != QuestProgress.ItemNameCategory)
+					continue;
+
+				if (!await db.Items.AnyAsync(i => i.Id == goal.TrailingRefId))
+				{
+					noItem++;
+					continue;
+				}
+
+				goal.GoalType = QuestGoalType.UseItem;
+				typed++;
+			}
+
+			if (typed > 0 || noItem > 0)
+			{
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Typed {typed} goal(s) UseItem from the client's own use verb; {noItem} left inert (the item is not in the catalog) (#522).");
 			}
 		}
 
