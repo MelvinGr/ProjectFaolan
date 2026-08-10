@@ -75,13 +75,33 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
   corpse where it fell) followed by a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6) on the dying
   handle. In `NecroL80_..._casting-combat` **every** NPC kill carries exactly this pair and **NO
   `SimpleCharKilledBy`** (validated by `DeathSequenceTests`). The death is identified by the
-  BccIIR **envelope** — form **0x0004**, slot **0x0000001F**, a 13-byte protobuf `08 <behaviorId> 18 <variant>
-  28 08 30 00 60 <f12>`; the **behaviorId is creature-specific** (that creature's own death animation — 41877
-  for the common humanoid mobs, 17036 for the F023 creature) and the field-3 `<variant>` byte varies per kill
-  (a hit-direction/ragdoll selector). Built by `DeathSequence.Pose` + `DeathSequence.Bcc(handle,
-  NpcDeathVariant)` (byte-exact goldens), sent by `CombatService.OnNpcKilled` after the killing-blow vitals. We
-  send the common humanoid death (behaviorId 41877, `NpcDeathVariant` = 0x05); per-creature death behaviorIds
-  need per-NPC behavior data we don't yet carry.
+  BccIIR **envelope** — form **0x0004**, slot **0x0000001F**, a protobuf `08 <behaviorId> 18 <counter>
+  28 08 30 00 60 <f12>`; the **behaviorId is creature-specific** (that creature's own death animation, harvested
+  per `NpcTemplate.DeathBehaviorId`). Built by `DeathSequence.Pose` + `DeathSequence.Bcc` (byte-exact goldens),
+  sent by `CombatService.OnNpcKilled` after the killing-blow vitals.
+
+  **Three of the four args fields were misread, and the 272 captured death records settle all three (#742).**
+  Only `field5 = 8` and `field6 = 0` really are constants — 272 of 272.
+
+  - ⚠️ **field3 is not a "death variant"**, it is the dying entity's own **behaviour counter**, which is what the
+    protobuf schema has called it all along (`CommandqueueServerId`). It takes **40 distinct values from 2 to
+    373**, and against the same actor's previous BCC record of *any* kind it is **+1 on 265 of 267**. The
+    progression is visible inside one kill: an NPC's two swings carry 5 and 6, the abort of the second carries 6
+    again, and its death carries 7. The old constants (5 for an NPC, 3 for a player) were just the value the two
+    golden captures happened to be at. `CombatService` now passes the NPC's real counter —
+    `WorldEntity.AttackSwingCounter`, the same one its swing acks already number themselves with.
+  - ⚠️ **field12 is per-ANIMATION, not per-kill**, and reads as that animation's own length in centiseconds:
+    humanoid **240**, quadruped/beast **100**, the environmental one **300** — each invariant across every
+    captured record of it (166 / 32 / 2). It was hardcoded at 240 for all of them, which gave a beast's 1.0 s
+    death animation 2.4× its own timing. The demon/large-caster animation is the exception and genuinely varies
+    (280 on 30 of its 52, then 240 / 160 / 816 / 176 / 360 / 592 / 120), so its modal value is used.
+    [V0: what varies field12 on 17036]
+  - ⭐ **There is a FOURTH death animation, `128031`**, and it is PLAYER-only: two records, both on one
+    character, both with field12 300. One of the two lands 8 s before that session's own annotation *"got
+    incinerated by lava"* — inside the normal annotation lag — while the plain *"died"* annotation two minutes
+    earlier maps to an ordinary 41877 death. So an environmental death appears to play its own animation. Two
+    records is not enough to wire a rule on, and nothing selects it.
+    [V0: what selects the 128031 death animation]
 - **Player death** (#214) uses `SimpleCharKilledByUpdateIIR_t` (**0xB066AFC2**) — the "you were killed by X"
   record that drives the local release/resurrect UI, ABSENT from NPC kills. Record:
   `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `SimpleCharKilledByUpdateCodec`

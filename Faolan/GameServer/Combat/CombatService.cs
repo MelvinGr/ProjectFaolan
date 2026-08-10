@@ -740,7 +740,11 @@ namespace Faolan.GameServer.Combat
 				// idx 545, between the killing damage and the pose); then the pose freezes the corpse.
 				await SendWorldPacket(killer, LookAtCodec.Build(LookAts.DropTarget(targetHandle)));
 				await SendWorldPacket(killer, MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)));
-				await SendWorldPacket(killer, BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, DeathSequence.NpcDeathVariant)));
+				// #742: the record's field3 is the dying NPC's own BEHAVIOUR COUNTER, not a "death variant" - so its
+				// death takes the next index after its last swing, which is exactly the 5 -> 6 -> 6(abort) -> 7
+				// progression one captured NPC's records walk. `AttackSwingCounter` is the same counter its swing acks
+				// already number themselves with, so death simply continues it.
+				await SendWorldPacket(killer, BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter)));
 
 				await AwardKillXp(killer, npcEntity.Level);
 				await AnnounceKillChain(killer);

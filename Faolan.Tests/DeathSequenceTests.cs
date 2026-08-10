@@ -11,26 +11,43 @@ namespace Faolan.Tests
 	// Reproduces the record from AssassinL23_..._resurect (the player-death sequence before the 0x2024 release screen).
 	public class DeathSequenceTests
 	{
-		[Theory, InlineData(41877u, "0895c702"), InlineData(17036u, "088c8501"), InlineData(215333u, "08a5920d")]
-		// humanoid biped (Picts, Nemedians, pirates, ...)
-		// demon / large caster (Arcanist, Bat Demon, Corruptor, Reaper, ...)
-		// quadruped / beast (Ape King, Jungle Ape, Panther)
-		public void BuildDeathBcc_EncodesCreatureDeathBehaviorId_AsVarint(uint behaviorId, string field1Hex)
+		// The behaviorId (protobuf field 1) is the creature's death animation, harvested per NpcTemplate (#362), and
+		// field12 follows it: the animation's own length in centiseconds, INVARIANT across every captured record of
+		// three of the four animations (#742). It used to be hardcoded at 240 for all of them, which gave a beast's
+		// 1.0 s death animation 2.4x its own timing. field5=8 and field6=0 are the only real constants - 272 of 272.
+		[Theory]
+		[InlineData(41877u, "0895c702", "60f001")] // humanoid biped (Picts, Nemedians, pirates, ...)  240 on 166/166
+		[InlineData(17036u, "088c8501", "609802")] // demon / large caster (Arcanist, Bat Demon, ...)   280, modal 30/52
+		[InlineData(215333u, "08a5920d", "6064")] // quadruped / beast (Ape King, Jungle Ape, Panther)  100 on 32/32
+		[InlineData(128031u, "089fe807", "60ac02")] // the environmental one - 300 on 2/2, PLAYER-only
+		public void BuildDeathBcc_EncodesTheDeathAnimation_AndItsOwnTiming(uint behaviorId, string field1Hex, string field12Hex)
 		{
-			// The behaviorId (protobuf field 1) is the creature's death animation, harvested per NpcTemplate (#362).
-			// Only field1 changes; field3 (variant 0x05), field5=8, field6=0, field12=240 stay constant.
-			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x00040000, behaviorId, DeathSequence.NpcDeathVariant));
-			Assert.Equal($"642cd3d60000c3500004000000040000001f0000000d{field1Hex}18052808300060f001", Convert.ToHexString(body).ToLowerInvariant());
+			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x00040000, behaviorId, DeathSequence.CapturedNpcDeathCounter));
+			var args = $"{field1Hex}18052808300060{field12Hex[2..]}";
+
+			Assert.Equal($"642cd3d60000c3500004000000040000001f{args.Length / 2:x8}{args}", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
 		public void BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact()
 		{
 			// The death-behavior BccIIR (0x642CD3D6, behaviorId 41877 = humanoid biped death) retail sends for a dying
-			// NPC from NecroL80_..._casting-combat pkt#5162: dying handle 0x0004EFE7, form 0x0004, slot 0x1F, protobuf with
-			// the NPC death variant (field-3 byte 0x05). The carrier prepends the u32 length 0x00000023.
-			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x0004EFE7, DeathSequence.HumanoidDeathBehaviorId, DeathSequence.NpcDeathVariant));
+			// NPC from NecroL80_..._casting-combat pkt#5162: dying handle 0x0004EFE7, form 0x0004, slot 0x1F, protobuf
+			// with field3 = 5 - which is that NPC's BEHAVIOUR COUNTER at the moment it died, not a "death variant".
+			// The carrier prepends the u32 length 0x00000023.
+			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x0004EFE7, DeathSequence.HumanoidDeathBehaviorId, DeathSequence.CapturedNpcDeathCounter));
 			Assert.Equal("642cd3d60000c3500004efe700040000001f0000000d0895c70218052808300060f001", Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		// ⚠️ field3 is the dying entity's own behaviour counter (#742): 40 distinct values from 2 to 373 across the
+		// 272 captured death records, and +1 against the same actor's previous BCC record on 265 of 267. So it has to
+		// be whatever the caller's entity is up to, and a codec that pinned it would be pinning a capture's accident.
+		[Theory, InlineData(1u, "1801"), InlineData(7u, "1807"), InlineData(373u, "18f502")]
+		public void BuildDeathBcc_CarriesTheEntitysOwnBehaviourCounter(uint counter, string field3Hex)
+		{
+			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x0004EFE7, DeathSequence.HumanoidDeathBehaviorId, counter));
+
+			Assert.Contains($"0895c702{field3Hex}2808", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]

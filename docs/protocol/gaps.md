@@ -99,6 +99,30 @@ it is per name after all. Tracked in Gitea #494.
 
 ---
 
+## The death record's animation timing
+
+### What varies field12 on the demon/large-caster death animation
+The death `BehaviorControlCenterIIR`'s field12 (`ActivationTime`) is per-ANIMATION and reads as that animation's
+own length in centiseconds — humanoid 240, quadruped/beast 100, the environmental one 300, each invariant across
+every captured record of it (166 / 32 / 2). The demon/large-caster animation (`17036`) is the one that does not
+hold still: 280 on 30 of its 52 records, then 240, 160, 816, 176, 360, 592 and 120. Nothing in the record or its
+actor separates them, so the modal value is what we send. Close it by finding what a 816 or a 120 has in common —
+the creature TEMPLATE behind the handle is the first thing to check, since one animation is shared by many
+creatures and a per-creature length would explain the spread exactly. Tracked in Gitea #742.
+`[V0: what varies field12 on 17036]`
+
+### What selects the 128031 death animation
+A fourth death animation exists and is PLAYER-only: two records, both on the same character, both carrying
+field12 300 where an ordinary player death carries 41877 / 240. One of the two lands 8 s before that session's
+own annotation *"got incinerated by lava"* — inside the normal annotation lag — while the plain *"died"*
+annotation two minutes earlier maps to an ordinary 41877 death, so an environmental death appears to play its
+own animation. Two records is not enough to wire a rule on and nothing selects it today. Close it with a capture
+of a second environmental death (lava, drowning, a fall) — or of a fatality, which is the other candidate for a
+"special" death. Tracked in Gitea #742.
+`[V0: what selects the 128031 death animation]`
+
+---
+
 ## How to close a gap
 
 Decode it, add a golden test, then promote the fact to `[V3: …]` in the relevant layer page and delete its entry
