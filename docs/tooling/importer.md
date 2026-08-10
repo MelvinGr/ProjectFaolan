@@ -231,6 +231,9 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
 `class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
+`spell-flags` (#632: sweeps the spell record's FLAGS word bit by bit against what the DB knows, so "which bit says
+X" can be asked rather than argued. Bit 2 is printed as the CONTROL - it is a known predicate and scores 100.00%,
+which is the yardstick every other row is read against),
 `spell-element-lists` (#785: scores the element-LIST grammar over the whole spell catalog - a spell record's
 elements come in count-framed groups, `[2][listId][(n+1) * 0x3F1]`, and this is the gate on that. It cannot be an
 xUnit test because the suite runs from a clone with no RDB. `--report-arg kinds` adds the per-id kind breakdown),

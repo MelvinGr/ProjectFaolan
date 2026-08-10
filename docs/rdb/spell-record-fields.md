@@ -90,9 +90,27 @@ read as absolute and their hide-from-tooltip bit to read as clear whatever the r
 spells' `ManaCostIsPercent` and 78 spells into the hidden set. `RdbSpellImporter.ReadFlagsWord` is the one place
 that locates it.
 
-⚠️ What is left is not bytes but MEANINGS: the head's data words `a` (6 distinct values) and `b`
-(now known to be the frame), the flags word's other bits, and what fields 22/36 select for. Every byte of
-`Hellfire Stream` is inside a named region.
+### The flags word's bits
+
+`--report spell-flags` sweeps it bit by bit against what the DB knows. ⭐ **Bit 2 is the control**: it is a known
+predicate (`ManaCostIsPercent`, #630) and it reproduces that column **100.00%, zero disagreement over 20,847
+records** — which is what a bit that IS a predicate looks like, and the yardstick every other row is read against.
+
+| bit | records set | reading |
+|---:|---:|---|
+| 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control, 100.00% |
+| 24 | 3,189 | **hide from tooltip** (#789) — from the client's own `FUN_014a3b30` |
+| 16 | 11,610 | tracks "carries a duration" at **99.07%** — 200 records disagree, so a LEAD, not a definition |
+| 25 | 185 | a strict SUBSET of the duration-carrying records (185/185, no exceptions) |
+
+⚠️ **A rare bit scores high against a rare predicate for free** — both are mostly false, so they agree on every
+record that has neither. Read the `set` column before the percentages; the report says so itself.
+
+⚠️ What is left is not bytes but MEANINGS: head word `a` and the flags word's unnamed bits. `a` takes 6 values and
+SPLITS the catalog sensibly — `a=2` is almost never trainable (6 of 2,066) and its records are named `Horror`,
+`Exhausted`, `Death Penalty`, i.e. internal effect records, while `a=4`/`a=5` are castables with high cast-time
+rates and every one of the 155 mounts is `a=4` — but nothing names it. Every byte of `Hellfire Stream` is inside
+a named region.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the
