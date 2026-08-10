@@ -10,6 +10,7 @@ The renderer is the **client's**, not ours — four pieces, each recovered from 
 | piece | source |
 |---|---|
 | the per-kind SENTENCE | **LDB category 170**, keyed by GameAction type id or by a token hash (below) |
+| the RESISTANCE kind | LDB category 55200, the client's spell-effect / metatype catalog (`7` is "Root") |
 | the stat NAME | LDB category 615, keyed by the wire stat id |
 | the wire→display DIVISOR | `StatDisplayScale` — `FUN_0149a300`'s divisor selection (#251) |
 | the UNIT suffix | `StatUnitSuffix` — `FUN_01119f20` (#775) |
@@ -75,6 +76,16 @@ slots are read:
 - **the hit-percent pair** — `ChangeHitPercent` 53030 and `ChangeLineHitPercent` 53075 — reads key 39 and picks
   `IncreasesHitPercent` when positive, `DecreasesHitPercent` otherwise, rendering the value ×0.01 with a `%`
   (branch `0x014a018c`, the float at `0x01f2800c` is literally `0.01`).
+- **`HitPercentage` 53007** picks between FIVE tokens on three things at once — which stat, the sign, and a mode
+  word (branch `0x014a0b99`): Health → `HitPercentHeal` / `HitPercentDamage`, Stamina drained → `HitPercentDamage`
+  with that stat's name, anything else → `HitPercentHealStatByOtherStat` / `HitPercentDamageStatByOtherStat`
+  ("Renews 20 percent of Mana based on Mana"). ⚠️ Its MAGNITUDE is **raw** — the client passes a literal `0` as
+  the range builder's divide flag where `Hit` passes the stat's own percent predicate, so scaling it would report
+  a 30% drain as 0.3%.
+
+⚠️ **An equal-endpoint range collapses to one number**, and that too is the client's branch rather than a tidy-up:
+`FUN_0149a700` compares its two arguments and takes a separate path when they match, so a flat magnitude draws as
+`20`, never `20-20`.
 
 The format grammar is printf plus two things printf has no notion of, both handled by `LdbFormat`:
 
@@ -134,7 +145,7 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 5,311,375 / 8,241,205 = 64.4%   (3,785,151 in elements, 1,526,224 in the property run)
 property-run field ids read         : 16 / 111
-elements rendered as a sentence     : 45,961 / 61,840 = 74.3%
+elements rendered as a sentence     : 47,632 / 61,840 = 77.0%
 ```
 
 The two failure modes are counted separately, because they are different work:
@@ -142,8 +153,8 @@ The two failure modes are counted separately, because they are different work:
 - **no sentence at all** — 11,281 elements over 90 kinds, led by `DPSHit` (2,660),
   `StartServerSideScryScriptWithParams` (1,597) and `StartParticleEffect` (1,182). Most of these are types the
   tooltip's dispatch sends to its DEFAULT, i.e. the client draws nothing for them either;
-- **a sentence whose slots are not bound** — 4,598 elements over 14 kinds, led by `HitPercentage`
-  (`%s %s by %d%% of %s %s`, whose branch also selects by value) and the two cone kinds.
+- **a sentence whose slots are not bound** — 2,235 elements over 11 kinds, led by the two cone kinds and
+  `AddComboProc`.
 
 ⚠️ **The cone kinds are deliberately unbound, and the reason generalises.** `%.2f%s degree arc, %.2fm%s radius`
 reads like two slots off the element and is not: branch `0x014a28f9` fetches the CHARACTER, adds keys 11 and 213

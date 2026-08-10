@@ -387,7 +387,63 @@ namespace Faolan.Importer.Cli
 				return (format, format == null ? null : [$"{percent * 0.01:0.##}%"]);
 			}
 
+			// The PERCENT-of-a-stat family, whose sentence is chosen by three things at once - which stat, the sign of
+			// the percentage, and a mode word (branch 0x014a0b99).
+			if (element.Kind == HitPercentageKind)
+				return HitPercentageSentence(ctx, element);
+
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
+		}
+
+		// `HitPercentage` (53007), keys [Stat, Value, Line, 71]. Its own type id carries `%s %s by %d%% of %s %s`, and
+		// the client draws none of it: branch 0x014a0b99 reads all four slots plus key 32, and picks one of five token
+		// sentences.
+		//
+		// ⚠️ The MAGNITUDE is raw here. The client builds the value string with `FUN_0149a700(v, v, 0)` - the same
+		// range builder the `Hit` family uses, but with the divide flag passed as a literal 0, where `Hit` passes the
+		// stat's own percent predicate. So a `HitPercentage` value is NOT divided by the stat's display scale, and
+		// scaling it would report a 30% drain as 0.3%.
+		private static (string? Format, object?[]? Args) HitPercentageSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var stat = element.Value(GameActionTypes.KeyStat);
+			var value = element.Value(GameActionTypes.KeyValue);
+			var otherStat = element.Value(GameActionTypes.KeyLine);
+			if (stat is null or 0 || value is null || otherStat is null)
+				return (null, null);
+
+			// ⛔ Mode 1 or 2 takes a different path entirely: the client reads the CHARACTER'S OWN value of the key-1
+			// stat and renders `charStat * value * 0.01` through the damage/heal renderer. That number is a property
+			// of the caster, not of the record, so this report cannot produce it - the same wall the cone kinds hit.
+			if (element.Value(KeyHitPercentMode) is 1 or 2)
+				return (null, null);
+
+			var signed = (int)value.Value;
+			var range = ctx.RawRange(signed, signed);
+
+			if (stat == GameActionTooltip.HealthStatId)
+			{
+				// ⛔ The DAMAGE arm's second slot is a damage SCHOOL name, resolved by `FUN_0149a8f0` through an
+				// enum-name table keyed on key 71 (values 1..14) - the resolver is not decoded, so binding this arm
+				// would leave a `%s` in the middle of a finished-looking line.
+				if (signed <= 0)
+					return (null, null);
+
+				var heal = ctx.SentenceForToken("HitPercentHeal");
+				return (heal, heal == null ? null : [range]);
+			}
+
+			// Stamina, drained: the second slot is simply that stat's own NAME.
+			// ⚠️ The client appends its `OnTarget` token to this one; that qualifier is not reproduced here.
+			if (stat == StaminaStatId && signed < 0)
+			{
+				var drain = ctx.SentenceForToken("HitPercentDamage");
+				return (drain, drain == null ? null : [range, ctx.StatName(stat.Value)]);
+			}
+
+			// Everything else is the three-slot form: how much, of WHICH stat, based on WHICH other stat.
+			var token = signed > 0 ? "HitPercentHealStatByOtherStat" : "HitPercentDamageStatByOtherStat";
+			var format = ctx.SentenceForToken(token);
+			return (format, format == null ? null : [range, ctx.StatName(stat.Value), ctx.StatName(otherStat.Value)]);
 		}
 
 		// `Hit` / `SpecialHit` carry their two magnitudes flat; `InterpolatedHit` ramps each of them over the caster's
@@ -491,6 +547,31 @@ namespace Faolan.Importer.Cli
 				// the DIFFERENCE. So the element states a DELTA and the drawn number needs live state this report does
 				// not have - binding it to the raw slots would print "4.00 degree arc" for `Cyclone of Steel`. See
 				// #782.
+
+				// `%s resistance to %s` - the value, then the RESISTANCE KIND. Branch 0x0149e942 reads key 152 and
+				// key 39, renders the value through stat 0x4B `MetaType`'s display scale (which is 1, so it prints
+				// raw), and resolves key 152 through LDB category 55200 - the client's spell-effect/metatype catalog
+				// (`68` is "Poison/Electrical resistance rating buff"), NOT the stat-name category.
+				case NanoResistanceKind:
+				{
+					var metaType = element.Value(KeyNanoResistanceMetaType);
+					var amount = element.Value(GameActionTypes.KeyValue);
+					if (metaType is null || amount is null)
+						return null;
+
+					var kind = ctx.Ldb.GetValueOrDefault((LdbMetaTypeCategory, metaType.Value));
+					return kind == null ? null : [ctx.Magnitude(MetaTypeStatId, (int)amount.Value), kind];
+				}
+
+				// `Knockback %d meters` - one conversion, and the branch (0x014a1542) fills it from key 238 FIRST.
+				// ⚠️ It reads key 191 as well and hands it to a second format call that has no slot left to fill, so
+				// the drawn number is 238 and 191 does not appear. Binding the two the other way round would put a
+				// resistance-shaped number where the metres go.
+				case KnockbackKind:
+				{
+					var metres = element.Value(KeyKnockbackMetres);
+					return metres is null ? null : [(int)metres.Value];
+				}
 
 				// `Team Formula %s` / `Team effect %s` - one slot, and the branch reads exactly key 88.
 				case TeamFormulaKind:
@@ -655,6 +736,9 @@ namespace Faolan.Importer.Cli
 		private const uint ChangeLineHitPercentKind = 53075;
 		private const uint FilteredAreaFormulaKind = 53088;
 		private const uint HitKind = 53002;
+		private const uint HitPercentageKind = 53007;
+		private const uint KnockbackKind = 53217;
+		private const uint NanoResistanceKind = 53162;
 		private const uint ModifyAsRatingKind = 53067;
 		private const uint ResurrectTargetKind = 53227;
 		private const uint TeamFormulaKind = 53066;
@@ -662,6 +746,26 @@ namespace Faolan.Importer.Cli
 
 		// `ResurrectTarget`'s only payload slot - the health percentage the target comes back at.
 		private const int KeyResurrectHealth = 188;
+
+		// `HitPercentage`'s MODE word: 1 or 2 sends the client down a path that reads the caster's own stat, so those
+		// two values are not renderable from the record.
+		private const int KeyHitPercentMode = 32;
+
+		// `Knockback`'s distance in metres (key 238) - the slot the client fills its one `%d` from. Per-TYPE.
+		private const int KeyKnockbackMetres = 238;
+
+		// `NanoResistance`'s first slot: an id into LDB 55200, the client's spell-effect / METATYPE catalog.
+		private const int KeyNanoResistanceMetaType = 152;
+
+		// LDB category 55200 - what a `NanoResistance` element's key 152 names ("Poison/Electrical resistance rating
+		// buff", "Damage - Poison Instant DD", ...). Not the stat-name category.
+		private const uint LdbMetaTypeCategory = 55200;
+
+		// 0x4B `MetaType` - the stat whose DISPLAY SCALE the client renders a `NanoResistance` amount through.
+		private const uint MetaTypeStatId = 0x4B;
+
+		// 0x1F8 Stamina - the one non-Health stat `HitPercentage` gives its own phrasing to.
+		private const uint StaminaStatId = 0x1F8;
 		private const uint InterpolatedHitKind = 53219;
 		private const uint SetSpellRecastTimeKind = 53226;
 		private const uint SpecialHitKind = 53196;
@@ -731,13 +835,34 @@ namespace Faolan.Importer.Cli
 			///     ⚠️ Drawn as a MAGNITUDE, not signed: the client's hit branch takes the absolute value when the low
 			///     endpoint is negative, because the sentence around it already says "points of" or "Removes". Signing
 			///     it here would render "-58--71 points of Health".
+			///     <para>
+			///         ⚠️ EQUAL endpoints collapse to one number. That is the client's own branch, not a tidy-up:
+			///         `FUN_0149a700` compares its two arguments and takes a separate path when they match, so a flat
+			///         magnitude draws as "20", never "20-20".
+			///     </para>
 			/// </remarks>
 			public string Range(uint statId, int min, int max)
 			{
 				var scale = StatDisplayScale.Of(statId);
 				var (low, high) = min < 0 ? (-min, -max) : (min, max);
 				var suffix = StatUnitSuffix.SuffixOf(statId);
-				return $"{low / (double)scale:0.##}-{high / (double)scale:0.##}{suffix}";
+				return low == high
+					? $"{low / (double)scale:0.##}{suffix}"
+					: $"{low / (double)scale:0.##}-{high / (double)scale:0.##}{suffix}";
+			}
+
+			/// <summary>
+			///     The same range with NO divisor and no unit - `FUN_0149a700(min, max, 0)`.
+			/// </summary>
+			/// <remarks>
+			///     ⚠️ Whether the range divides is the builder's THIRD argument, and it is per CALL SITE, not per stat:
+			///     the `Hit` family passes the stat's own percent predicate, `HitPercentage` passes a literal 0. Reusing
+			///     <see cref="Range" /> there would report a 30% drain as 0.3%.
+			/// </remarks>
+			public string RawRange(int min, int max)
+			{
+				var (low, high) = min < 0 ? (-min, -max) : (min, max);
+				return low == high ? low.ToString(CultureInfo.InvariantCulture) : $"{low}-{high}";
 			}
 
 			/// <summary>
