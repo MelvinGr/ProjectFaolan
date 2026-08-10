@@ -250,6 +250,26 @@ the record's and prints the difference. The second dispatch table (`SUB EAX,0xd0
 `CMP EAX,0xd00b` / `JZ`, and that branch never touches the character. So the live-state objection is `53273`'s,
 not ConeFormula's.
 
+### `ConeFormula` (53259): what its slots take
+
+Traced through the branch's stack locals rather than inferred from the fetch order. **Proven:**
+
+| record key | logical | what it is | evidence |
+| ---: | ---: | --- | --- |
+| `1123` | 88 | the effect spell — the leading `%s` | resolved by `FUN_0099bef0` off the first fetch |
+| `733` | 11 | the **radius**, metres — the second `%.2f`, carrying the `ValueModUnitMeters` unit | `SpellAreaEffects.RadiusMetres` is 6 for `Wave of Life (Rank 2)` and its key 11 is 6 |
+| `1245` | 213 | an **angle** — the first `%.2f`, the "degree arc" | the value reaching that slot is clamped to `[0, 360]` against the constant at `0x020b5270` (= `360.0`) |
+| `1244` | 212 | a second angle (`-60` on `Wave of Life`) | **not fetched** by this branch's `GetIntStat` sequence |
+
+⭐ So the arc fills the sentence BEFORE the radius, while the branch FETCHES the radius (`733`) before the angle
+(`1245`) — which is the concrete reason fetch order cannot stand in for slot order.
+
+⚠️ **The arc's arithmetic is NOT established.** Two `SUBSS` steps sit between the fetch and the append
+(`0x23bd`, `0x247c`), differencing against locals this trace did not follow to the end, and the record carries two
+angles (`212 = -60`, `213 = 120` on `Wave of Life`) of which the branch reads one. So the SLOT is settled and the
+NUMBER is not: binding this without finishing that trace would print a confident wrong angle, which is the same
+failure the retraction above is about.
+
 Two more exceptions worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"* — and **`53249`** reads
 **no keys**, so its two magnitudes come from somewhere other than a `GetIntStat` and remain open.
