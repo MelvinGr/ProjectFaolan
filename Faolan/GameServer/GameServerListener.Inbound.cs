@@ -2310,7 +2310,7 @@ namespace Faolan.GameServer
 				if (recastGroup != 0)
 					{
 						client.Session.SpellReadyAt[recastGroup] = castBeganAt + spell!.RecastCentiseconds * 10;
-						await SendSpellCooldown(client, spell, castBeganAt);
+						await SendSpellCooldown(client, spell);
 					}
 
 				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's

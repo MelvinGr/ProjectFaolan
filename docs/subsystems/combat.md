@@ -938,6 +938,48 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
   `GroundAoeRadiusUnits` (5 m, where the client's own radius distribution centres) still stands in. A `ConeFormula`
   spell's arc (keys 212/213) is not modelled — it currently blasts as a ring of the same reach.
 
+### A cast is TWO s2c behaviour records, and the cooldown rule has two exemptions (#768/#769)
+
+Both tickets were opened off a count of s2c `0x642cd3d6` bodies in the 45 packets after a cast, and both counts
+conflate other actors' behaviour with the caster's. Re-measured over **all 687 captured casts**, attributing each
+record to a cast by `(actor, args.1, args.2)` and each cast to its spell by the `Magic:Attack` **tail's u64 low
+word** — which *is* the spell id, and is the only place a cast states one:
+
+| phase sequence | casts |
+|---|---:|
+| `0x04` → `0x0A` (begin ack, complete) | 598 |
+| `0x04` → `0x07` (begin ack, **abort**) | 46 |
+| nothing at all | 25 |
+| `0x05` alone | 7 |
+| `0x04` → `0x0A` → `0x0F` (a commit after the complete) | 6 |
+| `0x04` → `0x0E` → `0x0A` (a **delay** record mid-cast) | 4 |
+
+**645 of 687 casts are exactly two records**, which is what we send: `SendBehaviorEchoAck` then the form-`0x0a`
+completion, and `CastInterruptAbort` for the `0x07` variant. The "7 to 14 per cast" of #769 was every entity in a
+busy live playfield — an NPC's `Combat:Unarmed` swings, a `Limbo/Death`, and the ambient `BccAction` burst a dozen
+unrelated NPCs share one timestamp for.
+
+**The cooldown (#768) has the same shape.** Once each `DispatchLockTemplate` is attributed to a cast rather than a
+window, retail locks **every completed cast of a spell that has a recast** — 102/102 buffs, and 100/101 nukes —
+with two exemptions. `SpellCooldownPolicy` is that rule:
+
+- **A recast of 1.0 s or less does not lock.** `Fires of Gehenna (Rank 1)` (recast 1.0 s) was cast **93** times
+  and locked **zero** times; the shortest recast retail *was* seen to lock is 2.0 s, over eight distinct spells,
+  and nothing in the corpus sits between the two. ⭐ This also re-reads the observation #767 took as evidence that
+  the recast runs from the cast BEGIN — `Smite (Rank 1)`, a 2.0 s cast with a 1.0 s recast, re-requested 2.43 s
+  after the begin. That is not a timer starting early, it is a button that was **never greyed**.
+- **A pet-POINT summon does not lock.** The necromancer's eleven `Undead Minion:` / `Deathless Acolyte:` /
+  `Dread Archmage:` spells all cost pet points and all state a 22.0 s recast, and across 28 captured casts retail
+  sent no lock at all — while `Ancient Soul`, which summons too but costs no points, locks on 7 of 7. The
+  discriminator is `SummonPointCost`, not "is a summon".
+
+⚠️ **The body carries the WHOLE recast, not what is left of it.** 40 of the 43 spells the corpus locks read
+exactly `RecastCentiseconds / 100`: `Flesh to Worms` is a 1.2 s cast with a 6.0 s recast and every lock reads
+6.00. We used to subtract the elapsed cast time, which got `Hellfire Breath` (a 2.8 s cast with a 2.0 s recast)
+wrong in both directions at once — it sent **nothing**, because the recast had already elapsed by the time the
+cast finished, where retail sends a full 2.00. (The partial values `LockTemplateCodec` documents are the RESTORE
+shape — a relog re-stating time left on a running lock — not the cast shape.)
+
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `CreateFlowService.SeedStarterEquipment`
 (`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures

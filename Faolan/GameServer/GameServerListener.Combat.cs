@@ -158,15 +158,16 @@ namespace Faolan.GameServer
 		// row - every rank on line 12 - each with the same 20.0. That is the wire form of `SetSpellLineRecastTime`,
 		// and it is why all five ranks of a spell grey together. So this resolves the line's membership rather than
 		// sending the cast id alone; a spell with no line locks only itself, matching `recastGroup`.
-		private async Task SendSpellCooldown(INetworkClient client, Spell spell, long castBeganAt)
+		//
+		// WHETHER to send one and WHAT value it carries are SpellCooldownPolicy's (#768), measured over all 687
+		// captured casts. This used to send what was LEFT of the recast measured from the cast begin, which retail
+		// does not do - and the two spells that exposed it are the two the policy now names.
+		private async Task SendSpellCooldown(INetworkClient client, Spell spell)
 		{
-			// Measured from the cast BEGIN, matching the server-side timer: the client starts counting on receipt, so
-			// send what is LEFT rather than the base. A cast that outlasted its own recast is already ready.
-			var remainingCs = spell.RecastCentiseconds - (Environment.TickCount64 - castBeganAt) / 10;
-			if (remainingCs <= 0)
+			if (!SpellCooldownPolicy.Locks(spell))
 				return;
 
-			var seconds = remainingCs / 100f;
+			var seconds = SpellCooldownPolicy.LockSeconds(spell);
 			var locked = spell.GuiStackingLine != 0
 				? await Database.SpellIdsOnLine(spell.GuiStackingLine)
 				: new[] { spell.Id };
