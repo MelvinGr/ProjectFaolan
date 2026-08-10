@@ -146,8 +146,8 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 5,311,375 / 8,241,205 = 64.4%   (3,785,151 in elements, 1,526,224 in the property run)
 property-run field ids read         : 16 / 111
-elements rendered as a sentence     : 48,941 / 61,840 = 79.1%
-...or accounted for                 : 58,065 / 61,840 = 93.9%
+elements rendered as a sentence     : 49,438 / 61,840 = 79.9%
+...or accounted for                 : 58,562 / 61,840 = 94.7%
 ```
 
 ⭐ **The second line is the honest one.** Three buckets, and only two of them are our debt:
@@ -158,8 +158,8 @@ elements rendered as a sentence     : 48,941 / 61,840 = 79.1%
   ~5,000 elements of debt that do not exist;
 - **a branch but no sentence we can find** — 2,157 over 7 kinds (`ChangeInheritedWeaponAttack` 795,
   `InheritedComboAttack` 753, `AddSpellLineProc` 424);
-- **a sentence whose slots are not bound** — 1,618 over 9 kinds, led by `HitPercentage`'s live-state arms,
-  `AddComboProc` and `UpgradeCombo`.
+- **a sentence whose slots are not bound** — 1,121 over 8 kinds, led by `HitPercentage`'s live-state arms,
+  `UpgradeCombo` and `AddSpellProc`.
 
 Nothing half-binds: a sentence with a conversion the binder cannot fill prints as its raw key list instead, and
 `LdbFormat.TryApply` fails rather than leaving a stray `%s` in a line that would otherwise read as confident.
@@ -324,3 +324,20 @@ its own type-id string `%.2fm%s wide column to target` when there is no distance
 
 One more exception worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"*.
+
+### `AddComboProc` (53212): the sentence is chosen by which SIDE is present
+
+Branch `0x0149ec8e` reads key 88 (the proc run on SELF), key 236 (the one run on the TARGET) and key 237, and
+picks one of three tokens by which of the two spells is there — `%s on self and %s on target`, `%s on self`,
+`%s on target`. The `Add Combo Proc. Run #1%s on self and #2%s on target. Triggers #4%d times per minute.` sitting
+at its own type id is not what the client draws, and its `#1 #2 #4` numbering against three key reads is exactly
+the mismatch that says so.
+
+⚠️ Key 237 (procs per minute) is appended as a third argument that none of the three token sentences has a slot
+for, so it never appears — the same shape as `Knockback`'s key 191.
+
+⭐ **A spell can suppress its own tooltip line.** The presence test is not `id != 0` but
+`id != 0 && (spell->0xCB & 1) == 0` — `FUN_014a3b30` loads the referenced spell through
+`SpellTemplate_t::GetMagicSpell` and returns one bit of it. The same predicate gates `ConeFormula`, which draws
+**nothing at all** when its effect spell has the bit set. We do not yet know which stored field carries it, so
+the renderer uses `id != 0`; that can only draw a line retail omits, never a wrong number in one.

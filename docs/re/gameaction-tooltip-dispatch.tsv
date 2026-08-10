@@ -15,7 +15,7 @@ typeId	name	branch	aliasSentence	tokens	keyFetchOrder
 53027	ItemText	0x0149e8f5			39
 53162	NanoResistance	0x0149e942			152;39
 53046	AddAbsorb	0x0149eaed		AddAbsorbEndSpell	0;70;33;34;88
-53212	AddComboProc	0x0149ec8e		AddComboProcBoth;AddComboProcOther	88;236;237
+53212	AddComboProc	0x0149ec8e		AddComboProcBoth;AddComboProcSelf;AddComboProcOther	88;236;237
 53213	AddProc	0x0149eecd		AddComboProcBoth;AddComboProcSelf;AddComboProcOther;PercentChance;TimesPerMinute	88;236;117;66;237
 53211	AddSpellProc	0x0149f3f7		ChanceOf;OnSelf;OnTarget	88;236
 53070	AddSpellLineProc	0x0149f69e		OnSelf;OnTarget;TimesPerMinute	88;236;237

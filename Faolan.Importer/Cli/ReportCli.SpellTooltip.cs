@@ -441,6 +441,41 @@ namespace Faolan.Importer.Cli
 					: [(int)columnWidth.Value * ColumnScale, "", (int)columnDistance.Value * ColumnScale, ""]);
 			}
 
+			// `AddComboProc` picks its sentence by WHICH of its two spell slots are present (branch 0x0149ec8e): key
+			// 88 is the proc run on SELF and key 236 the one run on the TARGET, and the branch has a token for each
+			// of the three combinations - `%s on self and %s on target`, `%s on self`, `%s on target`. The
+			// `Add Combo Proc. Run #1%s on self and #2%s on target. Triggers #4%d times per minute.` sitting at its
+			// own type id is not what the client draws.
+			//
+			// ⚠️ The branch reads key 237 (procs per minute) and appends it as a third argument that none of the
+			// three token sentences has a slot for, so it does not appear - the same shape as `Knockback`'s key 191.
+			if (element.Kind == AddComboProcKind)
+			{
+				var onSelf = element.Value(GameActionTypes.KeySpell) ?? 0;
+				var onTarget = element.Value(GameActionTypes.KeyProcTargetSpell) ?? 0;
+
+				// ⚠️ Presence here is `id != 0` where the client's is `id != 0 && (spell->0xCB & 1) == 0` - a HIDDEN
+				// bit on the referenced spell (`FUN_014a3b30`, the same predicate that makes `ConeFormula` draw
+				// nothing at all). We do not know which stored field carries that bit, so this renders a side retail
+				// would sometimes suppress. It can only draw a line retail omits, never a wrong number in one.
+				var self = onSelf != 0 ? $"{ctx.SpellName(onSelf)} ({onSelf})" : null;
+				var target = onTarget != 0 ? $"{ctx.SpellName(onTarget)} ({onTarget})" : null;
+
+				var (procToken, procArgs) = (self, target) switch
+				{
+					(not null, not null) => ("AddComboProcBoth", (object?[])[self, target]),
+					(not null, null) => ("AddComboProcSelf", [self]),
+					(null, not null) => ("AddComboProcOther", [target]),
+					_ => (null, null)
+				};
+
+				if (procToken == null)
+					return (null, null);
+
+				var procFormat = ctx.SentenceForToken(procToken);
+				return (procFormat, procFormat == null ? null : procArgs);
+			}
+
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
 		}
 
@@ -834,6 +869,7 @@ namespace Faolan.Importer.Cli
 		};
 
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
+		private const uint AddComboProcKind = 53212;
 		private const uint AreaFormulaKind = 53087;
 		private const uint AttackAddTargetsKind = 53273;
 		private const uint CastNanoKind = 53051;
