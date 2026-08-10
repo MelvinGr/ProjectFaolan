@@ -286,7 +286,8 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B) and
 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Only 1000511 and 1000513 of the above are decoded past their shape; the rest are counts and strides only. Open
+Decoded past their shape: 1000505, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513, 1000517,
+1000518, 1000080/1000081 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
@@ -500,6 +501,62 @@ mechanism — with a default per hair type and a table of exceptions per (hair t
 Nothing imports it. It is client-side appearance: the client already loads both tables and owns the mesh swap, and
 the server never names a hair mesh. Recorded here because #469 asks what the tables ARE, and because these two were
 the only ones with no name at all.
+
+## Decoded: 1000509 / 1000510 / 1000512 `PlayfieldPvPData_c` — playfield → PvP RULESET
+
+Three tables off one loader (`FUN_00911930`), and the client's own assert says how they relate:
+
+```
+"PlayfieldPvPData_c: Data is borked! Points to a non-existing PvP ruleset: "   FUN_00911830
+```
+
+So two of them are **lookups** and one is the **ruleset table** they point into.
+
+| type | records | record |
+|---|---:|---|
+| `1000509` | 243 | `[u32 playfieldId][u32 rulesetId][u32 alternateRulesetId]` — `0xFFFFFFFF` for "none" |
+| `1000512` | 5 | `[u32 playfieldId][u32 rulesetId]` |
+| `1000510` | 13 | the RULESETS, 21 × u32 each |
+
+⭐ **The foreign key holds**: every ruleset id either lookup names — `1, 2, 3, 6, 7, 8, 11, 12` from 1000509 and
+`4, 5, 13` from 1000512 — exists in 1000510, which is exactly the condition that assert fires on. And **235 of
+1000509's 243 playfield ids are in our `Maps`** (`1010` Conall's Valley, `1020` Field of the Dead, `2020`
+Tarantia Common District, …), which is what says column 0 is a playfield rather than an index.
+
+⭐ **1000512's five are the PvP MINIGAME maps** — `5201` Blood Ravine, `5006` The Call of Jhebbal Sag, `5012`
+Lost Temple, `5005` Hallowed Vaults, `5002` Totem Torrent — and they are the only three rulesets (4, 5, 13) that
+1000509 never names. So it is the minigame table, not an override of the same rows.
+
+⚠️ The **alternate** column is structural, not named. 186 of the 243 rows are ruleset `7` with no alternate, 36
+are ruleset `1` with alternate `8`, and the rest have none. Rulesets 1 and 8 are the only pair that shares a
+trailing `[20] = 1`, so the alternate is a variant of the same rule rather than an unrelated one — a PvE/PvP
+dimension split is the obvious reading (the login handshake does offer `Saga of Blood` beside `Crom`) and is
+**not** established here.
+
+The 13 rulesets, columns `[1]`, `[5..7]`, `[9..13]` and `[15..19]` being zero on every row:
+
+```
+ ruleset   [2]  [3]  [4]   [8]  [14]      [20]
+    1       2    6      0   1        0     1
+    2       0    0      0   1        0     3
+    3       0    0      0   1        0     2
+    4       2   12   2400   1  4230307     3
+    5       2    6   1200   1   269317     3
+    6       0    0      0   0        0     4
+    7       0    0      0   0        0     0     <- the default: 186 playfields, everything off
+    8       0    0      0   1        0     1
+    9       0    0      0   1   269317     3
+   10       0    0      0   0        0     5
+   11       0    0      0   1        0     3
+   12       0    0      0   1        0     3
+   13       2    6   1200   1   144407     3
+```
+
+`[4]` is `[3] × 200` wherever both are set, so one is derived from the other (6 / 1200 and 12 / 2400 read as a
+duration in two units). ⚠️ `[14]` is a reference of some kind — `269317` twice, `144407` and `4230307` once each
+— and it resolves to **nothing**: not a `Spells` or `Items` row, and `--report rdb-id` finds **0 entries** for
+any of the three anywhere in the RDB index. So it is not a resource id, and naming it needs the accessor's
+consumers rather than the table.
 
 ## Decoded: 1065103 `PvPConRating_c` — a per-LEVEL con rating, and the shipped file neutralises itself
 
