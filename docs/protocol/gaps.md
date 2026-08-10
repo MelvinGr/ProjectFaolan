@@ -187,9 +187,38 @@ client without being consulted. A third reader, `FUN_0163fff0`, sorts the value 
 **The three boss tiers are a SEPARATE field, and not a stat.** The same builder reads a non-stat member — dynel
 `+0x330` dereferenced at `+0x18`, valued 1, 2 or 3 — and picks the LDB texts **"Minion"**, **"Mini Boss"** and
 **"Boss"**, all rendered in one place on the nameplate (confirmed in-client: Minion appears in the same spot as
-Mini Boss and Boss). The client's own stat-name table has no minion/boss entry, so no stat carries this. Where the
-member is filled from is open — [V0: where the client's Minion/MiniBoss/Boss nameplate rank comes from]. There is
-also an unimported `Difficulty` stat (1398 / `0x576`) that no NPC record has been checked against.
+Mini Boss and Boss). The client's own stat-name table has no minion/boss entry, so no stat carries this.
+
+⭐ **That member is `npc_type` itself — which resolves this entry's own question, and #758's.** Four independent
+lines:
+
+1. **The DOMAIN is exact.** The client tests `== 1 || == 2 || == 3` and renders nothing otherwise; `npc_type`
+   takes exactly `{1, 2, 3, 4}`, and `4` is the untitled majority (897 of 1,021) — the ordinary interactive NPCs a
+   boss title has no business appearing over.
+2. **The MEMBERSHIP matches the three labels.** `3` = King Conan, Saddur, Ape King, Commander Vakarr, Battlemaster
+   Torgvall, Torin Chieftain, Head Poacher — **Boss**. `2` = Taskmaster Olaf, Pict Chief, Argus the Thief, Crow
+   Nightblade — **Mini Boss**. `1` = Rabbit, Hen, Spiderling, Scorpion, Target Dummy, Vanir Berserker — **Minion**.
+3. **The health ordering already noticed here agrees**: 2's members run 98k–937k against 3's up-to-300M.
+4. ⭐ **It renders on OUR server**, and we send `npc_type` on every NPC (`NpcStatCoreRankTests.EveryNpc_CarriesARank`
+   gates the column as fully populated). The title was observed in-client here, so whatever fills `+0x330` is
+   something we already put on the wire — and `npc_type` is the only 4-valued NPC field we send whose 1/2/3 could
+   feed it. See `if_it_renders_on_our_server_the_client_owns_it`.
+
+⚠️ **One row of the reading is uncomfortable and is not being smoothed over:** value `2` also holds the Tortage
+destiny NPCs (Delia, Sakumbe, Valerius), and "Mini Boss" over a friendly quest-giver's head reads wrong. Either the
+builder gates the title on hostility in a part of `FUN_011d8b00` the decompiled fragment does not cover, or the
+label genuinely appears there. **That is one in-client look** — stand in front of Delia and read her nameplate —
+rather than the eight-candidate `+0x330` offset hunt the previous plan called for, and the offset hunt was itself
+flagged as a dead end because `+0x330` collides across classes.
+
+⚠️ **The `Difficulty` stat (1398 / `0x576`) lead is DEAD, measured not assumed.** `--report npc-generic-stats`
+over the whole corpus: **23,116 NPC spawns read, 0 carry `generic_stats` at all.** Retail never sends a generic
+stat on an NPC spawn, so no stat in that block can be feeding a nameplate the client draws for every mob.
+
+Also note this makes the earlier remark "Eerika is #502's encounter boss yet is 2 while Saddur, a smaller boss,
+is 3 — so 2 and 3 are not simply two tiers of the same ladder" a non-objection: under Minion/Mini Boss/Boss they
+ARE two tiers of one ladder, and which side of the line a designer put a given encounter on is their call, not a
+contradiction.
 
 The two small groups are not separated. **1** (55 rows) is cleanly non-interactive — zero vendors, zero
 conversations, mostly hostile trash — so "plain creature" fits, but nothing rules out a narrower meaning.

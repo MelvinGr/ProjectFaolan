@@ -53,6 +53,40 @@ namespace Faolan.Tests
 			}
 		}
 
+		// ⭐ #758: the three values the client TITLES are 1 Minion / 2 Mini Boss / 3 Boss, and 4 is untitled. Gated by
+		// MEMBERSHIP rather than by the count, because the count is what a re-harvest changes and the membership is
+		// what the identification rests on: if King Conan ever stopped being 3, or a Rabbit stopped being 1, the
+		// reading is what broke.
+		[Theory]
+		[InlineData(1917, 3u)] // King Conan       - Boss
+		[InlineData(15090, 3u)] // Keaira          - Boss
+		[InlineData(9643, 3u)] // Ape King         - Boss
+		[InlineData(56, 2u)] // Taskmaster Olaf    - Mini Boss
+		[InlineData(9763, 1u)] // Hen              - Minion
+		[InlineData(8253, 1u)] // Rabbit           - Minion
+		public async Task TheTitledNpcs_CarryTheirTier(uint templateId, uint expected)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var core = await db.NpcStatCores.FirstOrDefaultAsync(s => s.NpcTemplateId == templateId, TestContext.Current.CancellationToken);
+
+			Assert.NotNull(core);
+			Assert.Equal(expected, core!.NpcType);
+		}
+
+		// ...and 4 - the value the client renders NO title for - has to stay the majority, because a boss title over
+		// most of the world's NPCs is the visible failure this identification would cause if the mapping inverted.
+		[Fact]
+		public async Task TheUntitledValueIsTheMajority()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var total = await db.NpcStatCores.CountAsync(ct);
+			var untitled = await db.NpcStatCores.CountAsync(s => s.NpcType == 4, ct);
+
+			Assert.True(untitled * 2 > total, $"only {untitled} of {total} NPCs are npc_type 4 - the rest would render a Minion/Mini Boss/Boss title (#758)");
+		}
+
 		// The kind is a small closed enum. A fifth value appearing means a re-harvest found something the reading in
 		// NpcStatCore.NpcType does not cover, and that comment (and the V0 in gaps.md) needs revisiting rather than
 		// the new value being quietly absorbed.

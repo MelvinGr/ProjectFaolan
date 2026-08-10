@@ -139,13 +139,25 @@ namespace Faolan.Core.Database.Tables
 		//   3 (59)  named/special NPCs, bosses among them - but see the warning above; NOT simply "the skull rank"
 		//   4 (897) ordinary interactive NPCs - 534 are shop vendors and 513 have a conversation
 		//
+		// ⭐ It is the nameplate's Minion / Mini Boss / Boss TITLE (#758). The nameplate builder `FUN_011d8b00` reads a
+		// non-stat member - dynel `+0x330` dereferenced at `+0x18` - and renders those three LDB category-100 texts
+		// for values 1, 2 and 3, and nothing at all otherwise. That is this field: the DOMAIN is exact (`{1,2,3,4}`
+		// against a `1|2|3` test, with 4 the untitled 897-row majority of ordinary interactive NPCs), the MEMBERSHIP
+		// matches the labels (3 = King Conan / Saddur / Ape King / Commander Vakarr; 2 = Taskmaster Olaf / Pict Chief
+		// / Argus the Thief; 1 = Rabbit / Hen / Spiderling / Target Dummy), the health ordering agrees (2 runs
+		// 98k-937k against 3's up-to-300M), and the title RENDERS ON OUR SERVER - so whatever fills `+0x330` is
+		// already something we send, and this is the only 4-valued NPC field we send that could feed it.
+		//
+		// ⚠️ Value 2 also holds the Tortage destiny NPCs (Delia, Sakumbe, Valerius), and "Mini Boss" over a friendly
+		// quest-giver reads wrong. Either the builder gates the title on hostility outside the decompiled fragment,
+		// or it genuinely shows there - one in-client look at Delia's nameplate settles it. Recorded rather than
+		// smoothed over; see docs/protocol/gaps.md.
+		//
 		// ⚠️ NULL would silently drop the rank, so every NPC renders unranked - which is why NpcStatCoreRankTests
 		// gates the column as fully populated rather than trusting that it happens to be. Nothing here needed
 		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreColumns.ToNpcStats), so
 		// whatever it drives was always reaching the client; the field was simply undocumented, which is why #508
-		// read as missing plumbing. Types 1 vs 2 are not separated - [V0: what npc_type 1 and 2 mean]. One lead: 2's
-		// members (Taskmaster Olaf, Arnulf Iceblade, Pict Chief, Argus the Thief, Crow Nightblade; 98k-937k health)
-		// look like MINI-bosses next to 3's up-to-300M, which would match the client's two boss tiers - unproven.
+		// read as missing plumbing.
 		public uint? NpcType { get; set; }
 		public uint? NpcFlags { get; set; }
 		// The client's `normalset` (stat 205 / 0xCD) - and **this, not `npc_type`, is what draws the SKULLS** either
