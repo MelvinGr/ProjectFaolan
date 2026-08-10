@@ -383,14 +383,20 @@ namespace Faolan.GameServer.Combat
 		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
 		// stamina-only in the captures; it rides the vitals stat block.) The cost is the spell's own RDB percentage
 		// of the pool (#629). No-op if the player has no mana pool, or if the spell costs nothing.
-		public async Task SpendCasterMana(INetworkClient client, uint spellId)
+		public async Task SpendCasterMana(INetworkClient client, uint spellId, SpellModifiers? modifiers = null)
 		{
 			var player = GetOrAddPlayerVitals(client);
 			if (player.MaxMana == 0)
 				return;
 
 			var spell = await _database.GetSpell(spellId);
-			var cost = CombatResolver.ResolveSpellManaCost(spell?.ManaCost ?? 0, player.MaxMana, spell?.ManaCostIsPercent ?? false);
+
+			// #710: a trained FEAT or a live BUFF can make the spell cheaper - "Mana Cost" is the stat these records
+			// aim at most, and 217 of its 228 shipped rows are RELATIVE, which is the half that needs no unit pin.
+			// Applied to the RAW cost before the percent-of-pool resolve, so a spell whose cost is itself a percentage
+			// is scaled rather than double-converted.
+			var raw = (ushort)(modifiers ?? SpellModifiers.None).ApplyPercent(spell?.ManaCost ?? 0, CharacterStatId.ManaCost);
+			var cost = CombatResolver.ResolveSpellManaCost(raw, player.MaxMana, spell?.ManaCostIsPercent ?? false);
 			if (cost == 0)
 				return;
 

@@ -272,7 +272,7 @@ namespace Faolan.Tests
 		//
 		// What this locks is the READER's behaviour on it: both elements are found (the second one has fewer bytes
 		// after it than its key list wants, and dropping it would hide the anomaly), and the first one's `Value` slot
-		// lands on the next element's type id - which is exactly what `RdbFeatImporter.ParseSpellStatModifiers`
+		// lands on the next element's type id - which is exactly what `ItemTemplateStatModifiers.ParseSpellStatModifiers`
 		// rejects on, rather than importing a GameAction type id as a magnitude.
 		[Fact]
 		public void AnElementNarrowerThanItsKeyListIsStillFound()

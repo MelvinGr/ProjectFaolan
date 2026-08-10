@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb;
 using Faolan.Importer.Rdb;
 using Xunit;
 
@@ -29,7 +30,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.AttackRange, 150, 0]);
 
-			var mod = Assert.Single(RdbFeatImporter.ParseSpellStatModifiers(body));
+			var mod = Assert.Single(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 			Assert.Equal(SpellStatModifier, mod.Kind);
 			Assert.Equal(144677u, mod.TargetId);
 			Assert.Equal(CharacterStatId.AttackRange, mod.Stat);
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellLineStatModifier, [41000, (uint)CharacterStatId.ManaCost, 0, unchecked((uint)-5000)]);
 
-			var mod = Assert.Single(RdbFeatImporter.ParseSpellStatModifiers(body));
+			var mod = Assert.Single(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 			Assert.Equal(SpellLineStatModifier, mod.Kind);
 			Assert.Equal(41000u, mod.TargetId);
 			Assert.Equal(CharacterStatId.ManaCost, mod.Stat);
@@ -62,7 +63,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.ManaCost, value, amount]);
 
-			Assert.Empty(RdbFeatImporter.ParseSpellStatModifiers(body));
+			Assert.Empty(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 		}
 
 		// The `Swift Pathing` case (Gitea #595): an element narrower than its key list says, so a magnitude slot lands
@@ -74,7 +75,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellStatModifier, [238, (uint)CharacterStatId.Duration, SpellStatModifier, 0]);
 
-			Assert.Empty(RdbFeatImporter.ParseSpellStatModifiers(body, out var misSliced));
+			Assert.Empty(ItemTemplateStatModifiers.ParseSpellStatModifiers(body, out var misSliced));
 			Assert.Equal(1, misSliced);
 		}
 
@@ -85,7 +86,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.SplashDamage, 0, 3000]);
 
-			Assert.Single(RdbFeatImporter.ParseSpellStatModifiers(body, out var misSliced));
+			Assert.Single(ItemTemplateStatModifiers.ParseSpellStatModifiers(body, out var misSliced));
 			Assert.Equal(0, misSliced);
 		}
 
@@ -97,7 +98,7 @@ namespace Faolan.Tests
 			var body = Template(SpellGrant, [4188065]);
 
 			Assert.Equal(4188065u, Assert.Single(RdbFeatImporter.ParseSpellGrants(body)));
-			Assert.Empty(RdbFeatImporter.ParseSpellStatModifiers(body));
+			Assert.Empty(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 		}
 
 		// ...and the converse: a stat modifier is not a grant. The two readers walk the same element list, so nothing
@@ -121,7 +122,7 @@ namespace Faolan.Tests
 		{
 			var body = Template(SpellStatModifier, [144677, (uint)CharacterStatId.CastingTimeSeconds, 0, unchecked((uint)-3300)], pad);
 
-			var mod = Assert.Single(RdbFeatImporter.ParseSpellStatModifiers(body));
+			var mod = Assert.Single(ItemTemplateStatModifiers.ParseSpellStatModifiers(body));
 			Assert.Equal(-3300, mod.PercentHundredths);
 		}
 
@@ -139,7 +140,7 @@ namespace Faolan.Tests
 
 			Assert.Equal([4188065u, 220723u], RdbFeatImporter.ParseSpellGrants(body).ToArray());
 
-			var mods = RdbFeatImporter.ParseSpellStatModifiers(body);
+			var mods = ItemTemplateStatModifiers.ParseSpellStatModifiers(body);
 			Assert.Equal(2, mods.Count);
 			Assert.Equal(SpellStatModifier, mods[0].Kind);
 			Assert.Equal(CharacterStatId.SpellCriticalChance, mods[0].Stat);

@@ -230,6 +230,7 @@ namespace Faolan.Importer.Rdb
 			// instantly AND over time keeps both, but a spell routinely states SEVERAL elements on the same stat and
 			// period - one per level band, or plain repeats - and keying on it discarded every one but the last (#783).
 			var statEffects = new Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>>();
+			var spellStatModifiers = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.SpellStatModifier>>();
 
 			// Every spell record this run PARSED - the scope the stat-effect delete runs over, which is deliberately
 			// wider than the set that still HAS effects (#701).
@@ -513,6 +514,16 @@ namespace Faolan.Importer.Rdb
 				// the parse got stricter - keeps its old rows for ever, so a change that REMOVES bad data would leave
 				// the bad data sitting there. Same lesson, same shape, as RdbFeatImporter's effect sync.
 				statEffectScope.Add(entry.Id);
+
+				// #710: the spell-scoped STAT modifiers - kinds 53054/53062, "make spell X (or every rank of line L)
+				// crit harder / cost less mana / cast faster". These do NOT target the carrier, so `SpellStatEffects`
+				// - which is keyed by the carrier with the carrier as the SUBJECT - had nowhere to put the target and
+				// dropped it, leaving a stat and a magnitude that named nothing. Same parser and same shape as the
+				// FEAT half (#593); see SpellSpellStatModifier for why it is one mechanism with two sources.
+				var spellMods = ItemTemplateStatModifiers.ParseSpellStatModifiers(body);
+				if (spellMods.Count > 0)
+					spellStatModifiers[entry.Id] = spellMods;
+
 				var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body.AsSpan(12));
 				if (mods.Count > 0)
 					// Every element, in record order, one row each - see SpellStatEffect for what the old (stat, period)
@@ -668,6 +679,33 @@ namespace Faolan.Importer.Rdb
 			var staleAreas = await db.SpellAreaEffects.Where(a => affected.Contains(a.SpellId)).ToListAsync();
 			if (staleAreas.Count > 0)
 				db.SpellAreaEffects.RemoveRange(staleAreas);
+
+			// #710: the spell-scoped stat modifiers, on the SAME delete-then-insert scoped to every record PARSED and
+			// for the same reason - keying the delete off the RESULTS would let a spell whose modifier list becomes
+			// empty keep its old rows for ever.
+			var staleMods = await db.SpellSpellStatModifiers.Where(m => affected.Contains(m.SpellId)).ToListAsync();
+			if (staleMods.Count > 0)
+				db.SpellSpellStatModifiers.RemoveRange(staleMods);
+			var spellModRows = 0;
+			foreach (var (carrierId, list) in spellStatModifiers)
+				for (var i = 0; i < list.Count; i++)
+				{
+					// The KIND picks the target column - a line under 53062, a single spell under 53054 - exactly as it
+					// does on FeatSpellStatModifier. Never both.
+					var isLine = list[i].Kind == ItemTemplateStatModifiers.SpellLineStatModifierKind;
+					db.SpellSpellStatModifiers.Add(new SpellSpellStatModifier
+					{
+						SpellId = carrierId,
+						Sequence = i,
+						TargetSpellId = isLine ? null : list[i].TargetId,
+						TargetSpellLineId = isLine ? list[i].TargetId : null,
+						StatId = list[i].Stat,
+						Value = list[i].Value,
+						PercentHundredths = list[i].PercentHundredths,
+						EffectKind = list[i].Kind
+					});
+					spellModRows++;
+				}
 			var areaRows = 0;
 			var chainRows = 0;
 			foreach (var (_, rows) in areaEffects)
@@ -739,7 +777,7 @@ namespace Faolan.Importer.Rdb
 				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
 				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows, chainRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
-				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows");
+				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows, {spellModRows} spell-scoped stat modifier rows");
 		}
 
 		/// <summary>

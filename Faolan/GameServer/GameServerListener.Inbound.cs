@@ -2276,7 +2276,12 @@ namespace Faolan.GameServer
 			// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
 			// resolves immediately. Movement mid-cast interrupts it (the cancel branch above / the move
 			// handler's token bump); the abort BCC drops the client bar (#347).
-			var castMs = spell?.CastTime ?? 0;
+			// #710: a trained FEAT or a live BUFF can shorten the cast. The client states these as
+			// `SpellStatModifier`/`SpellLineStatModifier` records on both sources, and `SpellModifierService` folds
+			// them; only the RELATIVE half is applied, because a percentage needs no unit pin and an absolute delta
+			// on `Casting Time (Seconds)` has none (see SpellModifiers.ApplyPercent).
+			var castModifiers = await _spellModifiers.For(client.Session.Character.Id, _simulation.PlayerWorldEntity(client), spellId);
+			var castMs = castModifiers.ApplyPercent(spell?.CastTime ?? 0, CharacterStatId.CastingTimeSeconds);
 			if (castMs == 0)
 				await Resolve();
 			else
@@ -2369,7 +2374,7 @@ namespace Faolan.GameServer
 				// the DispatchLockTemplate unlocks, and the mana push), so there is no ApplySpell carrier here.
 				if (isGroundCast)
 				{
-					await _combat.SpendCasterMana(client, spellId);
+					await _combat.SpendCasterMana(client, spellId, castModifiers);
 					// A channeled AoE (castMs > 0) already ticked its damage during the channel
 					// (ChannelGroundAoe, kicked at begin); only an INSTANT ground cast resolves its
 					// single blast here (#349).
@@ -2392,7 +2397,7 @@ namespace Faolan.GameServer
 				await ApplySpell(client, targetHandle == 0
 					? casterHandle
 					: targetHandle, casterHandle, spellId << 8);
-				await _combat.SpendCasterMana(client, spellId);
+				await _combat.SpendCasterMana(client, spellId, castModifiers);
 
 				// #772: the spell's INSTANT areas - "apply spell X to up to N entities within R metres". Distinct from
 				// the ground-AoE branch above, which is aimed at a reticle; these are self-centred, which is what the

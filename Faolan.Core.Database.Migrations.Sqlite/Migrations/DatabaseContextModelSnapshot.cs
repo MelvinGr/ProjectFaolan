@@ -3620,6 +3620,37 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellSpellStatModifier", b =>
+                {
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PercentHundredths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("TargetSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("TargetSpellLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Value")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SpellId", "Sequence");
+
+                    b.ToTable("SpellSpellStatModifiers");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellStatEffect", b =>
                 {
                     b.Property<uint>("SpellId")
@@ -5530,6 +5561,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("SpellId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellSpellStatModifier", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
                         .WithMany()

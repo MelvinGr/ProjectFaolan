@@ -39,6 +39,7 @@ namespace Faolan.Core.Database.Repositories
 		/// </summary>
 		Task<IReadOnlyDictionary<CharacterEquipmentSlot, ItemInstance>> GetEquippedItems(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
+		Task<FeatSpellStatModifier[]> GetCharacterFeatSpellStatModifiers(uint characterId);
 
 		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
@@ -563,6 +564,23 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
+		}
+
+		// The spell-scoped stat modifiers the character's TRAINED feats carry (#593/#710) - "your Shock costs 10% less
+		// mana", "every rank of your Frost line crits harder". The feat-sourced half of the one mechanism; the other
+		// half rides live BUFFS and is read straight off the catalog (SpellSpellStatModifier).
+		//
+		// Two hops, for the same reason GetCharacterFeatEffects has two: CharacterFeats holds the WIRE feat id and the
+		// modifier rows are keyed by the RDB TEMPLATE id, which FeatIdMaps bridges. The line -> rank fan-out is NOT
+		// done here - the rows keep the target space the client stated, and SpellModifierService resolves it once
+		// against the catalog, so a line row does not become N rows on every query.
+		public async Task<FeatSpellStatModifier[]> GetCharacterFeatSpellStatModifiers(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+				join mod in ctx.FeatSpellStatModifiers on map.TemplateId equals mod.FeatId
+				select mod).ToArrayAsync();
 		}
 
 		// The WIRE feat ids of the feats that TEACH any of `spellIds` (#298). The inverse of FeatSpellGrants: a feat

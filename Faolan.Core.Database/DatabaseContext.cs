@@ -115,6 +115,7 @@ namespace Faolan.Core.Database
 		DbSet<SpellEffect> SpellEffects { get; }
 		DbSet<SpellStatEffect> SpellStatEffects { get; }
 		DbSet<SpellAreaEffect> SpellAreaEffects { get; }
+		DbSet<SpellSpellStatModifier> SpellSpellStatModifiers { get; }
 		DbSet<StockPhrase> StockPhrases { get; }
 		DbSet<TradepostListing> TradepostListings { get; }
 		DbSet<WorldObject> WorldObjects { get; }
@@ -225,6 +226,7 @@ namespace Faolan.Core.Database
 		public DbSet<SpellEffect> SpellEffects { get; set; }
 		public DbSet<SpellStatEffect> SpellStatEffects { get; set; }
 		public DbSet<SpellAreaEffect> SpellAreaEffects { get; set; }
+		public DbSet<SpellSpellStatModifier> SpellSpellStatModifiers { get; set; }
 		public DbSet<StockPhrase> StockPhrases { get; set; }
 		public DbSet<TradepostListing> TradepostListings { get; set; }
 		public DbSet<WorldObject> WorldObjects { get; set; }

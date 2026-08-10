@@ -119,3 +119,35 @@ server-side content we do not have, exactly as with mana cost, recast and damage
 Spell **descriptions** (LDB category 50211, keyed by spell id → `Spells.Description`) are the useful
 counterweight: they state in words what an effect does, which is how an effect gets identified before it is
 implemented and how a decoded magnitude gets sanity-checked.
+
+## A spell can also modify ANOTHER spell (#710)
+
+Two of the kinds in a spell record do **not** target the spell that carries them, and that is why they needed a
+table of their own:
+
+| kind | client name | slots | rows | carriers |
+| --- | --- | --- | ---: | ---: |
+| 53054 | `SpellStatModifier` | `[spell, Stat, Value, Amount]` | 415 | 133 |
+| 53062 | `SpellLineStatModifier` | `[line, Stat, Value, Amount]` | 1,156 | 117 |
+
+They read "while this is up, make spell X — or every rank of line L — crit harder / cost less mana / cast
+faster". `SpellStatEffects` is keyed by `(SpellId, Sequence)` with the carrier as the **subject**, so it had
+nowhere to put the target: the rows were imported with their stat and their magnitude and the **target dropped on
+the floor**, which is the one field that makes them mean anything. `SpellSpellStatModifier` is where they live now.
+
+⭐ **One mechanism, two sources.** #593 imported the identical record off **feats** (`FeatSpellStatModifier`) —
+same kinds, same key lists, same four-slot payload. A feat that makes your Shock cheaper and a buff that makes
+your next Shock cheaper differ only in where the row was read from, so the parser
+(`ItemTemplateStatModifiers.ParseSpellStatModifiers`) and the consumer (`SpellModifierService`) are shared.
+
+The targets resolve, which is what says the decode is right rather than merely self-consistent: **415/415** of the
+spell-scoped targets are a `Spell.Id` and **1,146/1,156** of the line-scoped ones a `Spell.GuiStackingLine`.
+
+⚠️ **Only the RELATIVE half is applied.** `Value` and `PercentHundredths` are alternatives, never a pair. A
+percentage needs no unit — `-1000` is `-10%` of whatever the base is, and the client's tooltip builder pins that
+scale — while an absolute delta is in "the stat's own wire units" and nothing has pinned those against the columns
+we hold. So the engine scales `Mana Cost` (217 of its 228 rows are relative) and `Casting Time`, and the two
+biggest families, `Spell Critical Damage` (340 rows) and `Spell Critical Chance` (269), are **entirely absolute
+and therefore entirely unapplied**. Open in **#787**; applying one before its unit is pinned would be inventing a
+scale.
+[V3: SpellSpellStatModifierTests.EveryTarget_ResolvesAgainstTheShippedCatalog]

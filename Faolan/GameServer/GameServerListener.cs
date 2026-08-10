@@ -202,6 +202,7 @@ namespace Faolan.GameServer
 		// table. See Combat/SpellEffectService.cs.
 		private readonly SpellEffectService _spellEffects;
 		private readonly SpellAreaCatalog _spellAreas;
+		private readonly SpellModifierService _spellModifiers;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
@@ -331,6 +332,9 @@ namespace Faolan.GameServer
 			// which this listener implements (GameServerListener.Buffs.cs).
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellAreas = new SpellAreaCatalog(database);
+			// #710: the per-cast overrides a caster's trained feats and live buffs put on a spell's own properties.
+			// One service for both sources - the client states the identical record on a feat and on a spell.
+			_spellModifiers = new SpellModifierService(database);
 			// #140: the fatality burst. The buffs that PROC on a fatality are SpellEffect rows now, so this owns only
 			// the roll + the two Fatality ids every captured burst carries.
 			_fatality = new FatalityService(logger, this, _spellEffects);

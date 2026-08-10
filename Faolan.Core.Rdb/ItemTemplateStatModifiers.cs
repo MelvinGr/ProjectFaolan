@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
@@ -516,5 +517,89 @@ namespace Faolan.Core.Rdb
 			internal uint First => Values.Length > 0 ? Values[0] : 0;
 			internal uint Second => Values.Length > 1 ? Values[1] : 0;
 		}
+
+		/// <summary>
+		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
+		///     <c>Spell.GuiStackingLine</c> under 53062 - the kind is what says which.
+		/// </summary>
+		public readonly record struct SpellStatModifier(uint Kind, uint TargetId, CharacterStatId Stat, int? Value, int? PercentHundredths);
+
+		/// <summary>The kind that scopes a stat modifier to ONE spell - its target is a <c>Spell.Id</c>.</summary>
+		public const uint SpellStatModifierKind = 53054;
+
+		/// <summary>The kind that scopes it to a whole spell LINE - its target is a <c>Spell.GuiStackingLine</c>.</summary>
+		public const uint SpellLineStatModifierKind = 53062;
+
+		// The spell-scoped STAT modifiers: kinds 53054 `SpellStatModifier` and 53062 `SpellLineStatModifier`, the same
+		// four-slot payload with the target space swapped - "make spell X (or every rank of line L) crit harder / cost
+		// less mana / cast faster".
+		//
+		// ⚠️ ONE MECHANISM, TWO SOURCES, and that is why this parser lives here rather than in either importer. A FEAT
+		// states these (#593, `FeatSpellStatModifier`) and so does a SPELL (#710, `SpellSpellStatModifier`) - identical
+		// kinds, identical key lists, identical payload - so a buff that makes your next Fireball crit harder and a
+		// feat that does the same are the same record read from two records.
+		//
+		// Read BY KEY, never by position - `(Spell|Line, Stat, Value, Amount)` - which is the whole reason these were
+		// undecodable while the pair readers were the only view: `SpellStatModifier` puts the SPELL first and the STAT
+		// second, so its "magnitude that varied for no reason" was a stat id (#591).
+		//
+		// `Value` and `Amount` are ALTERNATIVES, not a pair, and the client's own tooltip builder is the evidence: at
+		// 014a2714 it renders the `Value` slot through the generic stat formatter (which appends the STAT'S unit
+		// suffix) and the `Amount` slot through a copy that appends a hardcoded `"%"` - the literal at 0x01fbcf18, on
+		// all three of that branch's print paths. Exactly one of the two is set on all 1068 shipped records, so the
+		// pair is stored as two NULLABLE columns rather than a value plus a mode flag.
+		public static IReadOnlyList<SpellStatModifier> ParseSpellStatModifiers(byte[] body)
+		{
+			return ParseSpellStatModifiers(body, out _);
+		}
+
+		/// <summary>
+		///     As <see cref="ParseSpellStatModifiers(byte[])" />, reporting how many elements were rejected as
+		///     mis-sliced so the importer can say so rather than dropping them silently.
+		/// </summary>
+		public static IReadOnlyList<SpellStatModifier> ParseSpellStatModifiers(byte[] body, out int misSliced)
+		{
+			misSliced = 0;
+			if (body.Length <= 12)
+				return [];
+
+			var mods = new List<SpellStatModifier>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != SpellStatModifierKind && e.Kind != SpellLineStatModifierKind)
+					continue;
+
+				// Every slot must be present: a key the type declares but the element does not carry means the element
+				// was mis-sliced, and half a modifier is worse than none.
+				var target = e.Value(e.Kind == SpellStatModifierKind ? GameActionTypes.KeySpell : GameActionTypes.KeyLine);
+				var stat = e.Value(GameActionTypes.KeyStat);
+				var value = e.Value(GameActionTypes.KeyValue);
+				var amount = e.Value(GameActionTypes.KeyAmount);
+				if (target is null or 0 || stat is null or 0 || value is null || amount is null)
+					continue;
+
+				// Both set, or neither, is a shape this decode does not cover - drop it rather than guess which wins.
+				if (value == 0 == (amount == 0))
+					continue;
+
+				// A magnitude that is itself a registered GameAction TYPE id is the next element's opening word, read
+				// as ours because this element was narrower than its key list says. `Swift Pathing` (5031395..5031401)
+				// is the case in the shipped catalog: its two 53054 elements tile the record end to end at TEN words
+				// each, so the `Value` slot lands on the following element's `0xCF3E`. Rejecting on the type-id range
+				// is not a special case for that feat - a spell id, a stat id and a magnitude all live nowhere near
+				// 0xCF09..0xD026, so a slot that does was never ours. Open as Gitea #595.
+				if (GameActionTypes.Get(value.Value) != null || GameActionTypes.Get(amount.Value) != null)
+				{
+					misSliced++;
+					continue;
+				}
+
+				mods.Add(new SpellStatModifier(e.Kind, target.Value, (CharacterStatId)stat.Value,
+					value == 0 ? null : (int)value.Value, amount == 0 ? null : (int)amount.Value));
+			}
+
+			return mods;
+		}
+
 	}
 }

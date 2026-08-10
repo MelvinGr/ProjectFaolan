@@ -41,6 +41,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> LockedTemplateIdsForConsumableLine(uint lockSpellLine);
 		Task<SpellEffect[]> GetSpellEffects();
 		Task<SpellAreaEffect[]> GetSpellAreaEffects();
+		Task<SpellSpellStatModifier[]> GetSpellStatModifiers();
+		Task<(uint Line, uint SpellId)[]> GetSpellLineMembers();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
 		Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class);
@@ -310,6 +312,27 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.SpellAreaEffects.AsNoTracking().OrderBy(a => a.SpellId).ThenBy(a => a.Sequence).ToArrayAsync();
+		}
+
+		// #710: every spell-scoped stat modifier a SPELL carries, read whole - 1,571 rows the importer owns, cached by
+		// SpellModifierService because the lookup sits on the cast-resolve path.
+		public async Task<SpellSpellStatModifier[]> GetSpellStatModifiers()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.SpellSpellStatModifiers.AsNoTracking().OrderBy(m => m.SpellId).ThenBy(m => m.Sequence).ToArrayAsync();
+		}
+
+		// The spell LINE -> its member spells map (#710). A line-scoped modifier covers every RANK of the line at
+		// once, so resolving one needs this fan-out; done as a single catalog read cached beside the modifiers rather
+		// than a join per cast.
+		public async Task<(uint Line, uint SpellId)[]> GetSpellLineMembers()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Spells.AsNoTracking()
+				.Where(s => s.GuiStackingLine > 0)
+				.Select(s => new ValueTuple<uint, uint>(s.GuiStackingLine, s.Id))
+				.ToArrayAsync();
 		}
 
 		// The server-acted spell effects (pet summons, triggered procs). Read whole in run order - a few dozen rows,

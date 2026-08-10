@@ -135,6 +135,10 @@ data comes from.
   | table | kinds | rows | holds |
   |---|---|---:|---|
   | `FeatSpellStatModifier` | 53054 + 53062 | 1,078 | a stat scoped to one spell, or to a whole line |
+
+  ⭐ The same two kinds appear on **spell** records too, and the spell-sourced half is `SpellSpellStatModifier`
+  (#710) — one mechanism with two sources, sharing this parser and the `SpellModifierService` consumer. See
+  [spell-stat-effects.md](../rdb/spell-stat-effects.md).
   | `FeatSpellGrant` | 53019 | 1,510 | a spell the feat TEACHES |
 
   All three resolve completely against the shipped catalogs — 1,510/1,510 grants and 485/485 line targets and
