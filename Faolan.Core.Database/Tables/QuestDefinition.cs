@@ -257,8 +257,15 @@ namespace Faolan.Core.Database.Tables
 		// and is what we emitted for everything before this column existed.
 		public uint ChainHeadQuestId { get; set; }
 
-		// @+0xec: 1 in every one of the 99 captured records - no quest varies it. Kept as a column rather than a
+		// @+0xec: 1 in every one of the captured records - no quest varies it. Kept as a column rather than a
 		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
+		//
+		// ⚠️ **It is therefore USELESS AS A CORRELATE, and looks exactly like a useful one.** Because it is constant
+		// where it is present and 0 where it is not, `FieldEc == 1` is EXACTLY `HasSnapshotRecord` - zero mismatches
+		// over all 5,049 rows. Any cross-tab against it is really a cross-tab against "was this quest captured", which
+		// returns a perfect-looking correlation with anything else that is only known from a snapshot. #570 nearly
+		// banked one: all six quests carrying `QuestLineFlags` bit 3 have `FieldEc == 1`, which says nothing at all,
+		// because every row with a non-zero `QuestLineFlags` does.
 		public uint FieldEc { get; set; }
 
 		// @+0xf0 and @+0xf8 - two per-quest magnitudes that are NOT the journal's XP or Money. Setting them to 8888
