@@ -225,7 +225,7 @@ namespace Faolan.GameServer
 			if (applyTo != client.Session.Character.Id)
 				return;
 
-			var effects = await _poolEffects.ForSpellBase(spellBase);
+			var effects = await _poolEffects.ForSpellBase(spellBase, CasterLevel(client));
 			if (effects.Count == 0)
 				return;
 
@@ -240,7 +240,7 @@ namespace Faolan.GameServer
 					_ => vitals.MaxStamina
 				};
 
-				var amount = effect.For(max);
+				var amount = effect.For(max, CasterLevel(client));
 				if (amount == 0 || max == 0)
 					continue;
 

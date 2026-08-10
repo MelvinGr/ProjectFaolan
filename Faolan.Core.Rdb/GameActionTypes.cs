@@ -35,6 +35,27 @@ namespace Faolan.Core.Rdb
 		/// </summary>
 		public bool IsLevelRamp => SlotOf(GameActionTypes.KeyLowValue) >= 0 && SlotOf(GameActionTypes.KeyHighValue) >= 0
 		                                                                   && SlotOf(GameActionTypes.KeyLowLevel) >= 0 && SlotOf(GameActionTypes.KeyHighLevel) >= 0;
+
+		/// <summary>
+		///     True when this type states its magnitude as a RANGE - a low and a high endpoint rather than one number.
+		///     The four <c>Hit</c>-family types carry it (<c>Hit</c>, <c>SpecialHit</c>, <c>AreaHit</c>, <c>Drain</c>),
+		///     and reading only the first endpoint reports a 58.40-71.40 hit as a flat 58.40 (Gitea #783).
+		/// </summary>
+		public bool IsHitRange => SlotOf(GameActionTypes.KeyHitMin) >= 0 && SlotOf(GameActionTypes.KeyHitMax) >= 0;
+
+		/// <summary>
+		///     True when this type carries the INTERPOLATED HIT family's SIX ramp slots - a range whose BOTH endpoints
+		///     ramp over the same two levels. <c>InterpolatedHit</c> (53219) and <c>Disarm</c> (53242) are the two.
+		///     <para>
+		///         ⚠️ A different slot set from <see cref="IsLevelRamp" />'s. The interpolated MODIFY family ramps ONE
+		///         value through 174/175; this family ramps a PAIR through 168/169 (the low endpoint) and 170/171 (the
+		///         high one), sharing 172/173 for the levels. Asking <see cref="IsLevelRamp" /> about 53219 answers no,
+		///         which is why every one of its 1,779 rows shipped with a null ramp (Gitea #783).
+		///     </para>
+		/// </summary>
+		public bool IsInterpolatedHitRange => SlotOf(GameActionTypes.KeyHitMinLow) >= 0 && SlotOf(GameActionTypes.KeyHitMinHigh) >= 0
+		                                                                                && SlotOf(GameActionTypes.KeyHitMaxLow) >= 0 && SlotOf(GameActionTypes.KeyHitMaxHigh) >= 0
+		                                                                                && SlotOf(GameActionTypes.KeyLowLevel) >= 0 && SlotOf(GameActionTypes.KeyHighLevel) >= 0;
 	}
 
 	// The client's GameAction type catalog, recovered STATICALLY from the initialiser FUN_008bdf40
@@ -63,6 +84,26 @@ namespace Faolan.Core.Rdb
 		public const int KeyLowValue = 174;
 		public const int KeyLowLevel = 172;
 		public const int KeyHighLevel = 173;
+
+		// The `Hit` FAMILY's own slots, and they are PER-TYPE like every unnamed key below - which is exactly why the
+		// predicates that read them (`IsHitRange` / `IsInterpolatedHitRange`) ask the KEY LIST rather than an id
+		// allowlist. Only a type carrying the whole set reads this way.
+		//
+		// A hit states a RANGE, not a number: `Hit`/`SpecialHit`/`AreaHit`/`Drain` are `[Stat, 2 min, 37 max, 71]`.
+		// `InterpolatedHit` (53219) states the same range twice - once at each end of a LEVEL RAMP - as
+		// `[Stat, 168, 170, 172, 169, 171, 173, 71]`: the low endpoint ramps 168 -> 169 and the high one 170 -> 171,
+		// both over levels 172..173. Read off the client's own tooltip builder (#782, `ReportCli.SpellTooltip`), which
+		// is what pins which pair is which: `Gangrenous Stench`'s tick renders "58.40-71.40 at level 75 .. 62.20-76.10
+		// at level 80" out of exactly these six slots.
+		//
+		// ⚠️ 170 is the target CAP on the area-targeting kinds (`FilteredAreaFormula`'s "up to 12 targets"). Same
+		// index, unrelated meaning - the per-type warning below is not theoretical.
+		public const int KeyHitMin = 2;
+		public const int KeyHitMax = 37;
+		public const int KeyHitMinLow = 168;
+		public const int KeyHitMinHigh = 169;
+		public const int KeyHitMaxLow = 170;
+		public const int KeyHitMaxHigh = 171;
 
 		// The ramp's HIGH endpoint. Deliberately an ALIAS of KeyAmount rather than a second constant: it is the same
 		// slot, and the two names are the two things the client calls it - `Amount` in its descriptor (which on the

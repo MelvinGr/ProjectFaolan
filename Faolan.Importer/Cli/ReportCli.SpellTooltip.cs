@@ -347,7 +347,10 @@ namespace Faolan.Importer.Cli
 		private static IEnumerable<string> RenderElement(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var type = element.Type;
-			var typeName = type?.Name ?? $"kind {element.Kind}";
+			// The byte OFFSET rides with the name, because "which element" is the first question asked of a line that
+			// looks wrong - and a record that states the same element twice (#783) is otherwise two identical lines
+			// with nothing to tell them apart.
+			var typeName = (type?.Name ?? $"kind {element.Kind}") + $"@{element.Offset}";
 			var (format, args) = Sentence(ctx, element);
 
 			// The element's 0x2d6 is the AURA PERIOD in centiseconds when it is set - a repeating element and a
@@ -709,6 +712,23 @@ namespace Faolan.Importer.Cli
 			var unparsed = ItemTemplateStatModifiers.UnparsedElementHeads(record.AsSpan(12));
 			if (unparsed.Count > 0)
 				yield return $"⚠️ {unparsed.Count} element head(s) the scan did not account for: {string.Join(", ", unparsed.Take(8))}";
+
+			// ⚠️ The OTHER half of the accounting, and the one the byte total cannot show: an element whose head sits
+			// INSIDE another element's payload. The scan anchors byte by byte and does not skip an element's own span,
+			// so a sub-record run holding a type-id-shaped word plus a `4` yields a second, nested "element" - and
+			// because the line above SUMS the widths, two overlapping elements make the record look BETTER accounted
+			// for than it is. Reported as a span pair, because the fix for a real one is to read the outer element's
+			// grammar rather than to filter the inner one out (#783).
+			var overlaps = new List<string>();
+			for (var i = 1; i < elements.Count; i++)
+			{
+				var previous = elements[i - 1];
+				if (elements[i].Offset < previous.Offset + previous.WidthBytes)
+					overlaps.Add($"{elements[i].Kind}@{elements[i].Offset} inside {previous.Kind}@{previous.Offset}+{previous.WidthBytes}");
+			}
+
+			if (overlaps.Count > 0)
+				yield return $"⚠️ {overlaps.Count} element(s) nested inside another's payload: {string.Join(", ", overlaps.Take(8))}";
 
 			// Every property field with the client's own name for it, and whether the importer reads it. This is the
 			// #592/#633 backlog rendered for ONE spell, which is the form that says whether a gap matters here.

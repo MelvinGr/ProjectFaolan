@@ -133,6 +133,11 @@ namespace Faolan.Importer.Rdb
 		// whether a record is a summon, not the action id.
 		private const uint StartServerSideScryScriptWithParamsKind = 53261;
 
+		// 53051 `CastNano` - "nano" being Funcom's Anarchy Online word for a spell. Its single key 39 is the spell to
+		// run, and on a SPELL record that makes it an effect-chain edge (#783); on an ITEM template the same element is
+		// the on-use spell (`ItemTemplateStatModifiers.ParseRejected`'s remarks, #762).
+		private const uint CastNanoKind = 53051;
+
 		// 499 - the QUALITY/rarity tier, the same field (and the same 0-indexed ItemQuality ladder) an item template
 		// carries; on a mount record it is the ONLY field separating "Swift <horse>" from "<horse>". Read into
 		// Mount.Quality - NOT as a speed, see Mount.Quality's remarks.
@@ -220,9 +225,11 @@ namespace Faolan.Importer.Rdb
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
 			var toAdd = new List<Spell>();
-			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
-			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
-			var statEffects = new Dictionary<uint, Dictionary<(uint Stat, uint Period), (uint Kind, int Amount, LevelRamp? Ramp)>>();
+			// #367: (spellId -> stat effects) from the [2][9] region, synced into SpellStatEffects after the spells save.
+			// ⚠️ A LIST, not a map keyed on (stat, period). That key was introduced (correctly) so a spell doing a thing
+			// instantly AND over time keeps both, but a spell routinely states SEVERAL elements on the same stat and
+			// period - one per level band, or plain repeats - and keying on it discarded every one but the last (#783).
+			var statEffects = new Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>>();
 
 			// Every spell record this run PARSED - the scope the stat-effect delete runs over, which is deliberately
 			// wider than the set that still HAS effects (#701).
@@ -436,6 +443,35 @@ namespace Faolan.Importer.Rdb
 							areaEffectSpell = applied;
 					}
 
+					// #783: `CastNano` - "also run spell X" - is the THIRD kind of effect link, and until now it was read
+					// only for ITEM templates (`Item.OnUseSpell`) and ignored on spells. 11,077 elements across the
+					// catalog, and dropping them left effect records imported and unreachable: `Gangrenous Stench`'s
+					// 221069 chains to 3963058 `Physical Wrack`, whose four -1000 rows ARE the "-10% Slashing / Piercing
+					// / Crushing / Poison" its in-client tooltip shows, and nothing in the DB could get from one to the
+					// other. 26 spells reference 3963058; 6 reached it, and the 20 that did not all reach it this way.
+					//
+					// Filed as a LINK rather than folded into `Spell.EffectSpell`: an area element says "apply X to
+					// everyone in a radius" and a `CastNano` says "also run X", and one column cannot hold which. The
+					// row's own `Kind` is what keeps them apart, with the area columns 0 because this link states none.
+					if (element.Kind == CastNanoKind && element.Value(GameActionTypes.KeyValue) is { } chained && chained != 0 && chained != entry.Id)
+					{
+						var links = areaEffects.TryGetValue(entry.Id, out var existingLinks)
+							? existingLinks
+							: areaEffects[entry.Id] = [];
+
+						links.Add(new SpellAreaEffect
+						{
+							SpellId = entry.Id,
+							Sequence = (uint)links.Count,
+							Kind = element.Kind,
+							EffectSpellId = chained,
+							// The element's own 0x2d6, carried faithfully like every other link's - but ⚠️ a consumer
+							// must not read a periodic CHAIN as an aura: an aura re-applies an area, and this row has
+							// no area to re-apply. `SpellAreaCatalog` splits on the kind before it splits on the period.
+							PeriodCentiseconds = element.Fixed2d6
+						});
+					}
+
 					var value = element.Value(GameActionTypes.KeyValue) ?? 0;
 					uint target;
 					if (element.Kind == SetSpellRecastTimeKind)
@@ -479,15 +515,9 @@ namespace Faolan.Importer.Rdb
 				statEffectScope.Add(entry.Id);
 				var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body.AsSpan(12));
 				if (mods.Count > 0)
-				{
-					// ⚠️ Keyed on (stat, PERIOD), not on the stat alone. A spell states the same stat twice when it does
-					// the thing instantly AND over time - `Daggamalt` heals 405 HP at once and 67.5 HP/s for 60 s - and
-					// collapsing those onto one key threw one of the two away, arbitrarily. See SpellStatEffect.
-					var deltas = new Dictionary<(uint Stat, uint Period), (uint Kind, int Amount, LevelRamp? Ramp)>();
-					foreach (var m in mods)
-						deltas[(m.StatId, m.PeriodCentiseconds)] = (m.Kind, (int)m.WireAmount, m.Ramp);
-					statEffects[entry.Id] = deltas;
-				}
+					// Every element, in record order, one row each - see SpellStatEffect for what the old (stat, period)
+					// key was throwing away and how a consumer resolves the set it now gets.
+					statEffects[entry.Id] = [.. mods];
 
 				summons.TryGetValue(entry.Id, out var summon);
 
@@ -639,30 +669,39 @@ namespace Faolan.Importer.Rdb
 			if (staleAreas.Count > 0)
 				db.SpellAreaEffects.RemoveRange(staleAreas);
 			var areaRows = 0;
+			var chainRows = 0;
 			foreach (var (_, rows) in areaEffects)
 				foreach (var row in rows)
 				{
 					db.SpellAreaEffects.Add(row);
-					areaRows++;
+					if (row.Kind == CastNanoKind)
+						chainRows++;
+					else
+						areaRows++;
 				}
 			var effectRows = 0;
-			foreach (var (spellId, deltas) in statEffects)
-			foreach (var (key, effect) in deltas)
-			{
-				db.SpellStatEffects.Add(new SpellStatEffect
+			foreach (var (spellId, mods) in statEffects)
+				for (var i = 0; i < mods.Count; i++)
 				{
-					SpellId = spellId,
-					StatId = (CharacterStatId)key.Stat,
-					PeriodCentiseconds = key.Period,
-					EffectKind = effect.Kind,
-					Amount = effect.Amount,
-					// Null on every kind but the interpolated family (#599).
-					HighAmount = effect.Ramp?.HighValue,
-					LowLevel = effect.Ramp?.LowLevel,
-					HighLevel = effect.Ramp?.HighLevel
-				});
-				effectRows++;
-			}
+					var effect = mods[i];
+					db.SpellStatEffects.Add(new SpellStatEffect
+					{
+						SpellId = spellId,
+						Sequence = (uint)i,
+						StatId = (CharacterStatId)effect.StatId,
+						PeriodCentiseconds = effect.PeriodCentiseconds,
+						EffectKind = effect.Kind,
+						Amount = (int)effect.WireAmount,
+						// Null on every kind that states ONE number rather than a range (#783).
+						MaxAmount = effect.MaxAmount,
+						// Null on every kind but the interpolated families (#599/#783).
+						HighAmount = effect.Ramp?.HighValue,
+						MaxHighAmount = effect.MaxRamp?.HighValue,
+						LowLevel = effect.Ramp?.LowLevel,
+						HighLevel = effect.Ramp?.HighLevel
+					});
+					effectRows++;
+				}
 
 			// #627: the mount catalog is wholly DERIVED from field 186, so the RDB is authoritative for the table as a
 			// whole - a row whose record no longer carries the field is gone, not stale. Rows whose summon spell did
@@ -696,11 +735,11 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows.",
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows, {ChainRows} CastNano chain rows.",
 				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
-				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows);
+				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows, chainRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
-				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows");
+				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows");
 		}
 
 		/// <summary>

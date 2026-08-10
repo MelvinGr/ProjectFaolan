@@ -1669,6 +1669,25 @@ is recursive by construction, and `Gangrenous Stench` is the whole of it in thre
 The client's tooltip states both levels ("Area Of Effect: … 7.00m radius up to 12 targets" and "Effect over
 time: … 4.00m radius every 3 seconds"), so the tiers are the client's own reading, not ours.
 
+### A chain edge is not always an area (#783)
+
+`SpellAreaEffects` carries a **second kind** of link, and the row's `Kind` is what separates them:
+
+| kind | means | area columns |
+| --- | --- | --- |
+| `AreaFormula` 53087 / `FilteredAreaFormula` 53088 / `ConeFormula` 53259 / … | apply the effect to everyone in a radius | radius, target cap, period |
+| `CastNano` 53051 | **also run** the effect, on the same subject | all zero |
+
+`Gangrenous Stench`'s `221069` states one of each: the 4 m / 3 s area above, **and** a `CastNano` to `3963058`
+*Physical Wrack*, whose four `-1000` rows are the "-10% Slashing / Piercing / Crushing / Poison" the in-client
+tooltip shows. Until #783 the `CastNano` half was read only for ITEM templates (`Item.OnUseSpell`) and dropped on
+spells, so `3963058` was imported and **unreachable** — no `Spells.EffectSpell` and no area row pointed at it, and
+the spell's headline effect did nothing. 26 spells reference it and 6 could reach it; the other 20 all reach it
+this way. The catalog is 10,676 chain rows.
+
+⚠️ A consumer branches on the **kind**, never on the radius: read as an area a chain edge sweeps a 0 m circle,
+which is silently nobody. `SpellAreaCatalog` splits on the kind before it splits on the period.
+
 **Applying an area is two jobs, and only the first existed.** `CombatService.ApplySpellArea` dealt the effect
 spell's damage to everyone in range and stopped there, so the effect record never LANDED on anybody:
 

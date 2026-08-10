@@ -16,6 +16,10 @@ namespace Faolan.Tests
 	// what made the client answer `ActivateBuff 220979 remaining time 0` and drop the cast (#767).
 	public class SpellAreaEffectTests
 	{
+		// 53051 `CastNano` - the CHAIN edge the same table carries since #783. Not an area, so every shape claim below
+		// about a radius is scoped away from it.
+		private const uint CastNanoKind = 53051;
+
 		// `Life Leech` - "Area Of Effect: Life Leech 5.00m radius up to 12 targets", applied ONCE at cast.
 		[Fact]
 		public async Task LifeLeech_AppliesItsEffectRecordOnceInFiveMetres()
@@ -58,11 +62,48 @@ namespace Faolan.Tests
 		public async Task TheEffectRecordItself_CarriesA3SecondArea()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var area = await db.SpellAreaEffects.AsNoTracking().SingleAsync(a => a.SpellId == 221069, TestContext.Current.CancellationToken);
+			var area = await db.SpellAreaEffects.AsNoTracking()
+				.SingleAsync(a => a.SpellId == 221069 && a.Kind != CastNanoKind, TestContext.Current.CancellationToken);
 
 			Assert.Equal(221068u, area.EffectSpellId);
 			Assert.Equal(4u, area.RadiusMetres);
 			Assert.Equal(300u, area.PeriodCentiseconds);
+		}
+
+		// #783: the OTHER edge out of 221069, and the one the import used to drop on the floor. `CastNano` is not an
+		// area - it says "also run 3963058", whose four -1000 rows are the "-10% Slashing / Piercing / Crushing /
+		// Poison" the in-client tooltip shows. Before this, 3963058 was imported and unreachable: nothing in the
+		// database got from `Gangrenous Stench` to it, so the spell's headline effect did nothing.
+		[Fact]
+		public async Task TheEffectRecord_AlsoChainsToTheResistanceDebuff()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var chain = await db.SpellAreaEffects.AsNoTracking()
+				.SingleAsync(a => a.SpellId == 221069 && a.Kind == CastNanoKind, TestContext.Current.CancellationToken);
+
+			Assert.Equal(3963058u, chain.EffectSpellId);
+
+			// The debuff itself, which was already imported - the chain edge is the only thing that was missing.
+			var wrack = await db.SpellStatEffects.AsNoTracking().Where(e => e.SpellId == 3963058).ToListAsync(TestContext.Current.CancellationToken);
+			Assert.Equal(4, wrack.Count);
+			Assert.All(wrack, e => Assert.Equal(-1000, e.Amount));
+		}
+
+		// A chain edge states no area at all, and a consumer that read one off these rows would sweep a 0 m circle and
+		// silently reach nobody. Both columns are 0 on every one of them, which is what makes `Kind` the only honest
+		// way to tell a chain edge from an area (`SpellAreaCatalog`).
+		[Fact]
+		public async Task EveryChainEdge_StatesNoArea()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var chains = await db.SpellAreaEffects.AsNoTracking().Where(a => a.Kind == CastNanoKind).ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.NotEmpty(chains);
+			Assert.All(chains, a =>
+			{
+				Assert.Equal(0u, a.RadiusMetres);
+				Assert.Equal(0u, a.MaxTargets);
+			});
 		}
 
 		// A row that names its own spell is a self-reference the importer must not emit - it would make the aura tick
@@ -83,7 +124,7 @@ namespace Faolan.Tests
 		public async Task EveryAura_HasAPlausiblePeriodAndRadius()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var rows = await db.SpellAreaEffects.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);
+			var rows = await db.SpellAreaEffects.AsNoTracking().Where(a => a.Kind != CastNanoKind).ToListAsync(TestContext.Current.CancellationToken);
 
 			Assert.NotEmpty(rows);
 

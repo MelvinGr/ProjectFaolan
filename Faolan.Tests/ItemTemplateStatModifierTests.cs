@@ -144,5 +144,43 @@ namespace Faolan.Tests
 			Assert.Equal(4, positional.Count);
 			Assert.Contains(positional, m => m is { Kind: 53176, StatId: 1, WireAmount: 4232751 });
 		}
+
+		// #783: the two damage families state a RANGE, and `InterpolatedHit` states it TWICE - once at each end of a
+		// level ramp. Reading only the first magnitude reported a 58.40-71.40 hit as a flat 58.40 and a level-80
+		// number as a level-75 one, on 2,900 shipped rows. The payloads are `Gangrenous Stench`'s tick (221068) and
+		// `Lifestrike (Rank 1)`'s damage half, both read off the client's own tooltip (#782).
+		[Fact]
+		public void ParseSpellStatEffects_CarriesBothEndpointsAndBothRamps()
+		{
+			uint[] words =
+			[
+				// `Hit` (53002) - [Stat, min, max, 71]. The upper endpoint is key 37 and was being dropped.
+				53002, 0, 4, 0, 1, 0, 2, 9, 27, unchecked((uint)-410), unchecked((uint)-500), 3,
+				// `InterpolatedHit` (53219) - [Stat, 168, 170, 172, 169, 171, 173, 71]: the min ramps 168 -> 169 and
+				// the max 170 -> 171, both over levels 172..173. `IsLevelRamp` tests 174/175 - the interpolated
+				// MODIFY family's slots - so this read as having no ramp at all.
+				53219, 0, 4, 0, 1, 0, 2, 9, 27, unchecked((uint)-5840), unchecked((uint)-7140), 75, unchecked((uint)-6220), unchecked((uint)-7610), 80, 3
+			];
+			var body = new byte[4 + words.Length * 4];
+			for (var i = 0; i < words.Length; i++)
+				body.WriteU32Le(4 + i * 4, words[i]);
+
+			var mods = ItemTemplateStatModifiers.ParseSpellStatEffects(body);
+
+			Assert.Equal([53002u, 53219u], mods.Select(m => m.Kind));
+
+			// The flat hit: both endpoints, no ramp.
+			Assert.Equal(-410, (int)mods[0].WireAmount);
+			Assert.Equal(-500, mods[0].MaxAmount);
+			Assert.Null(mods[0].Ramp);
+			Assert.Null(mods[0].MaxRamp);
+
+			// The interpolated one: 58.40-71.40 at level 75 ramping to 62.20-76.10 at 80, which is four magnitudes
+			// and two levels. `Ramp` is the LOW endpoint's and `MaxRamp` the high one's - they share their levels.
+			Assert.Equal(-5840, (int)mods[1].WireAmount);
+			Assert.Equal(-7140, mods[1].MaxAmount);
+			Assert.Equal(new LevelRamp(-5840, -6220, 75, 80), mods[1].Ramp);
+			Assert.Equal(new LevelRamp(-7140, -7610, 75, 80), mods[1].MaxRamp);
+		}
 	}
 }

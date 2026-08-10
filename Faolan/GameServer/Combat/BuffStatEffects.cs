@@ -200,8 +200,24 @@ namespace Faolan.GameServer.Combat
 		{
 			var catalog = await EnsureLoaded();
 			return catalog.BySpellBase.TryGetValue(spellBase, out var deltas)
-				? [.. deltas.Select(d => (d.Stat, d.At(level)))]
+				? [.. Applicable(deltas, level).Select(d => (d.Stat, d.At(level)))]
 				: [];
+		}
+
+		// The deltas that apply at this level, out of a set that may state the same stat once per level BAND (#783).
+		// Resolved PER STAT: two deltas on different stats are two effects, while two on one stat are the same effect
+		// said once per band - and where they are NOT banded (a record stating a stat twice outright) every one of them
+		// survives, which is `SpellEffectBands`' rule rather than a second one here.
+		private static IReadOnlyList<Delta> Applicable(IReadOnlyList<Delta> deltas, uint level)
+		{
+			if (deltas.Count <= 1)
+				return deltas;
+
+			var applicable = new List<Delta>(deltas.Count);
+			foreach (var stat in deltas.Select(d => d.Stat).Distinct())
+				applicable.AddRange(SpellEffectBands.ForLevel([.. deltas.Where(d => d.Stat == stat)], level, d => d.Band));
+
+			return applicable;
 		}
 
 		// Recomputes `gear + active buffs` for every honored stat on this entity, writes the live fields, and returns
@@ -245,7 +261,9 @@ namespace Faolan.GameServer.Combat
 			var honored = new Dictionary<uint, List<Delta>>();
 			var percent = new Dictionary<uint, List<Delta>>();
 			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0;
-			foreach (var row in rows)
+			// ⚠️ `DistinctBy(Statement)`: a record states the same element twice (`Hellfire Stream` repeats two of its
+			// five bands verbatim), and a repeated statement is one statement - see `SpellStatEffect.Statement`.
+			foreach (var row in rows.DistinctBy(r => r.Statement))
 			{
 				switch (Classify(row))
 				{
@@ -388,7 +406,9 @@ namespace Faolan.GameServer.Combat
 				if (!from.TryGetValue(spellBase, out var deltas))
 					return;
 
-				foreach (var delta in deltas)
+				// Through the same band resolution ForSpellBase uses, so the sheet and the live stats never disagree
+				// about which band a buff is in.
+				foreach (var delta in Applicable(deltas, level))
 					into[delta.Stat] = into.GetValueOrDefault(delta.Stat) + delta.At(level);
 			}
 		}
@@ -449,6 +469,10 @@ namespace Faolan.GameServer.Combat
 		// use - see <see cref="Delta.At" />.
 		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null)
 		{
+			// The LEVEL BAND this delta states its numbers for, or null when it is level-independent - the ramp's own
+			// two levels, because a record that bands a stat bands it by ramping each band separately (#783).
+			public (uint Low, uint High)? Band => Ramp is { } ramp ? (ramp.LowLevel, ramp.HighLevel) : null;
+
 			// The delta's value for a carrier of this level, in the units the catalog stores for this kind: DISPLAY
 			// units for a flat row (already divided at build time), raw hundredths for a percent one.
 			//

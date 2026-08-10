@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -66,11 +67,25 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
-		// The instant pool effects a spell BASE carries, or empty - which is the overwhelming majority.
-		public async Task<IReadOnlyList<PoolEffect>> ForSpellBase(uint spellBase)
+		// The instant pool effects a spell BASE carries for a caster of this LEVEL, or empty - which is the
+		// overwhelming majority.
+		//
+		// ⚠️ The level is not decoration. A record states one element per level BAND (`Hellfire Stream`'s five, banded
+		// 1-5 … 21-30), so the set has to be resolved rather than applied whole - see `SpellEffectBands` - and the
+		// magnitude inside the chosen band is itself a ramp over the same two levels.
+		public async Task<IReadOnlyList<PoolEffect>> ForSpellBase(uint spellBase, uint level)
 		{
 			var catalog = await EnsureLoaded();
-			return catalog.TryGetValue(spellBase, out var effects) ? effects : [];
+			if (!catalog.TryGetValue(spellBase, out var effects))
+				return [];
+
+			// Banded per POOL: two effects on different pools are two mechanics, and neither is an alternative reading
+			// of the other. Within one pool they are the same statement said once per band.
+			var resolved = new List<PoolEffect>(effects.Length);
+			foreach (var pool in effects.Select(e => e.Pool).Distinct())
+				resolved.AddRange(SpellEffectBands.ForLevel([.. effects.Where(e => e.Pool == pool)], level, e => e.Band));
+
+			return resolved;
 		}
 
 		// Whether this imported row is an instant pool move this engine applies. Public for the same reason
@@ -89,13 +104,22 @@ namespace Faolan.GameServer.Combat
 		internal static Dictionary<uint, PoolEffect[]> BuildCatalog(IEnumerable<SpellStatEffect> rows)
 		{
 			var bySpell = new Dictionary<uint, List<PoolEffect>>();
-			foreach (var row in rows)
+			// ⚠️ `DistinctBy(Statement)`: a record states the same element twice (`Hellfire Stream` repeats two of its
+			// five bands verbatim), and a repeated statement is one statement - see `SpellStatEffect.Statement`.
+			foreach (var row in rows.DistinctBy(r => r.Statement))
 			{
 				if (!Applies(row))
 					continue;
 
+				// ⚠️ The endpoints are carried RAW and divided after the interpolation, the same order `BuffStatEffects`
+				// uses and for the same reason: the lerp is the client's float arithmetic over the stored numbers, so
+				// dividing first rounds twice and the two disagree by one over most of a ramp's span.
+				var ramp = row is { HighAmount: { } high, LowLevel: { } low, HighLevel: { } top }
+					? new LevelRamp(row.Amount, high, low, top)
+					: (LevelRamp?)null;
+
 				(bySpell.TryGetValue(row.SpellId, out var list) ? list : bySpell[row.SpellId] = [])
-					.Add(new PoolEffect(row.StatId, row.Amount, row.EffectKind == PercentKind));
+					.Add(new PoolEffect(row.StatId, row.Amount, ramp, row.EffectKind == PercentKind));
 			}
 
 			return bySpell.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
@@ -126,19 +150,31 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     One instant pool move: which pool, and by how much for a carrier with that <paramref name="max" />.
+		///     One instant pool move: which pool, and by how much for a carrier of that level with that
+		///     <paramref name="max" />.
 		/// </summary>
 		/// <remarks>
 		///     Negative is damage and positive is a heal, in the pool's own DISPLAY units - so the caller hands the
 		///     result straight to <c>EntityVitals</c>, which clamps it to <c>[0, max]</c>.
+		///     <para>
+		///         <paramref name="Ramp" /> is non-null on the interpolated kinds, whose <paramref name="Amount" /> is
+		///         only the value at the ramp's LOW level. `InterpolatedHit` (53219) is the whole of the instant-heal
+		///         family and every one of its rows used to carry a null ramp, so a level-80 caster got the level-1
+		///         number (#783).
+		///     </para>
 		/// </remarks>
-		public readonly record struct PoolEffect(CharacterStatId Pool, int Amount, bool IsPercent)
+		public readonly record struct PoolEffect(CharacterStatId Pool, int Amount, LevelRamp? Ramp, bool IsPercent)
 		{
-			public int For(uint max)
+			// The LEVEL BAND this effect states its numbers for, or null when it is level-independent. It is the ramp's
+			// own two levels - a record that bands its magnitudes bands them by ramping each band separately.
+			public (uint Low, uint High)? Band => Ramp is { } ramp ? (ramp.LowLevel, ramp.HighLevel) : null;
+
+			public int For(uint max, uint level)
 			{
+				var amount = Ramp?.ValueAt(level) ?? Amount;
 				return IsPercent
-					? (int)((long)max * Amount / 100)
-					: Amount / VitalsScale;
+					? (int)((long)max * amount / 100)
+					: amount / VitalsScale;
 			}
 		}
 	}

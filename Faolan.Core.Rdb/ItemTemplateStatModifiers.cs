@@ -302,7 +302,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
 			}
 
 			return mods;
@@ -349,7 +349,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
 			}
 
 			return mods;
@@ -365,7 +365,7 @@ namespace Faolan.Core.Rdb
 				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp, e.Fixed2d6));
+				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
 			}
 
 			return mods;
@@ -392,7 +392,11 @@ namespace Faolan.Core.Rdb
 		// `PeriodCentiseconds` is the element's 0x2d6: 0 = the record applies ONCE, non-zero = it repeats on that
 		// cadence. Carried because the two are different mechanics on the same stat - `Daggamalt` heals 405 HP
 		// instantly and 67.5 HP every 100 cs - and a reader that drops it cannot tell them apart (#772).
-		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null, uint PeriodCentiseconds = 0);
+		// `MaxAmount`/`MaxRamp` are the RANGE's upper endpoint and its ramp, non-null exactly for the types that state
+		// a range (`Element.MaxAmount`). `WireAmount` is then only the LOWER endpoint, and a consumer that reads it
+		// alone reports a 58.40-71.40 hit as a flat 58.40 (Gitea #783).
+		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null, uint PeriodCentiseconds = 0, int? MaxAmount = null,
+			LevelRamp? MaxRamp = null);
 
 		/// <summary>
 		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order
@@ -435,6 +439,9 @@ namespace Faolan.Core.Rdb
 			{
 				get
 				{
+					if (Type is { IsInterpolatedHitRange: true })
+						return HitRamp(GameActionTypes.KeyHitMinLow, GameActionTypes.KeyHitMinHigh);
+
 					if (Type is not { IsLevelRamp: true })
 						return null;
 
@@ -447,6 +454,50 @@ namespace Faolan.Core.Rdb
 						? null
 						: new LevelRamp((int)low.Value, (int)high.Value, lowLevel.Value, highLevel.Value);
 				}
+			}
+
+			/// <summary>
+			///     The magnitude's UPPER endpoint, for a type that states a RANGE - <c>Hit</c>'s key 37, and the
+			///     interpolated family's key 170 at the ramp's low level. Null for every type that states one number
+			///     (Gitea #783), which is what makes "this record has a max" a property of the key list rather than of
+			///     a kind allowlist.
+			/// </summary>
+			public int? MaxAmount
+			{
+				get
+				{
+					if (Type is { IsInterpolatedHitRange: true })
+						return (int?)Value(GameActionTypes.KeyHitMaxLow);
+
+					return Type is { IsHitRange: true }
+						? (int?)Value(GameActionTypes.KeyHitMax)
+						: null;
+				}
+			}
+
+			/// <summary>
+			///     The ramp of the range's UPPER endpoint (170 @172 -> 171 @173) - the twin of <see cref="Ramp" />,
+			///     which carries the LOWER one. Non-null only on the interpolated HIT family, whose record is a pair
+			///     of ramps rather than one: `Gangrenous Stench` ticks for 58.40-71.40 at level 75 and 62.20-76.10 at
+			///     80, and keeping only <see cref="Ramp" /> loses the whole upper edge of that (Gitea #783).
+			/// </summary>
+			public LevelRamp? MaxRamp => Type is { IsInterpolatedHitRange: true }
+				? HitRamp(GameActionTypes.KeyHitMaxLow, GameActionTypes.KeyHitMaxHigh)
+				: null;
+
+			// One of the interpolated hit family's two ramps: a value pair over the SHARED 172/173 levels. The values
+			// are SIGNED - a damage hit's endpoints are negative in the shipped data - which reading them as `uint`
+			// turns into 4.29 billion.
+			private LevelRamp? HitRamp(int lowKey, int highKey)
+			{
+				var low = Value(lowKey);
+				var high = Value(highKey);
+				var lowLevel = Value(GameActionTypes.KeyLowLevel);
+				var highLevel = Value(GameActionTypes.KeyHighLevel);
+
+				return low is null || high is null || lowLevel is null || highLevel is null
+					? null
+					: new LevelRamp((int)low.Value, (int)high.Value, lowLevel.Value, highLevel.Value);
 			}
 
 			/// <summary>

@@ -3625,10 +3625,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("SpellId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("StatId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("PeriodCentiseconds")
+                    b.Property<uint>("Sequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Amount")
@@ -3646,7 +3643,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("LowLevel")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("SpellId", "StatId", "PeriodCentiseconds");
+                    b.Property<int?>("MaxAmount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaxHighAmount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PeriodCentiseconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SpellId", "Sequence");
 
                     b.ToTable("SpellStatEffects");
                 });

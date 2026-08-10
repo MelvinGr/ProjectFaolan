@@ -32,7 +32,7 @@ namespace Faolan.Tests
 
 			var effect = Assert.Single(catalog[1]);
 			Assert.Equal(CharacterStatId.HealthCurrent, effect.Pool);
-			Assert.Equal(405, effect.For(2000));
+			Assert.Equal(405, effect.For(2000, 1));
 		}
 
 		// ⭐ `HitPercentage` states its own unit through a carrier's NAME: the dev spell
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 
 			var effect = Assert.Single(catalog[2]);
 			Assert.True(effect.IsPercent);
-			Assert.Equal(-500, effect.For(2000)); // 25% of a 2000 pool
+			Assert.Equal(-500, effect.For(2000, 1)); // 25% of a 2000 pool
 		}
 
 		// ⚠️ The drain SENTINEL is a marker, not a number - `Demonic Puppet` carries -100000000 on health, which
@@ -106,16 +106,35 @@ namespace Faolan.Tests
 
 		// The shipped catalog: the population this is for. A heal that stops being imported would otherwise fail
 		// nothing, because the classification above is happy with zero rows.
+		//
+		// ⚠️ Lifestrike is a LIFE STEAL, and the row set says so - two health elements per rank, one negative and one
+		// positive. Until #783 only one of the two survived the import: keyed on (stat, period), the damage and the
+		// heal collapsed onto the same key and the last write won. The line is named for the mechanic this asserts.
 		[Fact]
 		public void TheShippedCatalog_CarriesTheHealsThisIsFor()
 		{
-			// Lifestrike's five ranks, the Necromancer's own sustain line - 34 HP at rank 1 up to 337 at rank 5.
-			var ranks = Query("SELECT s.Name, e.Amount FROM SpellStatEffects e JOIN Spells s ON s.Id = e.SpellId " +
-				"WHERE s.Name LIKE 'Lifestrike (Rank%' AND e.EffectKind = 53219 AND e.StatId = 27 ORDER BY e.Amount");
+			// Lifestrike's five ranks, the Necromancer's own sustain line - 34 HP healed at rank 1 up to 337 at rank 5.
+			var heals = Query("SELECT s.Name, e.Amount FROM SpellStatEffects e JOIN Spells s ON s.Id = e.SpellId " +
+				"WHERE s.Name LIKE 'Lifestrike (Rank%' AND e.EffectKind = 53219 AND e.StatId = 27 AND e.Amount > 0 ORDER BY e.Amount");
 
-			Assert.Equal(5, ranks.Count);
-			Assert.Equal(3400, ranks[0].Amount);
-			Assert.Equal(33700, ranks[4].Amount);
+			Assert.Equal(5, heals.Count);
+			Assert.Equal(3400, heals[0].Amount);
+			Assert.Equal(33700, heals[4].Amount);
+
+			// …and the damage half, which the old key was discarding. It is a RANGE (`Hit`'s min and max endpoints,
+			// #783), so rank 1 strikes for 4.10-5.00 rather than for one number, and it RAMPS over levels 15..29.
+			var damage = Query("SELECT s.Name, e.Amount FROM SpellStatEffects e JOIN Spells s ON s.Id = e.SpellId " +
+				"WHERE s.Name LIKE 'Lifestrike (Rank%' AND e.EffectKind = 53219 AND e.StatId = 27 AND e.Amount < 0 ORDER BY e.Amount DESC");
+
+			Assert.Equal(5, damage.Count);
+			Assert.Equal(-410, damage[0].Amount);
+
+			const string rank1Damage = "SELECT {0} FROM SpellStatEffects e JOIN Spells s ON s.Id = e.SpellId " +
+			                           "WHERE s.Name = 'Lifestrike (Rank 1)' AND e.EffectKind = 53219 AND e.StatId = 27 AND e.Amount < 0";
+			Assert.Equal(500u, Scalar(string.Format(rank1Damage, "-e.MaxAmount")));
+			Assert.Equal(700u, Scalar(string.Format(rank1Damage, "-e.MaxHighAmount")));
+			Assert.Equal(15u, Scalar(string.Format(rank1Damage, "e.LowLevel")));
+			Assert.Equal(29u, Scalar(string.Format(rank1Damage, "e.HighLevel")));
 		}
 
 		// ⭐ A potion heals TWICE - instantly, and then over time - and the record says so in two `Hit` elements on the
