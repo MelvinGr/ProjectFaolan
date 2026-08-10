@@ -3,8 +3,12 @@
 # 53259 ConeFormula reaches its branch through a plain JZ rather than a table slot, which is why it is last.
 # aliasSentence = the TYPE ID whose LDB-170 string this branch fetches with a literal `MOV ECX,<id>` (blank = its own).
 # tokens        = the token names it fetches instead/as well, keyed into LDB 170 by elf28(token).
-# slotOrder     = the key indices it reads, in the order it reads them (via GetIntStat(GameActionStat_e)).
-typeId	name	branch	aliasSentence	tokens	slotOrder
+# keyFetchOrder = the key indices it reads, in the order it reads them (via GetIntStat(GameActionStat_e)).
+#
+# ⚠️ keyFetchOrder is NOT the order the sentence's slots bind. A branch reads its keys into stack locals and
+#   appends them from those locals in a different order - 53259 fetches the radius before the arc and prints the
+#   arc first. Slot orders, where they have been traced, are in docs/rdb/spell-tooltip.md.
+typeId	name	branch	aliasSentence	tokens	keyFetchOrder
 53012	Skill	0x0149e4c0		GameActionGroup_Skills	0;39
 53045	Modify	0x0149e4c0		GameActionGroup_Skills	0;39
 53032	AOERadiusModification	0x0149e855		IncreaseAOERadius;DecreaseAOERadius	11
@@ -29,7 +33,7 @@ typeId	name	branch	aliasSentence	tokens	slotOrder
 53037	Charmed	0x014a0311			
 53019	Spell	0x014a0331			39
 53084	ColumnFormula	0x014a0688		ValueModUnitMeters	88;170
-53249	ColumnAddTargets	0x014a08f0		ValueModUnitMeters;ColumnAddTargetsWithDistance	
+53249	ColumnAddTargets	0x014a08f0		ValueModUnitMeters;ColumnAddTargetsWithDistance	11;238 (via FUN_014af090, x0.01)
 53121	Feared	0x014a0adc			
 53002	Hit	0x014a0ae6			0;2;37;71
 53196	SpecialHit	0x014a0ae6			0;2;37;71
@@ -58,4 +62,4 @@ typeId	name	branch	aliasSentence	tokens	slotOrder
 53285	GlobalTargetSpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
 53273	AttackAddTargets	0x014a28f9		ValueModUnitMeters	11;213
 53267	Fatality	0x014a2ab7			
-53259	ConeFormula	0x014a2316			88
+53259	ConeFormula	0x014a2316		ValueModUnitMeters	88;11;213

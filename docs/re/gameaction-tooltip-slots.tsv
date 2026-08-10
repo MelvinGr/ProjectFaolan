@@ -18,7 +18,16 @@
 #
 # ⚠️ 53007 fetches key 754, which its record does not declare - corroborating the existing note that this branch
 #    "reads all four slots plus key 32".
-# ⚠️ 53249 fetches NO keys: its magnitudes come from somewhere other than a GetIntStat.
+# ⚠️ 53249 shows NO keys here, and that is an artefact of what this dump anchors on rather than a fact about the
+#    branch. It reads keys 733 and 1270 through `FUN_014af090(record, <statKey>)` - the key PUSHED as an argument
+#    rather than passed in ECX, and a FLOAT getter that ends `CVTSI2SS; MULSS XMM0,[0x01F2800C]`, i.e. divides the
+#    stored integer by 100 on the way out. So a `MOV ECX,<key>; CALL 0x0077a510` dump is blind to it, and any
+#    magnitude read through it is HUNDREDTHS where every other branch's is verbatim.
+#
+# ⭐ SLOT ORDER, where it has been traced (the local -> slot step this file does not do), lives in
+#    docs/rdb/spell-tooltip.md. 53259/53273 are done: arc = key 213, radius = key 11, and 53259 prefixes the
+#    effect spell from key 88. Both confirmed against retail-documented tooltip text ("A 140 degree arc 8m radius
+#    knockback in front of you" for Mammoth Sweep, whose record holds 213=140 11=8).
 kind	branch	keyFetchOrder	statKeys	tokens
 53002	014a0ae6	722,724,759,794	722,724,759,794	
 53007	014a0b99	722,761,723,794,754	722,761,723,794	HitPercentHeal,HitPercentDamage,OnTarget,HitPercentHealStatByOtherStat,HitPercentDamageStatByOtherStat
@@ -33,6 +42,6 @@ kind	branch	keyFetchOrder	statKeys	tokens
 53211	0149f3f7	1123,1268	1123,1268,1219,1151,1269,796	ChanceOf,OnSelf,OnTarget
 53212	0149ec8e	1123,1268,1269	1123,1268,1219,1151,1269	AddComboProcBoth,AddComboProcSelf,AddComboProcOther
 53223	0149fdda	722,761	722,761	
-53249	014a08f0		733,1270	ValueModUnitMeters,ColumnAddTargetsWithDistance
+53249	014a08f0	733,1270 (via FUN_014af090)	733,1270	ValueModUnitMeters,ColumnAddTargetsWithDistance
 53250	014a1da2	1219,1119,789,790,791,792	1219,1119,789,790,791,792	OpeningComboAttack,DecreaseComboDPS,DecreaseComboCriticalChance,DecreaseComboHateAdjustment,ChangeComboDamageType
 53259	014a2316	1123,733,1245	1123,1244,1245,733	ValueModUnitMeters

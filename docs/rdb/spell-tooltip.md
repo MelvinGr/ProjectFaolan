@@ -146,8 +146,8 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 5,311,375 / 8,241,205 = 64.4%   (3,785,151 in elements, 1,526,224 in the property run)
 property-run field ids read         : 16 / 111
-elements rendered as a sentence     : 47,632 / 61,840 = 77.0%
-...or accounted for                 : 56,756 / 61,840 = 91.8%
+elements rendered as a sentence     : 48,941 / 61,840 = 79.1%
+...or accounted for                 : 58,065 / 61,840 = 93.9%
 ```
 
 ⭐ **The second line is the honest one.** Three buckets, and only two of them are our debt:
@@ -158,13 +158,8 @@ elements rendered as a sentence     : 47,632 / 61,840 = 77.0%
   ~5,000 elements of debt that do not exist;
 - **a branch but no sentence we can find** — 2,157 over 7 kinds (`ChangeInheritedWeaponAttack` 795,
   `InheritedComboAttack` 753, `AddSpellLineProc` 424);
-- **a sentence whose slots are not bound** — 2,927 over 12 kinds, led by the two cone kinds, `AddComboProc` and
-  the two `HitPercentage` arms that need live caster state.
-
-⚠️ **The cone kinds are deliberately unbound, and the reason generalises.** `%.2f%s degree arc, %.2fm%s radius`
-reads like two slots off the element and is not: branch `0x014a28f9` fetches the CHARACTER, adds keys 11 and 213
-to the cone she already has, clamps, and prints the DIFFERENCE. The element states a DELTA. Binding it to the raw
-slots renders `Cyclone of Steel` as "4.00 degree arc, 2.00m radius" — plausible, and wrong.
+- **a sentence whose slots are not bound** — 1,618 over 9 kinds, led by `HitPercentage`'s live-state arms,
+  `AddComboProc` and `UpgradeCombo`.
 
 Nothing half-binds: a sentence with a conversion the binder cannot fill prints as its raw key list instead, and
 `LdbFormat.TryApply` fails rather than leaving a stray `%s` in a line that would otherwise read as confident.
@@ -243,38 +238,89 @@ the radius slot takes key 11 and the arc takes key 213, the OPPOSITE of the fetc
 would render `Wave of Life` as *"6.00 degree arc, 120.00m radius"*. Filling these sentences therefore needs the
 local-to-slot trace, which that file deliberately does not claim to contain.
 
-⚠️ **`53259` and `53273` are different branches, and only one of them is unbindable.** An existing note groups
-both cone kinds under `0x014a28f9` — the branch that fetches the CHARACTER (`FUN_006f03b0`), adds her own cone to
-the record's and prints the difference. The second dispatch table (`SUB EAX,0xd013`, tables `0x14a324c` /
-`0x14a323c`) shows that address belongs to **`53273` alone**; `53259` dispatches to `0x014a2316` off the
-`CMP EAX,0xd00b` / `JZ`, and that branch never touches the character. So the live-state objection is `53273`'s,
-not ConeFormula's.
+⚠️ **The two cone kinds are different branches, and an earlier note grouped them under one.** The second dispatch
+table (`SUB EAX,0xd013`, tables `0x14a324c` / `0x14a323c`) puts `0x014a28f9` on **`53273` alone**; `53259`
+dispatches to `0x014a2316` off the `CMP EAX,0xd00b` / `JZ`. Both are read out below, and neither is blocked on
+live state.
 
-### `ConeFormula` (53259): what its slots take
+### ⭐ Every magnitude is appended TWICE, and the second one is the `%s`
 
-Traced through the branch's stack locals rather than inferred from the fetch order. **Proven:**
+The extra `%s` after each `%.2f`/`%d` is not a unit — the units are literal text (`%.2fm%s radius`). It is the
+**value-modifier annotation**. A branch appends the resolved number and then
+`FUN_014a3880(resolved - raw, <unitToken>)`, which is `FUN_014aa410`:
+
+- the difference is zero → it assigns `DAT_02c23bf8`, the **empty string**;
+- otherwise it builds `<font color="tooltip_positive|tooltip_negative">` around
+  LDB170(`ValueModSignPositive` / `ValueModSignNegative`) + the difference + the unit token.
+
+So a tooltip drawn with no character modifier in play has an empty string in every one of those slots, and that
+is why the renderer binds `""` to each of them. It also explains a family of tokens that never looked like
+sentences: `ValueModUnitMeters`, `ValueModSignPositive`, `ValueModSignNegative` are the annotation's pieces.
+
+### ⭐ …and the arithmetic around them collapses to the raw key
+
+Both numbers go through the client's value helpers before being drawn, and in this build both terms vanish:
+
+- the **multiplicative** term is `FUN_014a9f90`: `(GetStat(0x57B) * 0.1 * 0.01 * w + 1.0) * value`, where `w` is a
+  per-call float global — `0x02D25E34`, `0x02D25E54`, `0x02D25E64`. ⭐ **All three are `0.0` in the image and the
+  only references to them anywhere in `AgeOfConan.exe` are READS, from `FUN_0149e450` itself** — nothing writes
+  them, so the term is exactly `1.0` and the helper is the identity. (Its every early-exit path returns `value`
+  unchanged too, so there is no branch where it is anything else.)
+- the **additive** term is `FUN_014a9c10`: `value + f(character->0x2D8)` when a viewing character has a modifier of
+  index 6, `value` otherwise. That part genuinely needs live state — and it is exactly the part the `%s`
+  annotation reports, never the number.
+
+⚠️ Anyone reading these branches for a divisor should stop at the zero rather than transcribe it: the two `FLD`s
+of `0x02d25e34` / `0x02d25e54` are runtime-initialised defaults being pushed as arguments, not scale constants.
+
+### The CONE kinds (53259 / 53273): what their slots take
+
+Traced through the branches' stack locals rather than inferred from the fetch order.
 
 | record key | logical | what it is | evidence |
 | ---: | ---: | --- | --- |
-| `1123` | 88 | the effect spell — the leading `%s` | resolved by `FUN_0099bef0` off the first fetch |
-| `733` | 11 | the **radius**, metres — the second `%.2f`, carrying the `ValueModUnitMeters` unit | `SpellAreaEffects.RadiusMetres` is 6 for `Wave of Life (Rank 2)` and its key 11 is 6 |
-| `1245` | 213 | an **angle** — the first `%.2f`, the "degree arc" | the value reaching that slot is clamped to `[0, 360]` against the constant at `0x020b5270` (= `360.0`) |
-| `1244` | 212 | a second angle (`-60` on `Wave of Life`) | **not fetched** by this branch's `GetIntStat` sequence |
+| `1123` | 88 | the effect spell — 53259's leading `%s`, built by `ItemInfoCreator_c::MakeSpellLink` | `FUN_014a3950` formats `<a href="spellref://%d/">%s</a>` |
+| `1245` | 213 | the **arc in degrees** — the first `%.2f` | clamped to `[0, 360]` against the `360.0` at `0x020b5270`, and it is what retail draws (below) |
+| `733` | 11 | the **radius**, metres — the second `%.2f` | `SpellAreaEffects.RadiusMetres` is 6 for `Wave of Life (Rank 2)` and its key 11 is 6 |
+| `1244` | 212 | the arc's negative half (always `-213/2`) | **not fetched** by either branch |
 
-⭐ So the arc fills the sentence BEFORE the radius, while the branch FETCHES the radius (`733`) before the angle
-(`1245`) — which is the concrete reason fetch order cannot stand in for slot order.
+⭐ So the arc fills the sentence BEFORE the radius while both branches FETCH the radius first — the concrete
+reason fetch order cannot stand in for slot order, and a swap nothing would have caught, both slots being `%.2f`.
 
-⚠️ **The arc's arithmetic is NOT established.** Two `SUBSS` steps sit between the fetch and the append
-(`0x23bd`, `0x247c`), differencing against locals this trace did not follow to the end, and the record carries two
-angles (`212 = -60`, `213 = 120` on `Wave of Life`) of which the branch reads one. So the SLOT is settled and the
-NUMBER is not: binding this without finishing that trace would print a confident wrong angle, which is the same
-failure the retraction above is about.
+**Ground truth, from outside our own decode.** Retail's mount-ability text is documented publicly as *"Mammoth
+Sweep (A 140 degree arc 8m radius knockback in front of you)"*, *"Rhino Sweep … 90 degree arc 6m radius"*,
+*"Trample … 60 degree arc 5m radius"*. Our render off the RDB:
 
-Two more exceptions worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
-corroborating the existing note that this branch *"reads all four slots plus key 32"* — and **`53249`** reads
-**no keys**, so its two magnitudes come from somewhere other than a `GetIntStat` and remain open.
+```
+Mammoth Charge (3777189)              140.00 degree arc, 8.00m radius
+Mount Ability: Rhino Charge (3115122)  90.00 degree arc, 6.00m radius
+Mount Ability: Cavalry Charge (3113912) 60.00 degree arc, 4.00m radius
+```
 
-⚠️ The `FLD float ptr [0x02d25e34]` / `[0x02d25e54]` pair that sits between those reads is **not** a scale
-constant: both globals are `0.0` in the image, i.e. runtime-initialised defaults being pushed as arguments. The
-magnitudes come from the stack locals the key reads filled. Anyone reading this branch for a divisor should stop
-there rather than transcribe a zero.
+The arcs match exactly, and `140` is not reachable from any reading of the pair other than key 213 verbatim
+(`212` is `-70`). That is what settles the arithmetic the previous pass left open.
+
+⚠️ **53259 and 53273 are different branches** (`0x014a2316` / `0x014a28f9`) and only 53273 fetches the character
+(`FUN_006f03b0`) — 53259 gets its context from a vtable call on the singleton at `0x0297d374`. Both hand that
+context to the same helpers above, so neither is blocked on live state. 53273 also has **no** key-88 read and no
+spell link, which is why its sentence is the same line minus the leading `%s`: **the append count matches each
+sentence's slot count, 4 against 4 and 5 against 5**, which is the structural check that the two are paired the
+right way round.
+
+### `ColumnAddTargets` (53249): a different getter, and a x0.01
+
+⚠️ An earlier revision of the slot dump recorded this branch as reading **no keys**. That was an artefact of
+anchoring on `MOV ECX,<key>; CALL 0x0077a510`: it reads keys 11 and 238 through **`FUN_014af090(record, key)`**
+instead, which takes the key as a pushed argument.
+
+⚠️⚠️ And that getter ends `CVTSI2SS; MULSS XMM0,[0x01F2800C]` — it **divides the stored integer by 100** where
+the int getter every other branch uses hands the value back verbatim. A stored `50` is a half-metre column, not a
+50 m one, and the `%.2f` makes the 100× version look like a finished line rather than a failed bind. Bound
+correctly the widths come out as a clean per-rank progression: `1.00m`, `1.25m`, `1.50m`, `1.75m`, `2.00m`.
+
+The branch also picks its sentence by value: it compares `|key 238|` against the `0.005` at `0x01f27378`, drawing
+its own type-id string `%.2fm%s wide column to target` when there is no distance and the
+`ColumnAddTargetsWithDistance` token — which appends the distance and a second annotation — when there is.
+
+One more exception worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
+corroborating the existing note that this branch *"reads all four slots plus key 32"*.

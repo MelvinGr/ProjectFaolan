@@ -411,6 +411,36 @@ namespace Faolan.Importer.Cli
 			if (element.Kind == HitPercentageKind)
 				return HitPercentageSentence(ctx, element);
 
+			// `ColumnAddTargets` picks between its own type-id sentence and a token one on whether it carries a
+			// DISTANCE (branch 0x014a08f0): it takes |key 238| and compares it against the 0.005 at 0x01f27378,
+			// falling to `%.2fm%s wide column to target` when there is none and to `ColumnAddTargetsWithDistance`
+			// when there is, which appends the distance and its own modifier annotation.
+			//
+			// ⚠️ Its two magnitudes do NOT come from the `GetIntStat(GameActionStat_e)` every other branch uses - it
+			// reads them through `FUN_014af090(record, <statKey>)`, which takes the key as a PUSHED argument and
+			// returns a FLOAT. That is why a dump anchored on `MOV ECX,<key>; CALL 0x0077a510` reported this branch
+			// as reading no keys at all (#782).
+			//
+			// ⚠️⚠️ And that getter ends `CVTSI2SS; MULSS XMM0,[0x01F2800C]` - it divides the stored integer by 100
+			// on the way out, where the int getter every other branch uses hands the value back verbatim. So a stored
+			// 50 is a HALF-METRE column, not a 50m one; the client's own `%.2f` is what makes a 100x error here look
+			// like a finished line rather than a failed bind.
+			if (element.Kind == ColumnAddTargetsKind)
+			{
+				var columnWidth = element.Value(GameActionTypes.KeyRadius);
+				var columnDistance = element.Value(KeyColumnDistance);
+				if (columnWidth is null || columnDistance is null)
+					return (null, null);
+
+				if (columnDistance.Value == 0)
+					return (ctx.SentenceFor(element.Kind), [(int)columnWidth.Value * ColumnScale, ""]);
+
+				var withDistance = ctx.SentenceForToken("ColumnAddTargetsWithDistance");
+				return (withDistance, withDistance == null
+					? null
+					: [(int)columnWidth.Value * ColumnScale, "", (int)columnDistance.Value * ColumnScale, ""]);
+			}
+
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
 		}
 
@@ -432,7 +462,7 @@ namespace Faolan.Importer.Cli
 
 			// ⛔ Mode 1 or 2 takes a different path entirely: the client reads the CHARACTER'S OWN value of the key-1
 			// stat and renders `charStat * value * 0.01` through the damage/heal renderer. That number is a property
-			// of the caster, not of the record, so this report cannot produce it - the same wall the cone kinds hit.
+			// of the caster, not of the record, so this report cannot produce it.
 			// The SENTENCE is still determinable (the computed value keeps the stored one's sign, and the renderer is
 			// the `Hit` family's), so this reports as "cannot fill" rather than "no sentence" - the number is what is
 			// missing, not the string.
@@ -529,8 +559,15 @@ namespace Faolan.Importer.Cli
 		// is not established, and the caller prints the raw slots instead of inventing one.
 		//
 		// ⚠️ These are NOT the key list in order. `FilteredAreaFormula`'s keys are [Spell, Radius, MaxTargets, 93,
-		// 250] and its sentence takes (effect, radius, radiusUnit, targets, targetsUnit) - the client interleaves each
-		// value with the UNIT SUFFIX of the stat it came from, which is the `%s` after every `%.2f`/`%d`.
+		// 250] and its sentence takes five slots where the record has three magnitudes.
+		//
+		// ⭐ The extra `%s` after every `%.2f`/`%d` is the VALUE-MODIFIER ANNOTATION, not a unit (the unit is in the
+		// literal text - `%.2fm%s radius`). Every magnitude the builder appends is appended twice: the resolved
+		// number, then `FUN_014a3880(resolved - raw, <unit token>)`, which is `FUN_014aa410` - it returns the EMPTY
+		// string when the difference is zero and otherwise
+		// `<font color="tooltip_positive|negative">` + LDB170(`ValueModSign{Positive,Negative}`) + the delta + the
+		// unit. So a tooltip drawn with no character modifier in play has an empty string in every one of those
+		// slots, which is what `""` means at each of them below (#782).
 		private static object?[]? BindArgs(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var type = element.Type;
@@ -562,13 +599,41 @@ namespace Faolan.Importer.Cli
 					return targets is null ? null : [effect, (double)radius.Value, "", (int)targets.Value, ""];
 				}
 
-				// ⚠️ The CONE kinds (`ConeFormula` 53259, `AttackAddTargets` 53273) are deliberately NOT bound, and
-				// the reason is worth keeping: their sentence `%.2f%s degree arc, %.2fm%s radius` looks like two
-				// slots read straight off the element, and it is not. Branch 0x014a28f9 fetches the CHARACTER
-				// (`FUN_006f03b0`), adds key 11 and key 213 to the cone she already has, clamps the result and prints
-				// the DIFFERENCE. So the element states a DELTA and the drawn number needs live state this report does
-				// not have - binding it to the raw slots would print "4.00 degree arc" for `Cyclone of Steel`. See
-				// #782.
+				// The CONE kinds: `%s %.2f%s degree arc, %.2fm%s radius` (53259, which names the effect spell) and
+				// the same line without the leading `%s` (53273, which does not). Both branches - 0x014a2316 and
+				// 0x014a28f9 - append exactly (arc, arcMod, radius, radiusMod), and 53259 prefixes the spell link;
+				// the append COUNT matching each sentence's slot count is the structural check that the two are
+				// paired the right way round.
+				//
+				// ⭐ The ARC is key 213 and the RADIUS is key 11, which is the opposite of the order the branch
+				// FETCHES them in (it reads 11 first). Two independent pins: the radius slot's value is what
+				// `SpellAreaEffects.RadiusMetres` holds (6 for `Wave of Life (Rank 2)`, whose key 11 is 6), and the
+				// arc slot's value is clamped to [0, 360] against the 360.0 at 0x020b5270. Key 212 (the cone's
+				// negative half-angle, always -213/2) is not read by either branch.
+				//
+				// Both magnitudes go through the client's value-modifier helpers before being drawn, and both reduce
+				// to the raw key here: the MULTIPLICATIVE term is `(stat 0x57B * 0.1 * 0.01 * w + 1) * value`
+				// (`FUN_014a9f90`) where `w` is a per-call float global - 0x02D25E34 and 0x02D25E54 for these two -
+				// and all of those globals are 0.0 in the image with no writer anywhere in it, so the term is exactly
+				// 1; the ADDITIVE term (`FUN_014a9c10`) comes off the viewing CHARACTER and is 0 without one. What a
+				// character does contribute shows up in the `%s` annotation, not in the number. See #782.
+				case ConeFormulaKind:
+				case AttackAddTargetsKind:
+				{
+					var arc = element.Value(KeyConeArcDegrees);
+					var coneRadius = element.Value(GameActionTypes.KeyRadius);
+					if (arc is null || coneRadius is null)
+						return null;
+
+					object?[] cone = [(double)(int)arc.Value, "", (double)(int)coneRadius.Value, ""];
+					if (element.Kind == AttackAddTargetsKind)
+						return cone;
+
+					var coneSpell = element.Value(GameActionTypes.KeySpell);
+					return coneSpell is null
+						? null
+						: [$"{ctx.SpellName(coneSpell.Value)} ({coneSpell.Value})", .. cone];
+				}
 
 				// `%s resistance to %s` - the value, then the RESISTANCE KIND. Branch 0x0149e942 reads key 152 and
 				// key 39, renders the value through stat 0x4B `MetaType`'s display scale (which is 1, so it prints
@@ -770,7 +835,10 @@ namespace Faolan.Importer.Cli
 
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
 		private const uint AreaFormulaKind = 53087;
+		private const uint AttackAddTargetsKind = 53273;
 		private const uint CastNanoKind = 53051;
+		private const uint ColumnAddTargetsKind = 53249;
+		private const uint ConeFormulaKind = 53259;
 		private const uint ChangeHitPercentKind = 53030;
 		private const uint ChangeLineHitPercentKind = 53075;
 		private const uint FilteredAreaFormulaKind = 53088;
@@ -782,6 +850,18 @@ namespace Faolan.Importer.Cli
 		private const uint ResurrectTargetKind = 53227;
 		private const uint TeamFormulaKind = 53066;
 		private const uint TeamPropagatedBuffKind = 53224;
+
+		// The 0.01 `FUN_014af090` applies to both of `ColumnAddTargets`'s magnitudes on its way out. Named here rather
+		// than written as a bare /100 because it belongs to the GETTER, not to either key.
+		private const double ColumnScale = 0.01;
+
+		// `ColumnAddTargets`'s optional distance-to-target (key 238). Per-TYPE, like every unnamed key: 238 is the
+		// knockback distance on `Knockback`.
+		private const int KeyColumnDistance = 238;
+
+		// The cone kinds' arc in DEGREES (key 213, stat 0x4DD). Its partner key 212 is the negative half of it and is
+		// the one slot neither cone branch reads.
+		private const int KeyConeArcDegrees = 213;
 
 		// `ResurrectTarget`'s only payload slot - the health percentage the target comes back at.
 		private const int KeyResurrectHealth = 188;
