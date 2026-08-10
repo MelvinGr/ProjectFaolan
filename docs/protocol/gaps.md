@@ -85,6 +85,23 @@ struct. Tracked in Gitea #147.
 
 ---
 
+## Dungeons and instances
+
+### `DispatchSendPlayfieldLockoutData`'s six `lockoutInfo` fields
+The instance reset/lockout push (GameCharInterface `0xAA`) is fully framed - the dispatcher reader
+(`FUN_004cddb0`) and the composite reader it calls (`FUN_0077df00`) give
+`[u32 playfieldId]` then `[string][u32][u32][u32][u8][string]`, with no nesting and no list, so the message is
+byte-constructible today (`docs/subsystems/playfield-instance-ownership.md`).
+
+What is missing is what the six carry. The reader names only `lockoutInfo` as a whole - there are no per-field
+bail-out strings the way the guild-name refusals have - and **no capture in the corpus carries this message**, so
+there is nothing to correlate the columns against. A reset timer and an instance name are the obvious readings
+and are exactly the guess that must not be shipped. Tracked in Gitea #309.
+
+`[V0: DispatchSendPlayfieldLockoutData's six lockoutInfo fields]`
+
+---
+
 ## Player stats
 
 ### What else makes retail re-send the combat rating quad

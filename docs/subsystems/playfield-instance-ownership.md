@@ -110,6 +110,34 @@ set on 12, with its `3` shared by four open outdoor zones and a cave — neither
 of team-owned entry (#512) rather than needing data of its own, and is unsent until then. Whether a `00` is sent
 on LEAVING is still open: the corpus's only `00` is in a different capture.
 
+## ⭐ The lockout record — `DispatchSendPlayfieldLockoutData`
+
+`DispatchSendPlayfieldLockoutData` (GameCharInterface `0xAA`) is the reset/lockout push #309 wants, and its
+signature `(playfieldId, lockoutInfo)` said nothing about the second half. The dispatcher reader
+(`FUN_004cddb0`, named by its own two bail-out strings — *"stream bad after `'playfieldId'`"* and *"stream bad
+after `'lockoutInfo'`"*) and the composite reader it calls (`FUN_0077df00`) give it exactly:
+
+```
+[u32 playfieldId]
+lockoutInfo:
+  [std::string]      FUN_0048f840
+  [u32]              -> +0x1c
+  [u32]              -> +0x20
+  [u32]              -> +0x24
+  [u8]               -> +0x28, stored as a bool
+  [std::string]      FUN_0048f840
+```
+
+⭐ **It is not a shape we already hold** — the question the previous pass asked. It is a small new composite:
+two strings around three u32 and a flag, with no nesting and no list. That is the whole record, so the message
+is byte-constructible today.
+
+⚠️ **What the six fields MEAN is not recoverable.** The reader names only `lockoutInfo` as a whole — there are
+no per-field bail-out strings the way `DispatchGuildBadName`'s reader has — and **no capture carries this
+message**, so there is nothing to correlate against. A reset timer and an instance name are the obvious readings
+and are exactly the kind of guess this project does not ship.
+`[V0: DispatchSendPlayfieldLockoutData's six lockoutInfo fields]`
+
 ## What is decoded vs what is built
 
 Decoded and gated by tests: the owner pair, the difficulty word, the refusal's channel, and the instance-list
