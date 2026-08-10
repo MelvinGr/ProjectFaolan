@@ -1028,42 +1028,85 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     The property run, plus the byte offset just PAST it - which is where the record's string block starts
-		///     (see <see cref="ReadStringBlock" />).
+		///     ⭐ The property run, ANCHORED on the string block that terminates it (#632), plus the byte offset just
+		///     past it - which is where that block starts (see <see cref="ReadStringBlock" />).
 		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         The run ends where the record's `[u32 21][u32 33]` name/description block begins - **every one of
+		///         the 21,502 shipped records has that pair, and only one has it twice** - so the run is found by
+		///         locating the block and walking BACKWARDS while the field ids strictly descend. That is exact where
+		///         the old rule was a guess.
+		///     </para>
+		///     <para>
+		///         ⚠️ The old rule was "the LONGEST strictly-ascending run anywhere in the record wins", and it is
+		///         wrong on **2,010 of the 21,502 records (9.4%)**. The record's fixed 15-word HEAD opens with three
+		///         pairs whose ids happen to ascend - `(3|7, 15) (23, …) (76, 0)` at byte 4 - and that phantom run
+		///         BEATS the real one whenever a spell carries three property fields or fewer. Those records were
+		///         importing head words as properties: 1,207 reported a field `3` "Attack Speed", 1,203 a field `23`
+		///         "Static Instance", 1,167 a field `76` "Item Class", none of which the record states.
+		///     </para>
+		///     <para>
+		///         ⚠️ And it silently DROPPED real ones - 116 records lost field `294` Casting Time, 49 lost field `8`
+		///         Duration, 143 lost the icon. A cast time that is missing reads as an instant spell, which is why
+		///         this is a data bug and not a tidiness one.
+		///     </para>
+		///     <para>
+		///         The two agree on the other 19,492 records, so nothing that was right changes.
+		///     </para>
+		/// </remarks>
 		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body, out int endOffset)
 		{
-			var words = body.Length / 4;
-			var best = new Dictionary<uint, uint>();
 			endOffset = 0;
-			for (var start = 0; start + 1 < words; start++)
+			var fields = new Dictionary<uint, uint>();
+
+			var anchor = -1;
+			for (var o = 0; o + 12 <= body.Length; o += 4)
 			{
-				uint last = 0;
-				var haveLast = false;
-				var cur = new Dictionary<uint, uint>();
-				var end = start * 4;
-				for (var j = start; j + 1 < words; j++)
-				{
-					var fid = body.ReadU32Le(j * 4);
-					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
-						break;
+				if (body.ReadU32Le(o) != StringBlockNameField || body.ReadU32Le(o + 4) != StringBlockDescriptionField)
+					continue;
 
-					cur[fid] = body.ReadU32Le((j + 1) * 4);
-					last = fid;
-					haveLast = true;
-					j++; // consumed the value word too
-					end = (j + 1) * 4;
-				}
-
-				if (cur.Count > best.Count)
-				{
-					best = cur;
-					endOffset = end;
-				}
+				anchor = o;
+				break;
 			}
 
-			return best;
+			if (anchor < 0)
+				return fields;
+
+			endOffset = anchor;
+
+			var p = anchor - 8;
+
+			// ⚠️ A RESOURCE reference can sit between the last property and the string block: 664 records end the run
+			// with `[1000000][n]` and 117 with `[1000014][n]`, both RDB TYPE ids rather than field ids. Skipping them
+			// is not optional - stopping there instead returned an EMPTY run for all 781, which silently emptied the
+			// whole `Mounts` catalog on the first attempt at this (field 186 sits before one of them).
+			while (p >= 0 && body.ReadU32Le(p) >= FirstRdbTypeId)
+				p -= 8;
+
+			// Backwards from there: a pair is [fieldId][value], and the run is ascending, so walking back the ids must
+			// strictly DESCEND. The first that does not is the head, which is where the run began.
+			var lowest = uint.MaxValue;
+			for (; p >= 0; p -= 8)
+			{
+				var fid = body.ReadU32Le(p);
+				if (fid == 0 || fid > MaxPropertyFieldId || fid >= lowest)
+					break;
+
+				fields[fid] = body.ReadU32Le(p + 4);
+				lowest = fid;
+			}
+
+			return fields;
 		}
+
+		// The field-id ceiling the run is bounded by. Not a grammar claim - the real ids top out around 900 - but a
+		// word that large is the head rather than a property, and it is what stops the backward walk.
+		private const uint MaxPropertyFieldId = 2000;
+
+		// RDB type ids start at 1,000,000 and property field ids never reach it, so this separates the two spaces
+		// without listing the two types the catalog actually uses.
+		private const uint FirstRdbTypeId = 1_000_000;
 
 		/// <summary>
 		///     ⭐ The record's own NAME and DESCRIPTION, which sit immediately after the property run (#632).

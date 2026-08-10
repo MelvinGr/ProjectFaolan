@@ -144,8 +144,8 @@ Two decodes it exercises that a flat read would not:
 ## What the census measures
 
 ```
-record bytes inside a parsed region : 6,728,831 / 8,241,205 = 81.6%
-property-run field ids read         : 16 / 111
+record bytes inside a parsed region : 6,814,307 / 8,241,205 = 82.7%
+property-run field ids read         : 16 / 83
 elements rendered as a sentence     : 49,438 / 61,840 = 79.9%
 ...or accounted for                 : 58,562 / 61,840 = 94.7%
 ```

@@ -1,18 +1,24 @@
 # The spell record's property fields ARE stat ids
 
-RDB type **1040005** (the spell catalog, 21,502 records) is a 12-byte header followed by a run of
-`[fieldId u32][value u32]` LE pairs in strictly INCREASING field order. 111 distinct field ids occur.
+RDB type **1040005** (the spell catalog, 21,502 records) is a 12-byte header followed by a fixed HEAD, then a run
+of `[fieldId u32][value u32]` LE pairs in strictly INCREASING field order. **83 distinct field ids occur.**
+
+⚠️ **It was 111 until the run stopped being found by a heuristic (#632).** The old rule took the LONGEST ascending
+run anywhere in the record, and 28 of those "field ids" were regions that are not the property run at all —
+`3 Attack Speed` (1,207 records), `23 Static Instance` (1,203) and `76 Item Class` (1,167) are the record's own
+HEAD words, read as a 3-pair run because their ids happen to ascend. Any figure derived from the old count is
+inflated by those; the named-field tallies below were checked against the corrected set.
 
 ## ⭐ What the rest of a record is (#632)
 
 That run is only ~13% of a record, and #632 was filed on the other ~87% having "never been looked at". It is
-four things, and the accounting now reaches **81.6%** of all 8.2 MB (was 64.4%):
+four things, and the accounting now reaches **82.7%** of all 8.2 MB (was 64.4%):
 
 | region | bytes over the catalog | where it is decoded |
 |---|---:|---|
 | the element lists | 3,785,151 | [`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) |
-| the **name + description block** | 1,167,952 | below |
-| the property run | 1,526,224 | this page |
+| the **name + description block** | 1,261,636 | below |
+| the property run | 1,518,016 | this page |
 | the element-list headers | 249,504 | `[2][listId][(n+1) * 0x3F1]`, #785 |
 
 ### The name/description block
@@ -24,7 +30,7 @@ next two field ids carry TEXT rather than a u32.
 [u32 21][u32 33][u16 nameLength][u16 descriptionLength][name][description]
 ```
 
-LATIN1, unterminated, back to back. A zero description length is normal; a zero name length is not. 19,449 of
+LATIN1, unterminated, back to back. A zero description length is normal; a zero name length is not. 21,459 of
 the 21,502 records carry one, and `RdbSpellImporter.ReadStringBlock` reads it.
 
 ⭐ It is the record's OWN text rather than the LDB's, which matters for the **1,594 spells LDB category 50210
@@ -36,8 +42,9 @@ has no name for**: `Hellfire Stream` (8600) renders as *"spell 8600"* out of the
 that also appears between element lists. On `Hellfire Stream` those two are the whole of the remaining 92 bytes.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
-field run from a numbered blob into a readable property bag: **45 of the 111** already have a client name, most
-of them out of the `GameAction_*` / LDB-615 runs.
+field run from a numbered blob into a readable property bag: most already have a client name, out of the
+`GameAction_*` / LDB-615 runs. `--report rdb-field-coverage` is the live tally; a hard number here goes stale
+(the "45 of 111" this line used to carry was counted against the pre-#632 field set).
 
 ## Why this is not circular
 
