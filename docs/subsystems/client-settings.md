@@ -101,32 +101,46 @@ payloads exist in the corpus (408 / 527 / 606 / 618 bytes, over three characters
 appearance snapshot expressed in exactly the terms the create-editor and the spawn appearance use — which is what
 makes constructing one from `CharacterBody` / `CharacterBodyResources` plausible rather than speculative.
 
-### What is decoded
+### The grammar
 
-| region | shape | what it is |
-| --- | --- | --- |
-| header | `04 <u8> a7 10 00` | byte 0 constant; byte 1 is `08` on the 408-byte record and `0b` on the other three |
-| attachment entries | `[u32 slot][u32 rdbType][u32 rdbId][u32 flags][4×4 identity matrix, 16 × f32 LE]` | a resource attached at a slot, with a transform. `1010201` / `1010030` appear as the type word, and the id resolves: `1139362`, `215943`, `323710`, `700815` are all CDN-hosted client resources |
-| quadruples | `[u32 slot][u32 id][u32][u32]` | ids resolve to real records — `3735601` is **type 1000020, an ITEM TEMPLATE** (so this is worn gear) and `3394702` **type 1010001, a 3D model** |
-| named tail | repeated `[u32 index][u32 nameLength][name, LATIN1][f32 weight]`, terminated by a zero length | the appearance proper — see below |
+Every byte of all four corpus payloads is accounted for by this, and the two lists are the only variable-length
+parts:
 
-### The named tail is the character's own look
+```
+[u8  version = 4]
+[u32 modelId]                     the character's base MESH - an RDB 1010001 3D model
+[u32 entryCount]                  2 in all four payloads
+entryCount x ATTACHMENT (88 bytes):
+    [u32 rdbType][u32 rdbId][u32 flags]
+    [16 x f32]                    a row-major 4x4 affine; translation in the LAST ROW
+    [u32 itemTemplateId][u32][u32]
+N x SLOT (16 bytes):  [u32 slot][u32 resourceId][u32][u32]
+[u32]                             ONE word between the two lists - see below
+repeated NAMED:       [u32 index][u32 nameLength][name, LATIN1][f32 weight]   (nameLength 0 terminates)
+```
 
-Two vocabularies share it, and the weight tells them apart:
+⭐ **The header's three bytes after `04` are the low bytes of a MODEL ID**, not a count — `1091336` on the
+408-byte record and `1091339` on the other three, both RDB **1010001** (3D model). That is the character's base
+mesh, and it is why the byte differed between records: two body types, not two element counts.
 
-- **resource assignments at weight `1.0`** — `*texscript_213937`, `*texscript_3113027`, `*beardmesh_3181884`;
-- **body morph sliders at small signed weights** — `arm`, `arse`, `bosom`, `chest`, `leg`, `stomach`, `thigh`
-  at `0.1` / `-0.038` / `0.011` / `0.016` / `0.042` …
+**The attachment entries are `1010201` (MonsterData) and `1010030`, one of each, in either order.** Their tail's
+first word is an **item template**: `3735601`, `3806202`, `3419923`, `3803265` across the four characters, every
+one RDB type **1000020**, and `0` on the `1010201` entry. The last two words are constant per entry type —
+`(0, 35)` on `1010201`, `(6, 58)` on `1010030`.
 
-**All of them are rows in `MorphTargets`.** The seven sliders are exactly that table's `Category` 1, and the
-`*texscript_*` / `*beardmesh_*` names resolve there too. The float is the slider position, and the same character
-carries a consistent set across its uploads while the three characters differ — which is what says these are
-per-character appearance rather than a constant preamble.
+**The transform is real, not vestigial.** Most matrices are identity, but a `1010030` entry carries
+`[0, 0, -0.12, 1]` in its last row — a small Z offset — which is what identifies the layout as row-major with
+translation in the last row rather than an unused field.
 
 ### What is not decoded
 
-The three header bytes after `04`, the `flags` word on an attachment entry, the meaning of the transform (every
-observed matrix is identity, so nothing distinguishes "no transform" from "not used"), and the last two words of
-a quadruple. Those are what stand between reading a preview and BUILDING one — and a record the client rejects
-would be worse than the current no-preview state, which retail itself produces for a freshly created character.
+Two words, and their positions are now exact:
+
+- **the attachment `flags`** — `33` on every `1010201` entry, `5` or `11` on the `1010030` ones;
+- **the single `u32` between the slot list and the named list** — `0`, `0`, `18`, `1018` across the four, so it
+  carries a value rather than terminating anything, and the slot list's length has to be found by locating the
+  named list rather than read from a count.
+
+Those two are what stand between reading a preview and BUILDING one, and a record the client rejects would be
+worse than the current no-preview state — which retail itself produces for a freshly created character.
 Open work tracked in Gitea.
