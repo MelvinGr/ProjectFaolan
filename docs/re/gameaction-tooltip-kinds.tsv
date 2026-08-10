@@ -1,0 +1,36 @@
+# GameAction type id -> the tooltip TOKEN(s) its branch of FUN_0149e450 looks LDB category 170 up by (#782).
+#
+# Composed from two dumps, neither of which says this on its own:
+#   1. tools/ghidra/DumpSwitchTable.java over the builder's dense switch
+#      (BYTES=14a2e90 COUNT=f9 TARGETS=14a2de8 BASE=cf0a) - type id -> branch address;
+#   2. docs/re/gameaction-tooltip-tokens.tsv - token -> the call site that pushes it.
+# A call site is attributed to the branch it falls inside (the greatest branch target <= the site).
+#
+# A branch is shared where several kinds dispatch to it, so a kind can carry SEVERAL candidate tokens and
+# the branch picks between them at runtime on its own inner conditions - `kind -> token` is one-to-many by
+# construction, not by imprecision. Three further tokens (DamageHealth, HealHealth, DamageOtherStat) sit in
+# the SHARED formatter FUN_0149aa30 rather than in a branch, so they are reachable from many kinds and are
+# deliberately absent here.
+kind	branch	tokens	ldbIds
+53007	014a0b99	HitPercentHeal,HitPercentDamage,HitPercentHealStatByOtherStat,HitPercentDamageStatByOtherStat	214837020,241982229,71088740,67043396
+53012	0149e4c0	GameActionGroup_Skills	253163267
+53030	014a018c	IncreasesHitPercent,DecreasesHitPercent	256237844,95805700
+53032	0149e855	IncreaseAOERadius,DecreaseAOERadius	22958195,21274739
+53045	0149e4c0	GameActionGroup_Skills	253163267
+53046	0149eaed	AddAbsorbEndSpell	226182908
+53054	014a2584	IncreaseItemDelay	29583529
+53062	014a2584	IncreaseItemDelay	29583529
+53067	014a1a2e	ModifyAsRating	220690567
+53075	014a018c	IncreasesHitPercent,DecreasesHitPercent	256237844,95805700
+53087	0149f940	ValueModUnitMeters	11340835
+53098	014a2584	IncreaseItemDelay	29583529
+53099	014a2584	IncreaseItemDelay	29583529
+53170	014a103e	PerSecond	127652996
+53189	014a1b52	AddPercentSkillModifierSameStat,AddPercentSkillModifierDifferentStat	199802468,125323092
+53209	014a1817	UpgradeCombo_DecreaseDamage,UpgradeCombo_DecreaseCooldown	248531685,239053278
+53211	0149f3f7	ChanceOf,OnSelf,OnTarget	243572422,90414118,61376676
+53212	0149ec8e	AddComboProcBoth,AddComboProcSelf,AddComboProcOther	54499416,53515990,67518962
+53213	0149eecd	PercentChance,TimesPerMinute	240580757,117759957
+53221	014a13ca	AbsorbShield	65494692
+53249	014a08f0	ColumnAddTargetsWithDistance	243591253
+53250	014a1da2	OpeningComboAttack,DecreaseComboDPS,DecreaseComboCriticalChance,DecreaseComboHateAdjustment,ChangeComboDamageType	40567051,243600147,226291349,15470980,201643925

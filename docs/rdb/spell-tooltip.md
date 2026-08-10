@@ -175,3 +175,35 @@ Nothing half-binds: a sentence with a conversion the binder cannot fill prints a
   needs the caster. The report prints the mode and the stored value.
 - **A level ramp's value** without a level — `--report-arg <id>@<level>` supplies one; without it the ramp
   prints as its two endpoints.
+
+
+## The token -> KIND attribution (#782)
+
+`docs/re/gameaction-tooltip-tokens.tsv` says which TOKEN each call site pushes; it does not say which GameAction
+KIND reaches that call site, because the builder's per-type dispatch is a dense MSVC switch and neither of its
+two tables means anything alone. Composing them closes that:
+
+```
+SUB   EAX,0xcf0a                          ; FUN_0149e450
+CMP   EAX,0xf8
+MOVZX EAX,byte ptr [EAX + 0x14a2e90]      ; index table
+JMP   dword ptr [EAX*0x4 + 0x14a2de8]     ; target table
+```
+
+`DumpSwitchTable.java` with `BASE=cf0a COUNT=f9 BYTES=14a2e90 TARGETS=14a2de8` yields 249 `type id -> branch`
+rows; a token's call site then attributes to the branch it falls inside. Result:
+**`docs/re/gameaction-tooltip-kinds.tsv`, 33 of the 36 tokens placed onto 22 kinds.**
+
+⚠️ **`kind -> token` is one-to-many BY CONSTRUCTION.** Several kinds dispatch to one branch, and a branch picks
+between its tokens on its own inner conditions — `53250` reaches five (`OpeningComboAttack`,
+`DecreaseComboDPS`, `DecreaseComboCriticalChance`, `DecreaseComboHateAdjustment`, `ChangeComboDamageType`). So a
+row is the CANDIDATE SET for that kind, not a single sentence, and picking within it needs the branch's own
+conditions read.
+
+The three tokens that do not place (`DamageHealth`, `HealHealth`, `DamageOtherStat`) sit in the SHARED formatter
+`FUN_0149aa30` rather than in a branch, so they are reachable from many kinds — absent by design, not a gap.
+
+⭐ **A cross-check falls out.** The branch for `53054` `SpellStatModifier` / `53062` `SpellLineStatModifier`
+pushes **`IncreaseItemDelay`** — and the client's internal stat-name table calls stat `294` `ItemDelay` where
+LDB 615 displays it as *Casting Time (Seconds)* (see `docs/re/aoc-client-stat-names.md`). Two independent client
+sources agreeing that the delay those modifiers move is the cast time.
