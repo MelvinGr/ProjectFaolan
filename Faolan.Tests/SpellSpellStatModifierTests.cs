@@ -119,17 +119,52 @@ namespace Faolan.Tests
 			Assert.Equal(500, modifiers.ApplyPercent(1000, CharacterStatId.CastingTimeSeconds));
 		}
 
-		// ⚠️ The ABSOLUTE half is carried but deliberately NOT applied - its wire unit is unpinned (#787). If this
-		// ever starts changing the number, the scale has to have been established first.
+		// `ApplyPercent` is still the percent-only half, and it must stay that way - `Apply` is what composes them.
 		[Fact]
 		public void ApplyPercent_DoesNotApplyTheAbsoluteHalf()
 		{
-			var modifiers = new SpellModifiers(
-				new System.Collections.Generic.Dictionary<CharacterStatId, int> { [CharacterStatId.ManaCost] = -50 },
-				new System.Collections.Generic.Dictionary<CharacterStatId, int>());
+			var modifiers = Absolute(CharacterStatId.ManaCost, -50);
 
 			Assert.Equal(1000, modifiers.ApplyPercent(1000, CharacterStatId.ManaCost));
-			Assert.Equal(-50, modifiers.Absolute(CharacterStatId.ManaCost)); // still readable for whoever pins it
+			Assert.Equal(-50, modifiers.Absolute(CharacterStatId.ManaCost));
+		}
+
+		// ⭐ #787: the absolute half APPLIES now, in the units the column holds. `ManaCost` stores the property-run
+		// field verbatim, so the delta needs no conversion.
+		[Fact]
+		public void Apply_AddsTheAbsoluteHalfInTheColumnsOwnUnits()
+		{
+			Assert.Equal(950, Absolute(CharacterStatId.ManaCost, -50).Apply(1000, CharacterStatId.ManaCost));
+			Assert.Equal(0, Absolute(CharacterStatId.ManaCost, -5000).Apply(1000, CharacterStatId.ManaCost)); // clamped
+			Assert.Equal(1000, Absolute(CharacterStatId.CastingTimeSeconds, -50).Apply(1000, CharacterStatId.ManaCost));
+		}
+
+		// ⚠️ ...except where the importer converted the field on the way into the column. `CastTime` is built as
+		// `field * 10` (centiseconds -> ms), so a -300 modifier is -3.00 s = -3000 ms, not -300. Reading it in the
+		// column's units would take 3 s off a 5 s cast instead of 0.3 s.
+		[Fact]
+		public void Apply_ConvertsACentisecondModifierIntoTheMillisecondColumn()
+		{
+			Assert.Equal(2000, Absolute(CharacterStatId.CastingTimeSeconds, -300).Apply(5000, CharacterStatId.CastingTimeSeconds));
+			Assert.Equal(3000, Absolute(CharacterStatId.Duration, -200).Apply(5000, CharacterStatId.Duration));
+		}
+
+		// Additive first, then relative - the client's own composition order for a value carrying both (#782).
+		[Fact]
+		public void Apply_AddsBeforeItScales()
+		{
+			var both = new SpellModifiers(
+				new System.Collections.Generic.Dictionary<CharacterStatId, int> { [CharacterStatId.ManaCost] = -200 },
+				new System.Collections.Generic.Dictionary<CharacterStatId, int> { [CharacterStatId.ManaCost] = -5000 });
+
+			Assert.Equal(400, both.Apply(1000, CharacterStatId.ManaCost)); // (1000 - 200) * 0.5, not 1000*0.5 - 200
+		}
+
+		private static SpellModifiers Absolute(CharacterStatId stat, int value)
+		{
+			return new SpellModifiers(
+				new System.Collections.Generic.Dictionary<CharacterStatId, int> { [stat] = value },
+				new System.Collections.Generic.Dictionary<CharacterStatId, int>());
 		}
 
 		private static SpellModifiers Modifiers(CharacterStatId stat, int percentHundredths)

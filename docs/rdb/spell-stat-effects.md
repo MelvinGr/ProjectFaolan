@@ -143,11 +143,32 @@ your next Shock cheaper differ only in where the row was read from, so the parse
 The targets resolve, which is what says the decode is right rather than merely self-consistent: **415/415** of the
 spell-scoped targets are a `Spell.Id` and **1,146/1,156** of the line-scoped ones a `Spell.GuiStackingLine`.
 
-⚠️ **Only the RELATIVE half is applied.** `Value` and `PercentHundredths` are alternatives, never a pair. A
-percentage needs no unit — `-1000` is `-10%` of whatever the base is, and the client's tooltip builder pins that
-scale — while an absolute delta is in "the stat's own wire units" and nothing has pinned those against the columns
-we hold. So the engine scales `Mana Cost` (217 of its 228 rows are relative) and `Casting Time`, and the two
-biggest families, `Spell Critical Damage` (340 rows) and `Spell Critical Chance` (269), are **entirely absolute
-and therefore entirely unapplied**. Open in **#787**; applying one before its unit is pinned would be inventing a
-scale.
+`Value` and `PercentHundredths` are alternatives, never a pair. A percentage needs no unit — `-1000` is `-10%` of
+whatever the base is — and that half was applied from the start.
+
+⭐ **The ABSOLUTE half is pinned too (#787), and by two sources that agree on every stat.** A modifier states its
+delta in the units of the PROPERTY-RUN FIELD it names — the same units the column was built from — so the factor
+is whatever the importer already applies on the way in, and the client's own divisor table
+(`StatDisplayScale`, from `FUN_011197f0`/`FUN_01119ca0`) independently agrees:
+
+| stat | column | importer | client ÷ | suffix | shipped `Value` | reads as |
+|---|---|---|---:|:---:|---|---|
+| `129` Spell Critical Damage | `CriticalDamageHundredths` | raw | 100 | `%` | 1000..10000 | +10% .. +100% |
+| `147` Spell Critical Chance | `CriticalChanceHundredths` | raw | 100 | `%` | 50..10000 | +0.5% .. +100% |
+| `294` Casting Time | `CastTime` (ms) | `× 10` | 100 | — | -900..100 | -9.00 s .. +1.00 s |
+| `8` Duration | `DurationMs` | `× 10` | 100 | — | -100..4500 | -1.00 s .. +45.00 s |
+| `348` Splash Damage | `SplashDamage` | `/ 100f` | 100 | `%` | 400..4500 | +4% .. +45% |
+| `347` Splash Radius | `SplashRadius` | `/ 100f` | 100 | — | 50..500 | 0.5 .. 5.0 m |
+| `349` Splash max targets | `SplashMaxTargets` | raw | **1** | — | 1..20 | 1..20 targets |
+| `132` Mana Cost | `ManaCost` | raw | — | — | 2..20 | raw |
+
+⭐ `349` is the check the ticket named: the client scales it by **1** where every neighbour is 100, and every
+shipped modifier on it really is a small integer. Two tables that could disagree, and do not.
+
+`SpellModifiers.Apply` composes both halves — **additive first, then relative**, which is the client's own order
+for a value carrying both (`FUN_014a9c10` forms `value + additive` and hands it to `FUN_014a9f90`, which
+multiplies). The two live consumers (`Mana Cost`, `Casting Time`) use it, so the 99 absolute cast-time rows that
+were read and dropped now shorten a cast.
+
 [V3: SpellSpellStatModifierTests.EveryTarget_ResolvesAgainstTheShippedCatalog]
+[V3: SpellSpellStatModifierTests.Apply_ConvertsACentisecondModifierIntoTheMillisecondColumn]

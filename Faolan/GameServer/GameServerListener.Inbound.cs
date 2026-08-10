@@ -2278,10 +2278,11 @@ namespace Faolan.GameServer
 			// handler's token bump); the abort BCC drops the client bar (#347).
 			// #710: a trained FEAT or a live BUFF can shorten the cast. The client states these as
 			// `SpellStatModifier`/`SpellLineStatModifier` records on both sources, and `SpellModifierService` folds
-			// them; only the RELATIVE half is applied, because a percentage needs no unit pin and an absolute delta
-			// on `Casting Time (Seconds)` has none (see SpellModifiers.ApplyPercent).
+			// them. ⭐ BOTH halves apply since #787: the absolute delta on `Casting Time (Seconds)` is in the
+			// property-run field's own CENTISECONDS - the client divides that field by 100 and `CastTime` is built
+			// from it by x10 - so 99 rows that used to be read and dropped now shorten a cast.
 			var castModifiers = await _spellModifiers.For(client.Session.Character.Id, _simulation.PlayerWorldEntity(client), spellId);
-			var castMs = castModifiers.ApplyPercent(spell?.CastTime ?? 0, CharacterStatId.CastingTimeSeconds);
+			var castMs = castModifiers.Apply(spell?.CastTime ?? 0, CharacterStatId.CastingTimeSeconds);
 			if (castMs == 0)
 				await Resolve();
 			else

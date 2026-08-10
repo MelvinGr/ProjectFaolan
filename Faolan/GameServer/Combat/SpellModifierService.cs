@@ -147,21 +147,49 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Applies only the RELATIVE half to a base value, clamped at zero.
+		///     ⭐ Applies BOTH halves to a base value held in the COLUMN's units, clamped at zero (#787).
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The absolute half is deliberately NOT applied by this helper, and that is a statement about the
-		///     evidence rather than a simplification. A percentage needs no unit: -1000 is -10% of whatever the base
-		///     is, and the client's tooltip builder pins that scale (it prints the slot as <c>abs(amount) * 0.01</c>
-		///     under a <c>"%.1f%%"</c> format). An ABSOLUTE delta is in "the stat's own wire units", and for the stats
-		///     a caller would want it on - <c>Casting Time (Seconds)</c>, <c>Spell Critical Chance</c> - nothing has
-		///     pinned what those units are against the columns we hold. Applying one would be inventing a scale.
 		///     <para>
-		///         So callers use this where the modifier is overwhelmingly relative anyway - <c>Mana Cost</c> is 217
-		///         percent rows against 11 absolute - and the absolute half stays readable through
-		///         <see cref="Absolute" /> for whoever pins a unit. Open as #787.
+		///         The absolute half was unapplied because "the stat's own wire units" was unpinned. It is pinned now,
+		///         and by two independent sources that agree on every stat: the client's own divisor table
+		///         (<see cref="StatDisplayScale" />, transcribed from <c>FUN_011197f0</c>/<c>FUN_01119ca0</c>) and the
+		///         importer's existing field→column conversion. A modifier states its delta in the PROPERTY-RUN
+		///         FIELD's units - the same units the column was built from - so the factor is whatever the importer
+		///         already applies:
+		///     </para>
+		///     <list type="table">
+		///         <item><c>294 Casting Time</c> → <c>CastTime</c> is <c>field * 10</c> ms, so the modifier is
+		///         CENTISECONDS: the shipped -900..100 is -9.00 s..+1.00 s, and the client divides the same field by
+		///         100 with no unit suffix.</item>
+		///         <item><c>8 Duration</c> → <c>DurationMs</c> is <c>field * 10</c>, same reading.</item>
+		///         <item><c>129</c>/<c>147</c> → the columns store the field RAW as hundredths of a percent and the
+		///         client draws <c>field / 100</c> with a <c>%</c>, so a modifier of 2750 is +27.50% and needs no
+		///         conversion at all.</item>
+		///         <item><c>347</c>/<c>348</c> → <c>SplashRadius</c>/<c>SplashDamage</c> are <c>field / 100f</c>;
+		///         <c>349</c> and <c>132</c> are stored raw, and <c>349</c> is the checkable one - the client scales
+		///         it by 1, and every shipped modifier really is a small integer (1..20 targets).</item>
+		///     </list>
+		///     <para>
+		///         ⚠️ ORDER: additive first, then relative. That is the client's own composition for a value carrying
+		///         both - <c>FUN_014a9c10</c> forms <c>value + additive</c> and hands it to <c>FUN_014a9f90</c>, which
+		///         multiplies (#782). Assumed to hold for spell-property modifiers, which are a different applier;
+		///         it only matters where a stat carries both halves at once, which no shipped carrier does.
 		///     </para>
 		/// </remarks>
+		public int Apply(int baseValue, CharacterStatId stat)
+		{
+			// ⚠️ Clamped HERE and not left to `ApplyPercent`, which only clamps when there is a percent to apply. A
+			// -5000 absolute on a 1000 base has no relative half to pass through, and an unclamped sum reaches the
+			// caller as a NEGATIVE cast time or mana cost.
+			var shifted = baseValue + Absolute(stat) * ColumnScale(stat);
+			return shifted <= 0 ? 0 : ApplyPercent(shifted, stat);
+		}
+
+		/// <summary>
+		///     Applies only the RELATIVE half to a base value, clamped at zero. A percentage needs no unit, so this is
+		///     the half that was always safe; <see cref="Apply" /> is what callers want.
+		/// </summary>
 		public int ApplyPercent(int baseValue, CharacterStatId stat)
 		{
 			var pct = PercentHundredths(stat);
@@ -170,6 +198,18 @@ namespace Faolan.GameServer.Combat
 
 			var scaled = baseValue * (10000L + pct) / 10000L;
 			return scaled <= 0 ? 0 : (int)scaled;
+		}
+
+		// The factor from a modifier's own units (the property-run field's) to the units the COLUMN holds. 1 wherever
+		// the importer stores the field verbatim, which is all of them but the two centisecond→millisecond pairs.
+		private static int ColumnScale(CharacterStatId stat)
+		{
+			return stat switch
+			{
+				CharacterStatId.CastingTimeSeconds => 10,
+				CharacterStatId.Duration => 10,
+				_ => 1
+			};
 		}
 	}
 }

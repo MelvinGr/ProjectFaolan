@@ -392,10 +392,11 @@ namespace Faolan.GameServer.Combat
 			var spell = await _database.GetSpell(spellId);
 
 			// #710: a trained FEAT or a live BUFF can make the spell cheaper - "Mana Cost" is the stat these records
-			// aim at most, and 217 of its 228 shipped rows are RELATIVE, which is the half that needs no unit pin.
+			// aim at most (217 of its 228 shipped rows are relative, 11 absolute). ⭐ Both halves apply since #787:
+			// `ManaCost` stores the property-run field verbatim, so an absolute modifier on it needs no conversion.
 			// Applied to the RAW cost before the percent-of-pool resolve, so a spell whose cost is itself a percentage
 			// is scaled rather than double-converted.
-			var raw = (ushort)(modifiers ?? SpellModifiers.None).ApplyPercent(spell?.ManaCost ?? 0, CharacterStatId.ManaCost);
+			var raw = (ushort)(modifiers ?? SpellModifiers.None).Apply(spell?.ManaCost ?? 0, CharacterStatId.ManaCost);
 			var cost = CombatResolver.ResolveSpellManaCost(raw, player.MaxMana, spell?.ManaCostIsPercent ?? false);
 			if (cost == 0)
 				return;
