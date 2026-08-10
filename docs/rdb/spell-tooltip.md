@@ -42,8 +42,9 @@ category is far past coincidence; a single new token is not.
 ### …and a THIRD way: a kind can borrow another kind's sentence
 
 `FUN_0149e450`'s dispatch is two MSVC index+target table pairs (`0x14a2e90`/`0x14a2de8` over `0xCF0A..0xD002`,
-`0x14a324c`/`0x14a323c` over `0xD013..0xD025`). **49 of the 260 registered types reach a branch of their own;
-the other 211 fall to the default and the client draws nothing for them.** Every branch is transcribed in
+`0x14a324c`/`0x14a323c` over `0xD013..0xD025`), plus the compares that bracket them. **54 of the 260 registered
+types reach a branch of their own; the other 206 fall to the default and the client draws nothing for them** —
+which is what `GameActionTooltip.HasTooltipBranch` answers, and why the census counts those separately. Every branch is transcribed in
 [`../re/gameaction-tooltip-dispatch.tsv`](../re/gameaction-tooltip-dispatch.tsv) with its alias, its tokens and
 the order it reads its slots in.
 
@@ -146,15 +147,19 @@ Two decodes it exercises that a flat read would not:
 record bytes inside a parsed region : 5,311,375 / 8,241,205 = 64.4%   (3,785,151 in elements, 1,526,224 in the property run)
 property-run field ids read         : 16 / 111
 elements rendered as a sentence     : 47,632 / 61,840 = 77.0%
+...or accounted for                 : 56,756 / 61,840 = 91.8%
 ```
 
-The two failure modes are counted separately, because they are different work:
+⭐ **The second line is the honest one.** Three buckets, and only two of them are our debt:
 
-- **no sentence at all** — 11,281 elements over 90 kinds, led by `DPSHit` (2,660),
-  `StartServerSideScryScriptWithParams` (1,597) and `StartParticleEffect` (1,182). Most of these are types the
-  tooltip's dispatch sends to its DEFAULT, i.e. the client draws nothing for them either;
-- **a sentence whose slots are not bound** — 2,235 elements over 11 kinds, led by the two cone kinds and
-  `AddComboProc`.
+- **the client draws nothing either** — 9,124 elements over 83 kinds whose type id reaches no branch of
+  `FUN_0149e450` at all, led by `DPSHit` (2,660), `StartServerSideScryScriptWithParams` (1,597) and
+  `StartParticleEffect` (1,182). That is retail's behaviour, not a decode gap, and counting it as one read as
+  ~5,000 elements of debt that do not exist;
+- **a branch but no sentence we can find** — 2,157 over 7 kinds (`ChangeInheritedWeaponAttack` 795,
+  `InheritedComboAttack` 753, `AddSpellLineProc` 424);
+- **a sentence whose slots are not bound** — 2,927 over 12 kinds, led by the two cone kinds, `AddComboProc` and
+  the two `HitPercentage` arms that need live caster state.
 
 ⚠️ **The cone kinds are deliberately unbound, and the reason generalises.** `%.2f%s degree arc, %.2fm%s radius`
 reads like two slots off the element and is not: branch `0x014a28f9` fetches the CHARACTER, adds keys 11 and 213

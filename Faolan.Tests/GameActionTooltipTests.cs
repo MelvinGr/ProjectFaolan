@@ -32,6 +32,28 @@ namespace Faolan.Tests
 			Assert.Equal(fromDump.OrderBy(x => x.Key), GameActionTooltip.SentenceKinds.OrderBy(x => x.Key));
 		}
 
+		// ⭐ The branch set decides whether a missing sentence is OUR debt or the client's own behaviour, so it has to
+		// stay in step with the same dump. Every row of the dispatch TSV is a branched kind by construction.
+		[Fact]
+		public void HasTooltipBranch_CoversEveryDispatchedKind()
+		{
+			var dumped = File.ReadAllLines(DispatchTsv)
+				.Where(l => !l.StartsWith('#') && l.Contains('\t'))
+				.Select(l => l.Split('\t')[0])
+				.Where(c => uint.TryParse(c, out _))
+				.Select(uint.Parse)
+				.ToList();
+
+			Assert.NotEmpty(dumped);
+			foreach (var kind in dumped)
+				Assert.True(GameActionTooltip.HasTooltipBranch(kind), $"{kind} reaches a tooltip branch in the dump but the table says it does not");
+
+			// ...and the negative side, which is the one that carries the claim: `DPSHit` is 2,660 elements in the
+			// spell catalog and retail draws no line for any of them.
+			Assert.False(GameActionTooltip.HasTooltipBranch(53013));
+			Assert.False(GameActionTooltip.HasTooltipBranch(53238));
+		}
+
 		// An identity lookup must stay an identity lookup: a kind not in the alias table is its own sentence key, and
 		// nothing may quietly redirect it.
 		[Theory]

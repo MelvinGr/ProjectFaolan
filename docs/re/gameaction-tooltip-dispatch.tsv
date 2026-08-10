@@ -1,5 +1,6 @@
 # How the client's tooltip builder FUN_0149e450 renders each GameAction element (#782).
-# 49 of the 260 registered types reach a branch; the other 211 fall to the default and are drawn as nothing.
+# 54 of the 260 registered types reach a branch; the other 206 fall to the default and are drawn as nothing.
+# 53259 ConeFormula reaches its branch through a plain JZ rather than a table slot, which is why it is last.
 # aliasSentence = the TYPE ID whose LDB-170 string this branch fetches with a literal `MOV ECX,<id>` (blank = its own).
 # tokens        = the token names it fetches instead/as well, keyed into LDB 170 by elf28(token).
 # slotOrder     = the key indices it reads, in the order it reads them (via GetIntStat(GameActionStat_e)).
@@ -57,3 +58,4 @@ typeId	name	branch	aliasSentence	tokens	slotOrder
 53285	GlobalTargetSpellStatModifier	0x014a2584	53054	IncreaseItemDelay	0;39;175
 53273	AttackAddTargets	0x014a28f9		ValueModUnitMeters	11;213
 53267	Fatality	0x014a2ab7			
+53259	ConeFormula	0x014a2316			88

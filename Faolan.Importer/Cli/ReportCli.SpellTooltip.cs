@@ -117,6 +117,7 @@ namespace Faolan.Importer.Cli
 			long elements = 0, rendered = 0;
 			var fieldCounts = new Dictionary<uint, int>();
 			var noSentence = new Dictionary<uint, int>();
+			var notDrawn = new Dictionary<uint, int>();
 			var unbound = new Dictionary<uint, int>();
 
 			foreach (var entry in rdb.EntriesOfType(SpellTemplateType).Where(rdb.CanRead))
@@ -151,7 +152,11 @@ namespace Faolan.Importer.Cli
 					var (format, args) = Sentence(ctx, element);
 					if (format == null)
 					{
-						noSentence[element.Kind] = noSentence.GetValueOrDefault(element.Kind) + 1;
+						// ⭐ Split the two, because only one of them is OURS. A kind the tooltip builder has no branch
+						// for falls to its default and the client draws nothing either - counting that as a missing
+						// sentence reads as decode debt when it is retail's own behaviour.
+						var bucket = GameActionTooltip.HasTooltipBranch(element.Kind) ? noSentence : notDrawn;
+						bucket[element.Kind] = bucket.GetValueOrDefault(element.Kind) + 1;
 						continue;
 					}
 
@@ -168,9 +173,20 @@ namespace Faolan.Importer.Cli
 			                  + $"   ({elementBytes:N0} in elements, {fieldBytes:N0} in the property run)");
 			Console.WriteLine($"  property-run field ids read         : {SpellFieldsRead.Count(f => fieldCounts.ContainsKey(f.Key))} / {fieldCounts.Count}");
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
+			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
+			// work is what is left after both.
+			var accountedElements = rendered + notDrawn.Values.Sum();
+			Console.WriteLine($"  ...or accounted for                 : {accountedElements:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * accountedElements / elements):0.0}%"
+			                  + "   (rendered, or a kind the client itself draws nothing for)");
 			Console.WriteLine();
 
-			Console.WriteLine($"  kinds with NO LDB 170 sentence ({noSentence.Values.Sum():N0} elements over {noSentence.Count} kinds):");
+			Console.WriteLine($"  kinds the CLIENT does not draw either - no branch in FUN_0149e450, so they reach its default"
+			                  + $" ({notDrawn.Values.Sum():N0} elements over {notDrawn.Count} kinds):");
+			foreach (var (kind, count) in notDrawn.OrderByDescending(k => k.Value).Take(12))
+				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}");
+
+			Console.WriteLine();
+			Console.WriteLine($"  kinds WITH a branch but no sentence we can find ({noSentence.Values.Sum():N0} elements over {noSentence.Count} kinds):");
 			foreach (var (kind, count) in noSentence.OrderByDescending(k => k.Value).Take(20))
 				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}");
 
@@ -414,8 +430,11 @@ namespace Faolan.Importer.Cli
 			// ⛔ Mode 1 or 2 takes a different path entirely: the client reads the CHARACTER'S OWN value of the key-1
 			// stat and renders `charStat * value * 0.01` through the damage/heal renderer. That number is a property
 			// of the caster, not of the record, so this report cannot produce it - the same wall the cone kinds hit.
+			// The SENTENCE is still determinable (the computed value keeps the stored one's sign, and the renderer is
+			// the `Hit` family's), so this reports as "cannot fill" rather than "no sentence" - the number is what is
+			// missing, not the string.
 			if (element.Value(KeyHitPercentMode) is 1 or 2)
-				return (null, null);
+				return (ctx.SentenceForToken(GameActionTooltip.HitSentenceToken(stat.Value, (int)value.Value)), null);
 
 			var signed = (int)value.Value;
 			var range = ctx.RawRange(signed, signed);
@@ -426,7 +445,7 @@ namespace Faolan.Importer.Cli
 				// enum-name table keyed on key 71 (values 1..14) - the resolver is not decoded, so binding this arm
 				// would leave a `%s` in the middle of a finished-looking line.
 				if (signed <= 0)
-					return (null, null);
+					return (ctx.SentenceForToken("HitPercentDamage"), null);
 
 				var heal = ctx.SentenceForToken("HitPercentHeal");
 				return (heal, heal == null ? null : [range]);

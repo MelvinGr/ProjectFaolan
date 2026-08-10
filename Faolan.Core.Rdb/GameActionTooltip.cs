@@ -88,5 +88,30 @@ namespace Faolan.Core.Rdb
 
 		/// <summary>The stat id the hit renderer special-cases - <c>Health</c>, the only one with a heal phrasing.</summary>
 		public const uint HealthStatId = 0x1B;
+
+		// Every type id that reaches a branch of `FUN_0149e450` - 54 of the 260 the client registers. Read out of the
+		// two dispatch tables plus the two compares that bracket them (`0xD00B` ConeFormula takes a `JZ` rather than a
+		// table slot). Mirrors docs/re/gameaction-tooltip-dispatch.tsv.
+		private static readonly FrozenSet<uint> Branched = new uint[]
+		{
+			53002, 53007, 53012, 53019, 53026, 53027, 53030, 53031, 53032, 53037, 53045, 53046, 53051, 53054, 53061,
+			53062, 53066, 53067, 53069, 53070, 53075, 53084, 53087, 53088, 53098, 53099, 53121, 53122, 53129, 53162,
+			53170, 53176, 53182, 53189, 53196, 53209, 53211, 53212, 53213, 53217, 53219, 53220, 53221, 53223, 53224,
+			53225, 53227, 53249, 53250, 53259, 53267, 53273, 53283, 53285
+		}.ToFrozenSet();
+
+		/// <summary>
+		///     Whether the client's tooltip builder has a BRANCH for this kind at all.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ False is an ANSWER, not a gap: 206 of the 260 registered types fall to the switch's default, and the
+		///     client draws nothing for them. `DPSHit` (53013) is the big one - 2,660 elements in the spell catalog
+		///     and no tooltip line anywhere in retail. Counting those as "sentence missing" reads as decode debt when
+		///     it is the client's own behaviour (#782).
+		/// </remarks>
+		public static bool HasTooltipBranch(uint kind)
+		{
+			return Branched.Contains(kind);
+		}
 	}
 }
