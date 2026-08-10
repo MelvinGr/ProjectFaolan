@@ -338,7 +338,16 @@ for, so it never appears — the same shape as `Knockback`'s key 191.
 
 ⭐ **A spell can suppress its own tooltip line.** The presence test is not `id != 0` but
 `id != 0 && (spell->0xCB & 1) == 0` — `FUN_014a3b30` loads the referenced spell through
-`SpellTemplate_t::GetMagicSpell` and returns one bit of it. The same predicate gates `ConeFormula`, which draws
-**nothing at all** when its effect spell has the bit set. Which stored field populates that byte is open work,
-tracked in Gitea #789; until then the renderer uses `id != 0`, which can only draw a line retail omits, never a
-wrong number in one.
+`SpellTemplate_t::GetMagicSpell` and returns one bit of it. The same predicate gates `ConeFormula`, which skips
+its whole sentence when its effect spell has the bit (falling into the shared tail, so a periodic element still
+draws its "every N s" suffix and nothing else).
+
+⭐ **`+0xCB` is byte 3 of the dword at `+0xC8`** — the SAME spell flags word #629/#630 already reads bit 2 of for
+the mana mode, i.e. record word 13 / byte 52. So the flag needs no new field: it is **bit 24 of a word we were
+already reading**. `--report spell-tooltip census` measures it: **3,111 of 21,502 records = 14.5%** carry it.
+
+⚠️ **The renderer flags it rather than acting on it.** Only bits 1–2 of that word are proven to reach the client
+verbatim, and suppressing on an unproven bit makes lines *disappear* — the failure a screenshot diff cannot see,
+where over-drawing is the one it can. So an element whose referenced spell carries the bit renders normally with
+a `⚠️ retail draws nothing here` marker. Flip it to a real suppression once it is confirmed in-client. Open work
+and the falsified hypotheses are in Gitea #789.

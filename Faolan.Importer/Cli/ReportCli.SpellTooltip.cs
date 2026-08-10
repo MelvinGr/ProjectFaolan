@@ -115,6 +115,10 @@ namespace Faolan.Importer.Cli
 
 			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0;
 			long elements = 0, rendered = 0;
+			// #789: how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
+			// selects - the only way to say what the flag MEANS is to look at which spells wear it.
+			long hidden = 0, hiddenRanked = 0, shownRanked = 0, hiddenNameless = 0, shownNameless = 0, shown = 0;
+			var hiddenSample = new List<string>();
 			var fieldCounts = new Dictionary<uint, int>();
 			var noSentence = new Dictionary<uint, int>();
 			var notDrawn = new Dictionary<uint, int>();
@@ -138,6 +142,32 @@ namespace Faolan.Importer.Cli
 				records++;
 				var body = record.AsSpan(12);
 				bodyBytes += body.Length;
+
+				var spellName = ctx.SpellName(entry.Id);
+				var ranked = spellName.Contains("(Rank ", StringComparison.Ordinal);
+				var nameless = spellName.StartsWith("spell ", StringComparison.Ordinal);
+				if (record.Length >= ManaFlagsWordOffset + 4
+				    && (record.ReadU32Le(ManaFlagsWordOffset) >> HiddenFromTooltipBit & 1) == 1)
+				{
+					hidden++;
+					if (ranked)
+						hiddenRanked++;
+
+					if (nameless)
+						hiddenNameless++;
+
+					if (hiddenSample.Count < 12)
+						hiddenSample.Add($"{spellName} ({entry.Id})");
+				}
+				else
+				{
+					shown++;
+					if (ranked)
+						shownRanked++;
+
+					if (nameless)
+						shownNameless++;
+				}
 
 				var fields = RdbSpellImporter.ReadIncreasingFields(body);
 				fieldBytes += fields.Count * 8;
@@ -194,6 +224,16 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  kinds WITH a sentence this report cannot fill ({unbound.Values.Sum():N0} elements over {unbound.Count} kinds):");
 			foreach (var (kind, count) in unbound.OrderByDescending(k => k.Value).Take(20))
 				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   \"{ctx.SentenceFor(kind)}\"");
+
+			Console.WriteLine();
+			Console.WriteLine($"  spells carrying the hide-from-tooltip bit (word 13 bit {HiddenFromTooltipBit}, #789): {hidden:N0} / {records:N0}"
+			                  + $" = {(records == 0 ? 0 : 100.0 * hidden / records):0.0}%");
+			Console.WriteLine($"    named \"(Rank N)\"       : {hiddenRanked,6:N0} / {hidden:N0} flagged = {(hidden == 0 ? 0 : 100.0 * hiddenRanked / hidden):0.0}%"
+			                  + $"   against {shownRanked:N0} / {shown:N0} = {(shown == 0 ? 0 : 100.0 * shownRanked / shown):0.0}% of the rest");
+			Console.WriteLine($"    NO name in LDB 50210 : {hiddenNameless,6:N0} / {hidden:N0} flagged = {(hidden == 0 ? 0 : 100.0 * hiddenNameless / hidden):0.0}%"
+			                  + $"   against {shownNameless:N0} / {shown:N0} = {(shown == 0 ? 0 : 100.0 * shownNameless / shown):0.0}% of the rest");
+			foreach (var sample in hiddenSample)
+				Console.WriteLine($"    {sample}");
 
 			Console.WriteLine();
 			Console.WriteLine("  the property run's unread fields, by how many records carry one:");
@@ -357,9 +397,13 @@ namespace Faolan.Importer.Cli
 			// one-shot element are the same kind with the same keys, and the difference is only there (#772).
 			var period = element.Fixed2d6 == 0 ? "" : $", every {element.Fixed2d6 / 100.0:0.##} s";
 
+			// #789: the client checks a HIDE bit on a spell an element references, and draws nothing for the element
+			// when it is set. Flagged rather than acted on - see HiddenSpellNote.
+			var hidden = HiddenSpellNote(ctx, element);
+
 			if (format != null && args != null && LdbFormat.TryApply(format, args, out var text))
 			{
-				yield return $"{text}{period}   [{typeName}]";
+				yield return $"{text}{period}   [{typeName}]{hidden}";
 				yield break;
 			}
 
@@ -368,8 +412,36 @@ namespace Faolan.Importer.Cli
 				: string.Join(" ", type.Keys.Select((k, i) => $"{k}={(i < element.Values.Length ? ((int)element.Values[i]).ToString(CultureInfo.InvariantCulture) : "-")}"));
 
 			yield return format == null
-				? $"?? {typeName}  {raw}{period}   [no LDB 170 sentence for this type]"
-				: $"?? {typeName}  {raw}{period}   [\"{format}\" - slot binding not established]";
+				? $"?? {typeName}  {raw}{period}   [no LDB 170 sentence for this type]{hidden}"
+				: $"?? {typeName}  {raw}{period}   [\"{format}\" - slot binding not established]{hidden}";
+		}
+
+		/// <summary>
+		///     A marker for an element whose referenced spell carries the client's hide-from-tooltip bit (#789), or the
+		///     empty string.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Deliberately a NOTE and not a suppression. `FUN_014a3b30` makes `ConeFormula` skip its whole sentence
+		///     and makes `AddComboProc` treat that side as absent, so acting on it would make lines DISAPPEAR - and
+		///     only bits 1-2 of the flags word this bit lives in are proven to reach the client verbatim (#629/#630).
+		///     Over-drawing is visible in a screenshot diff; under-drawing is not, so the report takes the visible
+		///     failure. Flip this to a suppression once the bit is confirmed in-client.
+		/// </remarks>
+		private static string HiddenSpellNote(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			if (element.Kind is not (ConeFormulaKind or AddComboProcKind))
+				return "";
+
+			var flagged = new[] { GameActionTypes.KeySpell, GameActionTypes.KeyProcTargetSpell }
+				.Select(element.Value)
+				.Where(v => v is not (null or 0))
+				.Where(v => ctx.SpellHiddenFromTooltip(v!.Value))
+				.Select(v => v!.Value)
+				.ToList();
+
+			return flagged.Count == 0
+				? ""
+				: $"   ⚠️ retail draws nothing here - {string.Join("/", flagged)} carries the hide-from-tooltip bit (#789)";
 		}
 
 		/// <summary>
@@ -454,10 +526,9 @@ namespace Faolan.Importer.Cli
 				var onSelf = element.Value(GameActionTypes.KeySpell) ?? 0;
 				var onTarget = element.Value(GameActionTypes.KeyProcTargetSpell) ?? 0;
 
-				// ⚠️ Presence here is `id != 0` where the client's is `id != 0 && (spell->0xCB & 1) == 0` - a HIDDEN
-				// bit on the referenced spell (`FUN_014a3b30`, the same predicate that makes `ConeFormula` draw
-				// nothing at all). Which stored field carries that bit is open work (#789), so this renders a side
-				// retail would sometimes suppress. It can only draw a line retail omits, never a wrong number in one.
+				// ⚠️ The client's presence test is `id != 0 && !hidden`, and a side whose spell carries the
+				// hide-from-tooltip bit renders as a ONE-sided proc. Not acted on here for the same reason as the
+				// cone kinds - see #789 and HiddenSpellNote; the line is drawn and flagged.
 				var self = onSelf != 0 ? $"{ctx.SpellName(onSelf)} ({onSelf})" : null;
 				var target = onTarget != 0 ? $"{ctx.SpellName(onTarget)} ({onTarget})" : null;
 
@@ -664,6 +735,11 @@ namespace Faolan.Importer.Cli
 					if (element.Kind == AttackAddTargetsKind)
 						return cone;
 
+					// ⚠️ 53259 checks the hide-from-tooltip bit on its effect spell BEFORE building anything and
+					// skips its whole sentence when it is set (#789). This renderer does NOT act on that: the bit
+					// is bit 24 of the flags word and only bits 1-2 of that word are proven to reach the client
+					// verbatim, so suppressing on it would silently DROP lines if the reading is wrong - the worse
+					// direction of the two. The line is drawn and flagged instead (see HiddenSpellNote).
 					var coneSpell = element.Value(GameActionTypes.KeySpell);
 					return coneSpell is null
 						? null
@@ -848,6 +924,25 @@ namespace Faolan.Importer.Cli
 		private const int ManaFlagsWordOffset = 52;
 
 		/// <summary>
+		///     Bit 24 of that same flags word: the client's HIDE-FROM-TOOLTIP flag on a spell (#789).
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         `FUN_014a3b30(spellId)` loads the referenced spell through `SpellTemplate_t::GetMagicSpell` and
+		///         returns `*(byte*)(spell + 0xCB) &amp; 1`. ⭐ `+0xCB` is byte 3 of the dword at `+0xC8`, which is the
+		///         SAME flags word #629/#630 already reads bit 2 of for the mana mode — the client keeps record word
+		///         13 there. So the flag needed no new field: it is bit 24 of a word we were already reading.
+		///     </para>
+		///     <para>
+		///         Two branches consult it, and neither is cosmetic. `ConeFormula` calls it on key 88 and, when set,
+		///         skips its whole sentence (falling into the shared tail, so a periodic element still draws its
+		///         "every N s" suffix and nothing else). `AddComboProc` calls it on key 88 and key 236 separately and
+		///         treats a flagged side as ABSENT, so a two-sided proc draws as a one-sided one.
+		///     </para>
+		/// </remarks>
+		private const int HiddenFromTooltipBit = 24;
+
+		/// <summary>
 		///     What <see cref="RdbSpellImporter" /> actually consumes out of a spell record's property run, field ->
 		///     what it becomes. Shared with <c>--report rdb-field-coverage</c>, which is the census this is the
 		///     per-spell view of.
@@ -1029,6 +1124,34 @@ namespace Faolan.Importer.Cli
 				return Ldb.TryGetValue((LdbStringIndex.SpellNameCategory, spellId), out var name) && !string.IsNullOrWhiteSpace(name)
 					? name
 					: $"spell {spellId}";
+			}
+
+			/// <summary>
+			///     Whether the spell a tooltip element REFERENCES carries <see cref="HiddenFromTooltipBit" /> - the bit
+			///     the client's own `FUN_014a3b30` reads to decide the element draws nothing (#789).
+			/// </summary>
+			/// <remarks>
+			///     It loads the OTHER spell's record to answer, which is why an element's own bytes cannot decide it.
+			///     A spell with no record at all is not flagged - the client's `GetMagicSpell` returns null there and
+			///     the predicate answers 0.
+			/// </remarks>
+			public bool SpellHiddenFromTooltip(uint spellId)
+			{
+				if (spellId == 0 || !Rdb.TryGet(SpellTemplateType, spellId, out var entry))
+					return false;
+
+				byte[] record;
+				try
+				{
+					record = Rdb.ReadDecompressed(entry);
+				}
+				catch
+				{
+					return false;
+				}
+
+				return record.Length >= ManaFlagsWordOffset + 4
+				       && (record.ReadU32Le(ManaFlagsWordOffset) >> HiddenFromTooltipBit & 1) == 1;
 			}
 
 			public string StatName(uint statId)
