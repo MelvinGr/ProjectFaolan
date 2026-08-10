@@ -47,6 +47,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     AuthChallenge = table.Column<Guid>(type: "TEXT", nullable: false),
                     LastIpAddress = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
                     AuthStatus = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SubscriptionSettings = table.Column<byte[]>(type: "BLOB", nullable: true),
                     ClientInstance = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
@@ -54,6 +55,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     table.PrimaryKey("PK_Accounts", x => x.Id);
                     table.CheckConstraint("CK_Account_State", "State IN (0, 1, 2)");
                     table.CheckConstraint("CK_Account_Type", "Type IN (0, 1, 2, 3)");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Achievements",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Achievements", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -128,7 +142,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     table.PrimaryKey("PK_ClassAttributeBases", x => new { x.Class, x.Level, x.StatId });
                     table.CheckConstraint("CK_ClassAttributeBase_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
-                    table.CheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                 });
 
             migrationBuilder.CreateTable(
@@ -173,8 +186,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "FeatIdMaps",
                 columns: table => new
                 {
-                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
                     TemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
                     RootFlag = table.Column<uint>(type: "INTEGER", nullable: false),
                     BaseIndex = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -214,9 +226,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     PopulationCap = table.Column<int>(type: "INTEGER", nullable: false),
                     ClassSpecific = table.Column<bool>(type: "INTEGER", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    TravelConfirmKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
                     PlayfieldFieldA = table.Column<uint>(type: "INTEGER", nullable: false),
                     PlayfieldCount = table.Column<uint>(type: "INTEGER", nullable: false),
-                    PlayfieldFieldB = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldBlobLastWord = table.Column<uint>(type: "INTEGER", nullable: false),
                     PlayfieldFieldC = table.Column<uint>(type: "INTEGER", nullable: false),
                     PlayfieldFlags = table.Column<uint>(type: "INTEGER", nullable: false),
                     PlayfieldToken = table.Column<uint>(type: "INTEGER", nullable: false)
@@ -246,6 +262,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     TemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
                     DeathBehaviorId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    DeathActivationTime = table.Column<uint>(type: "INTEGER", nullable: true),
                     LootContainerTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
@@ -325,9 +342,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Header1 = table.Column<uint>(type: "INTEGER", nullable: false),
                     MidFlag = table.Column<uint>(type: "INTEGER", nullable: false),
                     RdbType = table.Column<uint>(type: "INTEGER", nullable: false),
-                    RefId0 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RequiredFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
                     Tail = table.Column<uint>(type: "INTEGER", nullable: false),
-                    RefId1 = table.Column<uint>(type: "INTEGER", nullable: true)
+                    RequiredWorkshopFeatId = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -340,19 +357,32 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     Id = table.Column<uint>(type: "INTEGER", nullable: false),
                     Level = table.Column<byte>(type: "INTEGER", nullable: false),
-                    Rank = table.Column<byte>(type: "INTEGER", nullable: false),
-                    DamageRating = table.Column<float>(type: "REAL", nullable: false),
+                    GuiStackingOrder = table.Column<byte>(type: "INTEGER", nullable: false),
+                    GuiStackingLine = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ScalingAttribute = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SplashRadius = table.Column<float>(type: "REAL", nullable: false),
+                    SplashDamage = table.Column<float>(type: "REAL", nullable: false),
+                    SplashMaxTargets = table.Column<uint>(type: "INTEGER", nullable: false),
                     Range = table.Column<float>(type: "REAL", nullable: false),
                     DotDelta = table.Column<int>(type: "INTEGER", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
                     Description = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
                     DotType = table.Column<uint>(type: "INTEGER", nullable: false),
                     DotIntervalMs = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChannelingIntervalMs = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CriticalChanceHundredths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CriticalDamageHundredths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AreaRadius = table.Column<float>(type: "REAL", nullable: false),
                     DurationMs = table.Column<uint>(type: "INTEGER", nullable: false),
                     EffectSpell = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SummonSpawnHash = table.Column<string>(type: "TEXT", maxLength: 16, nullable: true),
+                    SummonIsCompanion = table.Column<bool>(type: "INTEGER", nullable: false),
+                    SummonPetBuff = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SummonPointCost = table.Column<uint>(type: "INTEGER", nullable: true),
                     CastTime = table.Column<ushort>(type: "INTEGER", nullable: false),
-                    Cooldown = table.Column<ushort>(type: "INTEGER", nullable: false),
-                    ManaCost = table.Column<ushort>(type: "INTEGER", nullable: false)
+                    RecastCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ManaCost = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    ManaCostIsPercent = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -437,6 +467,53 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "FeatComboAttackModifiers",
+                columns: table => new
+                {
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AttackSlot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DpsPercent = table.Column<int>(type: "INTEGER", nullable: false),
+                    CriticalChanceRating = table.Column<int>(type: "INTEGER", nullable: false),
+                    HatePercent = table.Column<int>(type: "INTEGER", nullable: false),
+                    DamageTypeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatComboAttackModifiers", x => new { x.FeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatComboAttackModifiers_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatComboModifiers",
+                columns: table => new
+                {
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DamagePercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    CooldownPercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatComboModifiers", x => new { x.FeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatComboModifiers_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "FeatEffects",
                 columns: table => new
                 {
@@ -444,7 +521,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Sequence = table.Column<int>(type: "INTEGER", nullable: false),
                     StatId = table.Column<uint>(type: "INTEGER", nullable: false),
                     EffectKind = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Value = table.Column<uint>(type: "INTEGER", nullable: false)
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HighValue = table.Column<int>(type: "INTEGER", nullable: true),
+                    LowLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HighLevel = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -458,54 +538,91 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "MapAreas",
+                name: "FeatProcs",
                 columns: table => new
                 {
-                    AreaNameId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    MaxX = table.Column<float>(type: "REAL", nullable: false),
-                    MaxY = table.Column<float>(type: "REAL", nullable: false),
-                    MaxZ = table.Column<float>(type: "REAL", nullable: false),
-                    MinX = table.Column<float>(type: "REAL", nullable: false),
-                    MinY = table.Column<float>(type: "REAL", nullable: false),
-                    MinZ = table.Column<float>(type: "REAL", nullable: false),
-                    SampleCount = table.Column<uint>(type: "INTEGER", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SelfSpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TargetSpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Trigger = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MapAreas", x => new { x.MapId, x.AreaNameId });
+                    table.PrimaryKey("PK_FeatProcs", x => new { x.FeatId, x.Sequence });
                     table.ForeignKey(
-                        name: "FK_MapAreas_Maps_MapId",
-                        column: x => x.MapId,
-                        principalTable: "Maps",
+                        name: "FK_FeatProcs_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "MapHazards",
+                name: "FeatSpellGrants",
                 columns: table => new
                 {
-                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
-                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    EffectSpellId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Damage = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Lethal = table.Column<bool>(type: "INTEGER", nullable: false),
-                    MinY = table.Column<float>(type: "REAL", nullable: false),
-                    MaxY = table.Column<float>(type: "REAL", nullable: false),
-                    MaxX = table.Column<float>(type: "REAL", nullable: false),
-                    MaxZ = table.Column<float>(type: "REAL", nullable: false),
-                    MinX = table.Column<float>(type: "REAL", nullable: false),
-                    MinZ = table.Column<float>(type: "REAL", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MapHazards", x => x.Id);
+                    table.PrimaryKey("PK_FeatSpellGrants", x => new { x.FeatId, x.Sequence });
                     table.ForeignKey(
-                        name: "FK_MapHazards_Maps_MapId",
-                        column: x => x.MapId,
-                        principalTable: "Maps",
+                        name: "FK_FeatSpellGrants_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatSpellModifiers",
+                columns: table => new
+                {
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatSpellModifiers", x => new { x.FeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatSpellModifiers_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatSpellStatModifiers",
+                columns: table => new
+                {
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<int>(type: "INTEGER", nullable: true),
+                    PercentHundredths = table.Column<int>(type: "INTEGER", nullable: true),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatSpellStatModifiers", x => new { x.FeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatSpellStatModifiers_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -541,7 +658,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     MaxZ = table.Column<float>(type: "REAL", nullable: false),
                     MinX = table.Column<float>(type: "REAL", nullable: false),
                     MinZ = table.Column<float>(type: "REAL", nullable: false),
-                    ScryId = table.Column<uint>(type: "INTEGER", nullable: false)
+                    ScryId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AreaNameId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AreaNameSource = table.Column<int>(type: "INTEGER", nullable: true),
+                    NoMount = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -549,28 +669,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     table.ForeignKey(
                         name: "FK_MapRegions_Maps_MapId",
                         column: x => x.MapId,
-                        principalTable: "Maps",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TravelDestinations",
-                columns: table => new
-                {
-                    NpcName = table.Column<string>(type: "TEXT", nullable: false),
-                    DestinationMapId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Cost = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ArrivalX = table.Column<float>(type: "REAL", nullable: true),
-                    ArrivalY = table.Column<float>(type: "REAL", nullable: true),
-                    ArrivalZ = table.Column<float>(type: "REAL", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TravelDestinations", x => new { x.NpcName, x.DestinationMapId });
-                    table.ForeignKey(
-                        name: "FK_TravelDestinations_Maps_DestinationMapId",
-                        column: x => x.DestinationMapId,
                         principalTable: "Maps",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -588,7 +686,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     ObjectId = table.Column<uint>(type: "INTEGER", nullable: false),
                     TemplateItemId = table.Column<uint>(type: "INTEGER", nullable: true),
                     InteractAction = table.Column<uint>(type: "INTEGER", nullable: false),
-                    IsClosed = table.Column<bool>(type: "INTEGER", nullable: true),
                     ShowPopupOnUse = table.Column<bool>(type: "INTEGER", nullable: true),
                     EffectDynelState = table.Column<byte>(type: "INTEGER", nullable: false),
                     GeometryAssetId = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -639,6 +736,48 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         column: x => x.MapId,
                         principalTable: "Maps",
                         principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConversationNodes",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey = table.Column<string>(type: "TEXT", maxLength: 512, nullable: false),
+                    Discriminator = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Verified = table.Column<bool>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationNodes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ConversationNodes_NpcTemplates_NpcTemplateId",
+                        column: x => x.NpcTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "NpcAmbientAnimations",
+                columns: table => new
+                {
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AnimationId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DurationCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Weight = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NpcAmbientAnimations", x => new { x.NpcTemplateId, x.AnimationId });
+                    table.ForeignKey(
+                        name: "FK_NpcAmbientAnimations_NpcTemplates_NpcTemplateId",
+                        column: x => x.NpcTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -704,6 +843,30 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "NpcFollowPairs",
+                columns: table => new
+                {
+                    FollowerTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    LeaderTemplateId = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NpcFollowPairs", x => new { x.FollowerTemplateId, x.LeaderTemplateId });
+                    table.ForeignKey(
+                        name: "FK_NpcFollowPairs_NpcTemplates_FollowerTemplateId",
+                        column: x => x.FollowerTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NpcFollowPairs_NpcTemplates_LeaderTemplateId",
+                        column: x => x.LeaderTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "NpcMorphs",
                 columns: table => new
                 {
@@ -711,6 +874,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
                     MorphId = table.Column<uint>(type: "INTEGER", nullable: false),
                     Value = table.Column<float>(type: "REAL", nullable: false),
+                    Word2 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Text = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
@@ -793,7 +957,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
                     IirHeader = table.Column<uint>(type: "INTEGER", nullable: true),
-                    MinimalPostIirWord2 = table.Column<uint>(type: "INTEGER", nullable: true),
                     Race = table.Column<uint>(type: "INTEGER", nullable: true),
                     Sex = table.Column<byte>(type: "INTEGER", nullable: true),
                     Side = table.Column<uint>(type: "INTEGER", nullable: true),
@@ -914,13 +1077,14 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Level = table.Column<uint>(type: "INTEGER", nullable: false),
                     MarkerX = table.Column<uint>(type: "INTEGER", nullable: false),
                     MarkerY = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotUnknown118 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotQuestLineFlags = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotQuestLineReward = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotChainHeadQuestId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotUnknownEc = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotXpReward = table.Column<uint>(type: "INTEGER", nullable: false),
-                    SnapshotCashReward = table.Column<ulong>(type: "INTEGER", nullable: false)
+                    Field118 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestLineFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MoneyReward = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    XpReward = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChainHeadQuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldEc = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldF0 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldF8 = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1049,10 +1213,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateId2 = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PairKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Quality = table.Column<int>(type: "INTEGER", nullable: true),
                     Type = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 104),
                     ExcludeFromRandomLoot = table.Column<bool>(type: "INTEGER", nullable: false),
                     Level = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Flags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MoreFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Can = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GemSlots = table.Column<uint>(type: "INTEGER", nullable: false),
                     MaxDamage = table.Column<int>(type: "INTEGER", nullable: true),
                     MinDamage = table.Column<int>(type: "INTEGER", nullable: true),
                     Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
@@ -1062,6 +1235,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Value = table.Column<uint>(type: "INTEGER", nullable: false),
                     BagExtraSlots = table.Column<uint>(type: "INTEGER", nullable: true),
                     OnUseSpell = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OnUseLockSpellLine = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OnUseLockSeconds = table.Column<uint>(type: "INTEGER", nullable: true),
                     ResourceBagExtraSlots = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
@@ -1074,6 +1249,49 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         column: x => x.OnUseSpell,
                         principalTable: "Spells",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Mounts",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CreatureId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quality = table.Column<int>(type: "INTEGER", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Mounts", x => x.Id);
+                    table.CheckConstraint("CK_Mount_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
+                    table.ForeignKey(
+                        name: "FK_Mounts_Spells_Id",
+                        column: x => x.Id,
+                        principalTable: "Spells",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SpellAreaEffects",
+                columns: table => new
+                {
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectSpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RadiusMetres = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxTargets = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PeriodCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SpellAreaEffects", x => new { x.SpellId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_SpellAreaEffects_Spells_SpellId",
+                        column: x => x.SpellId,
+                        principalTable: "Spells",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -1108,13 +1326,20 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 columns: table => new
                 {
                     SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<uint>(type: "INTEGER", nullable: false),
                     StatId = table.Column<uint>(type: "INTEGER", nullable: false),
                     EffectKind = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Amount = table.Column<int>(type: "INTEGER", nullable: false)
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false),
+                    MaxAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    PeriodCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HighAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    MaxHighAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    LowLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HighLevel = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_SpellStatEffects", x => new { x.SpellId, x.StatId });
+                    table.PrimaryKey("PK_SpellStatEffects", x => new { x.SpellId, x.Sequence });
                     table.ForeignKey(
                         name: "FK_SpellStatEffects_Spells_SpellId",
                         column: x => x.SpellId,
@@ -1124,21 +1349,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "MapHazardVertices",
+                name: "MapHazards",
                 columns: table => new
                 {
-                    HazardId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    X = table.Column<float>(type: "REAL", nullable: false),
-                    Z = table.Column<float>(type: "REAL", nullable: false)
+                    RegionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectSpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Damage = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Lethal = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MapHazardVertices", x => new { x.HazardId, x.Sequence });
+                    table.PrimaryKey("PK_MapHazards", x => x.RegionId);
                     table.ForeignKey(
-                        name: "FK_MapHazardVertices_MapHazards_HazardId",
-                        column: x => x.HazardId,
-                        principalTable: "MapHazards",
+                        name: "FK_MapHazards_MapRegions_RegionId",
+                        column: x => x.RegionId,
+                        principalTable: "MapRegions",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -1219,6 +1444,107 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ConversationEntries",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Trigger = table.Column<int>(type: "INTEGER", nullable: false),
+                    TriggerWorldObjectId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ConditionQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ConditionQuestState = table.Column<int>(type: "INTEGER", nullable: true),
+                    RepeatGreeting = table.Column<bool>(type: "INTEGER", nullable: true),
+                    NodeId = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationEntries", x => x.Id);
+                    table.CheckConstraint("CK_ConversationEntry_ConditionQuestState", "ConditionQuestState IN (0, 1)");
+                    table.CheckConstraint("CK_ConversationEntry_Trigger", "Trigger IN (0, 1, 2)");
+                    table.ForeignKey(
+                        name: "FK_ConversationEntries_ConversationNodes_NodeId",
+                        column: x => x.NodeId,
+                        principalTable: "ConversationNodes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ConversationEntries_NpcTemplates_NpcTemplateId",
+                        column: x => x.NpcTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ConversationEntries_WorldObjects_TriggerWorldObjectId",
+                        column: x => x.TriggerWorldObjectId,
+                        principalTable: "WorldObjects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConversationPackets",
+                columns: table => new
+                {
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SubOpcode = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Env = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Flag = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotSize = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotType = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotEmphasis = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotFov = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotTilt = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Autoface = table.Column<bool>(type: "INTEGER", nullable: true),
+                    HeadPaddingY = table.Column<float>(type: "REAL", nullable: true),
+                    Field = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SenderInstance = table.Column<uint>(type: "INTEGER", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationPackets", x => new { x.ConversationNodeId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_ConversationPackets_ConversationNodes_ConversationNodeId",
+                        column: x => x.ConversationNodeId,
+                        principalTable: "ConversationNodes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TravelDestinations",
+                columns: table => new
+                {
+                    FromNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OptionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    DestinationMapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Cost = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ArrivalX = table.Column<float>(type: "REAL", nullable: true),
+                    ArrivalY = table.Column<float>(type: "REAL", nullable: true),
+                    ArrivalZ = table.Column<float>(type: "REAL", nullable: true),
+                    DelaySeconds = table.Column<float>(type: "REAL", nullable: false),
+                    FromDialogueDirective = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TravelDestinations", x => new { x.FromNodeId, x.OptionId });
+                    table.ForeignKey(
+                        name: "FK_TravelDestinations_ConversationNodes_FromNodeId",
+                        column: x => x.FromNodeId,
+                        principalTable: "ConversationNodes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_TravelDestinations_Maps_DestinationMapId",
+                        column: x => x.DestinationMapId,
+                        principalTable: "Maps",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "NpcChatterParameter",
                 columns: table => new
                 {
@@ -1271,6 +1597,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     ClassId = table.Column<byte>(type: "INTEGER", nullable: true),
                     NpcSpawnAreaId = table.Column<uint>(type: "INTEGER", nullable: true),
                     NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlacementId = table.Column<uint>(type: "INTEGER", nullable: true),
                     HasEquipment = table.Column<bool>(type: "INTEGER", nullable: false),
                     ApprenticeLevel = table.Column<uint>(type: "INTEGER", nullable: false),
                     HeadMesh = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -1320,40 +1647,38 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ConversationNodes",
+                name: "ConversationEdges",
                 columns: table => new
                 {
                     Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FromNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OptionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ToNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
                     ConditionQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    GrantQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    TypeId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ServerInitiated = table.Column<bool>(type: "INTEGER", nullable: false),
-                    Verified = table.Column<bool>(type: "INTEGER", nullable: false),
-                    TriggerWorldObjectId = table.Column<uint>(type: "INTEGER", nullable: true),
                     ConditionQuestState = table.Column<int>(type: "INTEGER", nullable: true),
-                    AnswerPath = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
+                    GrantQuestId = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ConversationNodes", x => x.Id);
+                    table.PrimaryKey("PK_ConversationEdges", x => x.Id);
+                    table.CheckConstraint("CK_ConversationEdge_ConditionQuestState", "ConditionQuestState IN (0, 1)");
                     table.ForeignKey(
-                        name: "FK_ConversationNodes_NpcTemplates_NpcTemplateId",
-                        column: x => x.NpcTemplateId,
-                        principalTable: "NpcTemplates",
-                        principalColumn: "TemplateId",
-                        onDelete: ReferentialAction.Restrict);
+                        name: "FK_ConversationEdges_ConversationNodes_FromNodeId",
+                        column: x => x.FromNodeId,
+                        principalTable: "ConversationNodes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_ConversationNodes_QuestDefinitions_GrantQuestId",
+                        name: "FK_ConversationEdges_ConversationNodes_ToNodeId",
+                        column: x => x.ToNodeId,
+                        principalTable: "ConversationNodes",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_ConversationEdges_QuestDefinitions_GrantQuestId",
                         column: x => x.GrantQuestId,
                         principalTable: "QuestDefinitions",
-                        principalColumn: "QuestId");
-                    table.ForeignKey(
-                        name: "FK_ConversationNodes_WorldObjects_TriggerWorldObjectId",
-                        column: x => x.TriggerWorldObjectId,
-                        principalTable: "WorldObjects",
-                        principalColumn: "Id");
+                        principalColumn: "QuestId",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -1424,45 +1749,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ItemStatModifiers", x => new { x.ItemId, x.StatId });
-                    table.CheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                     table.ForeignKey(
                         name: "FK_ItemStatModifiers_Items_ItemId",
                         column: x => x.ItemId,
                         principalTable: "Items",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "MailAttachments",
-                columns: table => new
-                {
-                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    ItemInstanceId = table.Column<ulong>(type: "INTEGER", nullable: false),
-                    MailId = table.Column<ulong>(type: "INTEGER", nullable: false),
-                    ItemHash = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ItemLevel = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Quantity = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Template = table.Column<uint>(type: "INTEGER", nullable: false),
-                    TrailerClass = table.Column<uint>(type: "INTEGER", nullable: false),
-                    TrailerTail = table.Column<uint>(type: "INTEGER", nullable: false),
-                    TrailerWord = table.Column<uint>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_MailAttachments", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_MailAttachments_Items_Template",
-                        column: x => x.Template,
-                        principalTable: "Items",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_MailAttachments_Mails_MailId",
-                        column: x => x.MailId,
-                        principalTable: "Mails",
-                        principalColumn: "MailId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -1514,6 +1805,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     ObjectiveKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
                     ObjectiveToken = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
                     TargetName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    TargetTemplateId = table.Column<uint>(type: "INTEGER", nullable: true),
                     GatesTargetVisibility = table.Column<bool>(type: "INTEGER", nullable: false),
                     RequiredLevel = table.Column<uint>(type: "INTEGER", nullable: true),
                     RequiredRankTitle = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
@@ -1524,7 +1816,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     TrailingKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
                     TrailingKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
                     TrailingToken = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
-                    Extra0 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Extra1 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Extra2 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Extra3 = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -1562,6 +1853,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         column: x => x.MapId,
                         principalTable: "Maps",
                         principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_QuestGoalDefinitions_NpcTemplates_TargetTemplateId",
+                        column: x => x.TargetTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId");
                     table.ForeignKey(
                         name: "FK_QuestGoalDefinitions_QuestDefinitions_QuestDefinitionId",
                         column: x => x.QuestDefinitionId,
@@ -1642,7 +1938,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Handle = table.Column<uint>(type: "INTEGER", nullable: false),
                     ItemHandle = table.Column<uint>(type: "INTEGER", nullable: false),
                     ItemHash = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ItemLevel = table.Column<uint>(type: "INTEGER", nullable: false),
                     Quantity = table.Column<uint>(type: "INTEGER", nullable: false),
                     Template = table.Column<uint>(type: "INTEGER", nullable: false),
                     Timestamp = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -1690,6 +1985,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Race = table.Column<byte>(type: "INTEGER", nullable: false),
                     Sex = table.Column<byte>(type: "INTEGER", nullable: false),
                     ActiveWeaponSet = table.Column<int>(type: "INTEGER", nullable: false),
+                    VanityShownMask = table.Column<uint>(type: "INTEGER", nullable: false),
                     IsDead = table.Column<bool>(type: "INTEGER", nullable: false),
                     AuthChallenge = table.Column<Guid>(type: "TEXT", nullable: false),
                     Language = table.Column<string>(type: "TEXT", maxLength: 4, nullable: true),
@@ -1701,6 +1997,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Kills = table.Column<uint>(type: "INTEGER", nullable: false),
                     Deaths = table.Column<uint>(type: "INTEGER", nullable: false),
                     MurderPoints = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChosenGod = table.Column<uint>(type: "INTEGER", nullable: false),
                     CriminalUntil = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
                     TutorialStepsSeen = table.Column<ulong>(type: "INTEGER", nullable: false),
                     PositionX = table.Column<float>(type: "REAL", nullable: false),
@@ -1750,6 +2047,33 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ConversationScreens",
+                columns: table => new
+                {
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ScreenId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Knubot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Antitag = table.Column<uint>(type: "INTEGER", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationScreens", x => new { x.ConversationNodeId, x.PacketSequence, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_ConversationScreens_ConversationPackets_ConversationNodeId_PacketSequence",
+                        columns: x => new { x.ConversationNodeId, x.PacketSequence },
+                        principalTable: "ConversationPackets",
+                        principalColumns: new[] { "ConversationNodeId", "Sequence" },
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "NpcSpawnEquipment",
                 columns: table => new
                 {
@@ -1783,6 +2107,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
                     MorphId = table.Column<uint>(type: "INTEGER", nullable: false),
                     Value = table.Column<float>(type: "REAL", nullable: false),
+                    Word2 = table.Column<uint>(type: "INTEGER", nullable: false),
                     Text = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
@@ -1852,32 +2177,42 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ConversationPackets",
+                name: "NpcAmbushes",
                 columns: table => new
                 {
-                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    SubOpcode = table.Column<uint>(type: "INTEGER", nullable: true),
-                    Env = table.Column<byte>(type: "INTEGER", nullable: true),
-                    Flag = table.Column<byte>(type: "INTEGER", nullable: true),
-                    ShotSize = table.Column<byte>(type: "INTEGER", nullable: true),
-                    ShotType = table.Column<byte>(type: "INTEGER", nullable: true),
-                    ShotEmphasis = table.Column<byte>(type: "INTEGER", nullable: true),
-                    ShotFov = table.Column<byte>(type: "INTEGER", nullable: true),
-                    ShotTilt = table.Column<byte>(type: "INTEGER", nullable: true),
-                    Autoface = table.Column<bool>(type: "INTEGER", nullable: true),
-                    HeadPaddingY = table.Column<float>(type: "REAL", nullable: true),
-                    Field = table.Column<uint>(type: "INTEGER", nullable: true),
-                    SenderInstance = table.Column<uint>(type: "INTEGER", nullable: true)
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestDefinitionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DelaySeconds = table.Column<float>(type: "REAL", nullable: false),
+                    AnchorDistance = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ConversationPackets", x => new { x.ConversationNodeId, x.Sequence });
+                    table.PrimaryKey("PK_NpcAmbushes", x => new { x.MapId, x.NpcTemplateId });
                     table.ForeignKey(
-                        name: "FK_ConversationPackets_ConversationNodes_ConversationNodeId",
-                        column: x => x.ConversationNodeId,
-                        principalTable: "ConversationNodes",
+                        name: "FK_NpcAmbushes_Maps_MapId",
+                        column: x => x.MapId,
+                        principalTable: "Maps",
                         principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NpcAmbushes_NpcTemplates_NpcTemplateId",
+                        column: x => x.NpcTemplateId,
+                        principalTable: "NpcTemplates",
+                        principalColumn: "TemplateId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NpcAmbushes_QuestDefinitions_QuestDefinitionId",
+                        column: x => x.QuestDefinitionId,
+                        principalTable: "QuestDefinitions",
+                        principalColumn: "QuestId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_NpcAmbushes_QuestGoalDefinitions_GoalId",
+                        column: x => x.GoalId,
+                        principalTable: "QuestGoalDefinitions",
+                        principalColumn: "GoalId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -1975,14 +2310,32 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     BuffId = table.Column<uint>(type: "INTEGER", nullable: false),
                     CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    Nonce = table.Column<uint>(type: "INTEGER", nullable: false)
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CharacterBuffs", x => new { x.CharacterId, x.BuffId });
                     table.ForeignKey(
                         name: "FK_CharacterBuffs_Characters_CharacterId",
+                        column: x => x.CharacterId,
+                        principalTable: "Characters",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CharacterClientSettings",
+                columns: table => new
+                {
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Settings = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    Preview = table.Column<byte[]>(type: "BLOB", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CharacterClientSettings", x => x.CharacterId);
+                    table.ForeignKey(
+                        name: "FK_CharacterClientSettings_Characters_CharacterId",
                         column: x => x.CharacterId,
                         principalTable: "Characters",
                         principalColumn: "Id",
@@ -2005,180 +2358,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         principalTable: "Characters",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "CharacterEquipment",
-                columns: table => new
-                {
-                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    BagId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    BeltId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    BootsId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    ChestId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    CloakId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    FirstPosBagId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    HandsId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    HeadId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    LegsId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    MainHandLeftId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    MainHandRightId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    NeckId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    OffHandLeftId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    OffHandRightId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    ResourceBagId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    RingLeftId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    RingRightId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    ShoulderId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityBeltId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityBootsId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityCapeId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityChestId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityHeadId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityLegsId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityWristId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    WristId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    VanityShownMask = table.Column<uint>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CharacterEquipment", x => x.CharacterId);
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Characters_CharacterId",
-                        column: x => x.CharacterId,
-                        principalTable: "Characters",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_BagId",
-                        column: x => x.BagId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_BeltId",
-                        column: x => x.BeltId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_BootsId",
-                        column: x => x.BootsId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_ChestId",
-                        column: x => x.ChestId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_CloakId",
-                        column: x => x.CloakId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_FirstPosBagId",
-                        column: x => x.FirstPosBagId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_HandsId",
-                        column: x => x.HandsId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_HeadId",
-                        column: x => x.HeadId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_LegsId",
-                        column: x => x.LegsId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_MainHandLeftId",
-                        column: x => x.MainHandLeftId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_MainHandRightId",
-                        column: x => x.MainHandRightId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_NeckId",
-                        column: x => x.NeckId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_OffHandLeftId",
-                        column: x => x.OffHandLeftId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_OffHandRightId",
-                        column: x => x.OffHandRightId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_ResourceBagId",
-                        column: x => x.ResourceBagId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_RingLeftId",
-                        column: x => x.RingLeftId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_RingRightId",
-                        column: x => x.RingRightId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_ShoulderId",
-                        column: x => x.ShoulderId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityBeltId",
-                        column: x => x.VanityBeltId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityBootsId",
-                        column: x => x.VanityBootsId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityCapeId",
-                        column: x => x.VanityCapeId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityChestId",
-                        column: x => x.VanityChestId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityHeadId",
-                        column: x => x.VanityHeadId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityLegsId",
-                        column: x => x.VanityLegsId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_VanityWristId",
-                        column: x => x.VanityWristId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CharacterEquipment_Items_WristId",
-                        column: x => x.WristId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -2219,53 +2398,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     table.ForeignKey(
                         name: "FK_CharacterFriends_Characters_FriendCharacterId",
                         column: x => x.FriendCharacterId,
-                        principalTable: "Characters",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "CharacterInventory",
-                columns: table => new
-                {
-                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Container = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Slot = table.Column<int>(type: "INTEGER", nullable: false),
-                    ItemId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    Count = table.Column<uint>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CharacterInventory", x => new { x.CharacterId, x.Container, x.Slot });
-                    table.CheckConstraint("CK_CharacterInventory_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
-                    table.ForeignKey(
-                        name: "FK_CharacterInventory_Characters_CharacterId",
-                        column: x => x.CharacterId,
-                        principalTable: "Characters",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CharacterInventory_Items_ItemId",
-                        column: x => x.ItemId,
-                        principalTable: "Items",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "CharacterMaxStats",
-                columns: table => new
-                {
-                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Health = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Mana = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Stamina = table.Column<uint>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CharacterMaxStats", x => x.CharacterId);
-                    table.ForeignKey(
-                        name: "FK_CharacterMaxStats_Characters_CharacterId",
-                        column: x => x.CharacterId,
                         principalTable: "Characters",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -2478,6 +2610,78 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ItemInstances",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Container = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Count = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Bound = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatorName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    OwnerCharacterId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OwnerGuildId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Slot = table.Column<int>(type: "INTEGER", nullable: false),
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ItemInstances", x => x.Id);
+                    table.CheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
+                    table.CheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
+                    table.ForeignKey(
+                        name: "FK_ItemInstances_Characters_OwnerCharacterId",
+                        column: x => x.OwnerCharacterId,
+                        principalTable: "Characters",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ItemInstances_Guilds_OwnerGuildId",
+                        column: x => x.OwnerGuildId,
+                        principalTable: "Guilds",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ItemInstances_Items_TemplateId",
+                        column: x => x.TemplateId,
+                        principalTable: "Items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConversationScreenParameters",
+                columns: table => new
+                {
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ScreenSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<byte>(type: "INTEGER", nullable: false),
+                    LocalizedId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    LocalizedToken = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Flags = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
+                    ContentKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationScreenParameters", x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence, x.Sequence });
+                    table.CheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
+                    table.ForeignKey(
+                        name: "FK_ConversationScreenParameters_ConversationScreens_ConversationNodeId_PacketSequence_ScreenSequence",
+                        columns: x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence },
+                        principalTable: "ConversationScreens",
+                        principalColumns: new[] { "ConversationNodeId", "PacketSequence", "Sequence" },
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PatrolNodeWaypoints",
                 columns: table => new
                 {
@@ -2520,33 +2724,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ConversationScreens",
-                columns: table => new
-                {
-                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    ScreenId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Key1 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Category = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Knubot = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Antitag = table.Column<uint>(type: "INTEGER", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ConversationScreens", x => new { x.ConversationNodeId, x.PacketSequence, x.Sequence });
-                    table.ForeignKey(
-                        name: "FK_ConversationScreens_ConversationPackets_ConversationNodeId_PacketSequence",
-                        columns: x => new { x.ConversationNodeId, x.PacketSequence },
-                        principalTable: "ConversationPackets",
-                        principalColumns: new[] { "ConversationNodeId", "Sequence" },
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "CharacterFeats",
                 columns: table => new
                 {
@@ -2573,34 +2750,63 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ConversationScreenParameters",
+                name: "ItemInstanceSockets",
                 columns: table => new
                 {
-                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    ScreenSequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    Kind = table.Column<byte>(type: "INTEGER", nullable: false),
-                    LocalizedId = table.Column<uint>(type: "INTEGER", nullable: true),
-                    LocalizedToken = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
-                    Category = table.Column<uint>(type: "INTEGER", nullable: true),
-                    Flags = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
-                    ContentKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ContentKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ContentKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    ContentKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Text = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false)
+                    ItemInstanceId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SocketIndex = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GemItemId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ConversationScreenParameters", x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence, x.Sequence });
-                    table.CheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
+                    table.PrimaryKey("PK_ItemInstanceSockets", x => new { x.ItemInstanceId, x.SocketIndex });
                     table.ForeignKey(
-                        name: "FK_ConversationScreenParameters_ConversationScreens_ConversationNodeId_PacketSequence_ScreenSequence",
-                        columns: x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence },
-                        principalTable: "ConversationScreens",
-                        principalColumns: new[] { "ConversationNodeId", "PacketSequence", "Sequence" },
+                        name: "FK_ItemInstanceSockets_ItemInstances_ItemInstanceId",
+                        column: x => x.ItemInstanceId,
+                        principalTable: "ItemInstances",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ItemInstanceSockets_Items_GemItemId",
+                        column: x => x.GemItemId,
+                        principalTable: "Items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MailAttachments",
+                columns: table => new
+                {
+                    ItemInstanceId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    MailId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    EscrowedInstanceId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ItemHash = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quantity = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Template = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerClass = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerTail = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerWord = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MailAttachments", x => new { x.MailId, x.ItemInstanceId });
+                    table.ForeignKey(
+                        name: "FK_MailAttachments_ItemInstances_EscrowedInstanceId",
+                        column: x => x.EscrowedInstanceId,
+                        principalTable: "ItemInstances",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_MailAttachments_Items_Template",
+                        column: x => x.Template,
+                        principalTable: "Items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_MailAttachments_Mails_MailId",
+                        column: x => x.MailId,
+                        principalTable: "Mails",
+                        principalColumn: "MailId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -2626,144 +2832,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 column: "CharacterId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_BagId",
-                table: "CharacterEquipment",
-                column: "BagId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_BeltId",
-                table: "CharacterEquipment",
-                column: "BeltId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_BootsId",
-                table: "CharacterEquipment",
-                column: "BootsId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_ChestId",
-                table: "CharacterEquipment",
-                column: "ChestId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_CloakId",
-                table: "CharacterEquipment",
-                column: "CloakId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_FirstPosBagId",
-                table: "CharacterEquipment",
-                column: "FirstPosBagId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_HandsId",
-                table: "CharacterEquipment",
-                column: "HandsId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_HeadId",
-                table: "CharacterEquipment",
-                column: "HeadId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_LegsId",
-                table: "CharacterEquipment",
-                column: "LegsId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_MainHandLeftId",
-                table: "CharacterEquipment",
-                column: "MainHandLeftId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_MainHandRightId",
-                table: "CharacterEquipment",
-                column: "MainHandRightId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_NeckId",
-                table: "CharacterEquipment",
-                column: "NeckId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_OffHandLeftId",
-                table: "CharacterEquipment",
-                column: "OffHandLeftId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_OffHandRightId",
-                table: "CharacterEquipment",
-                column: "OffHandRightId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_ResourceBagId",
-                table: "CharacterEquipment",
-                column: "ResourceBagId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_RingLeftId",
-                table: "CharacterEquipment",
-                column: "RingLeftId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_RingRightId",
-                table: "CharacterEquipment",
-                column: "RingRightId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_ShoulderId",
-                table: "CharacterEquipment",
-                column: "ShoulderId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityBeltId",
-                table: "CharacterEquipment",
-                column: "VanityBeltId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityBootsId",
-                table: "CharacterEquipment",
-                column: "VanityBootsId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityCapeId",
-                table: "CharacterEquipment",
-                column: "VanityCapeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityChestId",
-                table: "CharacterEquipment",
-                column: "VanityChestId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityHeadId",
-                table: "CharacterEquipment",
-                column: "VanityHeadId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityLegsId",
-                table: "CharacterEquipment",
-                column: "VanityLegsId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_VanityWristId",
-                table: "CharacterEquipment",
-                column: "VanityWristId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterEquipment_WristId",
-                table: "CharacterEquipment",
-                column: "WristId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_CharacterFriends_FriendCharacterId",
                 table: "CharacterFriends",
                 column: "FriendCharacterId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterInventory_ItemId",
-                table: "CharacterInventory",
-                column: "ItemId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CharacterQuestGoals_GoalId",
@@ -2852,24 +2923,39 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 column: "SpellId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ConversationNodes_GrantQuestId",
-                table: "ConversationNodes",
+                name: "IX_ConversationEdges_FromNodeId",
+                table: "ConversationEdges",
+                column: "FromNodeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationEdges_GrantQuestId",
+                table: "ConversationEdges",
                 column: "GrantQuestId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ConversationNodes_NpcName_TypeId_AnswerPath",
-                table: "ConversationNodes",
-                columns: new[] { "NpcName", "TypeId", "AnswerPath" });
+                name: "IX_ConversationEdges_ToNodeId",
+                table: "ConversationEdges",
+                column: "ToNodeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationEntries_NodeId",
+                table: "ConversationEntries",
+                column: "NodeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationEntries_NpcTemplateId",
+                table: "ConversationEntries",
+                column: "NpcTemplateId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationEntries_TriggerWorldObjectId",
+                table: "ConversationEntries",
+                column: "TriggerWorldObjectId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ConversationNodes_NpcTemplateId",
                 table: "ConversationNodes",
                 column: "NpcTemplateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ConversationNodes_TriggerWorldObjectId",
-                table: "ConversationNodes",
-                column: "TriggerWorldObjectId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Guilds_RealmId_Name",
@@ -2878,14 +2964,36 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ItemInstances_OwnerCharacterId_Container_Slot",
+                table: "ItemInstances",
+                columns: new[] { "OwnerCharacterId", "Container", "Slot" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemInstances_OwnerGuildId_Container_Slot",
+                table: "ItemInstances",
+                columns: new[] { "OwnerGuildId", "Container", "Slot" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemInstances_TemplateId",
+                table: "ItemInstances",
+                column: "TemplateId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ItemInstanceSockets_GemItemId",
+                table: "ItemInstanceSockets",
+                column: "GemItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Items_OnUseSpell",
                 table: "Items",
                 column: "OnUseSpell");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MailAttachments_MailId",
+                name: "IX_MailAttachments_EscrowedInstanceId",
                 table: "MailAttachments",
-                column: "MailId");
+                column: "EscrowedInstanceId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MailAttachments_Template",
@@ -2903,12 +3011,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 column: "RecipientName");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MapHazards_MapId_Name",
-                table: "MapHazards",
-                columns: new[] { "MapId", "Name" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_MapRegions_MapId_Name",
                 table: "MapRegions",
                 columns: new[] { "MapId", "Name" },
@@ -2919,6 +3021,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 table: "MorphTargets",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NpcAmbushes_GoalId",
+                table: "NpcAmbushes",
+                column: "GoalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NpcAmbushes_NpcTemplateId",
+                table: "NpcAmbushes",
+                column: "NpcTemplateId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NpcAmbushes_QuestDefinitionId",
+                table: "NpcAmbushes",
+                column: "QuestDefinitionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NpcEncounters_BossNpcTemplateId",
@@ -2934,6 +3051,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "IX_NpcEquipment_Template",
                 table: "NpcEquipment",
                 column: "Template");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NpcFollowPairs_LeaderTemplateId",
+                table: "NpcFollowPairs",
+                column: "LeaderTemplateId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NpcSpawnAreas_MapId_GroupOrdinal",
@@ -3003,6 +3125,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 column: "RegionId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_QuestGoalDefinitions_TargetTemplateId",
+                table: "QuestGoalDefinitions",
+                column: "TargetTemplateId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Realms_Name",
                 table: "Realms",
                 column: "Name",
@@ -3062,6 +3189,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "AccountClaims");
 
             migrationBuilder.DropTable(
+                name: "Achievements");
+
+            migrationBuilder.DropTable(
                 name: "AppearanceChoices");
 
             migrationBuilder.DropTable(
@@ -3080,22 +3210,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "CharacterBuffs");
 
             migrationBuilder.DropTable(
-                name: "CharacterCombos");
+                name: "CharacterClientSettings");
 
             migrationBuilder.DropTable(
-                name: "CharacterEquipment");
+                name: "CharacterCombos");
 
             migrationBuilder.DropTable(
                 name: "CharacterFeats");
 
             migrationBuilder.DropTable(
                 name: "CharacterFriends");
-
-            migrationBuilder.DropTable(
-                name: "CharacterInventory");
-
-            migrationBuilder.DropTable(
-                name: "CharacterMaxStats");
 
             migrationBuilder.DropTable(
                 name: "CharacterQuestGoals");
@@ -3143,7 +3267,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "ClassSpells");
 
             migrationBuilder.DropTable(
+                name: "ConversationEdges");
+
+            migrationBuilder.DropTable(
+                name: "ConversationEntries");
+
+            migrationBuilder.DropTable(
                 name: "ConversationScreenParameters");
+
+            migrationBuilder.DropTable(
+                name: "FeatComboAttackModifiers");
+
+            migrationBuilder.DropTable(
+                name: "FeatComboModifiers");
 
             migrationBuilder.DropTable(
                 name: "FeatEffects");
@@ -3152,16 +3288,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "FeatPrereqs");
 
             migrationBuilder.DropTable(
+                name: "FeatProcs");
+
+            migrationBuilder.DropTable(
+                name: "FeatSpellGrants");
+
+            migrationBuilder.DropTable(
+                name: "FeatSpellModifiers");
+
+            migrationBuilder.DropTable(
+                name: "FeatSpellStatModifiers");
+
+            migrationBuilder.DropTable(
+                name: "ItemInstanceSockets");
+
+            migrationBuilder.DropTable(
                 name: "ItemStatModifiers");
 
             migrationBuilder.DropTable(
                 name: "MailAttachments");
 
             migrationBuilder.DropTable(
-                name: "MapAreas");
-
-            migrationBuilder.DropTable(
-                name: "MapHazardVertices");
+                name: "MapHazards");
 
             migrationBuilder.DropTable(
                 name: "MapLootEntries");
@@ -3173,6 +3321,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "MorphTargets");
 
             migrationBuilder.DropTable(
+                name: "Mounts");
+
+            migrationBuilder.DropTable(
+                name: "NpcAmbientAnimations");
+
+            migrationBuilder.DropTable(
+                name: "NpcAmbushes");
+
+            migrationBuilder.DropTable(
                 name: "NpcChatterParameter");
 
             migrationBuilder.DropTable(
@@ -3180,6 +3337,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             migrationBuilder.DropTable(
                 name: "NpcEquipment");
+
+            migrationBuilder.DropTable(
+                name: "NpcFollowPairs");
 
             migrationBuilder.DropTable(
                 name: "NpcMorphs");
@@ -3218,6 +3378,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "ShopItems");
 
             migrationBuilder.DropTable(
+                name: "SpellAreaEffects");
+
+            migrationBuilder.DropTable(
                 name: "SpellEffects");
 
             migrationBuilder.DropTable(
@@ -3239,9 +3402,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "CharacterFeatSpecs");
 
             migrationBuilder.DropTable(
-                name: "QuestGoalDefinitions");
-
-            migrationBuilder.DropTable(
                 name: "Abilities");
 
             migrationBuilder.DropTable(
@@ -3251,16 +3411,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "ConversationScreens");
 
             migrationBuilder.DropTable(
+                name: "FeatIdMaps");
+
+            migrationBuilder.DropTable(
                 name: "Feats");
 
             migrationBuilder.DropTable(
-                name: "FeatIdMaps");
+                name: "ItemInstances");
 
             migrationBuilder.DropTable(
                 name: "Mails");
 
             migrationBuilder.DropTable(
-                name: "MapHazards");
+                name: "QuestGoalDefinitions");
 
             migrationBuilder.DropTable(
                 name: "NpcChatter");
@@ -3275,16 +3438,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "Shops");
 
             migrationBuilder.DropTable(
+                name: "WorldObjects");
+
+            migrationBuilder.DropTable(
+                name: "ConversationPackets");
+
+            migrationBuilder.DropTable(
                 name: "Characters");
 
             migrationBuilder.DropTable(
                 name: "Items");
 
             migrationBuilder.DropTable(
-                name: "ConversationPackets");
+                name: "QuestDefinitions");
 
             migrationBuilder.DropTable(
                 name: "NpcSpawns");
+
+            migrationBuilder.DropTable(
+                name: "ConversationNodes");
 
             migrationBuilder.DropTable(
                 name: "Accounts");
@@ -3299,7 +3471,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "Spells");
 
             migrationBuilder.DropTable(
-                name: "ConversationNodes");
+                name: "QuestLines");
 
             migrationBuilder.DropTable(
                 name: "NpcSpawnAreas");
@@ -3311,16 +3483,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "MapRegions");
 
             migrationBuilder.DropTable(
-                name: "QuestDefinitions");
-
-            migrationBuilder.DropTable(
-                name: "WorldObjects");
-
-            migrationBuilder.DropTable(
                 name: "NpcTemplates");
-
-            migrationBuilder.DropTable(
-                name: "QuestLines");
 
             migrationBuilder.DropTable(
                 name: "Maps");

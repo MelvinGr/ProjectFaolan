@@ -55,11 +55,15 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 
 # EF migrations (context lives in Faolan.Core.Database; the migrations themselves are PER PROVIDER, in
 # Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations).
-# ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP. The maintainer's standing call (2026-07-26): do not scaffold Postgres
-# migrations. It is not a new divergence - Postgres was already 16 migrations behind (8 vs 24) when the rule was set,
-# so it has not been migratable for a long time. The Postgres PROVIDER code stays (Faolan.Core.Database is
-# provider-agnostic and faolan.sql loads into both), but its migration chain is dead: bringing Postgres back means
-# deleting its Migrations/ and scaffolding ONE fresh initial migration from the current model, not replaying 16.
+# ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP (the maintainer's standing call, 2026-07-26). Both chains were
+# SQUASHED to a single `InitialCreate` on 2026-08-10, so Postgres is level with the model as of that day and does not
+# need replaying; it simply does not track changes made after it. The Postgres PROVIDER code stays (Faolan.Core.Database
+# is provider-agnostic and faolan.sql loads into both). Bringing Postgres back level = delete its Migrations/ and
+# scaffold ONE fresh initial migration from the current model, never a chain.
+# ⚠️ Its `InitialCreate` does NOT apply as it stands: `CK_ItemInstance_OneOwner` is declared with UNQUOTED column
+# names (DatabaseContext.OnModelCreating), which Postgres folds to lowercase - `column "ownercharacterid" does not
+# exist`. SQLite is case-insensitive, so only Postgres sees it. Quoting them is a model change and so a Sqlite
+# table rebuild too, which is why it was left alone.
 # The EF tools run design time with CWD = the PROJECT dir. That used to need FAOLAN_CONFIG + an absolute
 # --connection override (#456): Global.ConfigPath now searches UP from the CWD (then up from the exe dir) for
 # faolan.json, and a relative SQLite `Data Source` resolves against the DIRECTORY that file was found in - so

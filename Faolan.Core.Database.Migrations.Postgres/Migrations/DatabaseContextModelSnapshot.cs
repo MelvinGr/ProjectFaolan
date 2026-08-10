@@ -87,6 +87,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<byte>("State")
                         .HasColumnType("smallint");
 
+                    b.Property<byte[]>("SubscriptionSettings")
+                        .HasColumnType("bytea");
+
                     b.Property<byte>("Type")
                         .HasColumnType("smallint");
 
@@ -147,6 +150,25 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasIndex("ItemTemplateId");
 
                     b.ToTable("AccountClaims");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Achievement", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Achievements");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.AppearanceChoice", b =>
@@ -245,6 +267,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long?>("BindRespawnPointId")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("ChosenGod")
+                        .HasColumnType("bigint");
+
                     b.Property<byte>("Class")
                         .HasColumnType("smallint");
 
@@ -336,6 +361,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<decimal>("TutorialStepsSeen")
                         .HasPrecision(20)
                         .HasColumnType("numeric(20,0)");
+
+                    b.Property<long>("VanityShownMask")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -518,12 +546,25 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("Nonce")
-                        .HasColumnType("bigint");
-
                     b.HasKey("CharacterId", "BuffId");
 
                     b.ToTable("CharacterBuffs");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterClientSettings", b =>
+                {
+                    b.Property<long>("CharacterId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("Preview")
+                        .HasColumnType("bytea");
+
+                    b.Property<byte[]>("Settings")
+                        .HasColumnType("bytea");
+
+                    b.HasKey("CharacterId");
+
+                    b.ToTable("CharacterClientSettings");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterCombo", b =>
@@ -537,149 +578,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasKey("CharacterId", "ComboId");
 
                     b.ToTable("CharacterCombos");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterEquipment", b =>
-                {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("BagId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("BeltId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("BootsId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ChestId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("CloakId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("FirstPosBagId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("HandsId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("HeadId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("LegsId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("MainHandLeftId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("MainHandRightId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NeckId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("OffHandLeftId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("OffHandRightId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ResourceBagId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("RingLeftId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("RingRightId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ShoulderId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityBeltId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityBootsId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityCapeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityChestId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityHeadId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityLegsId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("VanityShownMask")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("VanityWristId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("WristId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("CharacterId");
-
-                    b.HasIndex("BagId");
-
-                    b.HasIndex("BeltId");
-
-                    b.HasIndex("BootsId");
-
-                    b.HasIndex("ChestId");
-
-                    b.HasIndex("CloakId");
-
-                    b.HasIndex("FirstPosBagId");
-
-                    b.HasIndex("HandsId");
-
-                    b.HasIndex("HeadId");
-
-                    b.HasIndex("LegsId");
-
-                    b.HasIndex("MainHandLeftId");
-
-                    b.HasIndex("MainHandRightId");
-
-                    b.HasIndex("NeckId");
-
-                    b.HasIndex("OffHandLeftId");
-
-                    b.HasIndex("OffHandRightId");
-
-                    b.HasIndex("ResourceBagId");
-
-                    b.HasIndex("RingLeftId");
-
-                    b.HasIndex("RingRightId");
-
-                    b.HasIndex("ShoulderId");
-
-                    b.HasIndex("VanityBeltId");
-
-                    b.HasIndex("VanityBootsId");
-
-                    b.HasIndex("VanityCapeId");
-
-                    b.HasIndex("VanityChestId");
-
-                    b.HasIndex("VanityHeadId");
-
-                    b.HasIndex("VanityLegsId");
-
-                    b.HasIndex("VanityWristId");
-
-                    b.HasIndex("WristId");
-
-                    b.ToTable("CharacterEquipment");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
@@ -731,52 +629,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasIndex("FriendCharacterId");
 
                     b.ToTable("CharacterFriends");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
-                {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Container")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Slot")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("Count")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ItemId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("CharacterId", "Container", "Slot");
-
-                    b.HasIndex("ItemId");
-
-                    b.ToTable("CharacterInventory", t =>
-                        {
-                            t.HasCheckConstraint("CK_CharacterInventory_Container", "\"Container\" IN (101, 104, 105, 111, 112, 113, 115)");
-                        });
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterMaxStats", b =>
-                {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Health")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Mana")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Stamina")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("CharacterId");
-
-                    b.ToTable("CharacterMaxStats");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
@@ -1056,8 +908,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("ClassAttributeBases", t =>
                         {
                             t.HasCheckConstraint("CK_ClassAttributeBase_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
-
-                            t.HasCheckConstraint("CK_ClassAttributeBase_StatId", "\"StatId\" IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                         });
                 });
 
@@ -1180,15 +1030,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("Combos");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEdge", b =>
                 {
                     b.Property<long>("Id")
                         .HasColumnType("bigint");
-
-                    b.Property<string>("AnswerPath")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
 
                     b.Property<long?>("ConditionQuestId")
                         .HasColumnType("bigint");
@@ -1196,7 +1041,44 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<int?>("ConditionQuestState")
                         .HasColumnType("integer");
 
+                    b.Property<long>("FromNodeId")
+                        .HasColumnType("bigint");
+
                     b.Property<long?>("GrantQuestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("OptionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ToNodeId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromNodeId");
+
+                    b.HasIndex("GrantQuestId");
+
+                    b.HasIndex("ToNodeId");
+
+                    b.ToTable("ConversationEdges", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationEdge_ConditionQuestState", "\"ConditionQuestState\" IN (0, 1)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ConditionQuestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("ConditionQuestState")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("NodeId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("NpcName")
@@ -1204,16 +1086,53 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<long?>("NpcTemplateId")
+                    b.Property<long>("NpcTemplateId")
                         .HasColumnType("bigint");
 
-                    b.Property<bool>("ServerInitiated")
+                    b.Property<bool?>("RepeatGreeting")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer");
 
                     b.Property<long?>("TriggerWorldObjectId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("TypeId")
+                    b.HasKey("Id");
+
+                    b.HasIndex("NodeId");
+
+                    b.HasIndex("NpcTemplateId");
+
+                    b.HasIndex("TriggerWorldObjectId");
+
+                    b.ToTable("ConversationEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationEntry_ConditionQuestState", "\"ConditionQuestState\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_ConversationEntry_Trigger", "\"Trigger\" IN (0, 1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ContentKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<long>("Discriminator")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("NpcName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("NpcTemplateId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Verified")
@@ -1221,13 +1140,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GrantQuestId");
-
                     b.HasIndex("NpcTemplateId");
-
-                    b.HasIndex("TriggerWorldObjectId");
-
-                    b.HasIndex("NpcName", "TypeId", "AnswerPath");
 
                     b.ToTable("ConversationNodes");
                 });
@@ -1400,6 +1313,65 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("Feats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboAttackModifier", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("AttackSlot")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ComboId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("CriticalChanceRating")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("DamageTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("DpsPercent")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("HatePercent")
+                        .HasColumnType("integer");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatComboAttackModifiers");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboModifier", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("ComboId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("CooldownPercentHundredths")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DamagePercentHundredths")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatComboModifiers");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>
                 {
                     b.Property<long>("FeatId")
@@ -1409,6 +1381,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasColumnType("integer");
 
                     b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("HighLevel")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("HighValue")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("LowLevel")
                         .HasColumnType("bigint");
 
                     b.Property<long>("StatId")
@@ -1425,10 +1406,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatIdMap", b =>
                 {
                     b.Property<long>("WireFeatId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("WireFeatId"));
 
                     b.Property<long>("BaseIndex")
                         .HasColumnType("bigint");
@@ -1461,6 +1439,112 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasKey("WireFeatId", "Sequence");
 
                     b.ToTable("FeatPrereqs");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatProc", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("ComboId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SelfSpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SpellLineId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetSpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Trigger")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatProcs");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellGrant", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("SpellId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatSpellGrants");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellModifier", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("PercentHundredths")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("SpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SpellLineId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatSpellModifiers");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellStatModifier", b =>
+                {
+                    b.Property<long>("FeatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("EffectKind")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("PercentHundredths")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("SpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SpellLineId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("StatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("Value")
+                        .HasColumnType("integer");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatSpellStatModifiers");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
@@ -1536,12 +1620,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long?>("BagExtraSlots")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("Can")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
                     b.Property<bool>("ExcludeFromRandomLoot")
                         .HasColumnType("boolean");
+
+                    b.Property<long?>("Flags")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GemSlots")
+                        .HasColumnType("bigint");
 
                     b.Property<long>("Hash")
                         .HasColumnType("bigint");
@@ -1555,10 +1648,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<int?>("MinDamage")
                         .HasColumnType("integer");
 
+                    b.Property<long>("MoreFlags")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("OnUseLockSeconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("OnUseLockSpellLine")
+                        .HasColumnType("bigint");
 
                     b.Property<long?>("OnUseSpell")
                         .HasColumnType("bigint");
@@ -1570,6 +1672,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<long>("SearchCategory")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TemplateId2")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Type")
@@ -1592,6 +1697,75 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Bound")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("Container")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Count")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CreatorName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long?>("OwnerCharacterId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("OwnerGuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("TemplateId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("OwnerCharacterId", "Container", "Slot")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerGuildId", "Container", "Slot")
+                        .IsUnique();
+
+                    b.ToTable("ItemInstances", t =>
+                        {
+                            t.HasCheckConstraint("CK_ItemInstance_Container", "\"Container\" IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
+
+                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstanceSocket", b =>
+                {
+                    b.Property<long>("ItemInstanceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SocketIndex")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GemItemId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ItemInstanceId", "SocketIndex");
+
+                    b.HasIndex("GemItemId");
+
+                    b.ToTable("ItemInstanceSockets");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemStatModifier", b =>
                 {
                     b.Property<long>("ItemId")
@@ -1605,10 +1779,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.HasKey("ItemId", "StatId");
 
-                    b.ToTable("ItemStatModifiers", t =>
-                        {
-                            t.HasCheckConstraint("CK_ItemStatModifier_StatId", "\"StatId\" IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
-                        });
+                    b.ToTable("ItemStatModifiers");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Mail", b =>
@@ -1671,25 +1842,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MailAttachment", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ItemHash")
-                        .HasColumnType("bigint");
+                    b.Property<decimal>("MailId")
+                        .HasPrecision(20)
+                        .HasColumnType("numeric(20,0)");
 
                     b.Property<decimal>("ItemInstanceId")
                         .HasPrecision(20)
                         .HasColumnType("numeric(20,0)");
 
-                    b.Property<long>("ItemLevel")
+                    b.Property<long?>("EscrowedInstanceId")
                         .HasColumnType("bigint");
 
-                    b.Property<decimal>("MailId")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<long>("ItemHash")
+                        .HasColumnType("bigint");
 
                     b.Property<long>("Quantity")
                         .HasColumnType("bigint");
@@ -1706,9 +1871,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("TrailerWord")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
+                    b.HasKey("MailId", "ItemInstanceId");
 
-                    b.HasIndex("MailId");
+                    b.HasIndex("EscrowedInstanceId");
 
                     b.HasIndex("Template");
 
@@ -1731,13 +1896,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<long>("PlayfieldBlobLastWord")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("PlayfieldCount")
                         .HasColumnType("bigint");
 
                     b.Property<long>("PlayfieldFieldA")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("PlayfieldFieldB")
                         .HasColumnType("bigint");
 
                     b.Property<long>("PlayfieldFieldC")
@@ -1760,43 +1925,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("Maps");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
-                {
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("AreaNameId")
-                        .HasColumnType("bigint");
-
-                    b.Property<float>("MaxX")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MaxY")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MaxZ")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinX")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinY")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinZ")
-                        .HasColumnType("real");
-
-                    b.Property<long>("SampleCount")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("MapId", "AreaNameId");
-
-                    b.ToTable("MapAreas");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<long>("RegionId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Damage")
@@ -1808,56 +1939,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<bool>("Lethal")
                         .HasColumnType("boolean");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
-
-                    b.Property<float>("MaxX")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MaxY")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MaxZ")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinX")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinY")
-                        .HasColumnType("real");
-
-                    b.Property<float>("MinZ")
-                        .HasColumnType("real");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MapId", "Name")
-                        .IsUnique();
+                    b.HasKey("RegionId");
 
                     b.ToTable("MapHazards");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazardVertex", b =>
-                {
-                    b.Property<long>("HazardId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.Property<float>("X")
-                        .HasColumnType("real");
-
-                    b.Property<float>("Z")
-                        .HasColumnType("real");
-
-                    b.HasKey("HazardId", "Sequence");
-
-                    b.ToTable("MapHazardVertices");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
@@ -1878,6 +1962,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("Id")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("AreaNameId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("AreaNameSource")
+                        .HasColumnType("integer");
+
                     b.Property<long>("MapId")
                         .HasColumnType("bigint");
 
@@ -1902,6 +1992,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("NoMount")
+                        .HasColumnType("boolean");
 
                     b.Property<long>("ScryId")
                         .HasColumnType("bigint");
@@ -1955,6 +2048,75 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .IsUnique();
 
                     b.ToTable("MorphTargets");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Mount", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CreatureId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("Quality")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Mounts", t =>
+                        {
+                            t.HasCheckConstraint("CK_Mount_Quality", "\"Quality\" IN (0, 1, 2, 3, 4, 5)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbientAnimation", b =>
+                {
+                    b.Property<long>("NpcTemplateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("AnimationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("DurationCentiseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Weight")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("NpcTemplateId", "AnimationId");
+
+                    b.ToTable("NpcAmbientAnimations");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
+                {
+                    b.Property<long>("MapId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("NpcTemplateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<float>("AnchorDistance")
+                        .HasColumnType("real");
+
+                    b.Property<float>("DelaySeconds")
+                        .HasColumnType("real");
+
+                    b.Property<long>("GoalId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("QuestDefinitionId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("MapId", "NpcTemplateId");
+
+                    b.HasIndex("GoalId");
+
+                    b.HasIndex("NpcTemplateId");
+
+                    b.HasIndex("QuestDefinitionId");
+
+                    b.ToTable("NpcAmbushes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
@@ -2066,6 +2228,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("NpcEquipment");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcFollowPair", b =>
+                {
+                    b.Property<long>("FollowerTemplateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("LeaderTemplateId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FollowerTemplateId", "LeaderTemplateId");
+
+                    b.HasIndex("LeaderTemplateId");
+
+                    b.ToTable("NpcFollowPairs");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcMorph", b =>
                 {
                     b.Property<long>("NpcTemplateId")
@@ -2084,6 +2261,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.Property<float>("Value")
                         .HasColumnType("real");
+
+                    b.Property<long>("Word2")
+                        .HasColumnType("bigint");
 
                     b.HasKey("NpcTemplateId", "Ordinal");
 
@@ -2144,6 +2324,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<long>("NpcTemplateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PlacementId")
                         .HasColumnType("bigint");
 
                     b.Property<float>("PositionX")
@@ -2325,6 +2508,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<float>("Value")
                         .HasColumnType("real");
 
+                    b.Property<long>("Word2")
+                        .HasColumnType("bigint");
+
                     b.HasKey("NpcSpawnId", "Ordinal");
 
                     b.ToTable("NpcSpawnMorphs");
@@ -2474,9 +2660,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long?>("MaxStamina")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("MinimalPostIirWord2")
-                        .HasColumnType("bigint");
-
                     b.Property<long?>("MonsterData")
                         .HasColumnType("bigint");
 
@@ -2575,6 +2758,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcTemplate", b =>
                 {
                     b.Property<long>("TemplateId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DeathActivationTime")
                         .HasColumnType("bigint");
 
                     b.Property<long?>("DeathBehaviorId")
@@ -2760,6 +2946,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("QuestId")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("ChainHeadQuestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Field118")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FieldEc")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FieldF0")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("FieldF8")
+                        .HasPrecision(20)
+                        .HasColumnType("numeric(20,0)");
+
                     b.Property<long>("GoalId")
                         .HasColumnType("bigint");
 
@@ -2803,6 +3005,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("MarkerY")
                         .HasColumnType("bigint");
 
+                    b.Property<decimal>("MoneyReward")
+                        .HasPrecision(20)
+                        .HasColumnType("numeric(20,0)");
+
                     b.Property<string>("Name")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -2813,33 +3019,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<bool>("ObjectiveRegionVerified")
                         .HasColumnType("boolean");
 
+                    b.Property<long>("QuestLineFlags")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("QuestLineId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("SnapshotCashReward")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
-
-                    b.Property<long>("SnapshotChainHeadQuestId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SnapshotQuestLineFlags")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SnapshotQuestLineReward")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SnapshotUnknown118")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SnapshotUnknownEc")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SnapshotXpReward")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Verified")
                         .HasColumnType("boolean");
+
+                    b.Property<long>("XpReward")
+                        .HasColumnType("bigint");
 
                     b.HasKey("QuestId");
 
@@ -2853,9 +3043,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestGoalDefinition", b =>
                 {
                     b.Property<long>("GoalId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Extra0")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Extra1")
@@ -2952,6 +3139,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<long?>("TargetTemplateId")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("TrailingCategory")
                         .HasColumnType("bigint");
 
@@ -2984,6 +3174,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasIndex("QuestItemId");
 
                     b.HasIndex("RegionId");
+
+                    b.HasIndex("TargetTemplateId");
 
                     b.ToTable("QuestGoalDefinitions");
                 });
@@ -3156,10 +3348,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("RdbType")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("RefId0")
+                    b.Property<long>("RequiredFeatId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("RefId1")
+                    b.Property<long?>("RequiredWorkshopFeatId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Tail")
@@ -3308,14 +3500,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("Id")
                         .HasColumnType("bigint");
 
+                    b.Property<float>("AreaRadius")
+                        .HasColumnType("real");
+
                     b.Property<int>("CastTime")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Cooldown")
-                        .HasColumnType("integer");
+                    b.Property<long>("ChannelingIntervalMs")
+                        .HasColumnType("bigint");
 
-                    b.Property<float>("DamageRating")
-                        .HasColumnType("real");
+                    b.Property<long>("CriticalChanceHundredths")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CriticalDamageHundredths")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
@@ -3336,11 +3534,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("EffectSpell")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("GuiStackingLine")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte>("GuiStackingOrder")
+                        .HasColumnType("smallint");
+
                     b.Property<byte>("Level")
                         .HasColumnType("smallint");
 
                     b.Property<int>("ManaCost")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("ManaCostIsPercent")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -3350,12 +3557,65 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<float>("Range")
                         .HasColumnType("real");
 
-                    b.Property<byte>("Rank")
-                        .HasColumnType("smallint");
+                    b.Property<long>("RecastCentiseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ScalingAttribute")
+                        .HasColumnType("bigint");
+
+                    b.Property<float>("SplashDamage")
+                        .HasColumnType("real");
+
+                    b.Property<long>("SplashMaxTargets")
+                        .HasColumnType("bigint");
+
+                    b.Property<float>("SplashRadius")
+                        .HasColumnType("real");
+
+                    b.Property<bool>("SummonIsCompanion")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("SummonPetBuff")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SummonPointCost")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SummonSpawnHash")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 
                     b.ToTable("Spells");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffect", b =>
+                {
+                    b.Property<long>("SpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("EffectSpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Kind")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MaxTargets")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PeriodCentiseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RadiusMetres")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("SpellId", "Sequence");
+
+                    b.ToTable("SpellAreaEffects");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
@@ -3403,7 +3663,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("SpellId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("StatId")
+                    b.Property<long>("Sequence")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Amount")
@@ -3412,7 +3672,28 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("EffectKind")
                         .HasColumnType("bigint");
 
-                    b.HasKey("SpellId", "StatId");
+                    b.Property<int?>("HighAmount")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("HighLevel")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("LowLevel")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("MaxAmount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MaxHighAmount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("PeriodCentiseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("StatId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("SpellId", "Sequence");
 
                     b.ToTable("SpellStatEffects");
                 });
@@ -3467,9 +3748,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("ItemLevel")
-                        .HasColumnType("bigint");
-
                     b.Property<decimal>("Price")
                         .HasPrecision(20)
                         .HasColumnType("numeric(20,0)");
@@ -3509,10 +3787,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.TravelDestination", b =>
                 {
-                    b.Property<string>("NpcName")
-                        .HasColumnType("text");
+                    b.Property<long>("FromNodeId")
+                        .HasColumnType("bigint");
 
-                    b.Property<long>("DestinationMapId")
+                    b.Property<long>("OptionId")
                         .HasColumnType("bigint");
 
                     b.Property<float?>("ArrivalX")
@@ -3524,10 +3802,24 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<float?>("ArrivalZ")
                         .HasColumnType("real");
 
-                    b.Property<long>("Cost")
+                    b.Property<long?>("Cost")
                         .HasColumnType("bigint");
 
-                    b.HasKey("NpcName", "DestinationMapId");
+                    b.Property<float>("DelaySeconds")
+                        .HasColumnType("real");
+
+                    b.Property<long>("DestinationMapId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("FromDialogueDirective")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("NpcName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("FromNodeId", "OptionId");
 
                     b.HasIndex("DestinationMapId");
 
@@ -3622,9 +3914,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.Property<long>("InteractAction")
                         .HasColumnType("bigint");
-
-                    b.Property<bool?>("IsClosed")
-                        .HasColumnType("boolean");
 
                     b.Property<long>("Kdtree")
                         .HasColumnType("bigint");
@@ -3842,6 +4131,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterClientSettings", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithOne("ClientSettings")
+                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterClientSettings", "CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterCombo", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -3851,173 +4151,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .IsRequired();
 
                     b.Navigation("Character");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterEquipment", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Bag")
-                        .WithMany()
-                        .HasForeignKey("BagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Belt")
-                        .WithMany()
-                        .HasForeignKey("BeltId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Boots")
-                        .WithMany()
-                        .HasForeignKey("BootsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithOne("Equipment")
-                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterEquipment", "CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Chest")
-                        .WithMany()
-                        .HasForeignKey("ChestId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Cloak")
-                        .WithMany()
-                        .HasForeignKey("CloakId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "FirstPosBag")
-                        .WithMany()
-                        .HasForeignKey("FirstPosBagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Hands")
-                        .WithMany()
-                        .HasForeignKey("HandsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Head")
-                        .WithMany()
-                        .HasForeignKey("HeadId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Legs")
-                        .WithMany()
-                        .HasForeignKey("LegsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "MainHandLeft")
-                        .WithMany()
-                        .HasForeignKey("MainHandLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "MainHandRight")
-                        .WithMany()
-                        .HasForeignKey("MainHandRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Neck")
-                        .WithMany()
-                        .HasForeignKey("NeckId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "OffHandLeft")
-                        .WithMany()
-                        .HasForeignKey("OffHandLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "OffHandRight")
-                        .WithMany()
-                        .HasForeignKey("OffHandRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "ResourceBag")
-                        .WithMany()
-                        .HasForeignKey("ResourceBagId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "RingLeft")
-                        .WithMany()
-                        .HasForeignKey("RingLeftId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "RingRight")
-                        .WithMany()
-                        .HasForeignKey("RingRightId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Shoulder")
-                        .WithMany()
-                        .HasForeignKey("ShoulderId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityBelt")
-                        .WithMany()
-                        .HasForeignKey("VanityBeltId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityBoots")
-                        .WithMany()
-                        .HasForeignKey("VanityBootsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityCape")
-                        .WithMany()
-                        .HasForeignKey("VanityCapeId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityChest")
-                        .WithMany()
-                        .HasForeignKey("VanityChestId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityHead")
-                        .WithMany()
-                        .HasForeignKey("VanityHeadId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityLegs")
-                        .WithMany()
-                        .HasForeignKey("VanityLegsId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "VanityWrist")
-                        .WithMany()
-                        .HasForeignKey("VanityWristId");
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Wrist")
-                        .WithMany()
-                        .HasForeignKey("WristId");
-
-                    b.Navigation("Bag");
-
-                    b.Navigation("Belt");
-
-                    b.Navigation("Boots");
-
-                    b.Navigation("Character");
-
-                    b.Navigation("Chest");
-
-                    b.Navigation("Cloak");
-
-                    b.Navigation("FirstPosBag");
-
-                    b.Navigation("Hands");
-
-                    b.Navigation("Head");
-
-                    b.Navigation("Legs");
-
-                    b.Navigation("MainHandLeft");
-
-                    b.Navigation("MainHandRight");
-
-                    b.Navigation("Neck");
-
-                    b.Navigation("OffHandLeft");
-
-                    b.Navigation("OffHandRight");
-
-                    b.Navigation("ResourceBag");
-
-                    b.Navigation("RingLeft");
-
-                    b.Navigation("RingRight");
-
-                    b.Navigation("Shoulder");
-
-                    b.Navigation("VanityBelt");
-
-                    b.Navigation("VanityBoots");
-
-                    b.Navigation("VanityCape");
-
-                    b.Navigation("VanityChest");
-
-                    b.Navigation("VanityHead");
-
-                    b.Navigation("VanityLegs");
-
-                    b.Navigation("VanityWrist");
-
-                    b.Navigation("Wrist");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
@@ -4067,34 +4200,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Character");
 
                     b.Navigation("Friend");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithMany("Inventory")
-                        .HasForeignKey("CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Faolan.Core.Database.Tables.Item", "Item")
-                        .WithMany()
-                        .HasForeignKey("ItemId");
-
-                    b.Navigation("Character");
-
-                    b.Navigation("Item");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterMaxStats", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithOne("MaxStats")
-                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterMaxStats", "CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Character");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
@@ -4261,26 +4366,67 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Spell");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEdge", b =>
                 {
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "From")
+                        .WithMany("OutgoingEdges")
+                        .HasForeignKey("FromNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "GrantQuest")
                         .WithMany()
-                        .HasForeignKey("GrantQuestId");
+                        .HasForeignKey("GrantQuestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "To")
+                        .WithMany()
+                        .HasForeignKey("ToNodeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("From");
+
+                    b.Navigation("GrantQuest");
+
+                    b.Navigation("To");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEntry", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "Node")
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
                         .WithMany()
                         .HasForeignKey("NpcTemplateId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.WorldObject", "TriggerWorldObject")
                         .WithMany()
-                        .HasForeignKey("TriggerWorldObjectId");
+                        .HasForeignKey("TriggerWorldObjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("GrantQuest");
+                    b.Navigation("Node");
 
                     b.Navigation("NpcTemplate");
 
                     b.Navigation("TriggerWorldObject");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NpcTemplate");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
@@ -4395,6 +4541,28 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Screen");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboAttackModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
@@ -4411,6 +4579,50 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.FeatIdMap", "Feat")
                         .WithMany()
                         .HasForeignKey("WireFeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatProc", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellGrant", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellStatModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -4463,10 +4675,86 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                                 .HasForeignKey("ItemId");
                         });
 
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "PairKey", b1 =>
+                        {
+                            b1.Property<long>("ItemId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("Key1")
+                                .HasColumnType("bigint")
+                                .HasColumnName("PairKey1");
+
+                            b1.Property<long>("Key2")
+                                .HasColumnType("bigint")
+                                .HasColumnName("PairKey2");
+
+                            b1.Property<long>("Key3")
+                                .HasColumnType("bigint")
+                                .HasColumnName("PairKey3");
+
+                            b1.Property<long>("Key4")
+                                .HasColumnType("bigint")
+                                .HasColumnName("PairKey4");
+
+                            b1.HasKey("ItemId");
+
+                            b1.ToTable("Items");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ItemId");
+                        });
+
                     b.Navigation("Key")
                         .IsRequired();
 
                     b.Navigation("OnUseSpellDefinition");
+
+                    b.Navigation("PairKey")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "OwnerCharacter")
+                        .WithMany("Items")
+                        .HasForeignKey("OwnerCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Faolan.Core.Database.Tables.Guild", "OwnerGuild")
+                        .WithMany()
+                        .HasForeignKey("OwnerGuildId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Faolan.Core.Database.Tables.Item", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OwnerCharacter");
+
+                    b.Navigation("OwnerGuild");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstanceSocket", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Item", "Gem")
+                        .WithMany()
+                        .HasForeignKey("GemItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.ItemInstance", "ItemInstance")
+                        .WithMany("Sockets")
+                        .HasForeignKey("ItemInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Gem");
+
+                    b.Navigation("ItemInstance");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemStatModifier", b =>
@@ -4493,6 +4781,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MailAttachment", b =>
                 {
+                    b.HasOne("Faolan.Core.Database.Tables.ItemInstance", "Escrowed")
+                        .WithMany()
+                        .HasForeignKey("EscrowedInstanceId");
+
                     b.HasOne("Faolan.Core.Database.Tables.Mail", "Mail")
                         .WithMany("Attachments")
                         .HasForeignKey("MailId")
@@ -4505,42 +4797,57 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Escrowed");
+
                     b.Navigation("Item");
 
                     b.Navigation("Mail");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Map", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
-                        .WithMany()
-                        .HasForeignKey("MapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "TravelConfirmKey", b1 =>
+                        {
+                            b1.Property<long>("MapId")
+                                .HasColumnType("bigint");
 
-                    b.Navigation("Map");
+                            b1.Property<long>("Key1")
+                                .HasColumnType("bigint")
+                                .HasColumnName("TravelConfirmKey1");
+
+                            b1.Property<long>("Key2")
+                                .HasColumnType("bigint")
+                                .HasColumnName("TravelConfirmKey2");
+
+                            b1.Property<long>("Key3")
+                                .HasColumnType("bigint")
+                                .HasColumnName("TravelConfirmKey3");
+
+                            b1.Property<long>("Key4")
+                                .HasColumnType("bigint")
+                                .HasColumnName("TravelConfirmKey4");
+
+                            b1.HasKey("MapId");
+
+                            b1.ToTable("Maps");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MapId");
+                        });
+
+                    b.Navigation("TravelConfirmKey")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
-                        .WithMany()
-                        .HasForeignKey("MapId")
+                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "Region")
+                        .WithOne("Hazard")
+                        .HasForeignKey("Faolan.Core.Database.Tables.MapHazard", "RegionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Map");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazardVertex", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.MapHazard", "Hazard")
-                        .WithMany("Vertices")
-                        .HasForeignKey("HazardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Hazard");
+                    b.Navigation("Region");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
@@ -4574,6 +4881,63 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .IsRequired();
 
                     b.Navigation("Region");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Mount", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbientAnimation", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany("AmbientAnimations")
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NpcTemplate");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbush", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.QuestGoalDefinition", "Goal")
+                        .WithMany()
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "QuestDefinition")
+                        .WithMany()
+                        .HasForeignKey("QuestDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
+
+                    b.Navigation("Map");
+
+                    b.Navigation("NpcTemplate");
+
+                    b.Navigation("QuestDefinition");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
@@ -4680,6 +5044,25 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("NpcTemplate");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcFollowPair", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "FollowerTemplate")
+                        .WithMany("Follows")
+                        .HasForeignKey("FollowerTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "LeaderTemplate")
+                        .WithMany()
+                        .HasForeignKey("LeaderTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FollowerTemplate");
+
+                    b.Navigation("LeaderTemplate");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcMorph", b =>
@@ -4877,6 +5260,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .WithMany()
                         .HasForeignKey("RegionId");
 
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "TargetTemplate")
+                        .WithMany()
+                        .HasForeignKey("TargetTemplateId");
+
                     b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "ObjectiveKey", b1 =>
                         {
                             b1.Property<long>("QuestGoalDefinitionGoalId")
@@ -4945,6 +5332,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("QuestItem");
 
                     b.Navigation("Region");
+
+                    b.Navigation("TargetTemplate");
 
                     b.Navigation("TrailingKey")
                         .IsRequired();
@@ -5172,6 +5561,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Shop");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("SpellId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
@@ -5264,7 +5664,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "FromNode")
+                        .WithMany()
+                        .HasForeignKey("FromNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("DestinationMap");
+
+                    b.Navigation("FromNode");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
@@ -5336,15 +5744,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.Navigation("Buffs");
 
-                    b.Navigation("Equipment");
+                    b.Navigation("ClientSettings");
 
                     b.Navigation("FeatSpecs");
 
                     b.Navigation("Feats");
 
-                    b.Navigation("Inventory");
-
-                    b.Navigation("MaxStats");
+                    b.Navigation("Items");
 
                     b.Navigation("Quests");
 
@@ -5363,6 +5769,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
                 {
+                    b.Navigation("OutgoingEdges");
+
                     b.Navigation("Packets");
                 });
 
@@ -5386,6 +5794,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("StatModifiers");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ItemInstance", b =>
+                {
+                    b.Navigation("Sockets");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Mail", b =>
                 {
                     b.Navigation("Attachments");
@@ -5402,13 +5815,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("RespawnPoints");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
-                {
-                    b.Navigation("Vertices");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegion", b =>
                 {
+                    b.Navigation("Hazard");
+
                     b.Navigation("Vertices");
                 });
 
@@ -5433,9 +5843,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcTemplate", b =>
                 {
+                    b.Navigation("AmbientAnimations");
+
                     b.Navigation("Chatter");
 
                     b.Navigation("Equipment");
+
+                    b.Navigation("Follows");
 
                     b.Navigation("Morphs");
 
