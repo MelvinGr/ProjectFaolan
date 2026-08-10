@@ -9,16 +9,47 @@ run anywhere in the record, and 28 of those "field ids" were regions that are no
 HEAD words, read as a 3-pair run because their ids happen to ascend. Any figure derived from the old count is
 inflated by those; the named-field tallies below were checked against the corrected set.
 
-## ⭐ What the rest of a record is (#632)
+## ⭐ The record, whole (#632)
+
+It is one **tagged field stream**, and word 4 states its own length. A field's value is a u32, a string, or a
+`0x3F1`-framed list:
+
+```
+[u32 magic = 51051][u32 a][u32 15][u32 23][u32 (pairs + 1) * 0x3F1]
+pairs x [u32 fieldId][u32 value]                          scalar fields
+[u32 21][u32 33][u16 nameLen][u16 descLen][name][desc]    the two TEXT fields
+[u32 22][u32 36][frame][1-word items][frame][criteria]    the two LIST fields   (1,871 records)
+element lists                                             [2][listId][frame] groups, #785
+```
+
+⭐ **The frame word at byte 16 is load-bearing**: the string block sits at exactly `20 + 8 * pairs`, on
+**21,502 of 21,502 records**. So the property run's extent is stated by the record rather than searched for, and
+the search is kept only as a fallback (one record carries the `[21][33]` pair twice, so a search that wins could
+anchor on a description's bytes).
+
+The `pairs` count spans the head's own pairs, the ascending property run, and any trailing resource reference -
+which is why `frameCount - propertyFields` is exactly the head-pair count, 5 / 4 / 3 for the 60 / 52 / 44-byte
+heads.
+
+⭐ **The two LIST-valued fields carry CRITERIA.** Field 22's items are one word; field 36's are three, and they
+are `[id][value][operator]` - the same triple the elements carry (#785/#790), with the same operator vocabulary
+(35 distinct, max 166, against the client's own `0..0x401` bound in `FUN_006e9f20`). ⚠️ Variable length - 32
+bytes on 1,338 records but 24, 44, 56 and 80 on the rest, so a fixed-32 read finds a third of them.
+
+Accounting over the whole catalog: **99.2%**, and `Hellfire Stream` (8600) is at **100%, zero bytes
+unaccounted**.
+
+## What the rest of a record is (#632)
 
 That run is only ~13% of a record, and #632 was filed on the other ~87% having "never been looked at". It is
-four things, and the accounting now reaches **82.7%** of all 8.2 MB (was 64.4%):
+five things, and the accounting now reaches **99.2%** of all 8.2 MB (was 64.4%):
 
 | region | bytes over the catalog | where it is decoded |
 |---|---:|---|
 | the element lists | 3,785,151 | [`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) |
 | the **name + description block** | 1,261,636 | below |
-| the property run | 1,518,016 | this page |
+| the head + property run | 2,808,488 | this page |
+| the list-valued fields | 70,764 | this page |
 | the element-list headers | 249,504 | `[2][listId][(n+1) * 0x3F1]`, #785 |
 
 ### The name/description block
@@ -49,8 +80,9 @@ start, the last five words are constant in shape —
 
 — and `298` / `88` hold catalog-wide, which is what pins the FLAGS word to `runStart - 20`. Everything earlier is
 `[51051 magic][a][15][23][b][76][0][30][c][0]`, where `15`, `23`, `76`, `0`, `30` and `0` are catalog-wide
-constants and the optional `[76][0]` pair is what makes the short head short. Four words carry data (`a`: 6
-distinct values, `b`: 26, `c`: 14, and the flags word: 1,364).
+constants and the optional `[76][0]` pair is what makes the short head short. ⭐ `b` is not data at all - it is
+the **frame word** above, `(pairs + 1) * 0x3F1`, which is why it took 28 values that are all multiples of
+`0x3F1`. What genuinely carries data is `a` (6 distinct values), `c` (17) and the flags word (1,364).
 
 ⚠️ **The flags word was read at a FIXED `record byte 52` until #632**, and the head being variable-length means
 that lands on the wrong word for the short ones — it returned **0 on 936 records**, forcing their mana cost to
@@ -58,8 +90,9 @@ read as absolute and their hide-from-tooltip bit to read as clear whatever the r
 spells' `ManaCostIsPercent` and 78 spells into the hidden set. `RdbSpellImporter.ReadFlagsWord` is the one place
 that locates it.
 
-⚠️ What is left is the head's four data words and a recurring **32-byte `[22][36][0x7E2]…` block** that also
-appears between element lists. On `Hellfire Stream` those are the whole of the remaining 92 bytes.
+⚠️ What is left is not bytes but MEANINGS: the head's data words `a` (6 distinct values) and `b`
+(now known to be the frame), the flags word's other bits, and what fields 22/36 select for. Every byte of
+`Hellfire Stream` is inside a named region.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the

@@ -113,7 +113,7 @@ namespace Faolan.Importer.Cli
 			var ldb = LdbStringIndex.EnglishPlaintext(rdb);
 			var ctx = new TooltipContext(rdb, ldb, null);
 
-			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0, stringBytes = 0, withText = 0;
+			long records = 0, bodyBytes = 0, elementBytes = 0, fieldBytes = 0, listBytes = 0, stringBytes = 0, withText = 0, listFieldBytes = 0, withListFields = 0;
 			long elements = 0, rendered = 0;
 			// #789: how much of the catalog carries the client's hide-from-tooltip bit, and a sample of what it
 			// selects - the only way to say what the flag MEANS is to look at which spells wear it.
@@ -170,13 +170,22 @@ namespace Faolan.Importer.Cli
 						shownNameless++;
 				}
 
-				fieldBytes += fields.Count * 8;
+				// ⭐ #632: the whole PAIR REGION is decoded now, not just the property run - the 20-byte prefix, the
+				// head's own pairs, the run, and any trailing resource reference. Its length is exactly where the
+				// string block starts, which the record itself states in its frame word.
+				fieldBytes += afterRun;
 				// #632: the record's own name + description sit immediately after the run, and were a large slice of
 				// what that ticket measured as "never looked at".
 				var block = RdbSpellImporter.ReadStringBlock(body, afterRun);
 				stringBytes += block.Bytes;
 				if (block.Bytes > 0)
 					withText++;
+
+				// #632: the two LIST-valued fields (22 and 36) that follow the text ones on 1,871 records.
+				var listFields = ScanListFields(body, afterRun + block.Bytes);
+				listFieldBytes += listFields;
+				if (listFields > 0)
+					withListFields++;
 				foreach (var field in fields.Keys)
 					fieldCounts[field] = fieldCounts.GetValueOrDefault(field) + 1;
 
@@ -206,11 +215,12 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			var accounted = elementBytes + fieldBytes + listBytes + stringBytes;
+			var accounted = elementBytes + fieldBytes + listBytes + stringBytes + listFieldBytes;
 			Console.WriteLine($"spell-tooltip census over {records} records of RDB {SpellTemplateType}");
 			Console.WriteLine($"  record bytes inside a parsed region : {accounted:N0} / {bodyBytes:N0} = {(bodyBytes == 0 ? 0 : 100.0 * accounted / bodyBytes):0.0}%"
-			                  + $"   ({elementBytes:N0} in elements, {listBytes:N0} in their list headers, {fieldBytes:N0} in the property run,"
-			                  + $" {stringBytes:N0} in the name/description block on {withText:N0} records)");
+			                  + $"   ({elementBytes:N0} in elements, {listBytes:N0} in their list headers, {fieldBytes:N0} in the head + property run,"
+			                  + $" {stringBytes:N0} in the name/description block on {withText:N0} records,"
+			                  + $" {listFieldBytes:N0} in the list-valued fields on {withListFields:N0})");
 			Console.WriteLine($"  property-run field ids read         : {SpellFieldsRead.Count(f => fieldCounts.ContainsKey(f.Key))} / {fieldCounts.Count}");
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
 			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
@@ -361,7 +371,7 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			foreach (var line in AccountingLines(ctx, record, fields, elements, inline.Bytes))
+			foreach (var line in AccountingLines(ctx, record, fields, elements, inline.Bytes, runEnd))
 				Console.WriteLine($"{pad}  {line}");
 		}
 
@@ -435,6 +445,26 @@ namespace Faolan.Importer.Cli
 			yield return format == null
 				? $"?? {typeName}  {raw}{period}   [no LDB 170 sentence for this type]{hidden}"
 				: $"?? {typeName}  {raw}{period}   [\"{format}\" - slot binding not established]{hidden}";
+		}
+
+		/// <summary>
+		///     The byte length of the record's LIST-valued fields (22 and 36), searched for from <paramref name="from" />.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Searched rather than read at a fixed place: the block does not always sit immediately after the text
+		///     - on `Spirit of the Bear (Rank 1)` it appears between two element lists - so its POSITION is not part of
+		///     the grammar yet even though its shape is (#632).
+		/// </remarks>
+		private static int ScanListFields(ReadOnlySpan<byte> body, int from)
+		{
+			for (var o = Math.Max(0, from); o + 8 <= body.Length; o += 4)
+			{
+				var length = RdbSpellImporter.ReadListFieldsLength(body, o);
+				if (length > 0)
+					return length;
+			}
+
+			return 0;
 		}
 
 		/// <summary>
@@ -892,14 +922,14 @@ namespace Faolan.Importer.Cli
 		// How much of the record the tooltip above actually consumed. The three regions are the fixed head, the
 		// ascending property run, and the element list; anything left over is bytes nobody has looked at (#632).
 		private static IEnumerable<string> AccountingLines(TooltipContext ctx, byte[] record, Dictionary<uint, uint> fields,
-			IReadOnlyList<ItemTemplateStatModifiers.Element> elements, int textBytes)
+			IReadOnlyList<ItemTemplateStatModifiers.Element> elements, int textBytes, int pairRegionBytes)
 		{
 			var body = record.Length - 12;
 			var elementBytes = elements.Sum(e => e.WidthBytes);
-			// The run is [fieldId][value] pairs, so its byte span is exactly 8 per field - the reader returns the
-			// LONGEST ascending run and a body may hold shorter ones before it, which is why this is a span and not a
-			// claim about where the run sits.
-			var fieldBytes = fields.Count * 8;
+			// ⭐ The whole PAIR REGION, not just the property run: the 20-byte prefix, the head's own pairs, the run
+			// and any trailing resource reference. Its length IS where the string block starts, which the record
+			// states in its frame word - `(pairs + 1) * 0x3F1` at byte 16 (#632).
+			var fieldBytes = pairRegionBytes;
 			// The 12-byte `[2][listId][(n + 1) * 0x3F1]` header in front of each element group (#785). Counted here
 			// because it IS decoded now - leaving it out reported the record as less accounted-for than it is, and it
 			// is what says which of two identical-looking elements belong to the same list.
@@ -907,11 +937,13 @@ namespace Faolan.Importer.Cli
 			var listBytes = lists.Count * 12;
 			// #632: the record's own name + description, immediately after the property run. Measured by the caller,
 			// which already has the run end.
-			var accounted = elementBytes + fieldBytes + listBytes + textBytes;
+			var listFieldBytes = ScanListFields(record.AsSpan(12), pairRegionBytes + textBytes);
+			var accounted = elementBytes + fieldBytes + listBytes + textBytes + listFieldBytes;
 
 			yield return "--";
 			yield return $"record {body} B body: {elements.Count} element(s) in {lists.Count} list(s) {elementBytes} B + {listBytes} B header "
-			             + $"+ {fields.Count} property field(s) {fieldBytes} B + {textBytes} B name/description "
+			             + $"+ {fields.Count} property field(s) in a {fieldBytes} B head+pair region + {textBytes} B name/description "
+			             + $"+ {listFieldBytes} B list fields "
 			             + $"= {accounted} B ({(body == 0 ? 0 : 100.0 * accounted / body):0.#}%), {body - accounted} B unaccounted";
 
 			var unparsed = ItemTemplateStatModifiers.UnparsedElementHeads(record.AsSpan(12));

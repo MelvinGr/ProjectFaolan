@@ -1066,14 +1066,25 @@ namespace Faolan.Importer.Rdb
 			startOffset = 0;
 			var fields = new Dictionary<uint, uint>();
 
+			// ⭐ The record STATES where its pair region ends. Word 4 is a `0x3F1` list frame - `(pairs + 1) * 0x3F1`
+			// - over every `[fieldId][value]` pair the record carries: the head's own, then the ascending property
+			// run, then any trailing resource reference. So the string block sits at exactly `20 + 8 * pairs`, which
+			// holds on 21,502 of 21,502 records.
 			var anchor = -1;
-			for (var o = 0; o + 12 <= body.Length; o += 4)
+			if (body.Length >= PairRegionStart && body.ReadU32Le(PairFrameOffset) is var frame and > 0 && frame % ListFrameUnit == 0)
 			{
-				if (body.ReadU32Le(o) != StringBlockNameField || body.ReadU32Le(o + 4) != StringBlockDescriptionField)
-					continue;
+				var derived = PairRegionStart + 8 * (int)(frame / ListFrameUnit - 1);
+				if (derived >= 0 && derived + 12 <= body.Length
+				    && body.ReadU32Le(derived) == StringBlockNameField && body.ReadU32Le(derived + 4) == StringBlockDescriptionField)
+					anchor = derived;
+			}
 
-				anchor = o;
-				break;
+			// ⚠️ The fallback SEARCHES for the block, and is deliberately second: one record carries the `[21][33]`
+			// pair twice, so a search that wins can anchor on a description's bytes rather than on the block.
+			for (var o = 0; anchor < 0 && o + 12 <= body.Length; o += 4)
+			{
+				if (body.ReadU32Le(o) == StringBlockNameField && body.ReadU32Le(o + 4) == StringBlockDescriptionField)
+					anchor = o;
 			}
 
 			if (anchor < 0)
@@ -1140,6 +1151,13 @@ namespace Faolan.Importer.Rdb
 		// without listing the two types the catalog actually uses.
 		private const uint FirstRdbTypeId = 1_000_000;
 
+		// The record opens `[magic 51051][a][15][23][frame]`, and the pairs start right after it.
+		private const int PairFrameOffset = 16;
+		private const int PairRegionStart = 20;
+
+		// The client's list count word, `(n + 1) * 0x3F1` - the same one the element lists use (#785).
+		private const uint ListFrameUnit = 0x3F1;
+
 		/// <summary>
 		///     ⭐ The record's own NAME and DESCRIPTION, which sit immediately after the property run (#632).
 		/// </summary>
@@ -1177,6 +1195,50 @@ namespace Faolan.Importer.Rdb
 			var description = Encoding.Latin1.GetString(body.Slice(afterRun + 12 + nameLength, descriptionLength));
 			return (name, description, 12 + nameLength + descriptionLength);
 		}
+
+		/// <summary>
+		///     ⭐ The record's two LIST-valued fields, `22` and `36`, and how many bytes they occupy (#632). 0 when the
+		///     record has none - 1,871 of the 21,502 carry them.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         Same shape as the string block, one step further: `[u32 22][u32 36]` and then each field's VALUE,
+		///         which is a `0x3F1`-framed list rather than a scalar or a string. Field 22's items are one word;
+		///         field 36's are three, and they are CRITERIA - `[id][value][operator]`, the same triple the elements
+		///         carry (#785/#790). Their operators are the same vocabulary: 35 distinct, max 166, against the
+		///         client's own `0..0x401` bound in `FUN_006e9f20`.
+		///     </para>
+		///     <para>
+		///         ⚠️ VARIABLE length - 32 bytes on 1,338 records but 24, 44, 56 and 80 on the rest, because both
+		///         counts vary. Reading it as a fixed 32 finds only a third of them.
+		///     </para>
+		/// </remarks>
+		internal static int ReadListFieldsLength(ReadOnlySpan<byte> body, int offset)
+		{
+			if (offset < 0 || offset + 8 > body.Length
+			    || body.ReadU32Le(offset) != ListFieldOne || body.ReadU32Le(offset + 4) != ListFieldTwo)
+				return 0;
+
+			var at = offset + 8;
+			at = SkipFramedList(body, at, 4);
+			at = SkipFramedList(body, at, 12);
+			return at > body.Length ? 0 : at - offset;
+		}
+
+		// One `(count + 1) * 0x3F1` frame followed by `count` items of `itemBytes` each.
+		private static int SkipFramedList(ReadOnlySpan<byte> body, int at, int itemBytes)
+		{
+			if (at + 4 > body.Length)
+				return at;
+
+			var frame = body.ReadU32Le(at);
+			at += 4;
+			return frame == 0 || frame % ListFrameUnit != 0 ? at : at + itemBytes * (int)(frame / ListFrameUnit - 1);
+		}
+
+		// The two LIST-valued field ids, the way 21/33 are the two TEXT-valued ones.
+		private const uint ListFieldOne = 22;
+		private const uint ListFieldTwo = 36;
 
 		// The two field ids the string block opens with. 21 is the NAME slot and 33 the DESCRIPTION one, in the same
 		// id space as the property run - they are simply the fields whose values are text rather than a u32, which is
