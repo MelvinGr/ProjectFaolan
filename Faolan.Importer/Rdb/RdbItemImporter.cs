@@ -71,6 +71,16 @@ namespace Faolan.Importer.Rdb
 		private const uint CastNanoKind = 53051;
 		private const int CastNanoSpellKey = 39;
 
+		// The element that gives a consumable its SHARED cooldown (#764): `CoreLockSpellLineTemplate`, key 39 = the
+		// spell LINE to lock and key 66 = for how long. The line groups by the resource restored - health 80000,
+		// stamina 80100, mana 80200 - so the three lock independently.
+		//
+		// ⚠️ Not to be confused with kind 53116 `LockSpellLine`, which ships with an EMPTY key list. Whatever that
+		// variant is, it is not this one read differently.
+		private const uint LockSpellLineKind = 53124;
+		private const int LockSpellLineKey = 39;
+		private const int LockSpellLineDurationKey = 66;
+
 		private static readonly HashSet<uint> ApplicableStatIds =
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax, (uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution,
@@ -160,6 +170,7 @@ namespace Faolan.Importer.Rdb
 				gemSlotsAdded = 0,
 				weaponDamageAdded = 0,
 				onUseAdded = 0,
+				lockLinesAdded = 0,
 				onUseUnknownSpell = 0;
 			var firstSampleShown = false;
 
@@ -323,6 +334,26 @@ namespace Faolan.Importer.Rdb
 					onUseAdded++;
 				}
 
+				// The consumable's SHARED COOLDOWN (#764), from the same element pass. Both keys or neither: a line with
+				// no duration cannot lock anything, and a duration with no line has nothing to lock.
+				foreach (var element in ItemTemplateStatModifiers.ParseElements(template.AsSpan(12)))
+				{
+					if (element.Kind != LockSpellLineKind)
+						continue;
+
+					if (element.Value(LockSpellLineKey) is not { } line || line == 0)
+						continue;
+					if (element.Value(LockSpellLineDurationKey) is not { } seconds || seconds == 0)
+						continue;
+
+					if (item.OnUseLockSpellLine == line && item.OnUseLockSeconds == seconds)
+						continue;
+
+					item.OnUseLockSpellLine = line;
+					item.OnUseLockSeconds = seconds;
+					lockLinesAdded++;
+				}
+
 				// Weapon MIN/MAX damage (docs/rdb/item-template-stats.md, #395): property fields 286 (0x11E) = min and
 				// 285 (0x11D) = max, decoded from the client's GUIGetMinDamage()/GUIGetMaxDamage(). Same strict property
 				// run as value/quality. Stored only when both are present and sane (min <= max, non-zero) - non-weapons
@@ -404,6 +435,9 @@ namespace Faolan.Importer.Rdb
 
 			if (weaponDamageAdded > 0)
 				Console.WriteLine($"  weapon min/max damage (fields 286/285) set on {weaponDamageAdded} item(s).");
+
+			if (lockLinesAdded > 0)
+				Console.WriteLine($"  {lockLinesAdded} consumable(s) got their SHARED-cooldown line from CoreLockSpellLineTemplate (#764).");
 
 			if (onUseAdded > 0 || onUseUnknownSpell > 0)
 				Console.WriteLine($"  on-use spells (CastNano, kind 53051) set on {onUseAdded} item(s); " +

@@ -222,9 +222,23 @@ one; key 67 is `0` on every one.
 cooldown behaves in the live game), but nothing here states it, and no capture in the corpus shows a second
 potion being refused. Treat it as "60 of something" until an in-client test pins it.
 
-**We implement none of this.** There is no shared-cooldown model at all — `Spells` has no line column (only
-`GuiStackingLine`), and none of `80000`/`80100`/`80200` appears anywhere in the database — so a player can drink
-health potions back to back. Open work tracked in Gitea #764.
+**Imported and enforced** (#764). `Item.OnUseLockSpellLine` + `OnUseLockSeconds` carry it — **46 items over four
+lines**, which is a good deal more than the four drinks above: health `80000` (15), stamina `80100` (13), mana
+`80200` (13), and a fourth line `82001` with a **1800**-second lock (5 items).
+
+⭐ **The line's MEMBERSHIP needs no line catalog** — it is exactly which items declare that line, which is why
+`80000`/`80100`/`80200` appearing nowhere else in the database was never the obstacle it looked like.
+
+⭐ **And there is no refusal message to find**, which is what this was blocked on. The mechanism is
+`DispatchLockTemplate` — the same message a spell recast uses (`docs/re/spell-recast-source.md`, #767) — so the
+CLIENT greys the thing on the bar and never sends the second use. Retail's own consumable lock is captured in
+`NecroL80_..._login_use-consumables`: using the firework item `3765539` produces **three** bodies, that item template
+*and both spells it casts* (`3510737`/`3510738`), so a consumable's lock covers the item AND what it triggers.
+
+That capture settles the unit question too, at least for the wire: those locks are re-sent **at login** carrying
+the time REMAINING as a big-endian float in **seconds** — 23.23 h on the item, 79.23 h on the spells. So a long
+cooldown survives a relog in retail. ⚠️ Ours does not: the lock is not persisted, and the `60` in the template is
+still "60 of something" (seconds being both the obvious reading and consistent with the wire's own unit).
 
 ⚠️ Note `53116 LockSpellLine` exists in the catalog too, with an EMPTY key list. Whatever that variant is, it is
 not this one, and it should not be assumed to be the same mechanism read differently.

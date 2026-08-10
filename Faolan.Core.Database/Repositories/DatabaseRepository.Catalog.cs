@@ -36,6 +36,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
 		Task<uint[]> SpellIdsOnLine(uint guiStackingLine);
+
+		// #764: every template a consumable's SHARED cooldown locks - the items on this line plus the spells they cast.
+		Task<uint[]> LockedTemplateIdsForConsumableLine(uint lockSpellLine);
 		Task<SpellEffect[]> GetSpellEffects();
 		Task<SpellAreaEffect[]> GetSpellAreaEffects();
 		Task<Spell[]> GetSpells();
@@ -265,6 +268,40 @@ namespace Faolan.Core.Database.Repositories
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.AsNoTracking().Where(s => s.GuiStackingLine == guiStackingLine).OrderBy(s => s.Id).Select(s => s.Id).ToArrayAsync();
+		}
+
+		// #764: every template a consumable's SHARED cooldown covers - the items on `OnUseLockSpellLine` and the on-use
+		// spells they cast. That set comes from the client's own item templates rather than from a line catalog: a
+		// `CoreLockSpellLineTemplate` names a LINE (health 80000 / stamina 80100 / mana 80200), and the line's
+		// membership is exactly which items declare it, which is why no line table is needed.
+		//
+		// The spells are included because that is what retail locks. In `NecroL80_..._login_use-consumables`, using the
+		// firework item 3765539 produces THREE `DispatchLockTemplate` bodies - that item template and both spells it
+		// casts (3510737 / 3510738) - so a consumable's lock covers the thing on the bar AND what it triggers.
+		//
+		// Ordered so the emitted sequence is stable rather than storage-dependent.
+		public async Task<uint[]> LockedTemplateIdsForConsumableLine(uint lockSpellLine)
+		{
+			if (lockSpellLine == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var members = await ctx
+				.Items.AsNoTracking()
+				.Where(i => i.OnUseLockSpellLine == lockSpellLine)
+				.Select(i => new
+				{
+					i.Id,
+					i.OnUseSpell
+				})
+				.ToListAsync();
+
+			return members
+				.Select(m => m.Id)
+				.Concat(members.Where(m => m.OnUseSpell is > 0).Select(m => m.OnUseSpell!.Value))
+				.Distinct()
+				.Order()
+				.ToArray();
 		}
 
 		// #772: every spell's AREA applications, read whole - a few thousand rows the importer owns, cached by

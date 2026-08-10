@@ -1,8 +1,10 @@
+using Faolan.Core.Constants;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -136,6 +138,37 @@ namespace Faolan.GameServer
 			// consume the item and leave the bar exactly where it was.
 			await ApplyPoolEffects(client, self, spellBase);
 			await RemoveItemFromBackpack(client, slot, 1);
+			await SendConsumableCooldown(client, item);
+		}
+
+		// The consumable's SHARED COOLDOWN (#764). The template states it - `CoreLockSpellLineTemplate`, stored as
+		// `Item.OnUseLockSpellLine` + `OnUseLockSeconds` - and the line groups by the resource restored, so health
+		// (80000), stamina (80100) and mana (80200) lock independently: a health potion does not lock mana.
+		//
+		// The mechanism is `DispatchLockTemplate`, the same message a spell recast uses (#767), and it is the whole
+		// answer to "what does retail send when a potion is used on cooldown": NOTHING. There is no refusal, because
+		// the CLIENT greys what it has been told to lock and never sends the second use. So this needs no invented
+		// rejection message - which is what the ticket was blocked on.
+		//
+		// One body per template in the line, items AND the spells they cast, which is what retail does: using the
+		// firework 3765539 in `NecroL80_..._login_use-consumables` produces three - the item and both its spells.
+		//
+		// ⚠️ Two things this does NOT reproduce. Retail RE-SENDS a lock at login carrying the time REMAINING (that
+		// capture's login burst restores 23.23 h on an item and 79.23 h on its spells), so a long cooldown survives a
+		// relog; ours is not persisted, so it does not. And the duration's UNIT is inferred - every potion states 60 and
+		// seconds is both the obvious reading and consistent with the wire's own float being seconds, but nothing states
+		// it (see Item.OnUseLockSpellLine).
+		private async Task SendConsumableCooldown(INetworkClient client, Item item)
+		{
+			if (item.OnUseLockSpellLine is not { } line || item.OnUseLockSeconds is not { } seconds || seconds == 0)
+				return;
+
+			var locked = await Database.LockedTemplateIdsForConsumableLine(line);
+			foreach (var templateId in locked)
+				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
+
+			Logger.LogDebug("Locked {Count} template(s) on consumable line {Line} for {Seconds}s after using '{Item}'.", locked.Length, line, seconds, item.Name);
 		}
 
 		// The domain side of a player USING (right-clicking) an item from a bag (#206/#64): the RightClickItem Inbound

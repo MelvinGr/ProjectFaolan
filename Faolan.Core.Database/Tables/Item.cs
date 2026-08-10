@@ -316,6 +316,25 @@ namespace Faolan.Core.Database.Tables
 		// [V0: the item-template tail's full record grammar - what the 53xxx keys enumerate]
 		public uint? OnUseSpell { get; set; }
 
+		// The SPELL LINE using this item locks, and for how long (#764): the template's `CoreLockSpellLineTemplate`
+		// element (kind 53124, keys 39 = the line, 66 = the duration). It is what gives potions their SHARED cooldown -
+		// the line groups by the resource restored, so health `80000`, stamina `80100` and mana `80200` lock
+		// independently and drinking a health potion does not lock mana.
+		//
+		// The wire mechanism is `DispatchLockTemplate` (`LockTemplateCodec`, #767), not a refusal: the CLIENT greys the
+		// thing on the bar when told to lock it. Captured on a consumable in
+		// `NecroL80_..._login_use-consumables` - using the firework item 3765539 locks that ITEM template *and* the two
+		// spells it casts (3510737/3510738), and the locks are RE-SENT at login carrying the time REMAINING
+		// (23.23 h on the item, 79.23 h on the spells), so a long cooldown survives a relog.
+		//
+		// ⚠️ The DURATION's unit is inferred. Every observed potion states 60, and seconds is both the obvious reading
+		// and consistent with the wire's own unit (the captured lock floats are seconds), but nothing in the template
+		// says so and no capture shows a second potion being refused.
+		// [V0: the CoreLockSpellLineTemplate duration's unit]
+		public uint? OnUseLockSpellLine { get; set; }
+
+		public uint? OnUseLockSeconds { get; set; }
+
 		// For a RESOURCE BAG item (equipped in the resource-bag slot, equip slot 26): the extra RESOURCE-container slots
 		// it adds - the sibling of BagExtraSlots for the backpack. The resource container's max_size = 48 (base) + this.
 		// RDB item-template property field 1331 (unlike the normal bag's field 104 = Bag kind, resource bags carry their

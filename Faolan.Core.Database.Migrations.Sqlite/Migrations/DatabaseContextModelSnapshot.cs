@@ -1628,6 +1628,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<uint?>("OnUseLockSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("OnUseLockSpellLine")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("OnUseSpell")
                         .HasColumnType("INTEGER");
 
