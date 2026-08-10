@@ -65,6 +65,7 @@ Capture-sourced (default group, run in dependency order):
 | `listings` | — |
 | `stock-phrases` | — |
 | `items` | — |
+| `chat-itemref` (item identities + TEA keys from `itemref://` chat links, #751) | `items` |
 | `maps` | — |
 | `spells` | — |
 | `dot-effects` (per-tick delta + the measured tick interval) | `spells` |

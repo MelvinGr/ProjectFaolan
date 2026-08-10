@@ -17,13 +17,24 @@ namespace Faolan.Importer.Captures
 	// reader - the Faolan.Importer tool feeds it AnalyzedPacket.Bytes; tests feed it capture .bin bytes.
 	public static class CaptureItemImporter
 	{
-		public static async Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
+		public static Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var harvested = new Dictionary<uint, ItemHashHarvester.CapturedItem>();
 			var types = new Dictionary<uint, ItemType>();
 			foreach (var packet in rawPackets)
 				ItemHashHarvester.Harvest(packet, harvested, types: types);
 
+			return UpsertAsync(db, harvested, types, null, logger);
+		}
+
+		// The upsert itself, over an ALREADY harvested set. Split out for the sources that do not arrive as raw Conan
+		// packets and so cannot go through `ItemHashHarvester`: the `itemref://` chat links (#751) are plain text on
+		// the CHAT stream, and they are also the only source that carries a NAME, which is why `names` exists at all.
+		// Every never-downgrade rule below is shared rather than reimplemented per source.
+		public static async Task<(int Total, int Inserted)> UpsertAsync(IDatabaseContext db, IReadOnlyDictionary<uint, ItemHashHarvester.CapturedItem> harvested,
+			IReadOnlyDictionary<uint, ItemType>? types = null, IReadOnlyDictionary<uint, string>? names = null, ILogger? logger = null)
+		{
+			types ??= new Dictionary<uint, ItemType>();
 			if (harvested.Count == 0)
 				return (0, 0);
 
@@ -78,6 +89,13 @@ namespace Faolan.Importer.Captures
 				// default Normal so a classification survives a later capture that holds the item in a bag.
 				if (types.TryGetValue(id, out var type) && type != ItemType.Normal)
 					item.Type = type;
+
+				// The display NAME, and ONLY into an empty one. A chat link is player-typed text that happens to be
+				// composed by the client, so it fills a gap but must never outrank a row a snapshot or the RDB named
+				// (#751). Every one of the 13 corpus links whose item we already hold agrees with the stored name
+				// anyway - that agreement is the oracle for the source, not a licence to overwrite.
+				if (names != null && string.IsNullOrEmpty(item.Name) && names.TryGetValue(id, out var name) && !string.IsNullOrEmpty(name))
+					item.Name = name;
 			}
 
 			await db.SaveChangesAsync();

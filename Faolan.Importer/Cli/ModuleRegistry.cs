@@ -15,7 +15,7 @@ namespace Faolan.Importer.Cli
 		public static IReadOnlyList<IImportModule> All { get; } =
 		[
 			// --- capture modules ---
-			new ListingsModule(), new StockPhrasesModule(), new ItemsModule(), new MapsModule(), new SpellsModule(), new StatDamageModule(), new SpellEffectsModule(), new AbilitiesModule(),
+			new ListingsModule(), new StockPhrasesModule(), new ItemsModule(), new ChatItemRefModule(), new MapsModule(), new SpellsModule(), new StatDamageModule(), new SpellEffectsModule(), new AbilitiesModule(),
 			new StartingSpellsModule(),
 			new CharactersModule(), new ConversationsModule(), new CharacterStateModule(), new LearnedSpellsModule(), new CharacterAbilitiesModule(), new CharacterQuestsModule(),
 			new CharacterBankModule(), new CharacterSocketsModule(), new ShopsModule(), new NpcsModule(), new NpcPlacementsModule(), new NpcDispositionModule(), new NpcDeathBehaviorsModule(), new NpcAmbientAnimationsModule(), new NpcChatterModule(), new WorldObjectsModule(),

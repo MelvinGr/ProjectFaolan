@@ -211,3 +211,43 @@ loitering on the boundary is not greeted, forgotten and greeted again every few 
 `GreetingRange` is matched to `SayRangeUnits` (50 u) on the ground that greeting someone too far away to hear it
 would be worse than not greeting them; nothing shipped states an NPC's detection radius, and the one annotated
 capture times a crier line without pinning the distance the player crossed to earn it.
+
+## An item LINK in chat carries the item's decryption key (#751)
+
+When a player links an item into chat, the client emits the whole `ProtoAcgItem` **as plain text**, inside an
+ordinary anchor:
+
+```
+<a style="text-decoration:none" href="itemref://T1/T2/T3/LEVEL/KEY1/KEY2/KEY3"><font color=#RGB>[Name]</font></a>
+```
+
+so one link yields `Items.Id`, `Name`, `Level` and the `Key1..Key4` TEA quad outright. It rides three carriers in
+the corpus — ChatServer `0x0041` (trade channel, most of them), ChatServer `0x0022`, and the c2s Conan `0x2002` —
+and `itemref` is the only item-bearing href scheme anywhere in it.
+
+**Why it matters far more than a name.** An item's RDB template is TEA-encrypted under a key the server assigns
+per item, so without the key the template cannot be read at all (#203, closed: there is no client-side key
+source). A chat link is therefore not an id+name stub — it unlocks the stats, quality, value, damage and search
+category behind the record. And it is the only source that reaches items the capturing character **never held**:
+whatever a stranger was advertising in trade chat.
+
+Measured over the 132 dumps: **43 links, 25 distinct templates, 12 of them absent from the catalogue**. The other
+13 agree with their stored row exactly on name, level and key quad — that agreement is the oracle, and it is
+non-circular because the key comes from the link and never from the database.
+
+⚠️ **Read `key1`.** `key3` is sometimes the `NullIdentity` sentinel `b290805c:29e627ca:b290805c:29e627ca` (a
+pre-existence item), and `key2` belongs to the SECOND template of a level-scaled pair (#752) — equal to `key1` on
+everything that is not one.
+
+⚠️ **The URL drops the hash word** the loot-chat body form carries
+(`[template][template][0][level][hash][k1][k2][k3]`). Harmless: `AcgHash.ForWire` mints a token at send time and
+`Items.Hash == 0` means "not harvested" (#723).
+
+⚠️ **Both the key words and the colour are UNPADDED lowercase hex** — `45e19f7` is seven characters and `#6ea7`
+is four — so a build that zero-pads either does not reproduce what the client sent.
+
+⚠️ **A link is player-typed text.** The client composes it, but the importer must not let one outrank a
+snapshot-sourced row: `chat-itemref` goes through `CaptureItemImporter.UpsertAsync`, where a name only fills an
+EMPTY one and a level only fills a 0. `ChatItemLinks.In` counts the anchors it could not read rather than
+swallowing them.
+[V3: ItemRefLinkCodecTests.ALinkedItemWeHold_AgreesWithTheStoredKeyQuad]
