@@ -94,14 +94,30 @@ namespace Faolan.Core.Progression
 		///         corroborates it. Reproduce with <c>--report ldb-search --report-arg 50200:Ironwood</c> (#746).
 		///     </para>
 		///     <para>
-		///         So the gap is NOT "the client does not ship them". Every one of the nine has an RDB item template at
-		///         its id (type 1000020, ~140 B, local) — it is <b>encrypted</b>, and the TEA key is the item's own
-		///         <c>ProtoDecryptionKey</c>, which only ever arrives on the WIRE. No capture holds these resources, so
-		///         there is no key and the template stays opaque (Gitea #203). What is missing from a row is exactly
-		///         what only the template states: <c>Level</c>, which is per-TIER and reaches the wire in the harvest's
-		///         loot-chat message (Copper 20, Iron 40, Gold 60), and the ACG <c>Hash</c>. Filling either from the
-		///         family's average would be the invention this list exists to avoid; wiring one is a one-line change
-		///         the moment a capture supplies its key.
+		///         So the gap is NOT "the client does not ship them". Every id above is stated by the client's own LDB
+		///         (verified one by one with <c>--report ldb-search --report-arg 50200:&lt;name&gt;</c>), and every one
+		///         of the nine has an RDB item template at that id (type 1000020, ~140 B, local) — it is
+		///         <b>encrypted</b>, and the TEA key is the item's own <c>ProtoDecryptionKey</c>, which only ever
+		///         arrives on the WIRE. No capture holds these resources, so there is no key and the template stays
+		///         opaque (Gitea #203).
+		///     </para>
+		///     <para>
+		///         ⚠️ <b>The blocker is the KEY, not the row's contents.</b> Two things a row would be missing are red
+		///         herrings: the ACG <c>Hash</c> is minted at send time by <c>AcgHash.ForWire</c> and a 0 there means
+		///         "not harvested", not "cannot be held" (proven in-client, #723); <c>Level</c> is per-TIER and only
+		///         reaches the loot-chat message (Copper 20, Iron 40, Gold 60), so a wrong one is cosmetic. What
+		///         actually stops a row being shipped is that the client cannot LOAD a keyless item: an item template
+		///         with no decryption key fails outright in <c>RDBSource.cpp:352</c> ("Resource %u:%u does not have a
+		///         decryption key") and is never fetched from the server. All 4,749 items we ship carry a key — a
+		///         keyless one has never existed — so minting these would hand the player an item the client cannot
+		///         render. Wiring one is a one-line change the moment a source supplies its key.
+		///     </para>
+		///     <para>
+		///         Sources checked and exhausted for these nine: the capture corpus (they are in none of it, which is
+		///         why the item importer's seven harvest sources produce nothing), and the <c>Archive/</c> p_items
+		///         dumps from the original Faolan project (not one of the nine appears in any of the three). The one
+		///         live route left is Gitea #751 — <c>itemref://</c> chat links, which carry a key quad for items the
+		///         capturing character never held.
 		///     </para>
 		/// </summary>
 		public static readonly ImmutableDictionary<uint, HarvestNode> Nodes = new HarvestNode[]
