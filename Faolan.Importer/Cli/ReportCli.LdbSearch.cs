@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
@@ -15,10 +16,16 @@ namespace Faolan.Importer.Cli
 	// item called Ironwood, and at what id"*, the name is all there is to go on. `rdb-search` does not help despite
 	// the name; it greps MESH manifest source paths.
 	//
-	// ⚠️ An LDB category is shipped ONCE PER LANGUAGE, in adjacent pages carrying the same (category, id) pairs, so a
-	// bare match count would be multiplied by however many languages the install bundles. Hits are therefore grouped by
-	// (category, id) and reported with the DISTINCT texts across pages, which is also what makes a translation visible
-	// rather than confusing: an English hit and its six translations are one row.
+	// ⚠️ **ENGLISH ONLY.** An LDB category is shipped ONCE PER LANGUAGE, in adjacent pages carrying the same
+	// (category, id) pairs, so an unfiltered search returns each hit once per bundled language. This used to print all
+	// of them - the modal text plus an `(also)` line per translation - which made every result several lines long and,
+	// worse, picked whichever language happened to have the most pages as the headline: `716200` reported as
+	// *"Jatte de Set"* with *"Bowl of Set"* filed underneath it as an also-ran. We only work in English, so the walk
+	// is filtered to the English pages up front (the dev, 2026-08-10).
+	//
+	// The filter is the CLIENT'S OWN statement of a page's language (`LdbLanguageIndex`, RDB type 1030001), never a
+	// sniff of the text - whole pages ship untranslated, so a text sniffer scores the Polish page of a category as
+	// English and silently unions several languages.
 	public static partial class ReportCli
 	{
 		private static void LdbSearch(string rdbDir, string arg)
@@ -39,11 +46,11 @@ namespace Faolan.Importer.Cli
 
 			using var rdb = OpenRdb(rdbDir);
 
-			// (category, id) -> the distinct texts seen for it, and how many pages carried each.
-			var hits = new Dictionary<(uint Category, uint Id), Dictionary<string, int>>();
+			// (category, id) -> the English text.
+			var hits = new Dictionary<(uint Category, uint Id), string>();
 			var pages = 0;
 			var scanned = 0;
-			foreach (var (_, pageCategory, strings) in LdbPagesOf(rdb))
+			foreach (var (_, pageCategory, strings) in EnglishLdbPagesOf(rdb))
 			{
 				pages++;
 				if (category is { } wanted && pageCategory != wanted)
@@ -55,25 +62,16 @@ namespace Faolan.Importer.Cli
 					if (value == null || !value.Contains(needle, StringComparison.OrdinalIgnoreCase))
 						continue;
 
-					if (!hits.TryGetValue((pageCategory, id), out var texts))
-						hits[(pageCategory, id)] = texts = [];
-
-					texts[value] = texts.GetValueOrDefault(value) + 1;
+					hits[(pageCategory, id)] = value;
 				}
 			}
 
 			Console.WriteLine($"ldb-search '{needle}'{(category is { } c ? $" in category {c}" : " across every category")}: "
-			                  + $"{hits.Count} (category, id) hit(s) over {scanned} of {pages} TDC2 page(s)");
+			                  + $"{hits.Count} (category, id) hit(s) over {scanned} of {pages} English TDC2 page(s)");
 			Console.WriteLine();
-			Console.WriteLine("  category        id  pages  text");
-			foreach (var ((cat, id), texts) in hits.OrderBy(h => h.Key.Category).ThenBy(h => h.Key.Id))
-			{
-				var ordered = texts.OrderByDescending(t => t.Value).ToList();
-				Console.WriteLine($"  {cat,8}  {id,9}  {ordered.Sum(t => t.Value),5}  {ordered[0].Key}");
-				// The other languages, when they differ - one line each, so a hit in the wrong language is obvious.
-				foreach (var (text, count) in ordered.Skip(1))
-					Console.WriteLine($"  {"",8}  {"",9}  {count,5}    (also) {text}");
-			}
+			Console.WriteLine("  category        id  text");
+			foreach (var ((cat, id), text) in hits.OrderBy(h => h.Key.Category).ThenBy(h => h.Key.Id))
+				Console.WriteLine($"  {cat,8}  {id,9}  {text}");
 		}
 
 		// What every category holds at ONE id - the reverse lookup. An id alone does not say which category it belongs
@@ -83,30 +81,32 @@ namespace Faolan.Importer.Cli
 		{
 			using var rdb = OpenRdb(rdbDir);
 
-			// category -> the distinct texts at this id, with how many pages (i.e. languages) carried each.
-			var hits = new Dictionary<uint, Dictionary<string, int>>();
+			var hits = new SortedDictionary<uint, string>();
 			var pages = 0;
-			foreach (var (_, category, strings) in LdbPagesOf(rdb))
+			foreach (var (_, category, strings) in EnglishLdbPagesOf(rdb))
 			{
 				pages++;
-				if (!strings.TryGetValue(id, out var value) || value == null)
-					continue;
-
-				if (!hits.TryGetValue(category, out var texts))
-					hits[category] = texts = [];
-
-				texts[value] = texts.GetValueOrDefault(value) + 1;
+				if (strings.TryGetValue(id, out var value) && value != null)
+					hits[category] = value;
 			}
 
-			Console.WriteLine($"ldb id {id} (0x{id:X}): present in {hits.Count} categor(ies) over {pages} TDC2 page(s)");
+			Console.WriteLine($"ldb id {id} (0x{id:X}): present in {hits.Count} categor(ies) over {pages} English TDC2 page(s)");
 			Console.WriteLine();
-			Console.WriteLine("  category  pages  text");
-			foreach (var (category, texts) in hits.OrderBy(h => h.Key))
+			Console.WriteLine("  category  text");
+			foreach (var (category, text) in hits)
+				Console.WriteLine($"  {category,8}  {text}");
+		}
+
+		// The English pages only - see the type comment for why this is not optional. A page the client's language
+		// records do not claim (39 of the 1103 shipped ones are stale/duplicate) belongs to no language and is skipped,
+		// which is the same rule LdbStringIndex.EnglishPlaintext applies.
+		private static IEnumerable<(uint PageId, uint Category, Dictionary<uint, string> Strings)> EnglishLdbPagesOf(RdbReader rdb)
+		{
+			var language = LdbLanguageIndex.LanguageByPage(rdb);
+			foreach (var page in LdbPagesOf(rdb))
 			{
-				var ordered = texts.OrderByDescending(t => t.Value).ToList();
-				Console.WriteLine($"  {category,8}  {ordered.Sum(t => t.Value),5}  {ordered[0].Key}");
-				foreach (var (text, count) in ordered.Skip(1))
-					Console.WriteLine($"  {"",8}  {count,5}    (also) {text}");
+				if (language.GetValueOrDefault(page.PageId) == LdbLanguageIndex.English)
+					yield return page;
 			}
 		}
 

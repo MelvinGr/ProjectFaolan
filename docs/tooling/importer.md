@@ -270,8 +270,10 @@ both": a creature that moves is re-streamed within one session, so reading it pe
 what EVERY category holds at one id, which is how an opaque wire id gets a name when its category is unknown — it is
 what identified LDB 55701/55700 as the achievement catalog behind `DispatchAddTag`, #748. The direction every other LDB tool cannot go: when
 the question is *"does the client ship an item called Ironwood, and at what id"* the name is all there is to go on.
-⚠️ Not `rdb-search`, which despite the name only greps MESH manifest source paths. Hits are grouped by
-(category, id) with the distinct texts across pages, because a category ships once per LANGUAGE),
+⚠️ Not `rdb-search`, which despite the name only greps MESH manifest source paths. **ENGLISH ONLY**: a category
+ships once per bundled LANGUAGE, so an unfiltered walk returns each hit seven times and headlines whichever
+language has the most pages — `716200` reported as *Jatte de Set* with *Bowl of Set* underneath it. The filter is
+the client's own per-page language record (`LdbLanguageIndex`), never a sniff of the text),
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
