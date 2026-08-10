@@ -204,7 +204,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return InventoryEntry(itemId, item, hash,
 			[
 				new ItemStat(0, WireFlags(item, bound)),
-				new ItemStat((uint)CharacterStatId.Duration, NoExpiry),
+				new ItemStat((uint)CharacterStatId.TimeExist, NoExpiry),
 				new ItemStat(23, (uint)recordId),
 				new ItemStat(26, (uint)count)
 			], creatorName, sockets);

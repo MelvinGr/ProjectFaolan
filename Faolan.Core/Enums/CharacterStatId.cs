@@ -463,7 +463,13 @@ namespace Faolan.Core.Enums
 		// Confirmed by the client: its item-tooltip builder resolves this word through
 		// `GetLocalisedString(615, stat)` - LDB category 615 is `0x267`, the literal it pushes at 014a2714 - so the
 		// name the client would print for the id is the name it has.
-		Duration = 0x008,
+		// ⚠️ The CLIENT calls stat 8 `TimeExist`, not `Duration` - recovered from its own stat-name table
+		// (docs/re/aoc-client-stat-names.tsv, `DumpStatNameTable.java`). The distinction is not cosmetic: the client
+		// also ships `OldTimeExist` at 0x188, so "duration" is our word for a pair the client names precisely, and
+		// reading 8 as "how long a BUFF lasts" is what the name invited. It is "how long the thing EXISTS" - which is
+		// why it reads correctly on an item's no-expiry stat and why a `Set` of it (GameAction 53026, 100 rows) does
+		// NOT match the carrier's own `Spell.DurationMs` (16 of 100 agree even allowing a centisecond scale). #711.
+		TimeExist = 0x008,
 		SpellCriticalDamage = 0x081,
 		ManaCost = 0x084,
 		SpellCriticalChance = 0x093,
