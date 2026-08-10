@@ -2240,7 +2240,11 @@ namespace Faolan.Importer.Captures
 			{
 				if (IsWired(goal) && goal.GoalType != QuestGoalType.CollectItem)
 					continue; // hand-reviewed or already given a better type
-				if (goal.MapId is null or 0 || (goal.MarkerX is null && goal.MarkerY is null))
+
+				// ⚠️ A PLACEHOLDER marker is not a marker (#522): `(50, 50)` is on nine playfields in the shipped data
+				// and `(1, 1)` on three, so typing a reach off one produces a goal solved by standing in the corner of
+				// the map. `HasReachablePin` covers the markerless case too, which is what this used to test alone.
+				if (!QuestProgress.HasReachablePin(goal))
 					continue;
 
 				goal.GoalType = QuestGoalType.ReachArea;
@@ -2291,7 +2295,11 @@ namespace Faolan.Importer.Captures
 				// rather than for zero: `goal.MapId == 0` on a `uint?` is FALSE when the column is null, which let 23
 				// markerless goals through on the first run of this rule - the exact silently-uncompletable quest the
 				// guard exists to prevent.
-				if (goal.MapId is null or 0 || goal.MarkerX is null && goal.MarkerY is null)
+				//
+				// ⚠️ And a PLACEHOLDER marker is not a marker either (#522) - `(50, 50)` is on nine playfields in the
+				// shipped data and `(1, 1)` on three, so a reach typed off one is solved by standing in the corner of
+				// the map. Both cases are `QuestProgress.HasReachablePin`, which the runtime trigger asks as well.
+				if (!QuestProgress.HasReachablePin(goal))
 				{
 					noMarker++;
 					continue;

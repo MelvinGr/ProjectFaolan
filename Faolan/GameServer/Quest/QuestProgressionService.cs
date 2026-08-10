@@ -197,6 +197,18 @@ namespace Faolan.GameServer.Quest
 					if (await GoalProgressOf(characterId, quest, def, goal) >= required)
 						continue; // already reached
 
+					// ⚠️ A reach goal's whole target IS its pin, so a PLACEHOLDER marker makes it solvable by standing
+					// in the corner of the map (#522). `(50, 50)` is on nine different playfields in the shipped data
+					// and `(1, 1)` on three, which is not what a place looks like - see QuestProgress. A goal carrying
+					// the client's real trigger REGION is exempt: the volume is the target then, and the marker is
+					// only a map pin.
+					if (goal.Region == null && !QuestProgress.HasReachablePin(goal))
+					{
+						_logger.LogDebug("Quest {Quest} goal {Goal} is typed ReachArea but has no usable marker ({X}/{Y} on map {Map}); not tracked.", quest.QuestId, goal.GoalId,
+							goal.MarkerX, goal.MarkerY, goal.MapId);
+						continue;
+					}
+
 					// The client's real trigger volume where the goal carries one (#521), else the marker radius. The
 					// region's own MapId wins when the goal has none: goal 14073 carries no map at all, and its
 					// region (`BossRoom`) is what says which playfield it is on.

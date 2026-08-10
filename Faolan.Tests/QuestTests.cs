@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -413,6 +416,58 @@ namespace Faolan.Tests
 			var both = new QuestGoalDefinition { GoalId = 1, RequiredLevel = 30, RequiredRankTitle = "Thug", RequiredRank = 1 };
 			Assert.False(QuestProgress.PreconditionMet(both, 29, _ => 5u)); // rank ok, level short
 			Assert.True(QuestProgress.PreconditionMet(both, 30, _ => 5u));
+		}
+
+		// #522: a reach goal's whole target IS its pin, so a placeholder marker makes it solvable by standing in the
+		// corner of the map. The tell that (50,50) and (1,1) are placeholders rather than places is that the SAME
+		// coordinate spans different playfields - nine of them for (50,50), three for (1,1) - while every other
+		// repeated marker in the shipped data sits on one map.
+		[Fact]
+		public void HasReachablePin_RejectsThePlaceholderMarkers()
+		{
+			Assert.True(QuestProgress.HasReachablePin(Pin(4010, 416, 701))); // "Enter the jungle" - a real pin
+			Assert.True(QuestProgress.HasReachablePin(Pin(2000, 826, 533)));
+
+			// The two shipped goals that were typed ReachArea off one of these, and are not reaches in the first
+			// place: 11446 "Win the Battle of Blood Ravine" and 11951 "Extinguish the Pods".
+			Assert.False(QuestProgress.HasReachablePin(Pin(5201, 1, 1)));
+			Assert.False(QuestProgress.HasReachablePin(Pin(6212, 50, 50)));
+
+			// A placeholder is only a placeholder as a PAIR - 50 on one axis with a real value on the other is a place.
+			Assert.True(QuestProgress.HasReachablePin(Pin(6212, 50, 700)));
+			Assert.True(QuestProgress.HasReachablePin(Pin(6212, 700, 50)));
+
+			// The markerless cases this subsumes.
+			Assert.False(QuestProgress.HasReachablePin(new QuestGoalDefinition { GoalId = 1 }));
+			Assert.False(QuestProgress.HasReachablePin(Pin(0, 416, 701)));
+			Assert.False(QuestProgress.HasReachablePin(new QuestGoalDefinition { GoalId = 1, MapId = 4010 }));
+		}
+
+		// #522: and no shipped goal is typed ReachArea on one - the gate is in the importer's typing pass AND in the
+		// runtime trigger, so a row that slips past one is caught by the other.
+		[Fact]
+		public async Task NoShippedReachGoal_SitsOnAPlaceholderMarker()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var offenders = await db.QuestGoalDefinitions
+				.AsNoTracking()
+				.Where(g => g.GoalType == QuestGoalType.ReachArea && g.RegionId == null)
+				.Where(g => (g.MarkerX == 50 && g.MarkerY == 50) || (g.MarkerX == 1 && g.MarkerY == 1))
+				.Select(g => g.GoalId + " " + g.Name)
+				.ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.True(offenders.Count == 0, "a ReachArea goal on a placeholder marker is solved by standing in the corner of the map:\n  " + string.Join("\n  ", offenders));
+		}
+
+		private static QuestGoalDefinition Pin(uint mapId, uint x, uint y)
+		{
+			return new QuestGoalDefinition
+			{
+				GoalId = 1,
+				MapId = mapId == 0 ? null : mapId,
+				MarkerX = x,
+				MarkerY = y
+			};
 		}
 
 		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------

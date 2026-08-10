@@ -150,6 +150,33 @@ namespace Faolan.Core.Network.Codecs.Quest
 					: null;
 		}
 
+		// The marker coordinates that are PLACEHOLDERS rather than places (#522), and the reason a `ReachArea` goal
+		// needs a gate that a kill or a talk goal does not: a reach goal's whole target IS its pin, so an unset pin
+		// makes the goal solvable by standing in the corner of the map.
+		//
+		// ⭐ **Measured, not assumed - the tell is that the SAME coordinate spans different MAPS.** Across the 136
+		// shipped goals that carry a map, `(50, 50)` appears on **nine** different playfields (6110, 6120, 6121, 6122,
+		// 6130, 6212, 6310, 6311, 6312) and `(1, 1)` on **three** (2095, 5201, 6400). Every OTHER repeated coordinate
+		// is confined to a single map - `(781, 348)` x6 all on 3044, `(913, 718)` x2 both on 4020 - which is what a
+		// genuinely shared LOCATION looks like. A place cannot be on nine playfields at once, so these two are the
+		// content editor's unfilled default.
+		//
+		// Two goals were typed `ReachArea` on one before this gate existed: 11446 "Win the Battle of Blood Ravine"
+		// (5201, 1/1) and 11951 "Extinguish the Pods" (6212, 50/50). Neither is a reach in the first place - both come
+		// from kind 22 `Generic`, the catch-all whose 52 goals span nineteen verbs - so their marker was the only
+		// thing typing them, and it was not a marker.
+		public static bool IsPlaceholderMarker(uint? markerX, uint? markerY)
+		{
+			return (markerX, markerY) is (50, 50) or (1, 1);
+		}
+
+		// Whether a goal carries a pin a REACH can be judged against: a map, and a marker that is a place. Used by the
+		// runtime trigger and by the importer's typing pass, so a row that slips past one is caught by the other.
+		public static bool HasReachablePin(QuestGoalDefinition goal)
+		{
+			return goal.MapId is > 0 && (goal.MarkerX != null || goal.MarkerY != null) && !IsPlaceholderMarker(goal.MarkerX, goal.MarkerY);
+		}
+
 		// Whether `goal` targets the live NPC identified by (`templateId`, `name`) - the id-first/name-second pair the
 		// kill path has always used, now shared by every target-matching trigger (#521).
 		//

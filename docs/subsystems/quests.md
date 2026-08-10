@@ -260,6 +260,24 @@ into walk-ups and closing Casilda's escort the instant it began. #704: the sente
 override, whose whole point is that she has **no imported dialogue**, so a greeting can never fire and only a
 reach can complete the goal.
 
+#### …and a marker can be a PLACEHOLDER, which is weaker still
+
+⭐ A reach goal's whole target IS its pin, so an unset pin makes it solvable by standing in the corner of the map.
+Two coordinates in the shipped data are not places: **`(50, 50)` appears on NINE different playfields** (6110, 6120,
+6121, 6122, 6130, 6212, 6310, 6311, 6312) and **`(1, 1)` on three** (2095, 5201, 6400). Every *other* repeated marker
+is confined to one map — `(781, 348)` ×6 all on 3044, `(913, 718)` ×2 both on 4020 — which is what a genuinely shared
+location looks like. A place cannot be on nine playfields at once.
+
+Two goals had been typed `ReachArea` off one: 11446 *"Win the Battle of Blood Ravine"* (5201 @ 1/1) and 11951
+*"Extinguish the Pods"* (6212 @ 50/50). Neither is a reach in the first place — both come from kind `22` `Generic`,
+the catch-all whose 52 goals span nineteen verbs — so the marker was the only thing typing them, and it was not a
+marker. Both are `None` now.
+
+`QuestProgress.HasReachablePin` is the rule, and it is asked in **two** places: the importer's typing passes, so a
+placeholder never types a reach again, and `QuestProgressionService.LoadReachGoals`, so a row that gets there anyway
+is not tracked. A goal carrying the client's real trigger REGION (#521) is exempt — the volume is the target then,
+and the marker is only a map pin.
+
 ## Collect goals do not care how the item arrives
 
 A gather objective is satisfied by **holding** the item. The client's data says which item and how many, and
