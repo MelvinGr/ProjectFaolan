@@ -256,7 +256,8 @@ namespace Faolan.GameServer.Combat
 
 		// The catalog build, as a pure function over the imported rows: filter to what we honor and convert each
 		// amount to display units. Also reports what was dropped, so the load summary can say how big the gap is.
-		internal static Catalog BuildCatalog(IEnumerable<SpellStatEffect> rows)
+		internal static Catalog BuildCatalog(IEnumerable<SpellStatEffect> rows,
+			ILookup<(uint SpellId, uint Sequence), SpellStatEffectCriterion>? criteria = null)
 		{
 			var honored = new Dictionary<uint, List<Delta>>();
 			var percent = new Dictionary<uint, List<Delta>>();
@@ -297,9 +298,14 @@ namespace Faolan.GameServer.Combat
 				var ramp = !isPercent && row is { HighAmount: { } high, LowLevel: { } low, HighLevel: { } top }
 					? new LevelRamp(row.Amount, high, low, top)
 					: (LevelRamp?)null;
+				// ⭐ #791: the element's own CONDITIONS ride with the delta, so the decision to apply it is made at
+				// the point of use - where the carrier's live stats exist - rather than at load, where they do not.
+				var conditions = criteria?[(row.SpellId, row.Sequence)]
+					.Select(c => new ItemTemplateStatModifiers.Criterion(c.CriterionId, c.Value, c.Operator))
+					.ToArray();
 				var delta = new Delta(row.StatId, isPercent || ramp is not null
 					? row.Amount
-					: row.Amount / (int)SpellScale(row.StatId), ramp);
+					: row.Amount / (int)SpellScale(row.StatId), ramp, conditions is { Length: > 0 } ? conditions : null);
 
 				var into = isPercent ? percent : honored;
 				(into.TryGetValue(row.SpellId, out var list) ? list : into[row.SpellId] = []).Add(delta);
@@ -401,7 +407,7 @@ namespace Faolan.GameServer.Combat
 					: 0;
 			}
 
-			static void Sum(IReadOnlyDictionary<uint, Delta[]> from, uint spellBase, Dictionary<CharacterStatId, int> into, uint level)
+			void Sum(IReadOnlyDictionary<uint, Delta[]> from, uint spellBase, Dictionary<CharacterStatId, int> into, uint level)
 			{
 				if (!from.TryGetValue(spellBase, out var deltas))
 					return;
@@ -409,7 +415,30 @@ namespace Faolan.GameServer.Combat
 				// Through the same band resolution ForSpellBase uses, so the sheet and the live stats never disagree
 				// about which band a buff is in.
 				foreach (var delta in Applicable(deltas, level))
+				{
+					// ⭐ #791: a delta that states CONDITIONS applies only when they hold. The carrier is both subject
+					// and target here - a live buff's stat contribution is read off the entity wearing it, and the
+					// entity that cast it is long gone by the time this recomputes.
+					if (delta.Criteria is { } conditions && !CriteriaEvaluator.Permits(conditions, StatOf, StatOf, out _))
+						continue;
+
 					into[delta.Stat] = into.GetValueOrDefault(delta.Stat) + delta.At(level);
+				}
+			}
+
+			// The carrier's own sheet, as the evaluator wants it: the live buffed value where one exists, the level
+			// and the class from the entity itself. An unknown stat reads 0, which is what an entity that does not
+			// carry one reports.
+			int? StatOf(CharacterStatId stat)
+			{
+				// ⚠️ NULL, not 0, for a stat this entity cannot supply - the evaluator treats that as unevaluated and
+				// lets the effect through. Reading an absent stat as 0 would drop every effect gated on `> n`.
+				return stat switch
+				{
+					CharacterStatId.Level => (int)entity.Level,
+					CharacterStatId.HealthCurrent => (int?)entity.Vitals?.Health,
+					_ => entity.BuffedStats.TryGetValue(stat, out var value) ? (int)value : null
+				};
 			}
 		}
 
@@ -437,12 +466,15 @@ namespace Faolan.GameServer.Combat
 					return _catalog.Value;
 
 				var rows = await _database.GetSpellStatEffects();
-				var catalog = BuildCatalog(rows);
+				var criteria = await _database.GetSpellStatEffectCriteria();
+				var catalog = BuildCatalog(rows, criteria);
 				_catalog = catalog;
 				_logger.LogInformation(
 					"BuffStatEffects: {Spells} spell(s) with flat stat effects and {PercentSpells} with percent ones, out of {Rows} imported records " +
-					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats - see #367).",
-					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped);
+					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats - see #367); " +
+					"{Conditional} honored delta(s) carry CONDITIONS and are evaluated per carrier (#791).",
+					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped,
+					catalog.BySpellBase.Values.Concat(catalog.PercentBySpellBase.Values).Sum(d => d.Count(x => x.Criteria != null)));
 				return catalog;
 			}
 			finally
@@ -467,7 +499,8 @@ namespace Faolan.GameServer.Combat
 		// One honored delta a spell carries: which stat, and what it is worth. Not a bare amount because a delta is
 		// either a constant or a LEVEL RAMP (#599), and only the carrier's level tells the two apart at the point of
 		// use - see <see cref="Delta.At" />.
-		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null)
+		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null,
+			IReadOnlyList<ItemTemplateStatModifiers.Criterion>? Criteria = null)
 		{
 			// The LEVEL BAND this delta states its numbers for, or null when it is level-independent - the ramp's own
 			// two levels, because a record that bands a stat bands it by ramping each band separately (#783).

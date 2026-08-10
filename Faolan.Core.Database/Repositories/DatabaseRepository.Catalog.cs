@@ -45,6 +45,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<(uint Line, uint SpellId)[]> GetSpellLineMembers();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
+		Task<ILookup<(uint SpellId, uint Sequence), SpellStatEffectCriterion>> GetSpellStatEffectCriteria();
 		Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class);
 		Task<uint[]> GetStartingSpells(uint level, ConanClass @class);
 		Task<Dictionary<string, StockPhrase>> GetStockPhrases();
@@ -349,6 +350,15 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.SpellStatEffects.OrderBy(e => e.SpellId).ThenBy(e => e.StatId).ToArrayAsync();
+		}
+
+		// #791: the CONDITIONS on each effect, keyed the way the effect is, with the run in `Pos` order - the run is a
+		// postfix expression, so the order is part of the data.
+		public async Task<ILookup<(uint SpellId, uint Sequence), SpellStatEffectCriterion>> GetSpellStatEffectCriteria()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx.SpellStatEffectCriteria.OrderBy(c => c.SpellId).ThenBy(c => c.Sequence).ThenBy(c => c.Pos).ToArrayAsync();
+			return rows.ToLookup(c => (c.SpellId, c.Sequence));
 		}
 
 		public async Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class)

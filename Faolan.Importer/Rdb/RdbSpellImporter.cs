@@ -722,6 +722,7 @@ namespace Faolan.Importer.Rdb
 						areaRows++;
 				}
 			var effectRows = 0;
+			var pendingCriteria = new List<SpellStatEffectCriterion>();
 			foreach (var (spellId, mods) in statEffects)
 				for (var i = 0; i < mods.Count; i++)
 				{
@@ -743,6 +744,28 @@ namespace Faolan.Importer.Rdb
 						HighLevel = effect.Ramp?.HighLevel
 					});
 					effectRows++;
+
+					// ⭐ #791: the element's CONDITIONS, verbatim and in order. The run is a postfix expression, so
+					// `Pos` is load-bearing rather than cosmetic. Stored including operators nothing can evaluate yet -
+					// dropping those would make the table look complete while deciding the condition is absent.
+					//
+					// ⚠️ COLLECTED here and written in a second SaveChanges below, not added now: the effect rows are
+					// delete-then-inserted and the criterion FK cascades, so inserting a child in the same unit of
+					// work as its parent's delete loses every row silently - the importer reported 32,189 written and
+					// the table held 0.
+					for (var c = 0; c < (effect.Criteria?.Count ?? 0); c++)
+					{
+						var criterion = effect.Criteria![c];
+						pendingCriteria.Add(new SpellStatEffectCriterion
+						{
+							SpellId = spellId,
+							Sequence = (uint)i,
+							Pos = (uint)c,
+							CriterionId = criterion.Id,
+							Value = criterion.Value,
+							Operator = criterion.Operator
+						});
+					}
 				}
 
 			// #627: the mount catalog is wholly DERIVED from field 186, so the RDB is authoritative for the table as a
@@ -776,12 +799,17 @@ namespace Faolan.Importer.Rdb
 
 			await db.SaveChangesAsync();
 
+			// The effects now exist, so their conditions can reference them.
+			db.SpellStatEffectCriteria.AddRange(pendingCriteria);
+			await db.SaveChangesAsync();
+			var criterionRows = pendingCriteria.Count;
+
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows, {ChainRows} CastNano chain rows.",
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows, {ChainRows} CastNano chain rows, {CriterionRows} effect CRITERIA.",
 				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
-				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows, chainRows);
+				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows, chainRows, criterionRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
-				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows, {spellModRows} spell-scoped stat modifier rows");
+				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows, {spellModRows} spell-scoped stat modifier rows, {criterionRows} effect criteria");
 		}
 
 		/// <summary>

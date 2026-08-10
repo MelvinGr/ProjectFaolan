@@ -385,7 +385,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp, [.. e.Criteria]));
 			}
 
 			return mods;
@@ -432,7 +432,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp, [.. e.Criteria]));
 			}
 
 			return mods;
@@ -448,7 +448,7 @@ namespace Faolan.Core.Rdb
 				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp));
+				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp, [.. e.Criteria]));
 			}
 
 			return mods;
@@ -478,8 +478,11 @@ namespace Faolan.Core.Rdb
 		// `MaxAmount`/`MaxRamp` are the RANGE's upper endpoint and its ramp, non-null exactly for the types that state
 		// a range (`Element.MaxAmount`). `WireAmount` is then only the LOWER endpoint, and a consumer that reads it
 		// alone reports a 58.40-71.40 hit as a flat 58.40 (Gitea #783).
+		// ⭐ `Criteria` is the element's own condition run, carried through rather than dropped (#791). An element
+		// that states one applies only when it evaluates - without it a conditional bonus is granted always, which is
+		// what 987 of the catalog's 1,117 apparent duplicate elements actually differ by.
 		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null, uint PeriodCentiseconds = 0, int? MaxAmount = null,
-			LevelRamp? MaxRamp = null);
+			LevelRamp? MaxRamp = null, IReadOnlyList<Criterion>? Criteria = null);
 
 		/// <summary>
 		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order
