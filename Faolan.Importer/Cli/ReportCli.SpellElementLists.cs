@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Rdb;
 
@@ -21,7 +22,12 @@ namespace Faolan.Importer.Cli
 	//     not account for all its elements is the grammar failing, and it is printed with its id;
 	//   * the list ID distribution, by position and by the KINDS each id carries - which is what any future reading
 	//     of what the id MEANS has to start from;
-	//   * the DUPLICATE elements the ticket is about, split by whether the twins share a list.
+	//   * the DUPLICATE elements the ticket is about, split by whether the twins share a list;
+	//   * ⭐ head word `a` (#632) cross-tabbed against those lists. `a` had been read as a CATEGORY - "a=2 is an
+	//     internal effect record, a=4/5 are castables" - and it is not: it is `2 + element lists + 1 if the record
+	//     carries a [22][36] block`, i.e. a count of the record's VALUE BLOCKS, at 97.10%. The category reading was
+	//     that count seen through what the records happen to hold. ⚠️ The residual is printed row by row rather
+	//     than summarised, because 97% is a reading and a bare percentage would read as a definition.
 	public static partial class ReportCli
 	{
 		private static void SpellElementLists(string rdbDir, string? arg)
@@ -42,6 +48,9 @@ namespace Faolan.Importer.Cli
 			var criterionOps = new Dictionary<uint, int>();
 			var zeroIdOps = new Dictionary<uint, int>();
 			var untiled = new List<string>();
+			var byHeadA = new Dictionary<(uint A, int Lists, bool ListFields), int>();
+			var headAAgrees = 0;
+			var headAMeasured = 0;
 
 			foreach (var entry in rdb.EntriesOfType(SpellTemplateType).Where(rdb.CanRead))
 			{
@@ -61,13 +70,28 @@ namespace Faolan.Importer.Cli
 				records++;
 				var body = record.AsSpan(12);
 				var all = ItemTemplateStatModifiers.ParseElements(body);
+
+				// ⭐ Head word `a` against the record's LIST-valued content (#632). Counted over EVERY record,
+				// including the 2,066 that carry no element at all - those are the ones that pin the formula's
+				// constant, and skipping them would leave `a`'s floor unmeasured.
+				var headA = body.ReadU32Le(HeadWordAOffset);
+				var elementLists = ItemTemplateStatModifiers.ParseElementLists(body);
+				var listFields = CountListFieldBlocks(body) > 0;
+				if (all.Count == 0 || elementLists.Sum(l => l.Elements.Count) == all.Count)
+				{
+					headAMeasured++;
+					byHeadA[(headA, elementLists.Count, listFields)] = byHeadA.GetValueOrDefault((headA, elementLists.Count, listFields)) + 1;
+					if (headA == HeadWordAFloor + elementLists.Count + (listFields ? 1 : 0))
+						headAAgrees++;
+				}
+
 				if (all.Count == 0)
 					continue;
 
 				withElements++;
 				elements += all.Count;
 
-				var lists = ItemTemplateStatModifiers.ParseElementLists(body);
+				var lists = elementLists;
 				var covered = lists.Sum(l => l.Elements.Count);
 				listed += covered;
 
@@ -144,6 +168,18 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    {count} list(s)   {n,7:N0} record(s)");
 
 			Console.WriteLine();
+			Console.WriteLine($"  ⭐ head word `a` vs the record's LIST-valued fields, over {headAMeasured:N0} records (#632):");
+			Console.WriteLine($"     `a` == {HeadWordAFloor} + element lists + 1 if the record carries a [22][36] block"
+			                  + $"   : {headAAgrees:N0} / {headAMeasured:N0}"
+			                  + $" = {(headAMeasured == 0 ? 0 : 100.0 * headAAgrees / headAMeasured):0.00}%");
+			Console.WriteLine($"     {"a",3} {"lists",6} {"[22][36]",9} {"records",9}   {"a - predicted",13}");
+			foreach (var ((a, lists, fields), n) in byHeadA.OrderBy(k => k.Key.A).ThenBy(k => k.Key.Lists).ThenBy(k => k.Key.ListFields))
+			{
+				var delta = (long)a - (HeadWordAFloor + lists + (fields ? 1 : 0));
+				Console.WriteLine($"     {a,3} {lists,6} {(fields ? "yes" : "no"),9} {n,9:N0}   {(delta == 0 ? "" : delta.ToString("+#;-#")),13}");
+			}
+
+			Console.WriteLine();
 			Console.WriteLine("  list ids, by how many lists carry one:");
 			foreach (var (id, n) in byId.OrderByDescending(k => k.Value))
 				Console.WriteLine($"    id {id,4}   {n,7:N0}");
@@ -180,13 +216,50 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    of those, [0][0][op] (no operand - a logical combiner?): {zeroIdOps.Values.Sum():N0}"
 			                  + "   ops: " + string.Join(", ", zeroIdOps.OrderByDescending(k => k.Value).Take(8).Select(k => $"{k.Key}x{k.Value:N0}")));
 
-			if (untiled.Count == 0)
-				return;
-
-			Console.WriteLine();
-			Console.WriteLine("  ⚠️ records whose lists do NOT account for every element:");
-			foreach (var line in untiled)
-				Console.WriteLine($"    {line}");
+			if (untiled.Count != 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  ⚠️ records whose lists do NOT account for every element:");
+				foreach (var line in untiled)
+					Console.WriteLine($"    {line}");
+			}
 		}
+
+		// ⭐ How many `[22][36]` LIST-valued field blocks does the record carry? Usually the block sits immediately
+		// after the string block, but not always - on some records it turns up BETWEEN two element lists, and a
+		// couple carry it twice - so this SCANS from the end of the text rather than reading one fixed spot (#632).
+		// `RdbSpellImporter` owns the shape.
+		private static int CountListFieldBlocks(ReadOnlySpan<byte> body)
+		{
+			RdbSpellImporter.ReadIncreasingFields(body, out var afterRun);
+			if (afterRun <= 0)
+				return 0;
+
+			var (_, _, stringBytes) = RdbSpellImporter.ReadStringBlock(body, afterRun);
+			if (stringBytes == 0)
+				return 0;
+
+			var blocks = 0;
+			for (var at = afterRun + stringBytes; at + 8 <= body.Length;)
+			{
+				var length = RdbSpellImporter.ReadListFieldsLength(body, at);
+				if (length > 0)
+				{
+					blocks++;
+					at += length;
+					continue;
+				}
+
+				at += 4;
+			}
+
+			return blocks;
+		}
+
+		// The record opens `[classTag][a][15][23][frame]`, so `a` is word 1 of the body after the 12-byte RDB header.
+		private const int HeadWordAOffset = 4;
+
+		// `a`'s floor: the value a record with no list-valued field at all carries.
+		private const uint HeadWordAFloor = 2;
 	}
 }

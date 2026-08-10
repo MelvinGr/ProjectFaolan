@@ -15,7 +15,7 @@ It is one **tagged field stream**, and word 4 states its own length. A field's v
 `0x3F1`-framed list:
 
 ```
-[u32 magic = 51051][u32 a][u32 15][u32 23][u32 (pairs + 1) * 0x3F1]
+[u32 classTag = 51051][u32 a][u32 15][u32 23][u32 (pairs + 1) * 0x3F1]
 pairs x [u32 fieldId][u32 value]                          scalar fields
 [u32 21][u32 33][u16 nameLen][u16 descLen][name][desc]    the two TEXT fields
 [u32 22][u32 36][frame][1-word items][frame][criteria]    the two LIST fields   (1,871 records)
@@ -79,10 +79,12 @@ start, the last five words are constant in shape —
 ```
 
 — and `298` / `88` hold catalog-wide, which is what pins the FLAGS word to `runStart - 20`. Everything earlier is
-`[51051 magic][a][15][23][b][76][0][30][c][0]`, where `15`, `23`, `76`, `0`, `30` and `0` are catalog-wide
+`[51051 classTag][a][15][23][b][76][0][30][c][0]`, where `15`, `23`, `76`, `0`, `30` and `0` are catalog-wide
 constants and the optional `[76][0]` pair is what makes the short head short. ⭐ `b` is not data at all - it is
 the **frame word** above, `(pairs + 1) * 0x3F1`, which is why it took 28 values that are all multiples of
-`0x3F1`. What genuinely carries data is `a` (6 distinct values), `c` (17) and the flags word (1,364).
+`0x3F1`. The head's five leading pairs are `(76, 30, 0, 298, 88)` — so the FLAGS word is the value of field `0`
+and `c` the value of field `30`, ordinary fields that simply sit in front of the ascending run. What genuinely
+carries data is `a` (6 distinct values, a block count — below), `c` (17) and the flags word (1,364).
 
 ⚠️ **The flags word was read at a FIXED `record byte 52` until #632**, and the head being variable-length means
 that lands on the wrong word for the short ones — it returned **0 on 936 records**, forcing their mana cost to
@@ -106,35 +108,68 @@ records** — which is what a bit that IS a predicate looks like, and the yardst
 ⚠️ **A rare bit scores high against a rare predicate for free** — both are mostly false, so they agree on every
 record that has neither. Read the `set` column before the percentages; the report says so itself.
 
-### ⭐ The first two words are a virtual KEY, so `a` is a member field
+### ⭐ Word 0 is a CLASS TAG — and the whole head is generic, not a spell head
 
-`0xC76B` (51051) appears **exactly once** in `AgeOfConan.exe`, in `FUN_0076bef0`:
+`0xC76B` (51051) appears **exactly once** in `AgeOfConan.exe`, in `FUN_0076bef0` — slot 23 of
+`SpellItemIF_c`'s vtable:
 
 ```c
-void FUN_0076bef0(undefined4 *out) {   // slot 23 of the vtable at 0x01fc7f74
-    out[0] = 0xc76b;                   // the class's TYPE TAG
-    out[1] = this->[0x3c];             // -> the record's word 1, `a`
+void FUN_0076bef0(int this, undefined4 *out) {
+    out[0] = 0xc76b;                   // this class's TYPE TAG
+    out[1] = *(undefined4 *)(this + 0x3c);
 }
 ```
 
-It is referenced only from that vtable, so it is a virtual accessor that writes a two-word KEY — and the record
-opens with exactly those two words. Three things follow:
+⭐ **Slot 23 is a `(typeTag, id)` resource-key accessor, swept across every RTTI vtable in the image**
+(`DumpVirtualSlotAcrossClasses.java SLOT=0x5c`). Its overriders are the shortcut-bar item-interface family —
+`SpellItemIF_c`, `ACGItemIF_c`, `ACGDynamicItemIF_c`, `ComboItemIF_c`, `SpecialItemIF_c`, `AttackDirectionIF_c`,
+`StatItemIF_c` (pure virtual). `ACGItemIF_c` passes its own `+0x3c` to an item lookup and returns the pair at the
+live item's `+0xC0/+0xC4` — the ACG **template pair** — while `ComboItemIF_c` / `SpecialItemIF_c` /
+`AttackDirectionIF_c` all return the shared zero pair. So `+0x3c` is *the referent's id* and the key is
+`(what kind of thing, which one)`.
 
-- `0xC76B` is the **class's type tag**, not a file magic;
-- **`a` is a genuine member field at `+0x3C`**, surfaced through that accessor — not a count, not a version and
-  not a length, which is what the corpus correlations could not settle on their own;
-- the class sits in the same module as the GameActionData accessors (slot 17 is `FUN_0077a740`, next door to the
-  `FUN_0077a510` int-stat getter every element read goes through).
+⚠️ **That means the key's second word is the SPELL ID, not the record's word 1.** The spell id sits in the RDB
+entry header at body `+4`, outside the record; only word 0 coincides with the tag. The earlier reading —
+"the record opens with exactly those two words, so `a` is a member at `+0x3C`" — does not survive the sweep.
 
-⭐ **The next step is named**: sweep who else overrides **slot 23**. Each overrider writes its own type tag, so
-the set of tags says what the key IS, and a sibling class whose tag we already recognise names the field
-(`name_a_virtual_slot_by_who_overrides_it`).
+⭐ **The head is not the spell catalog's.** A FEAT record (RDB type 1000020) has it word for word with a
+different tag:
 
-⚠️ What is left is not bytes but MEANINGS: head word `a` and the flags word's unnamed bits. `a` takes 6 values and
-SPLITS the catalog sensibly — `a=2` is almost never trainable (6 of 2,066) and its records are named `Horror`,
-`Exhausted`, `Death Penalty`, i.e. internal effect records, while `a=4`/`a=5` are castables with high cast-time
-rates and every one of the 155 mounts is `a=4` — but nothing names it. Every byte of `Hellfire Stream` is inside
-a named region.
+```
+[u32 rdbType][u32 id][u32 1000000]                         the 12-byte RDB entry header
+[u32 classTag][u32 a][u32 15][u32 23][u32 (pairs+1)*0x3F1]  ← identical on 1040005 and 1000020
+```
+
+`51005` (`0xC73D`) on feats against `51051` on spells, same `15`, same `23`, same frame word, same five leading
+pairs `(76, 30, 0, 298, 88)`. ⭐ And the tag is **not even constant within type 1040005**: 11 records carry
+`30047` and all 11 are named `Companion: <creature>`, and one carries `30030` and is named `Test Recipe`. A class
+tag is exactly what varies that way; a file magic is not. (Only `0xC76B` is an instruction immediate anywhere in
+the exe — `0xC73D` / `0x755F` / `0x754E` are not, so the client does not compare these; they are authoring-side
+class ids.)
+
+### ⭐ `a` is a structural COUNT, not a category
+
+Measured by `--report spell-element-lists`, which cross-tabs `a` against what the record actually carries:
+
+```
+`a` == 2 + element lists + 1 if the record carries a [22][36] block   : 20,551 / 21,165 = 97.10%
+```
+
+So `a` counts the record's **value blocks**: one for the scalar pair region, one for the `[21][33]` text block,
+one per `[2][listId]` element list, and one for the `[22][36]` list-valued pair. Its floor is exactly 2 — a
+record with no element list and no list fields — on 1,995 of the 1,999 such records.
+
+⚠️ **97.10% is a reading, not a definition**, and the cross-tab prints its own residual: 508 records come out one
+short of their `a` (mostly `a=4` with one list and no block detected) and ~106 come out over. Both edges look
+like the *detector* rather than the rule — the block-scan and the element-list tiling each fail on a handful —
+but nothing has attributed them, so the table is printed row by row instead of a single percentage.
+
+⭐ This **replaces** the old reading that `a` splits castables from internal effect records. That split is real
+but derived: an internal effect record carries no element list, so it lands on the floor, and a castable carries
+several. The correlation was with the record's *content*, not with a kind word.
+
+⚠️ What is left is not bytes but ONE meaning: the flags word's unnamed bits. Every byte of `Hellfire Stream` is
+inside a named region.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the
