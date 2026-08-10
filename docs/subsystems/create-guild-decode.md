@@ -35,6 +35,30 @@ Retail's immediate create response is **`DispatchGuildCreated` = 0x2044** (opcod
 The trailer holds capture-specific values (creation timestamps / ids), so a NEW guild generates different bytes
 there — the byte-exact goal is the header/member-record (deterministic); the tail is structural.
 
+## ⭐ The REFUSALS — `0x45`–`0x49`, and they carry no body at all
+
+A create that the server will not honour is answered by one of five methods in the same block, and every one of
+`0x45`–`0x48` is a **no-arg dispatch**: the whole message is the method id, because the client already knows
+which name it just submitted. `annotated_6` catches the taken-name case — `CreateGuild "Faolan"` at 20:21:52
+answered in the same second by `0x2047` with an EMPTY body and nothing else.
+
+⭐ Two of the five had no name, and a no-arg method has no argument signature for the client's string catalog to
+have recorded — which is exactly why. They are recovered from the code instead: the dispatcher hands each one to
+an interface VTABLE SLOT, and `CSClientIncoming_c`'s override of that slot fetches the **LDB category-100 token**
+it displays.
+
+| method | interface slot | LDB 100 token | name |
+|---:|---|---|---|
+| `0x45` | `+0x118` | `NonAlphanumericGuildName` | `DispatchGuildNonAlphanumericName` — *already named, the control* |
+| `0x46` | `+0x11C` | `WrongLengthGuildName` | **`DispatchGuildNameWrongLength`** |
+| `0x47` | `+0x120` | `TakenGuildName` | **`DispatchGuildNameTaken`** |
+| `0x48` | `+0x124` | `BadGuildName` | `DispatchGuildBadName` — *already named, the second control* |
+| `0x49` | — | — | `DispatchGuildNameWaitTime` (carries a body) |
+
+⭐ **Both ends of the block land on the name they already had**, which is what makes the two in the middle
+trustworthy rather than plausible. `HandleCreateGuild` sends `0x47` on a taken name (#737); the other three have
+no server-side rule to trigger them yet.
+
 ## Full server sequence (frames 362→383)
 
 1. C→S `0x2021 CreateGuild` `[name][form]`

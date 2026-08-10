@@ -5,6 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Guild;
+using Faolan.Core.Network.Protocol;
 using Xunit;
 
 namespace Faolan.Tests
@@ -205,6 +206,24 @@ namespace Faolan.Tests
 			// Compared as BYTES: GuildMemberRecord carries a byte[] of counters, so record equality is reference
 			// equality on it and would pass for two records that agree on nothing else.
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberUpdateCodec.Build(GuildMemberUpdateCodec.Parse(body))));
+		}
+
+		// ⭐ The guild-name refusals (#737). Every one of 0x45-0x48 is a NO-ARG dispatch, so there is no body to
+		// build a golden from - the whole message IS the method id, which is what this pins. `annotated_6` records
+		// the taken-name case as `0x2047` with an EMPTY body, and `WireOpcode.Of` is what turns the enum member
+		// into the number a dump prints.
+		//
+		// The two middle members are recovered from the client (`CSClientIncoming_c`'s override of the interface
+		// slot each dispatches to, and the LDB category-100 token it shows), and the two OUTER ones are the
+		// control: they already carried these names, and the same read reproduces both.
+		[Theory]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNonAlphanumericName, 0x2045)]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNameWrongLength, 0x2046)]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNameTaken, 0x2047)]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildBadName, 0x2048)]
+		public void TheGuildNameRefusals_RenderAsTheOpcodesTheCaptureRecorded(CSPlayerInterfaceMethods method, int wire)
+		{
+			Assert.Equal((ushort)wire, WireOpcode.Of(method));
 		}
 	}
 }

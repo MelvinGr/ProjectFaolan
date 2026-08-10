@@ -201,9 +201,12 @@ namespace Faolan.CSPlayerAgent
 			var guild = await _database.CreateGuild(name, character.Id);
 			if (guild == null)
 			{
-				// Retail answers with DispatchGuildBadName/-NonAlphanumericName here; those opcodes are not
-				// decoded yet, so the failure is server-side only.
+				// ⭐ Retail's name-taken refusal, and it is a NO-ARG dispatch - the client already knows which name
+				// it submitted, so the whole message is the method id (#737). Captured in `annotated_6`: a
+				// `CreateGuild "Faolan"` answered in the same second by `0x2047` with an EMPTY body and nothing
+				// else. Without it the registrar window just sits there.
 				_logger.LogWarning("CreateGuild failed for {CharacterId:X8}: guild name \"{Name}\" is taken.", character.Id, name);
+				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildNameTaken, _ => { }));
 				return;
 			}
 

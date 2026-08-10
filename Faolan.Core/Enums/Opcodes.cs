@@ -265,8 +265,20 @@ namespace Faolan.Core.Enums
 		DispatchGuildUpdateOther = 0x43,
 		DispatchGuildCreated = 0x44,
 		DispatchGuildNonAlphanumericName = 0x45,
-		Reserved0x46 = 0x46,
-		Reserved0x47 = 0x47,
+
+		// ⭐ The two NO-ARG members of the guild-name refusal block, recovered from the client rather than named
+		// (#737). A no-arg dispatch has no argument signature for the string catalog to have recorded, which is why
+		// they sat as `Reserved` - but the dispatcher hands each one to an interface VTABLE SLOT, and
+		// `CSClientIncoming_c`'s override of that slot fetches the LDB category-100 token it shows:
+		//
+		//   0x45 -> slot +0x118 -> "NonAlphanumericGuildName"     (already named - the control)
+		//   0x46 -> slot +0x11C -> "WrongLengthGuildName"
+		//   0x47 -> slot +0x120 -> "TakenGuildName"
+		//   0x48 -> slot +0x124 -> "BadGuildName"                 (already named - the second control)
+		//
+		// Both ends of the block land on their known names, which is what makes the two in the middle trustworthy.
+		DispatchGuildNameWrongLength = 0x46,
+		DispatchGuildNameTaken = 0x47,
 		DispatchGuildBadName = 0x48,
 		DispatchGuildNameWaitTime = 0x49,
 		Reserved0x4A = 0x4A,

@@ -242,8 +242,8 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x43` | `0x2043` | `DispatchGuildUpdateOther` |  |
 | `0x44` | `0x2044` | `DispatchGuildCreated` |  |
 | `0x45` | `0x2045` | `DispatchGuildNonAlphanumericName` |  |
-| `0x46` | `0x2046` | `Reserved0x46` |  |
-| `0x47` | `0x2047` | `Reserved0x47` |  |
+| `0x46` | `0x2046` | `DispatchGuildNameWrongLength` |  |
+| `0x47` | `0x2047` | `DispatchGuildNameTaken` |  |
 | `0x48` | `0x2048` | `DispatchGuildBadName` |  |
 | `0x49` | `0x2049` | `DispatchGuildNameWaitTime` |  |
 | `0x4A` | `0x204A` | `Reserved0x4A` |  |
