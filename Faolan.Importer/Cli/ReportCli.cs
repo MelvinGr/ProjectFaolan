@@ -293,6 +293,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #781: every death record's `field12` against the creature that died - is the animation's length the
+				// CREATURE's, or the animation's?
+				case "death-timing":
+				{
+					DeathTiming(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "follow-pairs":
 				{
 					FollowPairs(NamedCapture.LoadAll(capturesDir));

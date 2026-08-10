@@ -99,6 +99,10 @@ namespace Faolan.GameServer.World
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
 		public uint DeathBehaviorId { get; set; } = DeathSequence.HumanoidDeathBehaviorId;
 
+		// How long that animation runs for THIS creature, in centiseconds - from its NpcTemplate (#781). Null for a
+		// creature no capture measured; `DeathSequence` then uses the animation's own modal length.
+		public uint? DeathActivationTime { get; set; }
+
 		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
 		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort
 		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.

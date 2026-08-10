@@ -52,9 +52,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// INVARIANT across every captured record of that animation (166 / 32 / 2), which is why they are here rather
 		// than left at one global constant - a beast used to be given 2.4x its own timing.
 		//
-		// ⚠️ The demon/large-caster animation is the exception and genuinely varies (280 on 30 of its 52 records,
-		// then 240 / 160 / 816 / 176 / 360 / 592 / 120). Its modal value is used and the spread is the reason this is
-		// a lookup with a default rather than a claim that the field is a constant. [V0: what varies field12 on 17036]
+		// ⭐ **The demon/large-caster animation's spread is the CREATURE's** (#781, `--report death-timing`). It takes
+		// eight values over 52 records; resolving every actor against its own capture's spawns gives **22 creatures,
+		// 22 of which carry ONE value and none of which carries two** - Valley Yeti 816, Enslaved Demon 592, Bat Demon
+		// 360, Harvester 240, Necrotic Bomb 220, Striped Boar and Wild Boar both 176, Wild Cow and Wild Pig both 160,
+		// Moose 120, and a 280 cluster of ten casters and crawlers. Two families landing on one number each is not
+		// what noise looks like.
+		//
+		// So this lookup is the FALLBACK now, not the answer: a creature the corpus measured carries its own length in
+		// `NpcTemplate.DeathActivationTime`, and only an un-harvested one falls through to the animation's modal
+		// value. Which is still the right default - the humanoid and quadruped animations are invariant across all
+		// 166 and 32 of their records, so a creature of that family is served correctly by it either way.
 		public static uint ActivationTimeFor(uint deathBehaviorId)
 		{
 			return deathBehaviorId switch
@@ -96,7 +104,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// <see cref="CapturedNpcDeathCounter" />; field12 comes from the animation
 		// (<see cref="ActivationTimeFor" />). field5=8 and field6=0 are the only two that really are constants: 272
 		// of 272 captured records carry them.
-		public static BehaviorControlCenterIIR Bcc(uint handle, uint deathBehaviorId = HumanoidDeathBehaviorId, uint commandQueueId = CapturedPlayerDeathCounter)
+		//
+		// `activationTime` is the creature's own measured animation length (#781); null falls back to the animation's
+		// modal value, which is what every creature used before the per-creature harvest.
+		public static BehaviorControlCenterIIR Bcc(uint handle, uint deathBehaviorId = HumanoidDeathBehaviorId, uint commandQueueId = CapturedPlayerDeathCounter,
+			uint? activationTime = null)
 		{
 			var args = new CommandMessage
 			{
@@ -104,7 +116,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				CommandqueueServerId = commandQueueId,
 				Flags = 8,
 				ExecutionStatus = 0,
-				ActivationTime = ActivationTimeFor(deathBehaviorId)
+				ActivationTime = activationTime ?? ActivationTimeFor(deathBehaviorId)
 			}.ToProtobuf();
 
 			return new BehaviorControlCenterIIR(handle, DeathSeq, (uint)BehaviorId.LimboDeath, args, []);

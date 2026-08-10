@@ -1230,6 +1230,7 @@ namespace Faolan.GameServer.World
 				// default. Sent in the death BccIIR by CombatService.OnNpcKilled so demons/beasts play their own death.
 				if (npc.NpcTemplate.DeathBehaviorId is { } deathBehavior)
 					entity.DeathBehaviorId = deathBehavior;
+				entity.DeathActivationTime = npc.NpcTemplate.DeathActivationTime;
 
 				// The loot container this type drops on death (Bag by default, a bigger chest for bosses) - picked by
 				// the kill-drop path (SpawnLootBagAt) via its LootContainerTemplate variant.

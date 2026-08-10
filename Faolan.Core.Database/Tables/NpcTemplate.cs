@@ -22,6 +22,18 @@ namespace Faolan.Core.Database.Tables
 		// 215333 = quadruped/beast. NULL = un-harvested type; the runtime falls back to the humanoid 41877.
 		public uint? DeathBehaviorId { get; set; }
 
+		// How long that death animation runs FOR THIS CREATURE, in centiseconds - the death record's `ActivationTime`
+		// (field 12), harvested the same way (#781).
+		//
+		// ⭐ It is the CREATURE's, not the animation's, and the corpus says so cleanly: on animation 17036 the field
+		// takes eight values over 52 records, and resolving every actor gives **22 creatures, 22 of which carry ONE
+		// value and none of which carries two**. The families corroborate it - Striped Boar and Wild Boar both 176,
+		// Wild Cow and Wild Pig both 160, Valley Yeti 816, Moose 120 - which is not what noise looks like.
+		//
+		// NULL = un-harvested (or a creature whose only records carried a zero); the runtime then falls back to
+		// `DeathSequence.ActivationTimeFor`, the animation's modal value, which is what every type used before.
+		public uint? DeathActivationTime { get; set; }
+
 		[ConstrainToEnumValues]
 		public LootContainerTemplateId LootContainerTemplateId { get; set; } = LootContainerTemplateId.Bag;
 

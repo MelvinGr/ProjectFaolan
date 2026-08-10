@@ -28,6 +28,27 @@ namespace Faolan.Tests
 			Assert.Equal($"642cd3d60000c3500004000000040000001f{args.Length / 2:x8}{args}", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
+		// #781: the length is the CREATURE's, so a measured one overrides the animation's modal value. Valley Yeti
+		// (816) and Moose (120) both share animation 17036 with the ten casters that carry 280, and each of the 22
+		// creatures resolved on that animation carries exactly one value - which is what makes a per-creature column
+		// right and the modal 280 wrong for twelve of them.
+		[Theory]
+		[InlineData(816u, "60b006")] // Valley Yeti
+		[InlineData(120u, "6078")] // Moose
+		[InlineData(176u, "60b001")] // Striped Boar / Wild Boar
+		public void AMeasuredCreatureLength_OverridesTheAnimationsModalValue(uint activation, string field12Hex)
+		{
+			var body = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x00040000, 17036, DeathSequence.CapturedNpcDeathCounter, activation));
+			var args = $"088c85011805280830006{field12Hex[1..]}";
+
+			Assert.Equal($"642cd3d60000c3500004000000040000001f{args.Length / 2:x8}{args}", Convert.ToHexString(body).ToLowerInvariant());
+
+			// …and a null still falls through to the animation, which is what an un-harvested creature gets.
+			var fallback = BehaviorControlCenterCodec.Build(DeathSequence.Bcc(0x00040000, 17036, DeathSequence.CapturedNpcDeathCounter));
+			Assert.Equal(280u, DeathSequence.ActivationTimeFor(17036));
+			Assert.Contains("609802", Convert.ToHexString(fallback).ToLowerInvariant());
+		}
+
 		[Fact]
 		public void BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact()
 		{

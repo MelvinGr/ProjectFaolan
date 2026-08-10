@@ -90,12 +90,27 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
     again, and its death carries 7. The old constants (5 for an NPC, 3 for a player) were just the value the two
     golden captures happened to be at. `CombatService` now passes the NPC's real counter —
     `WorldEntity.AttackSwingCounter`, the same one its swing acks already number themselves with.
-  - ⚠️ **field12 is per-ANIMATION, not per-kill**, and reads as that animation's own length in centiseconds:
-    humanoid **240**, quadruped/beast **100**, the environmental one **300** — each invariant across every
-    captured record of it (166 / 32 / 2). It was hardcoded at 240 for all of them, which gave a beast's 1.0 s
-    death animation 2.4× its own timing. The demon/large-caster animation is the exception and genuinely varies
-    (280 on 30 of its 52, then 240 / 160 / 816 / 176 / 360 / 592 / 120), so its modal value is used.
-    [V0: what varies field12 on 17036]
+  - ⚠️ **field12 is the death animation's LENGTH in centiseconds, and it is the CREATURE's** (#742/#781). It was
+    hardcoded at 240 for everything, which gave a beast's 1.0 s death animation 2.4× its own timing. Three of the
+    four animations are invariant across every captured record of them — humanoid **240** (166/166),
+    quadruped/beast **100** (32/32), the environmental one **300** (2/2) — so for those the animation and the
+    creature say the same thing.
+
+    ⭐ **The demon/large-caster animation `17036` is where they come apart, and it settles the field.** It takes
+    eight values over 52 records; resolving every actor against its own capture's spawns
+    (`--report death-timing`) gives **22 creatures, 22 of which carry ONE value and none of which carries two**:
+
+    | 120 | 160 | 176 | 220 | 240 | 280 | 360 | 592 | 816 |
+    |---|---|---|---|---|---|---|---|---|
+    | Moose | Wild Cow, Wild Pig | Striped Boar, Wild Boar | Necrotic Bomb | Harvester | ten casters/crawlers | Bat Demon, Corruptor | Enslaved Demon | Valley Yeti |
+
+    Two FAMILIES landing on one number each — both boars 176, cow and pig 160 — is not what noise looks like.
+    Harvested per creature into `NpcTemplate.DeathActivationTime` (75 templates), with
+    `DeathSequence.ActivationTimeFor` demoted to the fallback for an un-harvested one.
+
+    ⚠️ A **zero** field12 is dropped rather than harvested: 20 of the 186 humanoid records carry one, on five
+    creatures, three of which carry nothing else — so a zero is some other state of the record, not a length.
+    Those three keep NULL and fall back to the animation's 240.
   - ⭐ **There is a FOURTH death animation, `128031`**, and it is PLAYER-only: two records, both on one
     character, both with field12 300. One of the two lands 8 s before that session's own annotation *"got
     incinerated by lava"* — inside the normal annotation lag — while the plain *"died"* annotation two minutes

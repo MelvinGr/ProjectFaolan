@@ -2726,6 +2726,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("TemplateId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("DeathActivationTime")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("DeathBehaviorId")
                         .HasColumnType("INTEGER");
 

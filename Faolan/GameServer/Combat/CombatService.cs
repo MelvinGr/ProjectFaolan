@@ -744,7 +744,8 @@ namespace Faolan.GameServer.Combat
 				// death takes the next index after its last swing, which is exactly the 5 -> 6 -> 6(abort) -> 7
 				// progression one captured NPC's records walk. `AttackSwingCounter` is the same counter its swing acks
 				// already number themselves with, so death simply continues it.
-				await SendWorldPacket(killer, BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter)));
+				await SendWorldPacket(killer,
+					BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter, npcEntity.DeathActivationTime)));
 
 				await AwardKillXp(killer, npcEntity.Level);
 				await AnnounceKillChain(killer);

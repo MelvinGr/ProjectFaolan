@@ -2,13 +2,18 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
-	// A harvested creature death animation: an NPC TYPE (by name) and the death-animation behaviorId retail sent in
-	// its death BccIIR. Keyed by name (the stable NpcTemplate join key) because the wire handle is session-volatile.
-	public sealed record NpcDeathBehavior(string Name, uint BehaviorId);
+	// A harvested creature death animation: an NPC TYPE (by name), the death-animation behaviorId retail sent in its
+	// death BccIIR, and how long that animation runs for THIS creature. Keyed by name (the stable NpcTemplate join
+	// key) because the wire handle is session-volatile.
+	//
+	// `ActivationTime` is 0 when no record of this creature stated one - see the extractor for why a zero is dropped
+	// rather than harvested.
+	public sealed record NpcDeathBehavior(string Name, uint BehaviorId, uint ActivationTime = 0);
 
 	// Harvests the per-creature death animation from captured NPC kills (#362). When an NPC dies, retail sends a
 	// death-behavior BccIIR (0x642CD3D6) on its handle: seq 0x0004, behaviorId 0x0000001F, protobuf field-1 = the death
@@ -56,10 +61,16 @@ namespace Faolan.Importer.Extractors
 				if (behaviorId == 0)
 					continue;
 
+				// ⚠️ A ZERO `ActivationTime` is dropped rather than harvested (#781). It is not a length: 20 of the 186
+				// captured humanoid deaths carry one, on five creatures - three of which carry NOTHING else, so a zero
+				// is some other state of the record rather than that creature's timing. Harvesting it would send a
+				// 0-length death animation where the animation default is at least right for its family.
+				var activation = ActivationTime(bcc.Args);
+
 				// Attribute only to a KNOWN npc handle (a player death carries the same behaviour record but its handle
 				// is in the instance range, so it never appears in handleName).
 				if (handleName.TryGetValue(bcc.Actor, out var name))
-					results.Add(new NpcDeathBehavior(name, behaviorId));
+					results.Add(new NpcDeathBehavior(name, behaviorId, activation));
 			}
 
 			return results;
@@ -67,9 +78,17 @@ namespace Faolan.Importer.Extractors
 
 		// Merge harvests across captures to one behaviorId per NAME. A creature's death id is consistent in the corpus;
 		// if a name were ever seen with two ids, the MAJORITY wins (defensive - none observed).
+		//
+		// The TIMING merges the same way but over the NON-ZERO values only, so a creature whose records are a mix
+		// (Pillager: 240 x24 and 0 x11, Scavenger Lackey: 240 x3 and 0 x3) keeps the length it stated rather than
+		// having a zero out-vote it. A creature with nothing but zeros ends up at 0, which the writer reads as
+		// "un-harvested" and leaves to the animation default.
 		public static List<NpcDeathBehavior> Merge(IEnumerable<NpcDeathBehavior> all)
 		{
-			return all.GroupBy(d => d.Name).Select(g => new NpcDeathBehavior(g.Key, g.GroupBy(d => d.BehaviorId).OrderByDescending(x => x.Count()).First().Key)).ToList();
+			return all.GroupBy(d => d.Name).Select(g => new NpcDeathBehavior(
+				g.Key,
+				g.GroupBy(d => d.BehaviorId).OrderByDescending(x => x.Count()).First().Key,
+				g.Where(d => d.ActivationTime != 0).GroupBy(d => d.ActivationTime).OrderByDescending(x => x.Count()).FirstOrDefault()?.Key ?? 0)).ToList();
 		}
 
 		// The death animation id out of the behaviour's `CommandMessage` args: field 1 (tag 0x08), the first thing the
@@ -86,6 +105,21 @@ namespace Faolan.Importer.Extractors
 			var r = new SpanReader(args, nameof(NpcDeathBehaviorExtractor));
 			r.Skip(1);
 			return (uint)r.ReadVarint();
+		}
+
+		// `CommandMessage.ActivationTime` (field 12) out of the same args - the death animation's length in
+		// centiseconds, and it is the CREATURE's rather than the animation's (#781). Unlike the animation id this one
+		// is not the first field, so it goes through the schema rather than a hand-walk; 0 when absent.
+		private static uint ActivationTime(byte[] args)
+		{
+			try
+			{
+				return args.FromProtobuf<CommandMessage>().ActivationTime;
+			}
+			catch (System.Exception)
+			{
+				return 0;
+			}
 		}
 	}
 }
