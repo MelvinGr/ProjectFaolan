@@ -94,19 +94,55 @@ that locates it.
 
 ### The flags word's bits
 
-`--report spell-flags` sweeps it bit by bit against what the DB knows. ⭐ **Bit 2 is the control**: it is a known
-predicate (`ManaCostIsPercent`, #630) and it reproduces that column **100.00%, zero disagreement over 20,847
-records** — which is what a bit that IS a predicate looks like, and the yardstick every other row is read against.
+`--report spell-flags` sweeps it bit by bit against twelve predicates — the DB's columns plus, from the record
+itself, whether it carries a proc element, any criterion, any element at all, or a `CastNano`. ⭐ **Bit 2 is the
+control**: it is a known predicate (`ManaCostIsPercent`, #630) and it reproduces that column exactly, which is
+the yardstick every other row is read against.
 
 | bit | records set | reading |
 |---:|---:|---|
-| 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control, 100.00% |
+| 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control |
 | 24 | 3,189 | **hide from tooltip** (#789) — from the client's own `FUN_014a3b30` |
-| 16 | 11,610 | tracks "carries a duration" at **99.07%** — 200 records disagree, so a LEAD, not a definition |
+| 16 | 11,610 | tracks "carries a duration"; the **strongest** association in the word — see below |
 | 25 | 185 | a strict SUBSET of the duration-carrying records (185/185, no exceptions) |
 
-⚠️ **A rare bit scores high against a rare predicate for free** — both are mostly false, so they agree on every
-record that has neither. Read the `set` column before the percentages; the report says so itself.
+### ⚠️ The raw agreement percentage is the wrong measure, and it inverted the answer
+
+Two mostly-false columns agree on every record that has neither, so a raw percentage **rewards rarity**. The
+report used to warn about that and then print percentages anyway; it now prints the **excess over chance** —
+what a bit of this bit's own rarity would score against this predicate's own prevalence, subtracted off. That
+collapses almost the whole table to nothing and leaves two entries:
+
+```
+bit  2 vs mana%     +15.6 points     <- the known definition, the yardstick
+bit 16 vs duration  +48.4 points     <- three times it
+```
+
+⭐ **So bit 16 is a far stronger signal than the control, not a weaker one.** `mana%` is an 8.5%-prevalence
+predicate and `duration` a 56% one: 99.07% agreement on a balanced predicate says much more than 100% on a rare
+one. The old rule of thumb — *"99% is a lead, 100% is a definition"* — is only valid between predicates of equal
+prevalence, and these are not.
+
+⚠️ **It is still not the plain duration predicate.** Broken out, the residual is asymmetric — **62** records set
+the bit with no duration, and **131** state a duration with the bit CLEAR, which is the direction that
+disproves it (`VisualBuffTest`, `Avert Thine Eyes (Rank 1-3)`, `TRIGGER Environmental Damage: Frost High`). And
+it is not a threshold: field 8's median is 1,550 on the agreeing set against 1,300 on the disagreeing one, over
+the same range. Measured against the record's OWN field 8, so it cannot be a `DurationMs` column blend.
+
+### ⭐ The route in is the CLIENT, and it is now located
+
+The client keeps the flags word at `spell + 0xC8` and tests its bits as bytes — #789 found bit 24 as
+`MOV BL, byte ptr [EAX + 0xCB]; AND BL, 1`. So **bit 16 is `byte [spell + 0xCA] & 1`**, and exactly three
+functions in the image test it:
+
+| | |
+|---|---|
+| `FUN_007f43a0` | in `CoreMagicHolder::Magic`. Takes the bit-set branch to apply something keyed on **stat 150 `CastingLevel`**, and passes `(*(uint *)(spell + 0xC8) >> 0x14) & 1` — **bit 20** of the same word — into the call beside it |
+| `FUN_007f4df0` | guards on the bit being CLEAR |
+| `FUN_008da660` | likewise |
+
+That is three named functions to read, instead of another sweep of 32 bits against predicates — and it hands
+bit 20 over with a consumer already attached.
 
 ### ⭐ Word 0 is a CLASS TAG — and the whole head is generic, not a spell head
 
