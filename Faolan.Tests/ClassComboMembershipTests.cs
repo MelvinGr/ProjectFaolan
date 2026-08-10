@@ -170,6 +170,65 @@ namespace Faolan.Tests
 			Assert.True(spoken >= 140, $"the gating feat names classes for only {spoken} combos - it used to speak for 142, so the join has come apart");
 		}
 
+		// #581: a combo's FEAT TREE is the leading segment of its name, and a tree belongs to ONE class. Three trees
+		// have said so themselves, through their own members' gating feats, and the tree-inheritance pass then applies
+		// that answer to the members whose feat names a WEAPON line (`Pole Arm Combos 20-40 1`) or an ability
+		// (`Combo - Skewer`) instead of a class.
+		//
+		// What is gated is the property the rule rests on: each of these trees is COMPLETE and UNANIMOUS. A tree that
+		// splits across two classes would mean the inheritance had attributed something wrongly.
+		[Theory]
+		[InlineData("Reaver_", ConanClass.Barbarian, 30)]
+		[InlineData("Halberdier_", ConanClass.Guardian, 30)]
+		[InlineData("Liberator_", ConanClass.Conqueror, 27)]
+		public async Task AFeatTree_IsOneClass_AndEveryMemberIsMapped(string tree, ConanClass expected, int members)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var combos = await db.Combos.AsNoTracking().Where(c => c.Name != null && c.Name.StartsWith(tree)).Select(c => new
+			{
+				c.Id,
+				c.Name
+			}).ToListAsync(ct);
+
+			Assert.Equal(members, combos.Count);
+
+			var ids = combos.Select(c => c.Id).ToList();
+			var mapped = (await db.ClassCombos.AsNoTracking().Where(cc => ids.Contains(cc.ComboId)).ToListAsync(ct))
+				.GroupBy(cc => cc.ComboId)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.Class).Distinct().ToList());
+
+			var unmapped = combos.Where(c => !mapped.ContainsKey(c.Id)).Select(c => c.Name!).ToList();
+			Assert.True(unmapped.Count == 0, $"{tree} members with no class: {string.Join(", ", unmapped)}");
+
+			var split = mapped.Where(kv => kv.Value.Count != 1 || kv.Value[0] != expected)
+				.Select(kv => $"{combos.First(c => c.Id == kv.Key).Name} -> [{string.Join(",", kv.Value)}]")
+				.ToList();
+			Assert.True(split.Count == 0, $"{tree} is not one class: {string.Join("; ", split)}");
+		}
+
+		// ⚠️ And the guard that keeps the rule off the trees it must NOT fire on. An ARCHETYPE tree is correctly
+		// multi-class and a RACIAL one is universal, so a unanimity rule that ignored them would collapse each to a
+		// single class - which is the exact mistake the stacking-line block above already documents.
+		[Theory]
+		[InlineData("Soldier_", 3)]
+		[InlineData("Rogue_", 3)]
+		[InlineData("Cimmerian_", 12)]
+		public async Task AMultiClassTree_KeepsAllOfItsClasses(string tree, int classes)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var rows = await db.ClassCombos.AsNoTracking()
+				.Join(db.Combos.AsNoTracking(), cc => cc.ComboId, c => c.Id, (cc, c) => new { cc.Class, c.Name })
+				.Where(x => x.Name!.StartsWith(tree))
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(rows);
+			Assert.Equal(classes, rows.Select(x => x.Class).Distinct().Count());
+		}
+
 		// Where the rule IS applied - lineIndex 400 and up - it must never contradict the map built independently
 		// from name prefixes and captured action bars. That agreement (257 of 257 at the time it landed) is the whole
 		// reason the field is trusted for the feat-tree prefixes it resolves.

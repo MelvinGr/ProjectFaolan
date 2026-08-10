@@ -25,7 +25,7 @@ resolves the blend + a backlash roll on deactivate.
 
 ## Which class gets which combo
 
-The map (`ClassCombos`) has four sources. The second was added in #296 and the third and fourth in #581, each
+The map (`ClassCombos`) has five sources. The second was added in #296 and the third, fourth and fifth in #581, each
 because the ones before it refuse to guess:
 
 1. **The combo's NAME prefix**, for the class-named ones (`Guardian_`, `Ranger_`, …) — `CaptureAbilityImporter`,
@@ -115,9 +115,37 @@ ones. `Rogue: Class Specific N` is exactly that shape (N → level 2N+3, measure
 arm agrees independently), which puts the seven `SneakAttack_*` at **level 5** rather than at the sentinel.
 ⚠️ Most feats gate a RANGE (`Ranger Class Feat 001` covers 5/7/10) and lend nothing.
 
+### 5. The FEAT TREE, for the members its own siblings have already answered for (#581)
+
+A combo's tree is the leading segment of its name — `Halberdier_20a_multihit_Flashing_Arc_II` is in the
+`Halberdier` tree — and **a tree belongs to one class**. Three of them have said so themselves, through their own
+members' gating feats:
+
+| tree | attributed by their feats | class |
+|---|---|---|
+| `Reaver_` | 29 of 30 | Barbarian |
+| `Halberdier_` | 26 of 30 | Guardian |
+| `Liberator_` | 25 of 27 | Conqueror |
+
+Unanimous in all three, so the answer applies to the stragglers — and the stragglers are exactly the members whose
+gating feat names a **weapon line** (`Pole Arm Combos 20-40 1`) or an **ability** (`Combo - Skewer`,
+`Combo - Whirlwind`) rather than a class. That is a gap in what the feat's NAME happens to say, not evidence that
+the combo belongs to another class.
+
+⚠️ Three guards, each removing a way this could attribute wrongly:
+
+- **unanimity** — a tree whose attributed members name more than one class lends nothing, which is what keeps the
+  ARCHETYPE trees (`Soldier_`, `Rogue_` → 3 classes each) and the RACIAL dances (`Cimmerian_` → all 12) out of it;
+- **an evidence floor** of three attributed members, so one stray row cannot define a tree;
+- **NPC/monster names excluded outright** — `combo_npc_guardian_polearm_1_sweep` splits to `combo`, which would
+  otherwise be the same "tree" as the player-facing `Combo_Charge_*` family.
+
+Additive, never subtractive, like the prefix rule: it cannot tell "no opinion" from "no class".
+
 Gated by `Faolan.Tests/ClassComboMembershipTests.cs`, which pins all of it: the stacking-line rule never
 contradicts source 1, every shipped row agrees with its combo's gating feat, each archetype combo is mapped to
-exactly its archetype's three classes, and the archetype spells go to those three or to nobody.
+exactly its archetype's three classes, the archetype spells go to those three or to nobody, and each of the three
+trees above is complete and single-class while the archetype/racial ones keep all of theirs.
 
 Which classes the remaining ambiguous prefixes belong to — open work tracked in Gitea #581.
 

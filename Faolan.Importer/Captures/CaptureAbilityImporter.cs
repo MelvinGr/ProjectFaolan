@@ -52,6 +52,16 @@ namespace Faolan.Importer.Captures
 		// multiple or uncertain classes and needs a taxonomy + validation: the Tortage starters (Slave_/Oar_),
 		// feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack), NPC combos
 		// (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities. #581.
+		// How many of a tree's members must already be attributed before the tree may lend its class to the rest
+		// (#581, InheritTreeClassesAsync). Three, so a single stray row cannot define a tree; the trees this actually
+		// fires on carry 25-29 attributed members each.
+		private const int MinTreeEvidence = 3;
+
+		// Combo names whose leading `_`-segment is NOT a feat tree - the NPC/monster/generic families. Excluded from
+		// tree inheritance outright: `combo_npc_*` splits to `combo`, which would then be the same "tree" as the
+		// player-facing `Combo_Charge_*` family.
+		private static readonly string[] NonTreeComboPrefixes = ["combo_npc_", "monster", "generic"];
+
 		private static readonly (string Prefix, ConanClass Class)[] ClassComboPrefixes =
 		[
 			("Guardian_", ConanClass.Guardian), ("Conqueror_", ConanClass.Conqueror), ("DarkTemplar_", ConanClass.DarkTemplar), ("Barbarian_", ConanClass.Barbarian), ("Ranger_", ConanClass.Ranger),
@@ -418,10 +428,96 @@ namespace Faolan.Importer.Captures
 			if (inserted > 0 || updated > 0 || removed > 0)
 				await db.SaveChangesAsync();
 
+			// 3. TREE INHERITANCE - the third source, and the weakest, which is why it runs last and only where the
+			//    tree has already spoken for itself.
+			var inherited = await InheritTreeClassesAsync(db, logger);
+
 			logger?.LogInformation(
-				"CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated, {Removed} removed) - {FromFeat} combos attributed by their GATING FEAT, {LevelFromFeat} taking the feat's level over the catalog sentinel; the rest from validated catalog prefixes.",
-				inserted, updated, removed, fromFeat, levelFromFeat);
-			return (inserted, updated);
+				"CaptureAbilityImporter: derived {Inserted} ClassCombo rows ({Updated} levels updated, {Removed} removed) - {FromFeat} combos attributed by their GATING FEAT, {LevelFromFeat} taking the feat's level over the catalog sentinel, {Inherited} from their own TREE; the rest from validated catalog prefixes.",
+				inserted + inherited, updated, removed, fromFeat, levelFromFeat, inherited);
+			return (inserted + inherited, updated);
+		}
+
+		// A combo's FEAT TREE is the leading segment of its catalog name - `Halberdier_20a_multihit_Flashing_Arc_II`
+		// is in the `Halberdier` tree - and a tree belongs to ONE class. Where the tree's own members have already
+		// said which, by their gating feats, that answer applies to the rest of the tree (#581).
+		//
+		// ⭐ The three trees this resolves are unanimous and well-evidenced, which is the whole basis for trusting it:
+		// `Reaver` 29 of 30 members attributed, every one Barbarian; `Halberdier` 26 of 30, every one Guardian;
+		// `Liberator` 25 of 27, every one Conqueror. The stragglers are the members whose gating feat names a WEAPON
+		// line rather than a class (`Pole Arm Combos 20-40 1`) or an ability (`Combo - Skewer`) - a gap in what the
+		// feat NAME happens to say, not evidence that the combo belongs elsewhere.
+		//
+		// ⚠️ Three guards, each removing a way this could attribute a combo wrongly:
+		//
+		//   - **unanimity**: a tree whose attributed members name more than one class lends nothing. That is what
+		//     keeps the ARCHETYPE trees (`Soldier_` -> 3 classes, `Rogue_` -> 3) and the RACIAL dance combos
+		//     (`Cimmerian_` -> all 12) out of it - they are correctly multi-class and have nothing to inherit.
+		//   - **evidence floor**: fewer than <see cref="MinTreeEvidence" /> attributed members lends nothing, so one
+		//     stray row cannot define a tree.
+		//   - **NPC/monster names are excluded outright**, because their leading segment is not a tree at all
+		//     (`combo_npc_guardian_polearm_1_sweep` splits to `combo`, which would then collide with the
+		//     `Combo_Charge_*` family).
+		//
+		// It is ADDITIVE and never removes: like the prefix rule, it cannot tell "no opinion" from "no class".
+		private static async Task<int> InheritTreeClassesAsync(IDatabaseContext db, ILogger? logger)
+		{
+			var combos = await db.Combos.Where(c => c.Name != null).Select(c => new
+			{
+				c.Id,
+				c.Name,
+				c.Level
+			}).ToListAsync();
+
+			var attributed = await db.ClassCombos.Select(cc => new
+			{
+				cc.ComboId,
+				cc.Class
+			}).ToListAsync();
+
+			var classesOf = attributed.GroupBy(x => x.ComboId).ToDictionary(g => g.Key, g => g.Select(x => x.Class).Distinct().ToArray());
+
+			var inherited = 0;
+			foreach (var tree in combos.Where(c => TreeOf(c.Name!) != null).GroupBy(c => TreeOf(c.Name!)!, StringComparer.OrdinalIgnoreCase))
+			{
+				var known = tree.Where(c => classesOf.ContainsKey(c.Id)).ToList();
+				if (known.Count < MinTreeEvidence)
+					continue;
+
+				var classes = known.SelectMany(c => classesOf[c.Id]).Distinct().ToList();
+				if (classes.Count != 1)
+					continue;
+
+				var cls = classes[0];
+				foreach (var combo in tree.Where(c => !classesOf.ContainsKey(c.Id)))
+				{
+					db.ClassCombos.Add(new ClassCombo
+					{
+						Class = cls,
+						ComboId = combo.Id,
+						Level = combo.Level
+					});
+					inherited++;
+					logger?.LogInformation("CaptureAbilityImporter: '{Combo}' inherits {Class} from its {Tree} tree (#581).", combo.Name, cls, tree.Key);
+				}
+			}
+
+			if (inherited > 0)
+				await db.SaveChangesAsync();
+
+			return inherited;
+		}
+
+		// The combo's feat TREE - the leading `_`-segment of its catalog name - or null when the name carries none, or
+		// when it is an NPC/monster/generic combo whose leading segment is not a tree.
+		private static string? TreeOf(string name)
+		{
+			foreach (var excluded in NonTreeComboPrefixes)
+				if (name.StartsWith(excluded, StringComparison.OrdinalIgnoreCase))
+					return null;
+
+			var split = name.IndexOf('_');
+			return split > 0 ? name[..split] : null;
 		}
 
 		// The UNIVERSAL combo kit: the combos every created character is granted regardless of class, written as a
