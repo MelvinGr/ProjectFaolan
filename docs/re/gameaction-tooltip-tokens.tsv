@@ -2,9 +2,12 @@
 # Dumped by tools/ghidra/DumpTooltipTokens.java from FUN_0149e450 (the per-type switch) and FUN_0149aa30 (the
 # shared damage/heal range formatter it calls). `ldbId` is Elf28.Of(token), which is how a token keys the LDB.
 # Every row below hashes onto an id category 170 actually ships - see docs/rdb/spell-tooltip.md. Seven further
-# tokens the same getters fetch (Ability, Combo, Spell, Mount, Pet, Perk, LearnSpell) hash onto NOTHING in 170:
-# the getter takes its category as a stack argument, so those call sites are reading a different category and are
-# excluded rather than reported as gaps.
+# tokens the same getters fetch (Ability, Combo, Spell, Mount, Pet, Perk, LearnSpell) hash onto NOTHING in 170.
+# ⭐ That exclusion is now PROVEN rather than inferred (#782): those call sites push `0x64` = category **100**, not
+# the `0xaa` = 170 every row here pushes, and all seven resolve in 100 as plain label NOUNS - 'Spell', 'Mount',
+# 'Pet', 'Perk', 'Combo', 'Ability', 'Learn Spell'. They are not tooltip sentences at all, so they are absent by
+# construction. It is also the answer for kinds 53019 `Spell` and 53061 `BCCCastSpell`, whose branches print those
+# nouns: there is no 170 sentence to find for them.
 callSite	tokenAddr	token	ldbId
 0149e722	0x208d1bc	GameActionGroup_Skills	253163267
 0149e85f	0x208d1d4	IncreaseAOERadius	22958195

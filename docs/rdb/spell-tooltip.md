@@ -207,3 +207,31 @@ The three tokens that do not place (`DamageHealth`, `HealHealth`, `DamageOtherSt
 pushes **`IncreaseItemDelay`** — and the client's internal stat-name table calls stat `294` `ItemDelay` where
 LDB 615 displays it as *Casting Time (Seconds)* (see `docs/re/aoc-client-stat-names.md`). Two independent client
 sources agreeing that the delay those modifiers move is the cast time.
+
+
+### The branches that push a DIFFERENT category (#782)
+
+Not every branch reads category 170. Seven call sites push **`0x64` = category 100** instead, and their tokens
+resolve there as plain label NOUNS rather than sentences:
+
+| token | LDB 100 |
+| --- | --- |
+| `Spell` / `Mount` / `Pet` / `Perk` / `Combo` / `Ability` | *Spell* / *Mount* / *Pet* / *Perk* / *Combo* / *Ability* |
+| `LearnSpell` | *Learn Spell* |
+
+⭐ That is the answer for the census bucket *"kinds WITH a branch but no sentence we can find"* on **`53019`
+`Spell`** and **`53061` `BCCCastSpell`**: their branches build a line out of those nouns plus a resolved spell
+name, so there is no category-170 sentence to find. Absent by construction, like the 206 kinds that reach the
+switch's default.
+
+### `ConeFormula` (53259): the slot order
+
+Its branch is `0x014a2316`, reached by a `JZ` off `CMP EAX,0xd00b` rather than through the jump table (which is
+why it is not in the composed switch dump). Read in order, it takes three GameAction keys —
+**`0x463` (1123), `0x2dd` (733), `0x4dd` (1245)** — and fills the sentence's two `%s` unit slots with an **empty
+string** and the **`ValueModUnitMeters`** token.
+
+⚠️ The `FLD float ptr [0x02d25e34]` / `[0x02d25e54]` pair that sits between those reads is **not** a scale
+constant: both globals are `0.0` in the image, i.e. runtime-initialised defaults being pushed as arguments. The
+magnitudes come from the stack locals the key reads filled. Anyone reading this branch for a divisor should stop
+there rather than transcribe a zero.
