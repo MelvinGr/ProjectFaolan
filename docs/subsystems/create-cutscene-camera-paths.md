@@ -65,3 +65,54 @@ drowning cutscene is client-autonomous, there is no server directive to add — 
 Reproduce the RE: `tools/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
 (`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `tools/ghidra/output` (see
 `tools/ghidra/README.md`).
+
+## An IN-WORLD cutscene: the achievement VISTA (#740)
+
+The create-flow intro is not the only cutscene. Interacting with the right world object plays a camera fly-through
+and awards an achievement, and the whole trigger chain is captured in one 50-second window
+[V2: NecroL80_mage-necromancer_login_gameplay_annotated_2.tshark.json frames 4024-4299]:
+
+| t | direction | record | what |
+|---|---|---|---|
+| 17:41:03.9 | c2s | `BccIIR` `UseDynel` (0x12) | the player interacts with the object |
+| 17:41:04.0 | s2c | `BccIIR` ack | |
+| 17:41:04.2 | s2c | `SimpleDynelVisualChangeIIR` `object_opened` | the lid opens |
+| 17:41:04.2 | s2c | `BccIIR` `ObjectInteraction` + a `remoteformat` | ⭐ names the mechanism, below |
+| 17:41:09.2 | s2c | `MagicBuffIIR` spell `0x4C45` | a buff for the duration of the scene |
+| 17:41:09.2 | s2c | **`GameActionListIIR` type 53260** | ⭐ the cutscene itself, below |
+| 17:41:09.2 | c2s | `CinematicTransition` `…01` | the client says it ENTERED the cinematic |
+| 17:41:10.9 | s2c | `SimpleDynelVisualChangeIIR` `object_closed` | the lid shuts |
+| *…41 s of fly-through…* | | | |
+| 17:41:50.3 | c2s | `CinematicTransition` `…00` | the client says it LEFT |
+| 17:41:53.1 | s2c | `ScryScriptIIR` `"EndPath"` | |
+| 17:41:54.5 | s2c | `GameActionListIIR` type **53231** | |
+| 17:41:54.8 | s2c | `DispatchAddTag` **716** = *Old Tarantia Docks* | the achievement |
+
+**The client names every part of it**, so none of this is inference:
+
+- **53260 = `e_Type_GC_GameAction_StartClientSideScryScriptWithParams`** — and its params are a plain string:
+
+  ```
+  PathName=Vista_Path_6;PathDuration=36;Object=51320:55664
+  ```
+
+  The camera path, its length in seconds, and an RDB reference. That the script is **client-side** is exactly why
+  the client reports its own `CinematicTransition` bracket rather than the server driving the camera.
+- **53231 = `e_Type_GC_GameAction_StopScryScript`** closes it (the same body with an empty params string).
+- **53228 = `e_Type_GC_GameAction_VisualLocation`** is what the OBJECT's own handle carries either side.
+- and the object-action feedback spells the interaction out:
+
+  ```
+  token="startobjectaction(7)|interaction(2)|GenericAchievementVista"  category="50026"
+  ```
+
+  A **generic achievement vista** — so "interact with a viewpoint, watch the fly-through, get the achievement" is a
+  content pattern retail has a name for, not a one-off script.
+
+`CinematicTransition` is `[u32 0xC350][u32 player][u8 state]`, `01` entering and `00` leaving; the three in this
+capture bracket the scene exactly.
+
+⚠️ **Not modelled yet.** The records are all ones we already build (`GameActionListCodec` carries the action tail,
+`GrantTag` awards the achievement), so the wiring is small — what is missing is the per-object DATA: which world
+object is a vista, its params string and its tag. One row is proven, which is a start and not a table.
+Open work tracked in Gitea #780.
