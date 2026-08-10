@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260810143210_InitialCreate")]
+    [Migration("20260810145420_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -1747,7 +1747,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         {
                             t.HasCheckConstraint("CK_ItemInstance_Container", "\"Container\" IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
 
-                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
+                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(\"OwnerCharacterId\" IS NULL) <> (\"OwnerGuildId\" IS NULL)");
                         });
                 });
 

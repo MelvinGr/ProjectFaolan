@@ -452,8 +452,17 @@ namespace Faolan.Core.Database
 			// EXACTLY ONE owner, enforced rather than merely documented. An item owned by both a character and a
 			// guild would be in two places at once and each unique index would police only its own half; an item
 			// owned by neither is unreachable by every read path there is. Both are bugs a comment does not stop.
+			//
+			// ⚠️ The column names are QUOTED, and that is not cosmetic: this string is raw SQL that goes into the
+			// CREATE TABLE verbatim, and Postgres FOLDS an unquoted identifier to lower case. Unquoted, the whole
+			// initial migration died on `column "ownercharacterid" does not exist` - while SQLite, being
+			// case-insensitive about identifiers, created the table happily and hid it. It is the same trap
+			// `SqlSeedWriter` quotes every identifier for, and the one `ConstrainToEnumValuesAttribute` already pays
+			// (it quotes on Npgsql); this is the one hand-written CHECK in the model, and it was not paying it.
+			// Quoted UNCONDITIONALLY rather than per provider, because a quoted identifier is equally correct on
+			// SQLite - verified by the constraint still rejecting a two-owner and a no-owner row there.
 			modelBuilder.Entity<ItemInstance>().ToTable(t =>
-				t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)"));
+				t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(\"OwnerCharacterId\" IS NULL) <> (\"OwnerGuildId\" IS NULL)"));
 
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);

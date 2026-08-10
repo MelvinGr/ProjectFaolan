@@ -60,10 +60,11 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # need replaying; it simply does not track changes made after it. The Postgres PROVIDER code stays (Faolan.Core.Database
 # is provider-agnostic and faolan.sql loads into both). Bringing Postgres back level = delete its Migrations/ and
 # scaffold ONE fresh initial migration from the current model, never a chain.
-# ⚠️ Its `InitialCreate` does NOT apply as it stands: `CK_ItemInstance_OneOwner` is declared with UNQUOTED column
-# names (DatabaseContext.OnModelCreating), which Postgres folds to lowercase - `column "ownercharacterid" does not
-# exist`. SQLite is case-insensitive, so only Postgres sees it. Quoting them is a model change and so a Sqlite
-# table rebuild too, which is why it was left alone.
+# Its `InitialCreate` is VERIFIED against a real postgres:17: it applies, and faolan.sql then loads into it with
+# ON_ERROR_STOP at zero errors and full row parity. ⚠️ It only got there once `CK_ItemInstance_OneOwner` started
+# QUOTING its column names - raw CHECK SQL goes into the CREATE TABLE verbatim and Postgres folds an unquoted
+# identifier to lower case (`column "ownercharacterid" does not exist`), while SQLite is case-insensitive and hid it.
+# Any hand-written SQL in the model pays that; `ConstrainToEnumValuesAttribute` already did (it quotes on Npgsql).
 # The EF tools run design time with CWD = the PROJECT dir. That used to need FAOLAN_CONFIG + an absolute
 # --connection override (#456): Global.ConfigPath now searches UP from the CWD (then up from the exe dir) for
 # faolan.json, and a relative SQLite `Data Source` resolves against the DIRECTORY that file was found in - so

@@ -1744,7 +1744,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         {
                             t.HasCheckConstraint("CK_ItemInstance_Container", "\"Container\" IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
 
-                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
+                            t.HasCheckConstraint("CK_ItemInstance_OneOwner", "(\"OwnerCharacterId\" IS NULL) <> (\"OwnerGuildId\" IS NULL)");
                         });
                 });
 

@@ -1,10 +1,9 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Faolan.Core.Database.Migrations.Postgres.Migrations
+namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -16,14 +15,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Abilities",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Key1 = table.Column<long>(type: "bigint", nullable: false),
-                    Key2 = table.Column<long>(type: "bigint", nullable: false),
-                    Key3 = table.Column<long>(type: "bigint", nullable: false),
-                    Key4 = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Data0 = table.Column<long>(type: "bigint", nullable: false),
-                    Slot = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Data0 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Slot = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -34,37 +33,37 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Accounts",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    State = table.Column<byte>(type: "smallint", nullable: false),
-                    Type = table.Column<byte>(type: "smallint", nullable: false),
-                    CreationDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    LastConnection = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    ClaimsAvailable = table.Column<bool>(type: "boolean", nullable: false),
-                    GmGodMode = table.Column<bool>(type: "boolean", nullable: false),
-                    GmInvisible = table.Column<bool>(type: "boolean", nullable: false),
-                    Password = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    UserName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    AuthChallenge = table.Column<Guid>(type: "uuid", nullable: false),
-                    LastIpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    AuthStatus = table.Column<long>(type: "bigint", nullable: false),
-                    SubscriptionSettings = table.Column<byte[]>(type: "bytea", nullable: true),
-                    ClientInstance = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    State = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Type = table.Column<byte>(type: "INTEGER", nullable: false),
+                    CreationDate = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    LastConnection = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    ClaimsAvailable = table.Column<bool>(type: "INTEGER", nullable: false),
+                    GmGodMode = table.Column<bool>(type: "INTEGER", nullable: false),
+                    GmInvisible = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Password = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    UserName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    AuthChallenge = table.Column<Guid>(type: "TEXT", nullable: false),
+                    LastIpAddress = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    AuthStatus = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SubscriptionSettings = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    ClientInstance = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Accounts", x => x.Id);
-                    table.CheckConstraint("CK_Account_State", "\"State\" IN (0, 1, 2)");
-                    table.CheckConstraint("CK_Account_Type", "\"Type\" IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_Account_State", "State IN (0, 1, 2)");
+                    table.CheckConstraint("CK_Account_Type", "Type IN (0, 1, 2, 3)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "Achievements",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -75,55 +74,55 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "AppearanceChoices",
                 columns: table => new
                 {
-                    Race = table.Column<byte>(type: "smallint", nullable: false),
-                    Sex = table.Column<byte>(type: "smallint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    Category = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Max = table.Column<int>(type: "integer", nullable: false),
-                    Min = table.Column<int>(type: "integer", nullable: false),
-                    Value = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Color = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true)
+                    Race = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sex = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Max = table.Column<int>(type: "INTEGER", nullable: false),
+                    Min = table.Column<int>(type: "INTEGER", nullable: false),
+                    Value = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Color = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AppearanceChoices", x => new { x.Race, x.Sex, x.Category, x.Sequence });
-                    table.CheckConstraint("CK_AppearanceChoice_Race", "\"Race\" IN (1, 2, 3, 10)");
-                    table.CheckConstraint("CK_AppearanceChoice_Sex", "\"Sex\" IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3, 10)");
+                    table.CheckConstraint("CK_AppearanceChoice_Sex", "Sex IN (0, 1, 2, 3)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "AppearanceSexOptions",
                 columns: table => new
                 {
-                    Sex = table.Column<byte>(type: "smallint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    Category = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Max = table.Column<int>(type: "integer", nullable: false),
-                    Min = table.Column<int>(type: "integer", nullable: false),
-                    Value = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true)
+                    Sex = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Max = table.Column<int>(type: "INTEGER", nullable: false),
+                    Min = table.Column<int>(type: "INTEGER", nullable: false),
+                    Value = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AppearanceSexOptions", x => new { x.Sex, x.Category, x.Sequence });
-                    table.CheckConstraint("CK_AppearanceSexOption_Sex", "\"Sex\" IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_AppearanceSexOption_Sex", "Sex IN (0, 1, 2, 3)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "ChatMessages",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ChannelId = table.Column<long>(type: "bigint", nullable: false),
-                    SenderId = table.Column<long>(type: "bigint", nullable: false),
-                    TargetId = table.Column<long>(type: "bigint", nullable: true),
-                    SentAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    IsWhisper = table.Column<bool>(type: "boolean", nullable: false),
-                    ChannelType = table.Column<byte>(type: "smallint", nullable: false),
-                    SenderName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Text = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    ChannelId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SenderId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TargetId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SentAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    IsWhisper = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ChannelType = table.Column<byte>(type: "INTEGER", nullable: false),
+                    SenderName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 512, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -134,49 +133,49 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ClassAttributeBases",
                 columns: table => new
                 {
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    Amount = table.Column<int>(type: "integer", nullable: false)
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassAttributeBases", x => new { x.Class, x.Level, x.StatId });
-                    table.CheckConstraint("CK_ClassAttributeBase_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassAttributeBase_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "ClassComboScalings",
                 columns: table => new
                 {
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    DpsModifier = table.Column<long>(type: "bigint", nullable: false),
-                    SecondaryModifier = table.Column<long>(type: "bigint", nullable: false),
-                    StaminaDivisor = table.Column<long>(type: "bigint", nullable: false)
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DpsModifier = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SecondaryModifier = table.Column<uint>(type: "INTEGER", nullable: false),
+                    StaminaDivisor = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassComboScalings", x => new { x.Class, x.Level });
-                    table.CheckConstraint("CK_ClassComboScaling_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassComboScaling_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "Combos",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    FeatId = table.Column<long>(type: "bigint", nullable: true),
-                    GameActionId = table.Column<long>(type: "bigint", nullable: false),
-                    ParentId = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<byte>(type: "smallint", nullable: false),
-                    Cooldown = table.Column<int>(type: "integer", nullable: false),
-                    Criteria = table.Column<int>(type: "integer", nullable: false),
-                    Quality = table.Column<int>(type: "integer", nullable: false),
-                    Stamina = table.Column<int>(type: "integer", nullable: false),
-                    Actions = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Animation = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    GameActionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ParentId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Cooldown = table.Column<int>(type: "INTEGER", nullable: false),
+                    Criteria = table.Column<int>(type: "INTEGER", nullable: false),
+                    Quality = table.Column<int>(type: "INTEGER", nullable: false),
+                    Stamina = table.Column<int>(type: "INTEGER", nullable: false),
+                    Actions = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Animation = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -187,11 +186,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatIdMaps",
                 columns: table => new
                 {
-                    WireFeatId = table.Column<long>(type: "bigint", nullable: false),
-                    TemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    RootFlag = table.Column<long>(type: "bigint", nullable: false),
-                    BaseIndex = table.Column<long>(type: "bigint", nullable: false),
-                    Rank = table.Column<long>(type: "bigint", nullable: false)
+                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RootFlag = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BaseIndex = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Rank = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -202,15 +201,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Feats",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    Flags = table.Column<long>(type: "bigint", nullable: false),
-                    TemplateCategory = table.Column<long>(type: "bigint", nullable: false),
-                    Group = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Rank = table.Column<int>(type: "integer", nullable: false),
-                    Tree = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    BaseName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: false),
+                    Flags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Group = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Rank = table.Column<int>(type: "INTEGER", nullable: false),
+                    Tree = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    BaseName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -221,22 +220,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Maps",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    InstanceMode = table.Column<int>(type: "integer", nullable: false),
-                    PlayfieldInstanced = table.Column<bool>(type: "boolean", nullable: false),
-                    PopulationCap = table.Column<int>(type: "integer", nullable: false),
-                    ClassSpecific = table.Column<bool>(type: "boolean", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    TravelConfirmKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    TravelConfirmKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    TravelConfirmKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    TravelConfirmKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldFieldA = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldCount = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldBlobLastWord = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldFieldC = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldFlags = table.Column<long>(type: "bigint", nullable: false),
-                    PlayfieldToken = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    InstanceMode = table.Column<int>(type: "INTEGER", nullable: false),
+                    PlayfieldInstanced = table.Column<bool>(type: "INTEGER", nullable: false),
+                    PopulationCap = table.Column<int>(type: "INTEGER", nullable: false),
+                    ClassSpecific = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    TravelConfirmKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TravelConfirmKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldFieldA = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldCount = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldBlobLastWord = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldFieldC = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlayfieldToken = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -247,10 +246,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MorphTargets",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Category = table.Column<byte>(type: "smallint", nullable: false),
-                    Weight = table.Column<float>(type: "real", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Category = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Weight = table.Column<float>(type: "REAL", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -261,48 +260,48 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcTemplates",
                 columns: table => new
                 {
-                    TemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    DeathBehaviorId = table.Column<long>(type: "bigint", nullable: true),
-                    DeathActivationTime = table.Column<long>(type: "bigint", nullable: true),
-                    LootContainerTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DeathBehaviorId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    DeathActivationTime = table.Column<uint>(type: "INTEGER", nullable: true),
+                    LootContainerTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_NpcTemplates", x => x.TemplateId);
-                    table.CheckConstraint("CK_NpcTemplate_LootContainerTemplateId", "\"LootContainerTemplateId\" IN (13781, 13782)");
+                    table.CheckConstraint("CK_NpcTemplate_LootContainerTemplateId", "LootContainerTemplateId IN (13781, 13782)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "QuestLines",
                 columns: table => new
                 {
-                    QuestLineId = table.Column<long>(type: "bigint", nullable: false),
-                    TitleRefId = table.Column<long>(type: "bigint", nullable: false),
-                    MapRefId = table.Column<long>(type: "bigint", nullable: false),
-                    RegionRefId = table.Column<long>(type: "bigint", nullable: false),
-                    TitleKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    TitleKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    TitleKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    TitleKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    MapKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    MapKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    MapKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    MapKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    RegionKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    RegionKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    RegionKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    RegionKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    TitleCategory = table.Column<long>(type: "bigint", nullable: false),
-                    Magic = table.Column<long>(type: "bigint", nullable: false),
-                    MapCategory = table.Column<long>(type: "bigint", nullable: false),
-                    RegionCategory = table.Column<long>(type: "bigint", nullable: false),
-                    TableField1 = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    FirstQuestId = table.Column<long>(type: "bigint", nullable: false),
-                    LastQuestId = table.Column<long>(type: "bigint", nullable: false),
-                    PrevQuestLineId = table.Column<long>(type: "bigint", nullable: true),
-                    Tier = table.Column<long>(type: "bigint", nullable: false)
+                    QuestLineId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleRefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapRefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionRefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TitleCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Magic = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TableField1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    FirstQuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    LastQuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PrevQuestLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Tier = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -313,39 +312,39 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Realms",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Country = table.Column<byte>(type: "smallint", nullable: false),
-                    LoadStatus = table.Column<byte>(type: "smallint", nullable: false),
-                    OnlineStatus = table.Column<byte>(type: "smallint", nullable: false),
-                    Type = table.Column<int>(type: "integer", nullable: false),
-                    IpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ChatServerPort = table.Column<int>(type: "integer", nullable: false),
-                    CsPlayerAgentPort = table.Column<int>(type: "integer", nullable: false),
-                    Port = table.Column<int>(type: "integer", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Country = table.Column<byte>(type: "INTEGER", nullable: false),
+                    LoadStatus = table.Column<byte>(type: "INTEGER", nullable: false),
+                    OnlineStatus = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Type = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    IpAddress = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    ChatServerPort = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    CsPlayerAgentPort = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    Port = table.Column<ushort>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Realms", x => x.Id);
-                    table.CheckConstraint("CK_Realm_Country", "\"Country\" IN (0, 1, 2, 3)");
-                    table.CheckConstraint("CK_Realm_LoadStatus", "\"LoadStatus\" IN (0, 1, 2, 3, 4)");
-                    table.CheckConstraint("CK_Realm_OnlineStatus", "\"OnlineStatus\" IN (0, 2)");
-                    table.CheckConstraint("CK_Realm_Type", "\"Type\" IN (0, 1, 256, 257, 1081)");
+                    table.CheckConstraint("CK_Realm_Country", "Country IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_Realm_LoadStatus", "LoadStatus IN (0, 1, 2, 3, 4)");
+                    table.CheckConstraint("CK_Realm_OnlineStatus", "OnlineStatus IN (0, 2)");
+                    table.CheckConstraint("CK_Realm_Type", "Type IN (0, 1, 256, 257, 1081)");
                 });
 
             migrationBuilder.CreateTable(
                 name: "Recipes",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingFlag = table.Column<byte>(type: "smallint", nullable: false),
-                    Header1 = table.Column<long>(type: "bigint", nullable: false),
-                    MidFlag = table.Column<long>(type: "bigint", nullable: false),
-                    RdbType = table.Column<long>(type: "bigint", nullable: false),
-                    RequiredFeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Tail = table.Column<long>(type: "bigint", nullable: false),
-                    RequiredWorkshopFeatId = table.Column<long>(type: "bigint", nullable: true)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingFlag = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Header1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MidFlag = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RdbType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RequiredFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Tail = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RequiredWorkshopFeatId = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -356,34 +355,34 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Spells",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<byte>(type: "smallint", nullable: false),
-                    GuiStackingOrder = table.Column<byte>(type: "smallint", nullable: false),
-                    GuiStackingLine = table.Column<long>(type: "bigint", nullable: false),
-                    ScalingAttribute = table.Column<long>(type: "bigint", nullable: false),
-                    SplashRadius = table.Column<float>(type: "real", nullable: false),
-                    SplashDamage = table.Column<float>(type: "real", nullable: false),
-                    SplashMaxTargets = table.Column<long>(type: "bigint", nullable: false),
-                    Range = table.Column<float>(type: "real", nullable: false),
-                    DotDelta = table.Column<int>(type: "integer", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Description = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    DotType = table.Column<long>(type: "bigint", nullable: false),
-                    DotIntervalMs = table.Column<long>(type: "bigint", nullable: false),
-                    ChannelingIntervalMs = table.Column<long>(type: "bigint", nullable: false),
-                    CriticalChanceHundredths = table.Column<long>(type: "bigint", nullable: false),
-                    CriticalDamageHundredths = table.Column<long>(type: "bigint", nullable: false),
-                    AreaRadius = table.Column<float>(type: "real", nullable: false),
-                    DurationMs = table.Column<long>(type: "bigint", nullable: false),
-                    EffectSpell = table.Column<long>(type: "bigint", nullable: false),
-                    SummonSpawnHash = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
-                    SummonIsCompanion = table.Column<bool>(type: "boolean", nullable: false),
-                    SummonPetBuff = table.Column<long>(type: "bigint", nullable: true),
-                    SummonPointCost = table.Column<long>(type: "bigint", nullable: true),
-                    CastTime = table.Column<int>(type: "integer", nullable: false),
-                    RecastCentiseconds = table.Column<long>(type: "bigint", nullable: false),
-                    ManaCost = table.Column<int>(type: "integer", nullable: false),
-                    ManaCostIsPercent = table.Column<bool>(type: "boolean", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<byte>(type: "INTEGER", nullable: false),
+                    GuiStackingOrder = table.Column<byte>(type: "INTEGER", nullable: false),
+                    GuiStackingLine = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ScalingAttribute = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SplashRadius = table.Column<float>(type: "REAL", nullable: false),
+                    SplashDamage = table.Column<float>(type: "REAL", nullable: false),
+                    SplashMaxTargets = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Range = table.Column<float>(type: "REAL", nullable: false),
+                    DotDelta = table.Column<int>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
+                    DotType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DotIntervalMs = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChannelingIntervalMs = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CriticalChanceHundredths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CriticalDamageHundredths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AreaRadius = table.Column<float>(type: "REAL", nullable: false),
+                    DurationMs = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectSpell = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SummonSpawnHash = table.Column<string>(type: "TEXT", maxLength: 16, nullable: true),
+                    SummonIsCompanion = table.Column<bool>(type: "INTEGER", nullable: false),
+                    SummonPetBuff = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SummonPointCost = table.Column<uint>(type: "INTEGER", nullable: true),
+                    CastTime = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    RecastCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ManaCost = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    ManaCostIsPercent = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -394,14 +393,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "StockPhrases",
                 columns: table => new
                 {
-                    Key = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    Category = table.Column<long>(type: "bigint", nullable: false),
-                    Knubot = table.Column<long>(type: "bigint", nullable: false),
-                    RemoteFormatId = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey4 = table.Column<long>(type: "bigint", nullable: false)
+                    Key = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Knubot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RemoteFormatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey4 = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -412,14 +411,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ClassAbilities",
                 columns: table => new
                 {
-                    AbilityId = table.Column<long>(type: "bigint", nullable: false),
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    Level = table.Column<byte>(type: "smallint", nullable: false)
+                    AbilityId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Level = table.Column<byte>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassAbilities", x => new { x.Class, x.AbilityId });
-                    table.CheckConstraint("CK_ClassAbility_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassAbility_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                     table.ForeignKey(
                         name: "FK_ClassAbilities_Abilities_AbilityId",
                         column: x => x.AbilityId,
@@ -432,14 +431,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ClassCombos",
                 columns: table => new
                 {
-                    ComboId = table.Column<long>(type: "bigint", nullable: false),
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    Level = table.Column<byte>(type: "smallint", nullable: false)
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Level = table.Column<byte>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassCombos", x => new { x.Class, x.ComboId });
-                    table.CheckConstraint("CK_ClassCombo_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassCombo_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                     table.ForeignKey(
                         name: "FK_ClassCombos_Combos_ComboId",
                         column: x => x.ComboId,
@@ -452,9 +451,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatPrereqs",
                 columns: table => new
                 {
-                    WireFeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    RequiresWireFeatId = table.Column<long>(type: "bigint", nullable: false)
+                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    RequiresWireFeatId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -471,15 +470,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatComboAttackModifiers",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    ComboId = table.Column<long>(type: "bigint", nullable: false),
-                    AttackSlot = table.Column<long>(type: "bigint", nullable: false),
-                    DpsPercent = table.Column<int>(type: "integer", nullable: false),
-                    CriticalChanceRating = table.Column<int>(type: "integer", nullable: false),
-                    HatePercent = table.Column<int>(type: "integer", nullable: false),
-                    DamageTypeId = table.Column<long>(type: "bigint", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AttackSlot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DpsPercent = table.Column<int>(type: "INTEGER", nullable: false),
+                    CriticalChanceRating = table.Column<int>(type: "INTEGER", nullable: false),
+                    HatePercent = table.Column<int>(type: "INTEGER", nullable: false),
+                    DamageTypeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -496,12 +495,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatComboModifiers",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    ComboId = table.Column<long>(type: "bigint", nullable: false),
-                    DamagePercentHundredths = table.Column<int>(type: "integer", nullable: false),
-                    CooldownPercentHundredths = table.Column<int>(type: "integer", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DamagePercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    CooldownPercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -518,14 +517,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatEffects",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<long>(type: "bigint", nullable: false),
-                    HighValue = table.Column<int>(type: "integer", nullable: true),
-                    LowLevel = table.Column<long>(type: "bigint", nullable: true),
-                    HighLevel = table.Column<long>(type: "bigint", nullable: true)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HighValue = table.Column<int>(type: "INTEGER", nullable: true),
+                    LowLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HighLevel = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -542,15 +541,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatProcs",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    ComboId = table.Column<long>(type: "bigint", nullable: true),
-                    SpellLineId = table.Column<long>(type: "bigint", nullable: true),
-                    SelfSpellId = table.Column<long>(type: "bigint", nullable: true),
-                    TargetSpellId = table.Column<long>(type: "bigint", nullable: true),
-                    Trigger = table.Column<long>(type: "bigint", nullable: false),
-                    Amount = table.Column<int>(type: "integer", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SelfSpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TargetSpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Trigger = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -567,9 +566,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatSpellGrants",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    SpellId = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -586,12 +585,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatSpellModifiers",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    SpellLineId = table.Column<long>(type: "bigint", nullable: true),
-                    SpellId = table.Column<long>(type: "bigint", nullable: true),
-                    PercentHundredths = table.Column<int>(type: "integer", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PercentHundredths = table.Column<int>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -608,14 +607,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "FeatSpellStatModifiers",
                 columns: table => new
                 {
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    SpellId = table.Column<long>(type: "bigint", nullable: true),
-                    SpellLineId = table.Column<long>(type: "bigint", nullable: true),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<int>(type: "integer", nullable: true),
-                    PercentHundredths = table.Column<int>(type: "integer", nullable: true),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false)
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpellLineId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<int>(type: "INTEGER", nullable: true),
+                    PercentHundredths = table.Column<int>(type: "INTEGER", nullable: true),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -632,8 +631,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MapLootEntries",
                 columns: table => new
                 {
-                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    MapId = table.Column<long>(type: "bigint", nullable: false)
+                    ItemTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -650,19 +649,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MapRegions",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    MinY = table.Column<float>(type: "real", nullable: false),
-                    MaxY = table.Column<float>(type: "real", nullable: false),
-                    MaxX = table.Column<float>(type: "real", nullable: false),
-                    MaxZ = table.Column<float>(type: "real", nullable: false),
-                    MinX = table.Column<float>(type: "real", nullable: false),
-                    MinZ = table.Column<float>(type: "real", nullable: false),
-                    ScryId = table.Column<long>(type: "bigint", nullable: false),
-                    AreaNameId = table.Column<long>(type: "bigint", nullable: true),
-                    AreaNameSource = table.Column<int>(type: "integer", nullable: true),
-                    NoMount = table.Column<bool>(type: "boolean", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    MinY = table.Column<float>(type: "REAL", nullable: false),
+                    MaxY = table.Column<float>(type: "REAL", nullable: false),
+                    MaxX = table.Column<float>(type: "REAL", nullable: false),
+                    MaxZ = table.Column<float>(type: "REAL", nullable: false),
+                    MinX = table.Column<float>(type: "REAL", nullable: false),
+                    MinZ = table.Column<float>(type: "REAL", nullable: false),
+                    ScryId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AreaNameId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AreaNameSource = table.Column<int>(type: "INTEGER", nullable: true),
+                    NoMount = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -679,59 +678,59 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "WorldObjects",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    DestinationMapId = table.Column<long>(type: "bigint", nullable: true),
-                    EffectQuestId = table.Column<long>(type: "bigint", nullable: true),
-                    GateQuestId = table.Column<long>(type: "bigint", nullable: true),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectId = table.Column<long>(type: "bigint", nullable: false),
-                    TemplateItemId = table.Column<long>(type: "bigint", nullable: true),
-                    InteractAction = table.Column<long>(type: "bigint", nullable: false),
-                    ShowPopupOnUse = table.Column<bool>(type: "boolean", nullable: true),
-                    EffectDynelState = table.Column<byte>(type: "smallint", nullable: false),
-                    GeometryAssetId = table.Column<long>(type: "bigint", nullable: false),
-                    GeometryAssetType = table.Column<long>(type: "bigint", nullable: false),
-                    GeometryName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    BoundsMinX = table.Column<float>(type: "real", nullable: false),
-                    BoundsMinY = table.Column<float>(type: "real", nullable: false),
-                    BoundsMinZ = table.Column<float>(type: "real", nullable: false),
-                    BoundsMaxX = table.Column<float>(type: "real", nullable: false),
-                    BoundsMaxY = table.Column<float>(type: "real", nullable: false),
-                    BoundsMaxZ = table.Column<float>(type: "real", nullable: false),
-                    GeometryWord0 = table.Column<long>(type: "bigint", nullable: false),
-                    GeometryWord1 = table.Column<long>(type: "bigint", nullable: false),
-                    GeometryFlag = table.Column<bool>(type: "boolean", nullable: false),
-                    DestinationX = table.Column<float>(type: "real", nullable: true),
-                    DestinationY = table.Column<float>(type: "real", nullable: true),
-                    DestinationZ = table.Column<float>(type: "real", nullable: true),
-                    DisplayKind = table.Column<byte>(type: "smallint", nullable: true),
-                    DisplayId = table.Column<long>(type: "bigint", nullable: true),
-                    DisplayToken = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    DisplayCategory = table.Column<long>(type: "bigint", nullable: true),
-                    DisplayFlags = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
-                    DisplayKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    DisplayKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    DisplayKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    DisplayKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    DisplayKnubot = table.Column<long>(type: "bigint", nullable: true),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    CarsGroup = table.Column<long>(type: "bigint", nullable: false),
-                    Kdtree = table.Column<long>(type: "bigint", nullable: false),
-                    SubOpcode = table.Column<long>(type: "bigint", nullable: false),
-                    QuestItemEffect = table.Column<long>(type: "bigint", nullable: true),
-                    WaypointType = table.Column<long>(type: "bigint", nullable: true),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false),
-                    RotationW = table.Column<float>(type: "real", nullable: false),
-                    RotationX = table.Column<float>(type: "real", nullable: false),
-                    RotationY = table.Column<float>(type: "real", nullable: false),
-                    RotationZ = table.Column<float>(type: "real", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DestinationMapId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    EffectQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    GateQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateItemId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    InteractAction = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ShowPopupOnUse = table.Column<bool>(type: "INTEGER", nullable: true),
+                    EffectDynelState = table.Column<byte>(type: "INTEGER", nullable: false),
+                    GeometryAssetId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GeometryAssetType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GeometryName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    BoundsMinX = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMinY = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMinZ = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMaxX = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMaxY = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMaxZ = table.Column<float>(type: "REAL", nullable: false),
+                    GeometryWord0 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GeometryWord1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GeometryFlag = table.Column<bool>(type: "INTEGER", nullable: false),
+                    DestinationX = table.Column<float>(type: "REAL", nullable: true),
+                    DestinationY = table.Column<float>(type: "REAL", nullable: true),
+                    DestinationZ = table.Column<float>(type: "REAL", nullable: true),
+                    DisplayKind = table.Column<byte>(type: "INTEGER", nullable: true),
+                    DisplayId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    DisplayToken = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    DisplayCategory = table.Column<uint>(type: "INTEGER", nullable: true),
+                    DisplayFlags = table.Column<string>(type: "TEXT", maxLength: 16, nullable: true),
+                    DisplayKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DisplayKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DisplayKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DisplayKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DisplayKnubot = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    CarsGroup = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Kdtree = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SubOpcode = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestItemEffect = table.Column<uint>(type: "INTEGER", nullable: true),
+                    WaypointType = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false),
+                    RotationW = table.Column<float>(type: "REAL", nullable: false),
+                    RotationX = table.Column<float>(type: "REAL", nullable: false),
+                    RotationY = table.Column<float>(type: "REAL", nullable: false),
+                    RotationZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_WorldObjects", x => x.Id);
-                    table.CheckConstraint("CK_WorldObject_DisplayKind", "\"DisplayKind\" IN (0, 1, 2)");
+                    table.CheckConstraint("CK_WorldObject_DisplayKind", "DisplayKind IN (0, 1, 2)");
                     table.ForeignKey(
                         name: "FK_WorldObjects_Maps_MapId",
                         column: x => x.MapId,
@@ -744,12 +743,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationNodes",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    ContentKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    Discriminator = table.Column<long>(type: "bigint", nullable: false),
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Verified = table.Column<bool>(type: "boolean", nullable: false),
-                    NpcName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey = table.Column<string>(type: "TEXT", maxLength: 512, nullable: false),
+                    Discriminator = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Verified = table.Column<bool>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -766,10 +765,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcAmbientAnimations",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    AnimationId = table.Column<long>(type: "bigint", nullable: false),
-                    DurationCentiseconds = table.Column<long>(type: "bigint", nullable: false),
-                    Weight = table.Column<long>(type: "bigint", nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AnimationId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DurationCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Weight = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -786,17 +785,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcChatter",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Channel = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    SayInChat = table.Column<long>(type: "bigint", nullable: false),
-                    ChannelCount = table.Column<long>(type: "bigint", nullable: false),
-                    Group = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Category = table.Column<long>(type: "bigint", nullable: false),
-                    Knubot = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    FormatKey4 = table.Column<long>(type: "bigint", nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Channel = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    SayInChat = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChannelCount = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Group = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Knubot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FormatKey4 = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -813,12 +812,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcEncounters",
                 columns: table => new
                 {
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    LureNpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    BossNpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    BarkRadius = table.Column<float>(type: "real", nullable: false),
-                    TriggerRadius = table.Column<float>(type: "real", nullable: false),
-                    ResetSeconds = table.Column<int>(type: "integer", nullable: true)
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    LureNpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BossNpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BarkRadius = table.Column<float>(type: "REAL", nullable: false),
+                    TriggerRadius = table.Column<float>(type: "REAL", nullable: false),
+                    ResetSeconds = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -847,8 +846,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcFollowPairs",
                 columns: table => new
                 {
-                    FollowerTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    LeaderTemplateId = table.Column<long>(type: "bigint", nullable: false)
+                    FollowerTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    LeaderTemplateId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -871,12 +870,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcMorphs",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    MorphId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<float>(type: "real", nullable: false),
-                    Word2 = table.Column<long>(type: "bigint", nullable: false),
-                    Text = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    MorphId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<float>(type: "REAL", nullable: false),
+                    Word2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -893,23 +892,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnAreas",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    CommunityId = table.Column<long>(type: "bigint", nullable: true),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: true),
-                    RoamPathCount = table.Column<int>(type: "integer", nullable: false),
-                    ResolvedBy = table.Column<int>(type: "integer", nullable: false),
-                    BoundsMaxX = table.Column<float>(type: "real", nullable: false),
-                    BoundsMaxY = table.Column<float>(type: "real", nullable: false),
-                    BoundsMaxZ = table.Column<float>(type: "real", nullable: false),
-                    BoundsMinX = table.Column<float>(type: "real", nullable: false),
-                    BoundsMinY = table.Column<float>(type: "real", nullable: false),
-                    BoundsMinZ = table.Column<float>(type: "real", nullable: false),
-                    GroupOrdinal = table.Column<int>(type: "integer", nullable: false),
-                    MaxCount = table.Column<int>(type: "integer", nullable: false),
-                    Category = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    GroupKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    GroupName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CommunityId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RoamPathCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    ResolvedBy = table.Column<int>(type: "INTEGER", nullable: false),
+                    BoundsMaxX = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMaxY = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMaxZ = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMinX = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMinY = table.Column<float>(type: "REAL", nullable: false),
+                    BoundsMinZ = table.Column<float>(type: "REAL", nullable: false),
+                    GroupOrdinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    MaxCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    GroupKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    GroupName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -932,14 +931,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpells",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    SpellId = table.Column<long>(type: "bigint", nullable: false),
-                    FlagA = table.Column<byte>(type: "smallint", nullable: false),
-                    DescriptorSlot0 = table.Column<byte>(type: "smallint", nullable: false),
-                    DescriptorSlot8 = table.Column<byte>(type: "smallint", nullable: false),
-                    DescriptorSlot3 = table.Column<byte>(type: "smallint", nullable: false),
-                    CastingLevel = table.Column<byte>(type: "smallint", nullable: false),
-                    Duration = table.Column<int>(type: "integer", nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FlagA = table.Column<byte>(type: "INTEGER", nullable: false),
+                    DescriptorSlot0 = table.Column<byte>(type: "INTEGER", nullable: false),
+                    DescriptorSlot8 = table.Column<byte>(type: "INTEGER", nullable: false),
+                    DescriptorSlot3 = table.Column<byte>(type: "INTEGER", nullable: false),
+                    CastingLevel = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Duration = table.Column<ushort>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -956,77 +955,77 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcStatCores",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    IirHeader = table.Column<long>(type: "bigint", nullable: true),
-                    Race = table.Column<long>(type: "bigint", nullable: true),
-                    Sex = table.Column<byte>(type: "smallint", nullable: true),
-                    Side = table.Column<long>(type: "bigint", nullable: true),
-                    Flags = table.Column<long>(type: "bigint", nullable: true),
-                    HeadMesh = table.Column<long>(type: "bigint", nullable: true),
-                    MonsterData = table.Column<long>(type: "bigint", nullable: true),
-                    MonsterScale = table.Column<long>(type: "bigint", nullable: true),
-                    Radius = table.Column<int>(type: "integer", nullable: true),
-                    ChatId = table.Column<long>(type: "bigint", nullable: true),
-                    GuildId = table.Column<long>(type: "bigint", nullable: true),
-                    CarsGroup = table.Column<long>(type: "bigint", nullable: true),
-                    OrientationMode = table.Column<long>(type: "bigint", nullable: true),
-                    SoundScryScript = table.Column<long>(type: "bigint", nullable: true),
-                    ClientScryScript = table.Column<long>(type: "bigint", nullable: true),
-                    MountMesh = table.Column<long>(type: "bigint", nullable: true),
-                    Skulk = table.Column<long>(type: "bigint", nullable: true),
-                    MaxSkulk = table.Column<long>(type: "bigint", nullable: true),
-                    TradeskillFlags = table.Column<long>(type: "bigint", nullable: true),
-                    OocMovementMultiplier = table.Column<long>(type: "bigint", nullable: true),
-                    RunSpeed = table.Column<long>(type: "bigint", nullable: true),
-                    MaxRunSpeed = table.Column<long>(type: "bigint", nullable: true),
-                    Bcc = table.Column<long>(type: "bigint", nullable: true),
-                    BccState = table.Column<long>(type: "bigint", nullable: true),
-                    BloodType = table.Column<long>(type: "bigint", nullable: true),
-                    LooksPackage = table.Column<long>(type: "bigint", nullable: true),
-                    MountFlags = table.Column<long>(type: "bigint", nullable: true),
-                    MountScale = table.Column<long>(type: "bigint", nullable: true),
-                    MovementMultiplier = table.Column<long>(type: "bigint", nullable: true),
-                    VoiceSet = table.Column<long>(type: "bigint", nullable: true),
-                    ApprenticeLevel = table.Column<long>(type: "bigint", nullable: true),
-                    Level = table.Column<long>(type: "bigint", nullable: true),
-                    Health = table.Column<long>(type: "bigint", nullable: true),
-                    Life = table.Column<long>(type: "bigint", nullable: true),
-                    Mana = table.Column<long>(type: "bigint", nullable: true),
-                    MaxMana = table.Column<long>(type: "bigint", nullable: true),
-                    Stamina = table.Column<long>(type: "bigint", nullable: true),
-                    MaxStamina = table.Column<long>(type: "bigint", nullable: true),
-                    Community = table.Column<long>(type: "bigint", nullable: true),
-                    Disposition = table.Column<long>(type: "bigint", nullable: true),
-                    TemplateId = table.Column<long>(type: "bigint", nullable: true),
-                    NpcType = table.Column<long>(type: "bigint", nullable: true),
-                    NpcFlags = table.Column<long>(type: "bigint", nullable: true),
-                    Normalset = table.Column<long>(type: "bigint", nullable: true),
-                    SuperFamily = table.Column<long>(type: "bigint", nullable: true),
-                    ProfessionName = table.Column<long>(type: "bigint", nullable: true),
-                    ProfessionType = table.Column<long>(type: "bigint", nullable: true),
-                    SightSkill = table.Column<long>(type: "bigint", nullable: true),
-                    HearingSkill = table.Column<long>(type: "bigint", nullable: true),
-                    SmellingSkill = table.Column<long>(type: "bigint", nullable: true),
-                    SpawnAnimation = table.Column<long>(type: "bigint", nullable: true),
-                    LosHeight = table.Column<long>(type: "bigint", nullable: true),
-                    FactionId = table.Column<long>(type: "bigint", nullable: true),
-                    AnimActionId = table.Column<long>(type: "bigint", nullable: true),
-                    AnimActionTimer = table.Column<float>(type: "real", nullable: true),
-                    AnimActionBlend = table.Column<bool>(type: "boolean", nullable: true),
-                    AnimIdleId = table.Column<long>(type: "bigint", nullable: true),
-                    AnimIdleTimer = table.Column<float>(type: "real", nullable: true),
-                    AnimIdleBlend = table.Column<bool>(type: "boolean", nullable: true),
-                    AnimForcedId = table.Column<long>(type: "bigint", nullable: true),
-                    AnimForcedTimer = table.Column<float>(type: "real", nullable: true),
-                    AnimForcedBlend = table.Column<bool>(type: "boolean", nullable: true),
-                    AnimFlags = table.Column<long>(type: "bigint", nullable: true),
-                    CanFall = table.Column<bool>(type: "boolean", nullable: true),
-                    MovementMode = table.Column<long>(type: "bigint", nullable: true)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IirHeader = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Race = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Sex = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Side = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Flags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HeadMesh = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MonsterData = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MonsterScale = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Radius = table.Column<int>(type: "INTEGER", nullable: true),
+                    ChatId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    GuildId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    CarsGroup = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OrientationMode = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SoundScryScript = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ClientScryScript = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MountMesh = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Skulk = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MaxSkulk = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TradeskillFlags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OocMovementMultiplier = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RunSpeed = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MaxRunSpeed = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Bcc = table.Column<uint>(type: "INTEGER", nullable: true),
+                    BccState = table.Column<uint>(type: "INTEGER", nullable: true),
+                    BloodType = table.Column<uint>(type: "INTEGER", nullable: true),
+                    LooksPackage = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MountFlags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MountScale = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MovementMultiplier = table.Column<uint>(type: "INTEGER", nullable: true),
+                    VoiceSet = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ApprenticeLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Health = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Life = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Mana = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MaxMana = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Stamina = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MaxStamina = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Community = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Disposition = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    NpcType = table.Column<uint>(type: "INTEGER", nullable: true),
+                    NpcFlags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Normalset = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SuperFamily = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ProfessionName = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ProfessionType = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SightSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HearingSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SmellingSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SpawnAnimation = table.Column<uint>(type: "INTEGER", nullable: true),
+                    LosHeight = table.Column<uint>(type: "INTEGER", nullable: true),
+                    FactionId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AnimActionId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AnimActionTimer = table.Column<float>(type: "REAL", nullable: true),
+                    AnimActionBlend = table.Column<bool>(type: "INTEGER", nullable: true),
+                    AnimIdleId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AnimIdleTimer = table.Column<float>(type: "REAL", nullable: true),
+                    AnimIdleBlend = table.Column<bool>(type: "INTEGER", nullable: true),
+                    AnimForcedId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    AnimForcedTimer = table.Column<float>(type: "REAL", nullable: true),
+                    AnimForcedBlend = table.Column<bool>(type: "INTEGER", nullable: true),
+                    AnimFlags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    CanFall = table.Column<bool>(type: "INTEGER", nullable: true),
+                    MovementMode = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_NpcStatCores", x => x.NpcTemplateId);
-                    table.CheckConstraint("CK_NpcStatCore_Sex", "\"Sex\" IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_NpcStatCore_Sex", "Sex IN (0, 1, 2, 3)");
                     table.ForeignKey(
                         name: "FK_NpcStatCores_NpcTemplates_NpcTemplateId",
                         column: x => x.NpcTemplateId,
@@ -1039,9 +1038,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Shops",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    VendorName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    MaxSize = table.Column<long>(type: "bigint", nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    VendorName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    MaxSize = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1058,34 +1057,34 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "QuestDefinitions",
                 columns: table => new
                 {
-                    QuestId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestLineId = table.Column<long>(type: "bigint", nullable: false),
-                    GoalId = table.Column<long>(type: "bigint", nullable: false),
-                    MapId = table.Column<long>(type: "bigint", nullable: true),
-                    NextQuestId = table.Column<long>(type: "bigint", nullable: true),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Verified = table.Column<bool>(type: "boolean", nullable: false),
-                    HasSnapshotRecord = table.Column<bool>(type: "boolean", nullable: false),
-                    ObjectiveRegionVerified = table.Column<bool>(type: "boolean", nullable: false),
-                    IndexQuestLineQuestIds = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    IndexMagic = table.Column<long>(type: "bigint", nullable: false),
-                    IndexMarker = table.Column<long>(type: "bigint", nullable: false),
-                    IndexTableField1 = table.Column<long>(type: "bigint", nullable: false),
-                    IndexTableField2 = table.Column<long>(type: "bigint", nullable: false),
-                    IndexTableField3 = table.Column<long>(type: "bigint", nullable: false),
-                    IndexTrailerWord = table.Column<long>(type: "bigint", nullable: false),
-                    JournalSequence = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    MarkerX = table.Column<long>(type: "bigint", nullable: false),
-                    MarkerY = table.Column<long>(type: "bigint", nullable: false),
-                    Field118 = table.Column<long>(type: "bigint", nullable: false),
-                    QuestLineFlags = table.Column<long>(type: "bigint", nullable: false),
-                    MoneyReward = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    XpReward = table.Column<long>(type: "bigint", nullable: false),
-                    ChainHeadQuestId = table.Column<long>(type: "bigint", nullable: false),
-                    FieldEc = table.Column<long>(type: "bigint", nullable: false),
-                    FieldF0 = table.Column<long>(type: "bigint", nullable: false),
-                    FieldF8 = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false)
+                    QuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestLineId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    NextQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Verified = table.Column<bool>(type: "INTEGER", nullable: false),
+                    HasSnapshotRecord = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ObjectiveRegionVerified = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IndexQuestLineQuestIds = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    IndexMagic = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IndexMarker = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IndexTableField1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IndexTableField2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IndexTableField3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IndexTrailerWord = table.Column<uint>(type: "INTEGER", nullable: false),
+                    JournalSequence = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MarkerX = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MarkerY = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Field118 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestLineFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MoneyReward = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    XpReward = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChainHeadQuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldEc = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldF0 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FieldF8 = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1107,11 +1106,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "QuestLineRewards",
                 columns: table => new
                 {
-                    QuestLineId = table.Column<long>(type: "bigint", nullable: false),
-                    Pos = table.Column<long>(type: "bigint", nullable: false),
-                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    RewardType = table.Column<long>(type: "bigint", nullable: false),
-                    Optional = table.Column<bool>(type: "boolean", nullable: false)
+                    QuestLineId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Pos = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ItemTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RewardType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Optional = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1128,25 +1127,25 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Guilds",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    RealmId = table.Column<long>(type: "bigint", nullable: false),
-                    CreationDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    GovernmentForm = table.Column<byte>(type: "smallint", nullable: false),
-                    Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    MessageOfTheDay = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: false),
-                    Name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    Renown = table.Column<long>(type: "bigint", nullable: false),
-                    Cash = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    RenownArtistry = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    RenownGlory = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    RenownValor = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    RealmId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CreationDate = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    GovernmentForm = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 512, nullable: false),
+                    MessageOfTheDay = table.Column<string>(type: "TEXT", maxLength: 4096, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Renown = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Cash = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    RenownArtistry = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    RenownGlory = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    RenownValor = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Guilds", x => x.Id);
-                    table.CheckConstraint("CK_Guild_GovernmentForm", "\"GovernmentForm\" IN (0, 1, 2, 3, 4, 5, 6)");
+                    table.CheckConstraint("CK_Guild_GovernmentForm", "GovernmentForm IN (0, 1, 2, 3, 4, 5, 6)");
                     table.ForeignKey(
                         name: "FK_Guilds_Realms_RealmId",
                         column: x => x.RealmId,
@@ -1159,19 +1158,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Mails",
                 columns: table => new
                 {
-                    MailId = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    RealmId = table.Column<long>(type: "bigint", nullable: false),
-                    IsRead = table.Column<bool>(type: "boolean", nullable: false),
-                    BodyXml = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: false),
-                    RecipientName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    SenderName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    FooterWord = table.Column<long>(type: "bigint", nullable: false),
-                    RecipientClass = table.Column<long>(type: "bigint", nullable: false),
-                    SenderBankSlot = table.Column<long>(type: "bigint", nullable: false),
-                    SenderClass = table.Column<long>(type: "bigint", nullable: false),
-                    Timestamp1 = table.Column<long>(type: "bigint", nullable: false),
-                    Timestamp2 = table.Column<long>(type: "bigint", nullable: false),
-                    Money = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false)
+                    MailId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    RealmId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
+                    BodyXml = table.Column<string>(type: "TEXT", maxLength: 4096, nullable: false),
+                    RecipientName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    SenderName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    FooterWord = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RecipientClass = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SenderBankSlot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SenderClass = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Timestamp1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Timestamp2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Money = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1188,15 +1187,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ClassSpells",
                 columns: table => new
                 {
-                    SpellId = table.Column<long>(type: "bigint", nullable: false),
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    IsStarter = table.Column<bool>(type: "boolean", nullable: false),
-                    GrantLevel = table.Column<byte>(type: "smallint", nullable: true)
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    IsStarter = table.Column<bool>(type: "INTEGER", nullable: false),
+                    GrantLevel = table.Column<byte>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassSpells", x => new { x.Class, x.SpellId });
-                    table.CheckConstraint("CK_ClassSpell_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassSpell_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                     table.ForeignKey(
                         name: "FK_ClassSpells_Spells_SpellId",
                         column: x => x.SpellId,
@@ -1209,42 +1208,42 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Items",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    Key1 = table.Column<long>(type: "bigint", nullable: false),
-                    Key2 = table.Column<long>(type: "bigint", nullable: false),
-                    Key3 = table.Column<long>(type: "bigint", nullable: false),
-                    Key4 = table.Column<long>(type: "bigint", nullable: false),
-                    TemplateId2 = table.Column<long>(type: "bigint", nullable: true),
-                    PairKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    PairKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    PairKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    PairKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    Quality = table.Column<int>(type: "integer", nullable: true),
-                    Type = table.Column<int>(type: "integer", nullable: false, defaultValue: 104),
-                    ExcludeFromRandomLoot = table.Column<bool>(type: "boolean", nullable: false),
-                    Level = table.Column<byte>(type: "smallint", nullable: false),
-                    Flags = table.Column<long>(type: "bigint", nullable: true),
-                    MoreFlags = table.Column<long>(type: "bigint", nullable: false),
-                    Can = table.Column<long>(type: "bigint", nullable: false),
-                    GemSlots = table.Column<long>(type: "bigint", nullable: false),
-                    MaxDamage = table.Column<int>(type: "integer", nullable: true),
-                    MinDamage = table.Column<int>(type: "integer", nullable: true),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Description = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
-                    Hash = table.Column<long>(type: "bigint", nullable: false),
-                    SearchCategory = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<long>(type: "bigint", nullable: false),
-                    BagExtraSlots = table.Column<long>(type: "bigint", nullable: true),
-                    OnUseSpell = table.Column<long>(type: "bigint", nullable: true),
-                    OnUseLockSpellLine = table.Column<long>(type: "bigint", nullable: true),
-                    OnUseLockSeconds = table.Column<long>(type: "bigint", nullable: true),
-                    ResourceBagExtraSlots = table.Column<long>(type: "bigint", nullable: true)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateId2 = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PairKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quality = table.Column<int>(type: "INTEGER", nullable: true),
+                    Type = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 104),
+                    ExcludeFromRandomLoot = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Level = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Flags = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MoreFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Can = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GemSlots = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxDamage = table.Column<int>(type: "INTEGER", nullable: true),
+                    MinDamage = table.Column<int>(type: "INTEGER", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
+                    Hash = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SearchCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BagExtraSlots = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OnUseSpell = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OnUseLockSpellLine = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OnUseLockSeconds = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ResourceBagExtraSlots = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Items", x => x.Id);
-                    table.CheckConstraint("CK_Item_Quality", "\"Quality\" IN (0, 1, 2, 3, 4, 5)");
-                    table.CheckConstraint("CK_Item_Type", "\"Type\" IN (104, 112, 113)");
+                    table.CheckConstraint("CK_Item_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
+                    table.CheckConstraint("CK_Item_Type", "Type IN (104, 112, 113)");
                     table.ForeignKey(
                         name: "FK_Items_Spells_OnUseSpell",
                         column: x => x.OnUseSpell,
@@ -1256,14 +1255,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Mounts",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    CreatureId = table.Column<long>(type: "bigint", nullable: false),
-                    Quality = table.Column<int>(type: "integer", nullable: true)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CreatureId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quality = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Mounts", x => x.Id);
-                    table.CheckConstraint("CK_Mount_Quality", "\"Quality\" IN (0, 1, 2, 3, 4, 5)");
+                    table.CheckConstraint("CK_Mount_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
                     table.ForeignKey(
                         name: "FK_Mounts_Spells_Id",
                         column: x => x.Id,
@@ -1276,13 +1275,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "SpellAreaEffects",
                 columns: table => new
                 {
-                    SpellId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<long>(type: "bigint", nullable: false),
-                    Kind = table.Column<long>(type: "bigint", nullable: false),
-                    EffectSpellId = table.Column<long>(type: "bigint", nullable: false),
-                    RadiusMetres = table.Column<long>(type: "bigint", nullable: false),
-                    MaxTargets = table.Column<long>(type: "bigint", nullable: false),
-                    PeriodCentiseconds = table.Column<long>(type: "bigint", nullable: false)
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectSpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RadiusMetres = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxTargets = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PeriodCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1299,21 +1298,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "SpellEffects",
                 columns: table => new
                 {
-                    SpellId = table.Column<long>(type: "bigint", nullable: false),
-                    Trigger = table.Column<byte>(type: "smallint", nullable: false),
-                    Sequence = table.Column<byte>(type: "smallint", nullable: false),
-                    Kind = table.Column<byte>(type: "smallint", nullable: false),
-                    TargetSpellId = table.Column<long>(type: "bigint", nullable: true),
-                    Template = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    Combat = table.Column<bool>(type: "boolean", nullable: false),
-                    DurationMs = table.Column<long>(type: "bigint", nullable: true),
-                    MaxDurationMs = table.Column<long>(type: "bigint", nullable: true)
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Trigger = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<byte>(type: "INTEGER", nullable: false),
+                    TargetSpellId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Template = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    Combat = table.Column<bool>(type: "INTEGER", nullable: false),
+                    DurationMs = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MaxDurationMs = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_SpellEffects", x => new { x.SpellId, x.Trigger, x.Sequence });
-                    table.CheckConstraint("CK_SpellEffect_Kind", "\"Kind\" IN (0, 1)");
-                    table.CheckConstraint("CK_SpellEffect_Trigger", "\"Trigger\" IN (0, 1)");
+                    table.CheckConstraint("CK_SpellEffect_Kind", "Kind IN (0, 1)");
+                    table.CheckConstraint("CK_SpellEffect_Trigger", "Trigger IN (0, 1)");
                     table.ForeignKey(
                         name: "FK_SpellEffects_Spells_SpellId",
                         column: x => x.SpellId,
@@ -1326,17 +1325,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "SpellStatEffects",
                 columns: table => new
                 {
-                    SpellId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<long>(type: "bigint", nullable: false),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    EffectKind = table.Column<long>(type: "bigint", nullable: false),
-                    Amount = table.Column<int>(type: "integer", nullable: false),
-                    MaxAmount = table.Column<int>(type: "integer", nullable: true),
-                    PeriodCentiseconds = table.Column<long>(type: "bigint", nullable: false),
-                    HighAmount = table.Column<int>(type: "integer", nullable: true),
-                    MaxHighAmount = table.Column<int>(type: "integer", nullable: true),
-                    LowLevel = table.Column<long>(type: "bigint", nullable: true),
-                    HighLevel = table.Column<long>(type: "bigint", nullable: true)
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<uint>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false),
+                    MaxAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    PeriodCentiseconds = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HighAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    MaxHighAmount = table.Column<int>(type: "INTEGER", nullable: true),
+                    LowLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HighLevel = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1353,10 +1352,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MapHazards",
                 columns: table => new
                 {
-                    RegionId = table.Column<long>(type: "bigint", nullable: false),
-                    EffectSpellId = table.Column<long>(type: "bigint", nullable: false),
-                    Damage = table.Column<long>(type: "bigint", nullable: false),
-                    Lethal = table.Column<bool>(type: "boolean", nullable: false)
+                    RegionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectSpellId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Damage = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Lethal = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1373,10 +1372,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MapRegionVertices",
                 columns: table => new
                 {
-                    RegionId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    X = table.Column<float>(type: "real", nullable: false),
-                    Z = table.Column<float>(type: "real", nullable: false)
+                    RegionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    X = table.Column<float>(type: "REAL", nullable: false),
+                    Z = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1393,20 +1392,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "RespawnPoints",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    AlwaysKnown = table.Column<bool>(type: "boolean", nullable: false),
-                    Shady = table.Column<bool>(type: "boolean", nullable: false),
-                    DiscoveryRegionId = table.Column<long>(type: "bigint", nullable: true),
-                    RestorationLevel = table.Column<float>(type: "real", nullable: false),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false),
-                    RotationW = table.Column<float>(type: "real", nullable: false),
-                    RotationX = table.Column<float>(type: "real", nullable: false),
-                    RotationY = table.Column<float>(type: "real", nullable: false),
-                    RotationZ = table.Column<float>(type: "real", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AlwaysKnown = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Shady = table.Column<bool>(type: "INTEGER", nullable: false),
+                    DiscoveryRegionId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RestorationLevel = table.Column<float>(type: "REAL", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false),
+                    RotationW = table.Column<float>(type: "REAL", nullable: false),
+                    RotationX = table.Column<float>(type: "REAL", nullable: false),
+                    RotationY = table.Column<float>(type: "REAL", nullable: false),
+                    RotationZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1428,10 +1427,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "WorldObjectWords",
                 columns: table => new
                 {
-                    WorldObjectId = table.Column<long>(type: "bigint", nullable: false),
-                    Kind = table.Column<byte>(type: "smallint", nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    Value = table.Column<long>(type: "bigint", nullable: false)
+                    WorldObjectId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1448,21 +1447,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationEntries",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    NpcName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Trigger = table.Column<int>(type: "integer", nullable: false),
-                    TriggerWorldObjectId = table.Column<long>(type: "bigint", nullable: true),
-                    ConditionQuestId = table.Column<long>(type: "bigint", nullable: true),
-                    ConditionQuestState = table.Column<int>(type: "integer", nullable: true),
-                    RepeatGreeting = table.Column<bool>(type: "boolean", nullable: true),
-                    NodeId = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Trigger = table.Column<int>(type: "INTEGER", nullable: false),
+                    TriggerWorldObjectId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ConditionQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ConditionQuestState = table.Column<int>(type: "INTEGER", nullable: true),
+                    RepeatGreeting = table.Column<bool>(type: "INTEGER", nullable: true),
+                    NodeId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ConversationEntries", x => x.Id);
-                    table.CheckConstraint("CK_ConversationEntry_ConditionQuestState", "\"ConditionQuestState\" IN (0, 1)");
-                    table.CheckConstraint("CK_ConversationEntry_Trigger", "\"Trigger\" IN (0, 1, 2)");
+                    table.CheckConstraint("CK_ConversationEntry_ConditionQuestState", "ConditionQuestState IN (0, 1)");
+                    table.CheckConstraint("CK_ConversationEntry_Trigger", "Trigger IN (0, 1, 2)");
                     table.ForeignKey(
                         name: "FK_ConversationEntries_ConversationNodes_NodeId",
                         column: x => x.NodeId,
@@ -1487,20 +1486,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationPackets",
                 columns: table => new
                 {
-                    ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    SubOpcode = table.Column<long>(type: "bigint", nullable: true),
-                    Env = table.Column<byte>(type: "smallint", nullable: true),
-                    Flag = table.Column<byte>(type: "smallint", nullable: true),
-                    ShotSize = table.Column<byte>(type: "smallint", nullable: true),
-                    ShotType = table.Column<byte>(type: "smallint", nullable: true),
-                    ShotEmphasis = table.Column<byte>(type: "smallint", nullable: true),
-                    ShotFov = table.Column<byte>(type: "smallint", nullable: true),
-                    ShotTilt = table.Column<byte>(type: "smallint", nullable: true),
-                    Autoface = table.Column<bool>(type: "boolean", nullable: true),
-                    HeadPaddingY = table.Column<float>(type: "real", nullable: true),
-                    Field = table.Column<long>(type: "bigint", nullable: true),
-                    SenderInstance = table.Column<long>(type: "bigint", nullable: true)
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    SubOpcode = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Env = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Flag = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotSize = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotType = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotEmphasis = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotFov = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ShotTilt = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Autoface = table.Column<bool>(type: "INTEGER", nullable: true),
+                    HeadPaddingY = table.Column<float>(type: "REAL", nullable: true),
+                    Field = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SenderInstance = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1517,16 +1516,16 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "TravelDestinations",
                 columns: table => new
                 {
-                    FromNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    OptionId = table.Column<long>(type: "bigint", nullable: false),
-                    NpcName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    DestinationMapId = table.Column<long>(type: "bigint", nullable: false),
-                    Cost = table.Column<long>(type: "bigint", nullable: true),
-                    ArrivalX = table.Column<float>(type: "real", nullable: true),
-                    ArrivalY = table.Column<float>(type: "real", nullable: true),
-                    ArrivalZ = table.Column<float>(type: "real", nullable: true),
-                    DelaySeconds = table.Column<float>(type: "real", nullable: false),
-                    FromDialogueDirective = table.Column<bool>(type: "boolean", nullable: false)
+                    FromNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OptionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    DestinationMapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Cost = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ArrivalX = table.Column<float>(type: "REAL", nullable: true),
+                    ArrivalY = table.Column<float>(type: "REAL", nullable: true),
+                    ArrivalZ = table.Column<float>(type: "REAL", nullable: true),
+                    DelaySeconds = table.Column<float>(type: "REAL", nullable: false),
+                    FromDialogueDirective = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1549,18 +1548,18 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcChatterParameter",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Channel = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    SayInChat = table.Column<long>(type: "bigint", nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    Name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Value = table.Column<string>(type: "text", nullable: true)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Channel = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    SayInChat = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Value = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_NpcChatterParameter", x => new { x.NpcTemplateId, x.Channel, x.SayInChat, x.Ordinal });
                     table.ForeignKey(
-                        name: "FK_NpcChatterParameter_NpcChatter_NpcTemplateId_Channel_SayInC~",
+                        name: "FK_NpcChatterParameter_NpcChatter_NpcTemplateId_Channel_SayInChat",
                         columns: x => new { x.NpcTemplateId, x.Channel, x.SayInChat },
                         principalTable: "NpcChatter",
                         principalColumns: new[] { "NpcTemplateId", "Channel", "SayInChat" },
@@ -1571,11 +1570,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnAreaPoints",
                 columns: table => new
                 {
-                    NpcSpawnAreaId = table.Column<long>(type: "bigint", nullable: false),
-                    PointIndex = table.Column<int>(type: "integer", nullable: false),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false)
+                    NpcSpawnAreaId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PointIndex = table.Column<int>(type: "INTEGER", nullable: false),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1592,37 +1591,37 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawns",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    GuildId = table.Column<long>(type: "bigint", nullable: true),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    ClassId = table.Column<byte>(type: "smallint", nullable: true),
-                    NpcSpawnAreaId = table.Column<long>(type: "bigint", nullable: true),
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    PlacementId = table.Column<long>(type: "bigint", nullable: true),
-                    HasEquipment = table.Column<bool>(type: "boolean", nullable: false),
-                    ApprenticeLevel = table.Column<long>(type: "bigint", nullable: false),
-                    HeadMesh = table.Column<long>(type: "bigint", nullable: false),
-                    Health = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    Life = table.Column<long>(type: "bigint", nullable: false),
-                    Mana = table.Column<long>(type: "bigint", nullable: false),
-                    MaxMana = table.Column<long>(type: "bigint", nullable: false),
-                    MaxStamina = table.Column<long>(type: "bigint", nullable: false),
-                    MonsterData = table.Column<long>(type: "bigint", nullable: false),
-                    MonsterScale = table.Column<long>(type: "bigint", nullable: false),
-                    Stamina = table.Column<long>(type: "bigint", nullable: false),
-                    VoiceSet = table.Column<long>(type: "bigint", nullable: false),
-                    HearingSkill = table.Column<long>(type: "bigint", nullable: true),
-                    SightSkill = table.Column<long>(type: "bigint", nullable: true),
-                    SmellingSkill = table.Column<long>(type: "bigint", nullable: true),
-                    WireHealth = table.Column<long>(type: "bigint", nullable: true),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false),
-                    RotationW = table.Column<float>(type: "real", nullable: false),
-                    RotationX = table.Column<float>(type: "real", nullable: false),
-                    RotationY = table.Column<float>(type: "real", nullable: false),
-                    RotationZ = table.Column<float>(type: "real", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GuildId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ClassId = table.Column<byte>(type: "INTEGER", nullable: true),
+                    NpcSpawnAreaId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PlacementId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    HasEquipment = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ApprenticeLevel = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HeadMesh = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Health = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Life = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Mana = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxMana = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxStamina = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MonsterData = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MonsterScale = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Stamina = table.Column<uint>(type: "INTEGER", nullable: false),
+                    VoiceSet = table.Column<uint>(type: "INTEGER", nullable: false),
+                    HearingSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SightSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SmellingSkill = table.Column<uint>(type: "INTEGER", nullable: true),
+                    WireHealth = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false),
+                    RotationW = table.Column<float>(type: "REAL", nullable: false),
+                    RotationX = table.Column<float>(type: "REAL", nullable: false),
+                    RotationY = table.Column<float>(type: "REAL", nullable: false),
+                    RotationZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1651,18 +1650,18 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationEdges",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    FromNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    OptionId = table.Column<long>(type: "bigint", nullable: false),
-                    ToNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    ConditionQuestId = table.Column<long>(type: "bigint", nullable: true),
-                    ConditionQuestState = table.Column<int>(type: "integer", nullable: true),
-                    GrantQuestId = table.Column<long>(type: "bigint", nullable: true)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FromNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OptionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ToNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ConditionQuestId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ConditionQuestState = table.Column<int>(type: "INTEGER", nullable: true),
+                    GrantQuestId = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ConversationEdges", x => x.Id);
-                    table.CheckConstraint("CK_ConversationEdge_ConditionQuestState", "\"ConditionQuestState\" IN (0, 1)");
+                    table.CheckConstraint("CK_ConversationEdge_ConditionQuestState", "ConditionQuestState IN (0, 1)");
                     table.ForeignKey(
                         name: "FK_ConversationEdges_ConversationNodes_FromNodeId",
                         column: x => x.FromNodeId,
@@ -1686,16 +1685,16 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "QuestTextRefs",
                 columns: table => new
                 {
-                    QuestId = table.Column<long>(type: "bigint", nullable: false),
-                    Slot = table.Column<int>(type: "integer", nullable: false),
-                    RefId = table.Column<long>(type: "bigint", nullable: false),
-                    IsLocalized = table.Column<bool>(type: "boolean", nullable: false),
-                    KeyText1 = table.Column<long>(type: "bigint", nullable: false),
-                    KeyText2 = table.Column<long>(type: "bigint", nullable: false),
-                    KeyText3 = table.Column<long>(type: "bigint", nullable: false),
-                    KeyText4 = table.Column<long>(type: "bigint", nullable: false),
-                    Flags = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Category = table.Column<long>(type: "bigint", nullable: false)
+                    QuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Slot = table.Column<int>(type: "INTEGER", nullable: false),
+                    RefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IsLocalized = table.Column<bool>(type: "INTEGER", nullable: false),
+                    KeyText1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    KeyText2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    KeyText3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    KeyText4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Flags = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1712,15 +1711,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "AccountClaims",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    AccountId = table.Column<long>(type: "bigint", nullable: false),
-                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Code = table.Column<string>(type: "character varying(4)", maxLength: 4, nullable: false),
-                    ClaimType = table.Column<long>(type: "bigint", nullable: false),
-                    MaxCharges = table.Column<long>(type: "bigint", nullable: true),
-                    Quantity = table.Column<long>(type: "bigint", nullable: true),
-                    Level = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    AccountId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ItemTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Code = table.Column<string>(type: "TEXT", maxLength: 4, nullable: false),
+                    ClaimType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MaxCharges = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Quantity = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Level = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1743,9 +1742,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ItemStatModifiers",
                 columns: table => new
                 {
-                    ItemId = table.Column<long>(type: "bigint", nullable: false),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    Amount = table.Column<int>(type: "integer", nullable: false)
+                    ItemId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Amount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1762,10 +1761,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcEquipment",
                 columns: table => new
                 {
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Pos = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    Template = table.Column<long>(type: "bigint", nullable: false)
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Pos = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Template = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1788,53 +1787,53 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "QuestGoalDefinitions",
                 columns: table => new
                 {
-                    GoalId = table.Column<long>(type: "bigint", nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Phase = table.Column<long>(type: "bigint", nullable: false),
-                    MapId = table.Column<long>(type: "bigint", nullable: true),
-                    ObjectiveRefId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestDefinitionId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestItemId = table.Column<long>(type: "bigint", nullable: true),
-                    SubId = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingRefId = table.Column<long>(type: "bigint", nullable: false),
-                    GoalType = table.Column<int>(type: "integer", nullable: false),
-                    Partial = table.Column<bool>(type: "boolean", nullable: false),
-                    TrailingLocalized = table.Column<bool>(type: "boolean", nullable: false),
-                    ObjectiveKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectiveKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectiveKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectiveKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectiveToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    TargetName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    TargetTemplateId = table.Column<long>(type: "bigint", nullable: true),
-                    GatesTargetVisibility = table.Column<bool>(type: "boolean", nullable: false),
-                    RequiredLevel = table.Column<long>(type: "bigint", nullable: true),
-                    RequiredRankTitle = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    RequiredRank = table.Column<long>(type: "bigint", nullable: true),
-                    TrailingFlags = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    TrailingKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    Extra1 = table.Column<long>(type: "bigint", nullable: false),
-                    Extra2 = table.Column<long>(type: "bigint", nullable: false),
-                    Extra3 = table.Column<long>(type: "bigint", nullable: false),
-                    Extra4 = table.Column<long>(type: "bigint", nullable: false),
-                    Extra5 = table.Column<long>(type: "bigint", nullable: false),
-                    Extra6 = table.Column<long>(type: "bigint", nullable: false),
-                    GoalIdEcho = table.Column<long>(type: "bigint", nullable: false),
-                    ObjectiveCategory = table.Column<long>(type: "bigint", nullable: false),
-                    RegionOrder = table.Column<long>(type: "bigint", nullable: false),
-                    RequiredCount = table.Column<long>(type: "bigint", nullable: false),
-                    Separator = table.Column<long>(type: "bigint", nullable: true),
-                    Sequence = table.Column<long>(type: "bigint", nullable: false),
-                    TrailingCategory = table.Column<long>(type: "bigint", nullable: false),
-                    Unknown1 = table.Column<long>(type: "bigint", nullable: false),
-                    Unknown2 = table.Column<long>(type: "bigint", nullable: false),
-                    MarkerX = table.Column<long>(type: "bigint", nullable: true),
-                    MarkerY = table.Column<long>(type: "bigint", nullable: true),
-                    RegionId = table.Column<long>(type: "bigint", nullable: true)
+                    GoalId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Phase = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ObjectiveRefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestDefinitionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestItemId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    SubId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingRefId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalType = table.Column<int>(type: "INTEGER", nullable: false),
+                    Partial = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TrailingLocalized = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ObjectiveKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectiveKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectiveKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectiveKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectiveToken = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    TargetName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    TargetTemplateId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    GatesTargetVisibility = table.Column<bool>(type: "INTEGER", nullable: false),
+                    RequiredLevel = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RequiredRankTitle = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    RequiredRank = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TrailingFlags = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    TrailingKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingToken = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    Extra1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Extra2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Extra3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Extra4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Extra5 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Extra6 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalIdEcho = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ObjectiveCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RegionOrder = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RequiredCount = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Separator = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Sequence = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailingCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Unknown1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Unknown2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MarkerX = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MarkerY = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RegionId = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1871,17 +1870,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "RecipeItems",
                 columns: table => new
                 {
-                    RecipeId = table.Column<long>(type: "bigint", nullable: false),
-                    Role = table.Column<byte>(type: "smallint", nullable: false),
-                    Position = table.Column<int>(type: "integer", nullable: false),
-                    ItemId = table.Column<long>(type: "bigint", nullable: false),
-                    Flag = table.Column<long>(type: "bigint", nullable: false),
-                    Trailing = table.Column<long>(type: "bigint", nullable: false)
+                    RecipeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Role = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Position = table.Column<int>(type: "INTEGER", nullable: false),
+                    ItemId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Flag = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Trailing = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_RecipeItems", x => new { x.RecipeId, x.Role, x.Position });
-                    table.CheckConstraint("CK_RecipeItem_Role", "\"Role\" IN (0, 1)");
+                    table.CheckConstraint("CK_RecipeItem_Role", "Role IN (0, 1)");
                     table.ForeignKey(
                         name: "FK_RecipeItems_Items_ItemId",
                         column: x => x.ItemId,
@@ -1900,12 +1899,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ShopItems",
                 columns: table => new
                 {
-                    ShopId = table.Column<long>(type: "bigint", nullable: false),
-                    Pos = table.Column<long>(type: "bigint", nullable: false),
-                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Count = table.Column<long>(type: "bigint", nullable: false),
-                    Stat356 = table.Column<long>(type: "bigint", nullable: false),
-                    TailLevel = table.Column<long>(type: "bigint", nullable: false)
+                    ShopId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Pos = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ItemTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Count = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Stat356 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TailLevel = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1928,22 +1927,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "TradepostListings",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ItemId = table.Column<long>(type: "bigint", nullable: false),
-                    RealmId = table.Column<long>(type: "bigint", nullable: false),
-                    SaleId = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    SellerName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    BankSlot = table.Column<long>(type: "bigint", nullable: false),
-                    EntryFlags = table.Column<long>(type: "bigint", nullable: false),
-                    Handle = table.Column<long>(type: "bigint", nullable: false),
-                    ItemHandle = table.Column<long>(type: "bigint", nullable: false),
-                    ItemHash = table.Column<long>(type: "bigint", nullable: false),
-                    Quantity = table.Column<long>(type: "bigint", nullable: false),
-                    Template = table.Column<long>(type: "bigint", nullable: false),
-                    Timestamp = table.Column<long>(type: "bigint", nullable: false),
-                    InstanceField = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    Price = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    ItemId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RealmId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SaleId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    SellerName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    BankSlot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EntryFlags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Handle = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ItemHandle = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ItemHash = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quantity = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Template = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Timestamp = table.Column<uint>(type: "INTEGER", nullable: false),
+                    InstanceField = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    Price = table.Column<ulong>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1972,50 +1971,50 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Characters",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false),
-                    AccountId = table.Column<long>(type: "bigint", nullable: false),
-                    BindRespawnPointId = table.Column<long>(type: "bigint", nullable: true),
-                    GuildId = table.Column<long>(type: "bigint", nullable: true),
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    MountId = table.Column<long>(type: "bigint", nullable: true),
-                    RealmId = table.Column<long>(type: "bigint", nullable: false),
-                    Class = table.Column<byte>(type: "smallint", nullable: false),
-                    CreationDate = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    LastConnection = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    GuildRank = table.Column<byte>(type: "smallint", nullable: true),
-                    Race = table.Column<byte>(type: "smallint", nullable: false),
-                    Sex = table.Column<byte>(type: "smallint", nullable: false),
-                    ActiveWeaponSet = table.Column<int>(type: "integer", nullable: false),
-                    VanityShownMask = table.Column<long>(type: "bigint", nullable: false),
-                    IsDead = table.Column<bool>(type: "boolean", nullable: false),
-                    AuthChallenge = table.Column<Guid>(type: "uuid", nullable: false),
-                    Language = table.Column<string>(type: "character varying(4)", maxLength: 4, nullable: true),
-                    LastIpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    Experience = table.Column<long>(type: "bigint", nullable: false),
-                    Money = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    Level = table.Column<int>(type: "integer", nullable: false),
-                    Kills = table.Column<long>(type: "bigint", nullable: false),
-                    Deaths = table.Column<long>(type: "bigint", nullable: false),
-                    MurderPoints = table.Column<long>(type: "bigint", nullable: false),
-                    ChosenGod = table.Column<long>(type: "bigint", nullable: false),
-                    CriminalUntil = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    TutorialStepsSeen = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false),
-                    RotationW = table.Column<float>(type: "real", nullable: false),
-                    RotationX = table.Column<float>(type: "real", nullable: false),
-                    RotationY = table.Column<float>(type: "real", nullable: false),
-                    RotationZ = table.Column<float>(type: "real", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    AccountId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BindRespawnPointId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    GuildId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MountId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    RealmId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    CreationDate = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    LastConnection = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    GuildRank = table.Column<byte>(type: "INTEGER", nullable: true),
+                    Race = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sex = table.Column<byte>(type: "INTEGER", nullable: false),
+                    ActiveWeaponSet = table.Column<int>(type: "INTEGER", nullable: false),
+                    VanityShownMask = table.Column<uint>(type: "INTEGER", nullable: false),
+                    IsDead = table.Column<bool>(type: "INTEGER", nullable: false),
+                    AuthChallenge = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Language = table.Column<string>(type: "TEXT", maxLength: 4, nullable: true),
+                    LastIpAddress = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    Experience = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Money = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    Level = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    Kills = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Deaths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    MurderPoints = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ChosenGod = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CriminalUntil = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    TutorialStepsSeen = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false),
+                    RotationW = table.Column<float>(type: "REAL", nullable: false),
+                    RotationX = table.Column<float>(type: "REAL", nullable: false),
+                    RotationY = table.Column<float>(type: "REAL", nullable: false),
+                    RotationZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Characters", x => x.Id);
-                    table.CheckConstraint("CK_Character_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
-                    table.CheckConstraint("CK_Character_GuildRank", "\"GuildRank\" IN (0, 4)");
-                    table.CheckConstraint("CK_Character_Race", "\"Race\" IN (1, 2, 3, 10)");
-                    table.CheckConstraint("CK_Character_Sex", "\"Sex\" IN (0, 1, 2, 3)");
+                    table.CheckConstraint("CK_Character_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_Character_GuildRank", "GuildRank IN (0, 4)");
+                    table.CheckConstraint("CK_Character_Race", "Race IN (1, 2, 3, 10)");
+                    table.CheckConstraint("CK_Character_Sex", "Sex IN (0, 1, 2, 3)");
                     table.ForeignKey(
                         name: "FK_Characters_Accounts_AccountId",
                         column: x => x.AccountId,
@@ -2051,23 +2050,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationScreens",
                 columns: table => new
                 {
-                    ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    PacketSequence = table.Column<int>(type: "integer", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    ScreenId = table.Column<long>(type: "bigint", nullable: false),
-                    Key1 = table.Column<long>(type: "bigint", nullable: false),
-                    Key2 = table.Column<long>(type: "bigint", nullable: false),
-                    Key3 = table.Column<long>(type: "bigint", nullable: false),
-                    Key4 = table.Column<long>(type: "bigint", nullable: false),
-                    Category = table.Column<long>(type: "bigint", nullable: false),
-                    Knubot = table.Column<long>(type: "bigint", nullable: false),
-                    Antitag = table.Column<long>(type: "bigint", nullable: true)
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ScreenId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Key4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Knubot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Antitag = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ConversationScreens", x => new { x.ConversationNodeId, x.PacketSequence, x.Sequence });
                     table.ForeignKey(
-                        name: "FK_ConversationScreens_ConversationPackets_ConversationNodeId_~",
+                        name: "FK_ConversationScreens_ConversationPackets_ConversationNodeId_PacketSequence",
                         columns: x => new { x.ConversationNodeId, x.PacketSequence },
                         principalTable: "ConversationPackets",
                         principalColumns: new[] { "ConversationNodeId", "Sequence" },
@@ -2078,10 +2077,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnEquipment",
                 columns: table => new
                 {
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    Pos = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
-                    Template = table.Column<long>(type: "bigint", nullable: false)
+                    NpcSpawnId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Pos = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Template = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2104,12 +2103,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnMorphs",
                 columns: table => new
                 {
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    MorphId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<float>(type: "real", nullable: false),
-                    Word2 = table.Column<long>(type: "bigint", nullable: false),
-                    Text = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    NpcSpawnId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    MorphId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<float>(type: "REAL", nullable: false),
+                    Word2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2126,40 +2125,40 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "PatrolNodes",
                 columns: table => new
                 {
-                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    ParentPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Mode = table.Column<byte>(type: "smallint", nullable: false),
-                    Flag = table.Column<byte>(type: "smallint", nullable: true),
-                    HeaderFlags = table.Column<byte>(type: "smallint", nullable: true),
-                    ListMin = table.Column<byte>(type: "smallint", nullable: true),
-                    PathFlags = table.Column<byte>(type: "smallint", nullable: true),
-                    TrailerByte = table.Column<byte>(type: "smallint", nullable: true),
-                    ApproachFlag = table.Column<byte>(type: "smallint", nullable: true),
-                    AnchorX = table.Column<float>(type: "real", nullable: true),
-                    AnchorY = table.Column<float>(type: "real", nullable: true),
-                    AnchorZ = table.Column<float>(type: "real", nullable: true),
-                    Duration = table.Column<float>(type: "real", nullable: true),
-                    Remaining = table.Column<float>(type: "real", nullable: true),
-                    Speed = table.Column<float>(type: "real", nullable: true),
-                    PathDirection1 = table.Column<float>(type: "real", nullable: true),
-                    PathDirection2 = table.Column<float>(type: "real", nullable: true),
-                    PathTrailerWord = table.Column<long>(type: "bigint", nullable: true),
-                    TargetX = table.Column<float>(type: "real", nullable: true),
-                    TargetY = table.Column<float>(type: "real", nullable: true),
-                    TargetZ = table.Column<float>(type: "real", nullable: true),
-                    TargetRotationX = table.Column<float>(type: "real", nullable: true),
-                    TargetRotationY = table.Column<float>(type: "real", nullable: true),
-                    TargetRotationZ = table.Column<float>(type: "real", nullable: true),
-                    TargetRotationW = table.Column<float>(type: "real", nullable: true),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    TerritoryIndex = table.Column<int>(type: "integer", nullable: true),
-                    TerritoryPathIndex = table.Column<int>(type: "integer", nullable: true),
-                    RotateTail = table.Column<int>(type: "integer", nullable: true),
-                    ApproachTarget = table.Column<long>(type: "bigint", nullable: true),
-                    ApproachType = table.Column<long>(type: "bigint", nullable: true),
-                    PathFloat10 = table.Column<long>(type: "bigint", nullable: true),
-                    PathFloat20 = table.Column<long>(type: "bigint", nullable: true)
+                    OrdinalPath = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    NpcSpawnId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ParentPath = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Mode = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Flag = table.Column<byte>(type: "INTEGER", nullable: true),
+                    HeaderFlags = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ListMin = table.Column<byte>(type: "INTEGER", nullable: true),
+                    PathFlags = table.Column<byte>(type: "INTEGER", nullable: true),
+                    TrailerByte = table.Column<byte>(type: "INTEGER", nullable: true),
+                    ApproachFlag = table.Column<byte>(type: "INTEGER", nullable: true),
+                    AnchorX = table.Column<float>(type: "REAL", nullable: true),
+                    AnchorY = table.Column<float>(type: "REAL", nullable: true),
+                    AnchorZ = table.Column<float>(type: "REAL", nullable: true),
+                    Duration = table.Column<float>(type: "REAL", nullable: true),
+                    Remaining = table.Column<float>(type: "REAL", nullable: true),
+                    Speed = table.Column<float>(type: "REAL", nullable: true),
+                    PathDirection1 = table.Column<float>(type: "REAL", nullable: true),
+                    PathDirection2 = table.Column<float>(type: "REAL", nullable: true),
+                    PathTrailerWord = table.Column<uint>(type: "INTEGER", nullable: true),
+                    TargetX = table.Column<float>(type: "REAL", nullable: true),
+                    TargetY = table.Column<float>(type: "REAL", nullable: true),
+                    TargetZ = table.Column<float>(type: "REAL", nullable: true),
+                    TargetRotationX = table.Column<float>(type: "REAL", nullable: true),
+                    TargetRotationY = table.Column<float>(type: "REAL", nullable: true),
+                    TargetRotationZ = table.Column<float>(type: "REAL", nullable: true),
+                    TargetRotationW = table.Column<float>(type: "REAL", nullable: true),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    TerritoryIndex = table.Column<int>(type: "INTEGER", nullable: true),
+                    TerritoryPathIndex = table.Column<int>(type: "INTEGER", nullable: true),
+                    RotateTail = table.Column<int>(type: "INTEGER", nullable: true),
+                    ApproachTarget = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ApproachType = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PathFloat10 = table.Column<uint>(type: "INTEGER", nullable: true),
+                    PathFloat20 = table.Column<uint>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -2181,12 +2180,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcAmbushes",
                 columns: table => new
                 {
-                    MapId = table.Column<long>(type: "bigint", nullable: false),
-                    NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestDefinitionId = table.Column<long>(type: "bigint", nullable: false),
-                    GoalId = table.Column<long>(type: "bigint", nullable: false),
-                    DelaySeconds = table.Column<float>(type: "real", nullable: false),
-                    AnchorDistance = table.Column<float>(type: "real", nullable: false)
+                    MapId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestDefinitionId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DelaySeconds = table.Column<float>(type: "REAL", nullable: false),
+                    AnchorDistance = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2221,8 +2220,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterAbilities",
                 columns: table => new
                 {
-                    AbilityId = table.Column<long>(type: "bigint", nullable: false),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false)
+                    AbilityId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2239,39 +2238,39 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterBodies",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Size = table.Column<byte>(type: "smallint", nullable: false),
-                    SkinColor = table.Column<byte>(type: "smallint", nullable: false),
-                    Voice = table.Column<byte>(type: "smallint", nullable: false),
-                    Arm = table.Column<float>(type: "real", nullable: false),
-                    Arse = table.Column<float>(type: "real", nullable: false),
-                    Bosom = table.Column<float>(type: "real", nullable: false),
-                    CheekDepth = table.Column<float>(type: "real", nullable: false),
-                    CheekHeight = table.Column<float>(type: "real", nullable: false),
-                    CheekWidth = table.Column<float>(type: "real", nullable: false),
-                    Chest = table.Column<float>(type: "real", nullable: false),
-                    ChinLength = table.Column<float>(type: "real", nullable: false),
-                    ChinWidth = table.Column<float>(type: "real", nullable: false),
-                    CrookedNose = table.Column<float>(type: "real", nullable: false),
-                    EarAngle = table.Column<float>(type: "real", nullable: false),
-                    Ears = table.Column<float>(type: "real", nullable: false),
-                    EyebrowScale = table.Column<float>(type: "real", nullable: false),
-                    EyesAngle = table.Column<float>(type: "real", nullable: false),
-                    EyesDepth = table.Column<float>(type: "real", nullable: false),
-                    EyesHorizontalPos = table.Column<float>(type: "real", nullable: false),
-                    EyesVerticalPos = table.Column<float>(type: "real", nullable: false),
-                    FaceLength = table.Column<float>(type: "real", nullable: false),
-                    JawWidth = table.Column<float>(type: "real", nullable: false),
-                    Leg = table.Column<float>(type: "real", nullable: false),
-                    MouthVerticalPos = table.Column<float>(type: "real", nullable: false),
-                    MouthWidth = table.Column<float>(type: "real", nullable: false),
-                    NoseAngle = table.Column<float>(type: "real", nullable: false),
-                    NoseCurve = table.Column<float>(type: "real", nullable: false),
-                    NoseLength = table.Column<float>(type: "real", nullable: false),
-                    NoseWidth = table.Column<float>(type: "real", nullable: false),
-                    Stomach = table.Column<float>(type: "real", nullable: false),
-                    Thigh = table.Column<float>(type: "real", nullable: false),
-                    HeadMesh = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Size = table.Column<byte>(type: "INTEGER", nullable: false),
+                    SkinColor = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Voice = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Arm = table.Column<float>(type: "REAL", nullable: false),
+                    Arse = table.Column<float>(type: "REAL", nullable: false),
+                    Bosom = table.Column<float>(type: "REAL", nullable: false),
+                    CheekDepth = table.Column<float>(type: "REAL", nullable: false),
+                    CheekHeight = table.Column<float>(type: "REAL", nullable: false),
+                    CheekWidth = table.Column<float>(type: "REAL", nullable: false),
+                    Chest = table.Column<float>(type: "REAL", nullable: false),
+                    ChinLength = table.Column<float>(type: "REAL", nullable: false),
+                    ChinWidth = table.Column<float>(type: "REAL", nullable: false),
+                    CrookedNose = table.Column<float>(type: "REAL", nullable: false),
+                    EarAngle = table.Column<float>(type: "REAL", nullable: false),
+                    Ears = table.Column<float>(type: "REAL", nullable: false),
+                    EyebrowScale = table.Column<float>(type: "REAL", nullable: false),
+                    EyesAngle = table.Column<float>(type: "REAL", nullable: false),
+                    EyesDepth = table.Column<float>(type: "REAL", nullable: false),
+                    EyesHorizontalPos = table.Column<float>(type: "REAL", nullable: false),
+                    EyesVerticalPos = table.Column<float>(type: "REAL", nullable: false),
+                    FaceLength = table.Column<float>(type: "REAL", nullable: false),
+                    JawWidth = table.Column<float>(type: "REAL", nullable: false),
+                    Leg = table.Column<float>(type: "REAL", nullable: false),
+                    MouthVerticalPos = table.Column<float>(type: "REAL", nullable: false),
+                    MouthWidth = table.Column<float>(type: "REAL", nullable: false),
+                    NoseAngle = table.Column<float>(type: "REAL", nullable: false),
+                    NoseCurve = table.Column<float>(type: "REAL", nullable: false),
+                    NoseLength = table.Column<float>(type: "REAL", nullable: false),
+                    NoseWidth = table.Column<float>(type: "REAL", nullable: false),
+                    Stomach = table.Column<float>(type: "REAL", nullable: false),
+                    Thigh = table.Column<float>(type: "REAL", nullable: false),
+                    HeadMesh = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2288,11 +2287,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterBodyResources",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    Ref = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Ref = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2309,9 +2308,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterBuffs",
                 columns: table => new
                 {
-                    BuffId = table.Column<long>(type: "bigint", nullable: false),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    BuffId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -2328,9 +2327,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterClientSettings",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Settings = table.Column<byte[]>(type: "bytea", nullable: true),
-                    Preview = table.Column<byte[]>(type: "bytea", nullable: true)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Settings = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    Preview = table.Column<byte[]>(type: "BLOB", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -2347,8 +2346,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterCombos",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    ComboId = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ComboId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2365,9 +2364,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterFeatSpecs",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Index = table.Column<int>(type: "integer", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Index = table.Column<int>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2384,8 +2383,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterFriends",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    FriendCharacterId = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    FriendCharacterId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2408,10 +2407,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterQuestGoals",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    GoalId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestId = table.Column<long>(type: "bigint", nullable: false),
-                    Progress = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Progress = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2440,19 +2439,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterQuests",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    QuestId = table.Column<long>(type: "bigint", nullable: false),
-                    State = table.Column<int>(type: "integer", nullable: false),
-                    GoalTargetName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    GoalProgress = table.Column<long>(type: "bigint", nullable: false),
-                    GoalRequired = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    QuestId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    State = table.Column<int>(type: "INTEGER", nullable: false),
+                    GoalTargetName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    GoalProgress = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GoalRequired = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CharacterQuests", x => x.Id);
-                    table.CheckConstraint("CK_CharacterQuest_State", "\"State\" IN (0, 1)");
+                    table.CheckConstraint("CK_CharacterQuest_State", "State IN (0, 1)");
                     table.ForeignKey(
                         name: "FK_CharacterQuests_Characters_CharacterId",
                         column: x => x.CharacterId,
@@ -2465,10 +2464,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterRespawnPoints",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    RespawnPointId = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RespawnPointId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2491,12 +2490,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterScaffoldPairs",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    PairId = table.Column<long>(type: "bigint", nullable: false),
-                    ListIndex = table.Column<byte>(type: "smallint", nullable: false),
-                    Value = table.Column<int>(type: "integer", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PairId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ListIndex = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Value = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2513,10 +2512,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterShortcuts",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Slot = table.Column<long>(type: "bigint", nullable: false),
-                    TargetId = table.Column<long>(type: "bigint", nullable: false),
-                    ShortcutType = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Slot = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TargetId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ShortcutType = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2533,9 +2532,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterSkills",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    SkillId = table.Column<long>(type: "bigint", nullable: false),
-                    Rank = table.Column<byte>(type: "smallint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SkillId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Rank = table.Column<byte>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2552,8 +2551,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterSpells",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    SpellId = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SpellId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2576,10 +2575,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterStats",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    StatId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2596,8 +2595,8 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterTags",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    TagId = table.Column<long>(type: "bigint", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TagId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2614,22 +2613,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ItemInstances",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    Container = table.Column<long>(type: "bigint", nullable: false),
-                    Count = table.Column<long>(type: "bigint", nullable: false),
-                    Bound = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatorName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    OwnerCharacterId = table.Column<long>(type: "bigint", nullable: true),
-                    OwnerGuildId = table.Column<long>(type: "bigint", nullable: true),
-                    Slot = table.Column<int>(type: "integer", nullable: false),
-                    TemplateId = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Container = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Count = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Bound = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatorName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    OwnerCharacterId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    OwnerGuildId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Slot = table.Column<int>(type: "INTEGER", nullable: false),
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ItemInstances", x => x.Id);
-                    table.CheckConstraint("CK_ItemInstance_Container", "\"Container\" IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
-                    table.CheckConstraint("CK_ItemInstance_OneOwner", "(OwnerCharacterId IS NULL) <> (OwnerGuildId IS NULL)");
+                    table.CheckConstraint("CK_ItemInstance_Container", "Container IN (101, 104, 105, 109, 111, 112, 113, 114, 115)");
+                    table.CheckConstraint("CK_ItemInstance_OneOwner", "(\"OwnerCharacterId\" IS NULL) <> (\"OwnerGuildId\" IS NULL)");
                     table.ForeignKey(
                         name: "FK_ItemInstances_Characters_OwnerCharacterId",
                         column: x => x.OwnerCharacterId,
@@ -2654,28 +2653,28 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationScreenParameters",
                 columns: table => new
                 {
-                    ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
-                    PacketSequence = table.Column<int>(type: "integer", nullable: false),
-                    ScreenSequence = table.Column<int>(type: "integer", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    Kind = table.Column<byte>(type: "smallint", nullable: false),
-                    LocalizedId = table.Column<long>(type: "bigint", nullable: true),
-                    LocalizedToken = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Category = table.Column<long>(type: "bigint", nullable: true),
-                    Flags = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                    ContentKey1 = table.Column<long>(type: "bigint", nullable: false),
-                    ContentKey2 = table.Column<long>(type: "bigint", nullable: false),
-                    ContentKey3 = table.Column<long>(type: "bigint", nullable: false),
-                    ContentKey4 = table.Column<long>(type: "bigint", nullable: false),
-                    Text = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false)
+                    ConversationNodeId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    PacketSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    ScreenSequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<byte>(type: "INTEGER", nullable: false),
+                    LocalizedId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    LocalizedToken = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Category = table.Column<uint>(type: "INTEGER", nullable: true),
+                    Flags = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
+                    ContentKey1 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey2 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey3 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    ContentKey4 = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Text = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ConversationScreenParameters", x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence, x.Sequence });
-                    table.CheckConstraint("CK_ConversationScreenParameter_Kind", "\"Kind\" IN (0, 1, 2)");
+                    table.CheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
                     table.ForeignKey(
-                        name: "FK_ConversationScreenParameters_ConversationScreens_Conversati~",
+                        name: "FK_ConversationScreenParameters_ConversationScreens_ConversationNodeId_PacketSequence_ScreenSequence",
                         columns: x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence },
                         principalTable: "ConversationScreens",
                         principalColumns: new[] { "ConversationNodeId", "PacketSequence", "Sequence" },
@@ -2686,12 +2685,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "PatrolNodeWaypoints",
                 columns: table => new
                 {
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    PositionX = table.Column<float>(type: "real", nullable: false),
-                    PositionY = table.Column<float>(type: "real", nullable: false),
-                    PositionZ = table.Column<float>(type: "real", nullable: false)
+                    NpcSpawnId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OrdinalPath = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    PositionX = table.Column<float>(type: "REAL", nullable: false),
+                    PositionY = table.Column<float>(type: "REAL", nullable: false),
+                    PositionZ = table.Column<float>(type: "REAL", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2708,10 +2707,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "PatrolNodeWords",
                 columns: table => new
                 {
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    Value = table.Column<long>(type: "bigint", nullable: false)
+                    NpcSpawnId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    OrdinalPath = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Ordinal = table.Column<int>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2728,10 +2727,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "CharacterFeats",
                 columns: table => new
                 {
-                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
-                    SpecIndex = table.Column<int>(type: "integer", nullable: false),
-                    FeatId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false)
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SpecIndex = table.Column<int>(type: "INTEGER", nullable: false),
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2754,9 +2753,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ItemInstanceSockets",
                 columns: table => new
                 {
-                    ItemInstanceId = table.Column<long>(type: "bigint", nullable: false),
-                    SocketIndex = table.Column<long>(type: "bigint", nullable: false),
-                    GemItemId = table.Column<long>(type: "bigint", nullable: false)
+                    ItemInstanceId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SocketIndex = table.Column<uint>(type: "INTEGER", nullable: false),
+                    GemItemId = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -2779,15 +2778,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MailAttachments",
                 columns: table => new
                 {
-                    ItemInstanceId = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    MailId = table.Column<decimal>(type: "numeric(20,0)", precision: 20, scale: 0, nullable: false),
-                    EscrowedInstanceId = table.Column<long>(type: "bigint", nullable: true),
-                    ItemHash = table.Column<long>(type: "bigint", nullable: false),
-                    Quantity = table.Column<long>(type: "bigint", nullable: false),
-                    Template = table.Column<long>(type: "bigint", nullable: false),
-                    TrailerClass = table.Column<long>(type: "bigint", nullable: false),
-                    TrailerTail = table.Column<long>(type: "bigint", nullable: false),
-                    TrailerWord = table.Column<long>(type: "bigint", nullable: false)
+                    ItemInstanceId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    MailId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    EscrowedInstanceId = table.Column<uint>(type: "INTEGER", nullable: true),
+                    ItemHash = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Quantity = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Template = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerClass = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerTail = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TrailerWord = table.Column<uint>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
