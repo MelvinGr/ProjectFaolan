@@ -3310,7 +3310,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("MidFlag")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("RdbType")
+                    b.Property<uint>("ProfessionId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("RequiredFeatId")

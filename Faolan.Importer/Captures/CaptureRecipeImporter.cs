@@ -62,7 +62,7 @@ namespace Faolan.Importer.Captures
 				else
 				{
 					existing.Header1 = row.Header1;
-					existing.RdbType = row.RdbType;
+					existing.ProfessionId = row.ProfessionId;
 					existing.MidFlag = row.MidFlag;
 					existing.Tail = row.Tail;
 					existing.TrailingFlag = row.TrailingFlag;
@@ -107,7 +107,7 @@ namespace Faolan.Importer.Captures
 			{
 				Id = r.Id,
 				Header1 = r.Header1,
-				RdbType = r.RdbType,
+				ProfessionId = r.ProfessionId,
 				MidFlag = r.MidFlag,
 				Tail = r.Tail,
 				TrailingFlag = r.TrailingFlag,

@@ -62,7 +62,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x265c8u, recipe9.Results[0].ItemId); // the produced item id
 
 			// Decoded per-recipe columns for recipe 9 (from the capture).
-			Assert.Equal(0xf4241u, recipe9.RdbType);
+			Assert.Equal(0xf4241u, recipe9.ProfessionId);
 			Assert.Equal([0x4e5e8u], recipe9.RefIds);
 
 			// Every recipe decodes into a non-empty element set (no over/under-run of the record body).
@@ -124,7 +124,7 @@ namespace Faolan.Tests
 			{
 				Id = r.Id,
 				Header1 = r.Header1,
-				RdbType = r.RdbType,
+				ProfessionId = r.ProfessionId,
 				MidFlag = r.MidFlag,
 				Tail = r.Tail,
 				TrailingFlag = r.TrailingFlag,

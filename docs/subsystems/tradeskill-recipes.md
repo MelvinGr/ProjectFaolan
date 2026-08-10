@@ -52,9 +52,9 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
   and so does the DB path (`Recipe` row → `RecipeRecords.FromRow` → `Build`); both are golden-gated in
   `TradeskillReplyCodecTests`. Parse validates every folded constant (header word 0 == list-key, mid header,
   element id-dup / key-dup / `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
-- **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `RdbType`
-  (`0xf4241`/`0xf4242`), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as `RefId0`
-  (always present) + `RefId1` (nullable; every captured record has 1 or 2). No `Data` blob.
+- **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `ProfessionId`
+  (`0xf4241`/`0xf4242` — see below), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as
+  `RefId0` (always present) + `RefId1` (nullable; every captured record has 1 or 2). No `Data` blob.
 - **Importer** `--only recipes` (`RecipesModule` / `CaptureRecipeImporter`) — scans captures for the reply
   sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. Seeded 603
   from the NecroL80 capture.
@@ -163,6 +163,30 @@ would close the client's window on an item it never received.
   sessions are L80s who already had one — so the trainer conversation and the rank-up rule are not built, and
   `.tradeskill` stands in for them.
 
-- `Header1` / `RdbType` / `MidFlag` / `Tail` / `TrailingFlag` / the ref-id list are stored faithfully but their
-  gameplay meaning is not yet decoded (they reproduce the wire exactly regardless).
+- `Header1` / `MidFlag` / `Tail` / `TrailingFlag` are stored faithfully but their gameplay meaning is not yet
+  decoded (they reproduce the wire exactly regardless). The ref-id list is decoded — it is the feat requirement.
+
+### ⭐ `ProfessionId` — the column that used to be called `RdbType` (#148)
+
+It takes two values, and they are the two shipped crafting professions. Resolving each recipe's
+`RequiredFeatId` through `FeatIdMaps.WireFeatId` names all twelve ladder ranks, six per value, with **zero
+crossover** — and the `RequiredWorkshopFeatId` families split the same way:
+
+| value | recipes | feats | workshop feats |
+|---|---:|---|---|
+| `0xF4241` 1000001 | 99 | `321000`/`321001`/`321100`/`321101`/`321200`/`321201` — **Weaponsmith** Novice…Master | `3282xx` |
+| `0xF4242` 1000002 | 504 | `321300`/`321301`/`321400`/`321401`/`321500`/`321501` — **Armorsmith** Novice…Master | `3283xx` |
+
+⚠️ **The old name was a misreading, and it is positively refuted rather than merely unsupported.** RDB type
+`1000001` is the **playfield** type — its entries are `Davids Test Playplace`, `Conarch Village`,
+`Spider_Caverns` — and type `1000002` does not exist in the client's RDB index at all. The mis-naming had also
+escaped into the issue history as *"recipes imported from RDB 1000001/1000002"*; recipes are **capture-derived**
+(`CaptureRecipeImporter` reads `TradeskillReplyIIR`) and the importer never opens the RDB.
+
+⚠️ Two values is a cheap partition on its own. What makes this a decode is that the six-rank ladder **and** the
+disjoint workshop-feat family fall on the same split, and that the alternative reading is disproved.
+
+⭐ It also sharpens what the missing professions look like: the shipped set is Weaponsmith + Armorsmith because
+that is what the one captured recipe book held, so an Alchemist's book would arrive carrying a **third**
+`ProfessionId`. That is the concrete prediction the alchemy-quest gap (#148, quests 13141/13143/13145) waits on.
 - `type=1` single-`RecipeLearnt` form + the `LearnRecipe` GameAction (`FUN_0112d750`) are not built yet.

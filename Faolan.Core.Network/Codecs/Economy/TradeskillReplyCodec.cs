@@ -213,7 +213,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				.WriteUInt32(r.Id) //           list-key
 				.WriteUInt32(r.Id) //           header[0] == list-key
 				.WriteUInt32(r.Header1)
-				.WriteUInt32(r.RdbType);
+				.WriteUInt32(r.ProfessionId);
 			WriteFramedCount(body, r.Ingredients.Count);
 			foreach (var e in r.Ingredients)
 				WriteElement(body, e, true);
@@ -237,7 +237,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	public sealed record RecipeRecord(
 		uint Id,
 		uint Header1,
-		uint RdbType,
+		uint ProfessionId,
 		uint MidFlag,
 		uint Tail,
 		byte TrailingFlag,
@@ -263,7 +263,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			if (row.RequiredWorkshopFeatId.HasValue)
 				refIds.Add(row.RequiredWorkshopFeatId.Value);
 
-			return new RecipeRecord(row.Id, row.Header1, row.RdbType, row.MidFlag, row.Tail, row.TrailingFlag, refIds, ElementsFor(row, RecipeItemRole.Ingredient),
+			return new RecipeRecord(row.Id, row.Header1, row.ProfessionId, row.MidFlag, row.Tail, row.TrailingFlag, refIds, ElementsFor(row, RecipeItemRole.Ingredient),
 				ElementsFor(row, RecipeItemRole.Result));
 		}
 
