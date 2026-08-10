@@ -704,6 +704,12 @@ reader that stops at the decoded slots cannot tell them apart. `AddProc` at `100
 twin's criteria are identical except that the operators `93` and `103` are swapped between two ids.
 
 Across the catalog: **74,593 criteria over 42 ids and 50 operators**. Half of them (37,540) carry **no operand** —
-`[0][0][op]` — which cannot be a comparison, so those operators are combiners and the whole thing reads like a
-postfix requirement expression. Suggestive rather than settled; the id and operator vocabularies are undecoded and
-tracked separately.
+`[0][0][op]`.
+
+⭐ **The evaluator is recovered and both vocabularies with it** — `FUN_006dd970` is `CriteriaItem_t::CheckCriteria`,
+it walks the run as a **postfix expression over a boolean stack**, and the no-operand half is exactly its logic
+operators plus a family of SUBJECT SELECTORS that push nothing. A criterion's `id` is an ordinary stat id. The
+whole reading, the 201-value operator switch and how it was pulled out of the exe are in
+[`criteria-grammar.md`](criteria-grammar.md) (#790); `CriteriaOperator` carries the names the client states.
+`AddProc`'s twin above swapping `93` and `103` reads as what it is with those names: `HasFeat` against
+`HasNotFeat`.

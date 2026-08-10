@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Rdb;
@@ -216,6 +217,36 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"    of those, [0][0][op] (no operand - a logical combiner?): {zeroIdOps.Values.Sum():N0}"
 			                  + "   ops: " + string.Join(", ", zeroIdOps.OrderByDescending(k => k.Value).Take(8).Select(k => $"{k.Key}x{k.Value:N0}")));
 
+			// ⭐ #790's first question, asked of the data rather than argued: is a criterion id a STAT id? Every id is
+			// printed against the client's own stat-name table (`CharacterStatId`, `docs/re/aoc-client-stat-names.tsv`).
+			// ⚠️ The hit RATE is not the evidence - the OPERATORS are printed through the same table as the CONTROL
+			// and all 50 of those "resolve" too, because the table is dense at low ids. What separates them is
+			// COHERENCE: the ids read as a condition vocabulary end to end (`Level`, `Race`, `CombatMode`,
+			// `CurrentPlayfield`, `Rnd`) while the control comes back `RespecPoints` / `VolumeMass` / `CATMesh`.
+			Console.WriteLine();
+			Console.WriteLine($"    every criterion ID against the client's stat-name table ({criterionIds.Count} distinct):");
+			foreach (var (id, n) in criterionIds.OrderByDescending(k => k.Value))
+				Console.WriteLine($"      {id,6} x{n,-7:N0} {ClientStatName(id)}");
+
+			// The OPERATOR read through its own vocabulary - `CriteriaItem_t::CheckCriteria`'s switch (#790,
+			// `docs/re/criteria-grammar.md`) - beside the stat-table reading it is NOT.
+			Console.WriteLine();
+			Console.WriteLine($"    every OPERATOR ({criterionOps.Count} distinct):  value, its name, then the CONTROL - what the stat table would have called it");
+			foreach (var (op, n) in criterionOps.OrderByDescending(k => k.Value))
+			{
+				var name = Enum.IsDefined(typeof(CriteriaOperator), op) ? ((CriteriaOperator)op).ToString() : "";
+				Console.WriteLine($"      {op,6} x{n,-7:N0} {name,-30} (control: {ClientStatName(op)})");
+			}
+
+			var opsNamed = criterionOps.Keys.Count(k => Enum.IsDefined(typeof(CriteriaOperator), k));
+			var sightingsNamed = criterionOps.Where(k => Enum.IsDefined(typeof(CriteriaOperator), k.Key)).Sum(k => k.Value);
+			Console.WriteLine();
+			Console.WriteLine($"    operators the client NAMES: {opsNamed} / {criterionOps.Count}"
+			                  + $"   covering {sightingsNamed:N0} / {criterionOps.Values.Sum():N0} sightings"
+			                  + $" = {(criterionOps.Count == 0 ? 0 : 100.0 * sightingsNamed / criterionOps.Values.Sum()):0.0}%");
+			Console.WriteLine($"    the stat table would name {criterionIds.Keys.Count(k => ClientStatName(k).Length > 0)} / {criterionIds.Count} ids"
+			                  + $" and {criterionOps.Keys.Count(k => ClientStatName(k).Length > 0)} / {criterionOps.Count} operators - which is why the rate alone proves nothing");
+
 			if (untiled.Count != 0)
 			{
 				Console.WriteLine();
@@ -254,6 +285,12 @@ namespace Faolan.Importer.Cli
 			}
 
 			return blocks;
+		}
+
+		// The client's own name for a stat id, or "" when the table does not name it (#790).
+		private static string ClientStatName(uint id)
+		{
+			return Enum.IsDefined(typeof(CharacterStatId), id) ? ((CharacterStatId)id).ToString() : "";
 		}
 
 		// The record opens `[classTag][a][15][23][frame]`, so `a` is word 1 of the body after the 12-byte RDB header.

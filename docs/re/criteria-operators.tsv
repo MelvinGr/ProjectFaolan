@@ -1,0 +1,207 @@
+# CriteriaItem_t::CheckCriteria (FUN_006dd970) operator switch - Gitea #790
+# Composed from the byte index table at 0x6e67d0 and the target table at 0x6e6630 by
+# tools/ghidra/DumpSwitchTable.java; the names come from each branch's own log text via
+# tools/ghidra/DumpSwitchBranchStrings.java. See docs/re/criteria-grammar.md.
+# An empty name is a REAL branch whose code carries no string of its own - unnamed, not absent.
+operator	branch	name	evidence
+0	006ddeeb	Equal	string: " equal success " / " failed!"
+1	006dec75	Less	string: " less success " / " less failed "
+2	006df7a9	Larger	string: " larger failed " / Criteria_IsRequiredToBeAtLeast
+3	006dfca2	Or	code: pops two off the boolean stack, pushes their OR
+4	006dfcf2	And	code: pops two off the boolean stack, pushes their AND
+5	006e0047	Time_Less	string: " Criteria failed on Operator_Time_Less: "
+6	006e0186	Time_Larger	string: " Criteria failed on Operator_Time_Larger: "
+7	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+8	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+9	006e095d	ID	string: " Criteria success on Operator_ID: "
+10	006e2cc4	(target id guard)	string: " CheckCriteria invalid TargetID.."
+11	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+12	006e2daa	TargetStat	string: " Criteria failed on Operator_TargetStat: "
+13	006e0c78	(primary item)	string: " primary item " / " Criteria failed primary item nothing to test on!"
+14	006e0f4c	(secondary item)	string: " secondary item "
+15	006e1bbc	Area	string: " Criteria Operator_Area - no dynel?"
+16	006e1d92	(user)	string: " user criteria failed: no user..!"
+17	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+18	006ddd34	SUBJECT SELECTOR	code: dynamic-casts the target (else the user) and stores it as the subject; pushes nothing
+19	006dddc5	SUBJECT SELECTOR	code: dynamic-casts the user and stores it as the subject; pushes nothing
+20	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+21	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+22	006df1aa	BitAnd	string: " & success " / " & failed "
+23	006df4aa	BitOr	string: " | success " / " | failed "
+24	006de7db	Unequal	string: " unequal success " / " unequal failed "
+25	006e62af	GC_HasQuestJournalSpace	string: e_Operator_GC_HasQuestJournalSpace / QuestLimitReached
+26	006ddd91	SUBJECT SELECTOR	code: dynamic-casts the user and stores it as the subject; pushes nothing
+27	006e33d1	OnValidTarget	string: "Criteria: OnValidTarget: Target is VALID/INVALID" (branch shared with 28)
+28	006e33d1	OnValidTarget	string: "Criteria: OnValidTarget: Target is VALID/INVALID" (branch shared with 27)
+29	006e353e	OnValidUser	string: "Criteria: OnValidUser: User is VALID/INVALID" (branch shared with 30)
+30	006e353e	OnValidUser	string: "Criteria: OnValidUser: User is VALID/INVALID" (branch shared with 29)
+31	006e02c5	HasWornItem	string: " Criteria failed on Operator_HasWornItem: "
+32	006e06f2	HasNotWornItem	string: " Criteria failed on Operator_HasNotWornItem: "
+33	006e04d3	HasWieldedItem	string: " Criteria failed on Operator_HasWieldedItem: "
+34	006e0836	HasNotWieldedItem	string: " Criteria failed on Operator_HasNotWieldedItem: "
+35	006e3dc3	HasFormula	string: " Criteria failed on Operator_HasFormula: "
+36	006e3fc5	HasNotFormula	string: " Criteria failed on Operator_HasNotFormula: " / YouAlreadyHaveThisSpell
+37	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+38	006e36ab	IsValid	string: "Criteria: IsValid: "
+39	006e3787	IsInvalid	string: "Criteria: IsInvalid: "
+40	006e3863	IsAlive	string: "Criteria: IsAlive("
+41	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+42	006dfd97	Not	string: "Criteria Operator_Not: !"; code: pops one, pushes its negation
+43	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+44	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+45	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+46	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+47	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+48	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+49	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+50	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+51	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+52	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+53	006e21a2	(user)	string: " user criteria failed: no user..!"
+54	006e232a	(user)	string: " user criteria failed: no user..!"
+55	006e1874	Area	string: " Criteria Operator_Area - no dynel?"
+56	006e19a5	Area	string: " Criteria Operator_Area - no dynel?"
+57	006e4257		
+58	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+59	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+60	006e1ad8		
+61	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+62	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+63	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+64	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+65	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+66	006deaee		
+67	006e1220	NumberOfItems	string: " Criteria success on Operator_NumberOfItems: "
+68	006e154a	PrimaryTemplate	string: " Criteria success on Operator_PrimaryTemplate: "
+69	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+70	006e39ce		
+71	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+72	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+73	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+74	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+75	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+76	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+77	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+78	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+79	006e3d96		
+80	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+81	006e429e		
+82	006e42f5		
+83	006dfb0c	Larger (second form)	string: " larger success, " with the stat in parentheses
+84	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+85	006e450b		
+86	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+87	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+88	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+89	006e45ca		
+90	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+91	006e464e	MustHavePassiveAbilityRunning	string: MustHavePassiveAbilityRunning
+92	006e4db8		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+93	006e542c	HasFeat	string: CriteriaMissingFeat / YouCanNotUseYet / YouCanNotUse
+94	006e49e3		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+95	006e4bd4		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+96	006e4f34		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+97	006e5277		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+98	006dfeb9	True	string: "Criteria Operator_True"
+99	006dff80	False	string: "Criteria Operator_False"
+100	006dddf9	SUBJECT SELECTOR	code: dynamic-casts the user and stores it as the subject; pushes nothing
+101	006e4823		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+102	006e50e9		the you/target requirement family (shares the CriteriaTarget / CriteriaYou message prefix)
+103	006e5659	HasNotFeat	string: CriteriaHasNotFeatFailed
+104	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+105	006e434c		
+106	006e439c		
+107	006df149		
+108	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+109	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+110	006e04bf		
+111	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+112	006e578c		
+113	006e59cf		
+114	006e2490	(target distance)	string: Criteria_TargetIsTooClose / Criteria_TargetIsTooFarAway / Criteria_TargetIsNotACharacter
+115	006e2b56		
+116	006dde2d	SUBJECT SELECTOR	code: resolves the dynel the subject`s +0x37c/+0x380 handle names and makes IT the subject
+117	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+118	006e5a28	MustBeInCombat	string: MustBeInCombatToUseThisItem
+119	006e5ac8	MustNotBeInCombat	string: MustNotBeInCombatToUseThisItem
+120	006e5b79		
+121	006e5bdb		
+122	006e273e	(target too close)	string: Criteria_TargetIsTooClose / Criteria_TargetIsNotACharacter
+123	006e294a	(target too far)	string: Criteria_TargetIsTooFarAway / Criteria_TargetIsNotACharacter
+124	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+125	006e3d5b		
+126	006e3ab0		
+127	006e3bca		
+128	006e3ce4		
+129	006e5d07		
+130	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+131	006e5c82		
+132	006e5cab		
+133	006deaee		
+134	006deaee		
+135	006e5ceb		
+136	006e57c0		
+137	006e5c1c		
+138	006e3058		
+139	006e580c		
+140	006e30ad		
+141	006e58b8		
+142	006e5915		
+143	006e5972		
+144	006e585b		
+145	006e5d70		
+146	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+147	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+148	006e3b37		
+149	006e3c51		
+150	006e3a24		
+151	006e3004		
+152	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+153	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+154	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+155	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+156	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+157	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+158	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+159	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+160	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+161	006e5dae		
+162	006e5e3a		
+163	006e5f0f		
+164	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+165	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+166	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+167	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+168	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+169	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+170	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+171	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+172	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+173	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+174	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+175	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+176	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+177	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+178	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+179	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+180	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+181	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+182	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+183	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+184	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+185	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+186	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+187	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+188	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+189	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+190	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+191	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+192	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+193	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+194	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+195	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+196	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+197	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+198	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+199	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
+200	006e3d1f		
