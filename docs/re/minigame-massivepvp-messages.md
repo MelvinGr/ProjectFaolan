@@ -63,6 +63,12 @@ Two readings that a corpus alone cannot separate, and one it can:
   cousin: **a length prefix that is zero in almost every capture reads as padding.**
 * `areaId` takes three values (11040 / 12070 / 13050) in contiguous runs over the eight rows, and the 7200 / 900
   columns are constant in every entry of every body — 2 hours and 15 minutes in seconds.
+* ⭐ **`areaId` is a PLAYFIELD id, corroborated from a file that knows nothing about this message.** All three
+  are in `Maps` — `Border Kingdoms, Cimmerian End` (11040), `Border Kingdoms, Aquilonian End` (12070) and
+  `Border to Kush` (13050) — and RDB **1000509** (`PlayfieldPvPData_c`, [client-data-tables.md](../rdb/client-data-tables.md))
+  files exactly those three, plus `Massive Pvp Test` and `Minigames (General)`, under **PvP ruleset 6** and
+  nothing else under it. So the wire's area id space and the client's own massive-PvP ruleset pick out the same
+  set, from a capture and from an asset file respectively. Gitea #146 / #147.
 
 `otherName` and the `tail`/`tailFlag` pair vary **together**: the ten rows with a non-empty `otherName` are
 exactly the ten with a non-zero tail. What either means is not recoverable from the corpus.
