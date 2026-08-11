@@ -96,25 +96,29 @@ namespace Faolan.GameServer.Combat
 		// the same Pillager the corpus has `combo_npc_guardian_polearm_1_sweep` x31 against `combo_npc_generic_polearm`
 		// x29 - and their level gate is `Combos.Level` (1/30/50/70), which is why nothing here parses a name.
 		//
-		// **The archetype is a per-NPC property in general and is NOT recoverable**: it is in no column we hold
-		// (`Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`, `CarsGroup` and `Flags` all cut
-		// straight across the eight observed families), the client ships no NPC-template catalog to read it from, and
-		// all 31 combo-swinging templates have zero `NpcSpell` rows. See #675.
+		// ⚠️ **This is the FALLBACK.** The archetype is a per-TEMPLATE property that is in no column the spawn body
+		// carries (`Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`, `CarsGroup` and `Flags`
+		// all cut straight across the eight observed families) and in no client table, so it is HARVESTED into
+		// `NpcStatCore.ComboClass` from the captured swings (#675). Where that column is set, `NpcClassComboIds`
+		// selects on it and the weapon only narrows through `MeetsComboCriteria`; this switch answers the ~97% of
+		// templates no capture ever caught swinging one.
 		//
-		// What IS settled is a subset, and the evidence is the per-SPAWN weapon rather than the per-type gear union -
-		// one handle in one capture has one loadout (`--report combo-swings`, the "combo -> the weapon of the actor
-		// that swung it" cut):
+		// What the WEAPON settles on its own is a subset, and the evidence is the per-SPAWN weapon rather than the
+		// per-type gear union - one handle in one capture has one loadout (`--report combo-swings`, the "combo -> the
+		// weapon of the actor that swung it" cut):
 		//
 		//   DAGGER  -> assassin   every one of the 31 captured assassin-family swings is by a dagger-wielder, and all
 		//                         8 dagger-armed templates swing the family
 		//   POLEARM -> guardian   likewise, 61 swings and all 5 polearm-armed templates
 		//
-		// ⚠️ And a subset is all it is - three buckets stay ambiguous and are deliberately absent:
+		// ⚠️ And a subset is all it is - three buckets a weapon rule cannot express, which is what the harvested
+		// archetype answers instead:
 		//
-		//   SHIELD    the one refuted case. `combo_npc_guardian_shield_*` is swung by 3 of the 6 shield-bearing
-		//             templates; the three Vanir ones swing only generic, so a shield does NOT make a guardian.
+		//   SHIELD    the one REFUTED case, and the archetype says why. `combo_npc_guardian_shield_*` is swung by 3 of
+		//             the 6 shield-bearing templates because the other three are not Guardians - Vanir Champion Elite
+		//             wears a shield and swings the BARBARIAN fatality rows. A shield does not make a guardian.
 		//   2h        `barbarian_2h` / `conqueror_2h` / `hox` all appear on two-handers, blunt AND edge, and no
-		//             template swings two of them. A per-NPC property with three candidates.
+		//             template swings two of them - a per-TEMPLATE property with three candidates.
 		//   dual 1h   `barbarian_dual` / `conqueror_dual`, same shape.
 		//
 		// BOW and CROSSBOW need no archetype at all, and are wired since #676 put the shot on its own carrier:
@@ -137,6 +141,37 @@ namespace Faolan.GameServer.Combat
 				Bow      => ("combo_npc_ranger_bow_", ConanClass.Ranger),
 				Crossbow => ("combo_npc_ranger_crossbow_", ConanClass.Ranger),
 				_        => null
+			};
+		}
+
+		// #675: whether this NPC's loadout satisfies a class combo's own weapon `criteria` - the client's `criteria`
+		// attribute, which is what replaces the name-prefix reading once `NpcStatCore.ComboClass` says WHICH class.
+		// `0` is no requirement at all and is what the assassin / bear-shaman / dark-templar / hox / heimdall families
+		// carry, so those swing on any weapon (the corpus has dark_templar swung with a 1hEdge and hox with a 2hEdge).
+		//
+		// ⚠️ **`28` is widened to ANY two-hander, and that is capture-driven rather than a reading of the number.**
+		// On the generic set 28 is `2he` and 29 is `2hb`, but retail swings the criteria-28 CLASS rows
+		// (`barbarian_2h`, `conqueror_2h`) with two-handed BLUNT weapons in the corpus - LargeWarclub, Warhammer,
+		// HeavyBludgeon, SledgeHammer, BattleMaul - so on a class family it reads as "a two-hander". Refusing 2hb
+		// there would silence exactly the mobs the archetype was harvested from.
+		public static bool MeetsComboCriteria(int criteria, IEnumerable<INpcEquipment>? equipment)
+		{
+			var main = CategoryIn(equipment, MainHandPos);
+			var off = CategoryIn(equipment, OffHandPos);
+
+			return criteria switch
+			{
+				0  => true,
+				23 => main == OneHandEdge,
+				25 => main == Polearm,
+				26 => main == Bow,
+				27 => main == OneHandBlunt,
+				28 => main is TwoHandEdge or TwoHandBlunt,
+				29 => main == TwoHandBlunt,
+				30 => main == Dagger,
+				32 => main == Crossbow,
+				52 => main is OneHandEdge or OneHandBlunt or Dagger && off is OneHandEdge or OneHandBlunt or Dagger,
+				_  => false // an unseen criteria code is a gap, and swinging on it would be a guess
 			};
 		}
 

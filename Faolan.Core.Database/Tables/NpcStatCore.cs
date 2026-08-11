@@ -247,5 +247,30 @@ namespace Faolan.Core.Database.Tables
 		// sightings even when restricted to freshly-spawned NPCs. What is stored is therefore the type's MODAL value
 		// over its own captured sightings - a measurement, not the corpus-wide mode, which is the line #602 drew.
 		public uint? MovementMode { get; set; }
+
+		// --- harvested, not lifted from the spawn body ---
+
+		// #675: the NPC's COMBAT ARCHETYPE, as a <see cref="Core.Enums.ConanClass" /> - which `combo_npc_<class>_*`
+		// family retail lets this template swing beside its generic row. NULL means no capture ever saw this template
+		// swing a class family, which is the honest answer for 98% of them; the runtime then falls back to the generic
+		// set alone.
+		//
+		// ⚠️ Not in the spawn body, not in the RDB and not derivable from anything else we hold: `Community`,
+		// `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`, `CarsGroup` and `Flags` all cut straight across
+		// the eight observed families (MonsterData 140326 alone carries barbarians, guardians and assassins), and
+		// `ProfessionType` is NULL on all but one of the captured actors. So it is HARVESTED: the class is read off
+		// the client's own `Combos.NpcClass` on every class-family combo the corpus catches this template swinging.
+		//
+		// ⭐ It is a per-TEMPLATE property and the corpus proves it: over the 30 templates caught swinging one, not a
+		// single template swings two different classes - Hired Bodyguard swings `guardian_shield` AND
+		// `guardian_polearm`, Poacher swings `barbarian_2h` AND `barbarian_dual`, Argus/Wharf Rat Thug swing
+		// `barbarian_2h` AND the `heimdall_fatality` rows the client marks `npcclass=18` Barbarian. Zero conflicts.
+		// It is also NOT a per-NAME property: `Pillager` 8756 is a Guardian and `Pillager` 14040 a Dark Templar,
+		// and `Scavenger Lackey` splits Conqueror (12137/14330) from Assassin (12141/14331).
+		//
+		// ⭐ And it explains the one case the old weapon heuristic could not: a shield does NOT make a Guardian -
+		// `Vanir Champion Elite` wears a shield and swings the Barbarian fatality rows, which is why the shield
+		// bucket was refuted when read as a weapon rule.
+		public int? ComboClass { get; set; }
 	}
 }

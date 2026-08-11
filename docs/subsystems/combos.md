@@ -476,7 +476,7 @@ is applied, shared with the spell-line boost (#590).
 column needs a threat model we have none of (it is 2 rows in the whole catalog), and the damage-TYPE column is
 zero on every shipped record. Tracked in Gitea #697 along with the proc and per-spell-stat tables.
 
-## NPC combos — the WEAPON picks the row
+## NPC combos — the WEAPON picks the generic row, the ARCHETYPE picks the class one
 
 Retail's mobs combo too, and constantly: **484 of the corpus's 840 combo swings are `combo_npc_*` rows**, from 150
 distinct NPC actors. They arrive only as a server-to-client `Combat:Melee` ack — the AI drives them, so there is no
@@ -570,37 +570,53 @@ assassin` is a CAPTURE correlation (8 of 8 dagger-armed templates) wearing the s
 dagger-armed non-assassin would swing the wrong family. `polearm` / `bow` / `crossbow` are on firmer ground: their
 rows do state criteria 25 / 26 / 32 and at each of those the class family is unique.
 
-**The archetype itself is a per-NPC property and is not recoverable in general.** Everything we hold cuts across
-the eight observed families — `Community`, `MonsterData`, `SuperFamily`, `NpcType`, `Race`, `VoiceSet`,
-`CarsGroup`, `Flags`, `Bcc` (constant 12488 on every one), and `ProfessionType` (null on all but one actor); a
-purity sweep of **every** `NpcStatCore` column against the 33 class-family templates beats the majority-class
-baseline only on columns whose cardinality buys it for free (`TemplateId` 33 distinct values scores 1.000, and
-`HeadMesh` 26 values scores 0.818). The client ships **no NPC-template catalog** to read it from (RDB 1000020 has
-no record for the combat actors' template ids).
+### ⭐ The archetype is HARVESTED per template (#675, closed)
 
-⚠️ **`NpcSpells` is not "zero rows" — that claim was wrong** — but it is not a route either. 22 of the 33
-class-family templates carry one, and the sets look strikingly family-pure (17 of the 20 distinct spell ids appear
-on exactly one family). That purity is **free**: the whole table is 63 rows over 33 of 1,194 templates and each id
-sits on 1–5 templates, so a spell id is very nearly a template id — the same artefact that makes `TemplateId`
-score 1.000 above. It would name the archetype for the templates a capture already names it for, and for nothing
-else.
+**It is in nothing we hold.** Every column cuts across the eight observed families — `Community`, `MonsterData`,
+`SuperFamily`, `NpcType`, `Race`, `VoiceSet`, `CarsGroup`, `Flags`, `Bcc` (constant 12488 on every one) and
+`ProfessionType` (null on all but one actor); `MonsterData` 140326 alone carries barbarians, guardians and
+assassins. A purity sweep of **every** `NpcStatCore` column against the class-family templates beats the
+majority-class baseline only where cardinality buys it for free (`TemplateId`, 33 distinct values, scores 1.000).
+The client ships **no NPC-template catalog** to read it from, and `NpcSpells` — 63 rows over 33 of 1,194
+templates, so a spell id is very nearly a template id — is the same artefact rather than a route.
 
-**Two buckets are answered anyway, because they have exactly one class family.** Measured per SPAWN rather than
-per type — one handle in one capture holds one loadout, which is the cut that matters:
+**So it is harvested, and the corpus says it is a per-TEMPLATE property with no exceptions.** Every captured NPC
+combo swing carries the catalog id; `Combos.NpcClass` states that row's class; the module tallies the classes per
+template. Over the **36** templates the corpus catches swinging a class family, **not one votes for two classes**:
+
+| the evidence | why it is decisive |
+|---|---|
+| Hired Bodyguard (15441) swings `guardian_shield_*` **and** `guardian_polearm_*` | one class, two weapons — so the class is not the weapon |
+| Poacher (8848) swings `barbarian_2h_*` **and** `barbarian_dual_*` | likewise |
+| Argus the Thief / Wharf Rat Thug swing `barbarian_2h_*` **and** the `heimdall_fatality` rows | which the client files as `npcclass=18` Barbarian |
+| `Pillager` **8756** is a Guardian, `Pillager` **14040** a Dark Templar | so it is per TEMPLATE, not per NAME |
+| `Scavenger Lackey` **12137/14330** Conqueror vs **12141/14331** Assassin | likewise, and in the same zone |
+
+⭐ **And it explains the shield refutation.** `combo_npc_guardian_shield_*` is swung by only 3 of the 6 captured
+shield-bearing templates because the other three are not Guardians — `Vanir Champion Elite` wears a shield and
+swings the *Barbarian* fatality rows. Read as a weapon rule the bucket was contradictory; read as an archetype it
+is not.
+
+The harvest is `--only npc-combo-class` → `NpcStatCore.ComboClass`, and it ships **36 templates over 7 classes**
+(Bear Shaman is the one the corpus never catches). A template no capture ever caught keeps NULL.
+
+**At runtime the class comes from the column and the weapon only narrows within it**, through the row's own
+`Criteria` (`NpcWeapon.MeetsComboCriteria`). ⚠️ One widening, and it is capture-driven: on the generic set
+`Criteria` 28 is *2h edge*, but retail swings the criteria-28 CLASS rows (`barbarian_2h`, `conqueror_2h`) with
+two-handed BLUNT weapons — LargeWarclub, Warhammer, HeavyBludgeon, SledgeHammer, BattleMaul — so on a class family
+28 reads as *any two-hander*. Refusing 2h blunt there would silence exactly the mobs the archetype came from.
+
+**The weapon fallback stays** for the ~97% of templates with no harvested archetype, and it is unchanged: the two
+buckets where the class family at that weapon criteria is unique, measured per SPAWN rather than per type (one
+handle in one capture holds one loadout):
 
 | weapon | family | evidence |
 |---|---|---|
 | dagger | `combo_npc_assassin_*` | all 31 assassin-family swings are by dagger-wielders; all **8** dagger-armed templates swing it |
 | polearm | `combo_npc_guardian_polearm_*` | 61 swings; all **5** polearm-armed templates swing it |
 
-Those two are shipped (`NpcWeapon.ClassComboFamily` → `ComboService.NpcClassComboIds`), level-gated, and chosen
-against the generic row at `ClassComboShare` — the corpus splits 92 class / 65 generic over exactly these two
-weapons.
-
-⚠️ **The rest are refused, and the shield case is refuted rather than unsampled.** `combo_npc_guardian_shield_*`
-is swung by only **3 of the 6** captured shield-bearing templates — the three Vanir ones swing generic only — so
-a shield does not make a guardian. Two-handers and dual-wielders carry two or three candidate families
-(`barbarian` / `conqueror` / `hox`) and no template swings two of them.
+Both paths are level-gated and chosen against the generic row at `ClassComboShare` — the corpus splits 92 class /
+65 generic over exactly those two weapons.
 
 **Ranged needs no archetype at all, and is wired since #676.** `ranger` is the only family at criteria 26/32,
 there is no `combo_npc_generic_bow` to fall back on, and all 57 captured ranged combos are ranger rows. A bow
@@ -612,7 +628,9 @@ What had to land first was the CARRIER, because a bow combo on a melee ack would
 see `docs/subsystems/combat.md`.
 
 Gated by `NpcComboTests`, which locks the catalog premise, the mapping, the coverage over the shipped spawn set,
-the `Criteria` decode, the level ceiling, the two answered buckets and the ones deliberately refused — and that
-the id reaches the wire in `combo_id` with nothing else about the ack moving.
+the `Criteria` decode (including the 28 widening), the level ceiling, the two weapon-answered buckets, the
+harvested archetype resolving the three the weapon cannot, the shield-bearing Barbarian, and that every shipped
+`ComboClass` is a class the catalog holds — and that the id reaches the wire in `combo_id` with nothing else about
+the ack moving.
 
 Open work — spellweaving polish — is tracked on **Gitea #141**.

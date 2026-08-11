@@ -2575,6 +2575,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("ClientScryScript")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ComboClass")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("Community")
                         .HasColumnType("INTEGER");
 

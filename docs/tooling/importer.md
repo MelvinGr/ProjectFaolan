@@ -82,6 +82,7 @@ Capture-sourced (default group, run in dependency order):
 | `shops` | — |
 | `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
 | `npc-placements` (pool the stationary spawn rows the corpus proves are one NPC seen twice — #718) | — |
+| `npc-combo-class` (the NPC combat ARCHETYPE — which `combo_npc_<class>_*` family a template swings, from the captured combo swings — #675) | — |
 | `npc-ambient-animations` (per-creature idle animations from the captured `Emote` records — #766) | — |
 | `npc-follow-pairs` (which creature TYPE walks with which, from the captured mode-07 formation MoveTasks — #741) | — |
 | `world-objects` | — |

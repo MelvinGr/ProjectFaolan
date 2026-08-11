@@ -169,9 +169,10 @@ namespace Faolan.GameServer.Combat
 			return 0;
 		}
 
-		// #675: the CLASS-family rows this NPC may swing beside its generic one, level-gated. Empty when the weapon
-		// does not answer the archetype - which is most of them; `NpcWeapon.ClassComboFamily` is where the two it does
-		// answer, and the three it refuses, are set out.
+		// #675: the CLASS-family rows this NPC may swing beside its generic one, level-gated. `comboClass` is the
+		// HARVESTED archetype (`NpcStatCore.ComboClass`) and is the selector when the corpus caught this template
+		// swinging one; without it the WEAPON answers the two buckets where the class family at that criteria is
+		// unique, and nothing else. Empty when neither speaks.
 		//
 		// The gate is `Combos.Level` verbatim, which IS the family name's trailing number: across the 30 captured
 		// class-family rows no actor ever swings one above its own level, and a level-75 mob still swings the rank-1
@@ -181,12 +182,33 @@ namespace Faolan.GameServer.Combat
 		// it (#675) - `combo_npc_conqueror_dual_1_life_reaper` says Dark Templar and `combo_npc_heimdall_fatality_1`
 		// says Barbarian, so a name is not the family. A row that states NOTHING is kept: the veto is a correction,
 		// never a narrowing, and one row (`combo_npc_assassin_death_whirlwind`) carries no `npcclass` at all.
-		public async Task<uint[]> NpcClassComboIds(IEnumerable<INpcEquipment>? equipment, uint level)
+		public async Task<uint[]> NpcClassComboIds(IEnumerable<INpcEquipment>? equipment, uint level, int? comboClass = null)
 		{
+			var catalog = _catalog ??= await LoadCatalog();
+
+			// ⭐ The HARVESTED archetype, when the corpus caught this template swinging one (#675). The class then
+			// comes from `Combos.NpcClass` on both sides - the stat core says which class, the catalog says which rows
+			// are that class - and the WEAPON only narrows within it, through the row's own `criteria`. That is what
+			// lets a Hired Bodyguard swing `guardian_shield_*` with a sword and `guardian_polearm_*` with a polearm
+			// off ONE column, and what stops a shield-bearing Barbarian (Vanir Champion Elite) being read as a
+			// Guardian the way a weapon rule had to.
+			if (comboClass is { } archetype)
+			{
+				return catalog.Values
+					.Where(e => e.Combo.Level <= level
+					            && e.Combo.NpcClass == archetype
+					            && NpcWeapon.MeetsComboCriteria(e.Combo.Criteria, equipment))
+					.Select(e => e.Combo.Id)
+					.Order()
+					.ToArray();
+			}
+
+			// The fallback for the ~98% of templates no capture ever caught swinging a class family: the WEAPON, for
+			// the two buckets where the class family at that weapon criteria is unique. `NpcWeapon.ClassComboFamily`
+			// is where the buckets it deliberately refuses are set out.
 			if (NpcWeapon.ClassComboFamily(equipment) is not { } family)
 				return [];
 
-			var catalog = _catalog ??= await LoadCatalog();
 			return catalog.Values
 				.Where(e => e.Combo.Level <= level
 				            && e.Combo.Name.StartsWith(family.NamePrefix, StringComparison.Ordinal)

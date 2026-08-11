@@ -287,6 +287,84 @@ namespace Faolan.Tests
 			Assert.All(db.Combos.Where(c => atOne.Contains(c.Id)).ToList(), c => Assert.True(c.Level <= 1, $"{c.Name} is level {c.Level}"));
 		}
 
+		// ⭐ #675 closed: the archetype is HARVESTED per template (`NpcStatCore.ComboClass`), and with it the three
+		// buckets the weapon could never answer resolve - because the class no longer comes from the weapon at all.
+		// The weapon only narrows WITHIN the class, through the row's own `Criteria`.
+		[Theory]
+		[InlineData(ConanClass.Barbarian, NpcWeapon.TwoHandBlunt, 0u, "combo_npc_barbarian_2h_")] // the 2h bucket
+		[InlineData(ConanClass.Barbarian, NpcWeapon.TwoHandEdge, 0u, "combo_npc_barbarian_2h_")]
+		[InlineData(ConanClass.Conqueror, NpcWeapon.TwoHandBlunt, 0u, "combo_npc_conqueror_2h_")] // ...on the same weapon
+		[InlineData(ConanClass.Barbarian, NpcWeapon.OneHandEdge, NpcWeapon.OneHandEdge, "combo_npc_barbarian_dual_")] // dual 1h
+		[InlineData(ConanClass.Guardian, NpcWeapon.OneHandEdge, NpcWeapon.Shield, "combo_npc_guardian_shield_")] // the shield bucket
+		[InlineData(ConanClass.Guardian, NpcWeapon.Polearm, 0u, "combo_npc_guardian_polearm_")] // ...and the SAME class on a polearm
+		[InlineData(ConanClass.HeraldOfXotli, NpcWeapon.TwoHandEdge, 0u, "combo_npc_hox_")]
+		[InlineData(ConanClass.DarkTemplar, NpcWeapon.OneHandEdge, 0u, "combo_npc_dark_templar_")]
+		public async Task TheHarvestedArchetype_AnswersTheBucketsTheWeaponCannot(ConanClass @class, uint main, uint off, string family)
+		{
+			var ids = await Service().NpcClassComboIds(Equip(main, off), 80, (int)@class);
+			Assert.NotEmpty(ids);
+
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var rows = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass, c.Criteria }).ToList();
+			// Every row is the archetype's, stated by the CLIENT rather than read off the name...
+			Assert.All(rows, r => Assert.Equal((int)@class, r.NpcClass));
+			// ...and the expected weapon family is among them.
+			Assert.Contains(rows, r => r.Name.StartsWith(family, System.StringComparison.Ordinal));
+		}
+
+		// The case that refuted the weapon reading, now expressed the right way round: a shield does not make a
+		// Guardian. `Vanir Champion Elite` (9074) wears a shield and swings the Barbarian fatality rows, and with the
+		// archetype in hand it gets exactly those and none of `combo_npc_guardian_shield_*`.
+		[Fact]
+		public async Task AShieldDoesNotMakeAGuardian_TheArchetypeDoes()
+		{
+			var shieldBearer = Equip(NpcWeapon.OneHandEdge, NpcWeapon.Shield);
+
+			var barbarian = await Service().NpcClassComboIds(shieldBearer, 80, (int)ConanClass.Barbarian);
+			var guardian = await Service().NpcClassComboIds(shieldBearer, 80, (int)ConanClass.Guardian);
+
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var barbarianNames = db.Combos.Where(c => barbarian.Contains(c.Id)).Select(c => c.Name).ToList();
+			Assert.NotEmpty(barbarianNames);
+			Assert.All(barbarianNames, n => Assert.DoesNotContain("guardian", n, System.StringComparison.Ordinal));
+			Assert.Contains(barbarianNames, n => n.StartsWith("combo_npc_heimdall_", System.StringComparison.Ordinal));
+
+			Assert.Contains(db.Combos.Where(c => guardian.Contains(c.Id)).Select(c => c.Name).ToList(),
+				n => n.StartsWith("combo_npc_guardian_shield_", System.StringComparison.Ordinal));
+		}
+
+		// ⚠️ `Criteria` 28 is `2hEdge` on the GENERIC set and yet retail swings the criteria-28 CLASS rows with
+		// two-handed BLUNT weapons - LargeWarclub, Warhammer, HeavyBludgeon, SledgeHammer, BattleMaul, all in the
+		// corpus. So the widening is capture-driven; pinned here so it cannot be "tidied" back to 2hEdge.
+		[Fact]
+		public void Criteria28_IsAnyTwoHander_BecauseRetailSwingsItWithBlunts()
+		{
+			Assert.True(NpcWeapon.MeetsComboCriteria(28, Equip(NpcWeapon.TwoHandBlunt, 0)));
+			Assert.True(NpcWeapon.MeetsComboCriteria(28, Equip(NpcWeapon.TwoHandEdge, 0)));
+			Assert.False(NpcWeapon.MeetsComboCriteria(28, Equip(NpcWeapon.OneHandEdge, 0)));
+
+			// 0 is "no weapon requirement" and is what the assassin / dark-templar / hox / heimdall families carry.
+			Assert.True(NpcWeapon.MeetsComboCriteria(0, Equip(0, 0)));
+			// ...and an unseen code is refused rather than guessed at.
+			Assert.False(NpcWeapon.MeetsComboCriteria(99, Equip(NpcWeapon.TwoHandEdge, 0)));
+		}
+
+		// The shipped harvest: every stamped archetype is a class the CLIENT's own combo catalog has rows for, so a
+		// stat core can never name a family that does not exist. 36 templates over 7 classes, and the module reports
+		// zero templates voting for two classes.
+		[Fact]
+		public void EveryHarvestedArchetype_IsAClassTheComboCatalogHolds()
+		{
+			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+
+			var stamped = db.NpcStatCores.Where(c => c.ComboClass != null).Select(c => c.ComboClass!.Value).ToList();
+			var classes = db.Combos.Where(c => c.NpcClass != null && c.NpcClass >= 0).Select(c => c.NpcClass!.Value).Distinct().ToHashSet();
+
+			Assert.NotEmpty(stamped);
+			Assert.All(stamped, c => Assert.Contains(c, classes));
+			Assert.All(stamped, c => Assert.True(System.Enum.IsDefined((ConanClass)c), $"archetype {c} is not a ConanClass"));
+		}
+
 		private static IEnumerable<(uint Main, uint Off, string Expected)> Loadouts()
 		{
 			yield return (NpcWeapon.OneHandEdge, NpcWeapon.Shield, "combo_npc_generic_1he_shield");
