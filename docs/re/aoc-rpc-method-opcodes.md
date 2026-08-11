@@ -61,6 +61,14 @@ and `DecompAddrs.java` on the implementing class's override.
 captures, sent immediately before every `IntendedTeleportIIR` — resolves to an empty `GamecodeClient_t` override,
 so the client does nothing with it and the zone-change handshake is not missing a step.
 
+⚠️ **And read the DISASSEMBLY, not the decompilation, on a one-line override.** `CSPlayerInterface` `0xC3`
+(+0x310) and `0xC8` (+0x324) decompile to the identical two-line body — `FUN_005385e0(); FUN_00443c70();` — and
+were written off as indistinguishable on that basis. They are not: the decompiler drops the `LEA ECX` that
+selects WHICH signal is fired, and the two fire different ones (`instance+0x7c` vs `instance+0x84`) off the
+`CSIncoming.cpp` singleton. `FUN_005385e0` is only its `s_pcInstance != NULL` accessor and `FUN_00443c70` the
+generic signal-emit loop, so on those two functions the whole difference sits in the dropped instruction. Naming
+them needs the SUBSCRIBER of each signal, which is not reachable from the singleton's three xrefs.
+
 ## s2c (server->client) tables
 `<no-arg>` = an inserted method with no body fields (no `stream bad` string); its opcode slot is known
 but its name is not recoverable FROM STRINGS (catalog also missed it) — see the vtable route above.
