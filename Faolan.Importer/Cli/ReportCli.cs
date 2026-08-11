@@ -90,6 +90,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB (LDB 51000) + DB, no corpus: can the client name the creature behind an unresolved `Name`-category
+			// spawn group? (#684 - the group->creature link is recoverable statically; the STATS are not.)
+			if (report == "name-group-templates")
+			{
+				await NameGroupTemplates(RdbDir());
+				return 0;
+			}
+
 			// RDB (+ DB for the cross-checks), no corpus: the bounded-area trigger-volume survey (#513).
 			if (report == "bounded-areas")
 			{

@@ -339,6 +339,13 @@ groups, which is the #518 question),
 row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
 line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;
 see [chat.md](../subsystems/chat.md)),
+`name-group-templates` (can the CLIENT name the creature behind an unresolved `Name`-category spawn group, #684?
+`LDB[51000]` is the NPC-template name table, keyed BY TEMPLATE ID, so reading it backwards answers exactly what the
+spawn-area resolver's tier 1 asks. Of the 31 unresolved creatures, **11 resolve to one template id** and 7 more are
+named but not uniquely — several templates share a string, and the 4-char tag beside the name does not break the tie
+(`Shark (H8AV)` and `Coast Shark (H8AV)` share one). ⚠️ Read-only by design: a template id plus a display name is an
+IDENTITY, not an entity — level, health, model and faction are still capture-bound — so writing a stats-less
+`NpcTemplate` would ship a creature that spawns WRONG rather than one that is absent),
 `bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
 bucket and cross-checks it against what we already hold; see
 [bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)),
