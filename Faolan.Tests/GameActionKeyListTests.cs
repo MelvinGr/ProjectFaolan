@@ -41,6 +41,35 @@ namespace Faolan.Tests
 			}
 		}
 
+		// ⭐ #485: `widthWords = 8 + keyCount`, on all 260 rows with no exception - so the descriptor's own WIDTH
+		// states how many keys the type has, and it is readable statically even where the key ARRAY is not.
+		//
+		// That settles the ticket's open question the other way round. The artifact's header used to warn that the
+		// 57 blank `keys` cells were blank "because the descriptor table is BSS - filled at runtime, so a static read
+		// sees zeros" and that they "need a live dump". They do not: every blank row reads width EXACTLY 8, the
+		// header-only size, and the blank set is EXACTLY the width-8 set. A row whose key array was hidden but
+		// non-empty would show width > 8 with no keys beside it, and there is not one. So those 57 types genuinely
+		// carry no fields - `StartFlymode` (53138) among them, which is what makes the empty key list `.fly` sends
+		// correct rather than an assumption.
+		[Fact]
+		public void DescriptorWidth_IsEightPlusTheKeyCount_SoABlankKeyListMeansNoKeys()
+		{
+			var widths = new List<(uint Id, int Width, int Keys)>();
+			foreach (var line in Rows(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")))
+			{
+				var f = line.Split('	');
+				widths.Add((uint.Parse(f[0]), int.Parse(f[4]), f[5].Length == 0 ? 0 : f[5].Split(';').Length));
+			}
+
+			var broken = widths.Where(w => w.Width != 8 + w.Keys).Select(w => $"type {w.Id}: width {w.Width}, {w.Keys} key(s)").ToList();
+			Assert.True(broken.Count == 0, "widthWords must be 8 + keyCount:\n  " + string.Join("\n  ", broken));
+
+			// ...and the blank rows are exactly the width-8 ones, which is what turns "we could not read them" into
+			// "there is nothing to read".
+			Assert.Equal(widths.Count(w => w.Keys == 0), widths.Count(w => w.Width == 8));
+			Assert.Empty(GameActionTypes.Get(53138)!.Keys); // StartFlymode - the .fly element
+		}
+
 		// A descriptor's key list holds an INDEX; the element reader resolves it through the client's key table
 		// (`DAT_025073c0`, built by `FUN_00897bd0`) to the real property key, which is an ordinary STAT id. The
 		// `statKeys` column carries that resolution, and the mapping is a property of the INDEX - so the same index
