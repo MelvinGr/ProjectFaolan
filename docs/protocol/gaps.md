@@ -427,13 +427,3 @@ entirely PvE — beach, Tortage, Ymir's Pass. Yet over the captured `StatIIR` st
 39, and only `1000070` caps (at exactly 20). Either the name↔id pairing is off by one or `1000070` counts all
 kills; the corpus cannot separate those without a PvP session, which is the capture that would close it.
 
-
-### Two Tarantia wagons with different max health under one name
-**Tracked: Gitea #798.** [V0: why two Tarantia wagons carry different max health under one name] The
-destructible trailer's word 1 is the object's **max health**, and it is a per-template constant across all 976
-shipped destructibles — every object sharing a name shares a max — with exactly one exception: two `Wagon` rows
-in Tarantia Common District ship at **58,000** and **62,000**. Nothing in the columns separates them (same
-display id, same display category, same map), so the reading is that the wire `name` string is not identity
-(the same string-vs-identity split #734 found on the harvest nodes) and these are two templates wearing one
-name. `DestructibleHealthTests.MaxHealth_IsConstantWithinAName_ExceptTheTarantiaWagons` pins the exception so a
-re-import that removes it — or adds a second one — has to say so.

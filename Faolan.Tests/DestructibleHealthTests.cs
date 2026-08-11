@@ -60,23 +60,41 @@ namespace Faolan.Tests
 		// `HarvestCatalog.NodeMaxHealth` a discriminator rather than a coincidence, and it is the claim that would fail
 		// first if word 1 were something per-instance.
 		//
-		// ⚠️ ONE name breaks it, and it is left as a real exception rather than smoothed over: two `Wagon`s in Tarantia
-		// Common District ship at 58,000 and 62,000. Whatever varies there is not visible in the columns (same display
-		// id, same category, same map), so the honest reading is that the max is a per-TEMPLATE constant and those two
-		// wagons are different templates that happen to share a wire name - the same string-vs-identity split #734
-		// found on the nodes. [V0: why two Tarantia wagons carry different max health under one name]
+		// ⭐ ONE name breaks it - two `Wagon`s in Tarantia Common District at 58,000 and 62,000 - and it is **not** an
+		// unexplained exception (#798). It used to be recorded as one, on the belief that nothing in the columns
+		// separated them. Something does: their `DisplayId`s are **278481 and 278482**, two different entries of LDB
+		// category 55000, and both read `Wagon` in every one of the seven shipped languages (German `Wagen`, French
+		// `Chariot`, Spanish `Carromato`, Russian `Повозка`, Polish `Wóz`, Korean `짐마차`).
+		//
+		// So they are two distinct display IDENTITIES wearing one text, and the max stays a per-template constant -
+		// the string-vs-identity split #734 found on the nodes, here with the discriminating column named.
+		//
+		// ⚠️ The two columns are different things and that is what the old reading missed: `Name` is the wire's own
+		// INTERNAL name (ProtoSimpleDynelIIR field 2, never localized - one object on map 1010 is called
+		// `Blacksmithing Hammer TESTITEM` and displays as `Cotton Shrub`), while `DisplayId` is the localized
+		// reference the player actually reads (field 3). Grouping by `Name` therefore merges identities on purpose;
+		// it is the right grouping for "is the max a category?" and the wrong one for "are these the same object".
+		//
+		// The test asserts the explanation rather than pinning the exception: the split name's rows must differ in
+		// `DisplayId`, and each `DisplayId` must carry ONE max - so a genuinely unexplained split (one DisplayId, two
+		// maxima) fails here instead of being absorbed by the allowance.
 		[Fact]
-		public async Task MaxHealth_IsConstantWithinAName_ExceptTheTarantiaWagons()
+		public async Task MaxHealth_IsConstantWithinAName_AndTheTarantiaWagonsAreTwoNameIds()
 		{
 			var rows = await LoadDestructibles();
 
 			var split = rows.GroupBy(r => r.Name)
-				.Select(g => (Name: g.Key, Maxima: g.Select(r => Trailer(r)[WorldObjectGeometryColumns.HealthMaxWord]).Distinct().Order().ToList()))
+				.Select(g => (Name: g.Key, Rows: g.ToList(), Maxima: g.Select(r => Trailer(r)[WorldObjectGeometryColumns.HealthMaxWord]).Distinct().Order().ToList()))
 				.Where(x => x.Maxima.Count > 1)
 				.ToList();
 
 			Assert.Equal(["Wagon"], split.Select(x => x.Name));
 			Assert.Equal([58_000u, 62_000u], split[0].Maxima);
+
+			// The explanation: as many distinct name ids as there are maxima, so the max is still one per identity.
+			Assert.Equal([278481u, 278482u], split[0].Rows.Select(r => r.DisplayId).Distinct().Order().ToList());
+			Assert.All(split[0].Rows.GroupBy(r => r.DisplayId),
+				g => Assert.Single(g.Select(r => Trailer(r)[WorldObjectGeometryColumns.HealthMaxWord]).Distinct()));
 		}
 
 		// The harvest half, stated the way the subsystem relies on it: a node is exactly the 1000-max band, and the
