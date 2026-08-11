@@ -26,8 +26,13 @@ namespace Faolan.Importer.Cli
 			bool Mount, bool Area, bool Combo, bool Proc, bool Criteria, bool Elements, bool CastNano, uint Id,
 			uint RawField8, string Name);
 
-		// The bit the sweep singles out - `--report spell-flags` scores its excess over chance at three times the
-		// control's, which is what promoted it from "a 99.07% lead" (#632).
+		// ⭐ NAMED (#632): bit 16 GATES THE CLIENT'S TIMED-EFFECT PATH. `FUN_007ee710`'s bit-set branch is the only
+		// place that computes a duration at all - it fetches stat 0x1D0 `DurationModifier`, scales by it and by 0.01,
+		// and lands the result in a longlong time. The sweep had it as a 99.07% association with "the record carries
+		// field 8"; the client turns that into a mechanism, and the mechanism explains the residual the association
+		// could not: the 131 records that state a duration with the bit CLEAR store a value that is NEVER APPLIED,
+		// because the code that would apply it sits behind the bit. `VisualBuffTest` heading that list is what a
+		// never-applied duration looks like. See docs/rdb/spell-record-fields.md.
 		private const int DurationBit = 16;
 
 		// The spell record's own duration property (`docs/rdb/spell-record-fields.md`).

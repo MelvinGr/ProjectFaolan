@@ -103,8 +103,8 @@ the yardstick every other row is read against.
 |---:|---:|---|
 | 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control |
 | 24 | 3,189 | **hide from tooltip** (#789) — from the client's own `FUN_014a3b30` |
-| 16 | 11,610 | tracks "carries a duration"; the **strongest** association in the word — see below |
-| 25 | 185 | a strict SUBSET of the duration-carrying records (185/185, no exceptions) |
+| 16 | 11,610 | **gates the timed-effect path** — the client only computes and applies a duration behind it (#632, below) |
+| 25 | 185 | a strict SUBSET of the duration-carrying records (185/185) — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
 
 ### ⚠️ The raw agreement percentage is the wrong measure, and it inverted the answer
 
@@ -129,20 +129,70 @@ disproves it (`VisualBuffTest`, `Avert Thine Eyes (Rank 1-3)`, `TRIGGER Environm
 it is not a threshold: field 8's median is 1,550 on the agreeing set against 1,300 on the disagreeing one, over
 the same range. Measured against the record's OWN field 8, so it cannot be a `DurationMs` column blend.
 
-### ⭐ The route in is the CLIENT, and it is now located
+### ⭐ The route in is the CLIENT, and bit 16 is NAMED: it GATES THE DURATION
 
-The client keeps the flags word at `spell + 0xC8` and tests its bits as bytes — #789 found bit 24 as
-`MOV BL, byte ptr [EAX + 0xCB]; AND BL, 1`. So **bit 16 is `byte [spell + 0xCA] & 1`**, and exactly three
-functions in the image test it:
+The client keeps the flags word at `spell + 0xC8`. #789 found bit 24 as `MOV BL, byte ptr [EAX + 0xCB]; AND BL, 1`,
+so **bit 16 is `byte [spell + 0xCA] & 1`** — and `FUN_007ee710`'s bit-set branch is what it is for:
 
-| | |
-|---|---|
-| `FUN_007f43a0` | in `CoreMagicHolder::Magic`. Takes the bit-set branch to apply something keyed on **stat 150 `CastingLevel`**, and passes `(*(uint *)(spell + 0xC8) >> 0x14) & 1` — **bit 20** of the same word — into the call beside it |
-| `FUN_007f4df0` | guards on the bit being CLEAR |
-| `FUN_008da660` | likewise |
+```c
+if (spell != 0 && (*(byte *)(spell + 0xCA) & 1) != 0) {     // <- bit 16
+    FUN_007ed310(local_68, param_1, in_EDX[1]);
+    ...
+    iVar7  = (**(code **)(... + 0x10c))(0x1d0, 2);          // GetStat(0x1D0 DurationModifier)
+    fVar1  = (float)(int)(iVar7 * local_60);
+    local_74 = (longlong)ROUND(fVar1 * 0.01);               // the applied duration
+}
+```
 
-That is three named functions to read, instead of another sweep of 32 bits against predicates — and it hands
-bit 20 over with a consumer already attached.
+**Stat `0x1D0` is `DurationModifier`** (the client's own stat-name table), the result is scaled `× 0.01` and lands
+in a `longlong` — a time. So bit 16 gates the **timed-effect path**: the branch that computes and applies a
+duration at all.
+
+⭐ **That turns the 99.07% from a correlation into a mechanism, and it explains the residual's asymmetry** — the
+thing the sweep could not do. The **131 records that state a duration with the bit CLEAR** are not
+counterexamples: their field 8 is stored and *never applied*, because the code that would apply it is behind the
+bit. `VisualBuffTest` heading that list is exactly what a never-applied duration looks like. And the 62 the other
+way are a bit set over a zero duration, which multiplies out to nothing.
+
+⚠️ **This is a naming, not a proof of exhaustiveness.** Six functions in the magic subsystem test the byte
+spelling (`FUN_007ea480`, `FUN_007ebe70`, `FUN_007eddc0`, `FUN_007ee710`, `FUN_007f43a0`, `FUN_007f4df0`, plus
+`FUN_008da660`); the duration computation above is in one of them, and the others are guards on the same
+condition rather than second meanings.
+
+### The bits the client READS AT ALL — the census, and why it needed a second spelling
+
+[`DumpFlagBitReads.java`](../../tools/ghidra/DumpFlagBitReads.java) enumerates every bit of the word the client
+reads, anywhere in the image. That is a different question from the predicate sweep and a more basic one: **a bit
+nothing reads is not a decode gap**, while a bit read in fifteen places is a lead with fifteen contexts attached.
+
+⚠️ **A bit test has two spellings, and a census that knows only one lies.** The client writes both, for the *same*
+bit:
+
+```
+MOVZX EAX, byte ptr [ESI + 0xCA] ; AND AL,1                    <- byte form, bit 16
+MOV   EAX, dword ptr [ESI + 0xC8] ; SHR EAX,0x10 ; AND EAX,1   <- shift-and-mask, the same bit
+```
+
+A scan for the byte form alone finds 14 sites for this whole word; most of it is read the other way. Walking both,
+**21 of the 32 bits are read somewhere**, and the count per bit is the ranking:
+
+```
+bit  0  x1     bit  1  x17    bit  2  x7     bit  3  x3     bit  4  x1
+bit  5  x4     bit  6  x4     bit  7  x3     bit  8  x7     bit 11  x1
+bit 14  x4     bit 15  x15    bit 16  x4     bit 19  x1     bit 20  x5
+bit 21  x2     bit 23  x1     bit 24  x3     bit 26  x2     bit 29  x1     bit 30  x1
+```
+
+**Bits 9, 10, 12, 13, 17, 18, 22, 25, 27, 28 and 31 are read nowhere** — including bit 25, which the predicate
+sweep flagged as a clean 185/185 subset of the duration-carrying records. A bit the client never reads cannot
+mean anything to the client, so that entry is a property of the DATA (a subset relation among stored values), not
+of the protocol.
+
+⚠️ The tool cannot know the base register holds a spell — `+0xC8` is a common displacement — so read the
+**addresses**, not the counts. The magic subsystem's own range (`0x0076xxxx`–`0x008Dxxxx`, plus the tooltip
+builder at `0x0149xxxx`–`0x014Axxxx`) is where the known bits 2, 16 and 24 all land, and it is the range a new
+lead has to land in before it is about this word at all. Bits 1 (x17) and 15 (x15) are the next two worth
+reading, and both have most of their sites there.
 
 ### ⭐ Read: bit 16 gates RE-INSTANTIATING a magic on the SPAWN path
 
