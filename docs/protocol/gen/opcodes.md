@@ -371,7 +371,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xC4` | `0x20C4` | `DispatchGroupFinderSignupSuccess` |  |
 | `0xC5` | `0x20C5` | `DispatchGroupFinderRemoved` |  |
 | `0xC6` | `0x20C6` | `DispatchGroupFinderReadyCheck` |  |
-| `0xC7` | `0x20C7` | `Reserved0xC7` |  |
+| `0xC7` | `0x20C7` | `DispatchVoteRetreatStarted` |  |
 | `0xC8` | `0x20C8` | `DispatchGroupFinderActivityStarted` |  |
 | `0xC9` | `0x20C9` | `DispatchGroupFinderReadyCheckStatus` |  |
 | `0xCA` | `0x20CA` | `DispatchGroupFinderReadyCheckRejected` |  |

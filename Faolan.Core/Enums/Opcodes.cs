@@ -416,7 +416,13 @@ namespace Faolan.Core.Enums
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
-		Reserved0xC7 = 0xC7,
+		// #801: the third no-arg method in this block, and the ONE nameable by the ordinary route rather than by
+		// its subscriber - its handler (vtable +0x320 -> `FUN_00538220`) is not a signal-only stub but 400 bytes
+		// that fetch an LDB category-100 token and put it on screen: `PUSH 0x64; MOV ESI,0x1fa406c` =
+		// **`VoteRetreatStarted`**. It then arms a timer callback (`FUN_0053ef20(..., FUN_005383b0, ...)`), which is
+		// the vote window. Sweeping every `Reserved*` slot of this interface for the same `PUSH 0x64` + token shape
+		// finds only this one, so the rest genuinely put nothing on screen.
+		DispatchVoteRetreatStarted = 0xC7,
 		// #801: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, subscribed by the same GUI
 		// block with the handler `FUN_014f07c0`, which sets the "in a group-finder activity" flag
 		// (`DAT_0297d14d`, cleared again by `DispatchGroupFinderRemoved`) and raises the ActionScript signal

@@ -100,6 +100,14 @@ So:
 | `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderRoleSelect` (ours — the window's, not the catalog's) |
 | `0xC8` | `+0x84` | `FUN_014f07c0` | sets the "in an activity" flag `DAT_0297d14d` and raises `SignalClientStartedGroupFinderActivity` | `DispatchGroupFinderActivityStarted` |
 
+⚠️ **And the third `Reserved` in the same block did NOT need any of this.** `0xC7`'s override is not a signal-only
+stub at all — 400 bytes that fetch an LDB **category-100** token and draw it (`PUSH 0x64; MOV ESI,0x1fa406c` =
+`VoteRetreatStarted`), then arm the vote's timer. That is the ORDINARY route from #737/#792, and it was never
+tried on `0xC7` because `0xC3`/`0xC8` sitting either side of it made the whole block look like one problem.
+Sweeping every `Reserved*` slot of this interface for the same `PUSH 0x64` + token shape finds only this one, so
+the remaining `Reserved` members really do put nothing on screen — **check the cheap route on each slot
+separately before concluding a block needs the expensive one.**
+
 Both readings agree with where the two sit in the capture: `0xC3` between a successful `QueueGroupFinder` and the
 client's `SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTeam`. A control from the same
 block: `0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
@@ -557,7 +565,7 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20C4  DispatchGroupFinderSignupSuccess
 0x20C5  DispatchGroupFinderRemoved
 0x20C6  DispatchGroupFinderReadyCheck
-0x20C7  <no-arg>
+0x20C7  <no-arg>  (#801: resolved - its handler puts the LDB-100 token `VoteRetreatStarted` on screen; `DispatchVoteRetreatStarted`)
 0x20C8  <no-arg>  (#801: resolved - raises `SignalClientStartedGroupFinderActivity`; `DispatchGroupFinderActivityStarted`)
 0x20C9  DispatchGroupFinderReadyCheckStatus
 0x20CA  DispatchGroupFinderReadyCheckRejected
