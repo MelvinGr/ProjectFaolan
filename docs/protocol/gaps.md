@@ -208,19 +208,26 @@ is the client-side NAMES that are missing, which needs the CsPlayerInterface/Gam
 identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
 value's id SPACE is not.
 
-What the client does with it is no longer a guess. `FriendListNode_c`'s buddy-apply (`FUN_006ca170`, anchored on its
-own `m_nCharacterId == cBuddy.nUserId` assert in `FriendListNode.cpp:118`) copies three of the `ppj::Buddy_t` dwords
-straight through and treats this one differently: it uses it as a **key into a global id→string map**
-(`FUN_0043ac00`, an rbtree find on the singleton at `DAT_03c03100`) and renders the hit's string — falling back to the
-literal `"unknown"` on a miss. So it is an **id whose NAME the client displays**, not a time (which also explains why
-`0x01EDA8B2` reading as 1971-01-10 never made sense), and five friends sharing one value with a sixth 1761 apart is
-five people in one named place and one elsewhere.
+⚠️ **This entry used to say the stamp is a key into a global id→string map. That was a MIS-ATTRIBUTION and is
+withdrawn.** The map is real — `FUN_0043ac00`, an rbtree find on the singleton at `DAT_03c03100` — and it is now
+named: `FUN_0138b7c0` fills it by dynamic-casting to **`RDBPlayerClassData_c`**, i.e. the **class registry**
+(`[u32 classId][string name][u32 tier]`, 17 records, ids `0x00`–`0x2C` — see
+[`client-data-tables.md`](../rdb/client-data-tables.md)). Its key is `ppj::Buddy_t` dword **9**, and dword 9 is the
+record's **class byte**, not the stamp. So that lookup renders the friend's CLASS NAME, and `"unknown"` is what an
+unrecognised class id shows — it says nothing about the stamp.
 
-What is left is naming the map: identify what fills `DAT_03c03100` (populated via `FUN_01389630` / `FUN_0138b7c0`)
-and the id space follows. ⚠️ Note the magnitude while doing it — `0x01EDA8B2` is ~32M, the same order as a
-**playfield token** (`0x004FE428`, `0x0802ABCD`) and nothing like a `Maps.Id` (4000, 4010, 11040); if it is the
-playfield table, the key is the token rather than the map id. We send the captured constant for every online friend,
-so today every online friend renders as whatever that id happens to name.
+⭐ **The client's own parser confirms the whole record and splits the stamp itself.** The `S2C_ADD_BUDDY` case of
+`FUN_00a71e00` unpacks it with the format string **`"IBBIB"`** — exactly `[u32 id][u8 online][u8 level][u32 stamp]
+[u8 class]` — and then stores the stamp in **two different members depending on the online flag**: offline into
+`Buddy_t[10]`, online into `Buddy_t[12]`. Two slots means two meanings, stated by the client rather than inferred,
+which is direct support for the union reading. The buddy-apply copies `[8]` (level), `[11]` (online) and `[10]`
+(the offline last-seen) and never touches `[12]` at all, so whatever consumes the ONLINE stamp is not the list node.
+
+What is left is therefore narrower than it was: find the reader of `Buddy_t[12]`. The standing reading is a
+**playfield-instance token** — `TeamMemberRecord` embeds a `PlayfieldProxy` carrying this exact `0x01EDA8B2` in its
+instance-token slot (Gitea #454), and the distribution agrees (five of six captured friends share it, one carries
+`0x01EDAF93`, 1761 higher: five players in one instance and one in another). Nothing has refuted it and nothing has
+confirmed it in-client.
 
 
 ### The skill-point curve above level 1, 5, 23, 24 and 80

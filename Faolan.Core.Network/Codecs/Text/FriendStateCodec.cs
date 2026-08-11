@@ -12,12 +12,18 @@ namespace Faolan.Core.Network.Codecs.Text
 	//
 	//   [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]
 	//
+	// ⭐ The CLIENT states that layout, so it is no longer read off the captures alone (#796): the `S2C_ADD_BUDDY`
+	// case of `FUN_00a71e00` unpacks the message with the format string **`"IBBIB"`** - u32, u8, u8, u32, u8, in
+	// exactly this order.
+	//
 	// LEVEL and CLASS are BOTH here, which is what the client's hover tooltip shows. The level byte was read as a
 	// constant 0x05 until six friends of differing levels made it obvious, and that also settled the trailing byte:
 	// all six values are valid Class ids (HeraldOfXotli, BearShaman, Demonologist, TempestOfSet, Demonologist,
 	// Barbarian) while the level byte reads 7/10/5/8/10/5.
 	//
-	// The STAMP is a UNION on the online flag:
+	// ⭐⭐ The STAMP is a UNION on the online flag, and the CLIENT SPLITS IT ITSELF (#796). The same parser stores
+	// it in two DIFFERENT members of `ppj::Buddy_t` depending on the flag - offline into `[10]`, online into `[12]`.
+	// Two slots is the client saying "two meanings", which is what turns the union from a reading into a fact:
 	//   OFFLINE -> a unix LAST-SEEN. The captured offline friend's 0x6A64AD51 is 2026-07-25 12:34:25 UTC, 2h06 before
 	//              that capture was taken, which is what identified it. We send Character.LastConnection.
 	//   ONLINE  -> a PLAYFIELD-INSTANCE TOKEN, i.e. which playfield instance the friend is in. Definitely not a
@@ -25,8 +31,15 @@ namespace Faolan.Core.Network.Codecs.Text
 	//              PlayfieldProxy carrying this exact value in its instance-token slot (Gitea #454), and the
 	//              distribution here agrees: five of the six captured friends share 0x01EDA8B2 and one carries
 	//              0x01EDAF93, 1761 higher - five players in one instance and one in another, which is what a
-	//              token does and what neither a constant nor a per-friend id would. Gitea #426. [V0 - structural,
+	//              token does and what neither a constant nor a per-friend id would. Gitea #796. [V0 - structural,
 	//              not yet checked in-client.]
+	//
+	// ⚠️ The ONLINE half is NOT what the friend-list node renders. `FriendListNode_c`'s buddy-apply (`FUN_006ca170`)
+	// reads `[8]` (level), `[11]` (online) and `[10]` (the OFFLINE last-seen) and never touches `[12]`. It also does
+	// one map lookup, and that lookup was once mis-attributed to this stamp: it keys on `[9]`, the CLASS byte, against
+	// the `RDBPlayerClassData_c` class registry, and renders the class NAME (`"unknown"` on a miss). So the online
+	// token is consumed somewhere else entirely, and `"unknown"` in the friend list is a class-id problem, never a
+	// stamp one.
 	//
 	// GuildService's member record already carries the same online/last-seen union off the same column.
 	public static class FriendStateCodec
