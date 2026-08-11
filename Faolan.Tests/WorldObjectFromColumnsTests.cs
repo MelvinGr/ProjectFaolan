@@ -72,6 +72,48 @@ namespace Faolan.Tests
 		}
 
 
+		// #498: the destructible trailer's word 0 is its CURRENT health, and the live value is stamped over the
+		// captured one - the health twin of the door's live `isClosed`. This pins BOTH halves of that claim: the word
+		// really is at the end-of-body position the grammar says, and passing the live value changes NOTHING ELSE.
+		//
+		// ⚠️ The second half is the load-bearing one. 142 of the 193 shipped harvest nodes were captured mid-harvest
+		// (one at 1/1000), so a build that replays the captured word renders most of a zone's nodes empty while the
+		// server holds them full - and a stamp that disturbed any other byte would break the round-trip gate above
+		// without this test saying which change did it.
+		[Fact]
+		public void Build_StampsLiveHealth_OverTheCapturedCurrentWord_AndNothingElse()
+		{
+			var capturedBody = Golden.Bytes("WorldObjDestructible");
+			var row = RowFromCapturedBody(capturedBody);
+			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
+			var token = ReadToken(capturedBody);
+
+			var verbatim = WorldObjectCodec.Build(row, handle, token);
+			var stamped = WorldObjectCodec.Build(row, handle, token, true, 424u);
+
+			Assert.Equal(verbatim.Length, stamped.Length);
+
+			// The trailer is 5 u32 at the very end, and `HealthCurrentWord` is its first - so the byte range is
+			// [len - 20, len - 16). Computed from the constants, never from a literal offset.
+			var start = stamped.Length - (TrailerWords * 4) + (WorldObjectGeometryColumns.HealthCurrentWord * 4);
+			Assert.Equal(424u, stamped.ReadU32Be(start));
+
+			for (var i = 0; i < stamped.Length; i++)
+			{
+				if (i >= start && i < start + 4)
+					continue;
+
+				Assert.Equal(verbatim[i], stamped[i]);
+			}
+
+			// And the MAX beside it is untouched by the stamp: whatever the capture recorded is what the client gets,
+			// which is what makes the max the category discriminator HarvestCatalog leans on.
+			Assert.Equal(verbatim.ReadU32Be(start + 4), stamped.ReadU32Be(start + 4));
+		}
+
+		// Destructible's per-class trailer length, from the class grammar (docs/re/iir-readers-combat-world.md).
+		private const int TrailerWords = 5;
+
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the transform (offset 60).
 		private static uint ReadToken(byte[] body)
 		{

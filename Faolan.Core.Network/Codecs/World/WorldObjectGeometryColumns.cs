@@ -22,21 +22,43 @@ namespace Faolan.Core.Network.Codecs.World
 	// followed by the PER-CLASS trailer, which is what makes the record's length vary by object class: none for
 	// SimpleDynel, 5 u32 for Destructible, 1 for Door and Climbing. Those are WorldObjectWord rows.
 	//
+	// ⭐ The DESTRUCTIBLE trailer's first two words are the object's HEALTH PAIR (#498) - `[0] = current`,
+	// `[1] = max`, and `[2..4]` are 0 on all 976 captured destructibles. Measured over the shipped rows, and the
+	// populations name themselves:
+	//
+	//   max        rows  what they are
+	//   1,000,000   524  Poitain's `Location Object - Keep / Walls / Towers / Tavern / ...` - the UNBUILT guild-city
+	//                    plot markers ("at the site, there is a marker stone", LDB 50020/689), uniform and undamaged
+	//   1,000       193  harvest nodes (#494) - the ONE band where current varies, 142 of them mid-harvest
+	//   100M..300M  221  Border Kingdoms' BUILT battlekeep, tiered in the name and in the health:
+	//                      wall 100M (II) / 150M (III) · tower 125M / 175M · building 150M / 200M · `Keep III` 300M
+	//
+	// So the health pair is also the category discriminator `HarvestCatalog` already relies on, and the tier ladder
+	// is +50M per tier with a +25M step per class. See docs/subsystems/guilds.md.
+	//
 	// LootBag (chests) is the exception and is NOT handled here: its trailer is the container's loot CONTENTS
 	// ([u32 len][ProtoLootBagIIR]), which is session state, not placement truth - the captured contents are
 	// deliberately not persisted and WorldObjectCodec appends a clean empty scaffold instead (LootContainerTemplate,
 	// which already worked this way for spawned bags).
-	// NOT a codec, deliberately: this is the WorldObject COLUMNS <-> that region mapping, and the region's length
-	// depends on the row's object class (the per-class trailer below), so it is not a standalone message with a
-	// self-describing body. Row<->value mapping is #533's subject; #530 rule 1 leaves it named for what it is.
+	//
 	// NOT a codec, deliberately (#530 rule 1): this is the WorldObject COLUMNS <-> that region mapping, and the
 	// region's length depends on the row's object CLASS (the per-class trailer below), so it is not a standalone
 	// message with a self-describing body. Row<->value mapping is #533's subject.
 	public static class WorldObjectGeometryColumns
 	{
+		// The two named slots of the Destructible trailer (see the class comment). Trailer ordinals, not byte offsets.
+		public const int HealthCurrentWord = 0;
+		public const int HealthMaxWord = 1;
+
 		// An object with no bounds writes an INVERTED box rather than zeros: min = +FLT_MAX, max = -FLT_MAX. Kept as
 		// the actual float values in the columns (no sentinel translation) so the record round-trips bit-for-bit.
-		public static byte[] ToWire(WorldObject row)
+		//
+		// `currentHealth` is the object's LIVE health, stamped over the captured `HealthCurrentWord` - the health twin
+		// of the door's live `isClosed` (#598). Null (the import/round-trip path) writes the row verbatim.
+		// ⚠️ It is load-bearing, not cosmetic: 142 of the 193 shipped harvest nodes were CAPTURED mid-harvest, one of
+		// them at 1/1000, so without this a fresh zone renders most of its nodes empty while the server holds them
+		// full - a node the player can still harvest ten times but whose bar reads 0%.
+		public static byte[] ToWire(WorldObject row, uint? currentHealth = null)
 		{
 			var name = row.GeometryName ?? "";
 			var nodes = row.Words.Where(w => w.Kind == WorldObjectWordKind.GeometryNode).OrderBy(w => w.Ordinal).Select(w => w.Value).ToArray();
@@ -67,7 +89,9 @@ namespace Faolan.Core.Network.Codecs.World
 					: (byte)0);
 
 			foreach (var word in row.Words.Where(w => w.Kind == WorldObjectWordKind.Trailer).OrderBy(w => w.Ordinal))
-				stream.WriteUInt32(word.Value);
+				stream.WriteUInt32(currentHealth is { } live && word.Ordinal == HealthCurrentWord
+					? live
+					: word.Value);
 
 			return stream.ToArray();
 		}

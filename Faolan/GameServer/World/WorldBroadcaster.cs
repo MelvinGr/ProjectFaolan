@@ -321,7 +321,9 @@ namespace Faolan.GameServer.World
 		{
 			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				// The door state comes from the LIVE object, not the row (#598) - a door this zone has open streams open.
-				s => s.WriteArrayUInt32Length(WorldObjectCodec.Build(obj.Row, obj.Handle, playfieldToken, obj.IsClosed)));
+				// So does a destructible's health (#498): 142 of the 193 shipped harvest nodes were captured MID-HARVEST,
+				// so replaying the captured word rendered most of a zone's nodes empty while the server held them full.
+				s => s.WriteArrayUInt32Length(WorldObjectCodec.Build(obj.Row, obj.Handle, playfieldToken, obj.IsClosed, obj.Health)));
 		}
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from

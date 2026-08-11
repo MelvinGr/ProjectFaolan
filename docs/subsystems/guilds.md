@@ -344,3 +344,41 @@ not — the client's own method signatures name every field, and they are alread
 `DispatchGuildCityBookingFailed(i_nErrorCode)` (`0x6C`). The layouts are tabulated in
 `docs/re/minigame-massivepvp-messages.md`. What a capture would still add is the *placement* data — which
 `PlayfieldModelID`s are bookable spots — not the grammar.
+
+### Guild-city plots and battlekeeps on the wire (#498)
+
+Every plot piece is an ordinary `DestructibleFullUpdateIIR` world object — the same message a harvest node uses
+(#494) — and the two populations are separated by the **health pair in the destructible trailer**, whose first
+two words are `[0] = current`, `[1] = max` (`WorldObjectGeometryColumns.HealthCurrentWord`/`HealthMaxWord`;
+words `[2..4]` are 0 on all 976 captured destructibles). Over the shipped rows:
+
+| max health | rows | what it is |
+|---:|---:|---|
+| 1,000,000 | 524 | **Poitain's unbuilt plot markers** — `Location Object - Keep / Walls / Curved Wall / Staired Wall / Towers / Corner Tower / Ending Tower / Gate / Centerpiece / Decoration / Profession / Tavern / Temple / Tradepost / Megalith`. Uniform and never damaged. |
+| 1,000 | 193 | harvest nodes (#494) — the one band whose `current` varies |
+| 100M–300M | 221 | **the Border Kingdoms battlekeep, BUILT** |
+
+The marker set *is* the build menu, and Poitain is one of the three booking zones the client's own help book
+names (LDB `50020`/`689`), so the 1,000,000 band is the ground truth for what a bookable spot looks like: the
+"marker stone" that help entry tells you to right-click.
+
+The built keep, on map 11040 (Border Kingdoms, Cimmerian End), carries the **tier in both the name and the
+health** — `Wall II` → `Wall III` — and the ladder is regular:
+
+| | wall | tower | building (Temple, Barracks, Library, Trade Post, the four workshops, Thieves' Guild) | keep |
+|---|---:|---:|---:|---:|
+| tier II | 100M | 125M | 150M | — |
+| tier III | 150M | 175M | 200M | 300M |
+
+So a tier step is +50M and a class step is +25M. That answers #498's three scope bullets: the body was already
+decoded (`WorldObjectCodec`, byte-exact), **construction/upgrade state is the tier suffix plus the health band**,
+and these are ordinary **world objects, not per-guild instances** — the full update carries no owner at all.
+Ownership rides its own message, `GuildCityOwnershipChange(const std::vector<ID32>& i_cMembers, bool
+i_bNewValue)` (GameCharAgent `0x15`), which names *members*, not objects.
+
+⚠️ **The decode exposed a live bug.** 142 of the 193 shipped harvest nodes were **captured mid-harvest** (one at
+`1/1000`), and the send path replayed the captured word verbatim — so a fresh zone rendered most of its nodes
+empty while the server held them full, and an "exhausted"-looking node was still harvestable ten times.
+`WorldObjectCodec.Build` now takes the object's **live** `currentHealth` and stamps it over the captured word,
+exactly as it already did for a door's live `isClosed` (#598). The captured rows are untouched; only the send
+corrects.
