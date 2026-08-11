@@ -385,7 +385,7 @@ namespace Faolan.Importer.Cli
 
 				case "spawn-animation":
 				{
-					SpawnAnimation(NamedCapture.LoadAll(capturesDir));
+					SpawnAnimation(NamedCapture.LoadAll(capturesDir), _options.Configuration[Keys.ContentRdbDir]);
 					return 0;
 				}
 

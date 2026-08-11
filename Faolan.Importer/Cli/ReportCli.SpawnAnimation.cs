@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Rdb;
+using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
@@ -63,17 +67,34 @@ namespace Faolan.Importer.Cli
 	// flag names a concrete per-creature ENTRANCE ANIMATION the client already holds, and "play it" is only meaningful
 	// while it is still running.
 	//
-	// ⚠️ HOW LONG the window is is bounded ABOVE only, and the bound is the useful number: the tightest observation
-	// puts it under **2.6 seconds**, which is an animation length rather than a server timer. The sender side stays
-	// unimplemented on that basis - `spawnanim` is a per-creature ASSET, so its duration is per creature, and picking
-	// one number would be inventing a duration retail does not use. See #607.
+	// ⚠️ HOW LONG the window is is bounded ABOVE at **2.6 seconds** by the tightest observation, and BELOW at 25.6s by
+	// six entities flagged on two sightings - which cannot both be one window. The lower bound is weak (five of the six
+	// are one co-streaming group in one capture, i.e. one event), so it does not settle anything on its own.
+	//
+	// ## ⛔ AND THE `spawnanim` ROUTE IS REFUTED, which is what #794 was for
+	//
+	// #794 proposed driving the sender off each creature's own `spawnanim` - a MonsterData (RDB 1010201) attribute -
+	// and #607 asked the right question first: *does the flag only ever appear on creatures that declare one?*
+	//
+	// **No.** `spawnanim` is a RARE attribute - 174 of the 3,185 shipped MonsterData records carry it, on undead,
+	// demons, frost giants and wraiths, things that claw out of the ground - while of the templates the corpus flags,
+	// **275 wear a creature that declares none and only 14 wear one**. The flag lands on Citizens, Guards, Noblemen
+	// and Nemedian Defenders, none of which has an entrance animation to play.
+	//
+	// So the flag does not mean "play this creature's entrance animation", and its duration is not that animation's
+	// length. The sender side stays unimplemented - now because the reading itself is open, not merely the number.
 	public static partial class ReportCli
 	{
-		private static void SpawnAnimation(IReadOnlyList<NamedCapture> captures)
+		private static void SpawnAnimation(IReadOnlyList<NamedCapture> captures, string? rdbDir)
 		{
 			var burst = new SpawnAnimationBucket();
 			var midSession = new SpawnAnimationBucket();
 			var noBoundary = 0;
+
+			// #794: template -> its creature asset, and which templates the corpus ever flags. Crossed against the
+			// RDB below to answer "does the flag only appear on creatures that HAVE an entrance animation?".
+			var monsterDataByTemplate = new Dictionary<uint, uint>();
+			var flaggedTemplates = new HashSet<uint>();
 
 			// The STICKINESS test (below): every sighting of one entity within one session, in order. Keyed by
 			// (capture, handle, templateId) - the handle alone would merge two creatures, because retail RECYCLES a
@@ -118,6 +139,16 @@ namespace Faolan.Importer.Cli
 						perEntity[key] = sightings = [];
 
 					sightings.Add((present, p.Ticks));
+
+					// #794's own precondition, collected from the SAME spawn body so it needs no DB: which creature
+					// asset each flagged template wears. `monster_data` is the RDB 1010201 record whose `spawnanim`
+					// attribute names the entrance animation.
+					if (spawn.Character.Stats?.MonsterData is > 0 and var md)
+					{
+						monsterDataByTemplate[npc.TemplateId] = (uint)md;
+						if (present)
+							flaggedTemplates.Add(npc.TemplateId);
+					}
 				}
 			}
 
@@ -148,7 +179,97 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"{agree} of {both.Count} names behave EXACTLY as the hypothesis predicts (never in the burst, always mid-session).");
 
 			StickinessTest(perEntity);
+			SpawnAnimAssetCheck(rdbDir, monsterDataByTemplate, flaggedTemplates);
 		}
+
+		// ⭐ #794's precondition, and it FAILS. The plan was to drive the flag off each creature's own `spawnanim`
+		// asset - a MonsterData (RDB 1010201) attribute - and #607 asked the right question first: does the flag only
+		// ever appear on creatures that declare one?
+		//
+		// It does not. `spawnanim` is a rare attribute (174 of the 3,184 shipped MonsterData records carry it, on
+		// undead, demons, frost giants and wraiths - things that claw out of the ground), while the flag lands on
+		// Citizens, Guards and Noblemen. So the flag cannot mean "play this creature's entrance animation": most of
+		// the creatures it is sent for have no entrance animation to play.
+		//
+		// Skipped, with a line saying so, when no RDB is configured - the rest of the report needs only captures.
+		private static void SpawnAnimAssetCheck(string? rdbDir, Dictionary<uint, uint> monsterDataByTemplate, HashSet<uint> flaggedTemplates)
+		{
+			Console.WriteLine();
+			Console.WriteLine("⭐ Does the flag only appear on creatures that HAVE an entrance animation? (#794)");
+
+			if (string.IsNullOrEmpty(rdbDir))
+			{
+				Console.WriteLine("  (skipped - no Content:RdbDir configured, and this half reads the client's MonsterData records.)");
+				return;
+			}
+
+			using var rdb = OpenRdb(rdbDir);
+			var declares = new Dictionary<uint, string?>();
+			var shipped = 0;
+			var withAnim = 0;
+			foreach (var e in rdb.EntriesOfType(MonsterDataFile.Type).Where(rdb.CanRead))
+			{
+				string? anim;
+				try
+				{
+					anim = SpawnAnimOf(rdb.ReadDecompressed(e));
+				}
+				catch
+				{
+					continue; // not a readable record (CDN-only / not zlib)
+				}
+
+				shipped++;
+				if (anim != null)
+					withAnim++;
+
+				declares[e.Id] = anim;
+			}
+
+			Console.WriteLine($"  {withAnim:N0} of the {shipped:N0} shipped MonsterData records declare a `spawnanim` at all.");
+
+			var flaggedWith = 0;
+			var flaggedWithout = 0;
+			var examples = new List<uint>();
+			foreach (var t in flaggedTemplates)
+			{
+				if (!monsterDataByTemplate.TryGetValue(t, out var md) || !declares.TryGetValue(md, out var anim))
+					continue;
+				if (anim != null)
+				{
+					flaggedWith++;
+					continue;
+				}
+
+				flaggedWithout++;
+				if (examples.Count < 8)
+					examples.Add(t);
+			}
+
+			Console.WriteLine($"  of the templates the corpus FLAGS: {flaggedWith} wear a creature that declares one, {flaggedWithout} do not.");
+			if (flaggedWithout == 0)
+				Console.WriteLine("  ⭐ The flag is confined to creatures with an entrance animation - a second, independent confirmation.");
+			else
+				Console.WriteLine($"  ⛔ The flag is NOT confined to them (e.g. templates {string.Join(", ", examples)}), so it cannot mean\n"
+					+ "     \"play this creature's entrance animation\" - most of the creatures it is sent for have none (#794).");
+		}
+
+		// The root `<monsterdata spawnanim="...">` attribute, or null when the record does not declare one (or is one
+		// of the handful of 1010201 entries that hold a different document entirely).
+		private static string? SpawnAnimOf(byte[] decompressed)
+		{
+			var xml = RdbXml.Carve(Encoding.Latin1.GetString(decompressed), "monsterdata");
+			if (xml == null)
+				return null;
+
+			var m = SpawnAnimRx.Match(xml);
+
+			return m.Success
+				? m.Groups[1].Value
+				: null;
+		}
+
+		private static readonly Regex SpawnAnimRx = new Regex("<monsterdata\\b[^>]*\\bspawnanim=\"([^\"]*)\"", RegexOptions.Compiled);
 
 		// ⭐ THE STICKINESS TEST: is the flag a property of the ENTITY, or a transient STATE of it?
 		//
@@ -235,6 +356,103 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  ⚠️ These are UPPER bounds, not the duration: a sighting happens when the player walks back into");
 			Console.WriteLine("     range, so the window closed somewhere inside each gap. Nothing in the corpus narrows it, so the");
 			Console.WriteLine("     sender side stays unimplemented rather than shipping an invented duration (#607).");
+
+			LowerBound(repeats);
+		}
+
+		// ⭐ The other end of the bracket (#794). An entity flagged on TWO sightings was still inside its window at the
+		// later one, so the gap between them is a LOWER bound - the one number the upper-bound distribution above
+		// cannot give, and the reason the window had only ever been bounded from one side.
+		//
+		// ⚠️ **Only entities with NO unflagged sighting in between count.** Retail RECYCLES a handle, so
+		// flagged -> unflagged -> flagged under one (capture, handle, template) key is two different entities, and its
+		// second window is a fresh one rather than the first still running. Including those would manufacture a lower
+		// bound out of a respawn. The report prints how many were dropped for exactly that reason.
+		private static void LowerBound(List<KeyValuePair<(string Capture, uint Handle, uint Template), List<(bool Flag, long Ticks)>>> repeats)
+		{
+			var multiFlag = repeats.Where(kv => kv.Value.Count(v => v.Flag) > 1).ToList();
+			var contiguous = multiFlag
+				.Where(kv =>
+				{
+					var first = kv.Value.FindIndex(v => v.Flag);
+					var last = kv.Value.FindLastIndex(v => v.Flag);
+
+					return kv.Value.Skip(first).Take(last - first + 1).All(v => v.Flag);
+				})
+				.ToList();
+
+			var recycled = multiFlag.Count - contiguous.Count;
+			var spans = contiguous
+				.Select(kv => kv.Value.Where(v => v.Flag).ToList())
+				.Select(f => (f[^1].Ticks - f[0].Ticks) / (double)TimeSpan.TicksPerSecond)
+				.Where(g => g > 0)
+				.Order()
+				.ToList();
+
+			if (recycled > 0)
+				Console.WriteLine($"\n  ({recycled} entit(ies) flagged twice with an UNFLAGGED sighting in between - a recycled handle, not one window - excluded.)");
+
+			Console.WriteLine();
+			if (spans.Count == 0)
+			{
+				Console.WriteLine("  the window, bounded BELOW: no entity is flagged on two sightings, so there is no lower bound at all.");
+				return;
+			}
+
+			Console.WriteLine($"  the window, bounded BELOW by the gap between two FLAGGED sightings of one entity ({spans.Count} entit(ies)):");
+			Console.WriteLine($"    the largest such gap is {spans[^1]:F1}s - the window is at least that long.");
+
+			// Named, because a lower bound resting on six entities has to be checkable by hand: which capture, which
+			// handle, and how many sightings apart.
+			foreach (var kv in contiguous.OrderByDescending(kv => kv.Value[^1].Ticks - kv.Value[0].Ticks).Take(6))
+			{
+				var flagged = kv.Value.Where(v => v.Flag).ToList();
+				Console.WriteLine($"      {(kv.Key.Capture.Length > 46 ? kv.Key.Capture[..46] : kv.Key.Capture),-46} handle 0x{kv.Key.Handle:X8} template {kv.Key.Template,-6} "
+					+ $"{flagged.Count} flagged of {kv.Value.Count} sighting(s), spanning {(flagged[^1].Ticks - flagged[0].Ticks) / (double)TimeSpan.TicksPerSecond:F1}s");
+			}
+
+			// The two bounds, CROSSED per TEMPLATE: the smallest upper bound against the largest lower bound. If a
+			// creature's own window were one number - which is what "the length of its `spawnanim` asset" would mean -
+			// then for every template max-lower <= min-upper, and a template that breaks it has no single window.
+			//
+			// ⚠️ Suggestive, not conclusive, and the report says so where it prints: the lower bounds it draws on are
+			// five co-streaming entities in ONE capture, which is one event rather than five observations.
+			var perTemplate = new Dictionary<uint, (double Upper, double Lower)>();
+			foreach (var kv in repeats)
+			{
+				var t = kv.Key.Template;
+				perTemplate.TryGetValue(t, out var cur);
+				var upper = cur.Upper == 0 ? double.MaxValue : cur.Upper;
+				var lower = cur.Lower;
+
+				if (kv.Value[0].Flag && kv.Value.FirstOrDefault(v => !v.Flag) is { Flag: false } off)
+					upper = Math.Min(upper, (off.Ticks - kv.Value[0].Ticks) / (double)TimeSpan.TicksPerSecond);
+
+				// Same contiguity rule as LowerBound: a flagged -> unflagged -> flagged run is a recycled handle, and
+				// its span is two windows rather than one.
+				var firstFlag = kv.Value.FindIndex(v => v.Flag);
+				var lastFlag = kv.Value.FindLastIndex(v => v.Flag);
+				if (lastFlag > firstFlag && kv.Value.Skip(firstFlag).Take(lastFlag - firstFlag + 1).All(v => v.Flag))
+					lower = Math.Max(lower, (kv.Value[lastFlag].Ticks - kv.Value[firstFlag].Ticks) / (double)TimeSpan.TicksPerSecond);
+
+				perTemplate[t] = (upper == double.MaxValue ? 0 : upper, lower);
+			}
+
+			var bracketed = perTemplate.Where(kv => kv.Value.Upper > 0 && kv.Value.Lower > 0).ToList();
+			var broken = bracketed.Where(kv => kv.Value.Lower > kv.Value.Upper).ToList();
+
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ CROSSING the two, per TEMPLATE ({bracketed.Count} template(s) have both a lower and an upper bound):");
+			Console.WriteLine($"    {broken.Count} of them have max-lower > min-upper, which no single per-creature window can satisfy.");
+			foreach (var kv in broken.OrderByDescending(kv => kv.Value.Lower - kv.Value.Upper).Take(8))
+				Console.WriteLine($"      template {kv.Key,-8} at least {kv.Value.Lower,6:F1}s and at most {kv.Value.Upper,6:F1}s");
+			if (broken.Count > 0)
+			{
+				Console.WriteLine("    ⚠️ Read the lower-bound lines above before leaning on this: if they are one co-streaming GROUP in");
+				Console.WriteLine("       one capture, the crossing rests on ONE event, and a simultaneous respawn of that group would");
+				Console.WriteLine("       explain it without any window being longer than the upper bounds. The MonsterData check below");
+				Console.WriteLine("       is the load-bearing one - it needs no timing at all.");
+			}
 		}
 
 		private sealed class SpawnAnimationBucket

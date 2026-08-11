@@ -223,14 +223,29 @@ placement. `PerSpawnEventModes` tallies each field over **all** of a type's sigh
 ⚠️ Not a blanket reset to a resting value. 14 types are never captured in `BccState` 1 — the Door Warden
 (19619) is state 11 in all 15 of its sightings — so a type *can* rest somewhere other than the common value.
 
-⭐ **`SpawnAnimation` is now decoded, and it is not merely per-event — it is a decaying STATE** (#607). It marks an
-entity that is still playing its entrance animation: over the 4,687 entities sighted more than once, 351 change
-their answer, 346 of those are ON for the first sighting and off thereafter, and **not one ever turns ON**
-(`--report spawn-animation`). The animation itself is real client data — `spawnanim` is a MonsterData (RDB 1010201)
-attribute the client parses into `MonsterData+0x158` beside `defaultidleanim`. The window is bounded above only,
-tightest observation **< 2.6 s**. The mode-keeping above is therefore an approximation that stays inside retail's
-distribution rather than a model of the field; the sender cannot decide it until the per-creature animation length
-is available.
+⭐ **`SpawnAnimation` is a decaying STATE, not merely per-event** (#607). Over the 4,687 entities sighted more than
+once, 351 change their answer, 346 of those are ON for the first sighting and off thereafter, and **not one ever
+turns ON** (`--report spawn-animation`).
+
+⛔ **What it is a state OF is open again, because "still playing its entrance animation" is refuted** (#794). That
+reading rested on `spawnanim`, a real MonsterData (RDB 1010201) attribute the client parses into
+`MonsterData+0x158` beside `defaultidleanim` — and the cross-check the reading itself asked for comes back
+negative:
+
+- `spawnanim` is **rare**: 174 of the 3,185 shipped MonsterData records declare one, on undead, demons, frost
+  giants and wraiths — creatures that claw out of the ground.
+- of the templates the corpus **flags**, **275 wear a creature that declares none** and only **14** wear one.
+
+The flag lands on Citizens, Guards, Noblemen and Nemedian Defenders, none of which has an entrance animation to
+play, so it cannot mean "play this creature's entrance animation" and its duration is not that animation's length.
+
+The window is bounded **above** at 2.6 s by the tightest observation and **below** at 25.6 s by six entities
+flagged on two sightings — which cannot both be one window. ⚠️ The lower bound is weak: five of the six are one
+co-streaming group in one capture, so it is one event, and a simultaneous respawn of that group would explain it.
+The MonsterData census above needs no timing and is the load-bearing half.
+
+The mode-keeping above therefore stays an approximation that sits inside retail's distribution rather than a model
+of the field, and the sender stays unimplemented — now because the *reading* is open, not merely the number.
 
 ⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
 companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are

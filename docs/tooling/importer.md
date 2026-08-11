@@ -262,8 +262,11 @@ ticket's hypothesis: 7.3% of burst spawns carry the flag against 5.8% mid-sessio
 is arriving". The second is the ⭐ **stickiness test**, which settled it: read per `(capture, handle, templateId)`,
 of the 4,687 entities sighted more than once **351 are MIXED** (refuting a per-creature capability), **346 of those
 are ON for the first sighting and off thereafter, and 0 ever turn ON** — so it is a **decaying state**, an entity
-inside a window that has closed by the next sighting. The window is bounded above only, tightest observation
-**< 2.6 s** — an animation length, not a server timer),
+inside a window that has closed by the next sighting. Two more since #794: the window is bracketed **above** at
+2.6 s and **below** at 25.6 s, which cannot both be one window (the lower bound is one co-streaming group in one
+capture, so it is weak); and ⛔ the `spawnanim` reading is **refuted** — 174 of 3,185 MonsterData records declare
+one, and of the templates the corpus flags **275 wear a creature that declares none** against 14 that do, so the
+flag cannot mean "play this creature's entrance animation". Needs `--Content:RdbDir` for that half),
 `follow-pairs` (#741: every NPC-follows-NPC binding the corpus carries — the mode-07 formation MoveTasks — with
 both ends resolved to creature NAMES and the offsets each follower held. Grouped by creature PAIR, because the
 formation is only visible as a GROUP: the four `Black Dragon Guard Patroller`s behind one captain each hold a
