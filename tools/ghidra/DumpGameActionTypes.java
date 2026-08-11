@@ -15,6 +15,20 @@ public class DumpGameActionTypes extends GhidraScript {
     long STATKEYS = 0x025073c0L; // byte-index -> real stat key
     int STRIDE = 0x104;  // FUN_008c3910: IMUL EAX,EAX,0x104. NOT 0x41 - and since 0x104 == 4*0x41 a wrong
                          // 0x41 stride still divides evenly, so it silently yields 4x-inflated ids (crashed the client).
+    // ⭐ The window is the CLIENT'S OWN registered range, not a guess, and #485 asked for it to be widened on the
+    // premise that it "silently truncates". It does not. `FUN_008c3910` states the bound TWICE in one function:
+    //
+    //     if (0x11d < typeId - 0xcf09U)  assert("i_nGameAction >= e_Type_GC_GameAction && "
+    //                                           "i_nGameAction < e_Type_GC_GameAction_End", "SpellData.cpp", 0x629)
+    //     if (typeId < 0xcf09 || 0xd026 < typeId)  typeId = 0xcf09;   // out of range -> clamped to the first entry
+    //
+    // 0xCF09 + 0x11D == 0xD026, so the assert bound and the clamp agree: 286 types and nothing past them. The
+    // descriptor table is indexed `(typeId - 0xCF09) * STRIDE`, so an id outside the window has no descriptor to
+    // read - widening this would read past the table, not find more types.
+    //
+    // ⚠️ The "types past 0xD026" #485 lists (Fatality 0xD331, SummonMount 0xD2D5, ...) are the OTHER numbering:
+    // `docs/re/gameaction_types.json` carries both a `typeId` and an `enumId` and they diverge (Hit is typeId 53005
+    // / enumId 53002). All eight are inside this window at their enum ids - Fatality is 0xD013, SummonMount 0xCFFC.
     int FIRST = 0xCF09, LAST = 0xD026;
 
     int u32(long a) throws Exception { return getInt(toAddr(a)); }

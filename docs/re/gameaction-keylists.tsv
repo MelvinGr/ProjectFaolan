@@ -1,3 +1,11 @@
+# GameActionData TYPE -> its descriptor key list (#271/#485). Dumped by tools/ghidra/DumpGameActionTypes.java.
+# The window 0xCF09..0xD026 is the CLIENT'S registered range, stated twice in FUN_008c3910 - the assert bounds at
+# 0x11d (= 0xD026 - 0xCF09) against `i_nGameAction < e_Type_GC_GameAction_End`, and an out-of-range id is CLAMPED to
+# the first entry. 286 types, nothing past them; the descriptor table has no rows to read beyond it.
+# ⚠️ The ids here are ENUM ids. `gameaction_types.json` also carries a `typeId` (Hit = typeId 53005 / enumId 53002)
+# and the two diverge - an id like 0xD331 is a typeId, not a type past the end of this table.
+# ⚠️ `keys` is EMPTY on 58 of the 261 rows because the descriptor table is BSS: it is filled at runtime, so a static
+# read sees zeros. Those need a live dump, not a wider scan.
 typeId	typeIdHex	name	label	widthWords	keys	statKeys	fields	form
 53002	0xCF0A	e_Type_GC_GameAction_Hit		12	0;2;37;71	0x2D2;0x2D4;0x2F7;0x31A	Stat;;;	abs
 53003	0xCF0B	e_Type_GC_GameAction_AddLayeredSkinnedMesh		10	194;39	0x4CA;0x2F9	;	abs

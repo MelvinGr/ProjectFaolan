@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		private static IReadOnlyList<(uint Id, string Name, int[] Keys)> Tsv()
 		{
 			var rows = new List<(uint, string, int[])>();
-			foreach (var line in File.ReadAllLines(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")).Skip(1))
+			foreach (var line in Rows(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")))
 			{
 				var f = line.Split('\t');
 				var keys = f[5].Length == 0 ? [] : f[5].Split(';').Select(int.Parse).ToArray();
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 		public void EveryKeyIndexResolvesToOneStatKeyAcrossAllTypes()
 		{
 			var byIndex = new Dictionary<int, string>();
-			foreach (var line in File.ReadAllLines(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")).Skip(1))
+			foreach (var line in Rows(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")))
 			{
 				var f = line.Split('\t');
 				if (f[5].Length == 0)
@@ -310,6 +310,13 @@ namespace Faolan.Tests
 			// The trailing one simply runs out of body, and is reported short rather than dropped.
 			Assert.Equal([864u, 5u], elements[1].Values);
 			Assert.Null(elements[1].Value(GameActionTypes.KeyValue));
+		}
+
+		// The tsv carries a `#` PROVENANCE header - where the dump's window comes from and why 58 rows have no keys
+		// (#485). Skipping comments as well as the column line keeps that documentable without the gate seeing it.
+		private static IEnumerable<string> Rows(string path)
+		{
+			return File.ReadAllLines(path).Where(l => !l.StartsWith('#')).Skip(1);
 		}
 	}
 }
