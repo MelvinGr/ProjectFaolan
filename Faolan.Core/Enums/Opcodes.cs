@@ -402,11 +402,21 @@ namespace Faolan.Core.Enums
 		Reserved0xC0 = 0xC0,
 		DispatchCSFeedback = 0xC1,
 		DispatchGroupFinderSignupFailed = 0xC2,
+		// #792: no-arg, so the string catalog has no name for it - but it is not opaque. Its handler is
+		// `CSClientIncoming_c`'s override of vtable +0x310, which fires the signal at `CSIncoming+0x7c`; ⚠️ the
+		// DECOMPILATION of that override is identical to 0xC8's and the two were written off as
+		// indistinguishable on that basis - the `LEA ECX` that picks the signal is dropped, and on a body this
+		// short it is the whole method. In the capture it fires immediately after a SUCCESSFUL
+		// `QueueGroupFinder`, in the slot where the refused attempt got `DispatchGroupFinderSignupFailed`
+		// instead, and before `SelectGroupFinderRoles` / `DispatchGroupFinderSignupSuccess`. Naming it needs the
+		// signal's SUBSCRIBER, which is not reachable from the singleton's three xrefs.
 		Reserved0xC3 = 0xC3,
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
 		Reserved0xC7 = 0xC7,
+		// #792: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, and in the capture it fires
+		// immediately after `DispatchYouJoinedTeam`, i.e. once the group finder's work is done.
 		Reserved0xC8 = 0xC8,
 		DispatchGroupFinderReadyCheckStatus = 0xC9,
 		DispatchGroupFinderReadyCheckRejected = 0xCA,
