@@ -59,7 +59,7 @@ namespace Faolan.Tests
 				};
 
 				CaptureCharacterImporter.AccountId = 7;
-				(int, int, int) result;
+				(int, int, int, int) result;
 				try
 				{
 					result = await CaptureCharacterImporter.ImportAsync(db, [capture]);
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 					CaptureCharacterImporter.AccountId = 0;
 				}
 
-				Assert.Equal((1, 1, 0), result);
+				Assert.Equal((1, 1, 0, 0), result);
 
 				var character = await db
 					.Characters.Include(c => c.Body)
@@ -122,8 +122,38 @@ namespace Faolan.Tests
 
 				// Re-run: nothing added, nothing changed.
 				var rerun = await CaptureCharacterImporter.ImportAsync(db, [capture]);
-				Assert.Equal((1, 0, 1), rerun);
+				Assert.Equal((1, 0, 1, 0), rerun);
 				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
+
+				// #753: the row carries the marker that makes it refreshable, and a REFRESH run rebuilds it - one
+				// character still, but deleted and re-imported rather than skipped.
+				Assert.True(character.ImportedFromCapture);
+				var refreshed = await CaptureCharacterImporter.ImportAsync(db, [capture], refresh: true);
+				Assert.Equal((1, 1, 0, 1), refreshed);
+				Assert.Equal(1, await db.Characters.CountAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken));
+
+				// ...and a character created IN-GAME is exempt by construction: no marker, so even a refresh keeps
+				// it. This is the `Adada` case - a blanket re-import deleted a level-4 local character, and the level
+				// threshold that was supposed to be the guard is what deleted it.
+				db.Characters.Add(new Character
+				{
+					AccountId = 7,
+					RealmId = character.RealmId,
+					Name = "Dikketest",
+					Level = 4,
+					Class = ConanClass.Barbarian,
+					Race = Race.Cimmerian,
+					Sex = Sex.Male,
+					MapId = 4000
+				});
+				db.Characters.Remove(await db.Characters.SingleAsync(c => c.ImportedFromCapture, TestContext.Current.CancellationToken));
+				await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+				var kept = await CaptureCharacterImporter.ImportAsync(db, [capture], refresh: true);
+				Assert.Equal((1, 0, 1, 0), kept);
+				var local = await db.Characters.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
+				Assert.False(local.ImportedFromCapture);
+				Assert.Equal(4, local.Level); // untouched - not rebuilt from the capture
 			}
 			finally
 			{

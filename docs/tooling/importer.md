@@ -136,10 +136,19 @@ The write strategy is an explicit, selectable dimension — orthogonal to *which
 Rules and edge cases:
 
 - **Per-module support.** Not every module supports every mode (`SupportedModes`). Conversations are *always*
-  a clean rebuild (handle-keyed stale rows must be purged), so it advertises `overwrite` only. Characters
-  are **insert-only** today (`SupportedModes = {insert}`, existing names never overwritten); adding
-  `upsert` and an `overwrite` guarded by `--force` (it cascades to 12 child tables incl. live player
-  progress) is the tracked step-2a follow-up.
+  a clean rebuild (handle-keyed stale rows must be purged), so it advertises `overwrite` only. Characters advertise
+  `insert` (the default: add what is missing, never touch an existing row) and `overwrite`, which is the
+  **refresh** (#753): a character whose row carries `Character.ImportedFromCapture` is deleted and rebuilt from
+  the current corpus, so a re-dumped capture can update an imported bag / worn set / stat sheet that would
+  otherwise stay frozen at whichever dump first built it.
+
+  ⚠️ **The marker is the whole safety rule, and the two obvious alternatives both fail.** "The name appears in a
+  capture" exempts nothing (the importer only ever iterates names that do), and the ACCOUNT cannot discriminate
+  either, because imported characters deliberately sit on the normal play account. Only the importer sets the
+  marker, so a character created in-game cannot carry one and is exempt by construction - which is how a blanket
+  re-import lost `Adada` (level 4, local), and why the level threshold that was supposed to be the guard is not
+  one. It still discards a player's own rearrangement of an *imported* character's items, so it is guarded by
+  `--force` - the first consumer that flag has had.
 - **Scope of `overwrite` = the module's own tables only.** It must never touch another module's data. The NPC
   reseed models this (it wipes only `NpcSpawns`/morphs/equipment/patrol, leaving `NpcSpells` and the other
   modules' tables intact). The committed seeds (e.g. the beach burst 4010) stay exempt.
@@ -168,8 +177,8 @@ Modifiers
   --dry-run            run everything, print the per-table delta, write NOTHING
   --mode <m>           insert | upsert (default) | overwrite — global write strategy
                        per-module override: --mode npcs=overwrite,items=insert
-  --force              permit overwrite on guarded modules (e.g. characters)
-                       (parsed onto ImportContext.Force; no module consumes it yet — step-2a)
+  --force              permit overwrite on guarded modules — `characters` is the one that consumes it,
+                       because its overwrite rebuilds every capture-imported character (#753)
   --rdb-proxy <url>    Faolan.Web.Content mirror ADDRESS for on-demand (le.idx file==0xFF) RDB resources —
                        just the host, e.g. http://127.0.0.1:7081; RdbReader owns the /gameupdate/upm/rdb route.
                        Defaults to the shared `Cdn` config (PublicAddress, else the local mirror on its

@@ -281,6 +281,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("HeroicMode")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ImportedFromCapture")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsDead")
                         .HasColumnType("INTEGER");
 

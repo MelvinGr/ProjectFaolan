@@ -169,6 +169,19 @@ namespace Faolan.Core.Database.Tables
 		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
 		public bool IsDead { get; set; }
 
+		// True when this row was built by the CAPTURE IMPORTER from a retail dump rather than created in-game
+		// (#753). It exists to make an imported character REFRESHABLE: `characters --mode overwrite` re-imports the
+		// rows carrying it and refuses to touch the rest, so a re-dumped corpus can update an imported bag/worn
+		// set/stat sheet without deleting a player's own character.
+		//
+		// ⚠️ A marker on the row is the only rule that works, and both of the obvious alternatives were tried and
+		// fail: "the name appears in a capture" exempts nothing (the importer only ever iterates names that do),
+		// and the ACCOUNT cannot discriminate either, because imported characters deliberately sit on the normal
+		// play account - the separate "captured" account was removed in 2026-07 for buying nothing. Without this
+		// column, a refresh that deletes-and-reinserts on either rule deletes locally created characters, which is
+		// exactly how `Adada` was lost.
+		public bool ImportedFromCapture { get; set; }
+
 		// Per-character token handed to the client in the small/full char lists, as 32 lowercase hex chars ("N").
 		// Generated once at character creation. NOTE: nothing on the server validates it back yet - see the Gitea
 		// follow-up; the account-level challenge is the one that actually gates login.

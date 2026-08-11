@@ -105,7 +105,12 @@ namespace Faolan.Importer.Captures
 			return null;
 		}
 
-		public static async Task<(int Seen, int Added, int Skipped)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0)
+		// `refresh` = #753's overwrite mode: an existing character the importer itself built (its row carries
+		// `ImportedFromCapture`) is deleted and rebuilt from the current corpus, so a re-dump can update a frozen
+		// bag/worn set/stat sheet. Off by default, because it discards any rearrangement the player has made to
+		// that character.
+		public static async Task<(int Seen, int Added, int Skipped, int Refreshed)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0,
+			bool refresh = false)
 		{
 			// Best (largest) parseable player spawn body per character name, with the map active when it
 			// spawned and the capture's FullChar snapshot for the same instance (the carried inventory -
@@ -210,27 +215,43 @@ namespace Faolan.Importer.Captures
 
 			var added = 0;
 			var skipped = 0;
+			var refreshed = 0;
 			foreach (var (name, (body, mapId, handle)) in best.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
 			{
-				// ⚠️ INSERT-ONLY, and #753 is why it stays that way for now: an imported character's items/worn
-				// set/stat sheet are frozen at whichever corpus dump first built them, and a later re-dump cannot
-				// update them.
+				// An existing row is left alone unless this is a REFRESH and the row is one we imported (#753).
 				//
-				// ⛔ The refresh rule #753 proposes - "those whose name matches a capture, with locally created ones
-				// exempt by construction" - does NOT work, and both halves fail for their own reason:
+				// ⛔ The refresh rule #753 first proposed - "those whose name matches a capture, with locally
+				// created ones exempt by construction" - does NOT work, and both halves fail for their own reason:
 				//   * this loop only ever iterates names that ARE in a capture (`best` is built from the captures),
 				//     so "matches a capture" exempts nothing at all;
 				//   * imported characters are attached to the NORMAL PLAY account (`ImportAccountName`) by
 				//     deliberate design - the dedicated "captured" account was removed on 2026-07-20 because the
 				//     split bought nothing - so a locally created character sits on the same account and the
 				//     account cannot discriminate either.
-				// So a refresh that deletes-and-reinserts on either rule would delete a player's own character.
-				// Upsert needs a real MARKER on the row (set here, checked there); adding one is the actual next
-				// step, and until it exists this skip is the only safe behaviour.
-				if (await db.Characters.AnyAsync(c => c.Name == name))
+				// So the rule is the row's own `ImportedFromCapture` marker, which only this importer ever sets.
+				// A character created in-game cannot carry it, so `Adada` (the level-4 local character a blanket
+				// re-import deleted) is exempt BY CONSTRUCTION rather than by a level threshold.
+				var existing = await db.Characters.FirstOrDefaultAsync(c => c.Name == name);
+				if (existing != null)
 				{
-					skipped++;
-					continue;
+					if (!refresh || !existing.ImportedFromCapture)
+					{
+						skipped++;
+						if (refresh && !existing.ImportedFromCapture)
+							Console.WriteLine($"Characters: kept '{name}' - created in-game (no ImportedFromCapture marker), so a refresh must not touch it.");
+
+						continue;
+					}
+
+					// ⚠️ DELETE + reinsert, not a field-by-field update: the character's capture-derived state is
+					// spread over a dozen child tables (items, equipment, scaffold rows, spellbook, stat sheet) and
+					// a partial refresh would leave whichever rows the new dump no longer states. The FK cascade is
+					// what makes this one statement; `PRAGMA foreign_keys` is ON through EF, unlike the sqlite3 CLI.
+					// It costs the player's own rearrangement of an IMPORTED character's bag, which is the trade
+					// `--mode overwrite` is asking for.
+					db.Characters.Remove(existing);
+					await db.SaveChangesAsync();
+					refreshed++;
 				}
 
 				SpawnBodyReader.TryParse(body, out var scaffold);
@@ -268,7 +289,7 @@ namespace Faolan.Importer.Captures
 				added++;
 			}
 
-			return (best.Count, added, skipped);
+			return (best.Count, added, skipped, refreshed);
 		}
 
 		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, SimpleCharFullUpdateIIR scaffold, ProtoCoreCharacterIIR message,
@@ -289,6 +310,9 @@ namespace Faolan.Importer.Captures
 				Id = originalId,
 				AccountId = accountId,
 				Name = name,
+				// #753: the MARKER that makes this row refreshable. Set here and nowhere else, so a character
+				// created in-game never carries it and `--mode overwrite` cannot touch one.
+				ImportedFromCapture = true,
 				AuthChallenge = Guid.NewGuid(),
 				CreationDate = DateTimeOffset.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
