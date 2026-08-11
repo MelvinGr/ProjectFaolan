@@ -121,6 +121,52 @@ check this sheet before deciding a number is missing from the client:
 constants are not the game's numbers: all eight daily caps differ between the two. `FUN_010CB540` is the registry
 (`name`, then a `double`); this table is what actually ships.
 
+## The whole sheet, by family — so a number is looked UP, not looked for
+
+The 294 names are not one flat list; they fall into families, and knowing the families is what makes this page a
+lookup. `--report rdb-tweaks --report-arg <substring>` filters by name.
+
+| family | count | what it covers |
+|---|---:|---|
+| `TWK_*` / `TKW_*` | 96 | the combat/regen/spell constants the sections above document |
+| `Camera_*` | 31 | the third-person camera's path, zoom and tilt |
+| `PvP_MonthlyFestival_*`, `WorldBoss_Spawn*` | 66 | event SCHEDULING slots — a spawn day/week per boss, all `0` on this sheet |
+| `Onslaught_*` | 8 | the Onslaught wave scaling — `BarTargetBase` 30, `BarTargetPerLevel` 2, HP/damage per-wave scalars 1.0185 (boss 1.04 / 1.025) |
+| `Combat_Pv[EP]{n}ShieldBonus` | 8 | the directional-shield bonus per difficulty tier: PvE `+0.2 / 0 / −0.33 / −0.66`, PvP `+0.2 / 0 / −0.15 / −0.3` |
+| `AlternateAdvancement_*` | 6 | `XPCap` 1,000,000, the three unused-token caps at 100 each, `PvPModifier` 5, `SpecificTokensAwarded` 3, `GenericTokensAwarded` 1 |
+| `Faction*` | 8 | the Khitai rank ladder — see [factions.md](../subsystems/factions.md) |
+| `Daily*Cap`, `WeeklyMetaCap`, `MonthlyMetaCap` | 8 | the daily-challenge caps (#656/#509) |
+| `Quest_*` | 6 | the quest system's limits, below |
+| `Inventory_*`, `ExpandInventories_*` | 5 | container sizing, below |
+| `PvP*`, `Hardcore*`, `Arena*` | 10 | loot chance 0.25, `PvPCashDropValue` 0.05, `PvPGenerateCashValue` 325, `PvPLevelExpModifier` 0.05, `HardcorePvPXPModifier` 1.5, `IsPvPServer` 0 |
+| `GuildRenown_*`, `Renown*` | 5 | `LevelingGainBase` 115, `LevelingGainMultiplier` 0.05, `PVPKillMultiplier` 0.5, `CacheLimit` 1000, `SaveInterval` 300 s |
+| `Event*`, `Anniversary*`, `Saga*` | 13 | seasonal toggles, all off on this sheet |
+| `AIDefaults_*` | 3 | `MaximumChaseRadius` 45, `ChaseDeaggroDelayTime` 5, `IrritationForgetPeriod` 4 |
+
+### ⭐ The one-offs worth knowing
+
+| tweak | value | why it matters |
+|---|---:|---|
+| `Quest_MaxQuestPerPremiumPlayer` / `...FreePlayer` | 45 / 30 | the **journal cap** — a character can hold at most 45 quests, which is what bounds the journal region rather than any wire ceiling |
+| `Quest_MaxGetDistance` | 5 | how close you must be to take a quest |
+| `Quest_TimeToCompleteMultiplier` / `Quest_CooldownTimeoutMultiplier` | 60 / 60 | the quest record's time columns are in MINUTES, these convert to seconds |
+| `Quest_LeaveBoundedAreaTimeout` | 10 | the grace period on stepping out of a `ReachArea` goal's volume |
+| `Inventory_DisabledBankSlots` | 30 | of the bank's slots, how many start locked |
+| `ExpandInventories_MaxBankSlots` | 300 | the bank's ceiling once expanded |
+| `Inventory_DisabledResourceSlots` | 12 | the resource bag's locked slots |
+| `RequiredTagForPFAccessTeleport` | **2063** | a concrete TAG id — playfield-access teleport is gated on holding it (#748's tag space) |
+| `Character_SetupDefaultStatsScript` | **17581** | the script the server runs to stat a NEW character (#346) |
+| `Energy_RegenDelayTimer` | 1 | seconds of no spend before the energy pool refills |
+| `MailTimeout` | 30 | mail's own timeout (days on retail's rules) |
+| `MaxMovementModifierRate` | 1.85 | the ceiling on stacked movement buffs |
+| `Achievements_Vistas_Enabled` / `Achievements_Lore_Enabled` | 1 / 1 | the vista and lore achievement subsystems are ON (#780) |
+| `NPCsWithNoNormalsetsAllowed` | 0 | an NPC without a `normalset` is a content error, not a valid state |
+| `GlobalModIncludedSpellLine` / `Excluded` | −1 / −1 | a global spell-line override, unused on this sheet |
+| `WaterSplashTextureID` | 3728533 | an RDB id, i.e. the sheet also carries RESOURCE references |
+
+⚠️ Several of these are values other tickets recorded as *"nothing in the client says"*. Check this sheet before
+concluding a number is absent — it has now answered that twice (the Khitai rank thresholds and the daily caps).
+
 ## Sibling tables (same single-entry family, NOT this grammar)
 
 Types 1000505–1000521 are all single-entry tables; only **1000516** uses the named `[len][name][f64]` shape. The
