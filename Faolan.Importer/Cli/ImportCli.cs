@@ -37,7 +37,17 @@ namespace Faolan.Importer.Cli
 						: ""));
 				}
 
-				Console.WriteLine("\nReports (read-only): --report coverage | conversation-states | anim | bcc-census | bcc-attack-tail | combo-swings | create-classes | creature-races | method-census | worldobj | rdb-tweaks | rdb-class-vitals | item-stat-scaling  [--report-arg <name>]");
+				// ⚠️ A SAMPLE, and it says so: this line is hand-written while `ReportCli` dispatches ~90 report
+				// names, so it went stale the moment the second one was added and reading it as the catalog is how
+				// an existing report gets rebuilt. The switch is the catalog; these are the ones worth knowing about
+				// without going to look.
+				Console.WriteLine("\nReports (read-only, ~90 of them - `grep 'case \"' Faolan.Importer/Cli/ReportCli.cs` for the full set):");
+				Console.WriteLine("  coverage | conversation-states | anim | bcc-census | combo-swings | creature-races | method-census | worldobj");
+				Console.WriteLine("  rdb-tweaks | rdb-class-vitals | item-stat-scaling | rdb-types | rdb-id | rdb-dump | rdb-search");
+				Console.WriteLine("  rdb-names <id|substring|index:<rdbType>>   the client's global id -> NAME table (RDB 1000010/1)");
+				Console.WriteLine("  rdb-text-scan <needle[,needle][:local][:<type>]>   ASCII search over DECOMPRESSED record bodies");
+				Console.WriteLine("  rdb-word-scan <hex[,hex][:local][:<type>]>         32-bit word search, both endiannesses");
+				Console.WriteLine("  timeline | sql-seed | apply-seed | fixtures | fixture-set          [--report-arg <arg>]");
 				return 0;
 			}
 

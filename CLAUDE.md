@@ -40,6 +40,12 @@ dotnet run --project Faolan.Importer -- --report burst-coverage       # read-onl
 dotnet run --project Faolan.Importer -- --report sql-seed             # (re)write faolan.sql from the DB
 dotnet run --project Faolan.Importer -- --report apply-seed --dry-run # upgrade an EXISTING db's content FROM faolan.sql (#412)
 dotnet run --project Faolan.Importer -- --report timeline --report-arg <capture>.tshark.json --Content:RdbDir <dir>
+# ⚠️ A grep over the RDB PACK FILES lies - most records are zlib-compressed, so a string the client plainly ships is
+# absent from the file bytes. Search DECOMPRESSED bodies instead (this is how the ambient-bark group names were found
+# after the docs had recorded them as "appearing zero times as text anywhere in the client"):
+dotnet run --project Faolan.Importer -- --report rdb-text-scan --report-arg "SomeName,Other:local"
+dotnet run --project Faolan.Importer -- --report rdb-names --report-arg index:1010029  # id->NAME table (1000010/1);
+#   index:<rdbType> lists one type's names (1010029 = the server-side script catalog). ⚠️ names are LOWERCASED.
 # ^ ONE capture as a flat chronological story, ids resolved + LDB text decrypted inline (`./run.sh --timeline <dump>`;
 #   see the `capture-timeline` skill). Decode lives in the CODECS - add one there, never inline in the report.
 # Modes: --mode insert|upsert(default)|overwrite (per-module: --mode npcs=overwrite,items=insert). NO old-flag
