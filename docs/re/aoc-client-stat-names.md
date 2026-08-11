@@ -145,11 +145,19 @@ evidence, not as a citation, until the id is used.
 - The engine's Anarchy-Online lineage shows through the low ids — `4 Breed`, `13 MagicBurden`, `17
   MemorizationSlot` — which is itself a check on the range: those are names nothing in this codebase would invent.
 
-## ⚠️ A name is not a consumer: `ChosenGod` (`0x0A9`) is stored and never read
+## ⚠️ A name is not a consumer: `HeroicMode` (`0x0A9`) is stored and never read
 
-The table names `0x0A9` `ChosenGod`, which is why #553 asked what its VALUES mean — retail sends `1` for one
-captured character and `0` for the other 183, and Mitra/Set/Ymir is the in-game set. **The client cannot answer
-that, and the reason is worth writing down: it never looks at the value.**
+⚠️ **This stat is named twice by the client, and the two disagree** (#625). The exe's descriptor registry
+(`FUN_01db2740`) pairs `PUSH "HeroicMode"` with `MOV [0x029959c0], 0xa9` on the very next instruction; **LDB
+category 615 says `ChosenGod`**. We take the exe's — it is compiled with this build, it names the whole
+`1000000+` range the LDB does not reach, and `player_stats.heroic_mode` is a real field of the client's own
+protobuf schema while nothing named for a deity is. A display string is exactly what goes stale when a stat slot
+is repurposed. #553 was opened on the `ChosenGod` reading and on the premise that AoC has a player-choosable
+religion, which it does not (that is Conan Exiles); the one captured character carrying `1` is a *necromancer*,
+a puzzle under the old name and not under the new one.
+
+Either way **the client cannot say what a VALUE means, and the reason is worth writing down: it never looks at
+the value.**
 
 `ConstScan CONST=a9` finds exactly **two** uses of `0xA9` as a stat id in the whole image, and both are WRITES —
 `FUN_007a2ad0` (`SetStat(0xa9, *(obj + 0x14c))`) and the stat-apply run in `FUN_01458d40`, where it is one of a
@@ -169,7 +177,7 @@ return *(undefined4 *)(in_ECX + 0x244);                            // 0xA9 lives
 …and those two functions are the only ones on that class that touch `+0x244`. So the client caches the value,
 mirrors it, and consumes it nowhere.
 
-**That makes `ChosenGod` a SERVER-side number**, the same tell as the `Combat_{PvE,PvP}*ShieldBonus` tweaks the
+**That makes `0x0A9` a SERVER-side number**, the same tell as the `Combat_{PvE,PvP}*ShieldBonus` tweaks the
 client registers and never reads ([`../rdb/client-tweak-table.md`](../rdb/client-tweak-table.md)). The practical
 consequence for anyone picking up #553: there is no value→deity mapping hidden in the client to recover, and no
 in-client check that could confirm one, because nothing the client draws depends on it. Whatever we emit is

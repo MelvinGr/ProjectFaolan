@@ -272,7 +272,7 @@ namespace Faolan.Core.Enums
 		PreviousMovementMode = 0x0AE,
 		CurrentMovementMode = 0x0AD,
 		DeathEffectXp = 0x40B,
-		ChosenGod = 0x0A9,
+		HeroicMode = 0x0A9,
 		ExpandBankInventory = 0x534,
 		NanoInterval = 0x16B,
 		Unknown15 = 0x163,

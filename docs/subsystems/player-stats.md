@@ -461,15 +461,21 @@ copies) because several of them share a stat id within one list and the id alone
 `CharacterValueIndex` map and the `(statId, value)` sheet are two models of the same words, and where they have
 been checked against each other they have disagreed — reconciling the rest is the remaining half of Gitea #447.
 
-### `ChosenGod` (0x0A9) — a stat we author without knowing what it MEANS (#553)
+### `HeroicMode` (0x0A9) — a stat we author without knowing what a VALUE selects (#553, renamed in #625)
 
 The snapshot emitted a hard `0` here for every character. It varies in retail: 183 of the 184 captured snapshots
-carry `0` and one carries `1`, so a fixed value is a character wearing someone else's number. `Character.ChosenGod`
-now persists it and `SnapshotStatSheet` authors it, with `.chosengod <n>` as the setter. **That — a per-character
+carry `0` and one carries `1`, so a fixed value is a character wearing someone else's number. `Character.HeroicMode`
+now persists it and `SnapshotStatSheet` authors it, with `.heroicmode <n>` as the setter. **That — a per-character
 value being shipped as a constant — is the entire justification.** It is not a claim about what the number means.
 
-⚠️ **The value is carried as an opaque wire number, with no deity name anywhere near it**, and there is no religion
-system behind it to model:
+⚠️ **It was called `ChosenGod` until #625, and the client names it BOTH ways** — the exe's descriptor registry
+`FUN_01db2740` says `HeroicMode` (it pairs the string with `MOV [0x029959c0], 0xa9` on the next instruction) while
+LDB category 615 says `ChosenGod`. We take the exe's: it is compiled with this build, it names the whole
+`1000000+` range the LDB never reaches, and `player_stats.heroic_mode` is a real field of the client's own
+protobuf schema. A display string is what goes stale when a stat slot is repurposed.
+
+⚠️ **The value is still carried as an opaque wire number**, and the old name had nothing to be about — there is no
+religion system in this game to model:
 
 - **Age of Conan has no player-choosable religion.** Deities are lore plus the three *priest classes'* patron gods
   (Priest of Mitra, Tempest of Set, Bear Shaman/Ymir). The AoC wiki has a "Choosing your Class" page and nothing
@@ -483,7 +489,8 @@ system behind it to model:
   see [`../re/aoc-client-stat-names.md`](../re/aoc-client-stat-names.md). It is a **server-side number**, so
   nothing the client draws depends on the value and no in-client check could confirm a meaning either.
 
-Even calling `0` "has not chosen" reads the stat's *name* rather than any evidence.
+Even calling `0` "not heroic" reads the stat's *name* rather than any evidence — the client never reads the
+value back, so nothing it draws could confirm one reading over another.
 
 ## Open follow-ups
 > Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.

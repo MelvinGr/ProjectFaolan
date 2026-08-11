@@ -198,7 +198,7 @@ tooltips, Ghidra, or `.setstat` probing) agrees; the entries it lists as differi
 | 166 | 0x00A6 | Track Frost Damage |
 | 167 | 0x00A7 | Cold Invulnerability |
 | 168 | 0x00A8 | Attackable |
-| 169 | 0x00A9 | ChosenGod |
+| 169 | 0x00A9 | ChosenGod  ⚠️ the EXE's registry says `HeroicMode`; see aoc-client-stat-names.md (#625) |
 | 170 | 0x00AA | Hate Modifier |
 | 173 | 0x00AD | Current Movement Mode |
 | 174 | 0x00AE | Previous Movement Mode |

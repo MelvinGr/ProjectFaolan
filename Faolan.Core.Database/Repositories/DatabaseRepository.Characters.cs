@@ -218,8 +218,8 @@ namespace Faolan.Core.Database.Repositories
 		// which is what the annotated capture shows it doing.
 		Task SetCharacterCriminalState(uint characterId, DateTimeOffset? criminalUntil, uint murderPoints);
 
-		/// <summary>The character's chosen deity (#553) - the raw wire value of stat 0x0A9, see Character.ChosenGod.</summary>
-		Task SetCharacterChosenGod(uint characterId, uint chosenGod);
+		/// <summary>Stat 0x0A9 `HeroicMode` (#625) - the raw wire value, see Character.HeroicMode.</summary>
+		Task SetCharacterHeroicMode(uint characterId, uint heroicMode);
 
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
@@ -1336,10 +1336,10 @@ namespace Faolan.Core.Database.Repositories
 
 		// See the interface note: the criminal debuff must outlive the session, so it is a persisted expiry rather
 		// than session state.
-		public async Task SetCharacterChosenGod(uint characterId, uint chosenGod)
+		public async Task SetCharacterHeroicMode(uint characterId, uint heroicMode)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.ChosenGod, chosenGod));
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.HeroicMode, heroicMode));
 		}
 
 		public async Task SetCharacterCriminalState(uint characterId, DateTimeOffset? criminalUntil, uint murderPoints)

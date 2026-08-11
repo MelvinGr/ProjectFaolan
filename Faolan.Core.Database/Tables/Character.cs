@@ -204,27 +204,33 @@ namespace Faolan.Core.Database.Tables
 		// Persisted because it is what the criminal ladder is scored from and it must survive relog.
 		public uint MurderPoints { get; set; }
 
-		// The raw wire value of stat `0x0A9`, which the client's own stat-name table calls `ChosenGod` (#553).
+		// Stat `0x0A9`. **The client names it TWICE, and the two disagree** (#625):
+		//
+		//   the EXE's descriptor registry   `HeroicMode`   `FUN_01db2740` pairs `PUSH "HeroicMode"` (0x01f6c92c)
+		//                                                  with `MOV [0x029959c0], 0xa9` on the next instruction
+		//   LDB category 615 (and 633)      `ChosenGod`    the DISPLAY name table
+		//
+		// ⭐ **We take the exe's.** It is compiled with this build, it names ids the LDB does not name at all (the
+		// whole 1000000+ range), and `player_stats.heroic_mode` is a real field of the client's own protobuf schema
+		// while nothing named for a deity is. A localisation string is exactly what goes stale when a stat slot is
+		// repurposed, and this reads as one: an early religion idea whose slot became heroic mode, with the LDB text
+		// never updated. ⚠️ It is a JUDGMENT between two client sources, not a proof - `--report ldb-stat-names`
+		// prints the disagreement (`0x00A9 HeroicMode != 'ChosenGod'`) and 171 more like it.
+		//
+		// The decisive supporting fact is that the old name had nothing to be about: **Age of Conan has no
+		// player-choosable religion.** Deities are lore plus the three PRIEST classes' patron gods. #553 was opened on
+		// the premise that "AoC's religion is chosen during the Tortage storyline" - that is CONAN EXILES, a different
+		// game - and the one captured character carrying `1` is a NECROMANCER, which is a puzzle under `ChosenGod`
+		// and not one under `HeroicMode`.
+		//
 		// PERSISTED because it VARIES per character and we were sending a constant: 183 of the 184 captured snapshots
-		// carry 0 and one carries 1, so a fixed pair is a character wearing someone else's number. That is the whole
-		// justification - it is not a claim about what the number means.
+		// carry 0 and one carries 1, so a fixed value is a character wearing someone else's number.
 		//
-		// ⚠️ IT IS AN OPAQUE NUMBER, NOT A DEITY ENUM, and there is no religion system behind it to model.
-		//   * Age of Conan has NO player-choosable religion. Deities are lore plus the three PRIEST classes' patron
-		//     gods (Priest of Mitra, Tempest of Set, Bear Shaman/Ymir); the AoC wiki has a "Choosing your Class" page
-		//     and nothing for choosing a god. ⚠️ The "pick a religion, find a priest, become an acolyte" material a
-		//     search turns up is CONAN EXILES, a DIFFERENT GAME - #553 was opened on that premise ("AoC's religion is
-		//     chosen during the Tortage storyline") and it does not hold.
-		//   * It is not the priest patron either: the one captured character carrying 1 is a NECROMANCER.
-		//   * And the client cannot be asked. It STORES this stat and never reads it back - `ConstScan` finds two uses
-		//     of `0xA9` as a stat id in the whole image, both WRITES; there is no `GetStat(0xA9)`; and the one class
-		//     that gives the id a dedicated slot (`FUN_00843d10`/`FUN_00843d40`, field `+0x244`) only mirrors it. See
-		//     docs/re/aoc-client-stat-names.md. It is a SERVER-side number, so nothing it draws depends on the value
-		//     and no in-client check could confirm a meaning either.
-		//
-		// So the column carries the number and claims nothing beyond it. Even calling 0 "has not chosen" would be
-		// reading the stat's NAME rather than any evidence.
-		public uint ChosenGod { get; set; }
+		// ⚠️ Still an OPAQUE NUMBER on our side, whatever it is called. The client STORES this stat and never reads it
+		// back - `ConstScan` finds exactly two uses of `0xA9` as a stat id in the whole image, both WRITES, no
+		// `GetStat(0xA9)`, and the one class giving it a dedicated slot (`FUN_00843d10`/`FUN_00843d40`, field `+0x244`)
+		// only mirrors it. So no in-client check can confirm what a given VALUE selects.
+		public uint HeroicMode { get; set; }
 
 		// When the character stops being a CRIMINAL, or null when it is not one. A timestamp rather than a bool
 		// because retail's is a timed debuff (the captured "Criminal" spell 3827287 runs 300 s) and it PERSISTS: in the

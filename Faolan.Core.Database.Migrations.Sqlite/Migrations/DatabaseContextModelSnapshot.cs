@@ -257,9 +257,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("BindRespawnPointId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("ChosenGod")
-                        .HasColumnType("INTEGER");
-
                     b.Property<byte>("Class")
                         .HasColumnType("INTEGER");
 
@@ -279,6 +276,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<byte?>("GuildRank")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("HeroicMode")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDead")

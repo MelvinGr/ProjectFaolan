@@ -43,9 +43,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			CharacterStatId.AttackRating, CharacterStatId.DefenseRating, CharacterStatId.MagicRating, CharacterStatId.MagicalResist,
 			// The murder-point pool, now derived from the character rather than carried as a fixed 0 (#503).
 			CharacterStatId.MurderPoints,
-			// Stat 0x0A9 `ChosenGod`, likewise (#553) - authored as an opaque wire number, since the client never
-			// reads the stat back and there is no religion system to interpret it as.
-			CharacterStatId.ChosenGod
+			// Stat 0x0A9 `HeroicMode`, likewise (#625) - authored as an opaque wire number, since the client never
+			// reads the stat back and so cannot say what a given value selects.
+			CharacterStatId.HeroicMode
 		];
 
 		/// <summary>
@@ -151,11 +151,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// holds, so this replaces the fixed 0 with the same number derived from the column that now tracks it.
 			yield return (CharacterStatId.MurderPoints, character.MurderPoints);
 
-			// Stat 0x0A9, the one the client's name table calls `ChosenGod` (#553). One captured character carries 1
-			// and 183 carry 0, so the fixed 0 was a per-character value shipped as a constant. The number is emitted
-			// VERBATIM and is not interpreted: see Character.ChosenGod - AoC has no player religion system, and the
-			// client stores this stat without ever reading it back, so there is nothing to map it to.
-			yield return (CharacterStatId.ChosenGod, character.ChosenGod);
+			// Stat 0x0A9, which the client's descriptor registry names `HeroicMode` (#625, renamed from the wrong
+			// `ChosenGod`). One captured character carries 1 and 183 carry 0, so the fixed 0 was a per-character value
+			// shipped as a constant. The number is emitted VERBATIM and is not interpreted: see Character.HeroicMode -
+			// the client stores this stat without ever reading it back, so nothing maps a value to a behaviour.
+			yield return (CharacterStatId.HeroicMode, character.HeroicMode);
 		}
 
 		// Writes a value at EVERY occurrence of a stat id. A stat can appear in both lists (and twice within

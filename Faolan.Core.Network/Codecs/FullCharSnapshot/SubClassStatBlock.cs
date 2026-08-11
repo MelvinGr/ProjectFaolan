@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.TempSaveTeamId, 0x0), (CharacterStatId.TempSavePlayfield, 0x0), (CharacterStatId.TempSaveX, 0x0), (CharacterStatId.TempSaveY, 0x0), (CharacterStatId.Flags, 0x1),
 			(CharacterStatId.Features, 0x0), (CharacterStatId.PreviousMovementMode, 0x2), (CharacterStatId.CurrentMovementMode, 0x2), (CharacterStatId.PlayfieldToken, 0x4FE428), (CharacterStatId.DeathEffectXp, 0x0),
 			(CharacterStatId.HealthMax, 0x2328), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.Level, 0x1), (CharacterStatId.Exp, 0x0), (CharacterStatId.MaxExp, 0x64),
-			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.ChosenGod, 0x0)
+			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.HeroicMode, 0x0)
 		];
 
 		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then

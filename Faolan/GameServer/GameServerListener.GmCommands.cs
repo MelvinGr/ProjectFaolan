@@ -367,7 +367,7 @@ namespace Faolan.GameServer
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
-				["chosengod"] = ChosenGodCommand,
+				["heroicmode"] = HeroicModeCommand,
 				["travel"] = TravelCommand,
 				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
@@ -597,28 +597,29 @@ namespace Faolan.GameServer
 		}
 
 		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
-		// .chosengod <n>  - set stat 0x0A9, the one the client's name table calls `ChosenGod` (#553). Named for the
-		// STAT and not for a mechanic, because there is no mechanic: nothing in retail is known to set this, so a GM
-		// command is the only way the column is ever anything but 0.
+		// .heroicmode <n>  - set stat 0x0A9, which the client's own descriptor registry names `HeroicMode` (#625).
+		// Named for the STAT and not for a mechanic, because there is no mechanic here: nothing in retail is known to
+		// set it, so a GM command is the only way the column is ever anything but 0.
 		//
-		// ⚠️ The argument is the RAW WIRE NUMBER and there is deliberately no deity name anywhere near it. AoC has no
-		// player-choosable religion (see Character.ChosenGod - the "choose a religion" system is Conan EXILES), the
-		// one captured character carrying 1 is a necromancer rather than a priest, and the client stores this stat
-		// without ever reading it back, so nothing it draws could show a wrong interpretation either way.
-		private async Task ChosenGodCommand(INetworkClient client, string arguments)
+		// ⚠️ Was `.chosengod` until #625. The client names this stat TWICE and the two disagree - the exe's descriptor
+		// registry says `HeroicMode`, LDB 615 says `ChosenGod` - and we take the exe's. See Character.HeroicMode.
+		//
+		// ⚠️ The argument is the RAW WIRE NUMBER. The client stores this stat and never reads it back, so nothing it
+		// draws could show a wrong VALUE either way - only the name is now the client's.
+		private async Task HeroicModeCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
 			if (!uint.TryParse((arguments ?? "").Trim(), out var value))
 			{
 				await _agentServerDispatcher.SendSystemMessage(character.Id,
-					$"Usage: .chosengod <n>  (raw stat 0x0A9 value. Currently {character.ChosenGod}.)");
+					$"Usage: .heroicmode <n>  (raw stat 0x0A9 value. Currently {character.HeroicMode}.)");
 				return;
 			}
 
-			character.ChosenGod = value;
-			await Database.SetCharacterChosenGod(character.Id, value);
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ChosenGod, value), character.Id);
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"ChosenGod set to {value}.");
+			character.HeroicMode = value;
+			await Database.SetCharacterHeroicMode(character.Id, value);
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HeroicMode, value), character.Id);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"HeroicMode set to {value}.");
 		}
 
 		// `.criminal 0` to clear it. The standard test bootstrap: the retail trigger is killing another player, and PvP
