@@ -13,7 +13,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// corpus carries a `2`, and it is not a decline: the same box (`localized id="1004"`, *"Do you want to travel
 	// to the Spider Caverns?"*) is answered `1` on the run the player annotates *"energed normal instance"* and
 	// `2` 34 seconds later on *"enered epic instance"*, and BOTH are followed by the redirect + `Authenticate2`
-	// that enters the zone. So a dungeon's difficulty MODE is which button of the travel box you press.
+	// that enters the zone. So a dungeon's difficulty MODE is which button of the travel box you press - and the
+	// server's answer to that choice is already decoded: the `PlayfieldProxy` it sends back carries the mode in its
+	// class word (`0xC79C` normal against `0xCABC` on that same epic entry, `PlayfieldInstanceOwnerTests`). Option
+	// index in, class word back.
 	// [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json, 19:56:41 and 19:57:15]
 	public static class ScryMessageBoxAnswerCodec
 	{

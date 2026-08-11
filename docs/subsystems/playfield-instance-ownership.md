@@ -46,6 +46,17 @@ map, seconds apart, with the player narrating which was which.
 ⚠️ So the mode is **not** part of `(mapId, instanceId)` — the map id is identical for both. Whatever models it
 has to sit beside that key, not inside it.
 
+### ⭐ …and the other end of the same decision: the player CHOOSES it in the travel box
+
+The class word is what the server sends back. What the player pressed is in the **`ScryMessageBoxAnswer`** that
+opened each of those two entries — same box (`<localized id="1004" category="520">`, *"Do you want to travel to
+the Spider Caverns?"*), `nAnswer` **1** on the normal entry and **2** on the epic one, both followed by the
+redirect that enters the zone. So the travel box's OPTIONS are the difficulty modes, and the pair reads
+end to end: option index in → class word back.
+See [scry-message-box.md](scry-message-box.md), which is also where the bug this uncovered is recorded — the
+answer had been read as a boolean, so a `2` would have been treated as a decline.
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json 19:56:41 / 19:57:15]
+
 ## The "too many quests" refusal is the GROUP FINDER, not an entry gate
 
 The annotation `treid to enter group instance, does not work because too many quests` reads like a precondition

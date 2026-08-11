@@ -68,8 +68,13 @@ chat-annotated corpus carries a **`2`**, and reading it as a decline would be ex
 
 Same box, same destination, 34 seconds apart, and **both entered the zone**. So a dungeon's difficulty MODE is
 which button of the travel box the player presses: the prompt text is the destination's name from category 520
-and the OPTIONS are the modes. ⭐ That is the whole of #511's "instances have a difficulty mode, chosen at
-entry" — it is chosen here, and it rides a message box that was already decoded.
+and the OPTIONS are the modes.
+
+⭐ **The other end of the same decision is already decoded**, which is what makes this more than one observation:
+the `PlayfieldProxy` the server sends back carries the mode in its class word — `0xC79C` normal against `0xCABC`
+on that one epic entry, over 183 captured proxies
+([playfield-instance-ownership.md](playfield-instance-ownership.md)). Option index in, class word back, on the
+same two entries.
 [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json 19:56:41 / 19:57:15]
 
 ⚠️ The DECLINE is still unobserved — no captured player cancels — so `0` is inferred, and inferred the safe way
