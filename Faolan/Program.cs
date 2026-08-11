@@ -97,6 +97,13 @@ namespace Faolan
 				Console.WriteLine("[login] Using the configured Server:PrivateKey - every client must be patched (Faolan.ClientLauncher --patch-login) and its password is validated.");
 			}
 
+			// ⚠️ This block runs BEFORE the host on purpose, and the alternative was weighed and dropped (#409). Every
+			// listener builds its `TcpListener` in its constructor, and the host constructs all hosted services before
+			// starting any, so a port cannot be resolved from inside one. Deferring socket creation to StartAsync would
+			// remove this block - at the cost of touching ServerBase and all five listeners, making `LocalEndPoint`
+			// invalid until start (the bind log lines read it), moving the `[role]` banner into a service, and turning
+			// two fail-fast errors - a bad `--role realm=<id>` and a port conflict - into failures during host start
+			// with worse messages. It is the same work either way and this shape says it in one place, so it stays.
 			Realm? hostRealm = null;
 			try
 			{

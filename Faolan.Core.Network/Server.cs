@@ -61,7 +61,8 @@ namespace Faolan.Core.Network
 				//
 				// Rethrowing stops the host: .NET's default BackgroundServiceExceptionBehavior is StopHost, so an
 				// unhandled ExecuteAsync exception brings the process down with this log line as the cause. There is no
-				// useful degraded mode for a listener that cannot bind - see Gitea #409.
+				// useful degraded mode for a listener that cannot bind. (#409 weighed moving the bind itself here from
+				// the constructor and decided against it - see the note on Program.cs's pre-host block.)
 				Logger.LogCritical(e, "Failed to bind port {Port} - stopping the host. Another instance is probably already running.", LocalEndPoint.Port);
 				throw;
 			}
