@@ -135,6 +135,13 @@ namespace Faolan.GameServer.Combat
 			// `BuffedStats` and falls back to the gear bonus, so honoring it here is what makes a knockback-resisting
 			// BUFF actually resist one rather than only a knockback-resisting item.
 			//
+			// ⭐ The client's own name for `0x40D` is **`Weight`** (#625 - the exe's descriptor registry, which beats
+			// the LDB's `Knockback Resistance`), and that is not a contradiction, it is the MECHANISM: mass is how a
+			// physics engine resists a shove. Retail's own data agrees from the other end - `Turtle Formation` grants
+			// +100 of it, which is a stance making you harder to move. The name here stays `KnockbackResistance`
+			// because it is what our model uses the number FOR, and because `0x40D` never crosses the wire in either
+			// direction, so nothing the client draws depends on the label.
+			//
 			// The other two are sheet-only for now, like the attributes below: the stat is real and the client draws
 			// it, but no server model consults it - there is no stagger mechanic at all (#699), and damage deflection
 			// has no consumer either.
