@@ -3685,6 +3685,8 @@ namespace Faolan.Importer.Cli
 			foreach (var d in disagree)
 				Console.WriteLine(d);
 
+			StatNameReconcile(names);
+
 			if (string.IsNullOrEmpty(outDir))
 				return;
 

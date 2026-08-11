@@ -145,6 +145,31 @@ evidence, not as a citation, until the id is used.
 - The engine's Anarchy-Online lineage shows through the low ids — `4 Breed`, `13 MagicBurden`, `17
   MemorizationSlot` — which is itself a check on the range: those are names nothing in this codebase would invent.
 
+## ⭐ Which client source wins: the compiled registry, not LDB 615 (#625)
+
+There are **two** client-side name tables and they disagree on **306 ids** — `--report ldb-stat-names` prints
+every one. The compiled descriptor registry is authoritative, and the LDB's own entries are the argument:
+
+| id | LDB 615 says | the exe registry says |
+|---:|---|---|
+| `0x009` | Map Flags | `MaxConsciousness` |
+| `0x016` | AMS | `SpellCategory` |
+| `0x02E` | Bandolier Slots | `ItemSource` |
+| `0x030` | Organization rank | `ClanLevel` |
+| `0x0A9` | ChosenGod | **`HeroicMode`** |
+
+`Organization` is Anarchy Online's word for a guild; `AMS` and `Bandolier Slots` are AO mechanics that do not
+exist in this game. **The DISPLAY table was never fully re-authored when slots were repurposed; the compiled one
+was.** That is the reason to prefer it, rather than a preference — and it is reinforced by the registry naming
+the whole `1000000+` range the LDB never reaches at all.
+
+`0x0A9` is the worked example and the one that was shipping wrong: see below.
+
+⚠️ **Our own `CharacterStatId` inherited the same problem**, from an Anarchy Online stat list rather than from the
+LDB — `AwardedOmniTekTokens` (OmniTek is an AO faction) and `NanoInterval` (nano is AO's magic) sit on ids AoC
+uses for something else. 120 members name a different thing from the registry; the report splits them from the
+38 that are the same concept reworded.
+
 ## ⚠️ A name is not a consumer: `HeroicMode` (`0x0A9`) is stored and never read
 
 ⚠️ **This stat is named twice by the client, and the two disagree** (#625). The exe's descriptor registry
