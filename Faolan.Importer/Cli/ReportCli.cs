@@ -90,6 +90,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// Corpus-only: pair every captured fall with the impact SPEED the client reported for it (#515).
+			if (report == "fall-speed")
+			{
+				FallSpeed(NamedCapture.LoadAll(capturesDir));
+				return 0;
+			}
+
 			// RDB-only, no corpus: the client's archetype -> class membership (RDB 1000506), checked against the
 			// hard-coded ConanArchetypes (#469).
 			if (report == "class-hierarchy")

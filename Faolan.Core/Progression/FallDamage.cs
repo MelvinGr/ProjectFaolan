@@ -31,11 +31,32 @@ namespace Faolan.Core.Progression
 	///         dominates when the fall is 4 units and the free distance is 3.08.
 	///     </para>
 	///     <para>
-	///         The client's own reported impact SPEED orders the 24 events far more cleanly than the sampled height
-	///         does - it is the vertical velocity the landing <c>CharDCMove</c> carries, and it separates the debuff
-	///         tiers almost perfectly where the sampled height does not. A future pass driving this off velocity should
-	///         tighten every constant here. Kept on distance because distance is what the server can compute from state
-	///         it already tracks, without trusting a client-reported speed.
+	///         <b>The client's own reported impact SPEED orders the events far better than the sampled height does,
+	///         and that is now measured rather than asserted (#515).</b> It is the vertical velocity the LANDING
+	///         <c>CharDCMove</c> carries. Over the 39 falls <c>--report fall-speed</c> pairs, the rank correlation
+	///         against damage, per entity so the pool is fixed:
+	///     </para>
+	///     <para>
+	///         <code>
+	///         handle       falls   speed vs damage   drop vs damage
+	///         0x0802E5D4      30             0.886            0.460
+	///         0x110099BD       5             1.000            0.700
+	///         </code>
+	///     </para>
+	///     <para>
+	///         ⭐ <b>And the trade-off this was "kept on distance" to avoid does not exist.</b> The old note here said
+	///         distance was preferred because it is what the server can compute without trusting a client-reported
+	///         speed. But impact speed and fall height are the SAME quantity under <c>v² = 2gh</c>: a law in <c>v</c>
+	///         is the same law in <c>h</c> through a fixed transform the server applies to its own tracked height. So
+	///         the client's speed is the <b>calibration oracle</b> - the precise measurement the constants are fitted
+	///         against - and never a runtime input. Nothing is trusted at runtime; only the accuracy is gained.
+	///     </para>
+	///     <para>
+	///         ⚠️ The refit itself still needs the health POOL per event, which must come from the separate
+	///         <c>StatUpdateIIR</c> stream: <c>StatDamageIIR.StatValue</c> is the damage again on the environmental
+	///         form, and reading a pool off it makes every fall cost exactly 50% <i>by construction</i>. Two passes
+	///         have now died on that, which is why <c>--report fall-speed</c> ships the pairing without the fit.
+	///         ⚠️ Note also that <c>Delta</c> is in HUNDREDTHS of a health point.
 	///     </para>
 	///     <para>
 	///         <b>The debuff tier is a function of the damage as a fraction of max health</b>, which separates the 24

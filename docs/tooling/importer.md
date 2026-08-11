@@ -343,6 +343,13 @@ groups, which is the #518 question),
 row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
 line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;
 see [chat.md](../subsystems/chat.md)),
+`fall-speed` (#515: pair every captured FALL with the impact SPEED the client reported for it — the landing
+`CharDCMove`'s `Velocity.Y`. ⭐ It confirms the ticket's premise by measurement: over 39 falls the rank
+correlation against damage is **0.886 / 1.000** per entity for the client's speed against **0.460 / 0.700** for
+the drop we reconstruct from position samples. ⚠️ Two traps it documents rather than falls into — `Delta` is in
+HUNDREDTHS of a health point, and a fall's airborne run cannot be bounded by the velocity SIGN because the client
+sends exactly one downward-velocity record per fall, so the drop has to come from a position-max window. It
+deliberately does NOT refit `FallDamage`, which needs the health pool per event),
 `ldb-stat-names` (the client's stat NAME tables — LDB category 615, plus a three-way reconciliation against the
 compiled descriptor registry recovered into [`aoc-client-stat-names.tsv`](../re/aoc-client-stat-names.tsv) and
 against `CharacterStatId`, #625. ⭐ It prints the **306 ids where the client's own two sources disagree** and says
