@@ -37,6 +37,59 @@ Attributes are the one place the spell and item regions disagree on SCALE: a spe
 (`Potion of Strength (4h)` carries `0x324`=2, and the client's description for the sibling `0x32E` records reads
 "Augmente la Dextérité de 1/2"), while an item stores the same attribute ×10.
 
+## ⭐ The POLYMORPH family — what its values are, and what the wire carries (#709)
+
+**296 rows over 231 spells** set appearance fields rather than combat ones — `Magic Morph Wolf`, `Fox Lady
+ShapeShift`, `Ursine Bond`, `Morph : Acheronian Soul`, `Avatar of Destruction`. `--report spell-effect-gap
+--report-arg 53110` lists them. Two questions had to be answered before any of it could be applied, and both
+now are.
+
+### The values are ids we already resolve
+
+| stat | distinct values | every one resolves as |
+|---|---:|---|
+| 359 `Monster Data` | 21 | **RDB 1010201** (MonsterData) — 21 of 21 |
+| 64 `Head Mesh` | 17 non-zero | **RDB 1010201** — 17 of 17, ⚠️ *not* 1010001 |
+| 21 `BCC` | 3 | **RDB 1010203 + 1010501** — all three, including the two low ones |
+
+⚠️ **`Head Mesh` does not hold a mesh.** Its values are MonsterData records, the same type as `Monster Data`'s
+— which is exactly the shape `preview.bin` uses for a head: `<previewresource attractortype="33" name="Head"
+resourceid="…" resourcetype="1010201"/>` (see [`client-settings.md`](../subsystems/client-settings.md)). Two
+independent decodes, one from a spell effect and one from a client-authored file, agreeing that a head is a
+1010201 attachment.
+
+⚠️ And **the two low `BCC` values are not a different phenomenon.** `Grizzly Hide` / `Avatar of Destruction`
+carry `10237` / `12488` where the true morphs carry `3986836`, which read as a magnitude beside a record id —
+but all three resolve as the same type pair, so they are record ids too and `12488` is simply a low one. (It is
+also the constant `NpcStatCore.Bcc` on every captured NPC.)
+
+`Scale` (360) runs 50..300 and is a PERCENT of normal size, the same quantity as `NpcStatCore.MonsterScale`.
+
+⭐ **So a polymorph is "wear this NPC's appearance columns".** Every field it sets is one we already hold on
+`NpcStatCore`: `MonsterData`, `HeadMesh`, `MonsterScale`, `Race`, `SuperFamily`, `Bcc`, `Radius`, `Side`.
+Nothing here needs decoding; it needs an applier.
+
+### The wire form is `StatIIR`, and retail is attested using it
+
+`--report morph-stats` censuses all **48,181** captured `StatIIR` (0xF98E10B3) records — the message that sets
+ONE stat to ONE value on ONE entity — against the shapeshift set:
+
+| stat | in the corpus |
+|---|---|
+| 360 `Scale` | **103 records, entity class `0xC350` (Character), values 70 and 80** |
+| 359 `Monster Data` | 4, but on a `SimpleDynel` and all zero — not a morph |
+| 21, 33, 47, 64, 89, 121, 421 | absent |
+
+⭐ So the CHANNEL is settled without inventing anything: an appearance stat rides an ordinary `StatIIR` on the
+character, and retail does it. No respawn, no `SimpleDynelVisualChange`, no new message.
+
+⚠️ **Only `Scale` is attested.** The other seven stats never appear in the corpus, so sending them is an
+extrapolation from one attested member of the set — a well-founded one (they are all the same kind of field on
+the same message) but an extrapolation, and it is why nothing is wired yet. The report prints the whole 77-id
+census beside the morph rows precisely so that "absent" reads as a measurement rather than a broken scan.
+
+Open work tracked in Gitea #709.
+
 ## One row per ELEMENT, and how a reader resolves the set (#783)
 
 A `SpellStatEffect` row is **one element of the record**, keyed `(SpellId, Sequence)` in record order. It used to be

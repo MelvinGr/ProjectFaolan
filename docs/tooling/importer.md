@@ -315,6 +315,9 @@ where that mattered),
 `method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
 and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
 evidence that decides whether a ticket is "decode it" or "capture it"),
+`morph-stats` (does retail ever push a SHAPESHIFT stat on the wire? Censuses every captured `StatIIR` against the
+POLYMORPH set — `Scale` is attested 103 times on a Character, the other seven never appear — and prints the whole
+77-id census beside it so an absence reads as a measurement rather than a broken scan. Gitea #709),
 `spell-effect-gap` (Db-only, no corpus and no RDB: how much of the imported `SpellStatEffects` table reaches a live
 engine, and for the rest, which of the two gates stopped it — the KIND one, or the STAT one. It asks
 `BuffStatEffects.Classify` and `SpellPoolEffects.Applies` rather than re-deriving them, so it cannot report a policy

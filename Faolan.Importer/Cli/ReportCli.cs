@@ -256,6 +256,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "morph-stats":
+				{
+					MorphStatsReport(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "buff-descriptor":
 				{
 					BuffDescriptor(NamedCapture.LoadAll(capturesDir), arg);
