@@ -110,48 +110,52 @@ namespace Faolan.Core.Database.Tables
 		public uint? Disposition { get; set; }
 		public uint? TemplateId { get; set; }
 
-		// The client's own `npc_type` (NpcStats field 14) - the NPC's KIND, which is one of the inputs to the
-		// nameplate's rank decoration (#508).
+		// The client's own `npc_type` (NpcStats field 14) - the NPC's RANK, and what the nameplate renders as its
+		// Minion / MiniBoss / Boss title (#508, named in #797).
 		//
-		// ⚠️ **It is NOT "the skull rank", and this comment used to say it was.** The identification came from one
-		// chat annotation - `talked to npc keira (skulls next to name. like king conan)` - and Keaira (template
-		// 15090) and King Conan (1917) do both carry npc_type 3. That is real evidence for those TWO NPCs and it was
-		// then generalised to all 59 rows sharing the value, which does not survive reading the roster: it contains
-		// `Tamed Puma` and `Pleasurable Company` (a PET and a Tortage civilian), `Mama Bear`, `Yeti` and
-		// `Decaying Corpse`, and its health spans 12,600 to 300,000,000 inside the one value. Melvin, who has played
-		// the game, says the skull is a special rank carried by CERTAIN npcs and that a 59-row list is far too long.
+		//   1 (55)   Minion    - plain creatures; ZERO are vendors and ZERO have a conversation, mostly hostile trash
+		//   2 (10)   MiniBoss  - a small named group: Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf
+		//                        Iceblade - and the Tortage destiny NPCs (Delia, Sakumbe, Valerius), see the warning
+		//   3 (59)   Boss      - King Conan, Saddur, Ape King, Commander Vakarr, Battlemaster Torgvall, Head Poacher
+		//   4 (897)  no title  - ordinary interactive NPCs; 534 are shop vendors and 513 have a conversation
 		//
-		// So 3 is a superset of, or merely correlated with, whatever the client actually reads to draw a skull. The
-		// client models at least three tiers - it ships `MiniBoss` and `Boss` tokens, SEPARATE `EvtDeathMiniBoss` /
-		// `EvtDeathFullBoss` script events, and separate `miniboss_icon` / `boss_icon` nameplate icons beside a
-		// `SkullLeft`/`SkullRight` widget pair - and nothing here has been mapped to those. There is also an
-		// unimported `Difficulty` stat (1398 / 0x576) that no NPC record has been checked for.
+		// ⚠️ **It is NOT "the skull rank", and this comment used to say it was.** That came from one chat annotation -
+		// `talked to npc keira (skulls next to name. like king conan)` - and Keaira (template 15090) and King Conan
+		// (1917) do both carry 3, which is real evidence for those TWO NPCs and was then generalised to all 59 rows
+		// sharing the value. The roster does not survive it: `Tamed Puma` and `Pleasurable Company` (a PET and a
+		// Tortage civilian), `Mama Bear`, `Yeti`, `Decaying Corpse`, health spanning 12,600 to 300,000,000 inside the
+		// one value. **The skull is `Normalset` (stat 205), pinned separately** - see that column.
 		//
-		// ⚠️ Do NOT build loot, XP or difficulty on `npc_type == 3` meaning boss until the selector is pinned: find
-		// what the client reads to show `SkullLeft`/`SkullRight` and to choose between the two icons. The widgets are
-		// constructed in the target-window builder (`FUN_0163b370`, stored at `+0x13b`/`+0x13c`); their VISIBILITY is
-		// set elsewhere and that writer is the answer.
+		// ⚠️ The health ordering agrees with the rank ladder (2 runs 98k-937k against 3's up-to-300M), but do NOT
+		// derive loot, XP or difficulty from it: a rank TITLE is what the client draws, and nothing measured says
+		// retail scales rewards off this field.
 		//
-		// The four observed values, characterised by what each group can DO rather than by guessing at names:
-		//   1 (55)  plain creatures - ZERO are vendors and ZERO have a conversation; mostly hostile trash
-		//   2 (10)  a small named group, mixing Tortage destiny NPCs (Delia, Sakumbe, Valerius) with named enemies
-		//           (Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf Iceblade) - see the V0 below
-		//   3 (59)  named/special NPCs, bosses among them - but see the warning above; NOT simply "the skull rank"
-		//   4 (897) ordinary interactive NPCs - 534 are shop vendors and 513 have a conversation
+		// ⭐⭐ SOLVED (#797): it is the nameplate's rank TITLE, and 1 = `Minion`, 2 = `MiniBoss`, 3 = `Boss`, 4 = no
+		// title. This is a code path, not an inference from the roster:
 		//
-		// ⭐ It is the nameplate's Minion / Mini Boss / Boss TITLE (#758). The nameplate builder `FUN_011d8b00` reads a
-		// non-stat member - dynel `+0x330` dereferenced at `+0x18` - and renders those three LDB category-100 texts
-		// for values 1, 2 and 3, and nothing at all otherwise. That is this field: the DOMAIN is exact (`{1,2,3,4}`
-		// against a `1|2|3` test, with 4 the untitled 897-row majority of ordinary interactive NPCs), the MEMBERSHIP
-		// matches the labels (3 = King Conan / Saddur / Ape King / Commander Vakarr; 2 = Taskmaster Olaf / Pict Chief
-		// / Argus the Thief; 1 = Rabbit / Hen / Spiderling / Target Dummy), the health ordering agrees (2 runs
-		// 98k-937k against 3's up-to-300M), and the title RENDERS ON OUR SERVER - so whatever fills `+0x330` is
-		// already something we send, and this is the only 4-valued NPC field we send that could feed it.
+		//   `FUN_01458d40` - the SimpleChar spawn APPLY, called from `FUN_011215e0` - walks the spawn's
+		//   `ProtoCoreCharacterIIR` and copies `npc_stats` (the submessage pointer at message `+0x5c`) field by field:
 		//
-		// ⚠️ Value 2 also holds the Tortage destiny NPCs (Delia, Sakumbe, Valerius), and "Mini Boss" over a friendly
-		// quest-giver reads wrong. Either the builder gates the title on hostility outside the decompiled fragment,
-		// or it genuinely shows there - one in-client look at Delia's nameplate settles it. Recorded rather than
-		// smoothed over; see docs/protocol/gaps.md.
+		//       +0x18 -> SetStat(0x79)   SuperFamily          = NpcStats field 5
+		//       +0x2c -> SetStat(0xCD)   Normalset            = field 10
+		//       +0x30 -> SetStat(0x7F)   NPCProfessionName    = field 11
+		//       +0x34 -> SetStat(0xC9)   NPCProfessionType    = field 12
+		//       +0x3c -> [[dynel+0x330]+0x18]                 = field 14, THIS FIELD
+		//
+		//   The same window copies three fields of the SIBLING `stats` submessage (+0x58) too - `+0x34` -> LooksPacket
+		//   (field 12), `+0x48` -> HeadMesh (17), `+0x58` -> BCC (21). Seven field->stat identities across two
+		//   messages, every one naming the same protobuf base offset (+0x08), which puts NpcStats field 14 at `+0x3c`
+		//   - the slot written into the very member the nameplate builder reads. `FUN_011d8b00` @011d8f35 then does
+		//   `MOV ECX,[EBX+0x330]; MOV EAX,[ECX+0x18]` and
+		//   DEC/JZ-chains 1 -> `"Minion"`, 2 -> `"MiniBoss"`, 3 -> `"Boss"`, rendering nothing otherwise. (A
+		//   `Normalset == 4` short-circuits all of it to `"Pray"` - the critter tier - before the rank is consulted.)
+		//
+		// So the domain `{1,2,3,4}` against the client's `1|2|3` test is not a coincidence, and 4 being the untitled
+		// 897-row majority of ordinary interactive NPCs is exactly right.
+		//
+		// ⚠️ Value 2 also holds the Tortage destiny NPCs (Delia, Sakumbe, Valerius), so "MiniBoss" genuinely does
+		// appear over a friendly quest-giver unless the builder gates it on hostility somewhere outside this path.
+		// That is retail's own data saying so, not a decode doubt - one in-client look at Delia settles which (#758).
 		//
 		// ⚠️ NULL would silently drop the rank, so every NPC renders unranked - which is why NpcStatCoreRankTests
 		// gates the column as fully populated rather than trusting that it happens to be. Nothing here needed

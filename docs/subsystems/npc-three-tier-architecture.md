@@ -68,6 +68,37 @@ table:
 Constant-everywhere fields (`Side`, `MovementMultiplier`, `Mount*`, the `*Blend` flags, `SpawnAnimation`
 which is zeroed on every fresh spawn) are hardcoded in the builder rather than stored.
 
+## The nameplate RANK: `npc_type` is Minion / MiniBoss / Boss (#797)
+
+`NpcStats.npc_type` (field 14, stored as `NpcStatCore.NpcType`) is the NPC's **rank**, and the client renders it
+as the title line on the nameplate:
+
+| `npc_type` | title | rows | who |
+|---:|---|---:|---|
+| 1 | `Minion` | 55 | plain creatures — zero vendors, zero conversations, mostly hostile trash |
+| 2 | `MiniBoss` | 10 | Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf Iceblade — and the Tortage destiny NPCs |
+| 3 | `Boss` | 59 | King Conan, Saddur, Ape King, Commander Vakarr, Battlemaster Torgvall, Head Poacher |
+| 4 | *(none)* | 897 | ordinary interactive NPCs — 534 vendors, 513 with a conversation |
+
+A `Normalset == 4` short-circuits the whole thing to `Pray` (the critter tier: Badger, Chicken, Hen, Moose)
+before the rank is consulted.
+
+This is a code path, not an inference from the roster. The nameplate builder reads a **non-stat** member —
+`[[dynel+0x330]+0x18]` — and DEC/JZ-chains it into the three LDB category-100 tokens; the SimpleChar spawn apply
+writes that member from the spawn's own `npc_stats` submessage, alongside four other fields whose destination
+stats the client's own name table names (`SuperFamily`, `Normalset`, `NPCProfessionName`, `NPCProfessionType`)
+and three more from the sibling `stats` submessage (`LooksPacket`, `HeadMesh`, `BCC`). All seven identities fix
+the same protobuf base offset, which is what puts field 14 at the slot being written.
+[V1: tools/ghidra/DumpNpcTypeRank.java]
+
+⚠️ **It is NOT the skull rank** — that is `Normalset` (stat 205), pinned separately. And the health ordering
+agrees with the ladder (2 runs 98k–937k against 3's up-to-300M) without licensing loot or XP to be derived from
+it: a rank title is all the client draws.
+
+⚠️ Value 2 also holds Delia, Sakumbe and Valerius, so `MiniBoss` appears over a friendly Tortage quest-giver
+unless the builder gates the title on hostility somewhere off this path. That is retail's own data saying so, not
+a decode doubt; one in-client look settles which (#758).
+
 ## One placement, several sightings (`PlacementId`, #713/#718)
 
 A captured spawn is keyed on `MapId` + exact XYZ, so **every sighting of a creature that is not exactly where it was
