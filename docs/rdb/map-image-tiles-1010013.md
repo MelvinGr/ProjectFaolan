@@ -44,7 +44,7 @@ The tile table at byte 48 reproduces the carved SOI offsets exactly. The ten hea
 partly understood: `1,1,512,512` is level 0's grid and tile size and `0,87882` is its `(offset,size)`, but the
 trailing `3,3,32,32` does not continue that pattern (level 1 is 3×3 with **256**-px tiles, not 32).
 
-## ⚠️ Not usable as an overlay basemap yet
+## ⚠️ Why the lava fit failed (superseded — see the transform below)
 
 1010209 is trivially georeferenced — it spans exactly the `1070003` `<tilemap>` extent, so world → pixel is a
 scale. **1010013 is not.** It carries a decorative frame, and the drawing extends past the playfield to show
@@ -60,5 +60,33 @@ The bounds are not in the neighbouring per-playfield resources either: `1010300`
 export metadata and `1060666` is the playfield environment (sky dome, fog). The remaining candidates are the
 undecoded `MTI1` header words and trailer, and `1010220`.
 
-So the image is usable as a picture today, but substituting it for 1010209 in a spawn render would misplace
-every marker. Open work tracked in Gitea #492.
+## ⭐ The transform, recovered from the CLIENT (#492)
+
+The ticket's own last suggestion was the one that worked: *"whatever draws the map window has to convert player
+position to a pin, so the transform is in code."* It is, in `MapGUI\RegionMapRenderer.cpp`
+(`FUN_01652460`, the waypoint placer), and it is a **pure per-axis scale with Z inverted** — no offset table, no
+per-map georeference:
+
+```
+pixelX = worldX              * (imageWidth  / extentX)
+pixelY = (extentZ - worldZ)  * (imageHeight / extentZ)      // ⚠️ Z is FLIPPED, X is not
+```
+
+(plus the view rect's own centring term, `((right - left) + 1) * 0.5`, which is a pan and not part of the
+georeference.)
+
+**`extentX` / `extentZ` are the PLAYFIELD's world extent**, handed to the renderer by its caller
+(`FUN_015818a0` → `FUN_01650270`) as a two-float struct read from the playfield record's `+0xFC` / `+0x100` as
+**unsigned** ints. That is the same quantity `1010209` is georeferenced to — so the two basemaps share one
+georeference after all, and the decorative frame is drawn INSIDE that extent rather than extending it.
+
+The renderer addresses its image as the texture **`RegionMaps/<playfieldId>`**, falling back to
+`RegionMaps/default`, and works in **metres per pixel** (`RegionMapRenderer.xml` declares
+`min_meter_per_pixel = 4`, `max_meter_per_pixel = 100`).
+
+⭐ So the ~20 % axis mismatch above is explained rather than mysterious: the lava really is drawn with artistic
+licence, and it was never going to anchor a fit that has no free parameters to absorb it. The remaining step is a
+data lookup — read the playfield's extent pair — not a decode.
+
+So the image is usable as a picture today; substituting it for 1010209 in a spawn render needs that extent pair
+read for the map being rendered. Open work tracked in Gitea #492.
