@@ -229,6 +229,7 @@ namespace Faolan.Importer.Cli
 
 			int carriers = 0, xpAgree = 0, cashAgree = 0, noChapter = 0, chapterSilent = 0;
 			int repeated = 0, contradicted = 0, first = 0, last = 0, middle = 0, unordered = 0;
+			int atMin = 0, atMax = 0, multiStep = 0;
 			var rows = new List<string>();
 
 			foreach (var carrier in quests.Where(q => q.FieldF0 != 0).OrderBy(q => q.QuestLineId))
@@ -252,6 +253,23 @@ namespace Faolan.Importer.Cli
 				var siblings = byLine[carrier.QuestLineId].Where(q => q.QuestId != carrier.QuestId && q.HasSnapshotRecord).ToList();
 				repeated += siblings.Count(q => q.FieldF0 == carrier.FieldF0);
 				contradicted += siblings.Count(q => q.FieldF0 != carrier.FieldF0);
+
+				// The WIDER position measure: is the carrier at the line's MINIMUM captured sequence? The strict test
+				// below drops 17 of the 31 lines for want of a full order, which is most of the evidence - and a
+				// sequence of 0 is a real captured value on this table, not a missing one. Counted separately rather
+				// than by loosening the strict one, so the two can be compared.
+				// ⚠️ Gated on min != max, not merely on more than one step. 14 of the 31 lines have every captured
+				// step at the SAME sequence, and on those "at the lowest" and "at the highest" are both trivially
+				// true - counting them inflates both columns and makes the finding look like a wash.
+				var all = byLine[carrier.QuestLineId];
+				var lo = all.Min(q => q.JournalSequence);
+				var hi = all.Max(q => q.JournalSequence);
+				if (lo != hi)
+				{
+					atMin += carrier.JournalSequence == lo ? 1 : 0;
+					atMax += carrier.JournalSequence == hi ? 1 : 0;
+					multiStep++;
+				}
 
 				// Position, only where every step of the line carries a captured sequence.
 				var steps = byLine[carrier.QuestLineId];
@@ -291,6 +309,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  @+0xf8 == MainQuest.cash_reward  {cashAgree,4} / {carriers}");
 			Console.WriteLine($"  constancy across CAPTURED siblings: {repeated} repeat the value, {contradicted} carry a different one");
 			Console.WriteLine($"  carrier position in its line (fully-ordered lines only): first {first}, last {last}, middle {middle}; {unordered} line(s) not fully ordered");
+			Console.WriteLine($"  ⭐ over the {multiStep} carriers whose line spans MORE THAN ONE sequence: {atMin} sit at its lowest, {atMax} at its highest");
+			Console.WriteLine("     - and `XpReward` is the other way round (the LAST step, 25 of 26), so the two pairs are");
+			Console.WriteLine("       positionally COMPLEMENTARY: one on the step you are offered, one on the step that pays.");
 			foreach (var r in rows)
 				Console.WriteLine(r);
 

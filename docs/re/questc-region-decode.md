@@ -263,12 +263,33 @@ the client catalog's `xp_reward`/`cash_reward` pair plus a magnitude coincidence
 disproved it: with both set to large distinctive values the quest pane showed the XP from `@+0x28` and left
 `Money:` blank. **A field-name match in a neighbouring data file is not evidence about the wire.**
 
-What remains true, and unexplained: the catalog gives a quest LINE exactly one `xp_reward`/`cash_reward` pair,
-and the magnitudes coincide — the `[Thunder River]` lines carry `xp_reward = 45800`, exactly the captured
-`@+0xf0` of quests 13895 and 14427, and the catalog's low-level cash/xp ratios (715/60, 1000/157, 455/36 →
-0.08–0.16) match the wire's `@+0xf8`/`@+0xf0` (150/15, 370/44, 550/66 → 0.10–0.12). A LINE-level reward the
-step pane never renders would fit both observations — but that is a guess, and the last guess here was wrong,
-so the two keep their offsets as names.
+#### ⛔ And they are not the LINE's reward either (#759)
+
+The line-reward reading was the standing hypothesis and it is now **falsified three times over**, by
+`--report rdb-quest-catalog`'s `LineRewardCheck`, which joins every carrier to the catalog's `MainQuest`:
+
+1. **The populations are disjoint.** All 31 carriers sit on a line whose catalog reward is `0`, and all 26 lines
+   the catalog *does* pay have no carrier at all. `@+0xf0 == xp_reward` on **0 of 31**; `@+0xf8 == cash_reward`
+   on **0 of 31**.
+2. **It is not constant across the line.** Of the carriers' captured siblings, 0 repeat the value and 4 carry a
+   different one — a line-scoped field cannot do that.
+3. **The supporting coincidence was a magnitude collision.** `[Thunder River]`'s `xp_reward = 45800` was read as
+   matching the captured `@+0xf0` of quests 13895 and 14427 — but 13895 is on line 1734
+   `[King_Conans_Throneroom] Storming the Gate` and 14427 on line 1976 `[ACG_Oasis_of_Zaara] Sacrilegious
+   Rites`. Neither is a Thunder River line, and the three that are (1961/1963/1971) carry no `@+0xf0`. 45800 is
+   simply what a level-70 XP reward is worth, so it recurs across unrelated content.
+
+#### ⭐ What survives: the two pairs are positionally COMPLEMENTARY
+
+The carrier is the step at the **start** of its line: over the 16 carriers whose line spans more than one
+captured sequence, **14 sit at its lowest and 0 at its highest** (the strict fully-ordered measure agrees —
+first 12, last 0, middle 2). `XpReward`/`MoneyReward` are the other way round, on the **last** step of a line
+(25 of 26).
+
+So the reading that fits everything is **one pair per quest at each end of it**: `@+0xf0`/`@+0xf8` on the step
+you are OFFERED — a precomputed "you will receive", scaled to `Field118`, which the step pane never renders
+because it belongs to the offer dialog — and `@+0x28`/`@+0x20` on the step that PAYS. That is still a reading,
+not a decode, so the two keep their offsets as names. Open work in Gitea #759.
 
 ⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 at level 23 rising to ~1.10 at 80), but 99
 samples do not close the law. Do not derive one from the other.
