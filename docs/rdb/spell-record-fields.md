@@ -144,6 +144,37 @@ functions in the image test it:
 That is three named functions to read, instead of another sweep of 32 bits against predicates — and it hands
 bit 20 over with a consumer already attached.
 
+### ⭐ Read: bit 16 gates RE-INSTANTIATING a magic on the SPAWN path
+
+`FUN_007f43a0` is `CoreMagicHolder::Magic` (it names itself in its own log channel), and its one caller is
+**`FUN_01458D40` — the SimpleChar spawn apply**, the same function that copies `npc_stats` field by field
+(#797/#800). It is handed the spawn message's magic list and walks it; per magic it looks the spell record up,
+logs `SpellItem_t <id> is missing from the RDB` when it cannot, and otherwise:
+
+```
+else if ((*(byte *)(spell + 0xCA) & 1) != 0) {           // bit 16 SET
+    SetStat(0x96 /* 150 CastingLevel */, magic->level);
+    apply(..., (*(uint *)(spell + 0xC8) >> 0x14) & 1 /* bit 20 */, ...);
+}
+```
+
+The other two consumers take the CLEAR branch, and both are about what the effect reaches: `FUN_007F4DF0` adds
+the **position** entries of a target list to the effect only when the bit is clear (entities are added either
+way), and `FUN_008DA660` aborts on a failed reachability check only when it is clear.
+
+⭐ So the mechanism behind the association is: **bit 16 marks a magic the client RE-CREATES when the entity
+streams in** — a persistent effect rather than an instant one. That is why it tracks "carries a duration" so
+closely, and it accounts for the residual going both ways: a permanent effect states no duration and still has to
+be re-applied (the 62), while a timed effect with nothing to re-instantiate states one without the bit (the 131).
+
+⚠️ Still a reading. No predicate partitions the bit, and the reading is inferred from what the three consumers do
+with it rather than from a name. What it does settle is that the bit is about the effect's LIFETIME on the
+client, not about its cost, school or targeting.
+
+⚠️ It also bears on Gitea #677 (buffs on an entity streaming into view): the spawn body's magic list is the
+channel a streaming observer needs, and bit 16 is what says which of those magics the client will actually
+re-create from it.
+
 ### ⭐ Word 0 is a CLASS TAG — and the whole head is generic, not a spell head
 
 `0xC76B` (51051) appears **exactly once** in `AgeOfConan.exe`, in `FUN_0076bef0` — slot 23 of
