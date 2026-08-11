@@ -64,8 +64,9 @@ namespace Faolan.Importer.Cli
 		// compared - and a map's SUB-AREAS are separate playfield ids sharing one coordinate space, which is exactly
 		// how that happens.
 		//
-		// ⚠️ A pair is a candidate, not a duplicate: two playfields CAN legitimately hold the same creature at the
-		// same spot. What this puts a number on is which map PAIRS overlap, how much of the smaller map is involved,
+		// ⚠️ A pair is not a defect (#728): a row records that retail streamed this NPC to a client in that playfield,
+		// and near a boundary retail streams the neighbour's NPCs across it - so both rows are true and both are
+		// served, each to its own map. What follows is a census of where that happens, not a list to act on. What this puts a number on is which map PAIRS overlap, how much of the smaller map is involved,
 		// and whether the twins agree on the columns a re-harvest of the same NPC would agree on - then
 		// `CrossMapSightings` below decides, and on the corpus it decides against the legitimate reading on two of
 		// the three pairs. Tortage day/night was the example of a legitimate pair and it is NOT one: one capture
@@ -153,33 +154,36 @@ namespace Faolan.Importer.Cli
 			CrossMapVotes(mapPairs, sightings, maps);
 		}
 
-		// WHICH id is the right one, and the only question that matters once a pair is known to be one NPC (#728).
-		// Spawns are served per `MapId`, so a row under the wrong id spawns an NPC in a playfield it does not stand in.
+		// ⭐⭐ A DIAGNOSTIC, NOT A DEFECT LIST. A cross-map pair is TWO TRUE OBSERVATIONS, and both rows are wanted
+		// (#728, settled by Melvin: *"spawns are for the map (id) they are on"*).
 		//
-		// ⛔⛔ **THE MAJORITY VOTE IS INVERTED. Do not resolve on it - this prints it to show that it fails.**
+		// A row means "retail streamed this NPC to a client standing in this playfield". Near a sub-area boundary
+		// retail streams the neighbour's NPCs across it, so it genuinely sends that Wharf Rat both to a player in the
+		// Common District AND to one standing in Old Tarantia looking in. Two rows record two things retail did.
+		// `GetNpcSpawns(mapId)` then serves strictly by map and a player is on exactly one map, so no client ever
+		// receives both and nothing is doubled - keeping both is what reproduces retail on BOTH sides of the boundary,
+		// and deleting either is what would break it (an NPC popping out of existence at a district line).
 		//
-		// The obvious rule is "a spot's true map is the one most captures agree on". On the Wharf Rats it answers
-		// `2000` 15 times out of 15, by 8 captures to 1 - and it is WRONG: the maintainer, who had just walked it,
-		// reports them in the Common District (2020).
+		// ⚠️ The one real divergence, and it is cosmetic: the two rows are independent entities in two zones, so a rat
+		// killed by someone in the Common District is still standing for an observer in Old Tarantia. Retail has one
+		// NPC streamed across the line. Not worth a shared-entity model.
 		//
-		// The mechanism is general, which is why this is a trap and not a bad-luck sample. **An NPC near a sub-area
-		// boundary is seen far more often from OUTSIDE it than from inside.** A session standing in the parent
-		// playfield streams the neighbour's NPCs into interest range and files them under the playfield the PLAYER is
-		// in; only a session that actually crosses the transition files them under the sub-area. So the vote counts
-		// OBSERVERS, not placements, and the majority is the population that never went in.
+		// ⛔ The vote below is printed to show that the obvious "resolve it" rule FAILS, so nobody builds one later.
+		// "A spot's true map is the one most captures agree on" answers `2000` 15 times out of 15, by 8 captures to 1
+		// - against the maintainer, who had just walked it and puts them in 2020.
 		//
-		// The sighting counts say the same thing: the single "losing" capture is `..._annotated_3` with 145 Wharf Rat
-		// sightings - the session that walked the district and narrated it - against 1-17 glancing sightings in each
-		// of the eight "winners".
+		// The mechanism is general, which is why this is a trap and not a bad-luck sample: **an NPC near a sub-area
+		// boundary is seen far more often from OUTSIDE it than from inside**, so the vote counts OBSERVERS rather than
+		// placements and the majority is the population that never went in. The sighting counts say it plainly - the
+		// single "losing" capture is `..._annotated_3` with 145 Wharf Rat sightings, the session that walked the
+		// district, against 1-17 glancing sightings in each of the eight "winners".
 		//
-		// ⭐ What the evidence actually supports is the RE-KEY, not the vote: a capture that files one spot under BOTH
-		// ids is a capture that crossed the boundary mid-stream, and it is the only kind of session whose attribution
-		// is worth anything. A capture that only ever says "parent" has merely never been inside.
+		// So the vote answers "where was the observer", which is not the question, and there is no question left.
 		private static void CrossMapVotes(IEnumerable<(uint A, uint B)> mapPairs,
 			Dictionary<(string Capture, uint Template, int X, int Z), HashSet<uint>> sightings, IReadOnlyDictionary<uint, string> maps)
 		{
 			Console.WriteLine();
-			Console.WriteLine("   ⭐ WHICH id wins, voted per spot across captures (a spawn is served by its MapId, so the loser is a bug):");
+			Console.WriteLine("   the per-spot vote across captures - ⛔ a DEAD END kept as a warning, not a resolution (#728):");
 			foreach (var (a, b) in mapPairs)
 			{
 				// (template, spot) -> how many captures filed it under a / under b.
@@ -199,7 +203,7 @@ namespace Faolan.Importer.Cli
 				var winsB = contested.Count(v => v.Value.B > v.Value.A);
 				var tied = contested.Count - winsA - winsB;
 				Console.WriteLine($"   {a} <-> {b}  contested spots {contested.Count,3}:  {a} wins {winsA,3}   {b} wins {winsB,3}   tied {tied,3}"
-					+ "   ⛔ counts OBSERVERS, not placements - see the comment; do not resolve on this");
+					+ "   ⛔ counts OBSERVERS, not placements - both rows are wanted");
 				foreach (var v in contested.OrderByDescending(v => Math.Abs(v.Value.A - v.Value.B)).Take(5))
 					Console.WriteLine($"        template {v.Key.Template,-7} at ~({v.Key.X * StationaryPlacementResolver.ClusterRadius,5}, {v.Key.Z * StationaryPlacementResolver.ClusterRadius,5})"
 						+ $"   {a}:{v.Value.A} vs {b}:{v.Value.B}");
