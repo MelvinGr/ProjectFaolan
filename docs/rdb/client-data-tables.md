@@ -301,7 +301,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000512 | `PlayfieldPvPData_c` | 5 | 16 B | 8 B | |
 | 1000513 | `RDBComboLookup_c` | 960 | 16 B | 24 B | 12 classes × 80 levels — decoded below |
 | 1000514 | `ArmorMitigation_c` | 0 | 16 B | — | empty (see below) |
-| 1000520 | `CoreTokenHolder` | — | — | — | the count word is not a count — some other shape entirely |
+| 1000520 | `CoreTokenHolder` | 29 | 14 B | variable | the count is a BYTE, not a word — decoded below |
 | 1000625 | `TokenStateTable` | 1 | 16 B | 4 B | |
 | 1065101 | `FeatClassTable_c` | 49 | 16 B | 16 B | |
 | 1065103 | `PvPConRating_c` | 200 | 16 B | 8 B | |
@@ -310,7 +310,7 @@ String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 10005
 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
 Decoded past their shape: 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
-1000517, 1000518, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
+1000517, 1000518, 1000520, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
@@ -577,6 +577,57 @@ each, recovered here from nothing but which line ids two trees have in common.
 ⚠️ **The perk NAMES are not reachable.** `1000043`'s `featId` column matches **neither** `Feats.Id` nor
 `FeatIdMaps.WireFeatId` — 0 of 9,916 in both — so it is a third id space, and nothing we hold names the 240
 lines. That, not the tree structure, is what #150 is now blocked on.
+
+## Decoded: 1000520 `CoreTokenHolder` — the alternate-CURRENCY catalog
+
+The one table whose *shape* the stride sweep could not even state, because its header is not the usual one: the
+sweep read the fourth word as a count and got `202875138`. The parse callback (`FUN_00813E80`, off loader
+`FUN_00813D20`) says why — after seeking past the 12-byte RDB header it reads **two BYTES**, a version and a
+count, and every record is variable-width:
+
+```
+[u32 type][u32 id][u32 version]          # the usual 12-byte RDB-Id header
+[u8 fileVersion = 2][u8 count = 29]
+count × [u8 tokenId][u16 nameLen][name][u8 group][u32 ldbNameId][u32 ldbDescriptionId]
+```
+
+⚠️ **The name is gated on `fileVersion`** — the callback reads it only `if (1 < version)`, so a v1 file has no
+names at all and a reader that assumes them would desync on one. This build ships v2.
+
+⭐ **The two u32s are LDB ids, and they are COMPUTED from the name**: `elf28("<name>_Name")` and
+`elf28("<name>_Description")`, the same 28-bit hash the bark tokens use (see
+[ldb-string-index.md](ldb-string-index.md)). It reproduces **26 of the 29 rows exactly**, and the three misses
+are the AltAdvancement family, whose LDB tokens are the SHORT spelling — `AAPvEToken`, `AAPvPToken`,
+`AAGeneralToken` — which then hit exactly too. **29 of 29.** The client's own `SimpleTrophy1_Name` /
+`RareRelic_Name` / … string block at `0203E5DC` is the independent confirmation that those tokens are real.
+(They do not resolve against our decrypted LDB pages, so the display TEXT is still out of reach; the ids and
+their preimages are not.)
+
+### The 29 tokens
+
+`tokenId` runs 1–62 with gaps — 29 of 62 slots are used, so the id space has retired entries and an id is not an
+index. `group` is an unnamed classification byte, and its clusters are legible:
+
+| group | tokens (`name` (id)) |
+|---|---|
+| 1 | `VeteranPoints` (1) |
+| 2 | `AltAdvancementPvPToken` (2), `AltAdvancementPvEToken` (3), `AltAdvancementGeneralToken` (4) |
+| 3 | `SimpleRelicIII` (5), `RareRelic` (6), `SimpleRelicI` (7), `SimpleRelicII` (8), `SimpleRelic` (17), `DragonTear` (19), `SimpleRelicV` (33), `ShardOfPureIce` (34), `EmeraldEssence` (35), `SimpleRelicVI` (36) |
+| 4 | `WorldPvPToken` (9), `PvPMinigameToken` (10), `VictoryToken` (30), `PortentRelic` (31) |
+| 5 | `SimpleTrophy1` (11), `SimpleTrophy2` (12), `SimpleTrophy3` (13), `RareTrophy` (14), `OnslaughtToken` (61), `SkullgateToken` (62) |
+| 6 | `EsteemToken` (15), `MarkOfAcclaim` (16), `LotteryToken` (32) |
+| 7 | `TeleportCoins` (50) |
+| 8 | `AtlanteanShard` (60) |
+
+⚠️ The group byte is the one field with no independent evidence for its MEANING. The loader stores it at the map
+entry's `+0x1c` and the clusters read as a kind (AA tokens together, relics together, trophies together, the PvP
+currencies together) — but "kind" is a description of the grouping, not a decode of the column.
+
+What the neighbouring exe strings say the subsystem does: `YouReceivedQuantityOfTokens` and
+`YouReceivedQuantityOfTokensMembershipBonus` are its award messages, and a `Subscriber<Token>BonusPercent` tweak
+exists per token (`SubscriberSimpleTrophy1BonusPercent`, `SubscriberEsteemTokenBonusPercent`, …) — i.e. a
+subscription multiplies token income per currency. Nothing on our side models tokens yet; this is the catalog a
+model would key on.
 
 ## Decoded: 1000509 / 1000510 / 1000512 `PlayfieldPvPData_c` — playfield → PvP RULESET
 
