@@ -486,3 +486,11 @@ a stock client cannot send a mismatched pair and the gap only matters against a 
 more harvested fields, not a decode: `--report gem-slots` already prints them (a 4-slot weapon declares
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
+### The two daily kill counters, and which one really tracks kills
+**Tracked: Gitea #656.** [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The client's
+stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
+entirely PvE — beach, Tortage, Ymir's Pass. Yet over the captured `StatIIR` stream (`--report stat-series
+--report-arg 106,1000069,1000070`) it is the **PvP-named** one that moves 118 times against the PvE-named one's
+39, and only `1000070` caps (at exactly 20). Either the name↔id pairing is off by one or `1000070` counts all
+kills; the corpus cannot separate those without a PvP session, which is the capture that would close it.
+

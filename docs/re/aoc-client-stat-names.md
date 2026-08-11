@@ -108,7 +108,31 @@ evidence, not as a citation, until the id is used.
   `PowerSessionBonusesCounter` is the third member of the trio. A **daily** refill is stated outright, which was one
   of #656's open questions.
 
-  The corpus agrees from the other side: **every captured character's login snapshot carries `0x06A`**, at `20` for
+  ⭐ **The corpus's own DYNAMICS corroborate the wording, including the word *worthy*.** `--report stat-series
+  --report-arg 106,1000069,1000070` over the whole `StatIIR` stream:
+
+  | stat | records | runs | range | moves |
+  |---|---:|---:|---|---|
+  | `106 PowerSessionRemaining` | 65 | 10 | 20..11 | 23, **all DOWN** |
+  | `1000069 DailyPvEKills` | 278 | 53 | 0..13 | 39, **all UP** |
+  | `1000070 DailyPvPKills` | 342 | 55 | 0..20 | 120, 118 up |
+
+  Three separate create captures show `106` at **20** on a brand-new character, and it never once increases —
+  a depleting pool, exactly as *"20 Fresh Kills every day"* predicts. ⭐ And it is **not** spent one-for-one:
+  in `xxx_mage-necromancer_login_play1` the same session moves `106` six times while `1000070` moves twenty.
+  That is the quickstart's *"when killing **worthy** monsters"* measured from the wire — most kills cost no
+  Fresh Kill.
+
+  ⚠️ `1000070` **caps at exactly 20** — three characters reach it and stop — which is a second, unrelated
+  20 sitting next to the Fresh Kill 20 and is presumably what made the two look complementary in the first
+  place. They are not: 106 counts 20→11 while 1000070 counts 0→20 in the same session.
+
+  ⚠️ [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The two names are `DailyPvEKills`
+  (1000069) and `DailyPvPKills` (1000070), and it is the PvP-named one that tracks ordinary beach and Tortage
+  kills three times more often than the PvE-named one. Either the name↔id pairing is off or `1000070` counts all
+  kills; the corpus cannot separate those without a PvP session.
+
+  The corpus agrees from the other side too: **every captured character's login snapshot carries `0x06A`**, at `20` for
   Hakotep / DemoL80 / AssassinL23 and at **`17` for NecroL80** — who is exactly the character the live observation caught
   three kills into her session. Nothing else in the trio is in the snapshot, so the reset instant and the bonus
   counter arrive (if at all) as stat updates.

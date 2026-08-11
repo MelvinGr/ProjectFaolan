@@ -262,6 +262,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "stat-series":
+				{
+					StatSeries(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "buff-descriptor":
 				{
 					BuffDescriptor(NamedCapture.LoadAll(capturesDir), arg);

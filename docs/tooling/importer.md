@@ -315,6 +315,9 @@ where that mattered),
 `method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
 and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
 evidence that decides whether a ticket is "decode it" or "capture it"),
+`stat-series` (`--report-arg <id>[,<id>...]`: the ordered value sequence of one or more stats per capture and
+handle, out of the captured `StatIIR` stream — a census says a stat is pushed, a SERIES says whether it counts
+up, counts down, resets or is merely restated. Repeats collapse to `20 x3`. Gitea #656),
 `morph-stats` (does retail ever push a SHAPESHIFT stat on the wire? Censuses every captured `StatIIR` against the
 POLYMORPH set — `Scale` is attested 103 times on a Character, the other seven never appear — and prints the whole
 77-id census beside it so an absence reads as a measurement rather than a broken scan. Gitea #709),
