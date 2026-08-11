@@ -121,9 +121,18 @@ bit 2 guards a third effect on the character (`+0x4c`).
    the census above rather than "an extrapolation from one attested member".
 2. **The 103 `Scale` records are not morphs.** Two values over a handful of handles, re-asserted dozens of
    times in one capture, is a per-character constant being restated, not a shapeshift landing.
-3. **`TempChangeSkill` OVERRIDES the stat, it does not add to it.** `BuffStatEffects` lists 53110 among its
-   flat additive kinds and sums it into `gear + sum(buffs)`. On a zero-baseline stat the two agree, which is
-   why nothing has looked wrong; on a stat gear also feeds they do not. Tracked separately.
+3. **`TempChangeSkill` OVERRIDES the stat, it does not add to it**, and `BuffStatEffects.OverrideKinds` is where
+   that lands: the value REPLACES `gear + sum(buffs)` for its stat rather than joining the sum. On a zero-baseline
+   stat the two agree, which is why nothing had looked wrong; on a stat gear also feeds they do not.
+
+⭐ **And the client runs these executors on OUR OWN buff packet**, which is what makes the combine rule forced
+rather than a free choice (#805). The chain, each link named by its own log string:
+`MagicBuffIIR_c::Activate` (`FUN_007a1580` — *"MagicBuffIIR_c::Activate, UpdateBuff with parameters:/n
+BuffTemplate "*) → `CoreMagicHolder::UpdateBuff` (`FUN_007ee710`) → `RunGameActions` (`FUN_0089bab0` — *"RunGameActions
+Type:%d Duration:%d"*, channel `GameCode/GameAction`) → the per-kind executor's vtable slot 9. Applying a buff is
+the whole trigger; the client evaluates the spell's elements from its own RDB copy with nothing else on the wire.
+The same loop is reached from the item side (`ItemHolder_c::ActionUnWear` and the feat/gem GameAction maps), which
+is how equipping runs an item's elements.
 
 Its ramped twin `53221 InterpolatedTempChangeSkill` is the same override with the value lerped between keys
 `0x4b6`/`0x4b7` at the carrier's level (`GameActionMethods_t::TempChangeSkillGameAction`, `FUN_008b1f20` —

@@ -128,7 +128,22 @@ same +100% step `Magic Shield` states with 53045 on cold — and `Soul of Mitra`
 ⚠️ **Admitting the kind admitted nothing else**, because the two halves of the gate are independent: 53110's bulk
 is a POLYMORPH tail (Head Mesh, Monster Data, Scale, Super Family) plus Natural Energy Regeneration, and the stat
 half goes on holding all of it — a shapeshift is not `gear + sum(buffs)` in any units.
-[V3: BuffStatEffectsTests.TempChangeSkill_IsFlat_LikeItsAlreadyHonoredInterpolatedTwin]
+[V3: BuffStatEffectsTests.TempChangeSkill_IsHonored_LikeItsAlreadyHonoredInterpolatedTwin]
+
+### …and the COMBINE rule is a third question: 53110 / 53221 OVERRIDE the stat
+
+Unit and shape do not say how the value meets what the stat already holds, and for these two the client answers
+it: `53110`'s executor is `SetStatOverride(statTable, Stat, Value)` and its remove is `ClearStatOverride`
+(`53221` is the same call with the value lerped between the ramp's endpoints — `docs/re/gameaction-executors.tsv`).
+So a `Soul of Mitra` on a character already carrying +25 deflection from gear reads **90**, not 115.
+
+⭐ **That is forced rather than chosen, because the client runs that executor on OUR OWN buff packet.**
+`MagicBuffIIR_c::Activate` → `CoreMagicHolder::UpdateBuff` → `RunGameActions` → the executor's vtable slot 9: the
+packet that applies a buff makes the client evaluate the spell's elements out of its own RDB copy, with nothing
+else on the wire. A server summing `gear + amount` would be a second opinion on a number the client had already
+set. ⚠️ Two overrides on one stat is the one part that *is* ours: the client keeps a single override slot per
+stat (last write wins, an order we do not have), so the strongest magnitude wins here.
+[V3: BuffStatEffectsTests.OverrideKind_ReplacesTheGearContributionRatherThanAddingToIt]
 - **×10000 is real.** Five ids sit in BOTH predicate sets and the client multiplies the divisors (an explicit
   `MULSS` against the same `100.0` constant): `0x00FF` Evade Level Growth, `0x013C` Variance, `0x013D`,
   `0x0140` Magic Variance, `0x0397` Critical Blast Chance.

@@ -258,7 +258,7 @@ namespace Faolan.Tests
 		// description is "shielding the priest from almost all damage" - carries 90 deflection beside `Phoenix
 		// Cloak`'s 53045 +40. Both were landing nowhere.
 		[Fact]
-		public void TempChangeSkill_IsFlat_LikeItsAlreadyHonoredInterpolatedTwin()
+		public void TempChangeSkill_IsHonored_LikeItsAlreadyHonoredInterpolatedTwin()
 		{
 			var catalog = BuffStatEffects.BuildCatalog([
 				Row(166828, CharacterStatId.SlashingInvulnerability, TempChangeSkill, 10000), // Skin of Iron
@@ -267,11 +267,81 @@ namespace Faolan.Tests
 
 			Assert.Equal(0, catalog.KindSkipped);
 
-			// In DISPLAY units, like every other flat delta: the invulnerabilities are ×100, so the 10000 the record
+			// In DISPLAY units, like every other honored delta: the invulnerabilities are ×100, so the 10000 the record
 			// carries is the +100% the client draws - the same number `Magic Shield` produces through 53045. Damage
-			// deflection is ×1, so 90 stays 90.
-			Assert.Equal([Delta(CharacterStatId.SlashingInvulnerability, 100)], catalog.BySpellBase[166828]);
-			Assert.Equal([Delta(CharacterStatId.DamageDeflection, 90)], catalog.BySpellBase[197061]);
+			// deflection is ×1, so 90 stays 90. What differs is how it COMBINES - see the override tests below.
+			Assert.Equal([Delta(CharacterStatId.SlashingInvulnerability, 100, true)], catalog.BySpellBase[166828]);
+			Assert.Equal([Delta(CharacterStatId.DamageDeflection, 90, true)], catalog.BySpellBase[197061]);
+		}
+
+		// #805: 53110 / 53221 REPLACE the stat, they do not add to it - and that is forced, not chosen. The client
+		// runs the spell's own GameAction elements off its RDB copy when OUR buff packet lands
+		// (`MagicBuffIIR_c::Activate` -> `CoreMagicHolder::UpdateBuff` -> `RunGameActions` -> the executor's vtable
+		// slot 9), and 53110's executor is `SetStatOverride(statTable, Stat, Value)`. Summing would tell the client
+		// `gear + 90` for a number its own executor had already set to 90.
+		[Fact]
+		public void OverrideKind_ReplacesTheGearContributionRatherThanAddingToIt()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(197061, CharacterStatId.DamageDeflection, TempChangeSkill, 90)]);
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.DamageDeflection] = 25 };
+
+			entity.ActiveBuffs[197061 << 8] = new ActiveBuff(197061 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			var changed = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Contains((CharacterStatId.DamageDeflection, 90u), changed); // not 115
+		}
+
+		// …and it goes back to the gear value when the buff ends, which is what `ClearStatOverride` does client-side.
+		[Fact]
+		public void OverrideKind_FallsBackToGearWhenTheBuffEnds()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(197061, CharacterStatId.DamageDeflection, TempChangeSkill, 90)]);
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.DamageDeflection] = 25 };
+
+			entity.ActiveBuffs[197061 << 8] = new ActiveBuff(197061 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+			entity.ActiveBuffs.Clear();
+
+			Assert.Contains((CharacterStatId.DamageDeflection, 25u), BuffStatEffects.Recompute(entity, catalog));
+		}
+
+		// An ADDITIVE delta on the same stat is not folded into an override - the override is the whole answer, which
+		// is the one place the two rules visibly disagree. (The client keeps one override slot per stat and applies it
+		// over whatever the stat otherwise holds.)
+		[Fact]
+		public void OverrideKind_WinsOverAFlatDeltaOnTheSameStat()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(197061, CharacterStatId.DamageDeflection, TempChangeSkill, 90), // Soul of Mitra: an override
+				Row(4239530, CharacterStatId.DamageDeflection, FlatKind, 40) // Phoenix Cloak: an addition
+			]);
+			var entity = Player();
+
+			entity.ActiveBuffs[197061 << 8] = new ActiveBuff(197061 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			entity.ActiveBuffs[4239530 << 8] = new ActiveBuff(4239530 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(90u, entity.BuffedStats[CharacterStatId.DamageDeflection]); // not 130
+		}
+
+		// Two overrides on one stat: the client's single override slot is last-write-wins, an order we do not have, so
+		// the strongest wins here. Deterministic whichever way the buff dictionary happens to enumerate.
+		[Fact]
+		public void TwoOverridesOnOneStat_TheStrongestWins()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(166828, CharacterStatId.SlashingInvulnerability, TempChangeSkill, 10000),
+				Row(166829, CharacterStatId.SlashingInvulnerability, TempChangeSkill, 2000)
+			]);
+			var entity = Player();
+
+			entity.ActiveBuffs[166828 << 8] = new ActiveBuff(166828 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			entity.ActiveBuffs[166829 << 8] = new ActiveBuff(166829 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(100u, entity.BuffedStats[CharacterStatId.SlashingInvulnerability]); // 10000 / ×100, not 120
 		}
 
 		// ...and admitting the kind does NOT admit what else it carries. 53110's bulk is a POLYMORPH tail - a
@@ -601,9 +671,9 @@ namespace Faolan.Tests
 
 		// The catalog entry a flat row builds - spelled out so the assertions above stay about the AMOUNT rather than
 		// about the shape the catalog happens to hold it in.
-		private static BuffStatEffects.Delta Delta(CharacterStatId stat, int amount)
+		private static BuffStatEffects.Delta Delta(CharacterStatId stat, int amount, bool @override = false)
 		{
-			return new BuffStatEffects.Delta(stat, amount);
+			return new BuffStatEffects.Delta(stat, amount, Override: @override);
 		}
 	}
 }

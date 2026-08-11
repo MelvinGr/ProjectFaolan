@@ -66,6 +66,10 @@ namespace Faolan.GameServer.Combat
 		// Delta.At. Their percent twin 53068 `InterpolatedModifyAsRating` is deliberately absent, for the same reason
 		// 53067 is: a percentage is not an addition.
 		//
+		// ⚠️ 53110 / 53221 are NOT on this list - they are OVERRIDES, see OverrideKinds. Everything the argument below
+		// establishes about them still holds; it is about the row's UNIT and SHAPE, which is a different question from
+		// how the value COMBINES with what is already on the stat.
+		//
 		// 53110 `TempChangeSkill` is `Modify` with a duration in its name, and four things say so rather than one:
 		//   - its KEY LIST is `[0 Stat, 39 Value]`, character-for-character the one 53045 `Modify` carries
 		//     (GameActionTypes) - so the record is the same shape read the same way;
@@ -80,7 +84,27 @@ namespace Faolan.GameServer.Combat
 		//     effect that deflection row expresses, which was landing nowhere.
 		// Its other 356 rows are a POLYMORPH tail (Head Mesh, Monster Data, Scale, Super Family) plus Natural Energy
 		// Regeneration, and the stat gate below goes on holding those: a shapeshift is not `gear + sum(buffs)`.
-		private static readonly HashSet<uint> FlatKinds = [53045, 53110, 53220, 53221];
+		private static readonly HashSet<uint> FlatKinds = [53045, 53220];
+
+		// The kinds whose Amount REPLACES the stat instead of adding to it (#805). Two, and they are the pair the
+		// paragraph above admitted: the client's own executor for `53110 TempChangeSkill` is
+		// `SetStatOverride(statTable, Stat, Value)` and its remove is `ClearStatOverride(statTable, Stat)`; `53221
+		// InterpolatedTempChangeSkill` is the same call with the value lerped between the ramp's endpoints
+		// (docs/re/gameaction-executors.tsv, #709). An override, not an addition.
+		//
+		// ⭐ This is not a free choice of combine rule, because the CLIENT RUNS THAT EXECUTOR ON OUR OWN BUFF PACKET.
+		// The chain is `MagicBuffIIR_c::Activate` (`FUN_007a1580`, named by its own log line "MagicBuffIIR_c::Activate,
+		// UpdateBuff with parameters:/n BuffTemplate ") -> `CoreMagicHolder::UpdateBuff` (`FUN_007ee710`) ->
+		// `RunGameActions` (`FUN_0089bab0`) -> the executor's vtable slot 9. So the very packet that applies a buff
+		// makes the client evaluate the spell's elements from its OWN RDB copy, and for these two it sets an override
+		// on the stat. A server that pushed `gear + amount` would be a second opinion on a number the client had
+		// already decided, and the two would disagree on exactly the stats that also carry gear.
+		//
+		// ⚠️ Two overrides on one stat: the client keeps ONE override slot per stat, so whichever landed last wins -
+		// an order our ActiveBuffs dictionary does not have and could not honor stably. The strongest (largest
+		// magnitude) wins here instead: deterministic, and it is the reading that cannot be beaten by a weaker buff
+		// re-landing. An assumption, not a capture fact - no capture has two override buffs on one stat.
+		private static readonly HashSet<uint> OverrideKinds = [53110, 53221];
 
 		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. The apply is
 		// null for the ones the server does not model yet, which are still pushed so the character sheet reflects the
@@ -250,7 +274,7 @@ namespace Faolan.GameServer.Combat
 		public static Gate Classify(SpellStatEffect row)
 		{
 			var isPercent = row.EffectKind == PercentKind;
-			if (!isPercent && !FlatKinds.Contains(row.EffectKind))
+			if (!isPercent && !FlatKinds.Contains(row.EffectKind) && !OverrideKinds.Contains(row.EffectKind))
 				return Gate.UnhandledKind;
 
 			// The stat gate is the same for both kinds: a percentage of a stat whose scale we have not verified is
@@ -312,7 +336,8 @@ namespace Faolan.GameServer.Combat
 					.ToArray();
 				var delta = new Delta(row.StatId, isPercent || ramp is not null
 					? row.Amount
-					: row.Amount / (int)SpellScale(row.StatId), ramp, conditions is { Length: > 0 } ? conditions : null);
+					: row.Amount / (int)SpellScale(row.StatId), ramp, conditions is { Length: > 0 } ? conditions : null,
+					OverrideKinds.Contains(row.EffectKind));
 
 				var into = isPercent ? percent : honored;
 				(into.TryGetValue(row.SpellId, out var list) ? list : into[row.SpellId] = []).Add(delta);
@@ -330,6 +355,9 @@ namespace Faolan.GameServer.Combat
 			// Sum each kind of delta over every live buff. The ActiveBuffs key is the WIRE id ((base << 8) | rank).
 			var flat = new Dictionary<CharacterStatId, int>();
 			var percent = new Dictionary<CharacterStatId, int>();
+			// …except an OVERRIDE, which does not sum with anything (#805): it replaces the gear + flat total for its
+			// stat, the way the client's own `SetStatOverride` executor does.
+			var overrides = new Dictionary<CharacterStatId, int>();
 			//
 			// The carrier's LEVEL is what resolves a ramped delta (#599) - the same buff is worth +887 health on a
 			// level-20 character and +17500 on a level-80 one - so a level change has to re-run this. It already
@@ -389,7 +417,7 @@ namespace Faolan.GameServer.Combat
 
 				// The FIRST seed off gear alone is not news - it is what the entity already had at world entry - so it
 				// applies but is not reported. Only a later change is.
-				if (!seeded && flat.GetValueOrDefault(stat) == 0 && percent.GetValueOrDefault(stat) == 0)
+				if (!seeded && flat.GetValueOrDefault(stat) == 0 && percent.GetValueOrDefault(stat) == 0 && !overrides.ContainsKey(stat))
 					continue;
 
 				changed.Add((stat, applied));
@@ -404,7 +432,11 @@ namespace Faolan.GameServer.Combat
 			// take a stat to 0, never negative.
 			int Buffed(CharacterStatId stat)
 			{
-				var total = entity.GearBonuses.GetValueOrDefault(stat) + flat.GetValueOrDefault(stat);
+				// An override replaces the gear + flat base and nothing else: a percentage still scales the result,
+				// because a percent record is a separate element on a separate stat table entry either way.
+				var total = overrides.TryGetValue(stat, out var overridden)
+					? overridden
+					: entity.GearBonuses.GetValueOrDefault(stat) + flat.GetValueOrDefault(stat);
 				var pct = percent.GetValueOrDefault(stat);
 				if (pct != 0)
 					total = (int)((long)total * (PercentScale + pct) / PercentScale);
@@ -429,7 +461,16 @@ namespace Faolan.GameServer.Combat
 					if (delta.Criteria is { } conditions && !CriteriaEvaluator.Permits(conditions, StatOf, StatOf, out _))
 						continue;
 
-					into[delta.Stat] = into.GetValueOrDefault(delta.Stat) + delta.At(level);
+					var value = delta.At(level);
+					if (!delta.Override)
+					{
+						into[delta.Stat] = into.GetValueOrDefault(delta.Stat) + value;
+						continue;
+					}
+
+					// Strongest wins - see OverrideKinds for why this is a choice and not a reading.
+					if (!overrides.TryGetValue(delta.Stat, out var already) || Math.Abs(value) > Math.Abs(already))
+						overrides[delta.Stat] = value;
 				}
 			}
 
@@ -506,8 +547,10 @@ namespace Faolan.GameServer.Combat
 		// One honored delta a spell carries: which stat, and what it is worth. Not a bare amount because a delta is
 		// either a constant or a LEVEL RAMP (#599), and only the carrier's level tells the two apart at the point of
 		// use - see <see cref="Delta.At" />.
+		// <paramref name="Override" /> is #805: the delta REPLACES the stat rather than adding to it, because the
+		// client's own executor for the kind is `SetStatOverride` - see OverrideKinds.
 		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null,
-			IReadOnlyList<ItemTemplateStatModifiers.Criterion>? Criteria = null)
+			IReadOnlyList<ItemTemplateStatModifiers.Criterion>? Criteria = null, bool Override = false)
 		{
 			// The LEVEL BAND this delta states its numbers for, or null when it is level-independent - the ramp's own
 			// two levels, because a record that bands a stat bands it by ramping each band separately (#783).
