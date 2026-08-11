@@ -56,8 +56,27 @@ shows, which is what pins the grammar:
 | `..._leave_king_conan_castle-Dismount` f837 → f848 | `00097F96` / `00000000350713F0` | `1`, same two |
 | `..._conans-castle-exit` f1630 → f1636 | `001FAA9D` / `0000000062872390` | `1`, same two |
 
-`nAnswer` is `1` in every capture — the player always confirmed, so the value for the other button is
-unobserved. [V2: NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount.tshark.json frame 848]
+### ⚠️ `nAnswer` is the OPTION INDEX, not a boolean — and `2` is a CONFIRM (#511)
+
+The table above is drawn from the door captures, where the player always pressed the first button. The
+chat-annotated corpus carries a **`2`**, and reading it as a decline would be exactly backwards:
+
+| time | the player's own `/say` | box | `nAnswer` | what followed |
+|---|---|---|---:|---|
+| 19:56:41 | *"energed normal instance"* | `id=1004` Spider Caverns | `1` | `Reserved0x1B` → `DispatchRedirectToServer :7025` → `Authenticate2` |
+| 19:57:15 | *"enered epic instance"* | `id=1004` Spider Caverns | **`2`** | the same three, to the same port |
+
+Same box, same destination, 34 seconds apart, and **both entered the zone**. So a dungeon's difficulty MODE is
+which button of the travel box the player presses: the prompt text is the destination's name from category 520
+and the OPTIONS are the modes. ⭐ That is the whole of #511's "instances have a difficulty mode, chosen at
+entry" — it is chosen here, and it rides a message box that was already decoded.
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json 19:56:41 / 19:57:15]
+
+⚠️ The DECLINE is still unobserved — no captured player cancels — so `0` is inferred, and inferred the safe way
+round: an unknown option travels (our boxes offer exactly one destination and no difficulty), and only an
+explicit `0` cancels. The handler used to test `!= 1` and would have dropped retail's own epic answer.
+
+[V2: NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount.tshark.json frame 848 — the `1` case]
 
 ## What the server does
 
@@ -67,7 +86,7 @@ Because the answer is a **pure echo**, no script thread is involved on either si
 `nScriptThreadCtxId`/`nCtxCookie` are its own script-context handles, and ours are just a correlation token
 (the character id plus a per-send counter, held in `INetworkClientSession.PendingTravelConfirm`).
 `SendTravelConfirmation` mints the pair and parks the trip; `ScryMessageBoxAnswer` teleports if the echo
-matches an outstanding box and the answer is `1`, and drops the trip otherwise.
+matches an outstanding box and the answer is not `0`, and drops the trip otherwise.
 
 **Which destinations confirm is harvested, not inferred.** Half the captured door walk-throughs raise no box
 at all, so "the door crosses a map" is not the rule. The corpus splits cleanly by DESTINATION — doors to the
@@ -77,5 +96,6 @@ box's `id` matching the map the same sequence then teleports to. A map no captur
 straight through, exactly as before. See [`teleport-changemap.md`](teleport-changemap.md).
 
 ⚠️ Two things the corpus does not settle, so neither is modelled: whether a map could confirm from one door
-but not another (none observed), and what a **decline** looks like — every captured answer is `1`, so the
-value for the other button is unobserved and we treat "not `1`" as a decline.
+but not another (none observed), and what a **decline** looks like — no captured player cancels. We treat `0`
+as the decline and anything else as "travel", which is the safe direction now that a `2` is known to be a
+confirm of the second option rather than a refusal.

@@ -1045,12 +1045,21 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					if (reply.Answer != ScryMessageBoxAnswerCodec.Confirm)
+					// ⚠️ ZERO is the decline, not "anything but 1". `Answer` is the OPTION INDEX (#511): the corpus
+					// carries a `2` on the same box a `1` appears on, and it is a CONFIRM of the second button -
+					// retail's difficulty picker, "energed normal instance" against "enered epic instance", both
+					// followed by the redirect that enters the zone. Our boxes offer one destination and no
+					// difficulty, so any non-zero option means the same trip; testing `!= 1` would have dropped it.
+					if (reply.Answer == ScryMessageBoxAnswerCodec.Decline)
 					{
 						Logger.LogInformation("Character {CharacterId} declined the trip to map {MapId}.", client.Session.Character.Id, pending.DestinationMapId);
 
 						break;
 					}
+
+					if (reply.Answer != ScryMessageBoxAnswerCodec.Confirm)
+						Logger.LogInformation("ScryMessageBoxAnswer chose option {Answer} for the trip to map {MapId} - we offer one, so it travels.", reply.Answer,
+							pending.DestinationMapId);
 
 					await DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition);
 
