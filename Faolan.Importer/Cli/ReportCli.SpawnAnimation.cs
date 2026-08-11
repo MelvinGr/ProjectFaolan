@@ -152,6 +152,13 @@ namespace Faolan.Importer.Cli
 					var present = npc.ShouldSerializeSpawnAnimation();
 					(i < boundary ? burst : midSession).Add(present, spawn.Character.Name ?? "?");
 
+					// ⚠️ #803: keying this by `p.Port` as well - to test "each SESSION is told once", which would
+					// explain the flagged-twice entities below as one delivery seen by two viewers - is a NO-OP, and
+					// the reason is worth writing down. `CapturedPacket.Port` is the GAME SIDE's port (the service
+					// tier), so both clients of a two-client dump share it and both sides of a playfield transition
+					// differ. Re-keyed, the counts come back identical: 14,777 entities, 351 mixed, the same six
+					// anomalies. So the corpus cannot separate two RECIPIENTS at all, and any reading that turns on
+					// "who was told" is untestable here rather than untested.
 					var key = (c.Name, spawn.Handle, npc.TemplateId);
 					if (!perEntity.TryGetValue(key, out var sightings))
 						perEntity[key] = sightings = [];

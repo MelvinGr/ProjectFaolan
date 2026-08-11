@@ -232,6 +232,12 @@ namespace Faolan.Core.Database.Tables
 		// It stays a column because the SENDER cannot yet decide it: the duration is per creature (it is an asset),
 		// and picking one number would invent a timing retail does not use. `PerSpawnEventModes` keeps the mode, which
 		// puts us inside retail's distribution without claiming to model it. See #607.
+		//
+		// ⚠️ The reading that would dissolve the timing question - "the flag is cleared once DELIVERED, so the six
+		// entities flagged twice are one delivery seen by two viewers" - is **untestable from the corpus**, not
+		// merely untested. `CapturedPacket.Port` is the GAME SIDE's port, so both clients of a two-client dump share
+		// it; re-keying the stickiness test by it is a no-op (identical counts, identical six anomalies). Nothing in
+		// a dump names the RECIPIENT, so no measurement over it can separate two of them. See #803.
 		public uint? SpawnAnimation { get; set; }
 
 		public uint? LosHeight { get; set; }
