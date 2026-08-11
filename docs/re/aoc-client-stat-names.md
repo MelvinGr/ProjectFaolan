@@ -139,6 +139,47 @@ evidence, not as a citation, until the id is used.
 
   ⚠️ Still open, and it is what any implementation turns on: **how much extra XP a Fresh Kill grants, and what makes
   a monster "worthy"**. Neither the client's names nor the guide says, and no capture measures it.
+
+### ⭐ And the DAILY counters are a whole subsystem, named end to end (#656 / #509)
+
+`DailyPvEKills` / `DailyPvPKills` are two members of a **daily-challenge** family the registry names in one run,
+and the client registers a **cap tweak for each of them** — which is what turns a set of counters into a model:
+
+| stat | name | its cap tweak | exe default | shipped in RDB 1000516 |
+|---:|---|---|---:|---:|
+| `1000069` | `DailyPvEKills` | `DailyPvEKillsCap` | 30 | **5** |
+| `1000070` | `DailyPvPKills` | `DailyPvPKillsCap` | 30 | **20** |
+| `1000071` | `DailyMinigameWins` | `DailyMinigameWinsCap` | 3 | **1** |
+| `1000072` | `DailyQuestsCompleted` | `DailyQuestsCompletedCap` | 3 | **3** |
+| `1000073` | `DailyUnchainedDungeonsCompleted` | `DailyUnchainedDungeonsCompletedCap` | 1 | **1** |
+
+Above them sit the META counters and their own caps, and three reset instants:
+
+| stat | name | | tweak | exe default | shipped |
+|---:|---|---|---|---:|---:|
+| `1000074` | `DailyDailyCounter` | | `DailyMetaCap` | 5 | **3** |
+| `1000075` | `DailyWeeklyCounter` | | `WeeklyMetaCap` | 10 | **15** |
+| `1000076` | `DailyMonthlyCounter` | | `MonthlyMetaCap` | 15 | **60** |
+| `1000077` | `CounterDailyChallenges` | | | | |
+| `1000066/67/68` | `Daily`/`Weekly`/`MonthlyResetTimestamp` | | | | |
+
+(`75 MetaType` is the family's other member.) The exe defaults come from the client's tweak REGISTRY
+(`FUN_010CB540`, which registers every tweak with a fallback `double`); the shipped column is
+`--report rdb-tweaks --report-arg Daily`, i.e. what the tuning sheet actually ships. **Every one differs from its
+default**, so reading the binary's fallbacks as the game's numbers would have been wrong in all eight places.
+
+⭐ **`DailyPvPKillsCap = 20` is exactly the ceiling the corpus measured** on `1000070` — "three characters reach
+it and stop". That was written up as *"a second, unrelated 20 sitting next to the Fresh Kill 20"*; it is not
+unrelated at all, it is this tweak, and the match confirms the id↔name pairing from a second direction.
+
+⚠️ It does NOT resolve the `[V0]` above. `DailyPvEKillsCap` is **5** while the corpus runs `1000069` up to **13**,
+so the cap cannot be clamping both counters the same way — either it bounds what counts toward the meta rather
+than the counter, or one of the two counters is not what its name says. The tension is now sharp enough to be
+worth a targeted measurement rather than a guess.
+
+The neighbouring config keys say what the subsystem is embedded in: `PvEXPFromPvPMultiplier`,
+`MinigamePvEXPMultiplier`, `PvPXPFromPvPCapMultiplier`, `PvEXPFromPvPGroupPenalty`, `TWK_MinLevelForPvPXP`,
+`ServerLevelCap` and `CurrentSeason`.
 - **`0x292` is `PvPTotalDeaths`, not `Deaths`**, sitting in a coherent run — `656 PvPTotalKills`,
   `657 PvPFinishingBlows`, `658 PvPTotalDeaths`, `659 PvPMatchesWon`, `660 PvPMatchesLost`. So the client does NOT
   use `Deaths` twice, and the belief that it did was the old sweep mispairing `0x542`'s name onto a neighbour.
