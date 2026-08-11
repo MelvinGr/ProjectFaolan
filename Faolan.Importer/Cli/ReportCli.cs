@@ -557,6 +557,18 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "rdb-names":
+				{
+					RdbNames(RdbDir(), arg);
+					return 0;
+				}
+
+				case "rdb-text-scan":
+				{
+					RdbTextScan(RdbDir(), arg);
+					return 0;
+				}
+
 				case "rdb-word-scan":
 				{
 					RdbWordScan(RdbDir(), arg);

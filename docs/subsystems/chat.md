@@ -143,16 +143,45 @@ in the RDB scry scripts; a dedicated extraction pass is needed". They do, the pa
   (`LdbStringIndex.TokenId`) of `sayinchat(N)|<channel>(K)|<Group>`, all of which are `NpcChatter` columns. All 13
   captured barks resolve to their text through it, which is the end-to-end proof.
 
-  ⭐ **And it has to be computed, because there is nothing to look it up in.** The group name
-  `RenownBystanderLovers` appears **zero times as text** anywhere in the client — not in `RDB/*.rdbdata`, not in
-  `AgeOfConan.exe`, and not in any of the 152 decrypted LDB pages. So there is no group table, no name→line index
-  and no scry script naming it: the hash of the whole token IS the addressing. (`NpcStatCore.ClientScryScript`,
-  the other route #331's body proposes, is `0` on all 1,194 stat cores.)
-
   ⚠️ Hashing the group name ALONE and hunting the value in the client answers nothing, and the control says so:
   `elf28("RenownBystanderLovers")` hits 6–10 times across ~GBs of RDB + exe, while `elf28("conversation1")` — a
   token the client demonstrably uses — hits 5. At that base rate the search has no discriminating power. It is
   the whole token that is hashed, not the group.
+
+### ⭐ The group names ARE in the client — a file grep could not see them
+
+This section used to say `RenownBystanderLovers` "appears **zero times as text** anywhere in the client — not in
+`RDB/*.rdbdata`". **That was a measurement artifact.** Most RDB records are zlib-compressed in the pack, so a grep
+over the pack FILES cannot see a string that is plainly shipped; `--report rdb-text-scan` searches the
+**decompressed** bodies instead and finds all five known groups, plus `renownbystandersstygian`, in one place:
+
+```
+RDB 1000010 record 1 — the client's global id -> NAME table, 192,291 entries / 187,474 distinct
+  ...  4285601 renownbystanderwomen   4285603 renownbystanderlovers   4285611 renownbystandersstygian ...
+```
+
+`RdbNameTable` reads it (`--report rdb-names`), and the per-type index records beside it narrow the pool further.
+Every one of the six is referenced by **`1020004/1010029`**, the name list for RDB type **1010029** — the
+server-side SCRIPT catalog, **7,102 names of which 5,810 are bare identifiers** (`aquiluspatroltoluco`,
+`acgregionambush`, `applyfearlessbuffv2wrapper`, `sewer4555spawn`). So a bark group is a script name, and the
+whole candidate pool is those 5,810.
+
+⚠️ That also explains the earlier sweep's clean miss: it pulled identifiers out of **`SCRIPTGROUP2` (1010028)**,
+the type NEXT TO the one that holds them.
+
+⚠️ **What still blocks discovery is CASE.** The name table is lowercased by the build, and the token hash is
+case-sensitive — `elf28("sayinchat(3)|conversation1(3)|RenownBystanderLovers")` resolves to *"That's just
+dreadful, Lord Ovidius, really."* while the same token with `renownbystanderlovers` resolves to nothing. So a pool
+entry has to have its CamelCase restored before it can be swept.
+
+⭐ The acceptance test for a restored casing is strong enough to make that safe, which is the difference from the
+`elf28(group)`-alone search above: a candidate is accepted only when **two or more** `sayinchat(N)` values resolve
+for the same (name, casing, channel). A single 28-bit collision against the 1,277-entry category has probability
+~4.8e-6, so two independent ones inside one 512-wide sweep is ~3e-9 — against ~10⁶ (name, casing, channel) triples
+that is far below one expected false group, where the single-hit threshold would have produced thousands.
+
+`NpcStatCore.ClientScryScript`, the other route #331's body proposes, is `0` on all 1,194 stat cores, so it is
+not how an NPC is tied to its group.
 
 Together those make a group's whole line set enumerable by sweeping `N`. For the five captured groups the sweep
 finds **54 lines where the DB carries 13** — e.g. `RenownBystanderLovers/conversation1` is an eleven-line
@@ -175,12 +204,10 @@ A harvested row is identifiable by its **empty `FormatKey`** — legitimate, sin
 encrypted string. Gated by `SeedContentTests.HarvestedBarks_AreInTheSeed_AndNoTwoHanderGroupWasHarvested`, which
 asserts both halves: the harvested lines are present, and no line of the shared conversation is among them.
 
-⚠️ **Group DISCOVERY is still open, and the obvious route does not work.** Pulling identifiers out of the client's
-`SCRIPTGROUP2` (1010028) records and hash-testing each was built and thrown away: not one of the five groups the
-corpus already proves appears among those 11,118 identifiers, so it finds no real group — while happily returning
-hash noise that looks like results. The id is 28 bits and the probes are not independent (names differing by a
-digit cluster in ELF-hash space), so even a "3+ hits" threshold let ten confident non-groups through. The 1,277
-strings in the category are reachable only once the group names are found somewhere else.
+⚠️ An earlier discovery attempt swept `SCRIPTGROUP2` (1010028) identifiers and was thrown away: not one of the
+five groups the corpus proves appears among those 11,118 identifiers, so it found no real group while happily
+returning hash noise that looked like results. The pool above is the corrected one — the same idea against
+`1010029` rather than `1010028`, with a two-line acceptance test instead of a hit count on the bare group name.
 
 Open work tracked in Gitea #331.
 
