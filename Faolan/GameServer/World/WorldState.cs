@@ -90,7 +90,16 @@ namespace Faolan.GameServer.World
 
 		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
-		public const float NpcLeashRange = 40f;
+		//
+		// ⭐ RETAIL'S OWN NUMBER: `AIDefaults_MaximumChaseRadius` in the client's tuning sheet (RDB 1000516,
+		// docs/rdb/client-tweak-table.md). It was a tuned guess of 40 until the sheet was indexed by family; the
+		// sheet ships 45 and there is no reason to prefer our guess to it.
+		//
+		// ⚠️ Its two TIMER siblings are deliberately NOT adopted here, because they do not map onto what we have:
+		// retail keeps `AIDefaults_ChaseDeaggroDelayTime` 5 and `AIDefaults_IrritationForgetPeriod` 4 as two separate
+		// clocks, while `NpcCombatMemorySeconds` below is one clock doing both jobs AND gating the anti-whittle heal.
+		// Halving it to match one of them would change the other two behaviours by accident. Tracked in Gitea #804.
+		public const float NpcLeashRange = 45f;
 
 		// How long a mob stays engaged with whoever last hit it, with no further hits and nobody in aggro range. It is
 		// the combat MEMORY: below this the mob is still fighting (so it chases, and does not reset its health), above

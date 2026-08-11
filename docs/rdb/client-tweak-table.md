@@ -105,7 +105,11 @@ the per-class/level curve `CharacterMaxStats.For` builds from RDB 1000511 (base 
 `AIDefaults_ChaseDeaggroDelayTime` 5 · `Combat_PvE0ShieldBonus` 0.2 (PvE1 0.0, PvE2 −0.33, PvE3 −0.66).
 
 Note `AIDefaults_MaximumChaseRadius` = 45 and `AIDefaults_ChaseDeaggroDelayTime` = 5: our NPC chase/leash values
-are tunable guesses and this is what retail used.
+were tunable guesses and this is what retail used. `WorldState.NpcLeashRange` is now the sheet's 45 (it was 40).
+⚠️ The two TIMERS are not adopted — retail keeps two clocks (`ChaseDeaggroDelayTime` 5,
+`IrritationForgetPeriod` 4) where we have one `NpcCombatMemorySeconds` doing both jobs *and* gating the
+anti-whittle heal, so swapping the number would change behaviours retail's constant says nothing about. Gitea
+#804.
 
 ⭐ **Two whole subsystems' numbers live here and were looked for everywhere else first**, which is the reason to
 check this sheet before deciding a number is missing from the client:
