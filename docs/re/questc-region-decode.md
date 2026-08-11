@@ -403,9 +403,27 @@ The old "player-progression lines" reading was the same set seen without its mec
 ⚠️ **Share is also disabled when you are not in a group**, independently of bit 4. A solo observation of a greyed
 Share button says nothing about the bit; only an A/B on the bit does.
 
-**bit 3 (0x08) — still unnamed.** No effect on this panel, and unlike bit 10 that null is trustworthy: no GM
-override is involved in its branch, and a read-watchpoint on a live record caught only the bit-10 test, so its
-consumer is elsewhere. Six quests carry it: 12381, 12583, 12889, 13473, 16004, 16183.
+**bit 3 (0x08) — the client never reads it.** Not "unnamed pending a better sweep": there is no consumer
+anywhere in the image, and the scan that says so carries its own controls.
+
+A bit test has two spellings in this binary and a scan for one is blind to the other — the mask form
+(`TEST byte ptr [reg+0x14], 8`, `DumpQuestLineFlagBits.java`) and the SHIFT form (`SHR reg,3; TEST CL,1`,
+`FindBitShiftAtOffset.java`), which is the one bits 4 and 10 are actually written in. Run over the whole image:
+
+| bit | shift-form sites | includes the known consumer? |
+|---|---|---|
+| 4 (Share) | 33 | ✅ `FUN_01617260`, the journal panel |
+| 10 (Delete) | 12 | ✅ `FUN_01617260`, plus `FUN_012ccd10` in the same journal module |
+| **3** | 12 | ❌ — 11 are `SAR reg,3` **divide-by-8 pointer arithmetic** in container code, and the 12th
+(`FUN_0137ec50`) is a protobuf serializer testing its own `has`-bits at `+0x84` |
+
+and the mask form adds nothing: its `[reg+0x14], 8` hits are stack locals (`[ESP/EBP + 0x14]`) or the C++
+iostream/locale internals around `0x0183xxxx`. So bit 3 is authoring metadata the record carries and the client
+ignores — like `@+0xf0`/`@+0xf8`, and unlike its two neighbours in the same word. Six quests carry it: 12381,
+12583, 12889, 13473, 16004, 16183.
+
+⚠️ The live-breakpoint route the ticket kept in reserve is now unnecessary *and* weaker: a watchpoint only sees
+the branches that session executes, while the scan covers every site in the image.
 
 ⚠️ One earlier reading is superseded. Bit 4 was guessed as "expansion content", which had counterexamples
 (17402/17403 are in Khitai with it clear); it is sharing, and those are simply shareable Khitai quests.

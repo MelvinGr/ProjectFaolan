@@ -197,12 +197,23 @@ namespace Faolan.Core.Database.Tables
 		// Tortage Destiny storyline (The Slaver, The Quarry, The City of Tortage, Nadini, Casilda, The Scavenger) plus
 		// the Alchemist progression, i.e. exactly the quests retail refuses to let you abandon.
 		//
-		// **bit 3 (0x08): still unnamed.** It has no effect on this panel (the sweep is trustworthy there - no GM
-		// override is involved) and a read-watchpoint on a live record caught only the bit-10 test, so its consumer is
-		// elsewhere. It is 6 quests: 12381, 12583, 12889, 13473, 16004, 16183. Gitea #570.
+		// **bit 3 (0x08): the CLIENT NEVER READS IT** (#570, closed). Not "unnamed pending a better sweep" - there
+		// is no consumer anywhere in the image. A bit test has two spellings here and a scan for one is blind to the
+		// other: the mask form (`TEST byte ptr [reg+0x14], 8`, `DumpQuestLineFlagBits.java`) and the SHIFT form
+		// (`SHR reg,3; TEST CL,1`, `FindBitShiftAtOffset.java`), which is the one bits 4 and 10 are written in.
+		// Over the whole image the shift form gives 33 sites for bit 4 and 12 for bit 10, both including the known
+		// consumer `FUN_01617260` (the journal panel) - and 12 for bit 3, of which ELEVEN are `SAR reg,3`
+		// divide-by-8 pointer arithmetic in container code and the twelfth is a protobuf serializer testing its own
+		// has-bits. The mask form adds only stack locals and C++ iostream internals. Two positive controls, one
+		// clean negative.
 		//
-		// RULED OUT so far, so the next attempt does not re-walk them. Each is a candidate that FITS all six and
-		// still fails, because it also fits most of the quests that do NOT carry the bit:
+		// So it is authoring metadata the record carries and the client ignores - like `FieldF0`/`FieldF8` (#802),
+		// and unlike its two neighbours in the same word. Our sender echoes the captured value per line, which is
+		// all it can do and all retail's own client would notice. It is 6 quests: 12381, 12583, 12889, 13473,
+		// 16004, 16183.
+		//
+		// RULED OUT along the way, so nothing re-walks them if a SERVER-side meaning is ever wanted. Each is a
+		// candidate that FITS all six and still fails, because it also fits most of the quests that do NOT carry it:
 		//   * "the line pays no reward" - true of all 6 (XpReward and MoneyReward both 0), and ALSO of 69 of the
 		//     other 93 flagged quests. Necessary, nowhere near sufficient. This is the observation the ticket
 		//     recorded; measuring the other side of it is what kills it.
