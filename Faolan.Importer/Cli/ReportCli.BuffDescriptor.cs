@@ -32,6 +32,10 @@ namespace Faolan.Importer.Cli
 			}
 
 			var applies = new List<(uint SpellId, uint Descriptor0, byte Bool2)>();
+			// #658: the same applies with enough CONTEXT to ask whether descriptor[0] is per-cast STATE rather than a
+			// property of the spell - which capture, in what order, on whom, and the whole 54 bytes so the question
+			// "does d0 gate any OTHER byte" can be asked of all of them instead of only [1] and [4].
+			var sequenced = new List<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)>();
 			var crossTab = new Dictionary<string, int>();
 			var nonZeroSlots = new List<string>();
 			var descriptor4 = new Dictionary<uint, int>();
@@ -47,6 +51,7 @@ namespace Faolan.Importer.Cli
 
 				var payload = MagicBuffDataCodec.Parse(buff.Data);
 				applies.Add((buff.SpellBaseId, payload.Descriptor[0], payload.Bool2));
+				sequenced.Add((capture.Name, sequenced.Count, buff.ApplyTo, buff.SpellBaseId, payload.Descriptor[0], payload.Bool2, buff.Data.ToArray()));
 
 				// The within-payload cross-tab. `descriptor` is seven words and only [2] (the spell id) and [3] (the
 				// caster's level) are named, so the first question to ask of [0] is whether it counts or gates one of
@@ -118,6 +123,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  descriptor[4] non-zero values: {string.Join(" ", descriptor4.OrderByDescending(kv => kv.Value).Take(20).Select(kv => $"{kv.Key}x{kv.Value}"))}");
 			Console.WriteLine($"  descriptor[4] set on {descriptor4Spells.Count} spells: {string.Join(" ", descriptor4Spells.OrderByDescending(kv => kv.Value).Take(20).Select(kv => $"0x{kv.Key:X8}x{kv.Value}"))}");
 			Console.WriteLine();
+			DescriptorZeroByteDiff(sequenced);
+			DescriptorZeroReapplySequence(sequenced, spells);
+			DescriptorProvenance(db, applies);
 
 			// The candidate columns, each as a coarse KEY over the spell. Deliberately coarse: a key with as many
 			// values as there are spells scores 100% for free and says nothing (the `field-predictors` report's
@@ -338,6 +346,118 @@ namespace Faolan.Importer.Cli
 		private static uint Modal(IEnumerable<uint> values)
 		{
 			return values.GroupBy(v => v).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).First().Key;
+		}
+
+		// #658: does `descriptor[0]` gate ANY other byte of the payload? The existing cross-tab asks that of slots
+		// [1] and [4] only, because those are the two that are near-zero rather than zero - which cannot see a byte
+		// that is populated on BOTH values and merely differs. This asks it of all 54: for each byte, the value sets
+		// under d0=1 and d0=2, and whether they are disjoint.
+		//
+		// ⚠️ A byte that varies freely (the level, the duration, the stamp) is NOISE here, not a discriminator - it
+		// is printed only when the two value sets do not overlap at all, which is what "gates" means.
+		private static void DescriptorZeroByteDiff(List<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> applies)
+		{
+			var ones = applies.Where(a => a.Descriptor0 == 1).ToList();
+			var twos = applies.Where(a => a.Descriptor0 == 2).ToList();
+			if (ones.Count == 0 || twos.Count == 0)
+				return;
+
+			Console.WriteLine($"does descriptor[0] GATE another byte? ({ones.Count} applies at d0=1 against {twos.Count} at d0=2, all {MagicBuffDataCodec.Length} bytes)");
+			var found = 0;
+			for (var i = 0; i < MagicBuffDataCodec.Length; i++)
+			{
+				var a = ones.Select(x => x.Payload[i]).ToHashSet();
+				var b = twos.Select(x => x.Payload[i]).ToHashSet();
+				if (a.Overlaps(b))
+					continue;
+
+				found++;
+				Console.WriteLine($"  byte @{i,2}: d0=1 {{{string.Join(",", a.Order().Take(8))}}}  d0=2 {{{string.Join(",", b.Order().Take(8))}}}");
+			}
+
+			Console.WriteLine(found == 0
+				? "  none - every byte's value set overlaps, so descriptor[0] gates nothing in the payload."
+				: $"  {found} byte(s) separate the two values.");
+			Console.WriteLine();
+		}
+
+		// #658: is `descriptor[0]` a per-cast STACK COUNT? The spells that carry 2 read like the game's stacking
+		// buffs (Wrath, Momentum, Furious Inspiration, Mutilation, Blessed Blade), and two of them are named with the
+		// stack in the name - `Furious Inspiration (6)`, `Mutilation (1)`. If it counts, a RE-application to the same
+		// target while the buff is up should carry a higher number than the one before it.
+		//
+		// Grouped by (capture, target, spell): a handle is session-scoped, so grouping on the handle alone merges
+		// unrelated entities across captures - the same rule the level-slot measurement needed.
+		private static void DescriptorZeroReapplySequence(List<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> applies,
+			Dictionary<uint, Core.Database.Tables.Spell> spells)
+		{
+			var runs = applies
+				.GroupBy(a => (a.Capture, a.Target, a.SpellId))
+				.Where(g => g.Count() > 1)
+				.Select(g => (Key: g.Key, Values: g.OrderBy(a => a.Order).Select(a => a.Descriptor0).ToList()))
+				.ToList();
+
+			var rising = runs.Count(r => IsStrictlyRisingSomewhere(r.Values));
+			var constant = runs.Count(r => r.Values.Distinct().Count() == 1);
+			Console.WriteLine($"is descriptor[0] a per-cast STACK COUNT? {runs.Count} re-application runs (same capture, target and spell, 2+ applies)");
+			Console.WriteLine($"  constant across the run : {constant}");
+			Console.WriteLine($"  rises at least once     : {rising}");
+			Console.WriteLine($"  starts at 1             : {runs.Count(r => r.Values[0] == 1)}");
+			foreach (var run in runs.Where(r => r.Values.Distinct().Count() > 1).Take(15))
+			{
+				var name = spells.TryGetValue(run.Key.SpellId, out var s) ? s.Name : $"0x{run.Key.SpellId:X8}";
+				Console.WriteLine($"    {name,-34} {string.Join(",", run.Values)}   ({run.Key.Capture})");
+			}
+
+			Console.WriteLine();
+		}
+
+		private static bool IsStrictlyRisingSomewhere(List<uint> values)
+		{
+			for (var i = 1; i < values.Count; i++)
+				if (values[i] > values[i - 1])
+					return true;
+
+			return false;
+		}
+
+		// #658: how each value of `descriptor[0]` / `bool2` splits on the spell's PROVENANCE - can the caster cast it,
+		// or does it only arrive through something else? Measured as a RATE OVER APPLIES rather than as the purity of
+		// a partition over spells, which is why the existing sweep could not see it: with an 83.5% baseline a purity
+		// score needs a near-perfect partition, and a 3x rate lift scores at the baseline.
+		//
+		// ⚠️ A rate lift is a LEAD, not a decode. None of these is a partition, so the builder still writes the
+		// constant - what they buy is a reading with numbers behind it instead of a list of spell names.
+		private static void DescriptorProvenance(Core.Database.DatabaseContext db, List<(uint SpellId, uint Descriptor0, byte Bool2)> applies)
+		{
+			// "Reachable as another spell's EFFECT" is the cut the earlier membership sweep did not include: it swept
+			// ClassSpells, Combos.GameActionId, SpellEffects, SpellStatEffects, NpcSpells and FeatSpellGrants, but not
+			// the chain/area target column, which is the one that separates.
+			var chained = db.SpellAreaEffects.Where(e => e.EffectSpellId != 0).Select(e => e.EffectSpellId).Distinct().ToHashSet();
+			var castable = db.ClassSpells.Select(c => c.SpellId).Distinct().ToHashSet();
+			var statEffect = db.SpellStatEffects.Select(e => e.SpellId).Distinct().ToHashSet();
+
+			var cuts = new (string Name, Func<uint, bool> Holds)[]
+			{
+				("reachable as another spell's effect", id => chained.Contains(id)),
+				("castable (a ClassSpells row)", id => castable.Contains(id)),
+				("ONLY reachable indirectly", id => chained.Contains(id) && !castable.Contains(id)),
+				("carries a SpellStatEffect", id => statEffect.Contains(id))
+			};
+
+			foreach (var (field, value) in new (string, Func<(uint SpellId, uint Descriptor0, byte Bool2), uint>)[]
+			         { ("descriptor[0]", a => a.Descriptor0), ("bool2", a => a.Bool2) })
+			{
+				Console.WriteLine($"{field} against the spell's PROVENANCE, as a rate over APPLIES:");
+				var byValue = applies.GroupBy(value).OrderByDescending(g => g.Count()).Take(3).ToList();
+				foreach (var (name, holds) in cuts)
+				{
+					var cells = byValue.Select(g => $"{field.Split('[')[0]}={g.Key}: {g.Count(a => holds(a.SpellId)),5}/{g.Count(),5} = {100.0 * g.Count(a => holds(a.SpellId)) / g.Count(),5:0.0}%");
+					Console.WriteLine($"  {name,-38}  {string.Join("   ", cells)}");
+				}
+
+				Console.WriteLine();
+			}
 		}
 
 		private static string Histogram(IEnumerable<uint> values)

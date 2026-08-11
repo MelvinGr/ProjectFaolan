@@ -198,9 +198,50 @@ Neither is it any `Spells` column we hold (16 candidates, all at baseline) nor c
 (`ClassSpells`, `Combos.GameActionId`, `SpellEffects`, `SpellStatEffects`, `NpcSpells`, `FeatSpellGrants` — all at
 baseline). The `descriptor[0] == 2` set is characterised only by its names so far, and they are all combo- or
 proc-applied: `Wrath` (21 ranks), `Spiritual Torment`, `Furious Inspiration`, `Mutilation`, `Chill`, `Momentum`,
-`Blessed Blade`, `Renewal`, `Ripping Revenge`, `Sacrarial Guard`, `Covenant of Vengeance`, `Stunned`. With the
-`3` form now known to name a combo, "`2` = applied by a proc/combo that is not named" is the reading to test next.
-Open work tracked in Gitea #658.
+`Blessed Blade`, `Renewal`, `Ripping Revenge`, `Sacrarial Guard`, `Covenant of Vengeance`, `Stunned`.
+
+### Two readings killed, and the one the numbers now favour (#658)
+
+⛔ **`descriptor[0]` gates NOTHING in the payload.** The old cross-tab asked that of slots `[1]` and `[4]` only,
+because those are the two that are near-zero rather than zero — which cannot see a byte populated on both values
+that merely differs. Asked of **all 54 bytes**, the only one whose value sets are disjoint between `d0=1` and
+`d0=2` is **byte @17 — descriptor[0]'s own low byte**. So the ARITY reading holds for `3` (which really does
+gate `descriptor[1]`, 2 of 2) and for nothing else.
+
+⛔ **It is not a per-cast stack or running count**, which the `Furious Inspiration (6)` / `Mutilation (1)` style
+of name invites. Over the **397** re-application runs (same capture, same target, same spell, 2+ applies) it is
+**constant on 394**, and the three that vary do not ramp — `2,1`, `1,1,2,1`, `2,2,2,1,2,1`.
+
+⭐ **What does separate is PROVENANCE, measured as a RATE OVER APPLIES rather than as a partition's purity** —
+which is exactly why the sweep above could not see it: against an 83.5% baseline a purity score needs a
+near-perfect partition, and a 2× rate lift scores at the baseline. The cut the membership sweep did not include
+is `SpellAreaEffects.EffectSpellId` — "can this spell be reached as another spell's effect at all":
+
+| | `d0=1` | `d0=2` | `d0=3` |
+|---|---:|---:|---:|
+| reachable as another spell's effect | 35.3% | **52.0%** | 100% |
+| castable (a `ClassSpells` row) | 16.7% | **4.1%** | 0% |
+| ONLY reachable indirectly | 25.7% | **48.2%** | 100% |
+
+So the reading with numbers behind it is an APPLY-SOURCE tag — `1` a direct cast, `2` applied by another
+effect, `3` applied by a COMBO with `descriptor[1]` naming it. ⚠️ **A rate lift is a lead, not a decode**: none
+of these is a partition, so `MagicBuffDatas.Apply` still writes the constant.
+
+⭐ **`bool2 = 0` is essentially never a castable spell** — the single sharpest signal in the whole field, and it
+holds per apply rather than per spell:
+
+| | `bool2=1` | `bool2=0` |
+|---|---:|---:|
+| castable (a `ClassSpells` row) | 25.0% | **0.2%** |
+| carries a `SpellStatEffect` | 65.6% | **96.3%** |
+| reachable as another spell's effect | 49.3% | 18.0% |
+
+3 applies of 1,334 at `bool2=0` are of a castable spell, against 523 of 2,090 at `bool2=1` — a 125× lift — and
+the `bool2=0` population is almost entirely stat-effect-bearing, mana-free, recast-free and range-free. That is
+the profile of a PASSIVE or derived effect rather than a cast, and it agrees with the one form we already know:
+the casterless apply (`ApplyNoCaster`, retail's local-travel "Racer") carries `bool2 = 0` on all 11.
+
+Reproduce all of it with `--report buff-descriptor`. Open work tracked in Gitea #658.
 
 ## The EMPIRICAL map, and how it lines up
 Before the client's reader was walked, the payload was recovered by diffing same-spell instances (per-cast
