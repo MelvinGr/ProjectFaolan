@@ -46,7 +46,12 @@ trailing `3,3,32,32` does not continue that pattern (level 1 is 3×3 with **256*
 
 ## ⚠️ Why the lava fit failed (superseded — see the transform below)
 
-1010209 is trivially georeferenced — it spans exactly the `1070003` `<tilemap>` extent, so world → pixel is a
+1010209 is georeferenced to the `1070003` `<tilemap>` extent — ⚠️ **the PAIR, `Width` *and* `Height`**, not a
+single number. 15 of the 520 shipped playfields are not square (2048×1536 on eight, 1024×512 on five,
+512×1024 on two), and map 1010's image is 1024×768 against a 2048×1536 extent — the same 4:3, which is what
+confirms the pair rather than the width alone is the georeference. `tools/maps/render_spawn_map.py` read only
+`Width` and used it for both axes, drawing every Z coordinate on that map at 3/4 of its true height; the marks
+stayed inside the image, so it did not look wrong. Fixed. World → pixel is a
 scale. **1010013 is not.** It carries a decorative frame, and the drawing extends past the playfield to show
 surrounding sea and neighbouring landmasses.
 

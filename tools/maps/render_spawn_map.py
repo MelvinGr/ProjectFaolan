@@ -29,7 +29,14 @@ Everything it needs already exists in the tree; there is no C# to add:
       --db faolan.db --out <mapId>-spawn-groups.png
 
 Only 66 (outdoor) playfields have a 1010209 entry at all; interiors/dungeons simply have none, so this is an
-outdoor-map tool. `--extent N` substitutes for `--playfield` when you already know the tilemap width.
+outdoor-map tool. `--extent N` (or `--extent WxH`) substitutes for `--playfield` when the tilemap extent is
+already known.
+
+⚠️ THE EXTENT IS A PAIR, not one number. 15 of the 520 shipped playfields are NOT square, and one of them -
+map 1010, with 644 spawns and 39 areas - is 2048x1536. Reading only `Width` and using it for both axes drew
+every Z coordinate at 3/4 of its true height, which does not LOOK broken because the marks stay inside the
+image. The 1010209 render is georeferenced to the pair: map 1010's image is 1024x768, the same 4:3 as its
+extent. The client divides by the same pair, one per axis (`RegionMapRenderer`, #492).
 
 ⚠️ ORIENTATION. The source PNG's row 0 is SOUTH - a property of the FORMAT, not of one map, and the same
 convention `Faolan.Web/wwwroot/js/radar.js` encodes. Confirmed independently by overlaying a map's baked
@@ -97,11 +104,22 @@ def load_map_image(path):
 
 
 def load_extent(path):
+    """The playfield's world extent as (X, Z).
+
+    ⚠️ It is NOT always square, and reading only Width silently squashes every marker on the ones that are
+    not: 15 of the 520 shipped playfields have Width != Height (2048x1536 on eight of them, 1024x512 on five,
+    512x1024 on two), and map 1010 - which carries 644 spawns and 39 areas - is one of them. Using the width
+    for both axes there scales Z by 0.75, which does not look broken because the markers stay INSIDE the
+    image; they are just all in the wrong place. That is the same silent-wrongness the flip note above warns
+    about, from the other axis.
+
+    The client agrees: `RegionMapRenderer` divides by a PAIR (playfield +0xFC / +0x100), one per axis (#492).
+    """
     xml = open(path, "rb").read().decode("latin-1")
-    m = re.search(r'<tilemap[^>]*Width="(\d+)"', xml)
+    m = re.search(r'<tilemap[^>]*Width="(\d+)"[^>]*Height="(\d+)"', xml)
     if not m:
-        sys.exit(f"{path}: no <tilemap Width=...> - is this a 1070003 body?")
-    return int(m.group(1))
+        sys.exit(f"{path}: no <tilemap Width=... Height=...> - is this a 1070003 body?")
+    return int(m.group(1)), int(m.group(2))
 
 
 def load_rows(db, map_id, character_id):
@@ -171,7 +189,8 @@ def main():
     p.add_argument("--db", default="faolan.db", help="path to faolan.db (default: ./faolan.db)")
     p.add_argument("--map-image", required=True, help="RDB 1010209 body from rdb-dump (or a plain .png)")
     p.add_argument("--playfield", help="RDB 1070003 body from rdb-dump, for the tilemap extent")
-    p.add_argument("--extent", type=int, help="tilemap width in world units, instead of --playfield")
+    p.add_argument("--extent", help="tilemap extent in world units instead of --playfield: N for a square "
+                                    "playfield, or WxH for one of the 15 that are not")
     p.add_argument("--character", type=int, help="optional character id to mark at its stored position")
     p.add_argument("--out", help="output PNG (default: <mapId>-spawn-groups.png)")
     p.add_argument("--dpi", type=int, default=260,
@@ -185,7 +204,13 @@ def main():
 
     if not args.playfield and not args.extent:
         p.error("one of --playfield or --extent is required")
-    world = float(args.extent or load_extent(args.playfield))
+    if args.extent:
+        parts = args.extent.lower().split("x")
+        if len(parts) not in (1, 2) or not all(q.isdigit() for q in parts):
+            p.error("--extent takes N or WxH")
+        world_x, world_z = (float(parts[0]), float(parts[-1]))
+    else:
+        world_x, world_z = (float(v) for v in load_extent(args.playfield))
     out_png = args.out or f"{args.map}-spawn-groups.png"
     out_txt = out_png.rsplit(".", 1)[0] + ".txt"
 
@@ -218,11 +243,11 @@ def main():
     fig.patch.set_facecolor("#0d0c08")
     ax = fig.add_axes([0.035, 0.028, 0.93, 0.885])
     ax.set_facecolor("#0d0c08")
-    ax.imshow(img, extent=(0, world, 0, world), origin="lower", interpolation="bilinear")
-    ax.set_xlim(0, world)
-    ax.set_ylim(0, world)
+    ax.imshow(img, extent=(0, world_x, 0, world_z), origin="lower", interpolation="bilinear")
+    ax.set_xlim(0, world_x)
+    ax.set_ylim(0, world_z)
     ax.set_aspect("equal")
-    for g in range(256, int(world), 256):
+    for g in range(256, int(max(world_x, world_z)), 256):
         ax.axhline(g, color=INK, lw=0.4, alpha=0.10, zorder=2)
         ax.axvline(g, color=INK, lw=0.4, alpha=0.10, zorder=2)
     ax.tick_params(colors=INK_DIM, labelsize=8, length=3)
@@ -237,7 +262,7 @@ def main():
     # these as --dpi rises and let labels collide again. Measured by eye against a render, since exact extents
     # would need a draw pass and only overlap-avoidance depends on them.
     ref_dpi = 110.0
-    per_px = world / (fig.get_size_inches()[0] * ref_dpi * 0.93)
+    per_px = world_x / (fig.get_size_inches()[0] * ref_dpi * 0.93)
     char_w, line_h = 7.0 * per_px, 12.0 * per_px
     # The character marker is an obstacle too, else its star sits on top of whichever group label it lands in.
     # Only the STAR: treating the callout as one too was tried and reverted - a rectangle crude enough to cover
@@ -278,7 +303,7 @@ def main():
         px, pz = player["PositionX"], player["PositionZ"]
         ax.scatter([px], [pz], s=420, marker="*", facecolor="#ffffff", edgecolor=PANEL, linewidths=1.6, zorder=12)
         ax.annotate(f"{player['Name']}  ·  level {player['Level']}\n({px:.0f}, {pz:.0f})", (px, pz),
-                    xytext=(px + world * 0.023, pz - world * 0.038), color=INK, fontsize=10.5,
+                    xytext=(px + world_x * 0.023, pz - world_z * 0.038), color=INK, fontsize=10.5,
                     fontweight="bold", zorder=12,
                     path_effects=[pe.withStroke(linewidth=3.0, foreground=PANEL, alpha=0.92)],
                     arrowprops=dict(arrowstyle="-", color=INK, lw=1.2, alpha=0.85,
@@ -320,7 +345,7 @@ def main():
              color=INK_DIM, fontsize=12.5, ha="left", va="top")
     fig.text(0.965, 0.977,
              "background: client RDB 1010209, contrast-expanded  ·  extent: RDB 1070003 <tilemap>, "
-             f"{int(world)}×{int(world)} world units\n"
+             f"{int(world_x)}×{int(world_z)} world units\n"
              "groups: NpcSpawnAreas + NpcSpawnAreaPoints (faolan.db)\n"
              "north-up: source row 0 is south (see radar.js; confirmed against the baked collision mesh)",
              color=INK_DIM, fontsize=8.8, ha="right", va="top", linespacing=1.7)
