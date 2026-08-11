@@ -69,6 +69,17 @@ namespace Faolan.Core.Database.Tables
 		///         display from the equipment container. So the 177 -> 73 above is arithmetic that FITS, not a
 		///         measurement, and the default stays <c>Primary</c> rather than being guessed the other way.
 		///     </para>
+		///     <para>
+		///         ⛔ <b>And the four candidate signals are now checked rather than assumed absent</b> (#588). The
+		///         client's stat registry names four that would say it - <c>EquippedWeapons</c> (274),
+		///         <c>WeaponItemType</c> (508), <c>WeaponAnimSet</c> (615), <c>WeaponFlags</c> (863) - and
+		///         <c>--report stat-series</c> finds <b>none of them in any captured StatIIR</b>. The spawn's own
+		///         protobuf carries no weapon-set field either, and <c>--report weapon-set-drawn</c> shows the
+		///         equipment list cannot stand in for it: DemoL80's spawn lists slots <c>[6,20,21]</c>, i.e. BOTH sets
+		///         at once, which is the case the render list cannot decide (138 of 10,990 captured spawns are like
+		///         that). So this is a measured negative, not an unexamined gap - a new capture would have to catch
+		///         the swap itself.
+		///     </para>
 		///         VERIFIED, not fitted. It reproduces the retail character sheet exactly at:
 		///         all TWELVE classes at level 1 (Guardian 130, Conqueror 168, Dark Templar 128/281/178, Assassin
 		///         98/236, Barbarian 118, Ranger 133, the priests 88/171, Bear Shaman 108/171/178, Herald 89/246/121,
