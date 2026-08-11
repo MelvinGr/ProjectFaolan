@@ -220,7 +220,7 @@ namespace Faolan.Importer.Cli
 		{
 			await using var db = OpenDb();
 			var quests = db.QuestDefinitions
-				.Select(q => new { q.QuestId, q.QuestLineId, q.JournalSequence, q.FieldF0, q.FieldF8, q.HasSnapshotRecord })
+				.Select(q => new { q.QuestId, q.QuestLineId, q.JournalSequence, q.FieldF0, q.FieldF8, q.XpReward, q.MoneyReward, q.HasSnapshotRecord })
 				.AsEnumerable()
 				.ToList();
 
@@ -327,6 +327,55 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    line {m.TemplateId,-6} xp {m.XpReward,-8} cash {m.CashReward,-8} '{m.Name}'  " +
 				                  $"(we hold {ours} step(s), @+0xf0 carrier {(carrier == null ? "none" : carrier.QuestId.ToString())})");
 			}
+
+			TwoPairExclusion(quests.Select(q => (q.QuestId, q.QuestLineId, q.XpReward, q.MoneyReward, q.FieldF0, q.FieldF8, q.HasSnapshotRecord)));
+		}
+
+		// ⭐ Are the two reward pairs the SAME quantity in two slots? (#802.)
+		//
+		// The standing reading is that they are two DIFFERENT rewards at opposite ends of a line - `@+0xf0`/`@+0xf8`
+		// on the step you are offered, `@+0x28`/`@+0x20` on the step that pays - and that reading predicts a line
+		// carrying BOTH. Measured over the captured lines, that is not what the corpus holds: a line carries one pair
+		// or the other, essentially never both, and on the single line that does carry both the XP values are EQUAL.
+		//
+		// ⚠️ Read the exclusion against CHANCE, not against zero. 31 quests carry the `@+0xf0` pair and 21 the
+		// journal's, over 100 captured quests, so ~6.5 overlaps is what independence predicts - which is why the
+		// expected count is printed beside the observed one. A single overlap is a real anti-correlation; calling it
+		// "almost none" without the base rate would be the same mistake as reading a purity sweep without one.
+		private static void TwoPairExclusion(IEnumerable<(uint QuestId, uint LineId, uint Xp, ulong Money, uint F0, ulong F8, bool Captured)> rows)
+		{
+			var all = rows.ToList();
+			var captured = all.Where(q => q.Captured).ToList();
+
+			var bothQ = all.Count(q => q.F0 != 0 && q.Xp != 0);
+			var f0Only = all.Count(q => q.F0 != 0 && q.Xp == 0);
+			var xpOnly = all.Count(q => q.F0 == 0 && q.Xp != 0);
+			var f0Any = bothQ + f0Only;
+			var xpAny = bothQ + xpOnly;
+			var expected = captured.Count == 0 ? 0 : (double)f0Any * xpAny / captured.Count;
+
+			Console.WriteLine();
+			Console.WriteLine("--- are @+0xf0/@+0xf8 and @+0x28/@+0x20 the SAME pair in two slots? (#802) ---");
+			Console.WriteLine($"  per QUEST over the {captured.Count} captured: @+0xf0 only {f0Only}, @+0x28 only {xpOnly}, BOTH {bothQ}" +
+			                  $"  (chance predicts {expected:0.0} overlaps)");
+
+			// Per LINE, which is the measure the "opposite ends of one line" reading actually makes a claim about:
+			// two rewards at the two ends of a line would put BOTH on almost every reward-bearing line.
+			var lines = all.GroupBy(q => q.LineId)
+				.Where(g => g.Any(q => q.Captured))
+				.Select(g => (Line: g.Key, HasF0: g.Any(q => q.F0 != 0), HasXp: g.Any(q => q.Xp != 0)))
+				.ToList();
+			var lf0 = lines.Count(l => l.HasF0 && !l.HasXp);
+			var lxp = lines.Count(l => !l.HasF0 && l.HasXp);
+			var lboth = lines.Count(l => l.HasF0 && l.HasXp);
+			Console.WriteLine($"  per LINE  over the {lines.Count} captured: @+0xf0 only {lf0}, @+0x28 only {lxp}, BOTH {lboth}" +
+			                  "   <- the 'one at each end of a line' reading predicts BOTH on nearly every line");
+
+			// And what the overlap says where it exists. This is the whole of the positive evidence, so it prints the
+			// rows rather than a verdict: one row is one row, however clean it looks.
+			foreach (var q in all.Where(q => q.F0 != 0 && q.Xp != 0))
+				Console.WriteLine($"    quest {q.QuestId} (line {q.LineId}): @+0xf0 {q.F0} vs @+0x28 {q.Xp} {(q.F0 == q.Xp ? "EQUAL" : "differ")}" +
+				                  $" | @+0xf8 {q.F8} vs @+0x20 {q.Money} {(q.F8 == q.Money ? "EQUAL" : "differ")}");
 		}
 
 		// No FIELD does: `Quest.tier` and `Quest.start_new_tier` are zero on all 5042 rows. But a protobuf's repeated

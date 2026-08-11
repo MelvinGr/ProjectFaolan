@@ -422,8 +422,11 @@ TSV sections; `--report-arg <line or quest id>` prints that line as a tree. It a
 against the four `ACGHash` line tokens recovered from captures, which is what establishes that our `QuestLineId`
 IS the client's `MainQuest.template_id`. ⚠️ It reads the **DB** as well as the RDB, for the step-order check:
 the catalog's row order is scored against the captured `JournalSequence`, with ascending-id and reversed-order
-controls — the measurement that rules the catalog OUT as a source of step order;
-see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
+controls — the measurement that rules the catalog OUT as a source of step order. It also carries the two reward
+checks: `LineRewardCheck` (is `Quest_c` @+0xf0/@+0xf8 the LINE's reward? no — the populations are disjoint) and
+⭐ `TwoPairExclusion` (is it the same pair as the journal's @+0x28/@+0x20 in a second slot? per LINE, 30 carry
+one, 20 the other and **1 both** where chance predicts 6.5 — which refutes "two rewards at opposite ends of a
+line", #802); see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `shield-rose` (every `CombatShieldIIR` timed against its own defender's spawn — which is what turns "no capture
 covers a catch-up send" into a measurement: of 71 first-roses, none arrives within 2 s of that handle's spawn, so
 retail sends none either, #622),

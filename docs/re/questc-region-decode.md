@@ -286,10 +286,33 @@ captured sequence, **14 sit at its lowest and 0 at its highest** (the strict ful
 first 12, last 0, middle 2). `XpReward`/`MoneyReward` are the other way round, on the **last** step of a line
 (25 of 26).
 
-So the reading that fits everything is **one pair per quest at each end of it**: `@+0xf0`/`@+0xf8` on the step
-you are OFFERED — a precomputed "you will receive", scaled to `Field118`, which the step pane never renders
-because it belongs to the offer dialog — and `@+0x28`/`@+0x20` on the step that PAYS. That is still a reading,
-not a decode, so the two keep their offsets as names. Open work in Gitea #759.
+#### ⛔ …but "one pair at each END of a line" is refuted by the LINE-level census (#802)
+
+That reading predicts a reward-bearing line carrying **both** pairs, one at each end. It does not:
+`--report rdb-quest-catalog`'s `TwoPairExclusion` measures, over the 100 captured quests / 95 captured lines,
+
+```
+per QUEST  @+0xf0 only 30, @+0x28 only 20, BOTH 1   (chance predicts 6.5 overlaps)
+per LINE   @+0xf0 only 30, @+0x28 only 20, BOTH 1
+the one overlap, quest 13479: @+0xf0 80 == @+0x28 80   (@+0xf8 7 against @+0x20 0)
+```
+
+A line carries **one** reward, in one slot pair or the other — and on the single line that carries both, the XP
+values are **equal** (a captured value: quest 13479's record is gated byte-exact by `QuestcRegionTests`). The
+positional law then describes *which slot a line uses*, not two rewards at two ends.
+
+⛔ The advertised-reward candidate's own named test is also answered, negatively:
+`QuestGiverList.MainQuestReward` is the **item** reward list — imported as `QuestLineReward`, its `type` being
+the item's `SearchCategory` on 1,635 of 1,635 resolvable rows — and it carries no xp or money amount at all, so
+an advertised money+xp pair cannot surface there.
+
+⚠️ Two client-side routes are also closed, so don't re-walk them: there is **no `com.GameInterface.Quest*`
+namespace** among the client's Lua-bound UI registries (Guild, Factions, Inventory, DialogIF, Lore,
+PvPMinigame, … — quests are not exposed by name), and a co-occurrence scan for functions touching Quest_c's own
+members together (`[+0xf0]` ∧ `[+0xf8]` ∧ `[+0x11c]` ∧ `[+0x118]`, and again with `[+0xec]`) leaves exactly
+three: the constructor `FUN_0091cf10`, the reader `FUN_0091df50` and the writer `FUN_0091d260`.
+
+The two keep their offsets as names. Open work in Gitea #802.
 
 ⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 at level 23 rising to ~1.10 at 80), but 99
 samples do not close the law. Do not derive one from the other.
