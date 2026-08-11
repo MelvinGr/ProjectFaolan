@@ -388,6 +388,16 @@ namespace Faolan.Importer.Cli
 					return await NpcPoseCheck(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "item-level-check":
+				{
+					return await ItemLevelCheck(NamedCapture.LoadAll(capturesDir));
+				}
+
+				case "buff-duration-check":
+				{
+					return await BuffDurationCheck(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "spawn-animation":
 				{
 					SpawnAnimation(NamedCapture.LoadAll(capturesDir), _options.Configuration[Keys.ContentRdbDir]);

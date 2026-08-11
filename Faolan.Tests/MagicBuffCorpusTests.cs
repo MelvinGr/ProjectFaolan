@@ -121,67 +121,12 @@ namespace Faolan.Tests
 				+ string.Join(", ", zero.Distinct().Take(12)));
 		}
 
-		// The DURATION at +8, against the `Spells` row it is built from - the original point of this ticket.
-		//
-		// ⭐ It exposed a mechanic rather than a bug. 242 of the 2,929 applies carry a duration the row disagrees
-		// with, and they are not noise: nearly all are LOWER than the row and the value DECREASES across a capture
-		// for the same spell (0x00119110, a 4-hour buff: 1,434,700 -> 1,252,990 -> ... -> 1,180,241 cs against a row
-		// of 1,440,000). That is retail re-sending a long buff with its REMAINING time, not its base duration - the
-		// restore path #601 is about, here with 242 samples instead of an argument.
-		//
-		// So the gate asserts what it can: an apply whose duration EXCEEDS the row's is unexplained by that reading
-		// and is asserted at ZERO (#659 landed the four rows it found); the shortfalls are pinned as a population
-		// and characterised.
-		[Fact]
-		public void TheDuration_MatchesTheSpellRow_OrIsARestoreCarryingTheTimeLeft()
-		{
-			var applies = CapturedApplies();
-			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var ids = applies.Select(a => a.Buff.SpellBaseId).Distinct().ToList();
-			var durations = db.Spells.Where(s => ids.Contains(s.Id)).ToDictionary(s => s.Id, s => s.DurationMs);
-
-			var compared = 0;
-			var exact = 0;
-			var shortfall = new List<(uint Spell, uint Captured, uint Row)>();
-			var over = new List<(uint Spell, string Line)>();
-			foreach (var (source, buff) in applies)
-			{
-				if (!durations.TryGetValue(buff.SpellBaseId, out var durationMs))
-					continue; // no row to construct from - not a builder failure
-
-				compared++;
-				var captured = buff.Data.ReadU32Be(DurationOffset);
-				var expected = durationMs / 10;
-				if (captured == expected)
-					exact++;
-				else if (captured < expected)
-					shortfall.Add((buff.SpellBaseId, captured, expected));
-				else
-					over.Add((buff.SpellBaseId, $"{source} spell 0x{buff.SpellBaseId:X8}: captured {captured} cs > row {expected} cs"));
-			}
-
-			Assert.True(compared > 500, $"only {compared} applies resolved to a Spells row - the gate would be near-vacuous");
-			Assert.Equal(2696, exact);
-
-			// The shortfall population, pinned - and split, because it is not homogeneous: 192 are on buffs of an
-			// hour or more (the restore reading above), and 41 are on shorter ones, which that reading does not
-			// explain and which are part of #658's decode.
-			Assert.Equal(233, shortfall.Count);
-			Assert.Equal(41, shortfall.Count(s => s.Row < 360000));
-
-			// ⭐ The other direction IS a data bug, and the gate found it: four spells whose `Spells.DurationMs` was 0
-			// or 1 ms while retail sends a real duration - 0x003B3C9C and 0x004902C0 at 40 s, 0x00485DE6 at 15 s,
-			// 0x004D3063 at 4 h. #659 sourced all four: the first three from the wire itself, where the same value
-			// repeats across distinct captures (`CaptureSpellImporter.ImportBuffDurationsAsync`), and `XP Boost (4h)`
-			// from its own RDB record, which is in the ability/effect catalog rather than the spell catalog
-			// (`RdbSpellImporter.FillDurationsFromEffectCatalog`) - so its 1,268,055 cs apply moved to the shortfall
-			// list, correctly, as the restore it always was.
-			//
-			// Asserted at ZERO rather than removed: an apply longer than the row it is built from can only be a wrong
-			// row, so any new one is a finding.
-			Assert.True(over.Count == 0, $"{over.Count} applies whose duration EXCEEDS the Spells row - a wrong Spells.DurationMs:\n  "
-			                             + string.Join("\n  ", over.Select(o => o.Line).Take(10)));
-		}
+		// ⛔ `TheDuration_MatchesTheSpellRow_OrIsARestoreCarryingTheTimeLeft` MOVED OUT to
+		// `--report buff-duration-check` (#729). It compared importer OUTPUT (`Spells.DurationMs`) against importer
+		// INPUT (the captured applies) and PINNED all three populations as exact counts, so both sides of the
+		// comparison moved whenever captures were added and every data change was a rebaseline. Its real content -
+		// "an apply cannot outlast the row it is built from" - is asserted there, against the real dumps, where the
+		// two sides are always in step. Run against them it immediately found a spell the frozen slice could not see.
 
 		// descriptor[2] is the spell's own base id, echoed inside the payload. 10 of the 2,929 disagree - pinned
 		// rather than excused, because a drift either way is a finding.

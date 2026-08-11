@@ -380,9 +380,14 @@ suite reads. It has two halves, and the difference decides which one a new gate 
   ⛔ **A gate comparing SHIPPED DATA to the corpus does not belong here — it belongs in a `--report`** (#729). The
   slice is frozen while `faolan.db` is built from whatever dumps exist today, so the two populations diverge the
   moment captures are added and the gate fails on data that is MORE correct than the evidence it demands. That is
-  what `--report npc-pose-check` is: the shipped-pose gate, moved out of `NpcStatCoreColumnsTests` and run against
-  the real dumps, where there is no second population. The test is the right home only for a property of the CODE
-  (a round-trip, a field sweep), never for one of the DATA.
+  what the `*-check` reports are — each one a shipped-data gate moved out of a test and run against the real dumps,
+  where there is no second population: **`npc-pose-check`** (from `NpcStatCoreColumnsTests`),
+  **`item-level-check`** (from `ItemLevelTests`, now deleted) and **`buff-duration-check`** (from
+  `MagicBuffCorpusTests`). The test is the right home only for a property of the CODE (a round-trip, a field
+  sweep), never for one of the DATA. ⚠️ And a moved check PRINTS its populations instead of pinning them: a count
+  that moves when captures are added is a fact about the data, so only the direction that can only be a defect
+  stays asserted (`buff-duration-check` returns non-zero on an apply that outlasts a row stating a real duration,
+  and merely reports the rows still at the empty placeholder).
 
 ```zsh
 dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures
