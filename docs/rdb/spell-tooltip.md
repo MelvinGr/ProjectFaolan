@@ -144,20 +144,26 @@ Two decodes it exercises that a flat read would not:
 ## What the census measures
 
 ```
-record bytes inside a parsed region : 6,814,307 / 8,241,205 = 82.7%
+record bytes inside a parsed region : 8,175,543 / 8,241,205 = 99.2%
 property-run field ids read         : 16 / 83
-elements rendered as a sentence     : 49,438 / 61,840 = 79.9%
-...or accounted for                 : 58,562 / 61,840 = 94.7%
+elements rendered as a sentence     : 49,543 / 61,840 = 80.1%
+...or accounted for                 : 59,499 / 61,840 = 96.2%
 ```
 
-⭐ **The second line is the honest one.** Three buckets, and only two of them are our debt:
+⭐ **The second line is the honest one.** Four buckets, and only two of them are our debt:
 
 - **the client draws nothing either** — 9,124 elements over 83 kinds whose type id reaches no branch of
   `FUN_0149e450` at all, led by `DPSHit` (2,660), `StartServerSideScryScriptWithParams` (1,597) and
   `StartParticleEffect` (1,182). That is retail's behaviour, not a decode gap, and counting it as one read as
   ~5,000 elements of debt that do not exist;
-- **a branch but no sentence we can find** — 2,157 over 7 kinds (`ChangeInheritedWeaponAttack` 795,
-  `InheritedComboAttack` 753, `AddSpellLineProc` 424);
+- **a branch that PROVABLY has no 170 sentence** — 832 over 3 kinds, and the proof is per kind rather than a
+  shrug (`GameActionTooltip.NoSentenceReason`). `Spell` (16) and `BCCCastSpell` (63) push category **100**, not
+  170, and their tokens resolve there as plain label NOUNS — they draw a label, so there is no sentence to find.
+  `InheritedComboAttack` (753) is the opposite shape: its sentence IS found (`PerSecond`, "%s per second") and
+  the `%s` is a number the record does not contain — branch `0x014a103e` computes it as
+  `key224 × 0.01 × [ESI] / [EBX]`, two floats out of the INVOCATION context. Rendering it would invent a number;
+- **a branch but no sentence we can find** — 1,220 over 3 kinds (`ChangeInheritedWeaponAttack` 795,
+  `AddSpellLineProc` 424, `Hit` 1);
 - **a sentence whose slots are not bound** — 1,121 over 8 kinds, led by `HitPercentage`'s live-state arms,
   `UpgradeCombo` and `AddSpellProc`.
 
@@ -324,6 +330,39 @@ its own type-id string `%.2fm%s wide column to target` when there is no distance
 
 One more exception worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"*.
+
+### `AddPercentSkillModifier` (53189): the sentence is chosen by whether its two STAT slots are equal
+
+One of the kinds #782 named as unreachable by the generic binder — it has no `Stat` (key 0) slot at all, so the
+`(Stat, magnitude)` rule cannot touch it and it sat in the "no sentence we can find" bucket. It has **two**
+sentences, and branch `0x014a1b52` picks between them by comparing its two stat slots:
+
+```
+ESI = GetIntStat(0x315)   ; key 66
+EDI = GetIntStat(0x316)   ; key 67
+EBX = GetIntStat(0x2f9)   ; key 39, the percentage
+CMP ESI,EDI ; JNZ 0x014a1c95         <- equal -> same-stat arm, else different-stat arm
+```
+
+| arm | token | English |
+|---|---|---|
+| equal | `AddPercentSkillModifierSameStat` | `#2{1: Increases \| Decreases } your #3%s by #1%s` |
+| differ | `AddPercentSkillModifierDifferentStat` | `#2{1: Increases \| Decreases } your #4%s by #1%s of your #3%s` |
+
+⭐ **The slot order is read off the binds, not guessed.** Both arms append the value string, then the `SETG` of
+the value's sign as the `#2` branch selector, then the stat saved at `[ESP+0x10]` (key 66); the different-stat arm
+appends one more from `[ESP+0x24]` (key 67). So **`#3` is key 66 and `#4` is key 67** — "increases your ⟨67⟩ by
+N% of your ⟨66⟩", i.e. 66 is the SOURCE stat and 67 the one being raised.
+
+⭐⭐ **And the shipped data confirms that direction independently, in prose.** `Arcane Plunder` (4281011) carries
+`66=804` Strength / `67=490` with `39=2..10`, and its own description reads *"Increases the rogue's **Immunity
+Rating** based on the sum of **Strength** and **Dexterity**"* — which is exactly what the binding renders
+("Increases your Immunity Rating by 2% of your Strength"), and the reverse of what swapping `#3`/`#4` would.
+`Absolute Philtre of Constitution` is the other arm: `66 = 67 = 806`, `39 = 8` → "Increases your Constitution by 8%".
+
+⚠️ The magnitude is a **plain** percent here (8, 13, 2..10) — not the hundredths `ChangeHitPercent` (53030) and
+`UpgradeCombo` (53209) carry. The sentence has no literal `%`, so the suffix belongs to the value string, which is
+what the branch's own value formatter appends.
 
 ### `AddComboProc` (53212): the sentence is chosen by which SIDE is present
 

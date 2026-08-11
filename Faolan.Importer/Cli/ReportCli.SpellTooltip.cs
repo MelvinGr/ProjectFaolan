@@ -121,6 +121,9 @@ namespace Faolan.Importer.Cli
 			var hiddenSample = new List<string>();
 			var fieldCounts = new Dictionary<uint, int>();
 			var noSentence = new Dictionary<uint, int>();
+			// The kinds whose lack of a 170 sentence is PROVEN rather than merely unfound - see
+			// GameActionTooltip.NoSentenceReason.
+			var noSentenceByConstruction = new Dictionary<uint, int>();
 			var notDrawn = new Dictionary<uint, int>();
 			var unbound = new Dictionary<uint, int>();
 
@@ -200,10 +203,14 @@ namespace Faolan.Importer.Cli
 					var (format, args) = Sentence(ctx, element);
 					if (format == null)
 					{
-						// ⭐ Split the two, because only one of them is OURS. A kind the tooltip builder has no branch
-						// for falls to its default and the client draws nothing either - counting that as a missing
-						// sentence reads as decode debt when it is retail's own behaviour.
-						var bucket = GameActionTooltip.HasTooltipBranch(element.Kind) ? noSentence : notDrawn;
+						// ⭐ Split THREE ways, because only one of them is OURS. A kind the tooltip builder has no
+						// branch for falls to its default and the client draws nothing either; a kind whose absence
+						// is PROVEN (a category-100 label, or a number that lives in the invocation context) is
+						// settled rather than outstanding. Counting either as a missing sentence reads as decode debt
+						// when it is retail's own behaviour.
+						var bucket = !GameActionTooltip.HasTooltipBranch(element.Kind) ? notDrawn
+							: GameActionTooltip.NoSentenceReason(element.Kind) != null ? noSentenceByConstruction
+							: noSentence;
 						bucket[element.Kind] = bucket.GetValueOrDefault(element.Kind) + 1;
 						continue;
 					}
@@ -225,15 +232,21 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
 			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
 			// work is what is left after both.
-			var accountedElements = rendered + notDrawn.Values.Sum();
+			var accountedElements = rendered + notDrawn.Values.Sum() + noSentenceByConstruction.Values.Sum();
 			Console.WriteLine($"  ...or accounted for                 : {accountedElements:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * accountedElements / elements):0.0}%"
-			                  + "   (rendered, or a kind the client itself draws nothing for)");
+			                  + "   (rendered, or a kind whose blank line is the client's own behaviour)");
 			Console.WriteLine();
 
 			Console.WriteLine($"  kinds the CLIENT does not draw either - no branch in FUN_0149e450, so they reach its default"
 			                  + $" ({notDrawn.Values.Sum():N0} elements over {notDrawn.Count} kinds):");
 			foreach (var (kind, count) in notDrawn.OrderByDescending(k => k.Value).Take(12))
 				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}");
+
+			Console.WriteLine();
+			Console.WriteLine($"  kinds with a branch that PROVABLY has no 170 sentence - settled, not outstanding"
+			                  + $" ({noSentenceByConstruction.Values.Sum():N0} elements over {noSentenceByConstruction.Count} kinds):");
+			foreach (var (kind, count) in noSentenceByConstruction.OrderByDescending(k => k.Value))
+				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   {GameActionTooltip.NoSentenceReason(kind)}");
 
 			Console.WriteLine();
 			Console.WriteLine($"  kinds WITH a branch but no sentence we can find ({noSentence.Values.Sum():N0} elements over {noSentence.Count} kinds):");
@@ -533,6 +546,50 @@ namespace Faolan.Importer.Cli
 			// the percentage, and a mode word (branch 0x014a0b99).
 			if (element.Kind == HitPercentageKind)
 				return HitPercentageSentence(ctx, element);
+
+			// `AddPercentSkillModifier` (branch 0x014a1b52) - one of the kinds #782 named as having no Stat slot at
+			// all, so the generic (Stat, magnitude) binder cannot touch it and it sat in the "no sentence we can
+			// find" bucket. It has two, and the branch picks between them by COMPARING ITS TWO STAT SLOTS:
+			//
+			//     CMP ESI,EDI ; JNZ <different-stat arm>      ESI = GetIntStat(0x315) = key 66
+			//                                                 EDI = GetIntStat(0x316) = key 67
+			//                                                 EBX = GetIntStat(0x2f9) = key 39, the percentage
+			//
+			//   same      `#2{1: Increases | Decreases } your #3%s by #1%s`
+			//   different `#2{1: Increases | Decreases } your #4%s by #1%s of your #3%s`
+			//
+			// ⭐ The SLOT ORDER is read off the binds rather than guessed: both arms append the value, then the
+			// `SETG` of the value's sign as the branch selector, then the stat saved at `[ESP+0x10]` (key 66), and
+			// the different-stat arm appends one more from `[ESP+0x24]` (key 67). So `#3` is key 66 and `#4` is key
+			// 67 - "increases your <67> by N% of your <66>", i.e. 66 is the SOURCE stat and 67 the one raised.
+			//
+			// The shipped data agrees independently: `Absolute Philtre of Constitution` carries 66=806, 67=806
+			// (equal -> the same-stat arm) with 39=8, and `Arcane Plunder` carries 66=804 Strength, 67=490, 39=2..8,
+			// which reads as "increases your 490 by 2% of your Strength" and not the other way round.
+			//
+			// ⚠️ The magnitude is a PLAIN percent here (8, 13, 2..8), not the hundredths `ChangeHitPercent` and
+			// `UpgradeCombo` carry - so it is rendered `8%`, not `0.08%`. The sentence has no literal `%`, so the
+			// suffix belongs to the value string, which is what the branch's own value formatter appends.
+			if (element.Kind == AddPercentSkillModifierKind)
+			{
+				var sourceStat = element.Value(SkillModifierSourceKey);
+				var targetStat = element.Value(SkillModifierTargetKey);
+				var percent = element.Value(GameActionTypes.KeyValue);
+				if (sourceStat is null or 0 || targetStat is null or 0 || percent is null)
+					return (null, null);
+
+				var signed = (int)percent.Value;
+				var same = sourceStat.Value == targetStat.Value;
+				var format = ctx.SentenceForToken(same ? "AddPercentSkillModifierSameStat" : "AddPercentSkillModifierDifferentStat");
+				if (format == null)
+					return (null, null);
+
+				object?[] args = same
+					? [$"{signed}%", signed > 0 ? 1 : 0, ctx.StatName(sourceStat.Value)]
+					: [$"{signed}%", signed > 0 ? 1 : 0, ctx.StatName(sourceStat.Value), ctx.StatName(targetStat.Value)];
+
+				return (format, args);
+			}
 
 			// `ColumnAddTargets` picks between its own type-id sentence and a token one on whether it carries a
 			// DISTANCE (branch 0x014a08f0): it takes |key 238| and compares it against the 0.005 at 0x01f27378,
@@ -1030,6 +1087,7 @@ namespace Faolan.Importer.Cli
 
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
 		private const uint AddComboProcKind = 53212;
+		private const uint AddPercentSkillModifierKind = 53189;
 		private const uint AreaFormulaKind = 53087;
 		private const uint AttackAddTargetsKind = 53273;
 		private const uint CastNanoKind = 53051;
@@ -1046,6 +1104,11 @@ namespace Faolan.Importer.Cli
 		private const uint ResurrectTargetKind = 53227;
 		private const uint TeamFormulaKind = 53066;
 		private const uint TeamPropagatedBuffKind = 53224;
+
+		// `AddPercentSkillModifier`'s two stat slots. Per-TYPE like every unnamed key: on `UpgradeCombo` 66/67 are the
+		// damage and cooldown deltas, here they are the SOURCE stat and the stat it raises (see the branch note).
+		private const int SkillModifierSourceKey = 66;
+		private const int SkillModifierTargetKey = 67;
 
 		// The 0.01 `FUN_014af090` applies to both of `ColumnAddTargets`'s magnitudes on its way out. Named here rather
 		// than written as a bare /100 because it belongs to the GETTER, not to either key.

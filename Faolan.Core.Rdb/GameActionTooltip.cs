@@ -113,5 +113,42 @@ namespace Faolan.Core.Rdb
 		{
 			return Branched.Contains(kind);
 		}
+
+		/// <summary>
+		///     Why a kind that DOES have a branch still has no category-170 sentence to find - or null when its
+		///     absence is genuinely unexplained and so still decode debt.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ A third bucket, and it exists for the same reason <see cref="HasTooltipBranch" /> does: "we could
+		///     not find a sentence" and "there is provably no sentence to find" read identically in a census and are
+		///     opposite facts. Both entries below are PROVEN, not assumed, and each is proven by something outside
+		///     the LDB lookup that failed:
+		///     <list type="bullet">
+		///         <item>
+		///             <b>53019 <c>Spell</c> / 53061 <c>BCCCastSpell</c></b> - their branches push category
+		///             <c>0x64</c> = <b>100</b>, not the <c>0xaa</c> = 170 every sentence-fetching branch pushes, and
+		///             the tokens resolve in 100 as plain label NOUNS ("Spell", "Combo", "Ability", ...). They draw a
+		///             LABEL, so there is no 170 sentence by construction
+		///             (docs/re/gameaction-tooltip-tokens.tsv's header carries the same proof).
+		///         </item>
+		///         <item>
+		///             <b>53170 <c>InheritedComboAttack</c></b> - its single token IS a 170 entry (<c>PerSecond</c>,
+		///             "%s per second"), but the <c>%s</c> is a number the record does not contain: branch
+		///             <c>0x014a103e</c> computes it as <c>key224 x 0.01 x [ESI] / [EBX]</c>, two floats that come
+		///             from the INVOCATION context rather than the element (the same wall #271 hit on recast). So the
+		///             sentence is found and cannot be filled from a template - rendering it would be inventing a
+		///             number.
+		///         </item>
+		///     </list>
+		/// </remarks>
+		public static string? NoSentenceReason(uint kind)
+		{
+			return kind switch
+			{
+				53019 or 53061 => "draws a category-100 label NOUN, not a 170 sentence",
+				53170 => "sentence found (`PerSecond`); its number needs the invocation context, not the record",
+				_ => null
+			};
+		}
 	}
 }
