@@ -229,15 +229,29 @@ namespace Faolan.Core.Database.Tables
 		// so the wire flag means *this entity is still playing its entrance animation*. The window is bounded above
 		// only, tightest observation < 2.6 s, which is an animation length rather than a server timer.
 		//
-		// It stays a column because the SENDER cannot yet decide it: the duration is per creature (it is an asset),
-		// and picking one number would invent a timing retail does not use. `PerSpawnEventModes` keeps the mode, which
-		// puts us inside retail's distribution without claiming to model it. See #607.
+		// ⭐ WHEN retail SETS it is measured now (#803): **at (re)creation**. `--report spawn-animation`'s respawn
+		// test matches each captured death to the same template coming back within 15 m of where it fell, and finds
+		// **20 of 35 such respawns flagged against 8.1 expected** from those same templates' OTHER first-sightings
+		// (the matched respawns excluded from the control, or the hypothesis' own evidence funds the null). The
+		// cleanest lines are the solitary animals, where a positional match cannot pick up a pack-mate: Panther 3/3
+		// against 1/68, Wild Cow 2/2 against 0/147, Wild Pig 1/1 against 0/83.
 		//
-		// ⚠️ The reading that would dissolve the timing question - "the flag is cleared once DELIVERED, so the six
-		// entities flagged twice are one delivery seen by two viewers" - is **untestable from the corpus**, not
-		// merely untested. `CapturedPacket.Port` is the GAME SIDE's port, so both clients of a two-client dump share
-		// it; re-keying the stickiness test by it is a no-op (identical counts, identical six anomalies). Nothing in
-		// a dump names the RECIPIENT, so no measurement over it can separate two of them. See #803.
+		// The SENDER now honors that, and only that: `WorldBroadcaster.BroadcastNpcRespawn` stamps the flag onto the
+		// respawn delivery (`NpcSpawnBuilder.WithSpawnAnimation`) and no other path does. That deliberately
+		// under-sends - retail also flags the ~6-9% of ordinary first-sightings whose creature respawned before the
+		// player arrived - because the WINDOW is still unmeasurable: the death->delivery gap has an unknown respawn
+		// timer inside it, so no flagged delivery bounds the window from below, and picking a duration would invent a
+		// timing retail does not use.
+		//
+		// ⚠️ This column keeps its imported mode-over-sightings value, which is a per-TYPE approximation of a
+		// per-ENTITY state and is why the column "should not exist". Retiring it needs the window; the respawn stamp
+		// rides on top of it either way.
+		//
+		// ⚠️ The other reading of the clear - "cleared once DELIVERED, so the six entities flagged twice are one
+		// delivery seen by two viewers" - is **untestable from the corpus**, not merely untested.
+		// `CapturedPacket.Port` is the GAME SIDE's port, so both clients of a two-client dump share it; re-keying the
+		// stickiness test by it is a no-op (identical counts, identical six anomalies). Nothing in a dump names the
+		// RECIPIENT, so no measurement over it can separate two of them.
 		public uint? SpawnAnimation { get; set; }
 
 		public uint? LosHeight { get; set; }

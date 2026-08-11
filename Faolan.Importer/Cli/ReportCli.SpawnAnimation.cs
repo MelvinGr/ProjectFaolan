@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Rdb;
@@ -99,8 +100,15 @@ namespace Faolan.Importer.Cli
 	// the `spawnanim` string is empty (`[monsterData+0x168]` is its `_Mysize`). A flagged Citizen replays its idle
 	// animation: invisible, not wrong. So a rare `spawnanim` is no evidence about the flag at all.
 	//
-	// The sender side stays unimplemented, now because the SENDER'S RULE is open (the client clears the stat, so the
-	// duration is not client-side and the corpus cannot pin when retail sets it) - tracked in Gitea #803.
+	// ## ⭐⭐ AND THE RESPAWN TEST SETTLES THE SENDER'S SET (#803) - it is (re)creation
+	//
+	// See `RespawnTest` below for the measurement and its control. In one line: 20 of 35 matched respawns carry the
+	// flag against 8.1 expected from those same templates' OTHER first-sightings, and the solitary animals - where a
+	// positional match cannot pick up a pack-mate - go 6/6 against a combined control of 1/298.
+	//
+	// So the SET is measured and `WorldBroadcaster.BroadcastNpcRespawn` now stamps the flag onto the respawn
+	// delivery. The CLEAR is still open, and unmeasurable here: the gap this report prints is death -> DELIVERY, with
+	// an unknown respawn timer inside it, so no flagged delivery bounds the window from below.
 	public static partial class ReportCli
 	{
 		private static void SpawnAnimation(IReadOnlyList<NamedCapture> captures, string? rdbDir)
@@ -113,6 +121,12 @@ namespace Faolan.Importer.Cli
 			// RDB below to answer "does the flag only appear on creatures that HAVE an entrance animation?".
 			var monsterDataByTemplate = new Dictionary<uint, uint>();
 			var flaggedTemplates = new HashSet<uint>();
+
+			// The RESPAWN test (#803): every sighting with its position, and every captured DEATH, so the two can be
+			// interleaved. A flat sighting list rather than the per-entity one, because a respawned creature does not
+			// keep its handle - the match has to be made on (template, position).
+			var sightings = new List<SpawnSighting>();
+			var deaths = new List<(string Capture, uint Handle, long Ticks)>();
 
 			// The STICKINESS test (below): every sighting of one entity within one session, in order. Keyed by
 			// (capture, handle, templateId) - the handle alone would merge two creatures, because retail RECYCLES a
@@ -160,10 +174,12 @@ namespace Faolan.Importer.Cli
 					// anomalies. So the corpus cannot separate two RECIPIENTS at all, and any reading that turns on
 					// "who was told" is untestable here rather than untested.
 					var key = (c.Name, spawn.Handle, npc.TemplateId);
-					if (!perEntity.TryGetValue(key, out var sightings))
-						perEntity[key] = sightings = [];
+					if (!perEntity.TryGetValue(key, out var perKey))
+						perEntity[key] = perKey = [];
 
-					sightings.Add((present, p.Ticks));
+					perKey.Add((present, p.Ticks));
+					sightings.Add(new SpawnSighting(c.Name, p.Ticks, spawn.Handle, npc.TemplateId, present,
+						spawn.Position.X, spawn.Position.Y, spawn.Position.Z, spawn.Character.Name ?? "?"));
 
 					// #794's own precondition, collected from the SAME spawn body so it needs no DB: which creature
 					// asset each flagged template wears. `monster_data` is the RDB 1010201 record whose `spawnanim`
@@ -174,6 +190,18 @@ namespace Faolan.Importer.Cli
 						if (present)
 							flaggedTemplates.Add(npc.TemplateId);
 					}
+				}
+
+				// The DEATH side of the respawn test (#803), read the way `--report death-timing` reads it: the
+				// BehaviorControlCenter record with BehaviorId 0x1F at phase 0x0004, whose actor is the dying handle.
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
+						continue;
+					if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var bcc) || bcc.Seq != DeathSeq || bcc.BehaviorId != DeathBehaviorId)
+						continue;
+
+					deaths.Add((c.Name, bcc.Actor, p.Ticks));
 				}
 			}
 
@@ -204,6 +232,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"{agree} of {both.Count} names behave EXACTLY as the hypothesis predicts (never in the burst, always mid-session).");
 
 			StickinessTest(perEntity);
+			RespawnTest(sightings, deaths);
 			SpawnAnimAssetCheck(rdbDir, monsterDataByTemplate, flaggedTemplates);
 		}
 
@@ -478,6 +507,194 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine("       explain it without any window being longer than the upper bounds. The MonsterData check below");
 				Console.WriteLine("       is the load-bearing one - it needs no timing at all.");
 			}
+		}
+
+		// One captured NPC spawn body, flattened: the identity, the moment, the place and the flag. A flat list rather
+		// than the per-entity map the stickiness test uses, because the respawn test's whole point is that a
+		// respawned creature does NOT keep its handle, so it has to be matched on (template, position) instead.
+		private readonly record struct SpawnSighting(string Capture, long Ticks, uint Handle, uint Template, bool Flag, float X, float Y, float Z, string Name);
+
+		// ⭐⭐ THE RESPAWN TEST (#803) - the one axis the two surviving sender rules disagree on.
+		//
+		// #800 settled what the flag MEANS (a one-shot "play your entrance animation now"), and the stickiness test
+		// above settled that it DECAYS. What neither settles is when retail SETS it, and two rules fit different
+		// halves of the evidence:
+		//
+		//   1. CLEARED ONCE DELIVERED - a per-entity latch dropped after the first spawn body that carries it.
+		//   2. A FLAT TIME WINDOW after the entity is created or respawned.
+		//
+		// Both predict "on for the first sighting, off after", which is why 4,687 entities could not tell them apart.
+		// They differ on one thing that IS in the corpus: **whether a respawn re-arms it**. Rule 2 says the window
+		// opens at (re)creation, so the first sighting of a creature that just respawned is flagged - at a rate far
+		// above the ~6% base rate. Rule 1's latch says nothing about respawns at all, so a post-respawn sighting is
+		// flagged only if it is that ENTITY's first delivery, which for a re-streamed area it is not.
+		//
+		// ⚠️ A respawned creature does NOT keep its handle (retail recycles them), so "the same entity after its
+		// death" cannot be found by handle. It is matched on (template, position): a respawn puts the same template
+		// back where it stood. Both halves are printed - the same-handle one first, because if it were populated it
+		// would be the cleaner measurement, and saying it is EMPTY is what justifies the positional one.
+		private static void RespawnTest(List<SpawnSighting> sightings, List<(string Capture, uint Handle, long Ticks)> deaths)
+		{
+			Console.WriteLine();
+			Console.WriteLine("⭐⭐ THE RESPAWN TEST (#803) - does a RESPAWN re-arm the flag?");
+			Console.WriteLine();
+			Console.WriteLine($"  {deaths.Count:N0} captured NPC death record(s) (BehaviorId 0x1F phase 0x0004) across {sightings.Count:N0} spawn bodies.");
+
+			if (deaths.Count == 0 || sightings.Count == 0)
+			{
+				Console.WriteLine("  ⛔ Nothing to cross - the corpus holds no deaths, so this cannot be asked here.");
+				return;
+			}
+
+			// The BASE RATE this has to beat. Every entity's FIRST sighting, which is the population a post-respawn
+			// first sighting belongs to - comparing against the all-spawns rate would mix in the re-streams that the
+			// stickiness test already showed are almost never flagged.
+			var firstByEntity = sightings
+				.GroupBy(s => (s.Capture, s.Handle, s.Template))
+				.Select(g => g.OrderBy(s => s.Ticks).First())
+				.ToList();
+			var baseFlagged = firstByEntity.Count(s => s.Flag);
+			Console.WriteLine($"  BASE RATE: {baseFlagged:N0} of {firstByEntity.Count:N0} first-sightings carry the flag = {baseFlagged * 100.0 / firstByEntity.Count:F1}%.");
+			Console.WriteLine();
+
+			// --- half 1: the SAME handle, sighted again after its own death.
+			var deathsByHandle = deaths.GroupBy(d => (d.Capture, d.Handle))
+				.ToDictionary(g => g.Key, g => g.Select(d => d.Ticks).Order().ToList());
+
+			var samePost = new List<SpawnSighting>();
+			foreach (var g in sightings.GroupBy(s => (s.Capture, s.Handle, s.Template)))
+			{
+				if (!deathsByHandle.TryGetValue((g.Key.Capture, g.Key.Handle), out var died))
+					continue;
+
+				var ordered = g.OrderBy(s => s.Ticks).ToList();
+				samePost.AddRange(ordered.Where(s => died.Any(t => t < s.Ticks)));
+			}
+
+			Console.WriteLine($"  same HANDLE, sighted after its own death record: {samePost.Count} sighting(s)"
+				+ (samePost.Count == 0
+					? " - as expected: retail recycles a handle, so a respawn is a new entity."
+					: $", {samePost.Count(s => s.Flag)} flagged = {samePost.Count(s => s.Flag) * 100.0 / samePost.Count:F1}%."));
+
+			// --- half 2: the same TEMPLATE, back at the same PLACE, after a death there.
+			//
+			// The death record names only a handle, so the dead creature's template and position come from that
+			// handle's LAST sighting before it died. A later sighting of the same template within `NearMetres` of
+			// that spot, in the same capture, is the respawn.
+			var byCaptureTemplate = sightings.GroupBy(s => (s.Capture, s.Template))
+				.ToDictionary(g => g.Key, g => g.OrderBy(s => s.Ticks).ToList());
+
+			var matched = new List<(SpawnSighting Dead, SpawnSighting Respawn, double Seconds)>();
+			var unresolvedActor = 0;
+			var noRespawnSeen = 0;
+
+			foreach (var (capture, handle, ticks) in deaths)
+			{
+				var last = sightings.Where(s => s.Capture == capture && s.Handle == handle && s.Ticks <= ticks)
+					.OrderBy(s => s.Ticks).LastOrDefault();
+				if (last.Capture == null)
+				{
+					unresolvedActor++; // a player death, or a creature streamed before the dump starts
+					continue;
+				}
+
+				if (!byCaptureTemplate.TryGetValue((capture, last.Template), out var candidates))
+				{
+					noRespawnSeen++;
+					continue;
+				}
+
+				var respawn = candidates.FirstOrDefault(s => s.Ticks > ticks && s.Handle != handle && Near(s, last));
+				if (respawn.Capture == null)
+				{
+					noRespawnSeen++;
+					continue;
+				}
+
+				matched.Add((last, respawn, (respawn.Ticks - ticks) / (double)TimeSpan.TicksPerSecond));
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"  same TEMPLATE back within {NearMetres}m of where one died, later in the same capture:");
+			Console.WriteLine($"    {matched.Count} respawn(s) matched; {unresolvedActor} death(s) whose actor never spawned in the dump"
+				+ $" (player deaths / pre-dump streams); {noRespawnSeen} with no matching later spawn.");
+
+			if (matched.Count == 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  ⛔ The corpus contains NO observed respawn, so it cannot decide between the two rules.");
+				Console.WriteLine("     That is a property of how the dumps were taken - a player kills something and moves on - and");
+				Console.WriteLine("     no amount of re-reading them will produce one. Deciding this needs a capture that STAYS PUT");
+				Console.WriteLine("     across a respawn timer, or the client's own sender-side code, neither of which exists yet.");
+				return;
+			}
+
+			var respawnFlagged = matched.Count(m => m.Respawn.Flag);
+			Console.WriteLine($"    of those respawns, {respawnFlagged} carry the flag = {respawnFlagged * 100.0 / matched.Count:F1}%"
+				+ $" (flat base rate {baseFlagged * 100.0 / firstByEntity.Count:F1}%).");
+
+			// ⚠️ THE CONTROL, and it is not optional. The matched respawns are not a random sample of creatures - they
+			// are the ones a player farmed, and the raw lift clusters hard by NAME (every Hatchling flagged, every
+			// Tortage Pirate not). If Hatchlings were simply a high-flag creature, "respawns are flagged" would be
+			// "the creature people kill is a flagged creature" wearing a different hat. So the comparison is against
+			// each template's OWN first-sighting rate - the excess-over-chance form.
+			//
+			// ⚠️⚠️ And the matched respawns are EXCLUDED from that rate. Leaving them in is circular in the direction
+			// that hides the effect: 13 of the 15 flagged Hatchling first-sightings ARE these respawns, so an
+			// uncorrected control credits the hypothesis' own evidence to chance and reports 86.7% expected for a
+			// creature whose non-respawn rate is 71%.
+			var matchedKeys = matched.Select(m => (m.Respawn.Capture, m.Respawn.Handle, m.Respawn.Template)).ToHashSet();
+			var control = firstByEntity.Where(s => !matchedKeys.Contains((s.Capture, s.Handle, s.Template)))
+				.GroupBy(s => s.Template)
+				.ToDictionary(g => g.Key, g => (Flagged: g.Count(s => s.Flag), Total: g.Count()));
+
+			var expected = matched.Sum(m => control.TryGetValue(m.Respawn.Template, out var r) && r.Total > 0
+				? r.Flagged / (double)r.Total
+				: baseFlagged / (double)firstByEntity.Count);
+
+			Console.WriteLine($"    ⭐ per-TEMPLATE control (matched respawns EXCLUDED from the control population):");
+			Console.WriteLine($"       {expected:F1} flagged EXPECTED from these same templates' other first-sightings, {respawnFlagged} observed.");
+			Console.WriteLine();
+			Console.WriteLine("    creature                       template     respawns SET   OTHER first-sightings SET");
+			foreach (var g in matched.GroupBy(m => m.Respawn.Template).OrderByDescending(g => g.Count()))
+			{
+				var r = control.GetValueOrDefault(g.Key);
+				var name = g.First().Dead.Name;
+				Console.WriteLine($"    {(name.Length > 28 ? name[..28] : name),-28}  {g.Key,-10}  {g.Count(m => m.Respawn.Flag),6}/{g.Count(),-6}"
+					+ $"      {r.Flagged,5}/{r.Total,-7} {(r.Total == 0 ? 0 : r.Flagged * 100.0 / r.Total),5:F1}%");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("    creature                        gap to respawn   flag");
+			foreach (var m in matched.OrderBy(m => m.Seconds).Take(30))
+				Console.WriteLine($"    {(m.Dead.Name.Length > 28 ? m.Dead.Name[..28] : m.Dead.Name),-28}  {m.Seconds,10:F1}s   {(m.Respawn.Flag ? "SET" : "-")}");
+
+			Console.WriteLine();
+			Console.WriteLine("  ⚠️ The gap is DEATH -> the spawn body's arrival, and a spawn body arrives when the PLAYER is in");
+			Console.WriteLine("     range, not when the creature respawned. So it is an UPPER bound on the creature's age at");
+			Console.WriteLine("     delivery, and a long gap with no flag is not evidence of a short window - it may be an old");
+			Console.WriteLine("     creature streamed late. Only the SHORT gaps carry information, and they are the flagged ones.");
+			Console.WriteLine();
+
+			Console.WriteLine(respawnFlagged > expected * 2
+				? "  ⭐ A respawn RE-ARMS the flag, and it survives the per-template control: the window opens at\n"
+				+ "     (re)creation, which is rule 2 - and it makes the 7.3% login-burst rate the fraction of a zone\n"
+				+ "     inside its respawn window rather than a paradox."
+				: "  ⛔ The raw lift does NOT survive the per-template control - it is the creatures that get farmed being\n"
+				+ "     the creatures that carry the flag, not the respawn. Rule 2 gains nothing from the corpus.");
+		}
+
+		// How close a respawn has to land to count as "the same spawn point". Deliberately generous: retail's own
+		// spawn points scatter within a radius, and a tighter bound would trade a real respawn for a clean number.
+		private const double NearMetres = 15;
+
+		private static bool Near(SpawnSighting a, SpawnSighting b)
+		{
+			var dx = a.X - b.X;
+			var dy = a.Y - b.Y;
+			var dz = a.Z - b.Z;
+
+			return Math.Sqrt(dx * dx + dy * dy + dz * dz) <= NearMetres;
 		}
 
 		private sealed class SpawnAnimationBucket

@@ -50,6 +50,33 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			});
 		}
 
+		// ⭐ #803: stamps `npc_stats.spawn_animation` into an ALREADY-BUILT spawn record - the client's one-shot
+		// "play your entrance animation now" trigger (`SimpleChar_t` slot 36 plays `spawnanim`, falls back to
+		// `defaultidleanim` when the creature declares none, then clears the stat itself; #800).
+		//
+		// Why a re-stamp of a built body rather than a `BuildLive` parameter: the flag is a property of ONE DELIVERY,
+		// not of the entity, and the spawn body is built once at map load and re-sent for the entity's whole life. A
+		// build parameter would have to be decided at map load, which is the one moment it is never true.
+		//
+		// A re-encode rather than a byte patch, because the field lives inside the embedded protobuf and setting it
+		// changes lengths at three nesting levels. That costs a parse+build per respawn delivery and is safe by the
+		// same gate everything else here rests on: `Parse` -> `Build` is byte-exact over every captured spawn body
+		// (ProtobufCorpusRoundTripTests / the codec round-trip gate), so a record that came out of `BuildBody`
+		// survives the trip unchanged apart from the one field.
+		//
+		// A body with no `npc_stats` at all (a player record) comes back untouched - the flag has no slot there.
+		public static byte[] WithSpawnAnimation(byte[] body)
+		{
+			var record = SimpleCharFullUpdateCodec.Parse(body);
+			if (record.Character?.npc_stats is not { } npc)
+				return body;
+
+			// Retail never sends 0 - the field is UNSET or 1, i.e. a presence flag (#607).
+			npc.SpawnAnimation = 1;
+
+			return SimpleCharFullUpdateCodec.Build(record);
+		}
+
 		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO
 		// world placement (#244/#307). This is what a summoned PET/MOUNT and an AMBIENT-POOL member use: the creature
 		// type carries the lifted stat core (NpcTemplate.StatCore), worn equipment (NpcTemplate.Equipment),

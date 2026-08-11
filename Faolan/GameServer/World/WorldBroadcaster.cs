@@ -647,6 +647,22 @@ namespace Faolan.GameServer.World
 
 		// An NPC respawned (its timer elapsed on the tick): re-render it for every player in range by re-sending its
 		// stored FA015807 spawn body (re-framed + position-patched per recipient by SendWorldSpawn).
+		//
+		// ⭐ #803: this delivery carries `npc_stats.spawn_animation`, and it is the ONLY one that does. Retail sets
+		// the flag when the entity is (re)created - measured by `--report spawn-animation`'s respawn test, which
+		// matches a death to the same template coming back at the same spot and finds 20 of 35 such respawns flagged
+		// against 8.1 expected from those same templates' OTHER first-sightings. The cleanest lines are the solitary
+		// animals, where a positional match cannot pick up a pack-mate standing nearby: Panther 3/3 flagged against
+		// 1/68, Wild Cow 2/2 against 0/147, Wild Pig 1/1 against 0/83.
+		//
+		// ⚠️ This UNDER-sends relative to retail, deliberately. Retail flags ~6-9% of ordinary first-sightings too -
+		// creatures that respawned before the player arrived and are still inside the window - and we cannot
+		// reproduce that without a duration the corpus does not contain (the death->delivery gap has an unmeasured
+		// respawn timer inside it, so no flagged delivery bounds the window from below). Flagging only the respawns a
+		// player actually witnesses is the subset we can justify, and it is the subset that matters visually. It also
+		// sidesteps the failure #803 warned about: a rule keyed to "the entity was created recently" would flag every
+		// NPC in the zone on the first login after a server start, because our world builds them all at load - a
+		// respawn is a distinct event from world-load creation, so keying on it cannot do that.
 		public async Task BroadcastNpcRespawn(WorldEntity npc)
 		{
 			if (npc.SpawnBody == null)
@@ -658,7 +674,7 @@ namespace Faolan.GameServer.World
 				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
 				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
-					await SendWorldSpawn(viewer.Client, npc); // #266: no route replay - the tick drives a server-side wander
+					await SendWorldSpawn(viewer.Client, npc, spawnAnimation: true); // #266: no route replay - the tick drives a server-side wander
 			}
 		}
 
@@ -2329,7 +2345,10 @@ namespace Faolan.GameServer.World
 				s => s.WriteArrayUInt32Length(N3ToClientQuitCodec.Build(subjectHandle, token, classWord))));
 		}
 
-		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		// `spawnAnimation` marks this ONE delivery as an entrance: the NPC (re)appeared just now, so the client should
+		// play its spawn-in clip rather than fade it in standing (#803). Default false - it is true only on the
+		// respawn path, which is the only creation event our world has that retail's own rule would also flag.
+		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject, bool spawnAnimation = false)
 		{
 			var playfieldToken = _sim.World.ZoneForEntity(subject).PlayfieldToken;
 
@@ -2355,7 +2374,7 @@ namespace Faolan.GameServer.World
 			}
 			else
 			{
-				await recipient.SendAsync(BuildWorldSpawnRecord(recipient, subject, playfieldToken));
+				await recipient.SendAsync(BuildWorldSpawnRecord(recipient, subject, playfieldToken, spawnAnimation));
 			}
 
 			// #363 dev nameplate: the client draws an NPC's floating name from its template_id LDB name and ignores the
@@ -2951,9 +2970,15 @@ namespace Faolan.GameServer.World
 				await _database.GetMorphTargetRegistry());
 		}
 
-		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
+		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken, bool spawnAnimation = false)
 		{
-			var body = (byte[])subject.SpawnBody.Clone();
+			// ⭐ #803: a RESPAWN delivery carries the entrance-animation trigger; every other delivery of the same
+			// entity does not. Stamped before the transform patch because the re-encode rebuilds the record, which
+			// would discard a patch applied to the old bytes.
+			var body = spawnAnimation
+				? NpcSpawnBuilder.WithSpawnAnimation(subject.SpawnBody)
+				: (byte[])subject.SpawnBody.Clone();
+
 			SpawnTransformPatch.WritePosition(body, subject.Position);
 
 			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at

@@ -253,14 +253,45 @@ The same window identifies the object the name is read from, by taking three nei
 `weaponmaterialtype` → `EmitterMaterial`, `materialtype` → `ReceiverMaterial`, `collisionradius` → `CharRadius`,
 the offsets the MonsterData loader `FUN_010005E0` writes them to.
 
-⚠️ **What is still open is the SENDER's rule, not the meaning.** The client clears the stat, so nothing about the
-duration is client-side, and the corpus cannot pin when retail sets it: the window is bounded **above** at 2.6 s by
-the tightest observation and **below** at 25.6 s by six entities flagged on two sightings — which cannot both be
-one window (five of the six are one co-streaming group in one capture, i.e. one event, so the lower bound is weak).
-A "cleared once delivered" rule fits the stickiness result exactly and the 7.3% login-burst rate poorly; a flat
-time window fits the burst rate and not the 2.6 s bound. The mode-keeping above therefore stays an approximation
-that sits inside retail's distribution rather than a model of the field, and the sender stays unimplemented —
-tracked in Gitea #803.
+⭐ **And the SENDER sets it at (re)creation** (#803). The discriminating axis is not in any spawn body: it is
+whether a **respawn re-arms the flag**. `--report spawn-animation`'s respawn test matches each captured death
+(`BehaviorControlCenterIIR` BehaviorId `0x1F` phase `0x0004`) to the same template coming back within 15 m of where
+it fell, later in the same capture — a positional match, because retail recycles a handle, so a respawned creature
+is a different entity by every id it carries.
+
+| | |
+|---|---|
+| respawns matched | **35** (272 deaths; 8 actors never spawned in the dump, 229 with no later spawn at the spot) |
+| flagged | **20** = 57.1%, against a flat first-sighting base rate of 9.5% |
+| **per-template control** | **8.1 expected**, 20 observed |
+
+⚠️ The control is the load-bearing half, and it has to **exclude the matched respawns from the control
+population**. Leaving them in is circular in the direction that hides the effect: 13 of the 15 flagged `Hatchling`
+first-sightings *are* these respawns, so an uncorrected control credits the hypothesis' own evidence to chance.
+The cleanest lines are the solitary animals, where a 15 m match cannot pick up a pack-mate standing nearby:
+
+```
+creature          template   respawns SET   OTHER first-sightings SET
+Panther           9590            3/3            1/68     1.5%
+Wild Cow          14467           2/2            0/147    0.0%
+Wild Pig          14466           1/1            0/83     0.0%
+Brutal Pirate     12130           6/9           13/78    16.7%
+```
+
+⚠️ **What that does NOT settle is the CLEAR.** The gap it measures is death → *delivery*, and a spawn body arrives
+when the player is in range, not when the creature respawned — so an unknown respawn timer sits inside every gap
+and no flagged delivery bounds the window from below. "Cleared once delivered" and "a flat time window" both
+survive; separating them needs a recipient, and the corpus cannot name one (`CapturedPacket.Port` is the game
+side's port, so re-keying the stickiness test by it is a no-op).
+
+**What we send.** `WorldBroadcaster.BroadcastNpcRespawn` stamps the flag onto the respawn delivery
+(`NpcSpawnBuilder.WithSpawnAnimation`, a parse→set→build re-encode rather than a byte patch, since the field sits
+inside the embedded protobuf); no other path sets it. This deliberately **under-sends** — retail also flags the
+~6-9% of ordinary first-sightings whose creature respawned before the player arrived — because reproducing those
+needs the window. It is also what makes the rule safe here: #803's own warning was that a rule keyed to "created
+recently" would flag *every* NPC in the zone on the first login after a server start, since our world builds them
+all at load. A respawn is a distinct event from world-load creation, so keying on it cannot do that. The
+mode-keeping above stays an approximation of the per-entity state, and rides underneath.
 
 ⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
 companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are
