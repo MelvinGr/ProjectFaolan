@@ -267,9 +267,9 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000071 | `TexScriptMeshGroupValues_c` | 1220 | 20 B | 8 B | |
 | 1000080 | `RDBHairReplacement` (default) | 8 | 16 B | 8 B | |
 | 1000081 | `RDBHairReplacement` (override) | 100 | 16 B | 12 B | |
-| 1000099 | `FeatClassTable_c` | 3096 | 20 B | 12 B | count is the FIFTH word |
+| 1000099 | `FeatClassTable_c` | 3096 | 20 B | 12 B | count is the FIFTH word; the feat POINT COST table — decoded below |
 | 1000505 | `RDBPlayerClassData_c` | 17 | — | — | does not divide — variable-width |
-| 1000506 | `RDBPlayerClassData_c` | 27 / 16 | 16 B | 8 B | two entries (id 0 and id 1) |
+| 1000506 | `FeatClassTable_c` (not `RDBPlayerClassData_c`) | 27 / 16 | 16 B | 8 B | the archetype → class MEMBERSHIP table — decoded below |
 | 1000507 | `RDBPlayerClassData_c` | 48 / 56 | 16 B | 8 B | two entries |
 | 1000508 | the CREATURE RACE table (not `RDBPlayerClassData_c`) | 109 | 16 B | — | variable-width: `[id][len][name]`, decoded above |
 | 1000509 | `PlayfieldPvPData_c` | 243 | 20 B | 12 B | |
@@ -286,7 +286,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B) and
 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Decoded past their shape: 1000043, 1000505, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
+Decoded past their shape: 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
 1000517, 1000518, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
@@ -684,3 +684,75 @@ This CONFIRMS #401's blocker rather than removing it. `CombatResolver` notes the
 mitigation formula "when its ARMOR_MITIGATION table has no matching row"; there are no rows at all, so that
 path is always taken, and the formula's `C1/C3/C4` coefficients really do have to come from the runtime
 balance config (a live Frida dump). The table route is closed, and now provably so rather than by assumption.
+
+
+## ⭐ Decoded: 1000506 `FeatClassTable_c` — the archetype → class MEMBERSHIP table
+
+The registry table above files 1000506 under `RDBPlayerClassData_c` because 1000505–1000508 is written there as a
+span. It is not: `DumpDataTableRegistry` puts 1000506 on the **`FeatClassTable_c`** loader (`FUN_0078de40`), whose
+own bail-out names it — *"Could not load classmembership info. This will cause gui to loose parent class feats"*.
+
+```
+[u32 type][u32 id][u32 version][u32 count]
+count * [u32 parentClassId][u32 childClassId]
+```
+
+The parse callback (`FUN_0078e870`) checks `length >= count * 8` and appends each row's **second** word to the
+vector belonging to the class named by its **first** — so it is a parent → children adjacency list over 1000505's
+class ids.
+
+**Two entries ship, and they are not versions of each other.**
+
+| id | edges | what it is |
+|---:|---:|---|
+| 0 | 27 | the full **authored** hierarchy, including eleven classes this build never shipped |
+| 1 | 16 | the **shipped** set |
+
+Entry 1, in full:
+
+```
+  0 Commoner  -> 1 Soldier, 2 Priest, 3 Rogue, 4 Mage
+  1 Soldier   -> 20 Guardian, 22 Conqueror, 31 Dark Templar
+  2 Priest    -> 24 Priest of Mitra, 28 Tempest of Set, 29 Bear Shaman
+  3 Rogue     -> 18 Barbarian, 34 Assassin, 39 Ranger
+  4 Mage      -> 41 Necromancer, 43 Herald of Xotli, 44 Demonologist
+```
+
+Entry 0 adds `21, 23, 30` to Soldier, `25, 26, 27` to Priest, `19, 33, 35, 36` to Rogue and `42` to Mage — ten ids
+1000505 does not name, i.e. cut classes.
+
+⭐ **This retires a wiki citation.** `ConanArchetypes` stated that "the client ships the archetype IDS (1000505 tier
+1) but no MEMBERSHIP table … so the membership is taken from the game's own published documentation". The
+documentation was right, and it is now corroboration rather than the source: all twelve placements agree with entry
+1 exactly. `--report class-hierarchy` re-runs that comparison and fails loudly on any drift.
+
+## Partly decoded: 1000099 `FeatClassTable_c` — the feat POINT COST table
+
+Named by its loader's two error strings — *"Could not load feat point cost info."* and, in the parse callback
+(`FUN_0078e560`), *"Invalid class point cost data size -- Expected[…] Got[…]"*. The callback also rejects any
+version but `1`, and requires `length >= count * 0xC`.
+
+```
+[u32 type][u32 id][u32 version][u32 ?][u32 count]      <- count is the FIFTH word
+count * [u32 key][u32 kind][u32 cost]
+```
+
+All three words are kept verbatim — the callback's per-record tail (`FUN_0078f7f0`) is a plain
+`vector<12-byte struct>::push_back`, so nothing is dropped or scaled, unlike 1000513.
+
+Measured over the shipped 3,096 records:
+
+| word | shape |
+|---|---|
+| `key` | 2,880 distinct in a **dense** 734,733–737,752 range; the vector is sorted on this word alone |
+| `kind` | `2` or `3`, exactly 1,548 of each |
+| `cost` | 1–50, 26 distinct values |
+
+216 keys appear **twice**, once under each `kind`, and both rows carry the **same cost** — so `kind` is not a
+currency (a currency would give every feat both rows) and not the 1000505 class tier (which is 1 or 3 in this
+build, never 2).
+
+⚠️ **The key's id space is unidentified.** It joins to nothing we hold — not `Feats.Id`, not
+`FeatIdMaps.WireFeatId` or `.TemplateId`, not any column of 1000042 `Feat_t`, not `Items.Id` or `Spells.Id`, and
+`LDB` has no string at it in any category. Stated as an open question rather than guessed at; tracked in Gitea
+#469.

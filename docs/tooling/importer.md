@@ -339,6 +339,11 @@ groups, which is the #518 question),
 row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
 line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;
 see [chat.md](../subsystems/chat.md)),
+`class-hierarchy` (the client's own archetype → class membership, RDB `1000506` — a `[parentClassId][childClassId]`
+adjacency list whose loader names it *"classmembership info"*. Prints both entries (0 = the full authored hierarchy
+including eleven cut classes, 1 = the shipped set) and **checks `ConanArchetypes` against entry 1**. That constant
+used to cite the game's published documentation on the finding that the client shipped no membership table; it
+does, all twelve placements agree, and this report is what keeps the hard-coded copy honest, #469),
 `factions` (the Khitai faction & reputation catalog, #310 — RDB `1010701`/1 `data/FactionRelations.xml` joined to
 `LDB[254]`. Prints the 16 faction ids with their rivals and icons, the six encounter tiers (`relationId =
 factionBase + tier`, 120/180/720/1800/1440/2400 points) and the nine player rank ladders. The LDB blocks are

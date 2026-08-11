@@ -19,17 +19,25 @@ namespace Faolan.Core.Enums
 
 	// Which classes each archetype holds (#581).
 	//
-	// The client ships the archetype IDS (1000505 tier 1) but no MEMBERSHIP table - not in the class registry, not in
-	// the race x class table (1000507), and not in the CHARACTERCREATOR XML (1010700), which is appearance only. So the
-	// membership is taken from the game's own published documentation
-	// (https://aoc.fandom.com/wiki/Class, which lists it twice - once as the per-archetype class panels and again as
-	// the summary table). It is a stable, public fact about the game rather than a derivation, and it is stated here
-	// once so nothing has to re-infer it.
+	// ⭐ **The CLIENT states this, in RDB 1000506** (`ClassMembershipTable`, #469) - a `[parentClassId][childClassId]`
+	// table whose loader bails with *"Could not load classmembership info. This will cause gui to loose parent class
+	// feats"*. Entry 1 is the shipped hierarchy: `Commoner (0)` parents the four archetypes, and each archetype
+	// parents its three classes. **All twelve placements below agree with it exactly**; `--report class-hierarchy`
+	// re-runs that comparison and fails loudly on any drift.
 	//
-	// ⚠️ It is CORROBORATED by the corpus on one arm, which is why it is trusted rather than merely plausible: the
-	// captured Assassin's action bar carries `Rogue_15_dotdetaunt_Vicious_Strike_II_2h` and
-	// `Rogue_19_damagedetaunt_Cunning_Strike_VI_2h` - two `Rogue_`-named archetype combos on an Assassin, which is a
-	// Rogue. Nothing in the corpus contradicts any of the twelve placements.
+	// This used to read "the client ships the archetype IDS (1000505 tier 1) but no MEMBERSHIP table", and took the
+	// twelve placements from the game's published documentation (https://aoc.fandom.com/wiki/Class) instead. That
+	// documentation turned out to be right - and it is now the CORROBORATION rather than the source, alongside the
+	// corpus arm that always backed it: the captured Assassin's action bar carries
+	// `Rogue_15_dotdetaunt_Vicious_Strike_II_2h` and `Rogue_19_damagedetaunt_Cunning_Strike_VI_2h`, two
+	// `Rogue_`-named archetype combos on an Assassin, which is a Rogue.
+	//
+	// It stays hard-coded rather than read from the RDB because the callers that need it (the combo/feat derivations)
+	// run in capture-driven importer modules with no `RdbDir` - the same reason `ConanClasses` inlines the names.
+	// The report is what keeps the constant honest.
+	//
+	// ⚠️ RDB 1000506 entry **0** is a WIDER table - 27 edges, the full authored hierarchy including eleven classes
+	// this build never shipped (Soldier alone has six children there). Entry 1 is the one that describes the game.
 	public static class ConanArchetypes
 	{
 		private static readonly Dictionary<ConanArchetype, ConanClass[]> Members = new Dictionary<ConanArchetype, ConanClass[]>

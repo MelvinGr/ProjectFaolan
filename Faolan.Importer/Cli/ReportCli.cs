@@ -90,6 +90,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB-only, no corpus: the client's archetype -> class membership (RDB 1000506), checked against the
+			// hard-coded ConanArchetypes (#469).
+			if (report == "class-hierarchy")
+			{
+				ClassHierarchy(RdbDir());
+				return 0;
+			}
+
 			// RDB-only, no corpus: the Khitai faction & reputation catalog (#310) - RDB 1010701's relation matrix
 			// joined to LDB[254]'s names and rank ladders.
 			if (report == "factions")
