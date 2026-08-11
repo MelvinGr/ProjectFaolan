@@ -284,3 +284,63 @@ where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64.
 ReadU32, FUN_0048f720 ReadU64, FUN_0048f6d0/FUN_004e0390 ReadByte, FUN_0048f840 ReadString, FUN_004d4c70
 ReadList). The C# field↔offset map is in `GuildRenownBlock`/`GuildRenownBlockCodec`. The per-guild meaning of the feat/city/cap fields is
 not recoverable from the stripped binary (no symbol names; only RenownCounters[1] varies in capture).
+
+## Guild cities: the booking guard and its error table (2026-08-11, #743)
+
+#743 observed that a refused plot booking produces **zero traffic** — the client declines with a popup and
+never asks the server — and concluded the requirement is therefore recoverable statically. It is, and it is
+**24 guild members**.
+
+`FUN_0115b2b0` is the `BookCitySpot` handler (the script binding is registered in `FUN_01473630` alongside
+`GetGuildCityInfo`). Its whole guard, before it builds the request:
+
+```c
+if (guild == NULL)                      -> LDB(100, 0x4EF3 /* 20211 */), return;   // no guild at all
+if (guild->memberCount /* +0x1e8 */ < 0x18) {                                      // < 24 MEMBERS
+    if (!override())                    -> LDB(100, 0x4EF5 /* 20213 */), return;   // vslot +0x1fc
+}
+/* only here does it send RequestGuildCitySpot */
+```
+
+`0x18` = **24**, and the client's own help book states the same number twice, independently of the code:
+LDB `50020`/`606` and `50020`/`689` both open with *"Only available to guilds with 24 or more members."*
+⚠️ LDB `50020`/`44` is an older prose entry that says *"a minimum of thirty members"* — it is stale; two
+structured requirement headers and the compiled comparison all say 24.
+
+`50020`/`689` also names where the spots are: **Lacheish Plains** (Cimmeria), **Poitain** (Aquilonia) and
+**Purple Lotus Swamp** (Stygia).
+
+### `DispatchGuildCityBookingFailed(i_nErrorCode)` — the code IS an LDB id
+
+`FUN_00532750` renders the failure with `LDB(100, i_nErrorCode)` and nothing else — no mapping table, no
+base. So the wire field is a **verbatim LDB category-100 id**, and the whole error alphabet is readable out
+of the LDB. A `CONST=` sweep of the client separates who emits which:
+
+| id | text | emitter |
+|---|---|---|
+| 20199 | Booking failed. There was a database error while attempting to book your spot. | **server** |
+| 20200 | Booking failed. There are no more free city spots. | **server** |
+| 20201 | Booking failed. Your guild already has a city spot. | **server** |
+| 20210 | Booking failed. An unknown city spot was assigned to your guild. | **server** |
+| 20211 | Could not fetch your guild data. You have to be in a guild to do this. | **client** (`FUN_0115b2b0`) |
+| 20212 | You do not have enough guild rank to do this. | **server** |
+| 20213 | Your guild does not have enough members to do this. | **client** (`FUN_0115b2b0`) |
+
+Only 20211 and 20213 appear as immediates anywhere in `AgeOfConan.exe`; the other five appear nowhere, which
+is exactly what "the client only renders whatever code the server sent" looks like. That split is the
+mechanism behind #743's observed silence: the two the client owns are the two that cost no traffic.
+
+Success is `FUN_00561f00`, which caches the three `DispatchGuildCityBooked` fields on the guild object
+(`+0xa0`/`+0xa4`/`+0xa8`, flag `+0x8c`) and shows LDB `100`/`129749027` *"Booking succeeded. Your guild has
+been assigned a city spot."*
+
+### The request/response shape needs no capture
+
+#743 listed *"a capture of a SUCCESSFUL booking … the only way to learn the request/response shape"*. It is
+not — the client's own method signatures name every field, and they are already catalogued in
+`docs/re/aoc-client-rpc-methods.md` and `Faolan.Core/Enums/Opcodes.cs`:
+`RequestGuildCitySpot(i_cCharacter, i_cGuildID, i_cPlayfieldModelID)` (CSPlayerAgent `0x45`),
+`DispatchGuildCityBooked(i_nCitySpotId, i_nCityPlayfieldModelInstance, i_nCitySubgroup)` (`0x6B`),
+`DispatchGuildCityBookingFailed(i_nErrorCode)` (`0x6C`). The layouts are tabulated in
+`docs/re/minigame-massivepvp-messages.md`. What a capture would still add is the *placement* data — which
+`PlayfieldModelID`s are bookable spots — not the grammar.
