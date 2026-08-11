@@ -64,6 +64,11 @@ namespace Faolan.Importer.Cli
 		// that have one (the rest of the category is keyed by ACG-hashed token names and is not element text).
 		private const uint LdbGameActionFormatCategory = 170;
 
+		// LDB category 100: the client's COMMON WORDS and label nouns - `Spell`, `Combo`, `Ability`, and the `And`
+		// that `AddSpellLineProc` joins its two sides with. A separate category, reached through a separate getter
+		// (`FUN_0060eb50`), which is why none of these appear in a tooltip-token dump (#782).
+		private const uint LdbCommonWordCategory = 100;
+
 		// The GameAction key that carries a target CAP on the area kinds (see RdbSpellImporter.KeyMaxTargets - the
 		// same key means something else on `Disarm`/`InterpolatedHit`, so it stays scoped to the binders below).
 		private const int KeyAreaMaxTargets = 170;
@@ -621,6 +626,11 @@ namespace Faolan.Importer.Cli
 					: [(int)columnWidth.Value * ColumnScale, "", (int)columnDistance.Value * ColumnScale, ""]);
 			}
 
+			// `AddSpellLineProc` (branch 0x0149f69e) COMPOSES its line instead of picking one, which is why a
+			// sentence lookup found nothing for it: none of its three tokens is a sentence.
+			if (element.Kind == AddSpellLineProcKind)
+				return SpellLineProcSentence(ctx, element);
+
 			// `AddComboProc` picks its sentence by WHICH of its two spell slots are present (branch 0x0149ec8e): key
 			// 88 is the proc run on SELF and key 236 the one run on the TARGET, and the branch has a token for each
 			// of the three combinations - `%s on self and %s on target`, `%s on self`, `%s on target`. The
@@ -656,6 +666,56 @@ namespace Faolan.Importer.Cli
 			}
 
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
+		}
+
+		// `AddSpellLineProc` (53070), branch 0x0149f69e. It looked like a kind with three tokens and no sentence; it is
+		// a kind that BUILDS its line out of fragments, and none of the three tokens is a sentence:
+		//
+		//     OnSelf          "on self"            OnTarget  "on target"       TimesPerMinute  "Procs per Minute"
+		//
+		// The branch reads GetIntStat(0x463) = key 88 (the spell run on SELF), 0x4f4 = key 236 (the one on the
+		// TARGET) and 0x4f5 = key 237 (the rate), then concatenates with three LITERAL formats found at the push
+		// sites rather than in the LDB:
+		//
+		//     "%s %s"      per side          -> "<spell> on self"
+		//     " %s "       the joiner        -> " and ",  its word from LDB category 100 id 18500 ("and")
+		//     "%s, %d %s"  the wrapper       -> "<pieces>, <rate> Procs per Minute"
+		//
+		// ⚠️ The joiner's word comes through a THIRD localised-string getter, `FUN_0060eb50`, which
+		// `DumpTooltipTokens.java` does not anchor on (it knows `FUN_0060ec00` and `FUN_0060f2f0`) - and it reads
+		// category 100, not 170. That is why "And" appears in no token dump: it is a common WORD, not a tooltip
+		// sentence, the same category the `Spell`/`Combo`/`Ability` label nouns come from.
+		//
+		// ⚠️ The wrapper is UNCONDITIONAL - the rate clause is appended whether or not either side is present. What
+		// is conditional is only the trim call before it, so a proc with no spell at all still draws its rate.
+		private static (string? Format, object?[]? Args) SpellLineProcSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var onSelf = element.Value(GameActionTypes.KeyProcSelfSpell) ?? 0;
+			var onTarget = element.Value(GameActionTypes.KeyProcTargetSpell) ?? 0;
+			var perMinute = element.Value(GameActionTypes.KeyProcAmount);
+			if (perMinute is null)
+				return (null, null);
+
+			var self = ctx.SentenceForToken("OnSelf");
+			var target = ctx.SentenceForToken("OnTarget");
+			var rate = ctx.SentenceForToken("TimesPerMinute");
+			var and = ctx.CommonWord("And");
+			if (self == null || target == null || rate == null || and == null)
+				return (null, null);
+
+			// ⚠️ Both sides gated on `id != 0` only. The client's test is `id != 0 && !hidden` - a side whose spell
+			// carries the hide-from-tooltip bit renders as a ONE-sided proc - and that is deliberately not acted on
+			// here for the same reason as `AddComboProc`: see #789 and HiddenSpellNote, which flags the line instead.
+			var pieces = new List<string>();
+			if (onSelf != 0)
+				pieces.Add($"{ctx.SpellName(onSelf)} ({onSelf}) {self}");
+			if (onTarget != 0)
+				pieces.Add($"{ctx.SpellName(onTarget)} ({onTarget}) {target}");
+
+			if (pieces.Count == 0)
+				return (null, null);
+
+			return (SpellLineProcWrapper, [string.Join($" {and} ", pieces), (int)perMinute.Value, rate]);
 		}
 
 		// `HitPercentage` (53007), keys [Stat, Value, Line, 71]. Its own type id carries `%s %s by %d%% of %s %s`, and
@@ -1088,6 +1148,7 @@ namespace Faolan.Importer.Cli
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
 		private const uint AddComboProcKind = 53212;
 		private const uint AddPercentSkillModifierKind = 53189;
+		private const uint AddSpellLineProcKind = 53070;
 		private const uint AreaFormulaKind = 53087;
 		private const uint AttackAddTargetsKind = 53273;
 		private const uint CastNanoKind = 53051;
@@ -1104,6 +1165,10 @@ namespace Faolan.Importer.Cli
 		private const uint ResurrectTargetKind = 53227;
 		private const uint TeamFormulaKind = 53066;
 		private const uint TeamPropagatedBuffKind = 53224;
+
+		// `AddSpellLineProc`'s wrapper, a LITERAL format at its push site (0x208d2e0) rather than an LDB entry -
+		// "<the composed sides>, <rate> Procs per Minute".
+		private const string SpellLineProcWrapper = "%s, %d %s";
 
 		// `AddPercentSkillModifier`'s two stat slots. Per-TYPE like every unnamed key: on `UpgradeCombo` 66/67 are the
 		// damage and cooldown deltas, here they are the SOURCE stat and the stat it raises (see the branch note).
@@ -1203,6 +1268,17 @@ namespace Faolan.Importer.Cli
 			public string? SentenceForToken(string token)
 			{
 				return Ldb.GetValueOrDefault((LdbGameActionFormatCategory, Elf28.Of(token)));
+			}
+
+			/// <summary>
+			///     A COMMON WORD, from LDB category 100 rather than 170 - the category the client's label nouns
+			///     ("Spell", "Combo", "Ability") and its glue words come from. `AddSpellLineProc` joins its two sides
+			///     with `And` out of here, which is why that token appears in no tooltip-token dump: the dumps anchor
+			///     on the two category-170 getters and this one comes through `FUN_0060eb50` (#782).
+			/// </summary>
+			public string? CommonWord(string token)
+			{
+				return Ldb.GetValueOrDefault((LdbCommonWordCategory, Elf28.Of(token)));
 			}
 
 			/// <summary>

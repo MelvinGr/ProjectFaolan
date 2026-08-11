@@ -146,8 +146,8 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 8,175,543 / 8,241,205 = 99.2%
 property-run field ids read         : 16 / 83
-elements rendered as a sentence     : 49,543 / 61,840 = 80.1%
-...or accounted for                 : 59,499 / 61,840 = 96.2%
+elements rendered as a sentence     : 49,967 / 61,840 = 80.8%
+...or accounted for                 : 59,923 / 61,840 = 96.9%
 ```
 
 ⭐ **The second line is the honest one.** Four buckets, and only two of them are our debt:
@@ -162,8 +162,8 @@ elements rendered as a sentence     : 49,543 / 61,840 = 80.1%
   `InheritedComboAttack` (753) is the opposite shape: its sentence IS found (`PerSecond`, "%s per second") and
   the `%s` is a number the record does not contain — branch `0x014a103e` computes it as
   `key224 × 0.01 × [ESI] / [EBX]`, two floats out of the INVOCATION context. Rendering it would invent a number;
-- **a branch but no sentence we can find** — 1,220 over 3 kinds (`ChangeInheritedWeaponAttack` 795,
-  `AddSpellLineProc` 424, `Hit` 1);
+- **a branch but no sentence we can find** — 796 over 2 kinds, and it is essentially one:
+  `ChangeInheritedWeaponAttack` (795), whose branch composes several clauses out of six tokens;
 - **a sentence whose slots are not bound** — 1,121 over 8 kinds, led by `HitPercentage`'s live-state arms,
   `UpgradeCombo` and `AddSpellProc`.
 
@@ -330,6 +330,37 @@ its own type-id string `%.2fm%s wide column to target` when there is no distance
 
 One more exception worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"*.
+
+### `AddSpellLineProc` (53070): it COMPOSES its line, so no sentence lookup could ever have found one
+
+It read as a kind with three recovered tokens and no sentence. It is a kind that **builds** its line, and none of
+its three tokens is a sentence — they are fragments:
+
+```
+OnSelf  "on self"      OnTarget  "on target"      TimesPerMinute  "Procs per Minute"
+```
+
+Branch `0x0149f69e` reads `GetIntStat(0x463)` = key 88 (the spell run on SELF), `0x4f4` = key 236 (the one on the
+TARGET) and `0x4f5` = key 237 (the rate), then concatenates using three **literal** formats that live at the push
+sites rather than in the LDB:
+
+| literal | address | role |
+|---|---|---|
+| `%s %s` | `0x20614a4` | one side — "⟨spell⟩ on self" |
+| `" %s "` | `0x208d330` | the joiner — " and " |
+| `%s, %d %s` | `0x208d2e0` | the wrapper — "⟨sides⟩, ⟨rate⟩ Procs per Minute" |
+
+⚠️ **The joiner's word comes from a THIRD getter and a different CATEGORY.** `MOV ESI,0x208ce00 ; CALL
+FUN_0060eb50` fetches the token `And`, and it resolves in **category 100** ("and"), not 170.
+`DumpTooltipTokens.java` anchors on the two category-170 getters (`FUN_0060ec00`, `FUN_0060f2f0`), so `And`
+appears in no token dump — it is a common WORD, from the same category as the `Spell` / `Combo` / `Ability` label
+nouns. Worth knowing before reading any token dump as exhaustive.
+
+⚠️ The wrapper is **unconditional**: the rate clause is appended whether or not either side is present (only the
+trim before it is conditional), so a proc with no spell at all still draws its rate.
+
+Rendered, `Aflame` (4414105) — whose own description is *"adds a spelline proc to all arrowspells"* — comes out as
+`Aflame (4357732) on target, 20 Procs per Minute`.
 
 ### `AddPercentSkillModifier` (53189): the sentence is chosen by whether its two STAT slots are equal
 
