@@ -256,10 +256,14 @@ the `Flags` bit census, and the wire's arrival `Flags` from the DUMPS against th
 [item-template-stats](../rdb/item-template-stats.md) binding section is measured with),
 `bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
 puts each in, with the direction ability resolved — #661) ·
-`spawn-animation` (#607: is `npc_stats.spawn_animation` a property of the spawn EVENT? Partitions every captured NPC
-spawn into the login BURST and MID-SESSION, which is the class of predictor a field census cannot see. ⛔ It
-FALSIFIED the ticket's own hypothesis - 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not
-mean "this entity is arriving"),
+`spawn-animation` (#607: what IS `npc_stats.spawn_animation`? Two tests. The first partitions every captured NPC
+spawn into the login BURST and MID-SESSION — the class of predictor a field census cannot see — and ⛔ FALSIFIED the
+ticket's hypothesis: 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not mean "this entity
+is arriving". The second is the ⭐ **stickiness test**, which settled it: read per `(capture, handle, templateId)`,
+of the 4,687 entities sighted more than once **351 are MIXED** (refuting a per-creature capability), **346 of those
+are ON for the first sighting and off thereafter, and 0 ever turn ON** — so it is a **decaying state**, an entity
+inside a window that has closed by the next sighting. The window is bounded above only, tightest observation
+**< 2.6 s** — an animation length, not a server timer),
 `follow-pairs` (#741: every NPC-follows-NPC binding the corpus carries — the mode-07 formation MoveTasks — with
 both ends resolved to creature NAMES and the offsets each follower held. Grouped by creature PAIR, because the
 formation is only visible as a GROUP: the four `Black Dragon Guard Patroller`s behind one captain each hold a

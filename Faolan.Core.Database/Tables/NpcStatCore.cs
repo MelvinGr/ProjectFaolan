@@ -214,6 +214,20 @@ namespace Faolan.Core.Database.Tables
 		public uint? SightSkill { get; set; }
 		public uint? HearingSkill { get; set; }
 		public uint? SmellingSkill { get; set; }
+
+		// ⛔ **Not a per-type property, and the column should not exist** (#607). Retail never sends it as 0 - it is
+		// UNSET or 1, a presence FLAG - and it is a **decaying STATE of one entity**, not a fact about the creature:
+		// over the 4,687 entities the corpus sights more than once, 351 change their answer, 346 of those are ON for
+		// the first sighting and off thereafter, and **not one ever turns ON** (`--report spawn-animation`).
+		//
+		// What it flags is concrete: `spawnanim` is a real per-creature MonsterData (RDB 1010201) XML attribute - the
+		// client parses it into `MonsterData+0x158` through the same animation-name resolver `defaultidleanim` uses -
+		// so the wire flag means *this entity is still playing its entrance animation*. The window is bounded above
+		// only, tightest observation < 2.6 s, which is an animation length rather than a server timer.
+		//
+		// It stays a column because the SENDER cannot yet decide it: the duration is per creature (it is an asset),
+		// and picking one number would invent a timing retail does not use. `PerSpawnEventModes` keeps the mode, which
+		// puts us inside retail's distribution without claiming to model it. See #607.
 		public uint? SpawnAnimation { get; set; }
 
 		public uint? LosHeight { get; set; }

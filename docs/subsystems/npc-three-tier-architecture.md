@@ -192,6 +192,15 @@ placement. `PerSpawnEventModes` tallies each field over **all** of a type's sigh
 ⚠️ Not a blanket reset to a resting value. 14 types are never captured in `BccState` 1 — the Door Warden
 (19619) is state 11 in all 15 of its sightings — so a type *can* rest somewhere other than the common value.
 
+⭐ **`SpawnAnimation` is now decoded, and it is not merely per-event — it is a decaying STATE** (#607). It marks an
+entity that is still playing its entrance animation: over the 4,687 entities sighted more than once, 351 change
+their answer, 346 of those are ON for the first sighting and off thereafter, and **not one ever turns ON**
+(`--report spawn-animation`). The animation itself is real client data — `spawnanim` is a MonsterData (RDB 1010201)
+attribute the client parses into `MonsterData+0x158` beside `defaultidleanim`. The window is bounded above only,
+tightest observation **< 2.6 s**. The mode-keeping above is therefore an approximation that stays inside retail's
+distribution rather than a model of the field; the sender cannot decide it until the per-creature animation length
+is available.
+
 ⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
 companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are
 summoned, not placed — so every one of them kept its representative's pose permanently. That is why 42 stat
