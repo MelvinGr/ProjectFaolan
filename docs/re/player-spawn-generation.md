@@ -160,10 +160,35 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
   - ending: TWO **plain**-counted pair lists `[u32 N][N x (u32 id, s32 value)]` = `CharacterScaffoldPair` (ids
     are decades 10,20,...,110; DemoL80 has both lists non-empty), then a THIRD pair list that is **count-framed**
     (`[u32 ListFrame word][n x (u32 id, s32 value)]`). That word is what used to be called the final `0x3F1`
-    marker; 10 captured spawns carry `ForCount(1)`, every observed element being `(975, 0)`.
+    marker.
 
-Three of those fields are decoded structurally but NOT semantically (the tail records, the entry kind flag, the
-third pair list's `(975, 0)` element) — carried verbatim; open work tracked in Gitea #466.
+### ⭐ The third pair list is a STAT list, and that is what the asymmetric framing was saying (#466)
+
+The 8-byte `(id, value)` shape is shared by **two unrelated families**. Lists 1 and 2 are the faction-reputation
+block (#315) — ids in the decades, values a signed standing. List 3's ids are wire **stat** ids, and every one
+resolves in the client's own name table (`docs/re/aoc-client-stat-names.tsv`):
+
+| id | client name | carriers | values | family |
+|---|---|---:|---|---|
+| `20` | `BCCState` | 8 | 1 | NPC spawns |
+| `975` | `DamageAbsorb` | 39 | 0 | both |
+| `1351` | `NaturalEnergyRegeneration` | 9 | 5625 / 7368 | **player only** |
+| `1000028` | `Energy` | 9 | 3222 / 9000 / 14000 | **player only** |
+| `1000029` | `MaxEnergy` | 9 | 9000 / 14000 | **player only** |
+
+⭐ **The three energy stats land on the same 9 spawns**, with `Energy <= MaxEnergy` on every one — a pool, its
+denominator and its regen rate pushed together. That is what makes them a deliberate block rather than noise.
+
+⚠️ **So `MaxEnergy` IS on the wire**, and the standing note that it *"appears ZERO times in 120 captures"* with
+its bytes sitting in *"the retail server's leaked scaffold region … not a value it wrote"* was reading this list.
+It is count-framed, parsed by our own codec and round-tripped byte-exact.
+[V3: SpawnPostIirGrammarTests.TheThirdPairList_IsAStatList_NotAThirdFactionList]
+
+#466 recorded this list as *"10 spawns carry `ForCount(1)`, every observed element being `(975, 0)`"* — that is
+the player-scaffold subset; over the whole `SimpleCharFullUpdateIIR` corpus it is **56 carriers and five ids**.
+
+Two of #466's three fields remain decoded structurally but NOT semantically — the tail records and the entry kind
+flag — and are carried verbatim; open work tracked in Gitea #466.
 
 ### The client's readers (V1)
 

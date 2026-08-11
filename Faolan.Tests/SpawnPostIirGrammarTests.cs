@@ -70,6 +70,79 @@ namespace Faolan.Tests
 			Assert.Equal([2u], byLength[40].ToArray());
 		}
 
+		// ⭐ #466 item 3: the THIRD closing pair list is a STAT list, and that is why it is framed differently from
+		// the two before it. Lists 1 and 2 are the faction-reputation block (#315) - ids in the decades
+		// 10..120 plus 200/310/320/330, values a signed standing. List 3's ids are wire STAT ids, and every one
+		// resolves in the client's own stat-name table (docs/re/aoc-client-stat-names.tsv):
+		//
+		//     20      BCCState                    x8   value 1        NPC spawns
+		//     975     DamageAbsorb                x39  value 0        both families
+		//     1351    NaturalEnergyRegeneration   x9   5625 / 7368    PLAYER spawns only
+		//     1000028 Energy                      x9   3222/9000/14000  PLAYER spawns only
+		//     1000029 MaxEnergy                   x9   9000 / 14000   PLAYER spawns only
+		//
+		// The three energy stats appear on exactly the same 9 spawns, which is what makes them a deliberate triple
+		// rather than noise: a pool, its denominator and its regen rate, pushed together, with Energy <= MaxEnergy
+		// on every one. #466 recorded this list as "(975, 0) on 10 spawns, always identical" - that is the
+		// player-scaffold subset; over the whole corpus it is 56 carriers and five ids.
+		//
+		// ⚠️ This also corrects a standing claim that `MaxEnergy` (0x000F425D) "appears ZERO times in 120 captures"
+		// and that the bytes are a leaked scaffold region rather than a value retail wrote. They are this list -
+		// count-framed, parsed by our own codec, and round-tripped byte-exact.
+		[Fact]
+		public void TheThirdPairList_IsAStatList_NotAThirdFactionList()
+		{
+			var factionIds = new HashSet<uint>();
+			var thirdIds = new HashSet<uint>();
+			var energySpawns = new Dictionary<uint, int>();
+			var pools = new List<(int Energy, int MaxEnergy)>();
+			var carriers = 0;
+
+			foreach (var (body, _) in Streams())
+			{
+				if (!SpawnBodyReader.TryParse(body, out var spawn))
+					continue;
+
+				foreach (var pair in spawn.Post.EndPairs.Concat(spawn.Post.EndPairs2))
+					factionIds.Add(pair.Id);
+
+				if (spawn.Post.EndPairs3.Count == 0)
+					continue;
+
+				carriers++;
+				foreach (var pair in spawn.Post.EndPairs3)
+				{
+					thirdIds.Add(pair.Id);
+					if (pair.Id is EnergyStat or MaxEnergyStat or EnergyRegenStat)
+						energySpawns[pair.Id] = energySpawns.GetValueOrDefault(pair.Id) + 1;
+				}
+
+				var energy = spawn.Post.EndPairs3.Where(p => p.Id == EnergyStat).Select(p => (int?)p.Value).FirstOrDefault();
+				var max = spawn.Post.EndPairs3.Where(p => p.Id == MaxEnergyStat).Select(p => (int?)p.Value).FirstOrDefault();
+				if (energy is { } e && max is { } m)
+					pools.Add((e, m));
+			}
+
+			Assert.Equal(56, carriers);
+			Assert.Equal([20u, 975u, 1351u, EnergyStat, MaxEnergyStat], thirdIds.Order().ToArray());
+
+			// The ids are NOT the faction domain: the four above 120 cannot be faction ids, and the one that does
+			// collide (20) is `BCCState`, which is a small-number coincidence rather than an overlap of families.
+			Assert.Equal([20u], thirdIds.Intersect(factionIds).ToArray());
+			Assert.All(thirdIds.Where(id => id != 20), id => Assert.True(id > factionIds.Max(), $"{id} sits inside the faction range"));
+
+			// ⭐ The energy triple is pushed TOGETHER, on the same spawns, and it is a real pool.
+			Assert.Equal(energySpawns[EnergyStat], energySpawns[MaxEnergyStat]);
+			Assert.Equal(energySpawns[EnergyStat], energySpawns[EnergyRegenStat]);
+			Assert.NotEmpty(pools);
+			Assert.All(pools, p => Assert.True(p.Energy <= p.MaxEnergy, $"Energy {p.Energy} exceeds MaxEnergy {p.MaxEnergy}"));
+		}
+
+		// The three energy stats, by the client's own names (docs/re/aoc-client-stat-names.tsv).
+		private const uint EnergyStat = 1000028;
+		private const uint MaxEnergyStat = 1000029;
+		private const uint EnergyRegenStat = 1351;
+
 		private static List<NpcAppearanceMorph> MorphsOf(SimpleCharFullUpdateIIR spawn)
 		{
 			return spawn.Post.Slot is NpcEntrySlot npc

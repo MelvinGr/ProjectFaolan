@@ -78,9 +78,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public List<ScaffoldPair> EndPairs { get; } = [];
 		public List<ScaffoldPair> EndPairs2 { get; } = [];
 
-		// The third, and the stream's last field. Note the asymmetry, which is what the bytes say rather than what is
-		// tidy: the two above are framed by a PLAIN count, this one by a ListFrame word. It was read as a closing
-		// 0x3F1 constant for years because ForCount(0) IS 0x3F1 and it is empty on all but 10 captured spawns.
+		// The third, and the stream's last field. ⭐ It is a STAT list, not a third helping of the faction block -
+		// which is what the asymmetric framing was saying (#466). The two above are framed by a PLAIN count and
+		// carry FACTION ids in the decades; this one is framed by a ListFrame word and carries wire STAT ids, every
+		// one of which resolves in the client's own name table:
+		//
+		//     20      BCCState                    x8   value 1          NPC spawns
+		//     975     DamageAbsorb                x39  value 0          both families
+		//     1351    NaturalEnergyRegeneration   x9   5625 / 7368      PLAYER spawns only
+		//     1000028 Energy                      x9   3222/9000/14000  PLAYER spawns only
+		//     1000029 MaxEnergy                   x9   9000 / 14000     PLAYER spawns only
+		//
+		// The energy triple lands on the same 9 spawns with Energy <= MaxEnergy on every one - a pool, its
+		// denominator and its regen rate, pushed together. ⚠️ So `MaxEnergy` IS on the wire; the note that it
+		// "appears ZERO times in 120 captures" was reading this list as a leaked scaffold region.
+		// [V3: SpawnPostIirGrammarTests.TheThirdPairList_IsAStatList_NotAThirdFactionList]
+		//
+		// It was read as a closing 0x3F1 constant for years because ForCount(0) IS 0x3F1 and it is empty on all but
+		// 56 captured spawns.
 		public List<ScaffoldPair> EndPairs3 { get; } = [];
 	}
 
@@ -155,9 +170,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// captures. The leading 0xC350 and the zero word are fixed and asserted on parse rather than carried.
 	public readonly record struct ScaffoldTailRef(uint Id, byte Kind);
 
-	// One 8-byte pair [u32 id][s32 value] in the three lists that CLOSE a post-IIR stream (ids are decades 10..110).
-	// The first list IS the FACTION-REPUTATION block: Id = faction id, Value = signed standing (+/-50000) shown in
-	// the client's Factions window. See CharacterScaffoldPair / Gitea #315.
+	// One 8-byte pair [u32 id][s32 value] in the three lists that CLOSE a post-IIR stream. ⚠️ The 8-byte shape is
+	// shared by TWO unrelated families, which is why the framing differs: lists 1 and 2 are the FACTION-REPUTATION
+	// block (Id = faction id in the decades 10..330, Value = signed standing +/-50000, shown in the client's
+	// Factions window - see CharacterScaffoldPair / Gitea #315), and list 3 is a STAT list (Id = a wire stat id,
+	// Value = its value - see EndPairs3, Gitea #466).
 	public readonly record struct ScaffoldPair(uint Id, int Value);
 
 	// One entry in a HUMANOID NPC's APPEARANCE / morph table: a morph id, its float value, and an optional texscript
