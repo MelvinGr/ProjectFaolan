@@ -268,6 +268,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "weapon-set":
+				{
+					WeaponSetReport(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "buff-descriptor":
 				{
 					BuffDescriptor(NamedCapture.LoadAll(capturesDir), arg);

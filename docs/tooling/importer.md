@@ -315,6 +315,9 @@ where that mattered),
 `method-census` (every RPC METHOD the corpus carries, named, with direction, endpoint classes and frame counts —
 and, with `--report-arg <substring>`, the OTHER half: which matching methods have NO frame at all, which is the
 evidence that decides whether a ticket is "decode it" or "capture it"),
+`weapon-set` (can a capture say which WEAPON SET a character had drawn? The drawn set rides a stat-0x17
+re-registration on the newly-active `Equipped` weapon slot at a swap — slots alternating 6 <-> 20 — but it is NOT
+readable at login, because every equipped slot carries that same registration. Gitea #588 / #400),
 `stat-series` (`--report-arg <id>[,<id>...]`: the ordered value sequence of one or more stats per capture and
 handle, out of the captured `StatIIR` stream — a census says a stat is pushed, a SERIES says whether it counts
 up, counts down, resets or is merely restated. Repeats collapse to `20 x3`. Gitea #656),
