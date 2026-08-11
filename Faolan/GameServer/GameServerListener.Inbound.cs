@@ -1288,6 +1288,10 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("Shop {Vendor:X8} closed by {Character}.", vendorHandle, client.Session.Character?.Name);
 
+					// #792: retail ACKS it - `DispatchTradeAbort` (0x6A), zero-length, on 152 of the 153 frames the
+					// corpus holds. We used to answer nothing.
+					await SendTradeAbort(client);
+
 					break;
 				}
 

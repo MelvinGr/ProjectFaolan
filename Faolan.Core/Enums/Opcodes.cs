@@ -1100,6 +1100,11 @@ namespace Faolan.Core.Enums
 		// EMPTY function, so the client does nothing with it. Retail sends it 102 times across 59 of 132 captures,
 		// immediately before every IntendedTeleportIIR, and the client ignores every one. So the zone-change
 		// handshake is not missing a step we fail to perform - this one is a no-op on the receiving end.
+		//
+		// ⭐ The "immediately before every" is now MEASURED and exact: of the 102 frames, the next s2c frame is an
+		// `IntendedTeleportIIR` (`0x10D27BC0`) **102 times, with no exceptions** - cross-map handoffs and same-map
+		// revives alike. That is what makes it safe to send unconditionally from the teleport senders, which we now
+		// do (`GameServerListener.SendTeleportPending`) for byte-stream fidelity and nothing else.
 		Reserved0x1B = 0x1B,
 		DispatchSetItemStat = 0x1C,
 		DispatchAddToItemSlot = 0x1D,
@@ -1182,7 +1187,11 @@ namespace Faolan.Core.Enums
 		// holds on all eight measured (0x1B, 0x6A, 0x6B, 0x6C, 0x6D, 0x71, 0x72, 0x75) - the four that DO have a name
 		// are the controls. `GamecodeClient_t` is the implementing class; `GameCharInterface_t`'s overrides are empty.
 		//
-		//   0x6A -> +0x1AC -> `CoreTradeHolder::TradeAbort()`, the client's own assert string
+		//   0x6A -> +0x1AC -> `CoreTradeHolder::TradeAbort()`, the client's own assert string ("is closing all
+		//                     trades"). ⭐ Its TRIGGER is measured: 152 of the 153 frames in the corpus are the
+		//                     immediate reply to `CloseShop` (the odd one follows an `UpdateQuestMarkerNPC` - a shop
+		//                     closed by walking away). A vendor session is a trade to the client, which is why one
+		//                     message serves both. We answer `CloseShop` with it (`SendTradeAbort`).
 		//   0x6B -> +0x1B0 -> the LOCAL holder's `accepted` byte set + the trade window refreshed. Byte for byte the
 		//                     same body as 0x6C's, which is named DispatchPartnerAcceptedTrade and differs only in
 		//                     taking the ID32 of whose holder to stamp - so 0x6B is the argument-less YOU half.

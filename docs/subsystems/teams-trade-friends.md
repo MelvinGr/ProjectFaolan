@@ -225,9 +225,26 @@ all empty), so its override IS the semantics:
 connection right after their `AcceptTrade`, and `0x6D` on both connections as the trade commits — which is
 exactly what the two handlers do.
 
+### ⭐ `0x6A`'s trigger is `CloseShop`, and it is measured
+
+The handler said *what* it does; the corpus says *when* retail sends it. Of the **153** frames across the 132
+captures, **152 are the immediate reply to `CloseShop`** — the odd one out follows an `UpdateQuestMarkerNPC`,
+i.e. a shop closed by walking away rather than by clicking. A vendor session **is** a trade to the client, which
+is why one message serves both, and it is why the handler's assert string reads *"is closing all trades"*
+(plural) rather than naming a partner.
+
+We answered `CloseShop` with nothing at all; the ack now goes out (`GameServerListener.SendTradeAbort`).
+[V2: Hakotep_hox_login_gameplay0.tshark.json fr695 → fr697, and 151 more like it across the corpus]
+
+⚠️ It aborts **every** open trade, not just the shop, so it must not be sent while a player-to-player trade is
+running. Nothing can do that today — a shop and a trade cannot both be open — but that is the reason it is not a
+general "close the window" message.
+
 ⚠️ Still uncaptured, and NOT built: whether an internal **move** notifies the partner at all, and whether a
 partner going offline mid-trade produces anything. **Cancel is no longer a blank**, though: `0x6A` is
-`TradeAbort`, it takes no body, and it is what closes a window without committing. Open work in Gitea #427.
+`TradeAbort`, it takes no body, and it is what closes a window without committing — the shop ack proves the
+message works, but no capture shows retail using it to cancel a *player* trade, so that use stays unbuilt. Open
+work in Gitea #427.
 
 ## Friend list
 

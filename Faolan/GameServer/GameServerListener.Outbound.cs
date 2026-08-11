@@ -567,6 +567,35 @@ namespace Faolan.GameServer
 			return removed;
 		}
 
+		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchTradeAbort` (GameCharInterface `0x6A`,
+		// zero-length) and we answered nothing at all - so the vendor session was left open on the client's side of
+		// the model.
+		//
+		// The name is the CLIENT's: its handler is `CoreTradeHolder::TradeAbort()`, whose own assert string reads
+		// *"is closing all trades"* - a vendor session IS a trade to the client, which is why one message serves both.
+		// The TRIGGER is measured rather than assumed: of the 153 frames across 132 captures, **152 are the immediate
+		// reply to `CloseShop`** (the odd one out follows an `UpdateQuestMarkerNPC`, i.e. a shop closed by walking
+		// away). [V2: Hakotep_hox_login_gameplay0.tshark.json fr695 -> fr697, and 151 more like it across the corpus]
+		//
+		// ⚠️ It aborts EVERY open trade, not just the shop, so it must not be sent while a player-to-player trade is
+		// running. Nothing here can do that today - a shop and a trade cannot both be open - but the constraint is the
+		// reason this is not a general "close the window" message.
+		private static Task SendTradeAbort(INetworkClient client)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeAbort, _ => { }));
+		}
+
+		// #792: the zero-length GameCharInterface `0x1B` retail sends immediately before every `IntendedTeleportIIR` -
+		// **102 of 102 across the corpus, no exceptions**, on cross-map handoffs and same-map revives alike.
+		//
+		// ⚠️ The client does NOTHING with it: `GamecodeClient_t`'s override of the vtable slot it dispatches to
+		// (+0x70) is an empty function. So this is sent for fidelity with retail's byte stream and for nothing else -
+		// do not hang behaviour off it, and do not go looking for what it "should" do.
+		private static Task SendTeleportPending(INetworkClient client)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.Reserved0x1B, _ => { }));
+		}
+
 		// Closes a craft: retail's last word on the transaction, after the product add and the ingredient removals.
 		// The body is the RECIPE ID and nothing else - the capture's `0000000F` is recipe 15, whose own rows are Plain
 		// Hilt Piece x1 + Copper x4 + Silver x4 -> Bloodsilver Khopesh, matching the removals that precede it.

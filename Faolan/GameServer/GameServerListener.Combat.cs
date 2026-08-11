@@ -87,11 +87,13 @@ namespace Faolan.GameServer
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, facingX, facingZ))));
 		}
 
-		Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
+		async Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
 		{
+			// #792: the zero-length 0x1B goes first - retail precedes EVERY IntendedTeleport with it, 102 of 102.
+			await SendTeleportPending(client);
 			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
 			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, playfieldToken))));
 		}
 

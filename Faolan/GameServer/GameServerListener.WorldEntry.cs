@@ -698,6 +698,9 @@ namespace Faolan.GameServer
 			// Source the destination playfield token from the destination map's burst so the announce matches the token
 			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
+			// #792: the zero-length 0x1B first - retail precedes EVERY IntendedTeleport with it, 102 of 102 across the
+			// corpus. The client discards it (its handler is an empty override); we send it because retail does.
+			await SendTeleportPending(client);
 			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor) })
 			{
 				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));

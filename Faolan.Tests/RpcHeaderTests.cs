@@ -103,6 +103,20 @@ namespace Faolan.Tests
 			Assert.Single(Varint(rpc.Method));
 		}
 
+		// #792: the two no-arg GameCharInterface methods the server now SENDS carry a zero-length body and one varint
+		// group. Both were `Reserved0xNN` until the client's own vtable named what they do, and the corpus pinned when
+		// they arrive: `DispatchTradeAbort` answers `CloseShop` (152 of 153 frames) and `0x1B` precedes every
+		// `IntendedTeleportIIR` (102 of 102). A body of any length here would be a different message.
+		[Theory, InlineData(GameCharInterfaceMethods.DispatchTradeAbort, 0x6A), InlineData(GameCharInterfaceMethods.Reserved0x1B, 0x1B)]
+		public void ANoArgWorldMethod_SendsAnEmptyBody(GameCharInterfaceMethods method, int expected)
+		{
+			var rpc = new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty);
+
+			Assert.Equal((uint)expected, rpc.Method);
+			Assert.Single(Varint(rpc.Method));
+			Assert.Equal(0, Rpc.Parse(rpc.Serialize()).Body.Length);
+		}
+
 		// The collision #608 is about, stated as bytes: the SAME opcode with two different method varints is two
 		// different methods, and only the whole field tells them apart. Retail sends all four; an opcode-keyed dispatch
 		// would read an 8-byte `AuthenticateLoggedIn` as the no-arg `ReceivedCharacterSettings` ack.
