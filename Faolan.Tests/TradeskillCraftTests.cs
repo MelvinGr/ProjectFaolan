@@ -125,6 +125,83 @@ namespace Faolan.Tests
 			Assert.Empty(h.Outbound.Granted);
 		}
 
+		// #793: retail PACES the transaction. The client's own duration getter (`FUN_0114bf50`) reads the recipe
+		// record's `+0x24` for a craft - the mid-header word the codec validates - and hardcodes 500 for a gem. Both
+		// are 5.00 s, and both are confirmed server-side on the wire (5.07 s craft, 4.98 s socket).
+		[Fact]
+		public void StagedTradeskill_IsDueFiveSecondsOn_ForBothOperations()
+		{
+			Assert.Equal(500u, TradeskillReplyCodec.CraftDurationCentiseconds);
+			Assert.Equal(500u, TradeskillService.GemSocketCentiseconds);
+		}
+
+		// Nothing happens until the bar has run out: staging alone must not grant, take or complete anything, or the
+		// pacing would only be a delayed duplicate of an instant craft.
+		[Fact]
+		public async Task StagedCraft_GrantsNothingBeforeItsDeadline()
+		{
+			var h = await Harness(silverHeld: 6);
+			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
+
+			var due = h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
+			Assert.Equal(now.AddSeconds(5), due);
+
+			await h.Service.CompleteDue(now.AddSeconds(4.9));
+			Assert.Empty(h.Outbound.Granted);
+			Assert.Empty(h.Outbound.Completed);
+
+			await h.Service.CompleteDue(now.AddSeconds(5));
+			Assert.Equal([(BloodsilverKhopesh, 1u, "NecroL80")], h.Outbound.Granted);
+			Assert.Equal([RecipeId], h.Outbound.Completed);
+		}
+
+		// The completion runs ONCE. The tick calls CompleteDue ten times a second, so an entry that survived its own
+		// completion would re-craft for as long as the player stayed logged in.
+		[Fact]
+		public async Task CompletedCraft_DoesNotRunAgainOnTheNextTick()
+		{
+			var h = await Harness(silverHeld: 6);
+			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
+
+			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
+			await h.Service.CompleteDue(now.AddSeconds(5));
+			await h.Service.CompleteDue(now.AddSeconds(5.1));
+
+			Assert.Single(h.Outbound.Completed);
+		}
+
+		// A refusal stays SILENT, five seconds late as it is now: retail has no failure form here, and a completion
+		// over a craft that did not happen tells the client to close its window on an item it never received.
+		[Fact]
+		public async Task StagedCraft_ThatCannotBeAfforded_CompletesSilently()
+		{
+			var h = await Harness(silverHeld: 3);
+			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
+
+			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
+			await h.Service.CompleteDue(now.AddSeconds(5));
+
+			Assert.Empty(h.Outbound.Granted);
+			Assert.Empty(h.Outbound.Taken);
+			Assert.Empty(h.Outbound.Completed);
+		}
+
+		// A player who logs out mid-bar takes nothing with them and is granted nothing: the staged entry is dropped,
+		// so the tick after their disconnect must find no work.
+		[Fact]
+		public async Task ForgottenCraft_NeverCompletes()
+		{
+			var h = await Harness(silverHeld: 6);
+			var now = new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero);
+
+			h.Service.Stage(h.Client, TradeskillCommands.Craft(RecipeId, 1), now);
+			Assert.Equal(1, h.Service.Forget(h.Client));
+
+			await h.Service.CompleteDue(now.AddSeconds(5));
+			Assert.Empty(h.Outbound.Granted);
+			Assert.Empty(h.Outbound.Completed);
+		}
+
 		private async Task<Harnessed> Harness(uint silverHeld)
 		{
 			var (options, path) = TestDb.NewSeededDatabase(Crafter);
@@ -170,6 +247,7 @@ namespace Faolan.Tests
 		private sealed class RecordingEconomyOutbound : NoOpEconomyOutbound
 		{
 			public bool BagFull { get; set; }
+			public List<uint> Completed { get; } = [];
 			public List<(uint Item, uint Count, string? Creator)> Granted { get; } = [];
 			public List<(uint TargetSlot, uint SocketIndex, uint GemTemplate, uint GemSlot)> Socketed { get; } = [];
 			public List<(uint Item, uint Count)> Taken { get; } = [];
@@ -186,6 +264,12 @@ namespace Faolan.Tests
 			public override Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
 			{
 				Socketed.Add((targetSlot, socket.SocketIndex, socket.GemItemId, gemSlot));
+				return Task.CompletedTask;
+			}
+
+			public override Task SendTradeskillComplete(INetworkClient client, uint recipeId)
+			{
+				Completed.Add(recipeId);
 				return Task.CompletedTask;
 			}
 

@@ -53,6 +53,11 @@ namespace Faolan.GameServer.Economy
 		// socketed item's container entry, so the client updates the item in place from the first message.
 		Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot);
 
+		// Closes a craft (#793): `DispatchTradeskillComplete`, body = the recipe id. Reached through the port because
+		// the craft no longer completes in the inbound handler - the world tick runs it out of `TradeskillService`
+		// five seconds later, and the tick has no listener.
+		Task SendTradeskillComplete(INetworkClient client, uint recipeId);
+
 		// The GUILD BANK vault's contents (#654) - pushed unasked as part of opening the banker, alongside the
 		// personal bank. Its container's wire `instance` is the GUILD id, not a character's.
 		Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault);

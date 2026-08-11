@@ -473,6 +473,11 @@ namespace Faolan.GameServer
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
 
+			// Nor can a tradeskill mid-bar (#793): it is staged and un-run, so dropping it takes nothing from the
+			// player - where letting it complete would grant an item to a session that has gone.
+			if (_tradeskill.Forget(client) is var dropped and > 0)
+				Logger.LogInformation("Tradeskill: dropped {Count} staged transaction(s) for a leaving connection.", dropped);
+
 			// A trade cannot outlive either connection. Nothing has moved at this point - the exchange only happens on the
 			// double accept - so there is nothing to roll back, just state to drop.
 			if (client.Session.Character is { } tradingCharacter)

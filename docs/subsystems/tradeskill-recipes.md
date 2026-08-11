@@ -33,7 +33,7 @@ The `0x3F1` (1009) framing is the same list invariant as the quest journal / Gam
 [u32 recipeId]                       # the list-key the loop maps by (== RequestRecipeInfo levelId)
 [u32 x3]                             # header (@c = 0xf4241 = 1000001, the tradeskill RDB type)
 KEY1 = 0x3F1-list of 18-u32 elements # ingredients: item id + item DecryptionKeys (FUN_0077c4f0 / FUN_005d5150)
-[u32 x4]
+[u32 x4]                             # mid header; word 1 (0x1F4) is the CRAFT DURATION in centiseconds (below)
 KEY2 = 0x3F1-list of u32             # id list (FUN_004d4c70)
 listC = 0x3F1-list of 17-u32 elements # results (FUN_005d4e50)
 [u32]                                # @50
@@ -100,9 +100,47 @@ the product before consuming (a full bag refuses the craft with the materials st
 materials and send the completion. The product carries the crafter through
 `ItemInstance.CreatorName` — see [inventory.md](inventory.md).
 
-Retail leaves ~5 s between the ack and the completion, a bar the client animates; we complete immediately.
 Refusals are **silent**, because retail has no failure form here and a completion over a craft that did not happen
 would close the client's window on an item it never received.
+
+### The 5-second bar is DATA, and it is server-side
+
+A tradeskill is a **command-queue command** — `CommandQueue\tradeskillcommand.cpp`, `TradeskillCommand_c` — and
+the client's duration getter for it (`FUN_0114bf50`) answers per operation:
+
+| operation | duration | where it comes from |
+|---|---:|---|
+| craft | the recipe's own | `ClientTradeskillRecipe_c` `+0x24`, i.e. the record's mid-header word 1 — `0x1F4` on all 603 shipped recipes |
+| put a gem in a socket | 500 | hardcoded in the getter |
+| take a gem out | 0 | hardcoded — instant |
+| anything else | 100 | hardcoded |
+
+The unit is **centiseconds**, the same as the BCC's `activation_time`/`recharge_time`, so both real values are
+**5.00 s**; it is what sizes the client's `TradeskillProgressBarDesc` bar. ⚠️ Do not read the c2s BCC's
+`activation_time` as the bar: it is **400** on both the craft and the socket record, i.e. the tradeskill
+*animation's* own 4.00 s length, and it is the same on two operations whose durations differ.
+
+The hold is **retail's server**, not a client-side animation — measured on the wire in two captures, corrected for
+half the ping RTT observed in each:
+
+| | request | grant | RTT/2 | server-side |
+|---|---|---|---:|---:|
+| craft | `..._annotated_5` fr17374 18:45:25.441 | fr17402 18:45:30.801 | ~140 ms | **5.07 s** |
+| socket | `..._annotated_8` fr8215 06:52:55.276 | fr8248 06:53:00.384 | ~65 ms | **4.98 s** |
+
+[V2: NecroL80_mage-necromancer_login_gameplay_annotated_5.tshark.json fr17374/17402;
+NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8215/8248]
+
+So the inbound handler only acks and **stages** the transaction (`TradeskillService.Stage`); the world tick runs it
+when the deadline passes (`CompleteDue`, reached through `IWorldOutbound.CompleteDueTradeskills`). Nothing is
+checked, taken or granted until then — which is retail's order too: the *completion* decides, so a player who
+empties their own bag mid-bar is refused at the end of it rather than at its start. A connection that drops
+mid-bar has its staged work thrown away (`Forget`), because the alternative is granting an item to a session that
+has gone.
+
+⚠️ `CraftDurationCentiseconds` is a folded codec constant rather than a `Recipe` column *because every captured
+recipe carries the one value*. `Parse` throws on anything else, so the day a capture disagrees cannot pass
+unnoticed — and that is the day to columnize it.
 
 ## Open / follow-ups
 

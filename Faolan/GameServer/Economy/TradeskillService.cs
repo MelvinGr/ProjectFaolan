@@ -37,9 +37,22 @@ namespace Faolan.GameServer.Economy
 	// telling the client what its book holds, ingredients and product included. There is no client-side recipe table
 	// to fall back on.
 	//
-	// ⚠️ Retail takes ~5s between the ack and the completion - a cast-like bar the client animates. We complete
-	// immediately, which cuts the animation short but delivers the same items in the same order. Timing it needs a
-	// scheduled completion, which is its own change.
+	// ⭐ RETAIL PACES IT, and the pace is the client's own data (#793). A tradeskill is a COMMAND QUEUE command -
+	// `CommandQueue\\tradeskillcommand.cpp`, `TradeskillCommand_c` - and its duration getter (`FUN_0114bf50`) answers per
+	// operation: a CRAFT returns the recipe record's `+0x24`, which is the mid-header word
+	// `TradeskillReplyCodec.CraftDurationCentiseconds` (`0x1F4` on every one of the 603 shipped recipes); a gem ADD
+	// returns a hardcoded 500; a gem REMOVE 0; anything else 100. The unit is centiseconds, the same as the BCC's
+	// `activation_time`, and it is what sizes the client's `TradeskillProgressBarDesc` bar.
+	//
+	// Both numbers are confirmed on the wire, SERVER-side, in two different captures - so the hold is real pacing and
+	// not a client-only animation:
+	//   craft  ..._annotated_5  fr17374 -> fr17402   18:45:25.441 -> 18:45:30.801, RTT/2 ~140 ms -> 5.07 s
+	//   socket ..._annotated_8  fr8215  -> fr8248    06:52:55.276 -> 06:53:00.384, RTT/2  ~65 ms -> 4.98 s
+	// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 fr17374/17402; NecroL80_mage-necromancer_login_gameplay_annotated_8 fr8215/8248]
+	//
+	// So the inbound handler STAGES the transaction (`Stage`) and the world tick runs it once its deadline passes
+	// (`CompleteDue`). Nothing is checked, taken or granted until then - which is also retail's order: the COMPLETION
+	// decides, which is why a player who empties their own bag mid-bar is refused at the end of the bar, not its start.
 	//
 	// ⭐ THE PROFESSION GATE (#735). A character must have TRAINED a tradeskill to see or use a recipe, and the model
 	// is the client's own: a profession is a strict linear chain of feats in `FeatPrereqs`, seven ranks deep, and
@@ -59,15 +72,95 @@ namespace Faolan.GameServer.Economy
 	// therefore still uncaptured, and `.tradeskill` is the GM bootstrap that stands in for it.
 	public sealed class TradeskillService
 	{
+		// The client's hardcoded duration for putting a gem IN (`FUN_0114bf50` case 2), in centiseconds. Removing one
+		// is 0 there - instant - which is the only reason there is no constant for it: we do not implement removal.
+		public const uint GemSocketCentiseconds = 500;
+
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
+
+		// The staged tradeskills, oldest first. A plain list under a lock rather than a per-client slot: the client's
+		// own command QUEUE can hold more than one, and dropping a second craft on the floor would silently eat it.
+		private readonly List<StagedTradeskill> _staged = [];
 
 		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
 			_logger = logger;
+		}
+
+		// One tradeskill waiting out its bar. `Request` is the parsed command verbatim, so the completion runs exactly
+		// what was asked for rather than a re-derivation of it.
+		private sealed record StagedTradeskill(INetworkClient Client, TradeskillCommand Request, DateTimeOffset DueAt);
+
+		// STAGE a tradeskill and answer when it will complete. The caller has already sent the behavior ack; retail
+		// then goes quiet for the duration, so there is nothing to send here.
+		public DateTimeOffset Stage(INetworkClient client, TradeskillCommand request, DateTimeOffset now)
+		{
+			ArgumentNullException.ThrowIfNull(request);
+			var centiseconds = request.Action == TradeskillAction.Socket
+				? GemSocketCentiseconds
+				: TradeskillReplyCodec.CraftDurationCentiseconds;
+
+			var due = now.AddMilliseconds(centiseconds * 10);
+			lock (_staged)
+				_staged.Add(new StagedTradeskill(client, request, due));
+
+			return due;
+		}
+
+		// Drop everything staged for a connection that is going away, so a craft cannot land on a client that left
+		// (or, worse, be granted to a character the session no longer holds). Answers how many were dropped.
+		public int Forget(INetworkClient client)
+		{
+			lock (_staged)
+				return _staged.RemoveAll(s => s.Client == client);
+		}
+
+		// Run every staged tradeskill whose bar has finished. Called from the world tick, which owns the cadence - the
+		// 10 Hz base tick lands the completion within 100 ms of its deadline, against the ~70 ms of jitter the two
+		// captured retail transactions themselves carry.
+		public async Task CompleteDue(DateTimeOffset now)
+		{
+			List<StagedTradeskill> due;
+			lock (_staged)
+			{
+				if (_staged.Count == 0)
+					return;
+
+				due = _staged.FindAll(s => s.DueAt <= now);
+				foreach (var entry in due)
+					_staged.Remove(entry);
+			}
+
+			foreach (var entry in due)
+			{
+				// A tradeskill that outlived its connection is not run at all - `Forget` drops those on disconnect, and
+				// this is the belt to its braces: a session that has already lost its character cannot be granted to.
+				if (entry.Client.Session.Character == null)
+					continue;
+
+				switch (entry.Request.Action)
+				{
+					case TradeskillAction.Craft:
+					{
+						// Retail answers a SUCCESSFUL craft and says nothing at all otherwise, so a refusal stays
+						// silent even now that it arrives five seconds later.
+						if (await Craft(entry.Client, entry.Request.RecipeId, entry.Request.Count) is { } crafted)
+							await _outbound.SendTradeskillComplete(entry.Client, crafted);
+
+						break;
+					}
+
+					case TradeskillAction.Socket:
+					{
+						await Socket(entry.Client, entry.Request.Target, entry.Request.Gem);
+						break;
+					}
+				}
+			}
 		}
 
 		// The client's own profession ladders (#735), walked out of the feat prerequisite graph ONCE. Fixed content -

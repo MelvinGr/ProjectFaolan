@@ -1870,26 +1870,21 @@ namespace Faolan.GameServer
 
 				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 
+				// ⭐ The ack is ALL retail sends now (#793). A tradeskill is a timed command-queue command - the client
+				// runs a ~5 s progress bar off its own recipe data - and retail holds the grant for exactly that long,
+				// measured server-side on both a craft and a socket. So this STAGES the transaction and the world tick
+				// completes it; nothing is checked, taken or granted here.
+				//
 				// Retail answers a SUCCESSFUL tradeskill and says nothing at all otherwise, so a refusal is silence
-				// here too - for both operations. The client keeps its window open rather than being told it worked.
-				switch (request?.Action)
+				// then too - for both operations. The client keeps its window open rather than being told it worked.
+				if (request != null)
 				{
-					case TradeskillAction.Craft:
-					{
-						Logger.LogInformation("Tradeskill: craft recipe {Recipe} x{Count}. {Args}", request.RecipeId, request.Count, args);
-						if (await _tradeskill.Craft(client, request.RecipeId, request.Count) is { } craftedRecipe)
-							await SendTradeskillComplete(client, craftedRecipe);
-
-						break;
-					}
-
-					case TradeskillAction.Socket:
-					{
-						Logger.LogInformation("Tradeskill: socket {Container}[{Gem}] into [{Target}]. {Args}", request.Target.Container, request.Gem.Slot, request.Target.Slot, args);
-						await _tradeskill.Socket(client, request.Target, request.Gem);
-
-						break;
-					}
+					var due = _tradeskill.Stage(client, request, DateTimeOffset.UtcNow);
+					if (request.Action == TradeskillAction.Craft)
+						Logger.LogInformation("Tradeskill: craft recipe {Recipe} x{Count}, completing at {Due:HH:mm:ss.fff}. {Args}", request.RecipeId, request.Count, due, args);
+					else
+						Logger.LogInformation("Tradeskill: socket {Container}[{Gem}] into [{Target}], completing at {Due:HH:mm:ss.fff}. {Args}", request.Target.Container, request.Gem.Slot,
+							request.Target.Slot, due, args);
 				}
 			}
 			else

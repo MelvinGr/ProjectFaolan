@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//   [u32 listKey]                                  # the recipe id (== the map key, and == header word 0)
 	//   [u32 id=listKey][u32 header1][u32 rdbType]      # header (rdbType = 0xf4241/0xf4242, the tradeskill RDB type)
 	//   0x3F1-list of 18-u32 elements                   # ingredients (see element layout below)
-	//   [u32 0][u32 0x1F4][u32 midFlag][u32 0]          # mid header (only midFlag varies: 0/1)
+	//   [u32 0][u32 0x1F4][u32 midFlag][u32 0]          # mid header (0x1F4 = the craft duration in centiseconds)
 	//   0x3F1-list of u32                               # ref-id list (1-2 opaque ids)
 	//   0x3F1-list of 17-u32 elements                   # results
 	//   [u32 tail]                                      # @50
@@ -48,7 +48,18 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		// Fixed record/element constants (invariant across all 603 captured records; validated on parse so a capture
 		// that breaks the assumption throws rather than silently mis-building).
-		private const uint MidWord1 = 0x1F4; // mid[1]
+		//
+		// ⭐ mid[1] is the recipe's own CRAFT DURATION in centiseconds (#793) - not a filler constant. It lands on
+		// `GameData::ClientTradeskillRecipe_c` at `+0x24` (record reader `FUN_0077be70`), and the client's
+		// command-queue duration getter for `TradeskillCommand_c` (`FUN_0114bf50`) returns exactly that member for a
+		// CRAFT - the value that sizes its `TradeskillProgressBarDesc` bar. The same getter hardcodes 500 for a gem
+		// ADD, 0 for a gem REMOVE and 100 for anything else, so the unit is shared with the BCC's
+		// `activation_time`/`recharge_time`: centiseconds. `0x1F4` = 5.00 s.
+		//
+		// It stays a folded constant rather than a `Recipe` column because all 603 captured recipes carry the one
+		// value - there is no second value to store. Columnize it the day a capture shows one; `Parse` throws on
+		// anything else, so that day cannot pass unnoticed.
+		public const uint CraftDurationCentiseconds = 0x1F4; // mid[1]
 
 		// Elements [13..16]: two unset identity slots (NullIdentity.Pair).
 
@@ -161,7 +172,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				ingredients.Add(ReadElement(ref r, true));
 
 			r.ExpectU32Be(0, "recipe mid header word0");
-			r.ExpectU32Be(MidWord1, "recipe mid header word1");
+			r.ExpectU32Be(CraftDurationCentiseconds, "recipe mid header word1 (the craft duration)");
 			var midFlag = r.ReadU32Be();
 			r.ExpectU32Be(0, "recipe mid trailer");
 
@@ -217,7 +228,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			WriteFramedCount(body, r.Ingredients.Count);
 			foreach (var e in r.Ingredients)
 				WriteElement(body, e, true);
-			body.WriteUInt32(0).WriteUInt32(MidWord1).WriteUInt32(r.MidFlag).WriteUInt32(0); // mid x4
+			body.WriteUInt32(0).WriteUInt32(CraftDurationCentiseconds).WriteUInt32(r.MidFlag).WriteUInt32(0); // mid x4
 			WriteFramedCount(body, r.RefIds.Count);
 			foreach (var id in r.RefIds)
 				body.WriteUInt32(id);

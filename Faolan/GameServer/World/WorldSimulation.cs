@@ -1050,6 +1050,7 @@ namespace Faolan.GameServer.World
 						await TickDots();
 						await TickAuras();
 						await TickNpcBuffs(); // #776: the same three jobs - expire, bleed, emit - for buffs sitting on a MOB
+						await _output.CompleteDueTradeskills(); // #793: a craft/socket whose ~5 s retail bar has run out
 
 						// Boundary CROSSING tests: every base tick (10 Hz). Both used to hang off the regen accumulator
 						// below, which has nothing to do with either and sampled them at 1 Hz - a walking player covers

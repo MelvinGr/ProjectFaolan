@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -78,6 +79,11 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.MaintainAmbientPools()
 		{
 			return _broadcaster.MaintainAmbientPools();
+		}
+
+		Task IWorldOutbound.CompleteDueTradeskills()
+		{
+			return _tradeskill.CompleteDue(DateTimeOffset.UtcNow);
 		}
 
 		Task IWorldOutbound.PlayDynelVisualStep(DueDynelVisualStep step)

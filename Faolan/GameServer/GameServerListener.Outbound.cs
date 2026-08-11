@@ -67,6 +67,11 @@ namespace Faolan.GameServer
 			return SendGemSocketed(client, container, targetSlot, socket, gemSlot);
 		}
 
+		Task IEconomyOutbound.SendTradeskillComplete(INetworkClient client, uint recipeId)
+		{
+			return SendTradeskillComplete(client, recipeId);
+		}
+
 		Task IEconomyOutbound.SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
 		{
 			return SendGuildBankData(client, vault);

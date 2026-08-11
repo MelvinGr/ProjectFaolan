@@ -36,6 +36,13 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		// #793: the completion the world tick sends when a staged craft's bar runs out. Recorded by the tradeskill
+		// tests, ignored by everyone else.
+		public virtual Task SendTradeskillComplete(INetworkClient client, uint recipeId)
+		{
+			return Task.CompletedTask;
+		}
+
 		public virtual Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
 		{
 			return Task.CompletedTask;

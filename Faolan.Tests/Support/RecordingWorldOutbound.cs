@@ -145,6 +145,11 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		public Task CompleteDueTradeskills()
+		{
+			return Task.CompletedTask;
+		}
+
 		public Task PlayDynelVisualStep(DueDynelVisualStep step)
 		{
 			return Task.CompletedTask;

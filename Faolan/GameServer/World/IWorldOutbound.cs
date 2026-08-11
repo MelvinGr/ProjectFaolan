@@ -65,6 +65,11 @@ namespace Faolan.GameServer.World
 		// Called on a slow cadence from the sim tick; no-op unless the ambient spawner is enabled.
 		Task MaintainAmbientPools();
 
+		// #793: run the tradeskills whose ~5 s bar has finished (the craft's item grant, the gem going into its
+		// socket). Retail paces both server-side, so the transaction is STAGED by the inbound handler and completed
+		// here - the tick owns the cadence, TradeskillService owns the deadline and the work.
+		Task CompleteDueTradeskills();
+
 		// #678: play one due step of a harvested world object's staged visual sequence (mesh swap, collision drop,
 		// regrowth) to everyone who can see it. The tick owns the TIMING; this is the wire side.
 		Task PlayDynelVisualStep(DueDynelVisualStep step);
