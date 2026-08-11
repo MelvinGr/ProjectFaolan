@@ -341,8 +341,13 @@ namespace Faolan.Core.Database.Tables
 		// ITEM reward list (imported as `QuestLineReward`, its `type` the item's `SearchCategory` on 1,635 of 1,635),
 		// carrying no xp or money amount at all - so it cannot be where an advertised money+xp pair surfaces.
 		//
-		// ⚠️ None of this reopens the in-client result: 8888/999999 in these two changed neither label, so whatever
-		// they are, they are not what the step pane renders. Open work in Gitea #802.
+		// ⛔ And the client settles the rest of it by NOT READING THEM (#802, closed). Three functions in the whole
+		// image touch `Quest_c+0xf0`/`+0xf8` - the constructor, the journal record's stream reader and its stream
+		// WRITER - so the client stores the pair and hands it straight back, which is exactly why 8888/999999 in
+		// these two changed no label anywhere. ⚠️ That is a statement about these fields, not about the record: the
+		// neighbouring `@+0x114`/`@+0x118` do have a consumer (`FUN_0091f6f0`, the journal's level-band/colour
+		// function - see QuestcRecordCodec). So which slot a quest's reward sits in has no observable consequence
+		// for the client, and our sender's job is to echo what was captured per quest, which is what this column is.
 		//
 		// @+0xf0 additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text: the
 		// beach starter is the one quest captured with two variants, and its goal 1448 carries

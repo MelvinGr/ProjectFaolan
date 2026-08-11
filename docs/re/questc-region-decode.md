@@ -70,8 +70,8 @@ with no separate count word, unlike the record lists which carry both. That is w
 u32 ver(=1)
 u32 questId          (+0xc)
 u32 level            (+0x10)  the quest LEVEL (see below); modelled as QuestcRecord.Level
-u32 field114         (+0x114)          # beach codec MISLABELS this as "Zero"
-u32 field118         (+0x118)          # beach codec MISLABELS this as "N"
+u32 field114         (+0x114)  the level band's TOLERANCE (see below)
+u32 field118         (+0x118)  the level the quest is FOR (see below)
 u32 lineFlags        (+0x14)  a flag word of the quest LINE - NOT a goal count (see below)
 string title, summary, area, region1, region2   # cats 50301/50302/50300/52000/52000
 u32 fieldEc          (+0xec)
@@ -312,7 +312,36 @@ PvPMinigame, … — quests are not exposed by name), and a co-occurrence scan f
 members together (`[+0xf0]` ∧ `[+0xf8]` ∧ `[+0x11c]` ∧ `[+0x118]`, and again with `[+0xec]`) leaves exactly
 three: the constructor `FUN_0091cf10`, the reader `FUN_0091df50` and the writer `FUN_0091d260`.
 
-The two keep their offsets as names. Open work in Gitea #802.
+⭐ **And that three-function result is a POSITIVE answer once it has a control** (#802). Read on its own it could
+mean "the client reaches Quest_c's fields some way this scan cannot see"; it does not, because a *sibling* field
+on the same class comes out the other way. Scanning reads of `[reg + 0x118]` inside the quest module returns a
+FOURTH function — `FUN_0091f6f0`, a live consumer — while the same scan for `+0xf0` and `+0xf8` returns only the
+three. So the client stores this pair and hands it straight back, and nothing it draws or computes depends on
+**which slot** a quest's reward sits in. Which is also why the in-client 8888/999999 sweep moved no label
+anywhere, rather than only in the step pane.
+
+The two keep their offsets as names. Gitea #802 is closed on that: our sender's job is to echo what the corpus
+captured per quest, which is what the column holds. What would reopen it is a capture holding ONE quest with
+both slots populated and a rendered difference — nothing short of that has a consequence.
+
+### `@+0x114` / `@+0x118` — the quest's LEVEL BAND, and the journal's difficulty colour
+
+`FUN_0091f6f0(quest /* EDX */, characterLevel /* ECX */)` is the one consumer either field has, and it is a
+five-way band:
+
+```
+H   = quest.@+0x118 != 0 ? quest.@+0x118 : quest.@+0x10   // the record's own Level is the fallback
+L   = quest.@+0x114
+low = H - L - 1 ;  top = H + L + 3
+level in [low, top]        -> 2      on level
+level > top                -> 1 while within 3 more, else 0     (slightly / far above)
+level < low                -> 3 while within 1 less, else 4     (slightly / far below)
+```
+
+so `@+0x118` is **the level the quest is FOR** and `@+0x114` its **tolerance**, and the return is the journal's
+quest colour. Its caller is the journal panel at `FUN_012ce1c0`. This is an independent client-side confirmation
+of `@+0x118`, which the corpus had only reached by measurement (it is the field the money:xp ratio is a function
+of — see `QuestDefinition.Field118`); it also names `@+0x114`, which had none.
 
 ⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 at level 23 rising to ~1.10 at 80), but 99
 samples do not close the law. Do not derive one from the other.

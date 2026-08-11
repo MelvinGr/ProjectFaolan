@@ -188,6 +188,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public string Region2 { get; init; } = ""; // <remoteformat category=52000>
 		public string Summary { get; init; } = ""; // <remoteformat category=50302>
 		public string Title { get; init; } = ""; // <remoteformat category=50301>
+		// @+0x114 - the TOLERANCE of the quest's level band, and @+0x118 the level it is centred on. Recovered from
+		// the client's own band function `FUN_0091f6f0(quest, characterLevel)` (#802), which is the ONE consumer of
+		// either field and returns a 5-way difficulty code:
+		//     H = quest.Field118 != 0 ? quest.Field118 : quest.Level     // @+0x10 is the fallback
+		//     L = quest.Field114;  low = H - L - 1;  top = H + L + 3
+		//     level in [low, top] -> 2  |  above: 1 within 3 more, else 0  |  below: 3 within 1 less, else 4
+		// i.e. the quest's colour in the journal (on-level, slightly/far above, slightly/far below). Its caller is the
+		// journal panel at `FUN_012ce1c0`. That is also what pins Field118 as "the level this quest is FOR" from the
+		// client side, independently of the reward-scaling measurement in QuestDefinition.Field118.
 		public uint Field114 { get; init; } // @+0x114 (=0 on the beach template)
 		public uint Field118 { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
@@ -208,6 +217,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// Correlates with the client catalog's line-level `xp_reward`, which is suggestive and not established -
 		// see QuestDefinition.FieldF0. Also selects the objective region's text spelling.
 		// (=0x96 in the template, 0x64 in the live full-update.)
+		//
+		// ⛔ **The client has no consumer for this field or for FieldF8** (#802). Exactly three functions in the image
+		// touch `Quest_c+0xf0`/`+0xf8`: the constructor `FUN_0091cf10` (zeroes them), the stream reader `FUN_0091df50`
+		// (fills them) and the stream WRITER `FUN_0091d260` (puts them back) - nothing reads them to compute or draw
+		// anything, which is why driving them to 8888/999999 in-client moved no label. ⚠️ Not vacuous: the
+		// neighbouring `Field114`/`Field118` DO have a consumer (the band function above), so this is a real
+		// difference between the fields, not "the client reads none of them". They are values the journal round-trips
+		// on retail's behalf, and our sender's job is to echo what was captured per quest.
 		public uint FieldF0 { get; init; }
 
 		// @+0x10 - the quest's LEVEL, not a state. It equals the DB `Level` on 96 of the 99 quests with a captured
