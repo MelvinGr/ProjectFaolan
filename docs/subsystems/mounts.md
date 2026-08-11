@@ -174,12 +174,46 @@ universal pass that fixed Search / Hide / Path of Asura ([player-actions.md](pla
 leaves these alone, because the only witnesses are that one pair of casters and "held by both captured casters"
 is not evidence of universality.
 
+### ⭐ CORRECTION (2026-08-11): the magnitudes ARE in the client, and imported
+
+The paragraph below said a charge's magnitude is server-GDB-only. **It is not** — six of the `Mount Ability: …`
+spell rows carry a full level-interpolated damage curve on stat **27 (Health)**, `EffectKind` **53219**, which is
+`InterpolatedHit`, the kind `SpellPoolEffects` already applies for every other damaging ability:
+
+| ability | @L40 | @L100 | max @L40 | max @L100 |
+|---|---:|---:|---:|---:|
+| Mammoth Sweep | −291.75 | −713.42 | −486.25 | −1189.04 |
+| Rhino Sweep | −230.25 | −563.25 | −383.75 | −938.75 |
+| Rhino Charge | −194.38 | −475.37 | −323.96 | −792.28 |
+| Cavalry Charge | −186.00 | −456.00 | −310.00 | −760.00 |
+| Trample | −144.18 | −352.70 | −240.30 | −587.83 |
+| Hind Leg Kick | −144.18 | −352.70 | −240.30 | −587.83 |
+
+(`LowLevel` 40 → `HighLevel` 100; the stored numbers are ×100, the ordinary wire scale.) Each charge has two spell
+rows — an "ability twin" pair — and only one of the two carries the effect, which is why a lookup on the wrong id
+of the pair finds nothing.
+
+⚠️ **Why the original reading was wrong is worth keeping**: it was measured before the spell-stat-effect import
+was complete. `SpellStatEffects` moved **1,714 → 5,637 rows** on a later reimport with nothing in the change
+touching that parse (Gitea #468, item 4) — so the "no `[2][9]` region" finding was true of the shipped data at the
+time and false of the client. A negative measured against a partial import is not a fact about the client.
+
+**What is still genuinely missing is the PACKETS, not the numbers.** The `Charge` element carries only
+`TemplateID`, `TemplateID2`, `CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action with no
+knockback and no radius on it — and the corpus has zero records of a mounted player as an attacker. So the
+charge's *damage* needs no invention (same numbers, same effect kind, same wire records as any other damaging
+ability), while its *knockback* and its mounted BCC/animation sequence still do. Gitea #667.
+
+<details><summary>The original paragraph, kept for the record</summary>
+
 **What is missing is a capture, not a decode.** The `Charge` element carries only `TemplateID`, `TemplateID2`,
 `CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action. There is no damage, no knockback, no
 radius on it, none of the mount-ability ids has a spell record at all, and none of the 16 charge spells carries
 a `[2][9]` stat-effect region. So a charge's magnitude is server-GDB-only, exactly like ordinary spell
 magnitudes (`stat-engine.md`). Implementing trample damage or a charge knockback today would mean inventing
 both the numbers and the packets.
+
+</details>
 
 **The rider never attacks.** The corpus is not silent about mounted characters in combat — those 27 mounted
 windows carry 168 `DamageResultIIR` and 147 `StatDamageIIR` records, and the mounted player is the TARGET of
