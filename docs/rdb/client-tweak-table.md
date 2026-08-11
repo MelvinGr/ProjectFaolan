@@ -107,6 +107,20 @@ the per-class/level curve `CharacterMaxStats.For` builds from RDB 1000511 (base 
 Note `AIDefaults_MaximumChaseRadius` = 45 and `AIDefaults_ChaseDeaggroDelayTime` = 5: our NPC chase/leash values
 are tunable guesses and this is what retail used.
 
+⭐ **Two whole subsystems' numbers live here and were looked for everywhere else first**, which is the reason to
+check this sheet before deciding a number is missing from the client:
+
+- **Khitai faction ranks** — `FactionValueRank1..4` = 50,000 / 200,000 / 450,000 / 1,000,000, with
+  `MaxFactionPoints` ±1,100,000 and a `Neutral{Min,Max}FactionPoints` band of ±5,000. `#310` and
+  [factions.md](../subsystems/factions.md) had recorded the thresholds as *"not in the client"*.
+- **Daily challenges** — `DailyPvEKillsCap` 5, `DailyPvPKillsCap` 20, `DailyMinigameWinsCap` 1,
+  `DailyQuestsCompletedCap` 3, `DailyUnchainedDungeonsCompletedCap` 1, and the meta caps `DailyMetaCap` 3 /
+  `WeeklyMetaCap` 15 / `MonthlyMetaCap` 60 (#656/#509).
+
+⚠️ **The exe registers a fallback for every tweak and the shipped sheet overrides them**, so the binary's
+constants are not the game's numbers: all eight daily caps differ between the two. `FUN_010CB540` is the registry
+(`name`, then a `double`); this table is what actually ships.
+
 ## Sibling tables (same single-entry family, NOT this grammar)
 
 Types 1000505–1000521 are all single-entry tables; only **1000516** uses the named `[len][name][f64]` shape. The

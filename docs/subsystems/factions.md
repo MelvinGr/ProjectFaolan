@@ -15,7 +15,7 @@ decode the wire form — none today."* Both halves are false against the shipped
 | the faction ids, icons and payout matrix | RDB `1010701`/1 — `data/FactionRelations.xml`, 15.9 KB of plaintext | decoded |
 | the display names + the four rank titles per faction | `LDB[254]` | decoded |
 | the standing gain/loss message | `LDB[254]` id `27066916` | decoded |
-| **the point thresholds between ranks** | — | **not in the client** |
+| the point thresholds between ranks | RDB `1000516` — the tuning sheet | **decoded** |
 
 `--report factions` prints the whole thing and re-derives the joins on every run.
 
@@ -106,11 +106,39 @@ by its own bail-out strings (`inviter`, `message`, `factionPoints`); the reader 
 remainder, and the caller builds a red-black-tree sentinel, so it is a `std::map<u32,u32>` behind the list frame.
 Zero occurrences in the capture corpus.
 
+## ⭐ The rank thresholds — in the tuning sheet all along
+
+This page used to end on *"the client ships the four rank names and the per-kill payouts and nothing that says
+what Rank 2 costs"*. It does say, in the place the balance numbers always are: the client's own tweak table
+(RDB **1000516**, [client-tweak-table.md](../rdb/client-tweak-table.md)).
+
+| tweak | value | what it fixes |
+|---|---:|---|
+| `FactionValueRank1` | **50,000** | the rank-1 threshold |
+| `FactionValueRank2` | **200,000** | rank 2 |
+| `FactionValueRank3` | **450,000** | rank 3 |
+| `FactionValueRank4` | **1,000,000** | rank 4 — the top title |
+| `MaxFactionPoints` | **1,100,000** | the ceiling standing is clamped to |
+| `MinFactionPoints` | **−1,100,000** | the floor, so the scale is SIGNED and symmetric |
+| `NeutralMaxFactionPoints` | **5,000** | the top of the neutral band |
+| `NeutralMinFactionPoints` | **−5,000** | its bottom |
+
+`dotnet run --project Faolan.Importer -- --report rdb-tweaks --report-arg Faction`.
+
+⭐ **The negative half is the part nothing else stated.** The ladder is not 0→1,000,000; it is
+−1,100,000→+1,100,000 with a ±5,000 **neutral band** in the middle, which is what makes "killing one side's NPC
+costs you standing with them and earns it with their rival" expressible: a faction you have farmed against sits
+below the band and is hostile.
+
+⭐ **The payout matrix and the thresholds agree with each other**, which is the check that they belong to the same
+system: at 120 points for a solo normal kill, rank 1 is ~417 kills and rank 4 ~8,333 — and on the group-boss row
+(1,800) rank 4 is 556. That is the order of magnitude Khitai reputation is remembered for, and a threshold set
+that belonged to something else would have no reason to land there.
+
+⚠️ The thresholds are absolute point counts, not deltas, and the tweak names carry no per-faction dimension — one
+ladder for all sixteen.
+
 ## What is still missing
 
-**The point thresholds between ranks.** The client ships the four rank names and the per-kill payouts and nothing
-that says what Rank 2 costs — so a ladder would have to be invented, and an invented threshold is
-indistinguishable from a decoded one the moment it is written down. Left open.
-
-Also still absent, and squarely implementation rather than decode: the `Faction` / `FactionStanding` model, the
-kill hooks that award points, and the standing-gated faction vendors.
+Implementation rather than decode: the `Faction` / `FactionStanding` model, the kill hooks that award points, and
+the standing-gated faction vendors. Nothing about the DATA is open any more.
