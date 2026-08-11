@@ -9,6 +9,31 @@ Both carry the same **PlayfieldProxy** stream (the `FUN_00a6a600` sub-reader): `
 [u32 ×8][u8 bool]`, where `u32[0]` is a constant playfield-class word (`0xC79C`) and `u32[1]` is the
 destination map id.
 
+## ⭐ A cross-map teleport is a mid-session SERVER HANDOFF
+
+The two records below are the *prep*; what actually moves the session is a **`DispatchRedirectToServer`** — the
+same method the login tier uses — carrying `host:port` in plain ASCII, followed by a fresh `Authenticate2` on the
+new connection and only then the destination `PlayfieldFIIR`. Retail's world is sharded across game-server
+PROCESSES by playfield, on one host:
+
+| capture time | redirect | landed on |
+|---|---|---|
+| 537.5 | `gs013-nj4.ageofconan.com:7030` | 1020 Field of the Dead |
+| 812.9 | `…:7028` | 1090 Ymir's Pass |
+| 1103.2 | `…:7031` | **1092 The Amphitheatre of Karutonia** (the group instance) |
+| 1243.3 | `…:7028` | 1090 Ymir's Pass — back to the same port as before |
+| 1503.1 | `…:7029` | 2000 Old Tarantia |
+
+(`NecroL80_…_chat-annotated-4`.) ⭐ Two things fall out. A **re-sent `PlayfieldFIIR` for the map you are already on
+carries NO redirect** — only a genuine change does, so the redirect is the transition, not the announce. And an
+**instance gets its own port** (`:7031` for the Amphitheatre) alongside the outdoor zones, which is what
+`(mapId, instanceId)` looks like when a live service implements it: one process per copy.
+
+⚠️ This corrects a standing note that *"nothing advertises the new port in a form the plugin recognises"*
+(`playfield_transition_opens_a_new_port`). It does — in plaintext ASCII, on the OLD connection, one second
+before the move. The capture tooling learns the port another way (a SYN-ACK sweep, commit `8aec82e5`), so
+nothing is broken; but the advert is there and is decodable.
+
 ## IntendedTeleportIIR_c (0x10D27BC0) — "begin teleport to map N"
 
 Reader `FUN_005bfce0` = the PlayfieldProxy + a trailing bool.
