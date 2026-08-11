@@ -437,6 +437,21 @@ more harvested fields, not a decode: `--report gem-slots` already prints them (a
 stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
 entirely PvE — beach, Tortage, Ymir's Pass. Yet over the captured `StatIIR` stream (`--report stat-series
 --report-arg 106,1000069,1000070`) it is the **PvP-named** one that moves 118 times against the PvE-named one's
-39, and only `1000070` caps (at exactly 20). Either the name↔id pairing is off by one or `1000070` counts all
-kills; the corpus cannot separate those without a PvP session, which is the capture that would close it.
+39, and only `1000070` caps (at exactly 20).
+
+⛔ **One of the two alternatives is now dead: the pairing is NOT off by one.** The tuning sheet ships a cap per
+counter — `DailyPvEKillsCap` **5**, `DailyPvPKillsCap` **20** — and `1000070` stops at exactly **20** in three
+independent captures (`xxx_mage-demo…beach-to-enter-tortage`, `xxx_mage-necromancer…play1`,
+`Hoxxling…gameplay`). Under the stated pairing that is its own cap, landed on exactly, three times. Under a
+swapped pairing `1000070` would be `DailyPvEKills` with a cap of **5** and would be overrunning it fourfold. The
+swap makes the fit worse, not better.
+
+⭐ **And the two are not one stream under two names.** In a single run — capture `…play1`, handle `0x01317CF8` —
+`1000069` advances **13** times while `1000070` advances **20**. Same session, same kills available, different
+counts, so they count different events.
+
+⚠️ What is left is therefore neither the pairing nor a missing PvP capture: it is that `1000069` runs to **13**
+against its own cap of **5**. Either the caps bound what counts toward the daily META rather than clamping the
+counter (and then `1000070` stopping dead on 20 needs another explanation), or `DailyPvEKillsCap` is not that
+counter's cap. That is the sharpened question.
 

@@ -129,8 +129,8 @@ evidence, not as a citation, until the id is used.
 
   ⚠️ [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The two names are `DailyPvEKills`
   (1000069) and `DailyPvPKills` (1000070), and it is the PvP-named one that tracks ordinary beach and Tortage
-  kills three times more often than the PvE-named one. Either the name↔id pairing is off or `1000070` counts all
-  kills; the corpus cannot separate those without a PvP session.
+  kills three times more often than the PvE-named one. ⛔ The *"name↔id pairing is off"* half of that is now
+  dead — see the cap measurement below — and what survives is a question about `1000069`.
 
   The corpus agrees from the other side too: **every captured character's login snapshot carries `0x06A`**, at `20` for
   Hakotep / DemoL80 / AssassinL23 and at **`17` for NecroL80** — who is exactly the character the live observation caught
@@ -172,10 +172,19 @@ default**, so reading the binary's fallbacks as the game's numbers would have be
 it and stop". That was written up as *"a second, unrelated 20 sitting next to the Fresh Kill 20"*; it is not
 unrelated at all, it is this tweak, and the match confirms the id↔name pairing from a second direction.
 
-⚠️ It does NOT resolve the `[V0]` above. `DailyPvEKillsCap` is **5** while the corpus runs `1000069` up to **13**,
-so the cap cannot be clamping both counters the same way — either it bounds what counts toward the meta rather
-than the counter, or one of the two counters is not what its name says. The tension is now sharp enough to be
-worth a targeted measurement rather than a guess.
+⛔ **And the caps kill the "the pairing is swapped" reading.** `1000070` stops at exactly **20** — its own
+`DailyPvPKillsCap` — in three independent captures (`xxx_mage-demo…beach-to-enter-tortage`,
+`xxx_mage-necromancer…play1`, `Hoxxling…gameplay`). Under a swapped pairing it would be `DailyPvEKills` with a cap
+of **5** and overrunning it fourfold. The swap makes the fit strictly worse, so the stat-name table is right.
+
+⭐ **The two are also not one stream under two names.** In a single run — capture `…play1`, handle `0x01317CF8` —
+`1000069` advances **13** times while `1000070` advances **20**. Same session, same kills on offer, different
+counts.
+
+⚠️ So what is left of the `[V0]` is narrower and it is about `1000069`, not about the pairing: it runs to **13**
+against its own cap of **5**. Either the caps bound what counts toward the daily META rather than clamping the
+counter — and then `1000070` landing dead on 20 three times needs another explanation — or `DailyPvEKillsCap` is
+not that counter's cap.
 
 The neighbouring config keys say what the subsystem is embedded in: `PvEXPFromPvPMultiplier`,
 `MinigamePvEXPMultiplier`, `PvPXPFromPvPCapMultiplier`, `PvEXPFromPvPGroupPenalty`, `TWK_MinLevelForPvPXP`,
