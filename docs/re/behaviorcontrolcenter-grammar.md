@@ -199,6 +199,25 @@ sit in a flat 15–27 % band. Against the **result type**, which is the swing's 
 Four sightings in 757 lower-arc swings against 598 in 2,539 upper-arc ones — a **30× split** on the one axis
 that is not flat. So whatever bit 5 marks, it is something only an upper-arc swing can produce.
 
+#### ⭐ …and WORD 4 does the same thing, absolutely (#661)
+
+Word 4's alphabet is `0xC9`/`0xCA`/`0xCB` — the three UPPER arcs and nothing else — and it is not merely
+*correlated* with the arc, it is **never present at all on a lower one**:
+
+| result type | rows | word 4 present |
+|---|---:|---:|
+| `0xC9` / `0xCA` / `0xCB` | 2,539 | 297 |
+| `0xCC` Lower Left | 393 | **0** |
+| `0xCD` Lower Right | 399 | **0** |
+
+⚠️ That is a real constraint on top of "independent of the result type" in the table above, which is true only
+*within* the upper three: all nine `(word 4, result type)` combinations occur there, and none at all outside.
+
+⭐ **So `0xCC` and `0xCD` are structurally apart from the upper three**, on two independent fields, and the
+client says why: `FUN_005edd90` rewrites `0xCC → 0xC9` and `0xCD → 0xCA` whenever the combo definition's level
+is below `0x28` (40). The lower arcs are the later addition, and the code paths that fill word 4 and bit 5
+predate them.
+
 ⚠️ **What it IS remains unnamed.** The shape fits a defender-side outcome — a guard meeting the swing — because
 the rose has three guards and the two lower codes are the two arcs the captured players never had unlocked; a
 block flag could then only ever fire where a guard could be. That is a hypothesis the corpus is consistent with,
