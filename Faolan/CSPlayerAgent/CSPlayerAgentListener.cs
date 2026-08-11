@@ -90,6 +90,12 @@ namespace Faolan.CSPlayerAgent
 				: [];
 		}
 
+		// The team's IDENTITY, which is what a team-owned playfield instance is keyed by (#512).
+		public uint? TeamIdOf(uint characterId)
+		{
+			return _teams.TeamOf(characterId);
+		}
+
 		// The guild bank's deposit half (#654) - the world tier has already taken the money out of the wallet.
 		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 		{

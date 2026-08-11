@@ -267,6 +267,8 @@ namespace Faolan.Tests
 			}
 
 			public IReadOnlyList<uint> TeamMembersOf(uint characterId) => members;
+
+			public uint? TeamIdOf(uint characterId) => members.Contains(characterId) ? 1u : null;
 		}
 
 		// Records what the sharer and the targets were told, and owns where everyone is standing.

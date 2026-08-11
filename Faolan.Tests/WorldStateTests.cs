@@ -91,6 +91,52 @@ namespace Faolan.Tests
 			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
 		}
 
+		// #512: a GROUP map is one copy per TEAM. Retail's own group entry names the team in the PlayfieldProxy's
+		// owner slots, so the routing has to be by team id and not by character.
+		[Fact]
+		public void Group_RoutesTheWholeTeamIntoOneCopy_AndADifferentTeamElsewhere()
+		{
+			var world = new WorldState();
+			var first = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB);
+			Assert.NotEqual(WorldState.DefaultInstance, first); // a group map is always somebody's copy, never shared
+
+			var leader = Player(1, 0, 0);
+			world.Place(leader, 1092, first, leader.Position, Quaternion.Identity);
+
+			// A member arriving later JOINS the team's copy rather than minting a second one...
+			var member = Player(2, 1, 0);
+			var second = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB);
+			Assert.Equal(first, second);
+			world.Place(member, 1092, second, member.Position, Quaternion.Identity);
+			Assert.Same(world.ZoneForEntity(leader), world.ZoneForEntity(member));
+
+			// ...while another team gets its own, and a player with no team gets a private copy.
+			Assert.NotEqual(first, world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x00500099));
+			Assert.NotEqual(first, world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group));
+
+			// The wire side: the zone knows it is the team's, which is what puts (0xDEA9, teamId) on the proxy.
+			Assert.Equal(0x000F08DBu, world.TeamOwning(1092, first));
+			Assert.Null(world.TeamOwning(1092, WorldState.DefaultInstance));
+		}
+
+		// The lifetime half: "empty = gone". Retail's leave message is "You will be unable to return to this
+		// instance", and the part of that which follows from state we hold is that a copy nobody is in is not the
+		// team's copy any more.
+		[Fact]
+		public void Group_EmptyCopyIsGone_AndReentryMintsANewOne()
+		{
+			var world = new WorldState();
+			var instance = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB);
+			var player = Player(1, 0, 0);
+			world.Place(player, 1092, instance, player.Position, Quaternion.Identity);
+
+			// Still occupied: the same team comes back to the same copy.
+			Assert.Equal(instance, world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB));
+
+			world.Remove(player);
+			Assert.NotEqual(instance, world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB));
+		}
+
 		[Fact]
 		public void Shared_PlacesEveryoneInOneCopy( /* #268 */)
 		{

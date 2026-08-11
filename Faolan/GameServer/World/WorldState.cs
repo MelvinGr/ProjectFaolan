@@ -189,6 +189,10 @@ namespace Faolan.GameServer.World
 		// to it and behave exactly as before instancing existed.
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
 
+		// #512: which copy of a map a TEAM owns. Keyed by the team so every member routes to one zone; see
+		// TeamInstance for why the entry is validated against the live zone rather than cleaned up on leave.
+		private readonly ConcurrentDictionary<(uint TeamId, uint MapId), uint> _teamInstances = new ConcurrentDictionary<(uint TeamId, uint MapId), uint>();
+
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService? _terrain;
@@ -242,15 +246,64 @@ namespace Faolan.GameServer.World
 		// Picks (or creates) the instance a player entering `mapId` should join, given the map's instancing mode and
 		// the player's EXISTING world entity (null on a fresh login) (#268). Same-map re-entry (respawn/teleport back)
 		// keeps the player's current copy; a fresh entry mints a private copy for a Solo map and joins the shared copy
-		// otherwise. Group is treated as Shared until party routing exists. The result is fed to Place.
-		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode)
+		// otherwise. The result is fed to Place.
+		//
+		// ⭐ #512: a GROUP map routes by the player's TEAM. `teamId` is the team they are in (null when solo), read
+		// across the CS seam by the caller - the whole party lands in one copy, a member arriving later JOINS it
+		// rather than minting a second, and a player entering a group map with no team gets a private copy of their
+		// own (there is no "shared dungeon" - a group map is always somebody's).
+		//
+		// ⚠️ Retail's own leave message is *"You will be unable to return to this instance"*, so a group instance is
+		// not re-enterable once left. `TeamInstance` models the half of that which follows from state we hold - the
+		// binding is dropped once the copy is EMPTY, so a party that all leaves cannot come back to that copy. It
+		// does NOT stop a single member who stepped out from rejoining while the others are still inside, which
+		// retail refuses; that needs the leave-side message box we do not send yet.
+		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode, uint? teamId = null)
 		{
 			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance)
 				return existing.InstanceId; // already in a private copy of this same map - stay in it
 
-			return mode == MapInstanceMode.Solo
-				? NextPlayfieldToken()
-				: DefaultInstance;
+			return mode switch
+			{
+				MapInstanceMode.Solo => NextPlayfieldToken(),
+				MapInstanceMode.Group => teamId is { } team ? TeamInstance(team, mapId) : NextPlayfieldToken(),
+				_ => DefaultInstance
+			};
+		}
+
+		// The copy of `mapId` owned by `teamId`, minted on the team's first entry and reused by every later member.
+		//
+		// The binding is only kept while the copy still HOLDS somebody: an entry whose remembered zone has emptied
+		// mints a fresh instance instead. That is the "empty = gone" lifetime the ticket asks for, expressed as a
+		// lookup rather than as a cleanup pass - a zone with no players in it is indistinguishable from one that was
+		// never created, so there is nothing to tear down and no timer to get wrong.
+		private uint TeamInstance(uint teamId, uint mapId)
+		{
+			if (_teamInstances.TryGetValue((teamId, mapId), out var existing)
+			    && _zones.TryGetValue((mapId, existing), out var zone)
+			    && zone.Entities.Any(e => e.IsPlayer))
+				return existing;
+
+			var minted = NextPlayfieldToken();
+			_teamInstances[(teamId, mapId)] = minted;
+			return minted;
+		}
+
+		/// <summary>Whether <paramref name="instanceId" /> of <paramref name="mapId" /> is the copy owned by a TEAM.</summary>
+		/// <remarks>
+		///     The wire side of #512: a team-owned copy's <c>PlayfieldProxy</c> carries <c>(0xDEA9, teamId)</c> in its
+		///     owner slots where a personal one carries the character. Asked of the ZONE rather than of the player, so
+		///     the answer is the same for every member and does not change when one of them leaves their team.
+		/// </remarks>
+		public uint? TeamOwning(uint mapId, uint instanceId)
+		{
+			foreach (var ((teamId, map), instance) in _teamInstances)
+			{
+				if (map == mapId && instance == instanceId)
+					return teamId;
+			}
+
+			return null;
 		}
 
 		// Advances the world model by `deltaSeconds` (Gitea #404) and returns the wire-visible

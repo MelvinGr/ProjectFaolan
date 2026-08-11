@@ -535,7 +535,10 @@ namespace Faolan.GameServer
 			// crit, plus the whole-combo damage that rides the finisher's spell.
 			var comboBonuses = await Database.GetCharacterComboBonuses(character.Id);
 
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses);
+			// #512: a GROUP map is one copy per TEAM, so the entry needs the team's id - which the CS tier owns, and
+			// which this listener reaches through the same seam LeaveTeam/KickFromTeam already use.
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
+				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id));
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
@@ -607,7 +610,10 @@ namespace Faolan.GameServer
 			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>
 			{
-				BuildMapChange(client, map!, playfieldToken)
+				// #512: if this copy of the playfield is a team's, the proxy names the TEAM as its owner rather than
+				// the player. Asked of the ZONE, so every member is told the same owner.
+				BuildMapChange(client, map!, playfieldToken,
+					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null)
 			};
 
 			// The MapChange is the one place a player is told which playfield they are in, so it is also where their

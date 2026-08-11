@@ -37,5 +37,10 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		{
 			return Provider?.TeamMembersOf(characterId) ?? [];
 		}
+
+		public uint? TeamIdOf(uint characterId)
+		{
+			return Provider?.TeamIdOf(characterId);
+		}
 	}
 }

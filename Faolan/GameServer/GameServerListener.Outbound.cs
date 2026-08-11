@@ -731,7 +731,13 @@ namespace Faolan.GameServer
 		// as 0x01000000 while the builder's framing was a byte out - see BuildPlayfieldFiir (#451). [V0]
 		private const uint SceneWord = 1u;
 
-		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken)
+		// ⭐ #512: `teamId` names the TEAM that owns this copy of the playfield, when one does. The proxy's owner pair
+		// is `(type, id)`, and retail's own group entry carries `(0xDEA9, <teamId>)` there where a personal instance
+		// carries `(PlayfieldFieldA, <characterId>)` - the Amphitheatre of Karutonia entry names the exact id
+		// `DispatchYouJoinedTeam` had announced three seconds earlier. So the pair is switched WHOLE rather than
+		// having the id swapped under the map's own type word: a team id under type 2 would be a shape retail never
+		// sends. Null (the common case) leaves the personal form exactly as it was.
+		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken, uint? teamId = null)
 		{
 			var character = client.Session.Character;
 			var charInstance = map?.PlayfieldInstanced ?? true
@@ -745,9 +751,13 @@ namespace Faolan.GameServer
 			var fieldA = map?.PlayfieldFieldA ?? 0u;
 			var fieldC = map?.PlayfieldFieldC ?? 7u;
 
+			// The owner pair, switched as a unit when a team owns the copy (see the remark above).
+			var ownerType = teamId is null ? fieldA : PlayfieldProxy.TeamOwnerType;
+			var ownerId = teamId ?? charInstance;
+
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(PlayfieldFCodec.Build(new Vector3(character.PositionX, character.PositionY, character.PositionZ), character.MapId,
-					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, fieldA, fieldC)));
+					ownerId, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, ownerType, fieldC)));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared

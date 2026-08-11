@@ -38,6 +38,14 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		IReadOnlyList<uint> TeamMembersOf(uint characterId);
 
 		/// <summary>
+		///     The id of the team <paramref name="characterId" /> belongs to, or null when solo. The team's IDENTITY
+		///     rather than its roster, because that is what a TEAM-OWNED playfield instance is keyed by (#512): the
+		///     entry's <c>PlayfieldProxy</c> carries <c>(0xDEA9, teamId)</c> in its owner slots, so the world listener
+		///     needs the id itself and not the members.
+		/// </summary>
+		uint? TeamIdOf(uint characterId);
+
+		/// <summary>
 		///     Credit <paramref name="amountTin" /> to the guild <paramref name="characterId" /> belongs to - the deposit
 		///     half of the guild bank (#654), and the exact mirror of the withdrawal's
 		///     <c>IGameServerDispatcher.CreditCharacterCash</c>. Returns false when the character is in no guild, or the

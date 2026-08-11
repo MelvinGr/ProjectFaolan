@@ -152,6 +152,24 @@ and are exactly the kind of guess this project does not ship.
 ## What is decoded vs what is built
 
 Decoded and gated by tests: the owner pair, the difficulty word, the refusal's channel, and the instance-list
-reply. **Only the instance list is implemented as behaviour** — resolving an instance from the player's TEAM
-needs #101 grouping to be solid, and the difficulty mode needs somewhere to live beside `(mapId, instanceId)`.
-Open work is tracked in Gitea #309, #511 and #512.
+reply.
+
+⭐ **Team routing is now BUILT (#512).** A `MapInstanceMode.Group` map resolves its instance from the player's
+TEAM, not their character: `WorldState.ResolveEntryInstance` takes the team id and `TeamInstance` keys one copy
+per `(teamId, mapId)`, so the whole party lands in one zone and a member arriving later JOINS it rather than
+minting a second. A player entering a group map with no team gets a private copy — there is no shared dungeon, a
+group map is always somebody's. The team id crosses the tier boundary through `ICsPlayerAgentProvider.TeamIdOf`,
+the same seam `LeaveTeam`/`KickFromTeam` already use, because the roster lives on the CS tier.
+
+The wire follows: `BuildMapChange` switches the proxy's owner pair **as a unit** to `(0xDEA9, teamId)` when the
+zone is a team's, where a personal copy keeps `(PlayfieldFieldA, characterId)`. Switched whole rather than having
+the id swapped under the map's own type word — a team id under type `2` is a shape retail never sends.
+
+⚠️ **Lifetime is "empty = gone", which is weaker than retail's rule.** The binding is validated against the live
+zone rather than cleaned up on leave, so a copy nobody is in is not the team's copy any more and a re-entry mints
+a fresh one. Retail is stricter: its leave prompt is *"Do you wish to leave? You will be unable to return to this
+instance."*, so a single member who steps out cannot rejoin **while the others are still inside**. Ours lets them.
+Closing that gap needs the leave-side message box, which is not sent yet.
+
+Still unbuilt: the difficulty mode needs somewhere to live beside `(mapId, instanceId)`. Open work is tracked in
+Gitea #309 and #511.
