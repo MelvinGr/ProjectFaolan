@@ -122,6 +122,31 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
   guarded id-propagation / the group's declared race), which resolves **790 of the 3,970 areas**; the rest await
   captures or a manual pass. See #363 and #518.
 
+  ⭐ **And for the `Name` groups the TEMPLATE ID is in the client too** (#684) — one lookup away, not
+  capture-bound. `LDB[51000]` (`npc_template.name`) is **keyed by the NPC template id**, so the creature name a
+  `Name` group carries resolves straight back to its id. Measured over the 23 real creatures behind the 153
+  unresolved `Name`-category areas (six `XX …` dev entries excluded), **18 resolve**:
+
+  | creature | template id | | creature | template id |
+  |---|---:|---|---|---:|
+  | Horned Viper | 8072 | | Jal Kor Bloodbane | 15116 |
+  | Idar | 8078 | | Warlord Repadis | 15100 |
+  | Shark | 10027 | | Attilius | 15585 |
+  | Tia Shar | 15113 | | I-po, Master of Bats | 16129 |
+  | The Red One | 15115 | | Jacinth Kappa | 16492 |
+  | Bibaculus | 15321 | | Hyrkanian Ghost | 16888 |
+  | Water Buffalo | 17387 | | Shar Kihn | 19189 |
+  | Xiao-mei | 18182 | | Tian-bai | 19936 |
+  | Refuge Corpse-Waker | 19961 | | Aratus | 20149 |
+
+  The five that do not are `Bamboo Forest Komodo`, `Coast Shark`, `Groll`, `The Artificer` and `Vayaspara` —
+  names the shipped English pages do not carry at all.
+
+  ⚠️ **What that buys is IDENTITY, not a spawn.** None of the 18 ids (or names) is in `NpcTemplates` today, so a
+  seed would add identity-only rows — and `WorldBroadcaster.LoadAmbientSpawns` already skips any resolved area
+  whose template has no buildable `StatCore.IirHeader`, so nothing would try to spawn a creature it cannot build.
+  The stats and the render model still need a capture; the LINK does not.
+
   **The `Race`-category groups are the exception to "inferred from captures".** A group's `id` under that category
   IS the RDB 1000508 creature-race id — the client STATING what lives there — so where we hold exactly one
   spawnable template of that race there is nothing left to infer. That tier (`RaceUnique`) resolves **283 areas /
