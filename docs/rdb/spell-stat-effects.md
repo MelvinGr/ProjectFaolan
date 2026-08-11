@@ -16,9 +16,15 @@ The record is ten `u32` LE words:
 ```
 
 `statId` is a wire stat id - the ids named by the client's own table, see
-[ldb-stat-names.md](../re/ldb-stat-names.md). What makes the spell region different from the item one is `kind`,
-the word that OPENS the record: item templates use one kind throughout, spells mix several, and **the kind says
-how to read `amount`**.
+[ldb-stat-names.md](../re/ldb-stat-names.md). The word that decides how to read the record is `kind`, the one that
+OPENS it: a template mixes several, and **the kind says how to read `amount`**.
+
+⚠️ This page used to say the item region "uses one kind throughout" and that this was what made it different from
+the spell region. It does not (#806). `--report item-effect-kinds` censuses the 4,753 decryptable keyed item
+templates and finds **24 distinct kinds**, the second-commonest of them `AddLayeredSkinnedMesh` (5,632 elements,
+carrying a mesh id where a positional read would expect a stat id). The measured statement that replaces it is
+narrower: exactly one kind, 53045 `Modify`, lands on a stat this server applies, so the region looks homogeneous
+*to a whitelisted consumer* - a property of `RdbItemImporter.ApplicableStatIds`, not of the catalog.
 
 ## The kinds
 

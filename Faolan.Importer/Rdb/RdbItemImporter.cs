@@ -81,7 +81,9 @@ namespace Faolan.Importer.Rdb
 		private const int LockSpellLineKey = 39;
 		private const int LockSpellLineDurationKey = 66;
 
-		private static readonly HashSet<uint> ApplicableStatIds =
+		// Internal rather than private so `--report item-effect-kinds` can measure the import against the SAME
+		// whitelist the import applies - a census run against a different set would answer a different question.
+		internal static readonly HashSet<uint> ApplicableStatIds =
 		[
 			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax, (uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution,
 			(uint)CharacterStatId.Intelligence, (uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
@@ -95,6 +97,12 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.Protection, // #401: magical mitigation of incoming NPC-cast damage
 			(uint)CharacterStatId.CombatRating // #399: provisional flat melee damage bonus
 		];
+
+		// The ONE effect kind whose payload is a flat additive stat delta, and so the only one `ItemStatModifier` can
+		// hold: `MaxStatAggregator.AggregateGearBonuses` sums the column straight into the gear total, and the table
+		// carries neither a kind nor the ramp columns `FeatEffect` grew for #599. Measured, not assumed - see the
+		// import loop's remarks and `--report item-effect-kinds` (#806).
+		private const uint FlatModifierKind = 53045; // `Modify` [Stat, Value]
 
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
@@ -173,6 +181,10 @@ namespace Faolan.Importer.Rdb
 				lockLinesAdded = 0,
 				onUseUnknownSpell = 0;
 			var firstSampleShown = false;
+
+			// Every effect kind that landed on a whitelisted stat but is NOT a flat additive delta, by kind. Empty on
+			// the shipped catalog (#806) - it exists to stay empty loudly.
+			var nonFlatKinds = new Dictionary<uint, int>();
 
 			foreach (var item in items)
 			{
@@ -298,11 +310,40 @@ namespace Faolan.Importer.Rdb
 				// Nothing replaces it. 972 names an attribute but states no amount (it reads like the spell record's
 				// ScalingAttribute - what the weapon scales OFF, not a bonus it grants), and 971/973 are crit stats
 				// whose wire scale is unmeasured, so emitting them would be inventing a number. Tracked in #631.
+				//
+				// ⭐ Read BY KEY (`ParseSpellStatEffects`), not by POSITION, and branch on the element's KIND (#806).
+				// Both were assumptions inherited rather than measured, and `--report item-effect-kinds` measured
+				// them: of the 24 kinds the 4,753 decryptable item templates carry, exactly ONE reaches this table -
+				// 53045 `Modify`, flat - and the positional and key-addressed readers agree on all 6,167 rows, 0
+				// differences. So neither change moves a value today. They are here because the SAFETY was three
+				// accidents deep and none of them is a rule:
+				//   - `AddLayeredSkinnedMesh` (5,632 elements, the second-commonest kind) has no stat slot at all,
+				//     and the positional reader was filing its key-194 MESH id as a stat id - harmless only because
+				//     no mesh id survives `ApplicableStatIds`;
+				//   - `SpellLineStatModifier` puts the LINE first and the stat second, and was rejected only because
+				//     a line id (44221) is above the parser's stat-id bound;
+				//   - `InterpolatedModify` is a level RAMP whose stored value is the ramp's LOW endpoint, and this
+				//     table has no ramp columns - the one item carrying it (Ring of Acheron) touches a stat the
+				//     whitelist drops.
+				// Widening `ApplicableStatIds` by one id is all it takes to turn any of those into a wrong stat, so
+				// the kind is TESTED and anything else is COUNTED and named rather than silently summed.
 				var mods = new Dictionary<uint, int>();
-				foreach (var m in ItemTemplateStatModifiers.Parse(template.AsSpan(12)))
+				foreach (var m in ItemTemplateStatModifiers.ParseSpellStatEffects(template.AsSpan(12)))
 				{
-					if (ApplicableStatIds.Contains(m.StatId))
-						mods[m.StatId] = (int)m.WireAmount; // region is authoritative; last (== only) write wins
+					if (!ApplicableStatIds.Contains(m.StatId))
+						continue;
+
+					if (m.Kind != FlatModifierKind)
+					{
+						// Not a flat additive delta, so `MaxStatAggregator` cannot sum it: a percent kind would add
+						// +200 for "+2%", a ramp's low endpoint under-grants everyone above its low level, and a
+						// `SetFlag`/`Set` is not an addition at all. Skipped and reported - the day the catalog grows
+						// one of these on a stat we apply, the import says so instead of shipping a wrong number.
+						nonFlatKinds[m.Kind] = nonFlatKinds.GetValueOrDefault(m.Kind) + 1;
+						continue;
+					}
+
+					mods[m.StatId] = (int)m.WireAmount; // region is authoritative; last (== only) write wins
 				}
 
 				if (SyncStatModifiers(item, mods))
@@ -438,6 +479,12 @@ namespace Faolan.Importer.Rdb
 
 			if (lockLinesAdded > 0)
 				Console.WriteLine($"  {lockLinesAdded} consumable(s) got their SHARED-cooldown line from CoreLockSpellLineTemplate (#764).");
+
+			if (nonFlatKinds.Count > 0)
+				Console.WriteLine($"  ⚠ {nonFlatKinds.Values.Sum()} stat element(s) on an APPLIED stat carry a non-flat kind and were skipped (#806): "
+					+ string.Join(", ", nonFlatKinds.OrderByDescending(k => k.Value)
+						.Select(k => $"{k.Key} {GameActionTypes.Get(k.Key)?.Name ?? "<unregistered>"} x{k.Value}"))
+					+ " - ItemStatModifier has no kind column, so these need one before they can be stored.");
 
 			if (onUseAdded > 0 || onUseUnknownSpell > 0)
 				Console.WriteLine($"  on-use spells (CastNano, kind 53051) set on {onUseAdded} item(s); " +

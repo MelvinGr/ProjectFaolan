@@ -178,6 +178,44 @@ coincidental `2,9` word pairs); the signature yields 1550 clean records (the wor
 (`1000017`/`1000018`) or garbage (`0x3de071`, `0xd00d`) — filter by a **known-stat-id whitelist**, exactly as
 field 972 is whitelisted to the 5 attribute ids.
 
+### The kind census — 24 kinds, and only one of them is a stat bonus (#806)
+
+`--report item-effect-kinds` walks every keyed `Items` row, decrypts its template and censuses the region by
+KIND (the item twin of `--report feat-effect-kinds`, which cannot reach these templates: feat and spell records
+are plaintext, item records are TEA-encrypted per item). **4,753 of 4,761 keyed templates decrypt; they carry 24
+distinct kinds.**
+
+| kind | name | elements | items | reaches `ItemStatModifier`? |
+|---|---|---:|---:|---|
+| 53045 | `Modify` `[Stat, Value]` | 9,311 | 2,232 | **yes** — the whole table |
+| 53003 | `AddLayeredSkinnedMesh` `[194, 39]` | 5,632 | 2,906 | no — key 194 is a MESH id |
+| 53261 | `StartServerSideScryScriptWithParams` | 212 | 201 | no |
+| 53019 | `Spell` | 196 | 196 | no |
+| 53164 | `SaveHere` (empty key list) | 174 | 174 | no |
+| 53269 | `AddTexScript` | 155 | 154 | no |
+| 53051 | `CastNano` | 135 | 132 | no — the on-use spell, below |
+| 53139 | `SetFlag` `[Stat, Value]` | 130 | 130 | no — a flag WRITE, and its stat is not whitelisted |
+| 53202 | `LockTemplate` | 89 | 58 | no |
+| … | 15 further kinds, ≤ 60 elements each | | | no |
+
+So the region is heterogeneous on items exactly as it is on spells, and the older claim that item templates "use
+one kind throughout" was an assumption, not a measurement. What is measured is narrower and load-bearing:
+
+> **Exactly one kind — 53045 `Modify` — carries a stat id that survives `RdbItemImporter.ApplicableStatIds`.**
+
+That homogeneity is a property of the WHITELIST, not of the catalog. Three near-misses show how thin it is:
+`AddLayeredSkinnedMesh` would have filed a mesh id as a stat id under a positional read; `SpellLineStatModifier`
+puts the spell LINE first and the stat second, and is rejected only because a line id (44221) exceeds the
+parser's `statId < 0x1000` bound; and the single `InterpolatedModify` item (`Ring of Acheron`) is a level RAMP
+whose stored value is only the ramp's low endpoint, in a table with no ramp columns. Adding one id to the
+whitelist turns any of them into a wrong stat.
+
+The importer therefore reads the region **by key** (`ParseSpellStatEffects`, the #701 rule) and **tests the
+kind**, counting and naming anything else that reaches a whitelisted stat rather than summing it. Both changes
+are provable no-ops today — the positional and key-addressed readers agree on all 6,167 `(item, stat)` rows,
+zero differences — and that is the point: the behaviour is now correct by construction instead of by three
+coincidences.
+
 ### The `typeMarker` is a GameAction type — and `CastNano` is the ON-USE spell
 
 The word that OPENS each record is not padding and not a "type marker" in the vague sense: it is a **GameAction

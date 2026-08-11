@@ -17,14 +17,22 @@ namespace Faolan.Core.Rdb
 	// WIRE SCALE (÷100 for vitals + Magic Damage, ÷10 for attributes, ÷1 for ratings - CharacterStatId.GetScale()).
 	//
 	// `kind` is the word that OPENS the record, and it is what makes the region heterogeneous: it is an effect-KIND tag
-	// (a ~53000-range id), not padding. Item templates use one kind throughout, but SPELL templates - parsed by this
-	// same code (#367) - mix several, and the kind is what says how to read `amount`:
+	// (a ~53000-range id), not padding. SPELL templates - parsed by this same code (#367) - mix several, and the kind
+	// is what says how to read `amount`:
 	//     53045 / 53189 / 53220 / 53221   flat modifier (Battle Cry +62 Hit Rating, Fend +1000 Armor)
 	//     53067                           PERCENT modifier, ×100 (Philtre of Guile 200 = +2% Critical Rating)
 	//     53219 / 53002 / 53007 / 53013   health effects - heals and the -100000000 drain/kill sentinel
 	// So a consumer MUST branch on the kind: reading a 53067 record as flat turns "+2%" into "+200". The classification
 	// above is empirical (docs/rdb/spell-stat-effects.md); the server honors only what it can justify - see
 	// BuffStatEffects.
+	//
+	// ⚠️ **ITEM templates are heterogeneous too** - the older reading here, that they "use one kind throughout", was an
+	// assumption and is wrong (#806). `--report item-effect-kinds` censuses the 4,753 decryptable keyed templates: 24
+	// distinct kinds, and the region's second-commonest member is `AddLayeredSkinnedMesh` (5,632 elements, a mesh id in
+	// a slot the positional reader would file as a stat id). What IS true, and is the measured claim that replaces it,
+	// is narrower: exactly one kind - 53045 `Modify` - carries a stat this server applies, so a whitelisted consumer
+	// sees a homogeneous region. That is a property of the whitelist, not of the catalog; widen `ApplicableStatIds` and
+	// it stops holding.
 	//
 	// ANCHOR ON THE SIGNATURE, not a raw [2][9] scan: the raw scan yields ~2500 hits (a third of them coincidental
 	// 2,9 word pairs); the signature yields the ~1550 real records (the word before the `4` is 0 in 100% of them).

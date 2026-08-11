@@ -598,6 +598,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "item-effect-kinds":
+				{
+					ItemEffectKinds(RdbDir(), arg);
+					return 0;
+				}
+
 				case "feat-effect-kinds":
 				{
 					FeatEffectKinds(RdbDir(), arg);

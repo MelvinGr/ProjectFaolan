@@ -12,6 +12,13 @@ namespace Faolan.Core.Database.Tables
 	// KEY is the natural (ItemId, StatId): an item never carries a stat id twice, so this needs no surrogate id and it
 	// enforces the no-duplicate invariant + makes re-import a clean per-(item,stat) upsert.
 	//
+	// ⚠️ NO effect-KIND column, unlike FeatEffect and SpellStatEffect - and that is a MEASURED position, not an
+	// oversight (#806). The item region carries 24 GameAction kinds, but exactly one of them (53045 `Modify`, a flat
+	// delta) lands on a stat this server applies, so every row here is flat by construction: `RdbItemImporter` tests
+	// the kind and skips - loudly - anything else that reaches `ApplicableStatIds`. The day one does, this table needs
+	// the column (and the ramp columns FeatEffect grew for #599) BEFORE it can hold the row; that is what the import's
+	// warning is for. See `--report item-effect-kinds` and docs/rdb/item-template-stats.md.
+	//
 	// Amount is the RAW WIRE value (as it sits in the template): divide by CharacterStatId.GetScale() for the displayed
 	// bonus (÷100 vitals + Magic Damage, ÷10 attributes, ÷1 ratings). Storing raw keeps the row a faithful mirror of
 	// the wire; the scale is applied by the consumer (MaxStatAggregator).
