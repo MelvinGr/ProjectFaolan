@@ -223,6 +223,21 @@ unrecognised class id shows — it says nothing about the stamp.
 which is direct support for the union reading. The buddy-apply copies `[8]` (level), `[11]` (online) and `[10]`
 (the offline last-seen) and never touches `[12]` at all, so whatever consumes the ONLINE stamp is not the list node.
 
+⭐ **And the store fires a SIGNAL, which is where the reader will be found.** Read off the disassembly rather
+than the decompilation (`0x00a72426`–`0x00a7247b`), the branch is exactly
+
+```
+[ESI+0x2c] = online ; [ESI+0x20] = level ; [ESI+0x24] = class
+online == 0  ->  [ESI+0x30] = 0      ; [ESI+0x28] = stamp     (offline: the last-seen)
+online != 0  ->  [ESI+0x30] = stamp  ; [ESI+0x28] = 0         (online:  the token)
+```
+
+and BOTH branches then `CALL FUN_0069d0d0` on the chat client itself — the same slot-list walk shape as the
+signal emits named in #801 (`*this` is the head, each node's vtable slot 2 is the callback). So `Buddy_t[12]` is
+not read by whoever stores it: its consumer is a **subscriber** of that buddy-changed signal, and the sweep that
+found the group-finder subscribers (the singleton getter's CALLERS, then the `LEA ECX,[base+off]; PUSH <handler>;
+CALL <connect>` block) is the same one that will find this.
+
 What is left is therefore narrower than it was: find the reader of `Buddy_t[12]`. The standing reading is a
 **playfield-instance token** — `TeamMemberRecord` embeds a `PlayfieldProxy` carrying this exact `0x01EDA8B2` in its
 instance-token slot (Gitea #454), and the distribution agrees (five of six captured friends share it, one carries
