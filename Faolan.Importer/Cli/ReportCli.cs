@@ -90,6 +90,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB-only, no corpus: the Khitai faction & reputation catalog (#310) - RDB 1010701's relation matrix
+			// joined to LDB[254]'s names and rank ladders.
+			if (report == "factions")
+			{
+				Factions(RdbDir());
+				return 0;
+			}
+
 			// RDB (LDB 51000) + DB, no corpus: can the client name the creature behind an unresolved `Name`-category
 			// spawn group? (#684 - the group->creature link is recoverable statically; the STATS are not.)
 			if (report == "name-group-templates")

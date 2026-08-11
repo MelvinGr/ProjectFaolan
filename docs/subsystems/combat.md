@@ -539,7 +539,8 @@ our sim, whether the NPC aggros on sight (`WorldEntity.Hostile` is `Disposition 
 
 **It is server-authored: there is no client-side table to mine.** The client ASKS, per target, at runtime — a
 client that could derive hostility from its own RDB would not need to. (`data/FactionRelations.xml`, RDB
-1010701/1, was chased for this and is player REPUTATION in a different id space; and retail's own spawns omit
+1010701/1, was chased for this and is player REPUTATION in a different id space - now decoded in its own right,
+see [factions.md](factions.md); and retail's own spawns omit
 `NpcStats.faction_id` entirely.) So the only way to learn a template's disposition is to capture retail
 answering for it, and **targeting the NPC is enough** — no combat, no kill, no quest state.
 

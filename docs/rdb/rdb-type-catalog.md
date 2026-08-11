@@ -147,7 +147,7 @@ fields (compressed on-disk bytes).
 | 1010513 | ANIMSYS LMXB (anim data) | 4,549 | 4,549 | 0 | 2.8 MB |
 | 1010514 | ANIMSYS LMXB (anim data) | 3,185 | 3,185 | 0 | 2.0 MB |
 | 1010700 | * CHARACTERCREATOR (per-race/sex appearance XML; #275/#291) | 3 | 3 | 0 | 110.4 KB |
-| 1010701 | Faction relations (XML) | 1 | 1 | 0 | 15.9 KB |
+| 1010701 | Faction relations (XML) — DECODED, the Khitai reputation ruleset ([factions.md](../subsystems/factions.md)) | 1 | 1 | 0 | 15.9 KB |
 | 1010702 | ANIMSYS LMXB (anim data) | 2 | 1 | 1 | 8.3 KB |
 | 1010703 | Playfield list (XML) | 1 | 0 | 1 | 372 B |
 | 1020002 | OGG1 (audio) | 17,192 | 14,062 | 3,130 | 349.2 MB |

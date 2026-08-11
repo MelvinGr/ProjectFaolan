@@ -339,6 +339,12 @@ groups, which is the #518 question),
 row resolved to its TEXT through the client's own token hash, and a per-group SWEEP of `sayinchat(N)` listing every
 line the client ships for that group with the ones the DB lacks marked, split by whether they carry a `{Slot}`;
 see [chat.md](../subsystems/chat.md)),
+`factions` (the Khitai faction & reputation catalog, #310 — RDB `1010701`/1 `data/FactionRelations.xml` joined to
+`LDB[254]`. Prints the 16 faction ids with their rivals and icons, the six encounter tiers (`relationId =
+factionBase + tier`, 120/180/720/1800/1440/2400 points) and the nine player rank ladders. The LDB blocks are
+ordered runs rather than keyed by id, so the join is BY NAME and the resulting id order is printed rather than
+assumed — it comes out strictly descending. ⚠️ The point THRESHOLDS between ranks are not in the client and the
+report says so instead of interpolating them; see [factions.md](../subsystems/factions.md)),
 `name-group-templates` (can the CLIENT name the creature behind an unresolved `Name`-category spawn group, #684?
 `LDB[51000]` is the NPC-template name table, keyed BY TEMPLATE ID, so reading it backwards answers exactly what the
 spawn-area resolver's tier 1 asks. Of the 31 unresolved creatures, **11 resolve to one template id** and 7 more are
