@@ -83,6 +83,7 @@ namespace Faolan.Importer.Cli
 	//
 	// So the flag does not mean "play this creature's entrance animation", and its duration is not that animation's
 	// length. The sender side stays unimplemented - now because the reading itself is open, not merely the number.
+	// What the state actually IS is tracked in Gitea #800.
 	public static partial class ReportCli
 	{
 		private static void SpawnAnimation(IReadOnlyList<NamedCapture> captures, string? rdbDir)

@@ -409,14 +409,14 @@ namespace Faolan.Core.Enums
 		// short it is the whole method. In the capture it fires immediately after a SUCCESSFUL
 		// `QueueGroupFinder`, in the slot where the refused attempt got `DispatchGroupFinderSignupFailed`
 		// instead, and before `SelectGroupFinderRoles` / `DispatchGroupFinderSignupSuccess`. Naming it needs the
-		// signal's SUBSCRIBER, which is not reachable from the singleton's three xrefs.
+		// signal's SUBSCRIBER, which is not reachable from the singleton (Gitea #801 records the exhausted routes).
 		Reserved0xC3 = 0xC3,
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
 		Reserved0xC7 = 0xC7,
 		// #792: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, and in the capture it fires
-		// immediately after `DispatchYouJoinedTeam`, i.e. once the group finder's work is done.
+		// immediately after `DispatchYouJoinedTeam`, i.e. once the group finder's work is done. Gitea #801.
 		Reserved0xC8 = 0xC8,
 		DispatchGroupFinderReadyCheckStatus = 0xC9,
 		DispatchGroupFinderReadyCheckRejected = 0xCA,

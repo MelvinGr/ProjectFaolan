@@ -245,7 +245,8 @@ co-streaming group in one capture, so it is one event, and a simultaneous respaw
 The MonsterData census above needs no timing and is the load-bearing half.
 
 The mode-keeping above therefore stays an approximation that sits inside retail's distribution rather than a model
-of the field, and the sender stays unimplemented — now because the *reading* is open, not merely the number.
+of the field, and the sender stays unimplemented — now because the *reading* is open, not merely the number. What
+the state actually IS is open work in Gitea #800.
 
 ⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
 companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are

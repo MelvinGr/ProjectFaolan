@@ -384,14 +384,14 @@ from the table alone. We allow the LEADER only, the narrowest rule that cannot b
 threshold that would quietly let the wrong members remove people.
 
 ### Which guild ranks may withdraw from the bank
-**Tracked: Gitea #795.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
+**Tracked: Gitea #799.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
 nothing in the corpus, the client's method table or RDB 1000518 (the rank-name ladder) says which rung they hang
 off. We allow the LEADER only — the narrowest rule that cannot be abused — and refuse everyone else, rather than
 guessing a threshold that would quietly let the wrong members drain the bank.
 
 ⚠️ The one captured guild-banking session (`demol80-demonologist_login_gameplay_annotated_3`) does **not** settle
 it and cannot: the depositor is the guild's own leader, so a successful withdrawal there is consistent with every
-threshold. What it does close is the message bodies, which used to be tracked here — see
+threshold. What it does close is the message bodies, which used to be tracked here (#795, now closed) — see
 `GuildTransferMoneyCodec` / `GuildWithdrawMoneyCodec` / `GuildUpdateCashCodec`, all now `[V2: …]`.
 
 ### What sets the MagicBuff apply payload's hostile flag

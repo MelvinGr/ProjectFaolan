@@ -201,6 +201,7 @@ Two deliberate choices, both about not minting money:
   the narrowest one that cannot be abused, by that guild's own governing form (`GuildRankLadder.LeaderRank` — the
   top rung is 3, 4 or 5 depending on the form). ⚠️ The captured session does not settle this and cannot: the
   member banking there is that guild's own leader, so a successful withdrawal is consistent with every threshold.
+  Open work in Gitea #799.
 
 ### The two renown messages (#104)
 
