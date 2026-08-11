@@ -212,6 +212,21 @@ namespace Faolan.Importer.Captures
 			var skipped = 0;
 			foreach (var (name, (body, mapId, handle)) in best.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
 			{
+				// ⚠️ INSERT-ONLY, and #753 is why it stays that way for now: an imported character's items/worn
+				// set/stat sheet are frozen at whichever corpus dump first built them, and a later re-dump cannot
+				// update them.
+				//
+				// ⛔ The refresh rule #753 proposes - "those whose name matches a capture, with locally created ones
+				// exempt by construction" - does NOT work, and both halves fail for their own reason:
+				//   * this loop only ever iterates names that ARE in a capture (`best` is built from the captures),
+				//     so "matches a capture" exempts nothing at all;
+				//   * imported characters are attached to the NORMAL PLAY account (`ImportAccountName`) by
+				//     deliberate design - the dedicated "captured" account was removed on 2026-07-20 because the
+				//     split bought nothing - so a locally created character sits on the same account and the
+				//     account cannot discriminate either.
+				// So a refresh that deletes-and-reinserts on either rule would delete a player's own character.
+				// Upsert needs a real MARKER on the row (set here, checked there); adding one is the actual next
+				// step, and until it exists this skip is the only safe behaviour.
 				if (await db.Characters.AnyAsync(c => c.Name == name))
 				{
 					skipped++;
