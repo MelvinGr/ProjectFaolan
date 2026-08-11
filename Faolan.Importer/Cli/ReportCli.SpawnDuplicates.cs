@@ -56,7 +56,7 @@ namespace Faolan.Importer.Cli
 				                  + $"ids={string.Join(",", c.Rows.Select(r => r.Id))}");
 			}
 
-			CrossMapDuplicates(rows, await db.Maps.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Name ?? "?"));
+			CrossMapDuplicates(rows, await db.Maps.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Name ?? "?"), captures);
 		}
 
 		// ⭐ The duplicate class the section above STRUCTURALLY cannot see (#728). `StationaryPlacementResolver`
@@ -64,12 +64,13 @@ namespace Faolan.Importer.Cli
 		// compared - and a map's SUB-AREAS are separate playfield ids sharing one coordinate space, which is exactly
 		// how that happens.
 		//
-		// ⚠️ This finds candidates, not duplicates. Two playfields can legitimately hold the same creature at the
-		// same spot - Tortage day and night are two maps over one city - so the discrimination (#718's concurrency
-		// test) is a separate question and this deliberately does not attempt it. What it does is put a number on
-		// the class: which map PAIRS overlap, how much of the smaller map is involved, and whether the twins agree
-		// on the columns a re-harvest of the same NPC would agree on.
-		private static void CrossMapDuplicates(IReadOnlyList<NpcSpawn> rows, IReadOnlyDictionary<uint, string> maps)
+		// ⚠️ A pair is a candidate, not a duplicate: two playfields CAN legitimately hold the same creature at the
+		// same spot. What this puts a number on is which map PAIRS overlap, how much of the smaller map is involved,
+		// and whether the twins agree on the columns a re-harvest of the same NPC would agree on - then
+		// `CrossMapSightings` below decides, and on the corpus it decides against the legitimate reading on two of
+		// the three pairs. Tortage day/night was the example of a legitimate pair and it is NOT one: one capture
+		// files the same spot under both ids.
+		private static void CrossMapDuplicates(IReadOnlyList<NpcSpawn> rows, IReadOnlyDictionary<uint, string> maps, IReadOnlyList<NamedCapture> captures)
 		{
 			var pairs = new Dictionary<(uint A, uint B), List<(NpcSpawn A, NpcSpawn B)>>();
 			foreach (var byTemplate in rows.GroupBy(r => r.NpcTemplateId))
@@ -111,6 +112,42 @@ namespace Faolan.Importer.Cli
 				                  + $" pairs={bucket.Count,-4} spawns {onA}/{onB} of {totalB} on the smaller"
 				                  + $"  level+health agree {agree}/{bucket.Count}"
 				                  + $"  templates={bucket.Select(p => p.A.NpcTemplateId).Distinct().Count()}");
+			}
+
+			CrossMapSightings(pairs.Keys, captures, maps);
+		}
+
+		// ⭐ The DECISIVE test for a cross-map pair, and it needs no timestamps (#728). If ONE capture sighted the
+		// same template at the same spot under BOTH map ids, then no second population is involved: the extractor
+		// re-keyed mid-stream and one physical NPC was filed twice. If instead each side is only ever sighted by
+		// captures that saw that map alone, the two are two populations and the pair is a coincidence of geometry -
+		// which is what Tortage day/night should look like.
+		private static void CrossMapSightings(IEnumerable<(uint A, uint B)> mapPairs, IReadOnlyList<NamedCapture> captures, IReadOnlyDictionary<uint, string> maps)
+		{
+			// (capture, template, rounded position) -> the map ids that capture filed it under.
+			var sightings = new Dictionary<(string Capture, uint Template, int X, int Z), HashSet<uint>>();
+			foreach (var capture in captures)
+			foreach (var e in NpcSpawnExtractor.Extract(capture.Packets))
+			{
+				if (e.TemplateId == 0)
+					continue;
+
+				var key = (capture.Name, e.TemplateId, (int)Math.Round(e.X / StationaryPlacementResolver.ClusterRadius), (int)Math.Round(e.Z / StationaryPlacementResolver.ClusterRadius));
+				if (!sightings.TryGetValue(key, out var seen))
+					sightings[key] = seen = [];
+
+				seen.Add(e.MapId);
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("   ...and whether ONE capture filed the SAME spot under BOTH ids - which is a re-key, not a second population:");
+			foreach (var (a, b) in mapPairs)
+			{
+				var both = sightings.Where(kv => kv.Value.Contains(a) && kv.Value.Contains(b)).ToList();
+				var verdict = both.Count > 0 ? "RE-KEY - one NPC filed twice" : "no capture saw it both ways - two populations, or two captures";
+				Console.WriteLine($"   {a} <-> {b}  {both.Count,4} spot(s) filed under both by one capture   {verdict}");
+				foreach (var kv in both.Take(4))
+					Console.WriteLine($"        {kv.Key.Capture} template {kv.Key.Template} at ~({kv.Key.X * StationaryPlacementResolver.ClusterRadius}, {kv.Key.Z * StationaryPlacementResolver.ClusterRadius})");
 			}
 		}
 

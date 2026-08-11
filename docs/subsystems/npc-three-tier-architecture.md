@@ -92,6 +92,32 @@ Nothing is deleted either way. The redundant rows are the placement's **variant 
 is exactly what retail re-rolls per spawn (level, the morph table, all seven equipment slots) — and
 `WorldBroadcaster` stands up ONE entity per pool, drawing which row it renders as at random.
 
+### ⚠️ The class both mechanisms are BLIND to: cross-map duplicates (#728)
+
+Both key on `MapId`, so **two records of one NPC filed under two map ids are never compared** — and a map's
+SUB-AREAS are separate playfield ids sharing one coordinate space, which is exactly how that happens. Measured by
+`--report spawn-duplicates`, the whole class is three map pairs:
+
+| pair | pairs within 5u | of the smaller map | level+health agree | one capture filed BOTH ids |
+|---|---:|---|---:|---|
+| 1090 Ymir's Pass ↔ 1092 The Amphitheatre of Karutonia | 123 | **53 of 53** | **123/123** | no |
+| 2000 Old Tarantia ↔ 2020 Tarantia Common District | 42 | 26 of 258 | 32/42 | **15 spots** |
+| 4020 City of Tortage ↔ 4022 City of Tortage Night | 10 | 9 of 56 | 4/10 | **5 spots** |
+
+⭐ **The decisive column is the last one, and it needs no timestamps.** If ONE capture filed the same template at
+the same spot under BOTH ids, no second population is involved: the extractor re-keyed mid-stream and one physical
+NPC was recorded twice. Tarantia and Tortage both fail that test — and Tortage day/night was the standing example
+of a pair that *should* be legitimate, one city under two playfields. One of the captures that does it is even
+named `move-from-night-to-day`.
+
+⭐ Ymir's Pass ↔ the Amphitheatre is the other shape: **no capture saw it both ways**, yet the Amphitheatre's
+population is duplicated in its ENTIRETY (53 of 53) and every one of the 123 pairs agrees on level AND health.
+That is one population recorded under two ids by two different captures — the same bug across sessions rather than
+within one.
+
+⚠️ **Which side is right is still open**, so nothing is deleted: the measurement says the class is a bug, not
+which attribution to keep. Open work tracked in Gitea #728.
+
 ## Ambient idle animations (#766)
 
 The spawn body's `AnimIdleId` is the pose a creature HOLDS. What makes it look alive is separate and does not ride
