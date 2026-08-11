@@ -21,20 +21,39 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// 3 x23 (#475). They are the SAME domain as the character message's own `movement_mode` field - the two are
 		// one value sent twice, see SpawnPostIir.MovementMode - so a spawn must carry the same number in both places
 		// and NpcSpawnBuilder derives this one from the message rather than storing it a second time (#605).
-		public const uint MovementModeOne = 1;
-		public const uint MovementModeTwo = 2;
-		public const uint MovementModeThree = 3;
+		//
+		// ⭐ WALK / RUN / SPRINT, named from the CLIENT rather than from the capture (#606). The mode picks a speed
+		// out of the entity's movement-set block, and the block is the `<movementset>` XML (RDB 1010205) laid out in
+		// its parser's own field order, so each mode's field triple names it outright:
+		//
+		//   mode | forward             | backward              | strafe
+		//   1|4  | basewalkspeed       | basereversewalkspeed  | strafewalkspeed
+		//   2|5  | baserunspeed        | basereverserunspeed   | straferunspeed
+		//   3    | basesprintspeed     | basereverserunspeed   | straferunspeed
+		//   6    | chargespeed x a factor
+		//
+		// Mode 3 reusing RUN's reverse and strafe is not a coincidence and is what pins it: the movementset has no
+		// sprint reverse or sprint strafe attribute to read. 4 and 5 are an unnamed parallel pair that shares the
+		// walk/run speeds exactly, and 6 is the vehicle/charge mode - none of the three has ever been seen on the
+		// wire. The empirical anchor is `WorldState.RouteWalkSpeed` = 2.2 u/s, measured off retail's own patrollers
+		// and exactly the Default Movementset's `basewalkspeed`, on NPCs we send as mode 1.
+		//
+		// Still `uint` rather than an enum on purpose: the client's switch has SIX arms and a `switch` over a
+		// three-member enum would silently discard the rest - the `CharDCMove.MovingType` mistake.
+		public const uint MovementModeWalk = 1;
+		public const uint MovementModeRun = 2;
+		public const uint MovementModeSprint = 3;
 
 		// The value we send when a type carries no movement mode of its own. 2 is retail's modal value on 71% of
 		// captured NPC spawns and on every captured player spawn, so it is inside retail's own distribution rather
 		// than an invented default - which is the whole test #602 set for a per-spawn-event field.
-		public const uint DefaultMovementMode = MovementModeTwo;
+		public const uint DefaultMovementMode = MovementModeRun;
 
 		// Whether a value is one retail has ever sent in this slot. Used by the appearance classifier to tell a
 		// minimal stream from a runtime-bearing one.
 		public static bool IsMovementMode(uint value)
 		{
-			return value is MovementModeOne or MovementModeTwo or MovementModeThree;
+			return value is MovementModeWalk or MovementModeRun or MovementModeSprint;
 		}
 
 		// A fresh NPC's stream: the move-task SLOT with no task in it (the one 0x00 byte that makes its first record
@@ -71,6 +90,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// The player's own movement mode, on every captured player spawn.
-		public const uint PlayerMovementMode = MovementModeTwo;
+		public const uint PlayerMovementMode = MovementModeRun;
 	}
 }

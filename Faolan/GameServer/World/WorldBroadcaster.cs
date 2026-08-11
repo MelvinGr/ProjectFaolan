@@ -1257,7 +1257,7 @@ namespace Faolan.GameServer.World
 				// field), and it is per-spawn STATE rather than type identity - retail sends 1 and 2 for the same
 				// creature. Ours were locked to whatever value the type happened to be lifted with, which for the
 				// Old Tarantia patrollers is 2, so they ran their beats.
-				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeOne : (uint?)null;
+				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeWalk : (uint?)null;
 				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, spawnMovementMode);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded

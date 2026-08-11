@@ -140,18 +140,58 @@ paths (`PathFlags = 0` on every one), so retail never caps a beat.
 The speed itself comes from the ENTITY, via `FUN_00a2f160` -> `FUN_00a2e670`:
 
 - `FUN_00a2f160` returns the entity's **movement mode** from `+0x15c`, folding in the control mode
-  (`vehicle.cpp`): under one control mode it maps 1→2, 2→3, 4→5, and returns 6 under another.
-- `FUN_00a2e670` switches on that mode and reads a **different per-entity speed field for each**:
+  (`vehicle.cpp`): under one control mode it maps 1→2, 2→3, 4→5 — a run/sprint modifier — and returns 6
+  under another.
+- `FUN_00a2e670` switches on that mode (a six-arm jump table) and reads a **different per-entity speed field for
+  each**, out of one contiguous float block at `+0x128`…`+0x144`:
 
-| mode | speed field |
-|---|---|
-| 1 or 4 | `+0x13c` forward / `+0x134` backward |
-| 2 or 5 | `+0x140` / `+0x138` / `+0x12c` |
-| 3 | `+0x130` |
-| 6 | a multiplier off `+0x144` |
+| mode | forward | backward | strafe |
+|---|---|---|---|
+| 1 or 4 | `+0x128` | `+0x134` | `+0x13c` |
+| 2 or 5 | `+0x12c` | `+0x138` | `+0x140` |
+| 3 | `+0x130` | `+0x138` | `+0x140` |
+| 6 | `+0x144` × a factor | | |
 
-So **the movement mode is the client's walk-vs-run selector**, and the MoveTask record does not set the pace at
-all. [V1: tools/ghidra/DumpVtableAround.java]
+### ⭐ The modes are WALK / RUN / SPRINT, and the `<movementset>` XML names them (#606)
+
+That block is the client's own `<movementset>` record (RDB **1010205**) laid out in its PARSER's field order.
+`FUN_00606300` reads the XML attributes into a float array, and the array's layout is exactly the block's:
+
+| offset in the movementset | attribute | entity offset |
+|---|---|---|
+| `+0x00` | `basewalkspeed` | `+0x128` |
+| `+0x04` | `baserunspeed` | `+0x12c` |
+| `+0x08` | `basesprintspeed` | `+0x130` |
+| `+0x0c` | `basereversewalkspeed` | `+0x134` |
+| `+0x10` | `basereverserunspeed` | `+0x138` |
+| `+0x14` | `strafewalkspeed` | `+0x13c` |
+| `+0x18` | `straferunspeed` | `+0x140` |
+| `+0x1c` | `chargespeed` | `+0x144` |
+
+(the array continues `accelspeed`, `idleturnspeed`, `movingturnspeed`, `jumpspeed`, `jumpheight`, which the
+speed switch does not read.) Substituting gives each mode's triple:
+
+| mode | forward | backward | strafe | ⇒ |
+|---|---|---|---|---|
+| 1 or 4 | `basewalkspeed` | `basereversewalkspeed` | `strafewalkspeed` | **WALK** |
+| 2 or 5 | `baserunspeed` | `basereverserunspeed` | `straferunspeed` | **RUN** |
+| 3 | `basesprintspeed` | `basereverserunspeed` | `straferunspeed` | **SPRINT** |
+| 6 | `chargespeed` × a factor | | | **CHARGE** (the `vehicle.cpp` control mode) |
+
+⭐ **Mode 3 reusing RUN's reverse and strafe is what pins it**, and it is forced rather than chosen: the
+movementset ships no sprint-reverse and no sprint-strafe attribute for it to read. The control-mode fold is the
+same story read from the other end — 1→2→3 is walk→run→sprint.
+
+The **empirical anchor**: retail's own patrollers move at 2.2 u/s (9,944 anchor pairs — `WorldState.RouteWalkSpeed`)
+and the Default Movementset's `basewalkspeed` is exactly `2.2`. Those NPCs are the ones we send as mode 1.
+
+4 and 5 are an unnamed parallel pair that shares the walk/run speeds exactly (so they differ in something other
+than pace), and neither they nor 6 has ever appeared in the spawn field — the corpus only ever carries 1, 2 and 3.
+`SpawnPostIirs` therefore keeps them as named `uint` constants rather than an enum: a `switch` over a
+three-member enum would silently discard the other three arms, which is the `CharDCMove.MovingType` mistake.
+
+So **the movement mode is the client's walk / run / sprint selector**, and the MoveTask record does not set the
+pace at all. [V1: tools/ghidra/DumpVtableAround.java]
 
 ⚠️ Two readings of this record that look right and are NOT:
 

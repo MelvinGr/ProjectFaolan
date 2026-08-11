@@ -290,6 +290,9 @@ about. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGra
   embedded `ProtoCoreCharacterIIR` carries in its own `movement_mode` field (21). One value, sent twice in one
   spawn body, in two unrelated byte regions. `SpawnPostIir.MovementMode`; re-derive with
   `--report field-predictors` [V1: Faolan.Importer/Cli/ReportCli.cs].
+  - ⭐ The three values it takes are **WALK (1) / RUN (2) / SPRINT (3)** — named from the client's own speed
+    switch and the `<movementset>` XML it reads, not from the capture. See
+    [`movetask-grammar.md`](movetask-grammar.md) for the derivation (#606).
   - The evidence is a whole-corpus cross-tab: over **5,739** captured NPC spawns the two agree on **5,738** (the
     one exception is a Rocknose part-way through a path plan), and over **209** captured PLAYER spawns they agree
     on all 209. The player family is what makes this a protocol fact rather than an NPC convention — its scaffold
