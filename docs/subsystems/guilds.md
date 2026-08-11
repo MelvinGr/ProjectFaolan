@@ -197,11 +197,15 @@ Two deliberate choices, both about not minting money:
 - **A deposit the payer cannot afford gets retail's own refusal**, `DispatchGuildNotEnoughCash`, rather than the
   silence every other refusal in this subsystem uses. The difference is that the client can legitimately send this
   one while being wrong — it does not know the wallet moved — and retail has a named message for exactly that.
-- **Leader only.** Retail has per-rank bank permissions and nothing pins which rung they hang off, so the rule is
-  the narrowest one that cannot be abused, by that guild's own governing form (`GuildRankLadder.LeaderRank` — the
-  top rung is 3, 4 or 5 depending on the form). ⚠️ The captured session does not settle this and cannot: the
-  member banking there is that guild's own leader, so a successful withdrawal is consistent with every threshold.
-  Open work in Gitea #799.
+- **The top two rungs may withdraw — the CLIENT'S rule, not ours** (#799). RDB 1000518 ships a permission
+  BITMASK per rung and the guild-management view names its bits, `CanWithdrawMoney` being `0x40`
+  [V1: tools/ghidra/DumpGuildRankPermissions.java]. It is set in the masks `7518` and `0x7FFFFFFF` and in nothing
+  below, which works out as the top two rungs on six governing forms and **the leader alone on Stygian** (whose
+  second rung carries `6430`, the mask without it). `GuildRankLadder.Allows(form, rank, WithdrawMoney)` is the
+  check; `GuildRankPermissionTests` gates the ladder. The same masks now gate kick/promote/demote, which reach one
+  to two rungs further down — every non-zero mask carries the officer four.
+  ⚠️ The captured session never could settle this: the member banking there is that guild's own leader, so a
+  successful withdrawal is consistent with every threshold. The answer came out of the client's data instead.
 
 ### The two renown messages (#104)
 
@@ -277,12 +281,14 @@ Accepting or declining an invite now answers the INVITER with `InviteReplyToInvi
 target who EXISTS but is already guilded stays silent — the client's catalog has no code for that refusal, and
 borrowing this one would tell the inviter a real character does not exist.
 
-Two things are decoded but deliberately unsent. `DispatchGuildOnInviteCooldown` (`0x204E`, one u32) needs an invite
-cooldown we do not model — its c2s twin `RemoveGuildInvitationCooldown` (`0x2024`) says retail has one. And WHO may
-kick/promote/demote is leader-only here rather than retail's real rule: the client ships a per-rung permission
-BITMASK (RDB 1000518, see `GuildRankLadder`) that we do not model, so the choice was between the narrowest safe rule
-and a guessed threshold that would let the wrong members kick people.
-[V0: which guild ranks may kick, promote and demote]
+One thing is decoded but deliberately unsent: `DispatchGuildOnInviteCooldown` (`0x204E`, one u32) needs an invite
+cooldown we do not model — its c2s twin `RemoveGuildInvitationCooldown` (`0x2024`) says retail has one.
+
+⭐ WHO may kick/promote/demote used to be leader-only here for want of retail's real rule. It is the client's rule
+now: the per-rung permission bitmask in RDB 1000518, whose bits the guild-management view names
+[V1: tools/ghidra/DumpGuildRankPermissions.java]. Every non-zero mask carries `InviteOthers|KickOthers|Promote|
+Demote`, so the officer rungs get them — one to two rungs below the leader depending on the governing form. See
+`GuildRankLadder.Allows` and the bank-withdrawal note above.
 
 The ticket also listed the **invite ACCEPT packet** as undecoded ("not isolated by sub-op in any capture; likely an
 Interact"). It is not an Interact: the c2s table has `AcceptGuildInvitation(const ID32& i_cGuildID)` at `0x201C`,

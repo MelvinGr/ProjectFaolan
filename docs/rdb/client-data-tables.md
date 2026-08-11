@@ -211,8 +211,31 @@ one above.
 - **`rank`** is a dense 0-based index within its form (Cimmerian 0–4, Acheron 0–5, …).
 - **`permissions`** is a BITMASK, and the observed values are strictly NESTED —
   `0 ⊂ 30 ⊂ 286 ⊂ 6430 ⊂ 7518 ⊂ 0x7FFFFFFF` (each is a superset of the one before), which is what a rank ladder
-  looks like. The top rank of **every** form carries `0x7FFFFFFF`, i.e. everything. Which bit is which right is
-  not decoded.
+  looks like. The top rank of **every** form carries `0x7FFFFFFF`, i.e. everything.
+
+  ⭐ **And the bits are named** (#799). The client's guild-management view builds its permission list by pairing
+  each bit with the LDB token that labels it, handing the bit itself to `com.GameInterface.Guild.GuildPermission`
+  as `m_permissionId` — so the constant and the name come out of one instruction window:
+
+  | bit | right | | bit | right |
+  |---|---|---|---|---|
+  | `0x001` | `CanDisbandGuild` | | `0x080` | `CanChangeGoverningForm` |
+  | `0x002` | `CanInviteOthers` | | `0x100` | `CanChangeMotd` |
+  | `0x004` | `CanKickOthers` | | `0x200` | `CanChangeName` |
+  | `0x008` | `CanPromote` | | `0x400` | `CanChangeRecruitmentMode` |
+  | `0x010` | `CanDemote` | | `0x800` | `CanChangeVulnerabilityWindow` |
+  | `0x040` | `CanWithdrawMoney` | | | |
+
+  [V1: tools/ghidra/DumpGuildRankPermissions.java]
+
+  ⚠️ `0x020` is **absent from the list and set in the shipped masks**, so it is a right the management window does
+  not render rather than an unused bit — as is everything above `0x800` inside the leader's `0x7FFFFFFF`. Do not
+  read an unnamed bit as unused.
+
+  Crossed against the masks, `WithdrawMoney` is in `7518` and `0x7FFFFFFF` and in neither `6430` nor below: **the
+  top two rungs may withdraw on six forms, and on Stygian the leader alone** (its second rung is `6430`).
+  Invite/kick/promote/demote are in every non-zero mask, so they reach one to two rungs further down. Transcribed
+  into `Faolan.Core.Constants.GuildRankLadder` and enforced by `GuildService`.
 - **`limit`** takes 0, 1, 5, 10, 20 and 1000 and reads as a per-rank member CAP with 0 meaning uncapped — six of
   the seven leader ranks carry 1. It is not clean, though: `Strategos` (Nemedian leader) carries 10 and `Madam`
   (Harem leader) carries 0, so either the reading is wrong or those two forms genuinely allow several leaders.
@@ -234,8 +257,8 @@ Deathbringer Envoy / Chaos-lord · **Stygian** Initiate / Serpent Devotee / Disc
 Vassal / Squire / Knight / Commandant / Lord · **Hyborian Milita** Conscript / Chiliostys / Phalanx / Hyparchos /
 Taxiarchos / Strategos · **Harem** Trollop / Harlot / Concubine / Courtesan / Madam.
 
-Nothing reads this yet — our guilds carry a numeric `GuildRank` with no names and no per-form ladder. Importing
-it is guild-subsystem work (#104).
+`GuildRankLadder` carries the names and the permission column; the `limit` column is still unread (nothing
+enforces per-rank member caps).
 
 Two corrections the sweep made to the names this table used to carry, both from guessing at a loader by what it
 sat next to: 1000042 is `Feat_t`, not `FeatTable_t`, and 1000044 is `FeatPointsTable_c` — the `FeatClassTable_c`

@@ -375,24 +375,30 @@ channel: the same message the corpus does show retiring a `~Team` when the group
 a zone change, whose body is exactly the `(type, id)` pair the subscription opens with. The MESSAGE is retail's;
 applying it to the guild case is the inference. A two-client guild leave settles it, alongside #104's fan-out.
 
-### Which guild ranks may kick, promote and demote
-**Tracked: Gitea #104.** [V0: which guild ranks may kick, promote and demote] The same gap the bank withdrawal has,
-one rung along: the client ships a per-rung permission BITMASK in RDB 1000518 (strictly nested, `0` subset `30`
-subset `286` subset `6430` subset `7518` subset `0x7FFFFFFF`), which is presumably what gates these - but which BIT
-is kick, which is promote, and whether promote is even permission-gated rather than leader-only, is not recoverable
-from the table alone. We allow the LEADER only, the narrowest rule that cannot be abused, rather than guessing a
-threshold that would quietly let the wrong members remove people.
+### Which guild ranks may kick, promote, demote and withdraw — SOLVED, from the client's own data
+Both of these were `[V0]`s (#104's rank actions and #799's bank withdrawal) on the same premise: RDB 1000518
+ships a per-rung permission BITMASK, strictly nested `0` ⊂ `30` ⊂ `286` ⊂ `6430` ⊂ `7518` ⊂ `0x7FFFFFFF`, and
+which BIT is which right was not recoverable *from the table*. It is recoverable from the CODE that renders it:
+the guild-management view builds its permission list by pairing each bit with the LDB token that labels it, and
+hands the bit itself to the `GuildPermission` object as `m_permissionId`.
 
-### Which guild ranks may withdraw from the bank
-**Tracked: Gitea #799.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
-nothing in the corpus, the client's method table or RDB 1000518 (the rank-name ladder) says which rung they hang
-off. We allow the LEADER only — the narrowest rule that cannot be abused — and refuse everyone else, rather than
-guessing a threshold that would quietly let the wrong members drain the bank.
+[V1: tools/ghidra/DumpGuildRankPermissions.java — `0x001` CanDisbandGuild, `0x002` InviteOthers, `0x004`
+KickOthers, `0x008` Promote, `0x010` Demote, `0x040` WithdrawMoney, `0x080` ChangeGoverningForm, `0x100`
+ChangeMotd, `0x200` ChangeName, `0x400` ChangeRecruitmentMode, `0x800` ChangeVulnerabilityWindow.]
 
-⚠️ The one captured guild-banking session (`demol80-demonologist_login_gameplay_annotated_3`) does **not** settle
-it and cannot: the depositor is the guild's own leader, so a successful withdrawal there is consistent with every
-threshold. What it does close is the message bodies, which used to be tracked here (#795, now closed) — see
-`GuildTransferMoneyCodec` / `GuildWithdrawMoneyCodec` / `GuildUpdateCashCodec`, all now `[V2: …]`.
+So the rules are the client's, not ours: **the top two rungs may withdraw** on six governing forms and **the
+leader alone on Stygian** (whose second rung is `6430`, the mask without `WithdrawMoney`); invite/kick/promote/
+demote sit in every non-zero mask and so reach one to two rungs further down. Enforced through
+`GuildRankLadder.Allows`, gated by `GuildRankPermissionTests`.
+
+⚠️ One rule beside them is still OURS: an action may not be aimed at an equal or higher rung. The table grants
+a right, it does not say who it may be used ON, and without that guard an Aquilonian Patrician could demote their
+own Potentate.
+
+⚠️ The one captured guild-banking session (`demol80-demonologist_login_gameplay_annotated_3`) never could settle
+this: the member banking there is the guild's own leader, so a successful withdrawal is consistent with every
+threshold. What it did close is the message bodies (#795) — see `GuildTransferMoneyCodec` /
+`GuildWithdrawMoneyCodec` / `GuildUpdateCashCodec`, all now `[V2: …]`.
 
 ### What sets the MagicBuff apply payload's hostile flag
 **Tracked: Gitea #658.** [V0: what separates the 134 from those 554] `descriptor[4]` of the 54-byte

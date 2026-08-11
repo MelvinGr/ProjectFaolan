@@ -265,7 +265,7 @@ namespace Faolan.CSPlayerAgent
 			var actor = client.Session.Character;
 			var targetId = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id;
 
-			var target = await AuthorizeRankAction(actor, targetId, "kick");
+			var target = await AuthorizeRankAction(actor, targetId, "kick", GuildPermission.KickOthers);
 			if (target == null)
 				return;
 
@@ -286,7 +286,9 @@ namespace Faolan.CSPlayerAgent
 
 			var target = await AuthorizeRankAction(actor, targetId, promote
 				? "promote"
-				: "demote");
+				: "demote", promote
+				? GuildPermission.Promote
+				: GuildPermission.Demote);
 			if (target == null)
 				return;
 
@@ -323,14 +325,19 @@ namespace Faolan.CSPlayerAgent
 			await BroadcastMemberUpdate(guild, target);
 		}
 
-		// The shared authority check for kick / promote / demote: the actor must be the LEADER of the target's guild,
-		// and may not aim it at themselves. Returns the target when allowed, else null (and logs why).
+		// The shared authority check for kick / promote / demote: the actor's RUNG must carry the right, and the
+		// action may not be aimed at themselves or at someone who outranks them. Returns the target when allowed,
+		// else null (and logs why).
 		//
-		// ⚠️ Leader-only is deliberately narrower than retail, for the same reason the bank withdrawal is (#132): the
-		// client ships a per-rung permission BITMASK (RDB 1000518) that we do not model, so the choice is between the
-		// narrowest safe rule and a guessed threshold that would let the wrong members kick people.
-		// [V0: which guild ranks may kick, promote and demote]
-		private async Task<Character?> AuthorizeRankAction(Character? actor, uint targetId, string verb)
+		// ⭐ The right comes from the client's own per-rung permission bitmask (RDB 1000518, #799), so these are no
+		// longer leader-only: `Officer`-tier rungs and up may invite, kick, promote and demote, which is one to two
+		// rungs below the leader depending on the governing form.
+		// [V1: tools/ghidra/DumpGuildRankPermissions.java]
+		//
+		// ⚠️ "may not aim it at an equal or higher rung" is OURS - the table grants a right, it does not say who it
+		// may be used ON, and without that guard an Aquilonian Patrician could demote their own Potentate. It is the
+		// narrow half of the choice: refusing an action retail might allow only inconveniences an officer.
+		private async Task<Character?> AuthorizeRankAction(Character? actor, uint targetId, string verb, GuildPermission permission)
 		{
 			if (actor?.GuildId is not { } guildId)
 			{
@@ -342,9 +349,11 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return null;
 
-			if ((byte)(actor.GuildRank ?? 0) != GuildRankLadder.LeaderRank(guild.GovernmentForm))
+			var actorRank = (byte)(actor.GuildRank ?? 0);
+			if (!GuildRankLadder.Allows(guild.GovernmentForm, actorRank, permission))
 			{
-				_logger.LogInformation("Guild {Verb} refused: {Actor} is not the leader of \"{Guild}\".", verb, actor.Name, guild.Name);
+				_logger.LogInformation("Guild {Verb} refused: {Actor} is rank {Rank} (\"{RankName}\") in \"{Guild}\", which may not {Verb}.", verb, actor.Name, actorRank,
+					GuildRankLadder.NameOf(guild.GovernmentForm, actorRank) ?? "?", guild.Name);
 				return null;
 			}
 
@@ -352,6 +361,13 @@ namespace Faolan.CSPlayerAgent
 			if (target == null || target.GuildId != guildId || target.Id == actor.Id)
 			{
 				_logger.LogInformation("Guild {Verb} refused: target {TargetId:X8} is not another member of \"{Guild}\".", verb, targetId, guild.Name);
+				return null;
+			}
+
+			if ((byte)(target.GuildRank ?? 0) >= actorRank)
+			{
+				_logger.LogInformation("Guild {Verb} refused: {Target} is rank {TargetRank} in \"{Guild}\", which {Actor} at rank {Rank} does not outrank.", verb, target.Name,
+					(byte)(target.GuildRank ?? 0), guild.Name, actor.Name, actorRank);
 				return null;
 			}
 
@@ -492,16 +508,16 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			// WHO may withdraw is a policy nothing in the corpus or the client pins, so it is the narrowest rule that
-			// cannot be abused: the guild LEADER only, by that guild's own governing form (the top rung is 3, 4 or 5
-			// depending on the form - GuildRankLadder). Per-rank bank permissions are real in retail and are follow-up
-			// work; refusing everyone else is the safe default until they are modelled.
-			// [V0: which guild ranks may withdraw from the bank]
-			var leaderRank = GuildRankLadder.LeaderRank(guild.GovernmentForm);
-			if ((byte?)character.GuildRank != leaderRank)
+			// WHO may withdraw is the CLIENT'S OWN rule, not a policy of ours: RDB 1000518 ships a permission bitmask
+			// per rung and `GuildPermission.WithdrawMoney` is one of its bits (#799). That works out as the top two
+			// rungs on six governing forms and the leader alone on Stygian - which is why this is not "leader only"
+			// any more, and why it is not a guessed threshold either.
+			// [V1: tools/ghidra/DumpGuildRankPermissions.java]
+			var rank = (byte)(character.GuildRank ?? 0);
+			if (!GuildRankLadder.Allows(guild.GovernmentForm, rank, GuildPermission.WithdrawMoney))
 			{
-				_logger.LogInformation("GuildWithdrawMoney refused: {Character} is rank {Rank} in \"{Guild}\", not the leader rank {Leader}.", character.Name, (byte?)character.GuildRank,
-					guild.Name, leaderRank);
+				_logger.LogInformation("GuildWithdrawMoney refused: {Character} is rank {Rank} (\"{RankName}\") in \"{Guild}\", which may not withdraw.", character.Name, rank,
+					GuildRankLadder.NameOf(guild.GovernmentForm, rank) ?? "?", guild.Name);
 				return;
 			}
 
