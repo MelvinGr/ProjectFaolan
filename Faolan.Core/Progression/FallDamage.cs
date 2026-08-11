@@ -52,11 +52,29 @@ namespace Faolan.Core.Progression
 	///         against - and never a runtime input. Nothing is trusted at runtime; only the accuracy is gained.
 	///     </para>
 	///     <para>
-	///         ⚠️ The refit itself still needs the health POOL per event, which must come from the separate
-	///         <c>StatUpdateIIR</c> stream: <c>StatDamageIIR.StatValue</c> is the damage again on the environmental
-	///         form, and reading a pool off it makes every fall cost exactly 50% <i>by construction</i>. Two passes
-	///         have now died on that, which is why <c>--report fall-speed</c> ships the pairing without the fit.
-	///         ⚠️ Note also that <c>Delta</c> is in HUNDREDTHS of a health point.
+	///         ⚠️ <b>The pool is now measured and the constants still stand - the refit is blocked one step further
+	///         on, at GRAVITY.</b> The pool is the high-water mark of <c>HealthCurrent</c> for that handle up to the
+	///         fall, and it is neither of the two things earlier passes reached for: <c>StatDamageIIR.StatValue</c>
+	///         is the damage again on the environmental form (every fall then costs exactly 50% <i>by
+	///         construction</i>), and the <c>HealthMax</c> the same stat block states is a BASE the client tops up
+	///         (#450) - it reads 2,371 for every fall in the corpus, the same value for two different characters,
+	///         against which the deepest falls come out at 225% of the pool. (<c>Delta</c> is also in HUNDREDTHS.)
+	///     </para>
+	///     <para>
+	///         With correct pools, <c>--report fall-speed</c> fits <c>frac = 0.026 x (h - 5.05)</c> at a measured
+	///         gravity of 19.3, and <c>0.032 x (h - 3.26)</c> at 25.6 - the shipped <c>0.038 x (h - 3.08)</c> sits
+	///         inside that spread. ⚠️ And gravity can only be measured as <c>v^2 / 2h</c> against the SAMPLED drop,
+	///         which is the very quantity #515 exists to stop using: over the deep falls it runs p10 7.6 / median
+	///         19.3 / p90 36.2. So the conversion from the client's precise speed into the server's own height units
+	///         is now the loosest part of the chain, and refitting against it would trade a known error for an
+	///         unknown one. <b>The constants are left as they are, deliberately.</b>
+	///     </para>
+	///     <para>
+	///         ⚠️ Two pairing rules the report needs and a naive pass does not have: the environmental school carries
+	///         LAVA as well as falls, so a hit whose nearest landing is more than a second away is not a fall (the
+	///         corpus has one 94 s out); and the fall DEBUFF cannot be attributed by a time bound alone - at 5 s the
+	///         corpus yields zero Broken Bones and at 15 s it yields five spanning 0.47%..84% of the pool, i.e. the
+	///         next fall's debuff. The report prints the debuff per fall and deliberately does not band it.
 	///     </para>
 	///     <para>
 	///         <b>The debuff tier is a function of the damage as a fraction of max health</b>, which separates the 24
