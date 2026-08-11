@@ -143,6 +143,17 @@ in the RDB scry scripts; a dedicated extraction pass is needed". They do, the pa
   (`LdbStringIndex.TokenId`) of `sayinchat(N)|<channel>(K)|<Group>`, all of which are `NpcChatter` columns. All 13
   captured barks resolve to their text through it, which is the end-to-end proof.
 
+  ⭐ **And it has to be computed, because there is nothing to look it up in.** The group name
+  `RenownBystanderLovers` appears **zero times as text** anywhere in the client — not in `RDB/*.rdbdata`, not in
+  `AgeOfConan.exe`, and not in any of the 152 decrypted LDB pages. So there is no group table, no name→line index
+  and no scry script naming it: the hash of the whole token IS the addressing. (`NpcStatCore.ClientScryScript`,
+  the other route #331's body proposes, is `0` on all 1,194 stat cores.)
+
+  ⚠️ Hashing the group name ALONE and hunting the value in the client answers nothing, and the control says so:
+  `elf28("RenownBystanderLovers")` hits 6–10 times across ~GBs of RDB + exe, while `elf28("conversation1")` — a
+  token the client demonstrably uses — hits 5. At that base rate the search has no discriminating power. It is
+  the whole token that is hashed, not the group.
+
 Together those make a group's whole line set enumerable by sweeping `N`. For the five captured groups the sweep
 finds **54 lines where the DB carries 13** — e.g. `RenownBystanderLovers/conversation1` is an eleven-line
 exchange between Lord Ovidius and his lady, of which captures caught five.
