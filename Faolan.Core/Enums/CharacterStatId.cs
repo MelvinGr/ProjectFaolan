@@ -783,23 +783,36 @@ namespace Faolan.Core.Enums
 		GemFamily = 0x457,
 		GameAction_ToClient = 0x45A,
 
-		// 0x45B..0x461 is the PvP INVULNERABILITY RATING series - one slot per damage school, in the same school
-		// order the rest of the enum uses. They carried `GameAction_MinLevel`/`MaxLevel`/`MonsterData`/`Cluster`/
-		// `Level`/`Seed`/`AttractorID` until 2026-08-05, which the client's own LDB 615 table contradicts on all
-		// seven at once - an inherited label block, not a decode (nothing ever read one).
+		// ⭐ 0x45B..0x461 are `GameAction_*`, restored 2026-08-11 (#625). They were renamed to a
+		// `PvP*InvulnerabilityRating` series on 2026-08-05 on the authority of **LDB 615** - which is the source that
+		// loses. The exe's descriptor registry (`FUN_01db2740`, compiled with this build) names them
+		// `MinLevel`/`MaxLevel`/`MonsterData`/`Cluster`/`Level`/`Seed`/`AttractorID`, and two independent things say
+		// the LDB is simply wrong here rather than merely differently worded:
 		//
-		// ⚠️ `GameAction_MinLevel` in particular was a live false lead: #298 was hunting a second, level-based
-		// usability gate behind "Your class cannot use this item until level %d" and this slot was the one datum it
-		// had. There is no such gate - that message is the LDB token `YouCanNotUseYet`, emitted by the FEAT criterion
-		// (FUN_006dd970 case 0x5d), which compares no level at all. The neighbours above that the client's table does
-		// not name are the same inherited block and should be trusted no further than this one was.
-		PvPSlashingInvulnerabilityRating = 0x45B,
-		PvPPiercingInvulnerabilityRating = 0x45C,
-		PvPCrushingInvulnerabilityRating = 0x45D,
-		PvPFireInvulnerabilityRating = 0x45E,
-		PvPColdInvulnerabilityRating = 0x45F,
-		PvPElectricalInvulnerabilityRating = 0x460,
-		PvPHolyInvulnerabilityRating = 0x461,
+		//   CONTIGUITY  0x454..0x57C is an unbroken `GameAction_*` run - 200+ consecutive ids where this enum and the
+		//               registry agree exactly. Seven `PvP*` names punched into the middle of it is a discontinuity;
+		//               seven more GameAction parameters are not.
+		//   COMPLETENESS The PvP invulnerability family has NINE damage schools plus siege, and the registry has all
+		//               of them, at 0xE4..0xEA + 0xEC + 0x119 + 0x11A (where this enum carries the bare school names
+		//               `Slashing`/`Piercing`/... instead). The LDB's copy at 0x45B stops after seven, with no Unholy
+		//               and no Poison - an incomplete duplicate of a family that already has a home.
+		//
+		// So LDB 615 has this family MISPLACED, labelling the GameAction block with names belonging 900 ids earlier.
+		// That is the sharpest example of the staleness documented in docs/re/aoc-client-stat-names.md, and it is why
+		// the registry is the source to take a stat name from.
+		//
+		// ⚠️ `GameAction_MinLevel` was a live FALSE LEAD and still is - the name is right, the inference from it was
+		// not. #298 was hunting a second, level-based usability gate behind "Your class cannot use this item until
+		// level %d" and this slot was the one datum it had. There is no such gate: that message is the LDB token
+		// `YouCanNotUseYet`, emitted by the FEAT criterion (`FUN_006dd970` case 0x5d), which compares no level at all.
+		// A correct NAME is not a decode of what the field is used for.
+		GameAction_MinLevel = 0x45B,
+		GameAction_MaxLevel = 0x45C,
+		GameAction_MonsterData = 0x45D,
+		GameAction_Cluster = 0x45E,
+		GameAction_Level = 0x45F,
+		GameAction_Seed = 0x460,
+		GameAction_AttractorID = 0x461,
 		GameAction_GfxID = 0x462,
 		GameAction_NanoTemplate = 0x463,
 		GameAction_GfxColor = 0x464,
