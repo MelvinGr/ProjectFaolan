@@ -93,7 +93,7 @@ namespace Faolan.Tests
 
 		// …and a method below the boundary stays bare, which is the half the trade replies used to get wrong: all seven
 		// are methods 0x68-0x6E (104-110) and every one hand-passed a `0x01` retail's captures do not carry.
-		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.Reserved0x6B), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
+		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.DispatchAcceptedTrade), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
 		 InlineData(GameCharInterfaceMethods.DispatchCharacterNameReply)]
 		public void ALowIndexSend_StaysOneGroup(GameCharInterfaceMethods method)
 		{

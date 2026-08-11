@@ -30,9 +30,40 @@ Recovery method (reproducible — scripts in `tools/ghidra/`):
   =0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility=0x2052, DispatchPong=0x2082 — all match
   the in-client-verified server behavior.
 
+## ⭐ A `<no-arg>` slot IS nameable — through the interface VTABLE (#737, #792)
+
+`<no-arg>` methods have no name in the string catalog because the catalog records a method's ARGUMENT
+signature and these have none. That is a property of the *catalog*, not of the client — the implementation is
+still there, and it is one virtual call away:
+
+```
+JMP dword ptr [EAX*4 + <targets>]        the dispatcher's dense switch, indexed by the method id
+  -> MOV ECX,[EAX]; MOV ECX,[ECX+0xc]; ADD ECX,EAX; MOV EAX,[ECX]; MOV EDX,[EAX+<slot>]; CALL EDX
+```
+
+A method WITH arguments reads them off the stream first, so its branch is a long function; a **no-arg method's
+branch is a bare stub** whose single job is that virtual call. The `[ECX+0xc]` hop is a **vbtable** lookup —
+the call goes through a virtual-base subobject's table, not the primary one, so a naive slot sweep answers about
+the wrong table.
+
+⭐ **`slot = (method id + 1) * 4`** on the GameChar/Game interface family — one leading slot, then one per method
+in id order. Measured on eight GameCharInterface methods (`0x1B`, `0x6A`, `0x6B`, `0x6C`, `0x6D`, `0x71`, `0x72`,
+`0x75`), with the ones that already have names as controls, and on `GameInterface` `0x04`. So any method's client
+implementation is directly addressable from its id.
+
+The implementing class is the one whose override is not empty: `GamecodeClient_t` for GameChar/GameInterface and
+`CSClientIncoming_c` for CSPlayerInterface — `GameCharInterface_t` / `CSPlayerInterface_t` are the empty defaults.
+Recipe: `DisasmFn.java` on the dispatcher for the jump table, `ReadVals.java` on `targets + id*4` for the branch,
+`DisasmFn.java` on the stub for the slot, then `DumpVirtualSlotAcrossClasses.java SLOT=<slot> MINSIZE=<slot+8>`
+and `DecompAddrs.java` on the implementing class's override.
+
+⚠️ **An EMPTY override is an answer, not a failure.** `GameCharInterface 0x1B` — 102 frames across 59 of 132
+captures, sent immediately before every `IntendedTeleportIIR` — resolves to an empty `GamecodeClient_t` override,
+so the client does nothing with it and the zone-change handshake is not missing a step.
+
 ## s2c (server->client) tables
 `<no-arg>` = an inserted method with no body fields (no `stream bad` string); its opcode slot is known
-but its name is not recoverable from strings (catalog also missed it). These are the drift insertions.
+but its name is not recoverable FROM STRINGS (catalog also missed it) — see the vtable route above.
 
 ### UniverseInterface — 6 methods (catalog had 6; +0 inserted)
 ```
@@ -50,7 +81,7 @@ but its name is not recoverable from strings (catalog also missed it). These are
 0x2001  DispatchAckAuthenticate
 0x2002  DispatchRedirectToServer
 0x2003  <no-arg>
-0x2004  <no-arg>
+0x2004  DispatchQuitGame   (#792: GameInterface_t::OnQuitGame)
 0x2005  DispatchPong
 0x2006  DispatchPongWithPacketTiming
 0x2007  DispatchInfoToUser
@@ -125,7 +156,7 @@ but its name is not recoverable from strings (catalog also missed it). These are
 0x2018  DispatchResurrectRequest
 0x2019  DispatchSetDbDebugCategory
 0x201A  DispatchSetDbDebugLevel
-0x201B  <no-arg>
+0x201B  <no-arg>  (#792: resolved - GamecodeClient_t's override of vtable +0x70 is EMPTY, a client no-op)
 0x201C  DispatchSetItemStat
 0x201D  DispatchAddToItemSlot
 0x201E  DispatchRemoveFromItemSlot
@@ -204,18 +235,18 @@ but its name is not recoverable from strings (catalog also missed it). These are
 0x2067  DispatchBroadcastMessage
 0x2068  DispatchRequestTrade
 0x2069  DispatchStartTrade
-0x206A  <no-arg>
-0x206B  <no-arg>
+0x206A  DispatchTradeAbort
+0x206B  DispatchAcceptedTrade
 0x206C  DispatchPartnerAcceptedTrade
-0x206D  <no-arg>
+0x206D  DispatchTradeCompleted
 0x206E  DispatchPartnerUpdatedCash
 0x206F  DispatchTradePartnerAddedItem
 0x2070  DispatchTradeAddedItem
-0x2071  <no-arg>
+0x2071  DispatchUnacceptedTrade
 0x2072  <no-arg>
 0x2073  DispatchTradePartnerRemovedItem
 0x2074  DispatchTradeRemovedItem
-0x2075  <no-arg>
+0x2075  DispatchDeleteCachedLDBData
 0x2076  DispatchShortcutBarReply
 0x2077  <no-arg>
 0x2078  <no-arg>

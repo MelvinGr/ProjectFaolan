@@ -236,9 +236,10 @@ namespace Faolan.GameServer
 
 		Task ITradeOutbound.SendAcceptAck(uint recipientId)
 		{
-			// Unnamed in the client's recovered catalog, so it keeps the honest Reserved name; the capture shows its role
-			// unambiguously - it lands on the accepter's own connection, empty, right after their AcceptTrade.
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.Reserved0x6B, []);
+			// #792 named it: its handler is byte for byte DispatchPartnerAcceptedTrade's, on the LOCAL holder instead
+			// of the one the ID32 names - so it is the argument-less YOU half. Which is exactly what the capture
+			// already said: it lands on the accepter's own connection, empty, right after their AcceptTrade.
+			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchAcceptedTrade, []);
 		}
 
 		Task ITradeOutbound.SendPartnerAccepted(uint recipientId, uint partnerId)
@@ -246,11 +247,14 @@ namespace Faolan.GameServer
 			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchPartnerAcceptedTrade, EntityIdCodec.Build(EntityIds.Character(partnerId)));
 		}
 
-		// The empty method 0x6D then the toast - retail sends both, in that order, to each party.
+		// The 0x6D trade-completed method then the toast - retail sends both, in that order, to each party.
 		async Task ITradeOutbound.SendTradeCompleted(uint recipientId)
 		{
-			// Also unnamed in the catalog. It lands on BOTH connections, empty, as the trade commits.
-			await SendTradeRpc(recipientId, GameCharInterfaceMethods.Reserved0x6D, []);
+			// #792 named it too: the client's handler is CoreTradeHolder's own reset - the in-trade flag cleared, the
+			// accepted byte and both cash slots zeroed, both item lists freed - and it fires the trade-ended signal
+			// with 1 where TradeAbort (0x6A) sends 0. The capture agrees: it lands on BOTH connections, empty, as the
+			// trade commits.
+			await SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchTradeCompleted, []);
 			if (ClientForCharacter(recipientId) is { } client)
 				await SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
 		}

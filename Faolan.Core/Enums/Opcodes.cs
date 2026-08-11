@@ -962,13 +962,18 @@ namespace Faolan.Core.Enums
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
 	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	//
+	// ⭐ #792: a no-arg slot is nameable through the INTERFACE VTABLE, because its dispatch branch is a bare stub -
+	// `slot index = method id + 1` on this interface family, so 0x04 is vtable +0x14, and `GameInterface_t`'s
+	// override of it logs `GameInterface_t::OnQuitGame` in the client's own words. Retail sends it 4 times in 4
+	// captures; the handler runs the disconnect/redirect path.
 	public enum GameInterfaceMethods : uint
 	{
 		DispatchPassBlob = 0x00,
 		DispatchAckAuthenticate = 0x01,
 		DispatchRedirectToServer = 0x02,
 		Reserved0x03 = 0x03,
-		Reserved0x04 = 0x04,
+		DispatchQuitGame = 0x04, // GameInterface_t::OnQuitGame (#792)
 		DispatchPong = 0x05,
 		DispatchPongWithPacketTiming = 0x06,
 		DispatchInfoToUser = 0x07,
@@ -1081,6 +1086,10 @@ namespace Faolan.Core.Enums
 		DispatchResurrectRequest = 0x18,
 		DispatchSetDbDebugCategory = 0x19,
 		DispatchSetDbDebugLevel = 0x1A,
+		// ⚠️ #792: NOT nameless for want of looking - `GamecodeClient_t`'s override of its vtable slot (+0x70) is an
+		// EMPTY function, so the client does nothing with it. Retail sends it 102 times across 59 of 132 captures,
+		// immediately before every IntendedTeleportIIR, and the client ignores every one. So the zone-change
+		// handshake is not missing a step we fail to perform - this one is a no-op on the receiving end.
 		Reserved0x1B = 0x1B,
 		DispatchSetItemStat = 0x1C,
 		DispatchAddToItemSlot = 0x1D,
@@ -1158,20 +1167,37 @@ namespace Faolan.Core.Enums
 		DispatchCraftUntrainMessageBox = 0x65,
 		DispatchUnbindItemReply = 0x66,
 		DispatchBroadcastMessage = 0x67,
+		// ⭐ #792: the TRADE block's four no-arg slots, named through the interface VTABLE. On this family the
+		// dispatch branch of a no-arg method is a bare stub calling one virtual slot, and `slot = (method + 1) * 4`
+		// holds on all eight measured (0x1B, 0x6A, 0x6B, 0x6C, 0x6D, 0x71, 0x72, 0x75) - the four that DO have a name
+		// are the controls. `GamecodeClient_t` is the implementing class; `GameCharInterface_t`'s overrides are empty.
+		//
+		//   0x6A -> +0x1AC -> `CoreTradeHolder::TradeAbort()`, the client's own assert string
+		//   0x6B -> +0x1B0 -> the LOCAL holder's `accepted` byte set + the trade window refreshed. Byte for byte the
+		//                     same body as 0x6C's, which is named DispatchPartnerAcceptedTrade and differs only in
+		//                     taking the ID32 of whose holder to stamp - so 0x6B is the argument-less YOU half.
+		//   0x6D -> +0x1B8 -> the holder's own vtable slot 2: clear the character's in-trade flag, zero the accepted
+		//                     byte and both cash slots, free both item lists, then the trade-ended signal with 1
+		//                     where TradeAbort sends 0. ⭐ The CAPTURES say the same thing independently - it lands on
+		//                     BOTH connections, empty, as the trade commits (ITradeOutbound.SendTradeCompleted).
+		//   0x71 -> +0x1C8 -> the exact inverse of 0x6B: the accepted byte set back to 0. Never sent in the corpus.
 		DispatchRequestTrade = 0x68,
 		DispatchStartTrade = 0x69,
-		Reserved0x6A = 0x6A,
-		Reserved0x6B = 0x6B,
+		DispatchTradeAbort = 0x6A,
+		DispatchAcceptedTrade = 0x6B,
 		DispatchPartnerAcceptedTrade = 0x6C,
-		Reserved0x6D = 0x6D,
+		DispatchTradeCompleted = 0x6D,
 		DispatchPartnerUpdatedCash = 0x6E,
 		DispatchTradePartnerAddedItem = 0x6F,
 		DispatchTradeAddedItem = 0x70,
-		Reserved0x71 = 0x71,
-		Reserved0x72 = 0x72,
+		DispatchUnacceptedTrade = 0x71,
+		Reserved0x72 = 0x72, // #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus.
+
 		DispatchTradePartnerRemovedItem = 0x73,
 		DispatchTradeRemovedItem = 0x74,
-		Reserved0x75 = 0x75,
+		// #792: the client logs "DeleteCachedLDBData remote method was called." under its `LDB` category, then builds
+		// the LDB cache object and resets it. Never sent in the corpus.
+		DispatchDeleteCachedLDBData = 0x75,
 		DispatchShortcutBarReply = 0x76,
 		Reserved0x77 = 0x77,
 		Reserved0x78 = 0x78,

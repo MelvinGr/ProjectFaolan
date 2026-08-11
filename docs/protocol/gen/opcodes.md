@@ -742,18 +742,18 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x67` | `0x2067` | `DispatchBroadcastMessage` |  |
 | `0x68` | `0x2068` | `DispatchRequestTrade` |  |
 | `0x69` | `0x2069` | `DispatchStartTrade` |  |
-| `0x6A` | `0x206A` | `Reserved0x6A` |  |
-| `0x6B` | `0x206B` | `Reserved0x6B` |  |
+| `0x6A` | `0x206A` | `DispatchTradeAbort` |  |
+| `0x6B` | `0x206B` | `DispatchAcceptedTrade` |  |
 | `0x6C` | `0x206C` | `DispatchPartnerAcceptedTrade` |  |
-| `0x6D` | `0x206D` | `Reserved0x6D` |  |
+| `0x6D` | `0x206D` | `DispatchTradeCompleted` |  |
 | `0x6E` | `0x206E` | `DispatchPartnerUpdatedCash` |  |
 | `0x6F` | `0x206F` | `DispatchTradePartnerAddedItem` |  |
 | `0x70` | `0x2070` | `DispatchTradeAddedItem` |  |
-| `0x71` | `0x2071` | `Reserved0x71` |  |
-| `0x72` | `0x2072` | `Reserved0x72` |  |
+| `0x71` | `0x2071` | `DispatchUnacceptedTrade` |  |
+| `0x72` | `0x2072` | `Reserved0x72` | #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus. |
 | `0x73` | `0x2073` | `DispatchTradePartnerRemovedItem` |  |
 | `0x74` | `0x2074` | `DispatchTradeRemovedItem` |  |
-| `0x75` | `0x2075` | `Reserved0x75` |  |
+| `0x75` | `0x2075` | `DispatchDeleteCachedLDBData` |  |
 | `0x76` | `0x2076` | `DispatchShortcutBarReply` |  |
 | `0x77` | `0x2077` | `Reserved0x77` |  |
 | `0x78` | `0x2078` | `Reserved0x78` |  |
@@ -851,7 +851,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x01` | `0x2001` | `DispatchAckAuthenticate` |  |
 | `0x02` | `0x2002` | `DispatchRedirectToServer` |  |
 | `0x03` | `0x2003` | `Reserved0x03` |  |
-| `0x04` | `0x2004` | `Reserved0x04` |  |
+| `0x04` | `0x2004` | `DispatchQuitGame` | GameInterface_t::OnQuitGame (#792) |
 | `0x05` | `0x2005` | `DispatchPong` |  |
 | `0x06` | `0x2006` | `DispatchPongWithPacketTiming` |  |
 | `0x07` | `0x2007` | `DispatchInfoToUser` |  |

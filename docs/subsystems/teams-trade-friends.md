@@ -204,11 +204,30 @@ One scalar each, written bare and big-endian with no header — the same rule th
 own-facing. Built by `TradeRemovedItemCodec`, gated by `TradeRemovedItemCodecTests`.
 [V1: docs/re/aoc-client-rpc-methods.json]
 
-⚠️ Still uncaptured, and NOT built: what closes the partner's window on **cancel** / **decline**, whether an
-internal **move** notifies the partner at all, and whether a partner going offline mid-trade produces anything. The
-client's dispatch table names no method for any of them — the slots around the trade run (`Reserved0x6A`, `0x6B`,
-`0x6D`, `0x71`, `0x72`, `0x75`) are unnamed — so unlike the remove pair there is nothing to recover. Open work in
-Gitea #427.
+### ⭐ The no-arg slots around the trade run are named after all (#792)
+
+The client's dispatch table names none of them, and it cannot: its method catalog records a method's ARGUMENT
+signature, and these have none. But a no-arg method's dispatch branch is a bare stub calling one **interface
+vtable slot**, and on this family `slot = (method + 1) * 4` — measured on all eight, with the four that already
+have names as the controls. `GamecodeClient_t` is the implementing class (`GameCharInterface_t`'s overrides are
+all empty), so its override IS the semantics:
+
+| method | vtable | what the client does |
+|---|---|---|
+| `0x6A` `DispatchTradeAbort` | `+0x1AC` | `CoreTradeHolder::TradeAbort()` — the client's own assert string |
+| `0x6B` `DispatchAcceptedTrade` | `+0x1B0` | sets the LOCAL holder's `accepted` byte and refreshes the window — **byte for byte `0x6C`'s body**, on your own holder instead of the one its ID32 names |
+| `0x6D` `DispatchTradeCompleted` | `+0x1B8` | the holder's own reset: in-trade flag cleared, `accepted` and both cash slots zeroed, both item lists freed, then the trade-ended signal with **1** where `TradeAbort` sends **0** |
+| `0x71` `DispatchUnacceptedTrade` | `+0x1C8` | the exact inverse of `0x6B` — `accepted` back to 0. Never sent in the corpus |
+| `0x72` | `+0x1CC` | fires the trade-window refresh signal and nothing else. Never sent |
+| `0x75` `DispatchDeleteCachedLDBData` | `+0x1D8` | not trade at all — logs *"DeleteCachedLDBData remote method was called."* Never sent |
+
+⭐ Two of those agree with what the CAPTURES already said, independently: `0x6B` lands on the accepter's own
+connection right after their `AcceptTrade`, and `0x6D` on both connections as the trade commits — which is
+exactly what the two handlers do.
+
+⚠️ Still uncaptured, and NOT built: whether an internal **move** notifies the partner at all, and whether a
+partner going offline mid-trade produces anything. **Cancel is no longer a blank**, though: `0x6A` is
+`TradeAbort`, it takes no body, and it is what closes a window without committing. Open work in Gitea #427.
 
 ## Friend list
 
