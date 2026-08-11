@@ -11,6 +11,25 @@ The point of this file is that a gap can never go silent. A doc that quietly omi
 
 Every gap below is a tracked Gitea issue, so it lives on the backlog, not just here.
 
+⚠️ **`ProtocolCitationTests` cannot check that the tracked issue is still OPEN**, only that the V0's text appears
+in this file. So a gap whose ticket closes goes silently untracked with the gate green — which is exactly what
+happened to four of them (#132, #426, #498, #508 all closed with their gaps still live; refiled as #795–#798 on
+2026-08-11). The test has no network, so this cannot be automated in the suite. Audit it by hand when closing a
+ticket that owns a gap:
+
+```zsh
+python3 - <<'EOF'
+import json, urllib.request, re
+tok = open('<your gitea token path>').read().strip()
+for n in sorted({int(m) for m in re.findall(r'Tracked: Gitea #(\d+)', open('docs/protocol/gaps.md').read())}):
+    d = json.load(urllib.request.urlopen(urllib.request.Request(
+        'https://git.groenendaal.io/api/v1/repos/MelvinGr/projectfaolan/issues/%d' % n,
+        headers={'Authorization': 'token ' + tok})))
+    if d['state'] == 'closed':
+        print('⛔ #%d is CLOSED but still tracks a gap: %s' % (n, d['title']))
+EOF
+```
+
 ---
 
 ## Transport
@@ -184,7 +203,7 @@ trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay)
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
 
 ### The friend/guild state stamp's ONLINE value
-**Tracked: Gitea #426.** [V0: the friend state's online stamp] The chat-tier friend state
+**Tracked: Gitea #796.** [V0: the friend state's online stamp] The chat-tier friend state
 (`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 whose OFFLINE meaning is solved — a unix last-seen,
 identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
 value's id SPACE is not.
@@ -205,7 +224,7 @@ so today every online friend renders as whatever that id happens to name.
 
 
 ### What `npc_type` 1 and 2 mean
-**Tracked: Gitea #508.** [V0: what npc_type 1 and 2 mean] `NpcStats.npc_type` (field 14) is the NPC kind, and one
+**Tracked: Gitea #797.** [V0: what npc_type 1 and 2 mean] `NpcStats.npc_type` (field 14) is the NPC kind, and one
 of the inputs to the nameplate's rank decoration. **4** is clear from behaviour: 534 of its 897 rows are shop
 vendors and 513 have a conversation, i.e. ordinary interactive NPCs.
 
@@ -433,7 +452,7 @@ from the table alone. We allow the LEADER only, the narrowest rule that cannot b
 threshold that would quietly let the wrong members remove people.
 
 ### The guild bank's two message bodies
-**Tracked: Gitea #132.** [V0: the guild withdrawal body] [V0: the guild cash update body] `GuildWithdrawMoney`
+**Tracked: Gitea #795.** [V0: the guild withdrawal body] [V0: the guild cash update body] `GuildWithdrawMoney`
 (c2s `0x2035`) and `DispatchGuildUpdateCash` (s2c `0x2052`) are the only guild-bank messages that exist —
 there is no deposit method, because guild money is fed by the guild TAX (`0x2029`). Neither body is captured, and
 that is not an accident of coverage: a sweep of all 215 captures finds **zero** guild-bank traffic, because no
@@ -449,7 +468,7 @@ Closing this needs an in-client check (open the guild bank, withdraw, see whethe
 capture we could go and find.
 
 ### Which guild ranks may withdraw from the bank
-**Tracked: Gitea #132.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
+**Tracked: Gitea #795.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
 nothing in the corpus, the client's method table or RDB 1000518 (the rank-name ladder) says which rung they hang
 off. We allow the LEADER only — the narrowest rule that cannot be abused — and refuse everyone else, rather than
 guessing a threshold that would quietly let the wrong members drain the bank.
@@ -496,7 +515,7 @@ kills; the corpus cannot separate those without a PvP session, which is the capt
 
 
 ### Two Tarantia wagons with different max health under one name
-**Tracked: Gitea #498.** [V0: why two Tarantia wagons carry different max health under one name] The
+**Tracked: Gitea #798.** [V0: why two Tarantia wagons carry different max health under one name] The
 destructible trailer's word 1 is the object's **max health**, and it is a per-template constant across all 976
 shipped destructibles — every object sharing a name shares a max — with exactly one exception: two `Wagon` rows
 in Tarantia Common District ship at **58,000** and **62,000**. Nothing in the columns separates them (same
