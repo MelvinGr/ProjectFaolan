@@ -367,12 +367,12 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xC0` | `0x20C0` | `Reserved0xC0` |  |
 | `0xC1` | `0x20C1` | `DispatchCSFeedback` |  |
 | `0xC2` | `0x20C2` | `DispatchGroupFinderSignupFailed` |  |
-| `0xC3` | `0x20C3` | `Reserved0xC3` |  |
+| `0xC3` | `0x20C3` | `DispatchGroupFinderRoleSelect` |  |
 | `0xC4` | `0x20C4` | `DispatchGroupFinderSignupSuccess` |  |
 | `0xC5` | `0x20C5` | `DispatchGroupFinderRemoved` |  |
 | `0xC6` | `0x20C6` | `DispatchGroupFinderReadyCheck` |  |
 | `0xC7` | `0x20C7` | `Reserved0xC7` |  |
-| `0xC8` | `0x20C8` | `Reserved0xC8` |  |
+| `0xC8` | `0x20C8` | `DispatchGroupFinderActivityStarted` |  |
 | `0xC9` | `0x20C9` | `DispatchGroupFinderReadyCheckStatus` |  |
 | `0xCA` | `0x20CA` | `DispatchGroupFinderReadyCheckRejected` |  |
 | `0xCB` | `0x20CB` | `DispatchGroupFinderPlayfieldInfo` |  |

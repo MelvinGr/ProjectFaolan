@@ -402,22 +402,27 @@ namespace Faolan.Core.Enums
 		Reserved0xC0 = 0xC0,
 		DispatchCSFeedback = 0xC1,
 		DispatchGroupFinderSignupFailed = 0xC2,
-		// #792: no-arg, so the string catalog has no name for it - but it is not opaque. Its handler is
-		// `CSClientIncoming_c`'s override of vtable +0x310, which fires the signal at `CSIncoming+0x7c`; ⚠️ the
-		// DECOMPILATION of that override is identical to 0xC8's and the two were written off as
-		// indistinguishable on that basis - the `LEA ECX` that picks the signal is dropped, and on a body this
-		// short it is the whole method. In the capture it fires immediately after a SUCCESSFUL
-		// `QueueGroupFinder`, in the slot where the refused attempt got `DispatchGroupFinderSignupFailed`
-		// instead, and before `SelectGroupFinderRoles` / `DispatchGroupFinderSignupSuccess`. Naming it needs the
-		// signal's SUBSCRIBER, which is not reachable from the singleton (Gitea #801 records the exhausted routes).
-		Reserved0xC3 = 0xC3,
+		// #801: no-arg, so the string catalog has no name for it - the name is the client's OWN, read off the
+		// subscriber. `CSClientIncoming_c`'s override of vtable +0x310 fires the signal at `CSIncoming+0x7c`
+		// (⚠️ the DECOMPILATION is identical to 0xC8's - the `LEA ECX` that picks the signal is dropped, and on
+		// a body this short that is the whole method); the group-finder GUI subscribes to it at
+		// `FUN_014ed2f0` with the handler `FUN_014ee020`, which opens the client window `groupFinder_roleSelect`
+		// when no roles have been picked yet, and otherwise re-pushes the already-chosen role bitmask to the UI.
+		// So it is the server asking for the role selection the client answers with `SelectGroupFinderRoles` -
+		// and in the capture it fires exactly there: after a SUCCESSFUL `QueueGroupFinder` (where a refused
+		// attempt got `DispatchGroupFinderSignupFailed` instead) and before `SelectGroupFinderRoles` /
+		// `DispatchGroupFinderSignupSuccess`. The name is ours; the window name is the client's.
+		DispatchGroupFinderRoleSelect = 0xC3,
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
 		Reserved0xC7 = 0xC7,
-		// #792: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, and in the capture it fires
-		// immediately after `DispatchYouJoinedTeam`, i.e. once the group finder's work is done. Gitea #801.
-		Reserved0xC8 = 0xC8,
+		// #801: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, subscribed by the same GUI
+		// block with the handler `FUN_014f07c0`, which sets the "in a group-finder activity" flag
+		// (`DAT_0297d14d`, cleared again by `DispatchGroupFinderRemoved`) and raises the ActionScript signal
+		// whose registered name is `SignalClientStartedGroupFinderActivity`. In the capture it fires
+		// immediately after `DispatchYouJoinedTeam` - the finder has formed the team and the activity is on.
+		DispatchGroupFinderActivityStarted = 0xC8,
 		DispatchGroupFinderReadyCheckStatus = 0xC9,
 		DispatchGroupFinderReadyCheckRejected = 0xCA,
 		DispatchGroupFinderPlayfieldInfo = 0xCB,

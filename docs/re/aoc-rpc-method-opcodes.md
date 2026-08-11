@@ -66,8 +66,44 @@ so the client does nothing with it and the zone-change handshake is not missing 
 were written off as indistinguishable on that basis. They are not: the decompiler drops the `LEA ECX` that
 selects WHICH signal is fired, and the two fire different ones (`instance+0x7c` vs `instance+0x84`) off the
 `CSIncoming.cpp` singleton. `FUN_005385e0` is only its `s_pcInstance != NULL` accessor and `FUN_00443c70` the
-generic signal-emit loop, so on those two functions the whole difference sits in the dropped instruction. Naming
-them needs the SUBSCRIBER of each signal, which is not reachable from the singleton's three xrefs.
+generic signal-emit loop, so on those two functions the whole difference sits in the dropped instruction.
+
+## ⭐ …and the SUBSCRIBER names it — through the Scaleform signal table (#801)
+
+An override that only fires a signal has said what it *does* nowhere; the meaning is in the GUI code that
+subscribed. Two steps, both mechanical:
+
+1. **Map every method to its signal field.** `DumpVtableBodies.java VT=<vtable base> FROM= TO=` dumps each slot's
+   body (following the `SUB ECX,[ECX-4]; JMP` adjustor thunk), and `LEA ECX,[EAX + <off>]` after the singleton
+   getter IS the field. For `CSClientIncoming_c` (vtable `0x01fa4524`, `slot = (id + 1) * 4`) that gives the whole
+   group-finder block: `0xC2`→`+0x78`, `0xC3`→`+0x7c`, `0xC4`→`+0x80`, `0xC8`→`+0x84`, `0xC5`→`+0x88`, … up to
+   `0xD0`→`+0xac`. `DumpSignalSlots.java` prints the same map one line per slot.
+2. **Find the subscriber, and read the name it registered.** ⚠️ Sweeping the singleton's own xrefs finds nothing —
+   the subscriber calls the getter ONCE and keeps the pointer in a register, so the `+0x7c` never appears near a
+   getter call. Sweep the getter's CALLERS instead (`Callers.java FN=5385e0`): `FUN_014ecd80` is the group-finder
+   GUI's connect block, `CALL <getter>; MOV ESI,EAX` then `LEA EAX,[ESI + <off>]; … PUSH <handler>; CALL <connect>`
+   once per signal — **including both of the two that had no name**.
+
+The handlers then name themselves, because the client's UI is **Scaleform/ActionScript** and every signal it
+raises is registered by NAME. `FUN_014ebb80` / `FUN_014ebcc0` / `FUN_014ebe40` are the group finder's registration
+fragments: `MOV [<record>],<name string>; MOV [<record>+4],EAX`. **The signal object sits 8 bytes BEFORE its name
+record** — a record is `{ SignalTarget vtable(4), list head(4), name(4), target(4) }` and the emit
+(`FUN_00b51820`) reads its `this + 0xC`, which is that same record's target field. Controls that pin the −8 and
+would all shift one entry under +8: `DispatchGroupFinderRemoved` → `SignalClientLeftGroupFinder`,
+`DispatchGroupFinderReadyCheckRejected` → `SignalGroupFinderReadyCheckRejected`,
+`DispatchGroupFinderFeaturedRaidNeededRoleUpdated` → `SignalGroupFinderFeaturedRaidNeededRoleUpdated`.
+
+So:
+
+| method | signal | handler | what it does | name |
+|---|---|---|---|---|
+| `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderRoleSelect` (ours — the window's, not the catalog's) |
+| `0xC8` | `+0x84` | `FUN_014f07c0` | sets the "in an activity" flag `DAT_0297d14d` and raises `SignalClientStartedGroupFinderActivity` | `DispatchGroupFinderActivityStarted` |
+
+Both readings agree with where the two sit in the capture: `0xC3` between a successful `QueueGroupFinder` and the
+client's `SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTeam`. A control from the same
+block: `0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
+`groupFinder_readyPrompt` — the name it already had, reproduced by the same read.
 
 ## s2c (server->client) tables
 `<no-arg>` = an inserted method with no body fields (no `stream bad` string); its opcode slot is known
@@ -517,12 +553,12 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20C0  <no-arg>
 0x20C1  DispatchCSFeedback
 0x20C2  DispatchGroupFinderSignupFailed
-0x20C3  <no-arg>
+0x20C3  <no-arg>  (#801: resolved - opens `groupFinder_roleSelect`; `DispatchGroupFinderRoleSelect`)
 0x20C4  DispatchGroupFinderSignupSuccess
 0x20C5  DispatchGroupFinderRemoved
 0x20C6  DispatchGroupFinderReadyCheck
 0x20C7  <no-arg>
-0x20C8  <no-arg>
+0x20C8  <no-arg>  (#801: resolved - raises `SignalClientStartedGroupFinderActivity`; `DispatchGroupFinderActivityStarted`)
 0x20C9  DispatchGroupFinderReadyCheckStatus
 0x20CA  DispatchGroupFinderReadyCheckRejected
 0x20CB  DispatchGroupFinderPlayfieldInfo
