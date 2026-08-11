@@ -71,19 +71,36 @@ namespace Faolan.Importer.Cli
 	// six entities flagged on two sightings - which cannot both be one window. The lower bound is weak (five of the six
 	// are one co-streaming group in one capture, i.e. one event), so it does not settle anything on its own.
 	//
-	// ## ⛔ AND THE `spawnanim` ROUTE IS REFUTED, which is what #794 was for
+	// ## ⭐⭐ AND THE CLIENT'S CONSUMER SETTLES THE READING - it IS the entrance animation (#800)
 	//
-	// #794 proposed driving the sender off each creature's own `spawnanim` - a MonsterData (RDB 1010201) attribute -
-	// and #607 asked the right question first: *does the flag only ever appear on creatures that declare one?*
+	// The wire field lands on client stat `0x19C SpawnAnimation` (`FUN_01458d40` copies `npc_stats+0x24` into it,
+	// which is field 8's slot under the five field->stat identities #797 pinned), and `SimpleChar_t`'s model build -
+	// virtual slot 36, `FUN_01104750` - consumes it:
 	//
-	// **No.** `spawnanim` is a RARE attribute - 174 of the 3,185 shipped MonsterData records carry it, on undead,
-	// demons, frost giants and wraiths, things that claw out of the ground - while of the templates the corpus flags,
-	// **275 wear a creature that declares none and only 14 wear one**. The flag lands on Citizens, Guards, Noblemen
-	// and Nemedian Defenders, none of which has an entrance animation to play.
+	//     if (GetStat(0x19C) != 0) {
+	//         name = monsterData->spawnanim.empty() ? monsterData->defaultidleanim    // +0x13C
+	//                                               : monsterData->spawnanim;         // +0x158
+	//         if (ResolveAnim(name, &length)) PlayAnim(..., 0x80, ...);               // channel "Control/Anim"
+	//         SetStat(0x19C, 0);                                                      // ONE-SHOT
+	//     }
 	//
-	// So the flag does not mean "play this creature's entrance animation", and its duration is not that animation's
-	// length. The sender side stays unimplemented - now because the reading itself is open, not merely the number.
-	// What the state actually IS is tracked in Gitea #800.
+	// See `tools/ghidra/DumpSpawnAnimationConsumer.java`.
+	//
+	// ## ⛔ WHICH OVERTURNS #794's REFUTATION of the `spawnanim` route
+	//
+	// #794 proposed driving the sender off each creature's own `spawnanim`, and #607 asked the right question first:
+	// *does the flag only ever appear on creatures that declare one?* Measured: **no** - `spawnanim` is a RARE
+	// attribute (174 of the 3,185 shipped MonsterData records carry it, on undead, demons, frost giants and wraiths,
+	// things that claw out of the ground) while of the templates the corpus flags, **275 wear a creature that declares
+	// none and only 14 wear one**. The census below still prints that.
+	//
+	// ⚠️ But the INFERENCE from it - "so the flag cannot mean play this creature's entrance animation" - does not
+	// follow, because the client takes `defaultidleanim` for exactly those creatures, in an explicit branch on whether
+	// the `spawnanim` string is empty (`[monsterData+0x168]` is its `_Mysize`). A flagged Citizen replays its idle
+	// animation: invisible, not wrong. So a rare `spawnanim` is no evidence about the flag at all.
+	//
+	// The sender side stays unimplemented, now because the SENDER'S RULE is open (the client clears the stat, so the
+	// duration is not client-side and the corpus cannot pin when retail sets it) - tracked in Gitea #803.
 	public static partial class ReportCli
 	{
 		private static void SpawnAnimation(IReadOnlyList<NamedCapture> captures, string? rdbDir)

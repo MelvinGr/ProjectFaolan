@@ -227,26 +227,40 @@ placement. `PerSpawnEventModes` tallies each field over **all** of a type's sigh
 once, 351 change their answer, 346 of those are ON for the first sighting and off thereafter, and **not one ever
 turns ON** (`--report spawn-animation`).
 
-⛔ **What it is a state OF is open again, because "still playing its entrance animation" is refuted** (#794). That
-reading rested on `spawnanim`, a real MonsterData (RDB 1010201) attribute the client parses into
-`MonsterData+0x158` beside `defaultidleanim` — and the cross-check the reading itself asked for comes back
-negative:
+⭐ **And the CLIENT says what the state is a state of: "you have not played your entrance animation yet"** (#800).
+The wire field lands on client stat `0x19C SpawnAnimation` — `FUN_01458d40` copies `npc_stats+0x24` straight into
+it, the slot NpcStats field 8 occupies under the five field↔stat identities #797 pinned — and `SimpleChar_t`'s
+model build (virtual slot 36, `FUN_01104750`) consumes it:
 
-- `spawnanim` is **rare**: 174 of the 3,185 shipped MonsterData records declare one, on undead, demons, frost
-  giants and wraiths — creatures that claw out of the ground.
-- of the templates the corpus **flags**, **275 wear a creature that declares none** and only **14** wear one.
+```
+if (GetStat(0x19C) != 0) {
+    name = monsterData->spawnanim.empty() ? monsterData->defaultidleanim   // +0x13C
+                                          : monsterData->spawnanim;        // +0x158
+    if (ResolveAnim(name, &length)) PlayAnim(..., 0x80, ...);              // channel "Control/Anim"
+    SetStat(0x19C, 0);                                                     // ONE-SHOT: consumed and cleared
+}
+```
 
-The flag lands on Citizens, Guards, Noblemen and Nemedian Defenders, none of which has an entrance animation to
-play, so it cannot mean "play this creature's entrance animation" and its duration is not that animation's length.
+[V1: tools/ghidra/DumpSpawnAnimationConsumer.java]
 
-The window is bounded **above** at 2.6 s by the tightest observation and **below** at 25.6 s by six entities
-flagged on two sightings — which cannot both be one window. ⚠️ The lower bound is weak: five of the six are one
-co-streaming group in one capture, so it is one event, and a simultaneous respawn of that group would explain it.
-The MonsterData census above needs no timing and is the load-bearing half.
+⛔ **This overturns #794's refutation.** That argument was: `spawnanim` is **rare** (174 of the 3,185 shipped
+MonsterData records declare one, on undead, demons and wraiths — creatures that claw out of the ground) while of
+the templates the corpus flags, **275 wear a creature that declares none** against 14 that do — so the flag lands
+on Citizens and Guards that have no entrance animation to play. The inference does not follow: the client takes
+`defaultidleanim` for exactly those, in an explicit branch on whether the `spawnanim` string is empty
+(`[monsterData+0x168] != 0` is its `_Mysize`). A flagged Citizen replays its idle, which is invisible, not wrong.
+The same window identifies the object the name is read from, by taking three neighbouring defaults from it —
+`weaponmaterialtype` → `EmitterMaterial`, `materialtype` → `ReceiverMaterial`, `collisionradius` → `CharRadius`,
+the offsets the MonsterData loader `FUN_010005E0` writes them to.
 
-The mode-keeping above therefore stays an approximation that sits inside retail's distribution rather than a model
-of the field, and the sender stays unimplemented — now because the *reading* is open, not merely the number. What
-the state actually IS is open work in Gitea #800.
+⚠️ **What is still open is the SENDER's rule, not the meaning.** The client clears the stat, so nothing about the
+duration is client-side, and the corpus cannot pin when retail sets it: the window is bounded **above** at 2.6 s by
+the tightest observation and **below** at 25.6 s by six entities flagged on two sightings — which cannot both be
+one window (five of the six are one co-streaming group in one capture, i.e. one event, so the lower bound is weak).
+A "cleared once delivered" rule fits the stickiness result exactly and the 7.3% login-burst rate poorly; a flat
+time window fits the burst rate and not the 2.6 s bound. The mode-keeping above therefore stays an approximation
+that sits inside retail's distribution rather than a model of the field, and the sender stays unimplemented —
+tracked in Gitea #803.
 
 ⚠️ **The correction used to live inline in the placed-NPC path, so it only ever reached placed NPCs.** Pets,
 companions and mounts are lifted by their own importers and have **no `NpcSpawns` placement at all** — they are

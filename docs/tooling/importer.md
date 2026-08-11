@@ -264,9 +264,11 @@ of the 4,687 entities sighted more than once **351 are MIXED** (refuting a per-c
 are ON for the first sighting and off thereafter, and 0 ever turn ON** — so it is a **decaying state**, an entity
 inside a window that has closed by the next sighting. Two more since #794: the window is bracketed **above** at
 2.6 s and **below** at 25.6 s, which cannot both be one window (the lower bound is one co-streaming group in one
-capture, so it is weak); and ⛔ the `spawnanim` reading is **refuted** — 174 of 3,185 MonsterData records declare
-one, and of the templates the corpus flags **275 wear a creature that declares none** against 14 that do, so the
-flag cannot mean "play this creature's entrance animation". Needs `--Content:RdbDir` for that half),
+capture, so it is weak); and the MonsterData census — 174 of 3,185 records declare a `spawnanim`, and of the
+templates the corpus flags **275 wear a creature that declares none** against 14 that do. ⛔ That census used to be
+read as refuting "play this creature's entrance animation"; it does not, because the client falls back to
+`defaultidleanim` for exactly those creatures (#800, `tools/ghidra/DumpSpawnAnimationConsumer.java`). Needs
+`--Content:RdbDir` for that half),
 `follow-pairs` (#741: every NPC-follows-NPC binding the corpus carries — the mode-07 formation MoveTasks — with
 both ends resolved to creature NAMES and the offsets each follower held. Grouped by creature PAIR, because the
 formation is only visible as a GROUP: the four `Black Dragon Guard Patroller`s behind one captain each hold a
