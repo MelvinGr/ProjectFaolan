@@ -146,8 +146,8 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 8,175,543 / 8,241,205 = 99.2%
 property-run field ids read         : 16 / 83
-elements rendered as a sentence     : 49,967 / 61,840 = 80.8%
-...or accounted for                 : 59,923 / 61,840 = 96.9%
+elements rendered as a sentence     : 50,733 / 61,840 = 82.0%
+...or accounted for                 : 60,689 / 61,840 = 98.1%
 ```
 
 ⭐ **The second line is the honest one.** Four buckets, and only two of them are our debt:
@@ -162,8 +162,8 @@ elements rendered as a sentence     : 49,967 / 61,840 = 80.8%
   `InheritedComboAttack` (753) is the opposite shape: its sentence IS found (`PerSecond`, "%s per second") and
   the `%s` is a number the record does not contain — branch `0x014a103e` computes it as
   `key224 × 0.01 × [ESI] / [EBX]`, two floats out of the INVOCATION context. Rendering it would invent a number;
-- **a branch but no sentence we can find** — 796 over 2 kinds, and it is essentially one:
-  `ChangeInheritedWeaponAttack` (795), whose branch composes several clauses out of six tokens;
+- **a branch but no sentence we can find** — 30 over 2 kinds, and what is left of it is the tail of
+  `ChangeInheritedWeaponAttack` (29 elements whose hate / damage-type clause is deliberately not drawn, below);
 - **a sentence whose slots are not bound** — 1,121 over 8 kinds, led by `HitPercentage`'s live-state arms,
   `UpgradeCombo` and `AddSpellProc`.
 
@@ -330,6 +330,50 @@ its own type-id string `%.2fm%s wide column to target` when there is no distance
 
 One more exception worth knowing: **`53007`** reads key `754`, which its record does not declare at all —
 corroborating the existing note that this branch *"reads all four slots plus key 32"*.
+
+### `ChangeInheritedWeaponAttack` (53250): a header enum plus four optional clauses
+
+The same composing shape with more parts. The **header** is picked by key 84, and it is a two-value enum —
+anything else bails out of the branch entirely (`CMP EDI,1 ; JNZ 0x014a22e4`), so such an element draws nothing:
+
+| key 84 | token | English |
+|---|---|---|
+| 0 | `FinishingComboAttack` | "Finishing attack" |
+| 1 | `OpeningComboAttack` | "Opening attack" |
+
+Then one clause per metric, each gated on **its own** key being non-zero:
+
+| key | tokens | English |
+|---|---|---|
+| 66 | `Increase`/`DecreaseComboDPS` | "Increase Damage per Sec %s" |
+| 67 | `Increase`/`DecreaseComboCriticalChance` | "Increase Critical Chance %s" |
+| 68 | `Increase`/`DecreaseComboHateAdjustment` | "Increase Hate Adjustment %s" |
+| 69 | `ChangeComboDamageType` | "Changes damage type to %s" |
+
+⚠️ **`Increase` is the DEFAULT; `Decrease` is taken only when the driver is NEGATIVE.** The client loads the
+Increase token first and overwrites it under `JNS` (jump if not sign), so **zero takes Increase**. Writing the
+test as `> 0` instead of `>= 0` inverts every clause whose driver is 0 — which, given the next paragraph, is all
+of them. `Annihilate`'s own description ("Substantially **increases** the critical strike chance of the
+conqueror's next combo") is what caught it.
+
+⛔ **The client picks the CRIT clause's increase/decrease from key 66, not key 67** — `TEST EBX,EBX` at
+`0x014a1fe3`, where `EBX` still holds the DPS delta fetched at `0x014a1de5` and nothing has reloaded it. Read
+literally that is a **client bug**: a positive key 66 with a negative key 67 would draw "Increase Critical Chance
+-N". It is reproduced rather than corrected, because retail is authoritative — and it is **unobservable** either
+way: key 66 is **0 on all 796 shipped elements** (key 67 is non-zero on 767), so the DPS clause never fires and
+the crit clause always takes its Increase arm.
+
+⚠️ The crit value is a **float**, unlike the DPS clause's int: `CVTSI2SS` off key 67's slot then
+`MULSS [0x020b5944]`, and that constant is **0.025**. So `Annihilate`'s stored 1000 draws as `25`.
+
+⚠️ Each clause is a separate **line** in the client (each ends in a `FUN_010d1850` push onto a string vector),
+not one sentence. `--report spell-tooltip` draws one line per element, so it joins them with `"; "` — that
+separator is the report's presentation, not something the client ships.
+
+⚠️ The HATE and DAMAGE-TYPE clauses are gated but **not rendered**, deliberately: no shipped element carries
+either key, so the hate scale is unmeasured and the damage-type `%s` has no resolved name space. An element that
+grew one is left unrendered so the census says so, rather than drawn with an invented number — which is the 29
+elements still in that bucket.
 
 ### `AddSpellLineProc` (53070): it COMPOSES its line, so no sentence lookup could ever have found one
 

@@ -631,6 +631,10 @@ namespace Faolan.Importer.Cli
 			if (element.Kind == AddSpellLineProcKind)
 				return SpellLineProcSentence(ctx, element);
 
+			// `ChangeInheritedWeaponAttack` (branch 0x014a1da2) - the same composing shape with more clauses.
+			if (element.Kind == ChangeInheritedWeaponAttackKind)
+				return InheritedWeaponAttackSentence(ctx, element);
+
 			// `AddComboProc` picks its sentence by WHICH of its two spell slots are present (branch 0x0149ec8e): key
 			// 88 is the proc run on SELF and key 236 the one run on the TARGET, and the branch has a token for each
 			// of the three combinations - `%s on self and %s on target`, `%s on self`, `%s on target`. The
@@ -666,6 +670,88 @@ namespace Faolan.Importer.Cli
 			}
 
 			return (ctx.SentenceFor(element.Kind), BindArgs(ctx, element));
+		}
+
+		// `ChangeInheritedWeaponAttack` (53250), branch 0x014a1da2 - the last kind in #782's "branch but no sentence"
+		// bucket, and a composer like `AddSpellLineProc` with four optional clauses instead of two.
+		//
+		// The HEADER is picked by key 84, and it is a two-value enum: anything but 0 or 1 bails out of the branch
+		// entirely (`CMP EDI,1 ; JNZ 0x014a22e4`), so such an element draws nothing at all.
+		//
+		//     key 84 = 0  ->  FinishingComboAttack  "Finishing attack"
+		//     key 84 = 1  ->  OpeningComboAttack    "Opening attack"
+		//
+		// Then one clause per metric, each gated on ITS OWN key being non-zero:
+		//
+		//     key 66  Increase/DecreaseComboDPS             "Increase Damage per Sec %s"
+		//     key 67  Increase/DecreaseComboCriticalChance  "Increase Critical Chance %s"
+		//     key 68  Increase/DecreaseComboHateAdjustment  "Increase Hate Adjustment %s"
+		//     key 69  ChangeComboDamageType                 "Changes damage type to %s"
+		//
+		// ⚠️ Each clause is a separate LINE in the client (each ends in a `FUN_010d1850` push onto a string vector),
+		// not one sentence. This report draws one line per element, so the clauses are joined with "; " - that
+		// separator is THIS report's presentation and not something the client ships.
+		//
+		// ⛔ **The client picks the crit clause's increase/decrease from key 66, not key 67** - `TEST EBX,EBX` at
+		// 0x014a1fe3, where `EBX` still holds the DPS delta fetched at 0x014a1de5 and nothing has reloaded it. Read
+		// literally that is a client BUG: a positive key 66 with a negative key 67 would draw "Increase Critical
+		// Chance -N". It is reproduced here rather than corrected, because retail is authoritative - and it is
+		// UNOBSERVABLE either way: key 66 is **0 on all 796 shipped elements** (key 67 is non-zero on 767), so the
+		// DPS clause never fires at all and the crit clause always takes its Increase arm.
+		//
+		// ⚠️ The crit clause's value is a FLOAT, unlike the DPS clause's int: `CVTSI2SS` off key 67's slot then
+		// `MULSS [0x020b5944]`, and that constant is **0.025**. So `Annihilate`'s stored 1000 draws as 25.
+		//
+		// ⚠️ The HATE and DAMAGE-TYPE clauses are gated but not rendered, and deliberately: no shipped element
+		// carries either key, so the hate scale is unmeasured and the damage-type `%s` has no resolved name space.
+		// An element that grew one returns null and lands in the census's unrendered bucket, which SAYS so - rather
+		// than being drawn with an invented number.
+		private static (string? Format, object?[]? Args) InheritedWeaponAttackSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var header = element.Value(GameActionTypes.KeyComboAttackSlot) switch
+			{
+				0 => ctx.SentenceForToken("FinishingComboAttack"),
+				1 => ctx.SentenceForToken("OpeningComboAttack"),
+				_ => null // the client's own bail-out: it draws nothing for any other value
+			};
+
+			if (header == null)
+				return (null, null);
+
+			var dps = (int)(element.Value(GameActionTypes.KeyComboAttackDps) ?? 0);
+			var crit = (int)(element.Value(ComboAttackCriticalKey) ?? 0);
+			var hate = element.Value(ComboAttackHateKey) ?? 0;
+			var damageType = element.Value(ComboAttackDamageTypeKey) ?? 0;
+
+			if (hate != 0 || damageType != 0)
+				return (null, null); // see the remarks - unmeasured, so not drawn
+
+			var clauses = new List<string>();
+			// ⚠️ `Increase` is the DEFAULT and `Decrease` is taken only when the value is NEGATIVE - the client loads
+			// the Increase token first and overwrites it under `JNS` (jump if not sign), so ZERO takes Increase. A
+			// `> 0` test instead of `>= 0` inverts every clause whose driver is 0, which is all of them here.
+			if (dps != 0 && Clause(ctx, dps < 0 ? "DecreaseComboDPS" : "IncreaseComboDPS", dps) is { } dpsLine)
+				clauses.Add(dpsLine);
+
+			// ⛔ The sign comes from `dps`, not from `crit`. That is the client's bug, reproduced - see the remarks.
+			if (crit != 0 && Clause(ctx, dps < 0 ? "DecreaseComboCriticalChance" : "IncreaseComboCriticalChance", crit * ComboCriticalScale) is { } critLine)
+				clauses.Add(critLine);
+
+			if (clauses.Count == 0)
+				return (header, []);
+
+			return ($"{header}: {string.Join("; ", clauses)}", []);
+
+			// One clause, its token sentence filled with the magnitude. Returns null when the token is missing, so a
+			// half-built line is never emitted.
+			static string? Clause(TooltipContext ctx, string token, double value)
+			{
+				var format = ctx.SentenceForToken(token);
+
+				return format != null && LdbFormat.TryApply(format, [value % 1 == 0 ? ((long)value).ToString(CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture)], out var text)
+					? text
+					: null;
+			}
 		}
 
 		// `AddSpellLineProc` (53070), branch 0x0149f69e. It looked like a kind with three tokens and no sentence; it is
@@ -1149,6 +1235,7 @@ namespace Faolan.Importer.Cli
 		private const uint AddComboProcKind = 53212;
 		private const uint AddPercentSkillModifierKind = 53189;
 		private const uint AddSpellLineProcKind = 53070;
+		private const uint ChangeInheritedWeaponAttackKind = 53250;
 		private const uint AreaFormulaKind = 53087;
 		private const uint AttackAddTargetsKind = 53273;
 		private const uint CastNanoKind = 53051;
@@ -1165,6 +1252,14 @@ namespace Faolan.Importer.Cli
 		private const uint ResurrectTargetKind = 53227;
 		private const uint TeamFormulaKind = 53066;
 		private const uint TeamPropagatedBuffKind = 53224;
+
+		// `ChangeInheritedWeaponAttack`'s three unnamed clause keys, and the float its crit value is scaled by
+		// (0x020b5944 = 0.025). Per-TYPE like every unnamed key - 67 is a stat id on `AddPercentSkillModifier` and a
+		// cooldown delta on `UpgradeCombo`.
+		private const int ComboAttackCriticalKey = 67;
+		private const int ComboAttackHateKey = 68;
+		private const int ComboAttackDamageTypeKey = 69;
+		private const double ComboCriticalScale = 0.025;
 
 		// `AddSpellLineProc`'s wrapper, a LITERAL format at its push site (0x208d2e0) rather than an LDB entry -
 		// "<the composed sides>, <rate> Procs per Minute".
