@@ -302,15 +302,15 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000513 | `RDBComboLookup_c` | 960 | 16 B | 24 B | 12 classes × 80 levels — decoded below |
 | 1000514 | `ArmorMitigation_c` | 0 | 16 B | — | empty (see below) |
 | 1000520 | `CoreTokenHolder` | 29 | 14 B | variable | the count is a BYTE, not a word — decoded below |
-| 1000625 | `TokenStateTable` | 1 | 16 B | 4 B | |
+| 1000625 | `TokenStateTable` | 1 | 16 B | 4 B | one record, and its only column is `0` — no content on this build |
 | 1065101 | `FeatClassTable_c` | 49 | 16 B | 16 B | |
 | 1065103 | `PvPConRating_c` | 200 | 16 B | 8 B | |
 
-String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B) and
-1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
+String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B), 1000520
+(29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
 Decoded past their shape: 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
-1000517, 1000518, 1000520, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
+1000517, 1000518, 1000520, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
@@ -628,6 +628,36 @@ What the neighbouring exe strings say the subsystem does: `YouReceivedQuantityOf
 exists per token (`SubscriberSimpleTrophy1BonusPercent`, `SubscriberEsteemTokenBonusPercent`, …) — i.e. a
 subscription multiplies token income per currency. Nothing on our side models tokens yet; this is the catalog a
 model would key on.
+
+## Decoded: 1000626 `CoreChatFilterDataTable` — the per-language profanity list
+
+The other variable-width table the stride sweep could not walk. It is a two-level list, and it parses to the
+byte with nothing left over:
+
+```
+[u32 type][u32 id][u32 version]              # the usual 12-byte RDB-Id header
+[u32 fileVersion = 1][u32 languageCount = 6]
+languageCount × [str langCode][u32 wordCount][wordCount × str]
+
+str = [u32 byteLength][bytes]                # ⚠️ UTF-8, not Latin-1
+```
+
+⚠️ **The strings are UTF-8 and u32-length-prefixed**, both unlike the wire (`[u16][Latin-1]`). The length is a
+BYTE count rather than a character count — `Abscheißer` is 10 characters and 11 bytes — and the 707 Korean
+entries settle the encoding beyond the one German case.
+
+| language | words |
+|---|---:|
+| `de` | 55 |
+| `en` | 60 |
+| `es` | 19 |
+| `fr` | 29 |
+| `ko` | 707 |
+| `pl` | 50 |
+| **total** | **920** |
+
+The list itself is not reproduced here. Nothing on our side filters chat; this is the catalog a filter would
+read, and its shape is what #469 wanted.
 
 ## Decoded: 1000509 / 1000510 / 1000512 `PlayfieldPvPData_c` — playfield → PvP RULESET
 
