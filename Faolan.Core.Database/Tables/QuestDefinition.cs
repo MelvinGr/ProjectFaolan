@@ -213,6 +213,14 @@ namespace Faolan.Core.Database.Tables
 		//     carry a count-style goal (Collect 23 / DestroyObject 25) against 26% - but 12889 is a single Kill goal
 		//     and breaks both.
 		//   * the line's TIER - both 0 and 1 appear among the six.
+		//   * PARALLEL objectives - "several distinct sub-goals that must all be done, all at Sequence 1" fits four
+		//     of the six beautifully (12583's four severed heads, 16004's seven faction documents, 13473's seven
+		//     Bowls of Set) and is refuted by its own denominator: 358 quests have >= 4 goals all at one sequence
+		//     and only THREE of them carry bit 3.
+		//   * carrying a goal of TYPE 5 - the six hold 12 of the catalog's 42 type-5 goals, a 29% share out of
+		//     6 quests in 5,049, which reads like a rule and is not: 27 quests carry a type-5 goal and only three
+		//     of them are bit-3. The concentration is because these six are goal-HEAVY, which the line above
+		//     already covers.
 		//
 		// ⚠️ Worth knowing while looking at bit 4: every bracket tag that carries it is Khitai/RoTG content
 		// (`RoTG_Storyline`, Northern Grasslands, Warmonk Monastery, Chosain_Province, Mines_of_Chosain,
