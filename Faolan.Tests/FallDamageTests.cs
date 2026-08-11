@@ -89,7 +89,7 @@ namespace Faolan.Tests
 				if (fall < 7f)
 					continue;
 
-				var predicted = FallDamage.Resolve(fall, pool);
+				var predicted = FallDamage.ResolveFromDistance(fall, pool);
 				// Cast BEFORE subtracting: both are uint, so `predicted - damage` underflows to ~4e9 whenever the
 				// prediction is the smaller of the two, and every error reads as a few million percent.
 				var error = MathF.Abs((float)predicted - damage) / damage;
@@ -127,12 +127,112 @@ namespace Faolan.Tests
 			Assert.InRange(damageRatio / poolRatio, 0.5f, 2f);
 		}
 
+		// ⭐ #515: the SPEED law, over every fall the corpus pairs with a landing move AND a health pool - the
+		// `--report fall-speed` table, at player scale rather than wire scale. This is the shipped path;
+		// `Observations` above is the fallback's.
+		//
+		// (impact speed in world units per second, max health, observed damage, observed debuff spell)
+		public static readonly IReadOnlyList<object[]> SpeedObservations =
+		[
+			[12.21f, 5949u, 77u, 0u], // the smallest DAMAGING fall - below the fitted intercept, see the class remarks
+			[12.75f, 6341u, 141u, 0u],
+			[14.55f, 6341u, 379u, 0u],
+			[15.00f, 5949u, 237u, 0u],
+			[15.15f, 263u, 13u, 0u], // Hoxxling's 263 pool - the 24x spread that makes the law pool-relative
+			[16.59f, 6341u, 510u, 0u],
+			[16.60f, 6518u, 190u, 0u],
+			[16.61f, 6341u, 156u, 0u],
+			[16.79f, 6341u, 95u, 0u],
+			[17.30f, 6518u, 262u, 0u],
+			[17.69f, 6341u, 421u, 0u],
+			[17.75f, 6126u, 425u, FallDamage.BruisedBodySpellId],
+			[17.75f, 6518u, 246u, 0u],
+			[18.21f, 6518u, 346u, 0u],
+			[18.24f, 6341u, 1115u, 0u],
+			[18.42f, 6518u, 31u, 0u], // ⚠️ the one ANOMALY: 0.5% of pool at a speed its neighbours cost 5-18% at
+			[19.06f, 6341u, 617u, 0u],
+			[19.25f, 6341u, 657u, 0u],
+			[19.59f, 6341u, 766u, 0u],
+			[20.00f, 6341u, 1016u, FallDamage.BruisedBodySpellId],
+			[20.34f, 263u, 32u, FallDamage.BruisedBodySpellId],
+			[20.85f, 6341u, 1299u, FallDamage.BruisedBodySpellId],
+			[20.94f, 6126u, 981u, FallDamage.BruisedBodySpellId],
+			[20.99f, 6518u, 1178u, FallDamage.BruisedBodySpellId],
+			[21.10f, 6341u, 968u, 0u],
+			[21.27f, 6341u, 1507u, FallDamage.BruisedBodySpellId],
+			[21.50f, 6341u, 1058u, FallDamage.BruisedBodySpellId],
+			[23.79f, 6126u, 1669u, 0u],
+			[25.64f, 6341u, 1843u, FallDamage.BruisedBodySpellId],
+			[26.51f, 6341u, 2395u, FallDamage.BruisedBodySpellId],
+			[31.11f, 6341u, 3284u, 0u],
+			[31.26f, 6341u, 2191u, 0u],
+			[33.04f, 6518u, 3822u, 0u],
+			[35.13f, 6341u, 5344u, 0u]
+		];
+
+		// The speed law reproduces the corpus, asserted as a DISTRIBUTION for the same reason the distance one is: a
+		// worst case would be asserting precision the corpus does not have. Every fall counts here, not only the deep
+		// ones - which is the point of #515, since the short falls are exactly where the sampled drop fell apart.
+		[Fact]
+		public void SpeedLaw_TracksTheCorpus_OnEveryPairedFall()
+		{
+			var errors = new List<(float Error, string Row)>();
+			foreach (var row in SpeedObservations)
+			{
+				var (speed, pool, damage) = ((float)row[0], (uint)row[1], (uint)row[2]);
+				var predicted = FallDamage.Resolve(speed, pool);
+				var error = MathF.Abs((float)predicted - damage) / damage;
+				errors.Add((error, $"{speed:F2} u/s, pool {pool}: observed {damage}, predicted {predicted} ({error:P0} off)"));
+			}
+
+			Assert.Equal(34, errors.Count);
+
+			var sorted = errors.Select(e => e.Error).OrderBy(e => e).ToArray();
+			var median = (sorted[16] + sorted[17]) / 2f;
+			Assert.True(median < 0.30f, $"the speed law drifted - median error {median:P0}; worst row {errors.MaxBy(e => e.Error).Row}");
+
+			// ⚠️ The single worst row is the 18.42 u/s fall that cost 0.5% of pool where its neighbours at the same
+			// speed cost 5-18%. It is named rather than tolerated silently: no monotone law in the impact speed can
+			// fit it and its neighbours at once, so it is an observation about the corpus, not about the model.
+			var worst = errors.MaxBy(e => e.Error);
+			Assert.StartsWith("18.42 u/s", worst.Row);
+			Assert.True(errors.Count(e => e.Error < 1.20f) >= 30, $"only {errors.Count(e => e.Error < 1.20f)} of 34 within 120%");
+		}
+
+		// ...and it beats the height law on the corpus it was fitted on, which is the whole claim of #515. Compared
+		// on the SAME falls, so the difference is the predictor and not the sample: each fall's sampled drop is
+		// recovered from its own speed at the corpus's median gravity, which is the best case the drop ever had.
+		[Fact]
+		public void SpeedLaw_BeatsTheHeightLaw_OnTheSameFalls()
+		{
+			const float gravity = 19.27f; // the corpus median, `--report fall-speed`
+
+			float Median(Func<float, uint, uint> resolve, Func<float, float> input)
+			{
+				var errs = SpeedObservations
+					.Select(row => ((float)row[0], (uint)row[1], (uint)row[2]))
+					.Select(r => MathF.Abs((float)resolve(input(r.Item1), r.Item2) - r.Item3) / r.Item3)
+					.OrderBy(e => e)
+					.ToArray();
+
+				return (errs[errs.Length / 2 - 1] + errs[errs.Length / 2]) / 2f;
+			}
+
+			var speedError = Median(FallDamage.Resolve, v => v);
+			var heightError = Median(FallDamage.ResolveFromDistance, v => v * v / (2 * gravity));
+
+			Assert.True(speedError < heightError,
+				$"the speed law should be the better predictor: speed p50 {speedError:P0} vs height p50 {heightError:P0}");
+		}
+
 		// A fall inside the free distance costs nothing at all, however big the pool.
 		[Fact]
 		public void ShortFalls_CostNothing()
 		{
 			Assert.Equal(0u, FallDamage.Resolve(0f, 6341));
-			Assert.Equal(0u, FallDamage.Resolve(FallDamage.FreeFallDistance, 6341));
+			Assert.Equal(0u, FallDamage.Resolve(FallDamage.FreeFallSpeed, 6341));
+			Assert.Equal(0u, FallDamage.ResolveFromDistance(0f, 6341));
+			Assert.Equal(0u, FallDamage.ResolveFromDistance(FallDamage.FreeFallDistance, 6341));
 			Assert.Equal(0u, FallDamage.ResolveDebuff(0, 6341));
 		}
 
@@ -142,6 +242,7 @@ namespace Faolan.Tests
 		public void HugeFall_IsClampedToThePool()
 		{
 			Assert.Equal(6341u, FallDamage.Resolve(10000f, 6341));
+			Assert.Equal(6341u, FallDamage.ResolveFromDistance(10000f, 6341));
 		}
 
 		// A pool of 0 (an entity whose vitals were never seeded) must not produce damage or a division by zero.
@@ -149,6 +250,7 @@ namespace Faolan.Tests
 		public void ZeroPool_IsInert()
 		{
 			Assert.Equal(0u, FallDamage.Resolve(50f, 0));
+			Assert.Equal(0u, FallDamage.ResolveFromDistance(50f, 0));
 			Assert.Equal(0u, FallDamage.ResolveDebuff(100, 0));
 		}
 	}

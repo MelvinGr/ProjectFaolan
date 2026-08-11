@@ -44,12 +44,11 @@ namespace Faolan.Core.Progression
 	///         </code>
 	///     </para>
 	///     <para>
-	///         ⭐ <b>And the trade-off this was "kept on distance" to avoid does not exist.</b> The old note here said
-	///         distance was preferred because it is what the server can compute without trusting a client-reported
-	///         speed. But impact speed and fall height are the SAME quantity under <c>v² = 2gh</c>: a law in <c>v</c>
-	///         is the same law in <c>h</c> through a fixed transform the server applies to its own tracked height. So
-	///         the client's speed is the <b>calibration oracle</b> - the precise measurement the constants are fitted
-	///         against - and never a runtime input. Nothing is trusted at runtime; only the accuracy is gained.
+	///         ⭐ <b>And the trade-off this was "kept on distance" to avoid does not exist.</b> The worry was that
+	///         driving damage off a client-reported speed means TRUSTING the client for a server-side number. It does
+	///         not: the server's own fall HEIGHT is reconstructed from the client's position stream, so the velocity
+	///         in the same packet is the same source, one field over - and without the 200 ms sampling loss. Nothing
+	///         new is trusted; only accuracy is gained.
 	///     </para>
 	///     <para>
 	///         ⚠️ <b>The pool is now measured and the constants still stand - the refit is blocked one step further
@@ -61,13 +60,30 @@ namespace Faolan.Core.Progression
 	///         against which the deepest falls come out at 225% of the pool. (<c>Delta</c> is also in HUNDREDTHS.)
 	///     </para>
 	///     <para>
-	///         With correct pools, <c>--report fall-speed</c> fits <c>frac = 0.026 x (h - 5.05)</c> at a measured
-	///         gravity of 19.3, and <c>0.032 x (h - 3.26)</c> at 25.6 - the shipped <c>0.038 x (h - 3.08)</c> sits
-	///         inside that spread. ⚠️ And gravity can only be measured as <c>v^2 / 2h</c> against the SAMPLED drop,
-	///         which is the very quantity #515 exists to stop using: over the deep falls it runs p10 7.6 / median
-	///         19.3 / p90 36.2. So the conversion from the client's precise speed into the server's own height units
-	///         is now the loosest part of the chain, and refitting against it would trade a known error for an
-	///         unknown one. <b>The constants are left as they are, deliberately.</b>
+	///         ⭐ <b>The law is fitted in v², which needs no gravity at all - that is what unblocked the refit.</b>
+	///         Expressing it in HEIGHT requires dividing by a measured gravity, and gravity can only be measured as
+	///         <c>v² / 2h</c> against the SAMPLED drop - the very quantity this exists to stop using (over the deep
+	///         falls it runs p10 7.6 / median 19.3 / p90 36.2, so the conversion was the loosest link in the chain).
+	///         But <c>frac = a(h − h0)</c> and <c>frac = A(v² − V0)</c> are the SAME model under <c>v² = 2gh</c>, with
+	///         gravity absorbed into the fitted slope (<c>A = a/2g</c>, <c>V0 = 2g·h0</c>). Fit in v², apply to the
+	///         speed the client reports, and the conversion never happens.
+	///     </para>
+	///     <para>
+	///         Measured over the same 34 falls, all three predictors scored the same way (<c>--report fall-speed</c>):
+	///     </para>
+	///     <para>
+	///         <code>
+	///         correlation with the damage fraction    v² 0.957    v 0.937    sampled drop 0.625
+	///         |error|, best case for each             v² p50 21%              drop p50 40% (refitted on this corpus)
+	///         </code>
+	///     </para>
+	///     <para>
+	///         So <see cref="Resolve" /> is the speed law and <see cref="ResolveFromDistance" /> the fallback for a
+	///         landing whose move carried no velocity block. ⚠️ The fitted intercept (13.96 u/s) sits ABOVE the
+	///         smallest damaging fall in the corpus (12.21 u/s, which cost 1.3% of pool), so that one fall is
+	///         predicted free - the opposite of how #504 pinned the distance intercept. Pinning here instead costs
+	///         accuracy on every other fall (p50 31% against 21%), and the error it removes is a trivial fall
+	///         costing nothing rather than 1.3%, which is the forgiving direction.
 	///     </para>
 	///     <para>
 	///         ⚠️ Two pairing rules the report needs and a naive pass does not have: the environmental school carries
@@ -121,6 +137,20 @@ namespace Faolan.Core.Progression
 		public const float DamagePerUnit = 0.038f;
 
 		/// <summary>
+		///     A landing slower than this costs nothing - the speed law's own intercept, and the same statement
+		///     <see cref="FreeFallDistance" /> makes in the other unit (13.96 u/s is 5.05 units at the corpus's
+		///     median gravity).
+		/// </summary>
+		public const float FreeFallSpeed = 13.96f;
+
+		/// <summary>
+		///     Fraction of max health lost per unit of <c>v² − FreeFallSpeed²</c>. Fitted over the same 34 falls as
+		///     everything else here; see the remarks for why v² and not v (the law is linear in the SQUARE of the
+		///     impact speed, because that is what is linear in height).
+		/// </summary>
+		public const float DamagePerSpeedSquared = 0.00067221f;
+
+		/// <summary>
 		///     Damage (as a fraction of max health) at or above which the fall applies <b>Bruised Body</b>. Just under
 		///     the lowest observed Bruised Body fall (7.977%) - see the inversion note in the remarks for why it is not
 		///     a round 8%.
@@ -131,10 +161,35 @@ namespace Faolan.Core.Progression
 		public const float BrokenBonesFraction = 0.46f;
 
 		/// <summary>
+		///     The health cost of a landing at <paramref name="impactSpeed" /> world units per second (a positive
+		///     number - the magnitude of the downward velocity the client reported) for a character whose maximum
+		///     health is <paramref name="maxHealth" />. 0 for any landing at or below <see cref="FreeFallSpeed" />.
+		///     <para>
+		///         This is the PRIMARY path: the speed comes off the landing move, where
+		///         <see cref="ResolveFromDistance" />'s height is reconstructed from 200 ms-apart position samples
+		///         that lose a fraction of a unit at each end. Same corpus, same 34 falls: <c>v²</c> explains the
+		///         damage at r = 0.96 against the sampled drop's 0.63.
+		///     </para>
+		/// </summary>
+		public static uint Resolve(float impactSpeed, uint maxHealth)
+		{
+			if (impactSpeed <= FreeFallSpeed || maxHealth == 0)
+				return 0;
+
+			var damage = maxHealth * DamagePerSpeedSquared * (impactSpeed * impactSpeed - FreeFallSpeed * FreeFallSpeed);
+			return (uint)MathF.Round(MathF.Min(damage, maxHealth));
+		}
+
+		/// <summary>
 		///     The health cost of a fall of <paramref name="fallDistance" /> world units for a character whose maximum
 		///     health is <paramref name="maxHealth" />. 0 for any fall inside the free distance.
+		///     <para>
+		///         ⚠️ The FALLBACK, for a landing whose move carried no velocity block. It is the same law in the
+		///         other unit and its constants are unchanged; what differs is the accuracy of the input, which is
+		///         the whole of #515.
+		///     </para>
 		/// </summary>
-		public static uint Resolve(float fallDistance, uint maxHealth)
+		public static uint ResolveFromDistance(float fallDistance, uint maxHealth)
 		{
 			if (fallDistance <= FreeFallDistance || maxHealth == 0)
 				return 0;

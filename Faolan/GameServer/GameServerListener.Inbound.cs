@@ -106,6 +106,21 @@ namespace Faolan.GameServer
 						? new Quaternion(0f, body.ReadFloat(), 0f, body.ReadFloat())
 						: body.ReadQuaternion();
 
+					// #515: the client's own VELOCITY, which is what fall damage is resolved from. The c2s move is the
+					// same record as the s2c one - retail's relay is the c2s body with its env byte flipped, verified
+					// byte-exact (see the echo below) - so the tail is CharDCMoveIIR's: `[u8 flag2]` and then, when
+					// flag2 < 8, the optional vectors the flag1 bits gate, velocity first.
+					//
+					// Read here rather than through CharDCMoveCodec because this handler works off the already-open
+					// stream and the codec wants a whole body with its own header; it is the same grammar either way.
+					float? moveVerticalSpeed = null;
+					if (body.Position < body.Length)
+					{
+						var moveFlag2 = body.ReadByte();
+						if (moveFlag2 < 8 && !moveFlags.HasFlag(MoveFlag.NoVelocityVector) && body.Length - body.Position >= 12)
+							moveVerticalSpeed = body.ReadVector3().Y;
+					}
+
 					// The WorldEntity owns the live transform (Gitea #404); the persisted Character is only the spawn seed.
 					//
 					// The `?? sessionCharacter` fallbacks below are NOT dead (the TODOs asking that are now answered):
@@ -161,7 +176,7 @@ namespace Faolan.GameServer
 					// position" (the entity's is already committed above): the fall's apex is seeded from
 					// WorldEntity.LastGroundedY, which the service maintains itself.
 					if (moveEntity != null)
-						await _environment.OnPlayerMoved(client, moveEntity, livePosition, moveFlags);
+						await _environment.OnPlayerMoved(client, moveEntity, livePosition, moveFlags, moveVerticalSpeed);
 
 					// Moving cancels an in-flight cast (#347): a real TRANSLATION invalidates the deferred Resolve()
 					// via the cast token. Turning in place leaves the position unchanged, so aiming a ground-target

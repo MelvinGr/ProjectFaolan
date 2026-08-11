@@ -83,6 +83,16 @@ namespace Faolan.GameServer.World
 		// The highest Y reached during the current airborne run; meaningless while grounded.
 		public float AirborneApexY { get; set; }
 
+		// The fastest DOWNWARD speed the client itself reported during the current airborne run, in world units per
+		// second (a positive number), or 0 if it reported none. #515: this is what fall damage is resolved from -
+		// the client's own number, sampled at its own rate, where the apex-minus-landing drop above is reconstructed
+		// from position samples ~200 ms apart and loses a fraction of a unit at each end. Over the corpus's 34 falls
+		// v² explains the damage at r = 0.96 against the drop's 0.63.
+		//
+		// ⚠️ The MAXIMUM over the run rather than the last sample: a fall accelerates, so the fastest report IS the
+		// one nearest the ground, and taking the maximum survives a stray record arriving after the landing.
+		public float AirborneFallSpeed { get; set; }
+
 		// The Y of the last move that was still on the GROUND. This, not the previous position, is what seeds a fall's
 		// apex: a fall off a ledge has no rising samples at all, so its highest point is the ground it left. Tracked
 		// here rather than read from Position because the move handler commits the new position BEFORE the fall check

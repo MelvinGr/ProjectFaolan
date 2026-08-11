@@ -330,6 +330,81 @@ namespace Faolan.Importer.Cli
 			var smallest = points.Where(p => p.Frac > 0).MinBy(p => p.H);
 			Console.WriteLine($"   smallest damaging fall: h {smallest.H:F2} for {smallest.Frac:P1} of pool " +
 				$"- an intercept above that predicts ZERO for it, which is why the shipped one is pinned, not fitted.");
+
+			FitInSpeed(falls);
+		}
+
+		// ⭐ The SAME law, fitted in v^2 - and this is the one that ships (#515).
+		//
+		// The height fit above has to divide by a measured gravity, and gravity can only be measured as `v^2 / 2h`
+		// against the SAMPLED drop - the very quantity this ticket exists to stop using. Over the deep falls it runs
+		// p10 7.6 / median 19.3 / p90 36.2, so the conversion was the loosest link in the chain and refitting through
+		// it would have traded a known error for an unknown one. That is why the constants sat unchanged.
+		//
+		// The blocker dissolves by never converting. `frac = a * (h - h0)` and `frac = A * (v^2 - V0)` are the SAME
+		// model under `v^2 = 2gh` - gravity is absorbed into the fitted slope (`A = a / 2g`, `V0 = 2g * h0`) - so
+		// fitting in v^2 needs no gravity at all, and the server applies it to the impact speed the client reports on
+		// the landing move rather than to a height it reconstructed. ⚠️ That is not a new trust assumption: the
+		// server's sampled drop already comes from the client's own position stream, so the velocity in the same
+		// packet is the same source, one field over and without the 200 ms sampling loss.
+		private static void FitInSpeed(IReadOnlyList<(string Capture, uint Handle, double Damage, float ImpactY, float DropY, int Samples, double Gap, uint Pool, uint Debuff)> falls)
+		{
+			var points = falls.Select(f => (V2: (double)f.ImpactY * f.ImpactY, Frac: f.Damage / f.Pool)).ToList();
+			var meanV2 = points.Average(p => p.V2);
+			var meanF = points.Average(p => p.Frac);
+			var sxx = points.Sum(p => (p.V2 - meanV2) * (p.V2 - meanV2));
+			if (sxx <= 0)
+				return;
+
+			var slope = points.Sum(p => (p.V2 - meanV2) * (p.Frac - meanF)) / sxx;
+			var free = meanV2 - meanF / slope;
+			Console.WriteLine();
+			Console.WriteLine($"⭐ the same law in SPEED, which needs no gravity: frac = {slope:F8} * (v^2 - {free:F1})" +
+				$"   i.e. free below {Math.Sqrt(free):F2} u/s   [shipped: {FallDamage.DamagePerSpeedSquared:F8} * (v^2 - {FallDamage.FreeFallSpeed * FallDamage.FreeFallSpeed:F1})]");
+
+			// The three candidate predictors, scored the same way, so "the speed is better" is a measurement rather
+			// than a preference. Pearson rather than Spearman here: the fit is linear in each x, and what is being
+			// compared is how much of the VARIANCE each one explains, not merely the ordering.
+			Console.WriteLine($"   correlation with the damage fraction:  v^2 {Pearson([.. points.Select(p => p.V2)], [.. points.Select(p => p.Frac)]):F3}" +
+				$"   v {Pearson([.. falls.Select(f => (double)-f.ImpactY)], [.. points.Select(p => p.Frac)]):F3}" +
+				$"   sampled drop {Pearson([.. falls.Select(f => (double)f.DropY)], [.. points.Select(p => p.Frac)]):F3}");
+
+			Errors("   |error| in v^2", points.Select(p => (Math.Max(0, slope * (p.V2 - free)), p.Frac)));
+			Errors("   |error| as SHIPPED (speed)",
+				points.Select(p => ((double)FallDamage.Resolve((float)Math.Sqrt(p.V2), 10000) / 10000, p.Frac)));
+			Errors("   |error| on the sampled drop, best case (refit)", RefitOnDrop(falls));
+		}
+
+		// The sampled-drop law refitted on this same corpus, so the comparison is against its BEST case rather than
+		// against constants fitted on an older pass. Anything worse than this is the measurement, not the model.
+		private static IEnumerable<(double Predicted, double Actual)> RefitOnDrop(
+			IReadOnlyList<(string Capture, uint Handle, double Damage, float ImpactY, float DropY, int Samples, double Gap, uint Pool, uint Debuff)> falls)
+		{
+			var pts = falls.Select(f => (H: (double)f.DropY, Frac: f.Damage / f.Pool)).ToList();
+			var mh = pts.Average(p => p.H);
+			var mf = pts.Average(p => p.Frac);
+			var sxx = pts.Sum(p => (p.H - mh) * (p.H - mh));
+			var slope = sxx > 0 ? pts.Sum(p => (p.H - mh) * (p.Frac - mf)) / sxx : 0;
+			var free = slope != 0 ? mh - mf / slope : 0;
+			return pts.Select(p => (Math.Max(0, slope * (p.H - free)), p.Frac));
+		}
+
+		private static void Errors(string label, IEnumerable<(double Predicted, double Actual)> rows)
+		{
+			var errors = rows.Where(e => e.Actual > 0).Select(e => Math.Abs(e.Predicted - e.Actual) / e.Actual).Order().ToList();
+			if (errors.Count == 0)
+				return;
+
+			Console.WriteLine($"{label}: p50 {errors[errors.Count / 2]:P0}, p90 {errors[errors.Count * 9 / 10]:P0}, max {errors[^1]:P0}");
+		}
+
+		private static double Pearson(double[] a, double[] b)
+		{
+			var ma = a.Average();
+			var mb = b.Average();
+			var sa = Math.Sqrt(a.Sum(x => (x - ma) * (x - ma)));
+			var sb = Math.Sqrt(b.Sum(x => (x - mb) * (x - mb)));
+			return sa <= 0 || sb <= 0 ? double.NaN : a.Zip(b, (x, y) => (x - ma) * (y - mb)).Sum() / (sa * sb);
 		}
 
 		// Spearman rank correlation - the right measure here because the law is monotone but not linear (damage goes

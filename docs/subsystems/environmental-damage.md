@@ -42,15 +42,37 @@ leaves the ground. `EnvironmentService` is an edge detector over that bit.
 only while the character is RISING (`flag1` `0x42`) and clears for the descent (`0x02`), so keying on it misses
 every fall that starts from a ledge rather than a jump — which is most of them.
 
-The drop is measured from the airborne run's **apex**, seeded with the last grounded height so a step off a ledge
-(which has no rising samples at all) still measures from the top.
-
 Damage is **a fraction of MAX HEALTH**, not a flat number — see `FallDamage` for the full derivation over all 28
-corpus events across four characters whose pools span 263 to 8241:
+corpus events across four characters whose pools span 263 to 8241.
+
+⭐ **What it is a fraction OF is the client's own reported impact SPEED, squared** (#515). The move record that
+lands carries the vertical velocity; `EnvironmentService` keeps the fastest downward one seen during the airborne
+run, and that is what the law is applied to:
+
+```
+damage = maxHealth × 0.00067221 × (v² − 13.96²)          v = impact speed, world units per second
+```
+
+The **fallback**, for a landing whose move carried no velocity block, is the same law in the other unit, applied
+to the drop measured from the airborne run's **apex** (seeded with the last grounded height, so a step off a ledge
+— which has no rising samples at all — still measures from the top):
 
 ```
 damage = maxHealth × 3.8% × (fallDistance − 3.08)
 ```
+
+⚠️ **Two things about that switch, both easy to get backwards.**
+
+- It is **not** a new trust assumption. The server's own drop is reconstructed from the client's position stream,
+  so the velocity in the same packet is the *same source*, one field over — and without the ~200 ms sampling loss
+  that costs a fraction of a unit at each end and dominates a 4-unit fall. Over the corpus's 34 paired falls, `v²`
+  explains the damage at **r = 0.957** against the sampled drop's **0.625**, and the median error is 21% against
+  40% (the drop refitted on this same corpus, i.e. its best case).
+- The law is fitted **in v², never converted to height**, and that is what unblocked the refit rather than a new
+  measurement. Height needs a gravity, and gravity can only be measured as `v²/2h` against the sampled drop — the
+  very quantity being replaced (p10 7.6 / median 19.3 / p90 36.2 over the deep falls). `frac = a(h−h₀)` and
+  `frac = A(v²−V₀)` are the same model with gravity absorbed into the slope, so fitting in `v²` never needs it.
+[V3: FallDamageTests.SpeedLaw_BeatsTheHeightLaw_OnTheSameFalls]
 
 The debuff that rides with it comes from a two-tier ladder, applied atomically with the damage:
 

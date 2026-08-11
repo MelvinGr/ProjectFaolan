@@ -43,9 +43,9 @@ namespace Faolan.GameServer.World
 
 		// Every accepted player move runs through here. `position` is the ACCEPTED position (the spellweave trance pins
 		// it), so a rooted caster cannot be pushed into a hazard by a move the server rejected.
-		public async Task OnPlayerMoved(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags)
+		public async Task OnPlayerMoved(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags, float? verticalSpeed = null)
 		{
-			await TrackFall(client, entity, position, flags);
+			await TrackFall(client, entity, position, flags, verticalSpeed);
 			await CheckHazards(client, entity, position);
 			await CheckNoMount(client, entity, position);
 		}
@@ -88,7 +88,7 @@ namespace Faolan.GameServer.World
 		// ⚠️ The Airborne bit (0x40) is NOT the test, even though its name invites it: measured across the fall
 		// captures it is set only while the character is RISING (flag1 0x42) and clears for the descent (0x02), so
 		// keying on it would miss every fall that starts from a ledge rather than a jump - which is most of them.
-		private async Task TrackFall(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags)
+		private async Task TrackFall(INetworkClient client, WorldEntity entity, Vector3 position, MoveFlag flags, float? verticalSpeed)
 		{
 			var airborne = !flags.HasFlag(MoveFlag.NoAccelerationVector);
 			if (airborne)
@@ -99,10 +99,17 @@ namespace Faolan.GameServer.World
 					// Seed the apex with the last GROUNDED height, so a fall straight off a ledge - which has no rising
 					// samples at all - still measures from the top rather than from its first mid-air sample.
 					entity.AirborneApexY = MathF.Max(entity.LastGroundedY, position.Y);
+					entity.AirborneFallSpeed = 0f;
 				}
 
 				if (position.Y > entity.AirborneApexY)
 					entity.AirborneApexY = position.Y;
+
+				// #515: the client's own downward speed, which is what the damage is resolved from. Only the DOWNWARD
+				// half is kept - a jump's rise reports a positive Y and says nothing about how hard the landing will
+				// be - and the maximum, since a fall accelerates.
+				if (verticalSpeed is { } vy && -vy > entity.AirborneFallSpeed)
+					entity.AirborneFallSpeed = -vy;
 
 				return;
 			}
@@ -112,15 +119,25 @@ namespace Faolan.GameServer.World
 				return;
 
 			entity.Airborne = false;
+			var speed = entity.AirborneFallSpeed;
+			entity.AirborneFallSpeed = 0f;
 			var fall = entity.AirborneApexY - position.Y;
-			if (fall <= FallDamage.FreeFallDistance)
+
+			// #515: the SPEED law where the client reported one, the height law where it did not. Both are the same
+			// fit over the same 34 corpus falls; the speed is simply the more accurate input (r = 0.96 against 0.63),
+			// and it is not a new trust assumption - the height above is reconstructed from the same client's
+			// position stream, so the velocity is the same source one field over.
+			var useSpeed = speed > 0f;
+			if (useSpeed ? speed <= FallDamage.FreeFallSpeed : fall <= FallDamage.FreeFallDistance)
 				return;
 
 			var vitals = entity.Vitals;
 			if (vitals == null || vitals.IsDead)
 				return;
 
-			var damage = FallDamage.Resolve(fall, vitals.MaxHealth);
+			var damage = useSpeed
+				? FallDamage.Resolve(speed, vitals.MaxHealth)
+				: FallDamage.ResolveFromDistance(fall, vitals.MaxHealth);
 			if (damage == 0)
 				return;
 
@@ -144,8 +161,9 @@ namespace Faolan.GameServer.World
 			// TickPlayerDeaths' job - it notices IsDead, strips buffs and sends the release screen - so nothing here
 			// duplicates that. LastAttackerHandle stays 0: there is no killer, and attributing the death to the last
 			// mob that hit you would give a wrong instant-respawn (#214).
-			_logger.LogInformation("Environment: {Player} fell {Fall:F1} units for {Damage} damage ({Percent:P0} of {Max}){Debuff}.",
-				client.Session.Character?.Name, fall, damage, (float)damage / vitals.MaxHealth, vitals.MaxHealth,
+			_logger.LogInformation("Environment: {Player} fell {Fall:F1} units at {Speed:F1} u/s for {Damage} damage ({Percent:P0} of {Max}){Source}{Debuff}.",
+				client.Session.Character?.Name, fall, speed, damage, (float)damage / vitals.MaxHealth, vitals.MaxHealth,
+				useSpeed ? "" : " [no reported speed - resolved from the sampled drop]",
 				debuff == 0 ? "" : debuff == FallDamage.BrokenBonesSpellId ? " - Broken Bones" : " - Bruised Body");
 
 			if (vitals.IsDead)
