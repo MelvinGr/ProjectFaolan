@@ -69,26 +69,65 @@ also the constant `NpcStatCore.Bcc` on every captured NPC.)
 `NpcStatCore`: `MonsterData`, `HeadMesh`, `MonsterScale`, `Race`, `SuperFamily`, `Bcc`, `Radius`, `Side`.
 Nothing here needs decoding; it needs an applier.
 
-### The wire form is `StatIIR`, and retail is attested using it
+### ⭐ There is no wire form: the CLIENT executes a polymorph itself
 
 `--report morph-stats` censuses all **48,181** captured `StatIIR` (0xF98E10B3) records — the message that sets
-ONE stat to ONE value on ONE entity — against the shapeshift set:
+ONE stat to ONE value on ONE entity — against the shapeshift set, and comes back nearly empty:
 
 | stat | in the corpus |
 |---|---|
-| 360 `Scale` | **103 records, entity class `0xC350` (Character), values 70 and 80** |
-| 359 `Monster Data` | 4, but on a `SimpleDynel` and all zero — not a morph |
+| 360 `Scale` | 103 records, entity class `0xC350` (Character), only ever the two values 70 and 80 |
+| 359 `Monster Data` | 4, on a `SimpleDynel`, all **zero** |
 | 21, 33, 47, 64, 89, 121, 421 | absent |
 
-⭐ So the CHANNEL is settled without inventing anything: an appearance stat rides an ordinary `StatIIR` on the
-character, and retail does it. No respawn, no `SimpleDynelVisualChange`, no new message.
+That reads as "retail barely uses this channel", and the reason is that **retail does not use a channel at
+all**. Every one of these records is a `GameAction` ELEMENT of the spell, and the client has an executor for
+each kind — one C++ class per `e_Type_GC_GameAction_*`, an 11-slot vtable whose **slot 9 applies** the element
+to its target and **slot 10 removes** it again. The whole table is
+[`gameaction-executors.tsv`](../re/gameaction-executors.tsv) (`tools/ghidra/DumpGameActionExecutors.java`);
+93 of the 214 kinds act client-side, and 121 are bare `return 1` stubs, which is exactly how a
+server-authoritative kind looks (`Hit`, `DPSHit`, `HitPercentage`, `BindAtLocation` are all stubs).
 
-⚠️ **Only `Scale` is attested.** The other seven stats never appear in the corpus, so sending them is an
-extrapolation from one attested member of the set — a well-founded one (they are all the same kind of field on
-the same message) but an extrapolation, and it is why nothing is wired yet. The report prints the whole 77-id
-census beside the morph rows precisely so that "absent" reads as a measurement rather than a broken scan.
+Two of the client-side ones are this family:
 
-Open work tracked in Gitea #709.
+```
+53110 TempChangeSkill  apply  SetStatOverride(statTable, key0 Stat, key39 Value)      FUN_008a7a90
+                       remove ClearStatOverride(statTable, key0 Stat)                 FUN_008a7ae0
+53028 PolyMorph        apply  entry = character->PolyMorphHolder.Add()                FUN_008b5d50
+                              entry = (key799 BodyCatMesh, key761 Value, key796 Flags)
+                              UpdatePolyMorph(holder)
+                       remove drop the entry by its token, UpdatePolyMorph again      FUN_008b5e20
+```
+
+`UpdatePolyMorph` (`FUN_00747dc0`, whose own assert string — *"UpdatePolyMorph run with no polymorph active.
+Programming error."*, debug channel `GameCode/GameActions` — names it) keeps the *effective* entry, re-applying
+only when its `BodyCatMesh` or `Flags` change, and the apply itself is:
+
+```c
+SetStatOverride(0x167 MonsterData, entry.BodyCatMesh);
+if (!(entry.Flags & 2)) SetStatOverride(0x40 HeadMesh, 0);     // FUN_00748070
+if (!(entry.Flags & 1)) SetStatOverride(0x2f HairType,  1);
+```
+
+⭐ **So `HeadMesh = 0` is not missing data — it is the value the client writes for itself**, which is why 44 of
+the imported `Head Mesh` rows carry exactly that. `Flags` bits 0 and 1 are "keep my own hair / my own head";
+bit 2 guards a third effect on the character (`+0x4c`).
+
+⚠️ **Three consequences, and they replace the plan this section used to carry.**
+
+1. **Nothing is sent for a morph.** The client already holds the spell's RDB record — it renders the tooltip
+   and the particle effects from it — and applying the buff is the entire trigger. Pushing the eight appearance
+   stats over `StatIIR` would be inventing traffic retail does not produce, which is also the honest reading of
+   the census above rather than "an extrapolation from one attested member".
+2. **The 103 `Scale` records are not morphs.** Two values over a handful of handles, re-asserted dozens of
+   times in one capture, is a per-character constant being restated, not a shapeshift landing.
+3. **`TempChangeSkill` OVERRIDES the stat, it does not add to it.** `BuffStatEffects` lists 53110 among its
+   flat additive kinds and sums it into `gear + sum(buffs)`. On a zero-baseline stat the two agree, which is
+   why nothing has looked wrong; on a stat gear also feeds they do not. Tracked separately.
+
+Its ramped twin `53221 InterpolatedTempChangeSkill` is the same override with the value lerped between keys
+`0x4b6`/`0x4b7` at the carrier's level (`GameActionMethods_t::TempChangeSkillGameAction`, `FUN_008b1f20` —
+its assert string is what names the family).
 
 ## One row per ELEMENT, and how a reader resolves the set (#783)
 

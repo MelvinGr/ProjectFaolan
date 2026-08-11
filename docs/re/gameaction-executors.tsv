@@ -1,0 +1,234 @@
+# The CLIENT's per-kind GameAction EXECUTOR pair, dumped by tools/ghidra/DumpGameActionExecutors.java (#709).
+# One C++ class per e_Type_GC_GameAction_* kind, each an 11-slot vtable whose slot 9 APPLIES the element to its
+# target and slot 10 REMOVES it again. This says what an element MEANS, where docs/re/gameaction-keylists.tsv only
+# says what its fields ARE; `apply`/`remove` are Ghidra FUN_ addresses in AgeOfConan.exe.
+#
+# `side` is the load-bearing column. `stub` means BOTH executors are a bare `return 1` - the client does nothing
+# for that kind, so it is SERVER-authoritative (Hit, DPSHit, HitPercentage, BindAtLocation and
+# TeleportToBindLocation are all stubs, which is the sanity check that the column reads the right way round).
+# `client` means the client acts on the element itself, from its own RDB copy of the spell record, with no packet
+# involved - 93 of the 214 kinds.
+#
+# Worked examples:
+#   TempChangeSkill  apply = SetStatOverride(statTable, key0 Stat, key39 Value); remove = ClearStatOverride
+#                    - an OVERRIDE of the stat, not an addition to it.
+#   PolyMorph        apply pushes (key799 BodyCatMesh, key761 Value, key796 Flags) into the character's
+#                    PolyMorphHolder and runs UpdatePolyMorph, which sets MonsterData := BodyCatMesh and (unless
+#                    Flags bit 1 / bit 0) HeadMesh := 0 and HairType := 1. See docs/rdb/spell-stat-effects.md.
+#
+# typeId joins docs/re/gameaction-type-ids.tsv and is EMPTY on the 14 classes whose name is absent from it.
+typeId	typeIdHex	name	side	vtable	apply	remove
+53002	0xCF0A	Hit	stub	0204c994	FUN_011b1750	FUN_011b1760
+53003	0xCF0B	AddLayeredSkinnedMesh	client	01fd73e8	FUN_008ac1f0	FUN_008ac290
+53004	0xCF0C	StartParticleEffectOnHead	client	01fd7490	FUN_008ac650	FUN_008ac670
+53005	0xCF0D	BindAtLocation	stub	0204c7b4	FUN_011b08f0	FUN_011b0900
+53006	0xCF0E	TeleportToBindLocation	stub	0204c754	FUN_011b0610	FUN_011b0620
+53007	0xCF0F	HitPercentage	stub	0204c934	FUN_011b1470	FUN_011b1480
+53009	0xCF11	Charge	stub	0204c3d4	FUN_011ae060	FUN_011ae070
+53010	0xCF12	SetMorphValue	client	01fd7088	FUN_008a9b80	FUN_008a9f30
+53013	0xCF15	DPSHit	stub	0204c964	FUN_011b15e0	FUN_011b15f0
+53015	0xCF17	AddFormation	stub	01fd72c8	FUN_008ab720	FUN_008ab730
+53016	0xCF18	Teleport	stub	01fd8520	FUN_008b7c70	FUN_008b7c80
+53018	0xCF1A	AreaRangeFormula	stub	01fd8580	FUN_008b7f50	FUN_008b7f70
+53020	0xCF1C	Bandaging	stub	01fd86a0	FUN_008b8820	FUN_008b8830
+53021	0xCF1D	RenewMana	stub	01fd8640	FUN_008b8540	FUN_008b8550
+53022	0xCF1E	LayeredVisualLocation	client	01fd78c0	FUN_008afd00	FUN_008b00b0
+53023	0xCF1F	CatMesh	client	01fd8428	FUN_008b77d0	FUN_008b7800
+53024	0xCF20	SetFollowerScriptGroup	stub	01fd6c78	FUN_008a7640	FUN_008a7650
+53025	0xCF21	AddHateToPets	stub	01fd6c48	FUN_008a74d0	FUN_008a74e0
+53028	0xCF24	PolyMorph	client	01fd821c	FUN_008b5d50	FUN_008b5e20
+53029	0xCF25	ChangeModifyPercent	client	01fd83f8	FUN_008b7460	FUN_008b7480
+53030	0xCF26	ChangeHitPercent	client	01fd83c8	FUN_008b70f0	FUN_008b7110
+53031	0xCF27	ChangeRecastTime	client	0204cb70	FUN_011b2e20	FUN_011b2e40
+53032	0xCF28	AOERadiusModification	client	01fd8368	FUN_008b6970	FUN_008b6ad0
+53033	0xCF29	ApplyFactionRank	stub	01fd8da4	FUN_008bb4d0	FUN_008bb4e0
+53034	0xCF2A	SummonFollower	stub	01fd6c18	FUN_008a7360	FUN_008a7370
+53035	0xCF2B	EnterSiegeTargeting	client	01fd8c40	FUN_008bb040	FUN_008bb0b0
+53036	0xCF2C	SpawnQuest	stub	01fd67f8	FUN_0089dc90	FUN_0089dca0
+53037	0xCF2D	Charmed	client	01fd8144	FUN_008b4e00	FUN_008b5010
+53038	0xCF2E	PlaceTrap	stub	01fd67c8	FUN_0089db20	FUN_0089db30
+53040	0xCF30	StartTracking	client	0204c614	FUN_011af760	FUN_011af7f0
+53041	0xCF31	ModifyBasedOnStat	client	01fd8174	FUN_008b5380	FUN_008b56e0
+53043	0xCF33	ExecuteBccAction	client	01fd6be8	FUN_008a7130	FUN_008a7200
+53046	0xCF36	AddAbsorb	stub	01fd6af0	FUN_008a6870	FUN_008a6880
+53047	0xCF37	CameraShake	client	01fd6b50	FUN_008a6bb0	FUN_008a6c30
+53048	0xCF38	Name	stub	0204c674	FUN_011aff30	FUN_011aff40
+53053	0xCF3D	CameraRoll	client	01fd6b20	FUN_008a69e0	FUN_008a6a50
+53054	0xCF3E	SpellStatModifier	client	0204cbd0	FUN_011b3360	FUN_011b3380
+53055	0xCF3F	AttractorMesh	client	01fd89ec	FUN_008b9ca0	FUN_008b9d40
+53056	0xCF40	RemoveCowardStatus	stub	0204c9c4	FUN_011b18c0	FUN_011b18d0
+53058	0xCF42	SpawnRemotePet	stub	01fd6a00	FUN_008a5d70	FUN_008a5d90
+53059	0xCF43	LineTeleport	stub	01fd89bc	FUN_008b9b30	FUN_008b9b40
+53060	0xCF44	MonsterShape	client	01fd898c	FUN_008b97a0	FUN_008b9980
+53061	0xCF45	BCCCastSpell	stub	01fd8a4c	FUN_008ba0d0	FUN_008ba0e0
+53062	0xCF46	SpellLineStatModifier	client	0204cba0	FUN_011b3120	FUN_011b3140
+53064	0xCF48	SpawnItemOnCharacter	stub	01fd88b0	FUN_008b9630	FUN_008b9640
+53065	0xCF49	CoreSpellStatModifier	client	01fd6a60	FUN_008a6170	FUN_008a6190
+53066	0xCF4A	TeamFormula	client	01fd8880	FUN_008b9450	FUN_008b94e0
+53067	0xCF4B	ModifyAsRating	client	0204ca20	FUN_011b1a30	FUN_011b1cb0
+53068	0xCF4C	InterpolatedModifyAsRating	client	0204ca50	FUN_011b1fe0	FUN_011b2310
+53069	0xCF4D	ChangeLineRecastTime	client	0204cb40	FUN_011b2b20	FUN_011b2b40
+53070	0xCF4E	AddSpellLineProc	stub	01fd6ec8	FUN_008a95c0	FUN_008a95d0
+53074	0xCF52	LineAOERadiusModification	client	01fd8304	FUN_008b66b0	FUN_008b6720
+53075	0xCF53	ChangeLineHitPercent	client	01fd8398	FUN_008b6d80	FUN_008b6da0
+53076	0xCF54	CoreSpellLineStatModifier	client	01fd6a30	FUN_008a5ef0	FUN_008a5f10
+53077	0xCF55	SetSpellLineRecastTime	client	01fd7920	FUN_008b07d0	FUN_008b0820
+53078	0xCF56	CastSpellOnOwner	stub	01fd8aac	FUN_008ba3b0	FUN_008ba3c0
+53079	0xCF57	CastInvertibleBuff	stub	01fd8b0c	FUN_008ba690	FUN_008ba6a0
+53080	0xCF58	PetFormula	stub	01fd8a7c	FUN_008ba240	FUN_008ba250
+53081	0xCF59	ProxyForceTeleport	stub	01fd87f0	FUN_008b8f30	FUN_008b8f40
+53082	0xCF5A	ProxyTeleport	stub	01fd87c0	FUN_008b8dc0	FUN_008b8dd0
+53083	0xCF5B	ProxyTeleportLine	stub	01fd86d0	FUN_008b8990	FUN_008b89a0
+53084	0xCF5C	ColumnFormula	stub	01fd85e0	FUN_008b8250	FUN_008b8260
+53085	0xCF5D	Recovery	stub	01fd8670	FUN_008b86b0	FUN_008b86c0
+53086	0xCF5E	EnableShieldTaunt	client	01fd6bb8	FUN_008a6d90	FUN_008a6eb0
+53087	0xCF5F	AreaFormula	stub	01fd8610	FUN_008b83c0	FUN_008b83e0
+53088	0xCF60	FilteredAreaFormula	stub	0204cc00	FUN_011b35a0	FUN_011b35c0
+53089	0xCF61	ItemFormula	stub	01fd8820	FUN_008b90a0	FUN_008b90b0
+53090	0xCF62	EnableCriminalStatus	stub	0204c5b4	FUN_011af480	FUN_011af490
+53092	0xCF64	SetTradingPostAccess	stub	01fd6948	FUN_0089ee90	FUN_0089eea0
+53093	0xCF65	LockMetaline	client	01fd7d24	FUN_008b2870	FUN_008b2a50
+53095	0xCF67	DisableMinigames	client	01fd7328	FUN_008aba00	FUN_008aba60
+53096	0xCF68	CoreFilteredAreaFormula	stub	01fd85b0	FUN_008b80d0	FUN_008b80f0
+53097	0xCF69	ChangeTokenPoints	client	01fd8d74	FUN_008bb210	FUN_008bb220
+53098	0xCF6A	TargetSpellStatModifier	client	01fd6ac0	FUN_008a6630	FUN_008a6650
+53099	0xCF6B	TargetSpellLineStatModifier	client	01fd6a90	FUN_008a63f0	FUN_008a6410
+53100	0xCF6C	HateValueAdd	stub	01fd8114	FUN_008b4c90	FUN_008b4ca0
+53101	0xCF6D	HateSetAdd	stub	01fd80e4	FUN_008b4b20	FUN_008b4b30
+53102	0xCF6E	HateModify	stub	01fd80b4	FUN_008b49b0	FUN_008b49c0
+53103	0xCF6F	HatelistStepUp	stub	01fd8084	FUN_008b4840	FUN_008b4850
+53104	0xCF70	HatelistStepDown	stub	01fd8054	FUN_008b46d0	FUN_008b46e0
+53105	0xCF71	RemoveBuff	stub	01fd8b3c	FUN_008ba800	FUN_008ba810
+53107	0xCF73	HatelistStepToTop	stub	01fd8024	FUN_008b4560	FUN_008b4570
+53108	0xCF74	AddBuffCounter	stub	01fd8bcc	FUN_008bad60	FUN_008bad70
+53109	0xCF75	RemoveBuffCounter	stub	01fd8bfc	FUN_008baed0	FUN_008baee0
+53110	0xCF76	TempChangeSkill	client	01fd6d08	FUN_008a7a90	FUN_008a7ae0
+53112	0xCF78	TransferBuffCounter	stub	01fd8ec4	FUN_008bc0c0	FUN_008bc0d0
+53113	0xCF79	ModifyGameAction	client	01fd797c	FUN_008b0980	FUN_008b0bd0
+53116	0xCF7C	LockSpellLine	client	01fd8e04	FUN_008bb900	FUN_008bb940
+53117	0xCF7D	ModifySpellLineCooldown	client	01fd8e34	FUN_008bbb10	FUN_008bbbb0
+53118	0xCF7E	ModifyTemplateCooldown	client	01fd8e64	FUN_008bbd10	FUN_008bbd90
+53119	0xCF7F	LockAllSpells	client	01fd8e94	FUN_008bbef0	FUN_008bbf20
+53120	0xCF80	AddSkill	client	01fd6918	FUN_0089dfd0	FUN_0089e9b0
+53121	0xCF81	Feared	client	01fd82d4	FUN_008b6450	FUN_008b64d0
+53122	0xCF82	Stun	client	01fd827c	FUN_008b6020	FUN_008b6190
+53123	0xCF83	RemoveSpellLineBuff	stub	01fd8b6c	FUN_008ba970	FUN_008ba980
+53124	0xCF84	CoreLockSpellLineTemplate	stub	01fd907c	FUN_008bce80	FUN_008bce90
+53128	0xCF88	AddTokenStateCounter	stub	01fd8f24	FUN_008bc3f0	FUN_008bc400
+53129	0xCF89	Root	client	01fd81ec	FUN_008b5910	FUN_008b5a80
+53130	0xCF8A	GrantAccessToPlayfield	stub	01fd904c	FUN_008bcd00	FUN_008bcd10
+53132	0xCF8C	GenerateName	client	0204c644	FUN_011afcd0	FUN_011afdd0
+53135	0xCF8F	RemoveTokenStateCounter	stub	01fd8f54	FUN_008bc560	FUN_008bc570
+53136	0xCF90	TransferTokenStateCounter	stub	01fd8f84	FUN_008bc6d0	FUN_008bc6e0
+53137	0xCF91	StartParticleEffectOnMount	client	0204c054	FUN_011b3a30	FUN_011b3a50
+53139	0xCF93	SetFlag	client	01fd7ff4	FUN_008b4340	FUN_008b43a0
+53140	0xCF94	ClearFlag	client	01fd7fc4	FUN_008b4170	FUN_008b41e0
+53141	0xCF95	ToggleFlag	client	01fd7f94	FUN_008b3fb0	FUN_008b4010
+53144	0xCF98	TeleportToSaveSpot	stub	01fd7f64	FUN_008b3e40	FUN_008b3e50
+53148	0xCF9C	PersistentStatChange	stub	0204cc30	FUN_011b3720	FUN_011b3730
+53153	0xCFA1	CorePersistentGroundEffect	stub	01fd913c	FUN_008bd400	FUN_008bd420
+53159	0xCFA7	CoreRandomPointAreaFormula	stub	01fd910c	FUN_008bd290	FUN_008bd2b0
+53163	0xCFAB	AddDiminishingReturn	stub	0204cc90	FUN_011b3a10	FUN_011b3a20
+53164	0xCFAC	SaveHere	stub	01fd7f04	FUN_008b3b60	FUN_008b3b70
+53166	0xCFAE	TransferBuff	stub	01fd8fec	FUN_008bca20	FUN_008bca30
+53167	0xCFAF	TransferSpellLine	stub	01fd901c	FUN_008bcb90	FUN_008bcba0
+53168	0xCFB0	StartEffect	client	01fd8dd4	FUN_008bb640	FUN_0089c8c0
+53170	0xCFB2	InheritedComboAttack	stub	0204c4f4	FUN_011aeec0	FUN_011aeed0
+53171	0xCFB3	InheritedComboHit	stub	0204c4c4	FUN_011aed50	FUN_011aed60
+53172	0xCFB4	AdjustHitTable	stub	0204ca80	FUN_011b2560	FUN_011b2570
+53173	0xCFB5	AdjustSpellHitTable	stub	0204cab0	FUN_011b26d0	FUN_011b26e0
+53174	0xCFB6	AdjustSpellLineHitTable	stub	0204cae0	FUN_011b2840	FUN_011b2850
+53176	0xCFB8	DisplayLearnAbility	stub	0204cb10	FUN_011b29b0	FUN_011b29c0
+53177	0xCFB9	Dispell	client	01fd7ed4	FUN_008b38d0	FUN_008b3a00
+53179	0xCFBB	TeleportToGuildCity	stub	0204c524	FUN_011af030	FUN_011af040
+53182	0xCFBE	SpecialAbility	stub	01fd7ea4	FUN_008b3760	FUN_008b3770
+53183	0xCFBF	AddSelfResurrectionSpell	stub	0204c494	FUN_011aebe0	FUN_011aebf0
+53184	0xCFC0	StatMultiplier	client	01fd7e74	FUN_008b3570	FUN_008b35c0
+53189	0xCFC5	AddPercentSkillModifier	client	0204c464	FUN_011ae4b0	FUN_011ae7a0
+53191	0xCFC7	AddComboHate	stub	0204c434	FUN_011ae340	FUN_011ae350
+53194	0xCFCA	Interrupt	stub	0204c554	FUN_011af1a0	FUN_011af1b0
+53195	0xCFCB	DebuffDPS	stub	01fd7b38	FUN_008b1bb0	FUN_008b1bc0
+53197	0xCFCD	BCCCastSpellOnGround	client	01fd8a1c	FUN_008b9f20	FUN_008b9f70
+53198	0xCFCE	LearnRecipe	stub	01fd6978	FUN_0089f000	FUN_0089f010
+53199	0xCFCF	InheritedWeaponAttackHateFlag	stub	0204c7e4	FUN_011b0a60	FUN_011b0a70
+53200	0xCFD0	LockPicking	stub	01fd6ca8	FUN_008a77b0	FUN_008a77c0
+53201	0xCFD1	RemoveSpell	client	01fd7e14	FUN_008b3250	FUN_008b3290
+53202	0xCFD2	LockTemplate	stub	01fd6cd8	FUN_008a7920	FUN_008a7930
+53203	0xCFD3	PickPocket	stub	01fd6da8	FUN_008a8d20	FUN_008a8d30
+53204	0xCFD4	AddBliss	stub	01fd6e68	FUN_008a92e0	FUN_008a92f0
+53205	0xCFD5	AddSwaying	stub	01fd6e08	FUN_008a9000	FUN_008a9010
+53206	0xCFD6	AddFocus	stub	01fd6dd8	FUN_008a8e90	FUN_008a8ea0
+53207	0xCFD7	Feedback	client	01fd7de4	FUN_008b3020	FUN_008b30f0
+53208	0xCFD8	PerformCorruptionCheck	stub	01fd6e98	FUN_008a9450	FUN_008a9460
+53209	0xCFD9	UpgradeCombo	client	01fd70b8	FUN_008aa380	FUN_008aa3f0
+53210	0xCFDA	AddGuildRenown	stub	01fd6e38	FUN_008a9170	FUN_008a9180
+53211	0xCFDB	AddSpellProc	stub	01fd6ef8	FUN_008a9730	FUN_008a9740
+53212	0xCFDC	AddComboProc	stub	01fd6f28	FUN_008a98a0	FUN_008a98b0
+53213	0xCFDD	AddProc	stub	01fd6f58	FUN_008a9a10	FUN_008a9a20
+53217	0xCFE1	Knockback	stub	01fd7d84	FUN_008b2d30	FUN_008b2d40
+53218	0xCFE2	EnableDefensiveStance	client	0204c724	FUN_011b0380	FUN_011b04b0
+53219	0xCFE3	InterpolatedHit	stub	0204c904	FUN_011b1300	FUN_011b1310
+53220	0xCFE4	InterpolatedModify	client	01fd7c70	FUN_008b2320	FUN_008b2620
+53221	0xCFE5	InterpolatedTempChangeSkill	client	01fd7be8	FUN_008b1f20	FUN_008b20b0
+53223	0xCFE7	CastingLevelModifier	client	01fd7b68	FUN_008b1d20	FUN_008b1d80
+53224	0xCFE8	TeamPropagatedBuff	client	01fd8850	FUN_008b9210	FUN_008b9260
+53225	0xCFE9	InheritedWeaponAttack	stub	0204c8d4	FUN_011b1190	FUN_011b11a0
+53226	0xCFEA	SetSpellRecastTime	client	01fd7a88	FUN_008b0f50	FUN_008b1330
+53227	0xCFEB	ResurrectTarget	stub	0204c5e4	FUN_011af5f0	FUN_011af600
+53228	0xCFEC	VisualLocation	client	01fd78f0	FUN_008b0370	FUN_008b0600
+53229	0xCFED	StartClientSideScryScript	client	01fd7824	FUN_008af510	FUN_008af550
+53230	0xCFEE	StartServerSideScryScript	stub	01fd77f4	FUN_008af3a0	FUN_008af3b0
+53231	0xCFEF	StopScryScript	client	01fd77c4	FUN_008aef40	FUN_008af240
+53233	0xCFF1	SetBaseAnim	client	01fd7640	FUN_008ae800	FUN_008ae9d0
+53235	0xCFF3	CinematicCamera	client	01fd75e0	FUN_008ae2f0	FUN_008ae370
+53237	0xCFF5	PlayActionAnim	client	01fd7610	FUN_008ae4d0	FUN_008ae6a0
+53238	0xCFF6	StartParticleEffect	client	01fd750c	FUN_008ad180	FUN_008ad570
+53239	0xCFF7	StopParticleEffect	client	01fd7580	FUN_008adc70	FUN_008adc80
+53240	0xCFF8	AddSkinnedMesh	client	01fd7418	FUN_008ac440	FUN_008ac4b0
+53241	0xCFF9	SendScryEvent	client	01fd73b8	FUN_008abed0	FUN_008ac090
+53242	0xCFFA	Disarm	client	01fd7b08	FUN_008b1490	FUN_008b1930
+53243	0xCFFB	StartParticleEffectOnEquippedItem	stub	01fd74c0	FUN_008acca0	FUN_008accb0
+53244	0xCFFC	SummonMount	stub	01fd7388	FUN_008abd60	FUN_008abd70
+53245	0xCFFD	BanishMount	stub	01fd7358	FUN_008abbf0	FUN_008abc00
+53247	0xCFFF	AreaKnockback	stub	01fd7d54	FUN_008b2bb0	FUN_008b2bd0
+53249	0xD001	ColumnAddTargets	stub	0204c814	FUN_011b0bd0	FUN_011b0be0
+53250	0xD002	ChangeInheritedWeaponAttack	stub	0204c8a4	FUN_011b1020	FUN_011b1030
+53251	0xD003	CodeHooks	stub	01fd69d0	FUN_0089f200	FUN_0089f210
+53252	0xD004	OverrideMostHatedTarget	stub	0204c404	FUN_011ae1d0	FUN_011ae1e0
+53253	0xD005	ChargeSpecialAbility	stub	01fd72f8	FUN_008ab890	FUN_008ab8a0
+53255	0xD007	AddCleaveTargets	stub	0204c874	FUN_011b0eb0	FUN_011b0ec0
+53259	0xD00B	ConeFormula	stub	01fd8550	FUN_008b7de0	FUN_008b7df0
+53262	0xD00E	DefensiveStance	stub	0204c6d4	FUN_011b0210	FUN_011b0220
+53264	0xD010	FrenzyStance	stub	0204c6a4	FUN_011b00a0	FUN_011b00b0
+53265	0xD011	ChangeSubstate	stub	01fd7298	FUN_008ab5a0	FUN_008ab5b0
+53266	0xD012	SetCatMesh	client	01fd7854	FUN_008af6e0	FUN_008af970
+53267	0xD013	Fatality	stub	01fd75b0	FUN_008ae180	FUN_008ae190
+53268	0xD014	SetIdleBaseAnim	client	01fd76bc	FUN_008aeb30	FUN_008aede0
+53269	0xD015	AddTexScript	client	01fd71a8	FUN_008aa7e0	FUN_008aaac0
+53270	0xD016	RemoveTexScript	client	01fd70e8	FUN_008aa5b0	FUN_008aa680
+53271	0xD017	Search	client	01fd7238	FUN_008ab220	FUN_008ab2d0
+53272	0xD018	Sneak	client	01fd7208	FUN_008aaee0	FUN_008ab010
+53273	0xD019	AttackAddTargets	stub	0204c844	FUN_011b0d40	FUN_011b0d50
+53274	0xD01A	RefreshAirSupply	client	01fd71d8	FUN_008aad40	FUN_008aad70
+53275	0xD01B	ToggleSubstate	stub	01fd7268	FUN_008ab430	FUN_008ab440
+53278	0xD01E	BindAtSetLocation	stub	0204c784	FUN_011b0780	FUN_011b0790
+53281	0xD021	AddTag	stub	01fd90ac	FUN_008bcfe0	FUN_0089c8c0
+53282	0xD022	GlobalAOERadiusModification	client	01fd6798	FUN_0089d900	FUN_0089d940
+53283	0xD023	GlobalSpellStatModifier	client	0204c3a4	FUN_011add90	FUN_011ade10
+53284	0xD024	GlobalCoreSpellStatModifier	client	01fd6768	FUN_0089d630	FUN_0089d6d0
+53285	0xD025	GlobalTargetSpellStatModifier	client	01fd6738	FUN_0089d360	FUN_0089d3e0
+53286	0xD026	GlobalModifyGameAction	client	01fd6708	FUN_0089cd10	FUN_0089cfd0
+		ActivateSpec	stub	0204cc60	FUN_011b3890	FUN_011b38a0
+		AwardBonusTokens	stub	01fd90dc	FUN_008bd130	FUN_008bd140
+		CastSpell	stub	01fd8adc	FUN_008ba520	FUN_008ba530
+		Chain	stub	01fd8fb4	FUN_008bc8a0	FUN_008bc8b0
+		EnableKDTree	client	01fd7db4	FUN_008b2ea0	FUN_008b2ec0
+		LearnSpell	stub	01fd7e44	FUN_008b3400	FUN_008b3410
+		ModifySkill	client	01fd6d78	FUN_008a7cd0	FUN_008a8810
+		ProxyTeleportWithPetHandling	stub	01fd8700	FUN_008b8b00	FUN_008b8b10
+		RegisterTemplateSet	client	01fd8ef4	FUN_008bc230	FUN_008bc270
+		SetNewTextEffect	client	01fd8b9c	FUN_008baae0	FUN_008bac00
+		SetStat	client	01fd8458	FUN_008b7960	FUN_008b79e0
+		SpellResistance	stub	01fd7f34	FUN_008b3cd0	FUN_008b3ce0
+		StartSpellweavingMode	stub	0204c584	FUN_011af310	FUN_011af320
+		TeleportOutOfACG	stub	01fd6828	FUN_0089de00	FUN_0089de10
