@@ -125,6 +125,33 @@ check this sheet before deciding a number is missing from the client:
   `DailyQuestsCompletedCap` 3, `DailyUnchainedDungeonsCompletedCap` 1, and the meta caps `DailyMetaCap` 3 /
   `WeeklyMetaCap` 15 / `MonthlyMetaCap` 60 (#656/#509).
 
+  ⭐ **Each cap has exactly one COUNTER stat, and the two families pair one-to-one** — which is what turns two
+  half-answers into a specification of the whole subsystem (#656). The counters are a contiguous run in the
+  client's own stat-name registry (`docs/re/aoc-client-stat-names.tsv`):
+
+  | counter stat | id | its cap | value |
+  |---|---|---|---:|
+  | `DailyPvEKills` | 1000069 | `DailyPvEKillsCap` | 5 |
+  | `DailyPvPKills` | 1000070 | `DailyPvPKillsCap` | 20 |
+  | `DailyMinigameWins` | 1000071 | `DailyMinigameWinsCap` | 1 |
+  | `DailyQuestsCompleted` | 1000072 | `DailyQuestsCompletedCap` | 3 |
+  | `DailyUnchainedDungeonsCompleted` | 1000073 | `DailyUnchainedDungeonsCompletedCap` | 1 |
+  | `DailyDailyCounter` | 1000074 | `DailyMetaCap` | 3 |
+  | `DailyWeeklyCounter` | 1000075 | `WeeklyMetaCap` | 15 |
+  | `DailyMonthlyCounter` | 1000076 | `MonthlyMetaCap` | 60 |
+
+  …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
+  (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is
+  answered by the client carrying a per-character stamp for it, not only by the name.
+
+  The meta ladder reads straight off the numbers: five capped activities feed a daily meta of **3**, which feeds
+  **15** a week (5 days × 3) and **60** a month (4 weeks × 15).
+
+  ⚠️ **Stat `106` is NOT one of these.** The live observation behind #656 — 106 counting 20→19→18 while
+  `DailyPvPKills` counts 0→1→2 — is `PowerSessionRemaining` (0x06A) being spent, a separate quota that happens
+  to start at 20 as well; the captured snapshot ships `0x14` for it. Its own reset stat is
+  `NextPowersessionReset` (105). Two systems, one coincidence of size.
+
 ⚠️ **The exe registers a fallback for every tweak and the shipped sheet overrides them**, so the binary's
 constants are not the game's numbers: all eight daily caps differ between the two. `FUN_010CB540` is the registry
 (`name`, then a `double`); this table is what actually ships.
