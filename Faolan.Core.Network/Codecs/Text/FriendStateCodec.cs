@@ -41,6 +41,25 @@ namespace Faolan.Core.Network.Codecs.Text
 	// token is consumed somewhere else entirely, and `"unknown"` in the friend list is a class-id problem, never a
 	// stamp one.
 	//
+	// ⛔ **And "somewhere else" is NOWHERE - the client never reads `[12]` back** (#796). `ppj::Buddy_t` is
+	// `sizeof == 0x34`, held in a plain vector spanning `[chatClient+0x110] .. [+0x114]` (the add path walks it with
+	// `ADD ESI,0x34`), so every reachable consumer either iterates that vector or is handed a record by the
+	// buddy-changed signal. Both were swept (`tools/ghidra/DumpBuddyFieldReaders.java`, all 139,441 functions):
+	// four functions in the chat client iterate the vector and none of them touches `+0x30`, and the co-read sweep
+	// for `+0x2c` (the online flag - the union's own discriminator) beside `+0x30` returns only the STORE
+	// (`FUN_00a71e00`), the record COPY (`FUN_00a73b20`) and `FriendListNode_c`, whose `+0x30` is a different
+	// struct's field. So the client parses the online stamp, files it, and drops it - and no further reading is
+	// recoverable from the client, which is why the playfield-token reading stays [V0].
+	//
+	// ⚠️⚠️ **`online` is NOT a boolean on the client side.** `FriendListNode_c::PresenceCategory` (`FUN_006ca510`)
+	// copies the byte to node `+0x30` and switches on it: **1 -> category 0, 2 -> category 1, 3 -> category 2**, and
+	// anything else falls through to the offline branch (category 3). The social-list row builder `FUN_016bf320`
+	// then routes the row into one of five sub-lists by that category and INCREMENTS its online counter
+	// (`+0x438`) for 0/1/2 while DECREMENTING it for 3 - so all three of 1/2/3 are ONLINE states and only they are.
+	// Retail sends 1 (online) / 0 (offline) in every captured record and we send the same, so nothing is wrong
+	// today; what `2` and `3` mean is simply not in the corpus. Modelled as `bool` because inventing three names
+	// for two unobserved values would be worse than the narrowing.
+	//
 	// GuildService's member record already carries the same online/last-seen union off the same column.
 	public static class FriendStateCodec
 	{

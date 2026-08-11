@@ -233,16 +233,46 @@ online != 0  ->  [ESI+0x30] = stamp  ; [ESI+0x28] = 0         (online:  the toke
 ```
 
 and BOTH branches then `CALL FUN_0069d0d0` on the chat client itself — the same slot-list walk shape as the
-signal emits named in #801 (`*this` is the head, each node's vtable slot 2 is the callback). So `Buddy_t[12]` is
-not read by whoever stores it: its consumer is a **subscriber** of that buddy-changed signal, and the sweep that
-found the group-finder subscribers (the singleton getter's CALLERS, then the `LEA ECX,[base+off]; PUSH <handler>;
-CALL <connect>` block) is the same one that will find this.
+signal emits named in #801 (`*this` is the head, each node's vtable slot 2 is the callback).
 
-What is left is therefore narrower than it was: find the reader of `Buddy_t[12]`. The standing reading is a
-**playfield-instance token** — `TeamMemberRecord` embeds a `PlayfieldProxy` carrying this exact `0x01EDA8B2` in its
-instance-token slot (Gitea #454), and the distribution agrees (five of six captured friends share it, one carries
-`0x01EDAF93`, 1761 higher: five players in one instance and one in another). Nothing has refuted it and nothing has
-confirmed it in-client.
+⛔ **And the reader of `Buddy_t[12]` does not exist. The client files the online stamp and never reads it back.**
+The struct is now pinned exactly: `sizeof(ppj::Buddy_t) == 0x34`, held in a plain vector spanning
+`[chatClient+0x110] .. [+0x114]` — the add path walks it with `ADD ESI,0x34`, which is what fixes both the size and
+the field map (`+0x00` id, `+0x04` name `std::string`, `+0x20` level, `+0x24` class, `+0x28` last-seen, `+0x2c`
+online, `+0x30` online stamp). So every reachable consumer either iterates that vector or is handed a record by the
+buddy-changed signal, and both were swept over all 139,441 functions
+([`DumpBuddyFieldReaders.java`](../../tools/ghidra/DumpBuddyFieldReaders.java)):
+
+- **four** functions in the chat client address both `+0x110` and `+0x114` (the vector's begin/end) — `FUN_00a70560`,
+  `FUN_00a70a30`, `FUN_00a70de0`, `FUN_00a71e00` — and **none of them touches `+0x30`**;
+- the co-read sweep for `+0x2c` (the online flag, i.e. the union's own discriminator) beside `+0x30` returns, in the
+  chat/friend-list code, only the STORE (`FUN_00a71e00`), the record COPY (`FUN_00a73b20`/`FUN_00a77750`/
+  `FUN_00a77f60`) and `FriendListNode_c` — whose `+0x2c`/`+0x30` are a *different* struct's fields (see below).
+
+The store site is the sweep's own positive control and it shows up in both halves, so a null result is a measured
+negative rather than a mis-aimed query. **Nothing further about this value is recoverable from the client**: the
+standing reading — a **playfield-instance token**, since `TeamMemberRecord` embeds a `PlayfieldProxy` carrying this
+exact `0x01EDA8B2` in its instance-token slot (Gitea #454), and the distribution agrees (five of six captured
+friends share it, one carries `0x01EDAF93`, 1761 higher) — can only be confirmed by watching the client, not by
+reading it.
+
+### ⚠️ The friend state's `online` byte is NOT a boolean
+
+Found while sweeping for the above. `FriendListNode_c` copies the byte to its own `+0x30` (the buddy-apply's
+`*(int *)(node + 0x30) = Buddy_t[11]`), and `FUN_006ca510` — the node's presence-category accessor — switches on it:
+
+```
+node+0x2c (buddy data present) && node+0x30 == 1  ->  category 0
+                                 node+0x30 == 2  ->  category 1
+                                 node+0x30 == 3  ->  category 2
+otherwise                                        ->  the offline branch (category 3; 4 for node+0xe0)
+```
+
+The social-list row builder `FUN_016bf320` then routes each row into one of five sub-lists by that category, and
+**increments its online counter (`+0x438`) for 0/1/2 while decrementing it for 3** — so all three of `1`, `2` and
+`3` are ONLINE states and only they are. Retail sends `1` (online) / `0` (offline) in every captured record and we
+send the same, so nothing is wrong today; what `2` and `3` mean is simply not in the corpus, and
+`FriendState.Online` stays a `bool` rather than gaining three invented names for two unobserved values.
 
 
 ### The skill-point curve above level 1, 5, 23, 24 and 80
