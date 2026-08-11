@@ -383,6 +383,11 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "npc-pose-check":
+				{
+					return await NpcPoseCheck(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "spawn-animation":
 				{
 					SpawnAnimation(NamedCapture.LoadAll(capturesDir), _options.Configuration[Keys.ContentRdbDir]);

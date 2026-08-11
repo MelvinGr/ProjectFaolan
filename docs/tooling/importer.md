@@ -265,6 +265,14 @@ the `Flags` bit census, and the wire's arrival `Flags` from the DUMPS against th
 [item-template-stats](../rdb/item-template-stats.md) binding section is measured with),
 `bcc-attack-tail` (the attack tail's middle block word by word, under the Command slot the client's reader
 puts each in, with the direction ability resolved — #661) ·
+`npc-pose-check` (#729: does every shipped `NpcStatCores` row carry the pose and idle animation the type is USUALLY
+caught in? A `bcc_state` / `anim_idle_id` is the MODE over a type's sightings, so a type whose one captured
+representative was mid-emote ships that emote as its permanent pose — the Citizen shipped one its own sightings
+outnumbered 57:1. ⭐ It is a report and not a test *because* it compares importer OUTPUT against importer INPUT: as a
+test it had to read the input through `fixtures.bin`'s frozen corpus half, and the two populations diverge the moment
+captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
+sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
+something is flagged, so it can gate a re-import) ·
 `spawn-animation` (#607: what IS `npc_stats.spawn_animation`? Two tests. The first partitions every captured NPC
 spawn into the login BURST and MID-SESSION — the class of predictor a field census cannot see — and ⛔ FALSIFIED the
 ticket's hypothesis: 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not mean "this entity

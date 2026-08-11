@@ -8,7 +8,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
-using Microsoft.Data.Sqlite;
 using ProtoBuf;
 using Xunit;
 
@@ -140,132 +139,21 @@ namespace Faolan.Tests
 			Assert.True(wrong.Count == 0, $"{wrong.Count} record(s) disagree with the bit-28 = NPC reading: {string.Join("; ", wrong.Take(5))}");
 		}
 
-		// A TYPE row must not carry a pose the type is only RARELY caught in (#688, the sibling of #602/#605).
+		// ⛔ The pose/idle gate that used to live here has MOVED to `dotnet run --project Faolan.Importer -- --report
+		// npc-pose-check` (#729). It asked whether a shipped `NpcStatCores` row carries a pose the type is only rarely
+		// caught in - the Citizen shipped one its own sightings outnumbered 57:1 - and to ask that it had to compare
+		// importer OUTPUT (faolan.db) against importer INPUT, which as a test meant reading the input through
+		// `fixtures.bin`'s frozen corpus half.
 		//
-		// `bcc_state` and the `anim_idle_id` that goes with it are per-spawn-EVENT: 102 of 1024 captured types appear
-		// in more than one state, always lopsidedly. A Citizen (12460) is captured standing 286 times and sitting 5
-		// times - and the representative that reached the lift was one of the 5, so every Citizen in Old Tarantia sat
-		// down, walking around in a seated pose because a MoveTask moves an NPC whatever pose it holds.
+		// Those two populations diverge the moment captures are added, and the failure is the wrong way round: on
+		// 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a sample of
+		// fourteen, while the shipped value came from a run over a corpus the extract had not seen. The gate was
+		// judging a BETTER-attested value against evidence it had outgrown, and the sanctioned fix - regenerate the
+		// extract - rebaselines twenty-odd unrelated gates in one commit. Run against the real dumps there is no
+		// second population, and the `minimumEvidence` floor that existed only to paper over the gap is gone.
 		//
-		// ⚠️ **This does NOT re-derive the importer's mode, and the first draft that did was wrong.** The importer
-		// measures over ALL 120 captures; the committed extract is a sample of them, so on a near-tie the two
-		// legitimately disagree (type 8775 is 32/26 in the extract, and the full corpus puts it the other way round).
-		// A gate that demands equality there is asserting which sample it was fed, not what is true - the same trap as
-		// any other derived gate. What IS stable across both is the SHAPE of the bug: a value that some other value
-		// outnumbers many times over. So the assertion is that margin, and near-ties are deliberately left alone.
-		//
-		// It does not assert "everyone stands" either, which would trade one wrong pose for another: the Door Warden
-		// (19619) is state 11 in all 15 of its sightings, the Beggar sits, the Drunken Pirate is drunk.
-		[Fact]
-		public void BccStateAndIdleAnimation_AreNotAPoseTheTypeIsRarelyCaughtIn()
-		{
-			// How far another value may outnumber the shipped one before it reads as "the representative was caught
-			// mid-emote" rather than "the corpus is thin". The Citizen bug was 57x; the worst near-tie is 1.5x.
-			const int outnumberedBy = 4;
-
-			var states = new Dictionary<uint, Dictionary<uint, int>>();
-			var idles = new Dictionary<uint, Dictionary<uint, int>>();
-
-			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
-			{
-				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read) || read.Message.npc_stats is not { } npc || !npc.ShouldSerializeTemplateId())
-					continue;
-
-				if (read.Message.Stats?.ShouldSerializeBccState() == true)
-					Tally(states, npc.TemplateId, read.Message.Stats.BccState);
-				if (read.Message.Bcc?.ShouldSerializeAnimIdleId() == true)
-					Tally(idles, npc.TemplateId, read.Message.Bcc.AnimIdleId);
-			}
-
-			// The shipped value is an outlier when the corpus has never seen it, or when another value outnumbers it
-			// by the margin above. Everything closer than that is the sample talking, not the data.
-			//
-			// ⚠️ A RATIO ALONE IS NOT ENOUGH, and the second condition is what makes this gate survive new captures.
-			// The tally comes from the CORPUS EXTRACT - a frozen, derived slice of the dumps - while the shipped
-			// value comes from an importer run over the REAL captures. Add three captures and the two populations
-			// diverge instantly: the importer sees sightings the extract does not, picks a different mode, and a
-			// pure ratio test fails on a value that is actually better attested than the one it demands.
-			//
-			// That is not hypothetical - it is what happened on 2026-08-08. Template 14227 (Knight) shipped
-			// anim_idle_id 42176 before the new captures and 42024 after, and the extract - still at the old capture
-			// set - called 42024 an outlier at 12:2. Regenerating the extract would resync it, but that rebaselines
-			// every other whole-corpus gate at once, which is a far larger change than the thing being judged.
-			//
-			// So the winning value must also be attested by ENOUGH sightings to outvote a population we cannot see.
-			// 14 sightings is a thin sample; the real bug this gate was built for (the Citizen) was outnumbered 57x.
-			// The ratio keeps its teeth where the evidence is strong and stops firing where the extract is simply
-			// behind. See Gitea: the standing goal is for the corpus half to go away entirely.
-			const int minimumEvidence = 20;
-
-			static string? Outlier(uint shipped, Dictionary<uint, int> tally, int margin)
-			{
-				var mine = tally.GetValueOrDefault(shipped);
-				var best = tally.OrderByDescending(kv => kv.Value).First();
-				if (mine == 0)
-					return "never captured on this type";
-
-				return best.Value >= mine * margin && best.Value >= minimumEvidence
-					? $"outnumbered {best.Value}:{mine} by {best.Key}"
-					: null;
-			}
-
-			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
-			{
-				var tally = into.TryGetValue(template, out var t) ? t : into[template] = [];
-				tally[value] = tally.GetValueOrDefault(value) + 1;
-			}
-
-			var mixed = states.Count(kv => kv.Value.Count > 1);
-			Assert.True(mixed > 50, $"only {mixed} types are captured in more than one bcc_state - the gate would be vacuous");
-
-			using var con = new SqliteConnection($"Data Source={TestPaths.FaolanDb};Mode=ReadOnly");
-			con.Open();
-			using var cmd = con.CreateCommand();
-			// EVERY core with one of the two fields, placed or not (#689). This used to exclude types with no
-			// `NpcSpawns` row, on the reading that they were beyond the importer's reach - 42 rows, the Courtesan
-			// among them. That reading was wrong twice over: those rows are overwhelmingly SUMMON targets (pets,
-			// companions, minions) and encounter bosses, which are never placed BY DESIGN rather than by a dropped
-			// placement; and they were only unreachable because the modal correction lived inline in the placed-NPC
-			// path, so the pet/mount importers never ran it. They do now, so the exclusion would hide a live gate.
-			//
-			// A template the CORPUS has no sighting of is still skipped, but by the `TryGetValue` below rather than by
-			// a proxy - that is the honest condition, and it is a much smaller set.
-			cmd.CommandText =
-				"""
-				SELECT c.NpcTemplateId, c.BccState, c.AnimIdleId FROM NpcStatCores c
-				WHERE c.BccState IS NOT NULL OR c.AnimIdleId IS NOT NULL
-				""";
-			using var reader = cmd.ExecuteReader();
-
-			var wrong = new List<string>();
-			var checkedRows = 0;
-			while (reader.Read())
-			{
-				var template = (uint)reader.GetInt64(0);
-				if (!reader.IsDBNull(1) && states.TryGetValue(template, out var seenStates))
-				{
-					checkedRows++;
-					var shipped = (uint)reader.GetInt64(1);
-					if (Outlier(shipped, seenStates, outnumberedBy) is { } why)
-						wrong.Add($"template {template} ships bcc_state {shipped} ({why}); sightings {Format(seenStates)}");
-				}
-
-				if (!reader.IsDBNull(2) && idles.TryGetValue(template, out var seenIdles))
-				{
-					var shipped = (uint)reader.GetInt64(2);
-					if (Outlier(shipped, seenIdles, outnumberedBy) is { } why)
-						wrong.Add($"template {template} ships anim_idle_id {shipped} ({why}); sightings {Format(seenIdles)}");
-				}
-			}
-
-			static string Format(Dictionary<uint, int> tally)
-			{
-				return string.Join(", ", tally.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key}x{kv.Value}"));
-			}
-
-			Assert.True(checkedRows > 500, $"only {checkedRows} shipped cores could be checked against the corpus - the gate would be vacuous");
-			Assert.True(wrong.Count == 0, $"{wrong.Count} shipped stat core(s) carry a pose the type is only rarely caught in:\n  " + string.Join("\n  ", wrong.Take(10)));
-		}
+		// What stays here is the CODEC property - the round-trip and the field sweep above - which a frozen slice
+		// serves perfectly well, because it asserts something about the code rather than about the data.
 
 		// The writable, protobuf-mapped scalar properties of a generated message - the ones a column has to exist for.
 		private static IEnumerable<PropertyInfo> Fields(object message)
