@@ -55,7 +55,8 @@ we've seen_, and names the gaps). Regenerate with
   screen; the costly ones ask you to confirm first. A few rarer ones only play the open animation (#341, #637)
 - ✅ **Area-name banners** — crossing into a named district floats its title on screen; coverage grows with the
   captures (#377)
-- ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy
+- ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy, and a group map is
+  one copy per TEAM: the whole party lands in the same one and a member arriving later joins it (#512)
 - ✅ **Sit on benches** — sitting down, switching seats and standing up (#355)
 - ✅ **Spend a skillpoint** — putting points into Run Speed, Climbing, Hiding and Perception out of the pool a
   level-up hands you; the pool and the skills persist. Selling one back waits for a capture (#739, #745)
@@ -225,8 +226,8 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Group PvE content (not started)
 
-- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (#309). Two pieces are decoded but not
-  built: the difficulty an instance is entered at (#511), and group instances being owned by the team (#512)
+- ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (#309). Group instances are now owned
+  by the team (#512, above); what is still decoded-but-unbuilt is the difficulty an instance is entered at (#511)
 - ⬜ Factions & reputation — the Khitai faction ranks, vendors and companions. The Factions window populates for
   imported characters; the catalog and the reputation changes from quests and kills are missing (#310, #315)
 
