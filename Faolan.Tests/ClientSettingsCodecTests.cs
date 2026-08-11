@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
+using System.Numerics;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.PlayerAgent;
 using Faolan.Tests.Support;
 using Xunit;
@@ -76,6 +78,56 @@ namespace Faolan.Tests
 			// ... and the two codecs really do agree on it: serving the UPLOADED buffer under the s2c method reproduces
 			// the upload's bytes exactly, which is what the store-and-echo path does at login.
 			Assert.Equal(upload, SendCharacterPreviewCodec.Build(new CharacterPreview(uploaded.CharacterId, uploaded.Buffer)));
+		}
+
+		// #788: the archive member itself. The grammar was derived over all FOUR corpus payloads (408 / 527 / 606 /
+		// 618 bytes, three characters); the two that ride committed fixtures are the 408-byte upload and the 527-byte
+		// served one, and both re-encode byte-exact - which is what a count-prefixed grammar buys. Nothing is skipped:
+		// Parse ends at the last byte or throws.
+		[Fact]
+		public void PreviewRecord_RoundTripsTheCapturedPayloads()
+		{
+			var upload = UpdateCharacterPreviewCodec.Parse(TestPaths.AssetBytes("playeragent-update-character-preview.bin")).Buffer.Files[0].Data;
+			var served = SendCharacterPreviewCodec.Parse(TestPaths.AssetBytes("playeragent-send-character-preview.bin")).Buffer.Files[0].Data;
+
+			Assert.Equal(upload, CharacterPreviewSetCodec.Build(CharacterPreviewSetCodec.Parse(upload)));
+			Assert.Equal(served, CharacterPreviewSetCodec.Build(CharacterPreviewSetCodec.Parse(served)));
+
+			// The upload: a body (RDB 1010201), a head hung off attractor 33 and a weapon off attractor 11 carrying
+			// its item template, four worn mesh-index files at CharacterEquipmentSlot positions, five texscripts.
+			var preview = CharacterPreviewSetCodec.Parse(upload);
+			Assert.Equal(1091336u, preview.MonsterDataId);
+			Assert.Equal([(1010201u, 1139362u, 33u, 0u), (1010030u, 215943u, 11u, 3735601u)],
+				preview.Resources.Select(r => (r.ResourceType, r.ResourceId, r.AttractorType, r.ItemTemplateId)));
+			Assert.All(preview.Resources, r => Assert.Equal(Matrix4x4.Identity, r.Transform));
+			Assert.Equal([(uint)CharacterEquipmentSlot.Chest, (uint)CharacterEquipmentSlot.Legs, (uint)CharacterEquipmentSlot.Wrist, 0u], preview.Meshes.Select(m => m.Slot));
+			Assert.Equal(["*texscript_1108153", "*texscript_198086", "*texscript_202378", "*texscript_214018", "*texscript_3770785"], preview.Morphs.Select(m => m.Name));
+			Assert.All(preview.Morphs, m => Assert.Equal(1f, m.Weight));
+
+			// The served one is the same grammar with the parts that vary actually varying: a different body, a
+			// non-identity attachment transform (a -0.06 Z offset, which is what makes the matrix a real field), a
+			// vanity slot alongside the worn set, and body sliders at small signed weights next to the texscripts.
+			var other = CharacterPreviewSetCodec.Parse(served);
+			Assert.Equal(1091339u, other.MonsterDataId);
+			Assert.Equal(-0.06f, other.Resources[1].Transform.M43, 4);
+			Assert.Contains((uint)CharacterEquipmentSlot.VanityBelt, other.Meshes.Select(m => m.Slot));
+			Assert.Equal([1f, 1f, 1f, -0.032f, -0.014f, -0.032f, 1f], other.Morphs.Select(m => MathF.Round(m.Weight, 3)));
+			Assert.Equal("*beardmesh_3181884", other.Morphs[^1].Name);
+		}
+
+		// #788: the other direction - a preview AUTHORED here, packed into a fresh IOz1 archive and served under the
+		// s2c method. The bytes are deliberately NOT retail's (a deflate stream is not a function of its contents), so
+		// what is asserted is that the record survives the round trip intact.
+		[Fact]
+		public void ConstructedPreview_SurvivesTheArchiveRoundTrip()
+		{
+			var source = CharacterPreviewSetCodec.Parse(SendCharacterPreviewCodec.Parse(TestPaths.AssetBytes("playeragent-send-character-preview.bin")).Buffer.Files[0].Data);
+
+			var served = SendCharacterPreviewCodec.Parse(SendCharacterPreviewCodec.Build(0x110099BD, source));
+
+			Assert.Equal(0x110099BDu, served.CharacterId);
+			Assert.Equal(["preview.bin"], served.Buffer.Files.Select(f => f.Name));
+			Assert.Equal(CharacterPreviewSetCodec.Build(source), served.Buffer.Files[0].Data);
 		}
 
 		// Retail's empty forms, which are what a character with nothing stored gets: a 12-byte SendCharacterSettings

@@ -47,6 +47,19 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			return value.Payload;
 		}
 
+		// The archive AUTHORING form: pack the members and deflate them into a fresh buffer. Retail never needs this -
+		// the client authors every archive the server holds - but a preview constructed here (#788) has to become one.
+		// ⚠️ The bytes are NOT retail's: a deflate stream is not a function of its contents, so the checksum of a
+		// packed buffer will not match the one the client would have computed for the same files. That is fine for a
+		// buffer we author and would be wrong for one we merely relay, which is why Build(ClientSettingsBuffer) still
+		// carries the payload verbatim.
+		public static byte[] Build(IReadOnlyList<ClientFile> files)
+		{
+			ArgumentNullException.ThrowIfNull(files);
+
+			return Build(new ClientSettingsBuffer(Pack(files), files));
+		}
+
 		public static ClientSettingsBuffer Parse(in ReadOnlySpan<byte> data)
 		{
 			return data.Length == 0 ? ClientSettingsBuffer.Empty : new ClientSettingsBuffer(data.ToArray(), Unpack(data));
@@ -81,6 +94,30 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			}
 
 			return files;
+		}
+
+		// The inverse of Unpack + Inflate: concatenate the name/data pairs, deflate them, and put the marker and the
+		// INFLATED size in front. Private because it is not an encoding of the value type - Build(ClientSettingsBuffer)
+		// stays the one method that turns a buffer into bytes, and this is what gives that buffer its payload.
+		private static byte[] Pack(IReadOnlyList<ClientFile> files)
+		{
+			using var contents = new FaolanStream();
+			foreach (var file in files)
+			{
+				var name = Encoding.Latin1.GetBytes(file.Name);
+				contents.WriteUInt32LittleEndian((uint)name.Length).WriteArray(name).WriteUInt32LittleEndian((uint)file.Data.Length).WriteArray(file.Data);
+			}
+
+			var inflated = contents.ToArray();
+			using var deflated = new MemoryStream();
+			using (var zlib = new ZLibStream(deflated, CompressionLevel.Optimal, true))
+			{
+				zlib.Write(inflated);
+			}
+
+			using var payload = new FaolanStream();
+
+			return payload.WriteUInt32(Marker).WriteUInt32LittleEndian((uint)inflated.Length).WriteArray(deflated.ToArray()).ToArray();
 		}
 
 		private static byte[] Inflate(in ReadOnlySpan<byte> deflated, int inflatedSize)

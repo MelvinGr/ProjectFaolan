@@ -46,7 +46,7 @@ repeated [u32 nameLength][name, LATIN1][u32 dataLength][data]      (both lengths
 |---|---|---|
 | `UpdateSubscriptionSettings` (account-wide) | `hotkeys.xml`, `Prefs_2.xml` — 60 named values (audio/video/chat-bubble/camera) | 3.9 KB |
 | `UpdateCharacterSettings` | `Chat\Windows.xml`, `DockAreas\SideBarLeft.xml`, `DockAreas\SideBarRight.xml`, `Prefs_2.xml` — 404 named values | 32 KB |
-| `UpdateCharacterPreview` | `preview.bin` — a binary appearance record; **partially decoded** (#612), see below | 427 B |
+| `UpdateCharacterPreview` | `preview.bin` — a binary appearance record; **decoded** (#612, #788), see below | 427 B |
 
 Note the member names use BACKSLASHES.
 
@@ -89,7 +89,7 @@ could ever match it.
 - Byte-exact gates: `ClientSettingsCodecTests` against the captured bodies, `ClientSettingsPersistenceTests`
   against a real SQLite database.
 
-## Inside `preview.bin` (#612)
+## Inside `preview.bin` (#612, #788)
 
 The server stores and echoes the record, which is all the client needs — it authored it. Constructing one, so a
 character created here has a select-screen pose before it has ever logged in, needs the contents. Four distinct
@@ -97,66 +97,81 @@ payloads exist in the corpus (408 / 527 / 606 / 618 bytes, over three characters
 `ClientSettingsBufferCodec` alone, since the archive member is already parsed.
 
 ⭐ **The headline result: it is not a new vocabulary.** Every name in the record resolves against the
-`MorphTargets` table we already ship, and every id resolves in the client RDB. So the preview is a character
-appearance snapshot expressed in exactly the terms the create-editor and the spawn appearance use — which is what
-makes constructing one from `CharacterBody` / `CharacterBodyResources` plausible rather than speculative.
+`MorphTargets` table we already ship, every id resolves in the client RDB, and the field NAMES come from the
+client's own `monsterdata` XML (see below). So the preview is a character appearance snapshot expressed in
+exactly the terms the create-editor and the spawn appearance use.
 
 ### The grammar
 
-Every byte of all four corpus payloads is accounted for by this, and the two lists are the only variable-length
-parts:
+Every byte of all four corpus payloads is accounted for, and **every list is count-prefixed** — which is what
+makes the record buildable rather than only readable. All integers and floats are LITTLE-endian, like the `IOz1`
+archive around them.
 
 ```
 [u8  version = 4]
-[u32 modelId]                     the character's base MESH - an RDB 1010001 3D model
-[u32 entryCount]                  2 in all four payloads
-entryCount x ATTACHMENT (88 bytes):
-    [u32 rdbType][u32 rdbId][u32 flags]
-    [16 x f32]                    a row-major 4x4 affine; translation in the LAST ROW
-    [u32 itemTemplateId][u32][u32]
-N x SLOT (16 bytes):  [u32 slot][u32 resourceId][u32][u32]
-[u32]                             ONE word between the two lists - see below
-repeated NAMED:       [u32 index][u32 nameLength][name, LATIN1][f32 weight]   (nameLength 0 terminates)
+[u32 monsterDataId]                                    RDB 1010201 — the body definition
+[u32 resourceCount]   resourceCount x PREVIEW RESOURCE (88 bytes)
+[u32 meshCount]       meshCount     x PREVIEW MESH     (16 bytes)
+[u32 morphCount]      morphCount    x PREVIEW MORPH    (variable)
+[u32 0]                                                a fourth list, EMPTY in all four payloads
+
+PREVIEW RESOURCE  [u32 resourceType][u32 resourceId][u32 attractorType]
+                  [16 x f32]                           a row-major 4x4; translation in the LAST row
+                  [u32 itemTemplateId][u32][u32]
+PREVIEW MESH      [u32 meshIndexFileId][u32][u32][u32 slot]
+PREVIEW MORPH     [u32 nameLength][name, LATIN1][f32 weight][u32 index]
 ```
 
-⭐ **The header's three bytes after `04` are the low bytes of a MODEL ID**, not a count — `1091336` on the
-408-byte record and `1091339` on the other three, both RDB **1010001** (3D model). That is the character's base
-mesh, and it is why the byte differed between records: two body types, not two element counts.
+⭐ **The client's `monsterdata` XML names the fields.** RDB **1010201** record `1091339` is
+`<monsterdata name="StygianMaleCharacter" …>` and carries
 
-**The attachment entries are `1010201` (MonsterData) and `1010030`, one of each, in either order.** Their tail's
-first word is an **item template**: `3735601`, `3806202`, `3419923`, `3803265` across the four characters, every
-one RDB type **1000020**, and `0` on the `1010201` entry. The last two words are constant per entry type —
-`(0, 35)` on `1010201`, `(6, 58)` on `1010030`.
+```xml
+<previewset name="Guywithswordshield">
+  <previewresource attractortype="33" name="head"   resourceid="18312"  resourcetype="1010201"/>
+  <previewresource attractortype="6"  name="Shield" resourceid="108527" resourcetype="1010030"/>
+  <previewresource attractortype="1"  name="Sword"  resourceid="113386" resourcetype="1010030"/>
+</previewset>
+```
 
-**The transform is real, not vestigial.** Most matrices are identity, but a `1010030` entry carries
-`[0, 0, -0.12, 1]` in its last row — a small Z offset — which is what identifies the layout as row-major with
-translation in the last row rather than an unused field.
+— which is the record's head and its first list, field for field. So the header id is the **monsterdata** (not a
+3D model: `1091336` = `CimmerianFemaleCharacter`, `1091339` = `StygianMaleCharacter`), and the third word of an
+entry is an **`attractortype`** — an attachment POINT (1 = main hand, 2 = ranged, 6 = shield, 33 = Head, …), not
+a flags word. The corpus carries `33` on the `1010201` head entry and `5`/`11` on the `1010030` weapon.
 
-### ⭐ The attachment `flags`: bit 2 says the transform is real
+**The transform is real, not vestigial.** Most matrices are identity, but a `1010030` entry carries `-0.12` /
+`-0.06` in its last row — a small Z offset — which is what identifies the layout as row-major with translation
+in the last row rather than an unused field.
 
-The eight attachment entries in the corpus carry three values — `5`, `11`, `33` — and **bit 2 (`0x04`) is the
-only bit that separates the entries with a real matrix from the ones with an identity**:
+**The mesh list is the worn look.** Every id resolves as RDB **1010030**, a `MeshIndexFile` whose
+`<MeshClusters>` names the body part outright (`ItemNeck`, `ItemBelt`, `ItemLegs`, `ItemWrist`), and its `slot`
+is the ordinary [`CharacterEquipmentSlot`](../../Faolan.Core/Enums/CharacterEquipmentSlot.cs) — `1`, `2`, `5`,
+`7`, `11`, `12`, `14`–`18` worn and `1002`/`1007`/`1011`/`1014`/`1018` vanity are all attested. ⚠️ Slot `0` is
+the odd one out: it carries an RDB **1010001** 3D model rather than a mesh index — the hair/base model, which
+has no equip slot.
 
-| flags | bits | entries | matrix |
-|---:|---|---:|---|
-| `5` | 0,**2** | 3 | a translation (`-0.12`, `-0.06`, `-0.06` in the last row) |
-| `11` | 0,1,3 | 1 | identity |
-| `33` | 0,5 | 4 | identity |
+**The morph list is the create editor's own stream:** a resource ref at weight exactly `1.0`
+(`*texscript_…`, `*beardmesh_…`) or a `MorphTargets` category-1 body slider at a small signed weight (`arm`,
+`arse`, `bosom`, `chest`, `leg`, `stomach`, `thigh`). Its trailing `index` is the editor arrival order, the same
+ordering `CharacterBodyResource.Sequence` keeps.
 
-Bit 0 is set on all three, bit 1 and bit 3 only on `11`, bit 5 only on `33`; bit 2 partitions the set exactly,
-and "the transform slot is meaningful" is what a flags bit next to a matrix would carry. So the transform is
-**opt-in**, which also answers why most matrices are identity: they are unset fields, not neutral transforms.
+### What is not named
 
-⚠️ Eight entries is a small sample and the bit is inferred from the partition, not from the client's reader. It
-is the reading to build on and the first thing to re-check if a built record is rejected.
+Three words carry values nothing in the corpus explains, and none of them blocks a builder — every one is
+reproducible from a record we hold:
 
-### What is not decoded
+* a **preview resource's last two words** — constant per `resourceType` across all four payloads, `(6, 58)` on
+  the `1010030` weapon and `(0, 35)` on the `1010201` head;
+* a **preview mesh's second word**, `0`–`3`. It is a property of the MESH, not of the slot: the same mesh id
+  carries the same value at different slots and in different payloads, and the mesh's own `MeshIndexFile` XML
+  does not distinguish them — which reads like a material or colour set index chosen by the item;
+* a **preview mesh's third word**, zero in every captured entry.
 
-One word: **the single `u32` between the slot list and the named list** — `0`, `0`, `18`, `1018` across the four
-payloads, so it carries a value rather than terminating anything, and the slot list's length has to be found by
-locating the named list rather than read from a count.
+### Building one
 
-⚠️ **That is the whole remaining obstacle to a builder, and it is not the binding one.** Acceptance is an
-in-client round-trip — the client has to take the record and draw the pose — and a record it REJECTS is worse
-than the current no-preview state, which is what retail itself produces for a freshly created character. So the
-builder is gated on a client run rather than on more decode. Open work tracked in Gitea.
+`CharacterPreviewSetCodec` parses and re-encodes both committed payloads byte-exact, and
+`SendCharacterPreviewCodec.Build(characterId, CharacterPreviewSet)` packs a constructed record into a fresh
+`IOz1` archive (`ClientSettingsBufferCodec.Build(files)`). ⚠️ **Nothing in the server authors one.** Retail
+itself sends no preview for a freshly created character, so a constructed preview is an improvement on retail
+rather than a divergence being fixed — and a record the client REJECTS is worse than the current no-preview
+state. Acceptance is an in-client run: the client has to take the record and draw the pose. Open work tracked in
+Gitea.

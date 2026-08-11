@@ -300,6 +300,16 @@ namespace Faolan.Core
 			return WriteArray(buffer);
 		}
 
+		// The little-endian twin of WriteUInt32. Not a wire form: the client's own FILE formats (the `IOz1` settings
+		// archive and the `preview.bin` inside it) are little-endian and happen to be shipped over a big-endian wire.
+		public FaolanStream WriteUInt32LittleEndian(uint value)
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(uint)];
+			BinaryPrimitives.WriteUInt32LittleEndian(buffer, value);
+
+			return WriteArray(buffer);
+		}
+
 		// The spawn transform's playfield token: a FIXED-WIDTH 4-byte LEB128 varint (not a normal variable-length
 		// varint). The fixed width is deliberate - SpawnTransformPatch overwrites the token in place - so it always
 		// emits 4 bytes; tokens are < 2^28, so 4 bytes always suffice.

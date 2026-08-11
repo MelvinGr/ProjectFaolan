@@ -21,6 +21,9 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 		// against (#613).
 		public const uint Method = (uint)PlayerInterfaceMethods.SendCharacterPreview;
 
+		// The archive's only member, on both directions of the message.
+		public const string PreviewFileName = "preview.bin";
+
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharacterPreview value)
 		{
@@ -30,6 +33,18 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 			ClientSettingsBufferCodec.Write(s, value.Buffer);
 
 			return s.ToArray();
+		}
+
+		// The CONSTRUCTED form (#788): a preview authored from a character's own appearance rather than echoed back
+		// from an upload. ⚠️ Nothing in the server calls this - retail sends no preview for a character that has never
+		// logged in, and a record the client REJECTS is worse than the no-preview state retail itself produces. It
+		// exists so a constructed record can be put in front of the client and checked.
+		public static byte[] Build(uint characterId, CharacterPreviewSet preview)
+		{
+			ArgumentNullException.ThrowIfNull(preview);
+			var buffer = ClientSettingsBufferCodec.Build([new ClientFile(PreviewFileName, CharacterPreviewSetCodec.Build(preview))]);
+
+			return Build(new CharacterPreview(characterId, ClientSettingsBufferCodec.Parse(buffer)));
 		}
 
 		public static CharacterPreview Parse(in ReadOnlySpan<byte> data)
