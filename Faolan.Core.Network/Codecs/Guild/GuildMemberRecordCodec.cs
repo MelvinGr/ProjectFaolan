@@ -6,8 +6,15 @@ namespace Faolan.Core.Network.Codecs.Guild
 {
 	// One member record of the guild roster / joined / update packets (75 bytes + the name):
 	//   [u8 0x03][u8 0x03][u32 charId][name s16][u8 rank][u8 online][u32 playfield][u8 level][u32 class]
-	//   [u32 unknown][u32 lastSeenUnix][48 bytes sparse renown/pvp counters]
+	//   [u64 lastSeenUnix][48 bytes sparse renown/pvp counters]
 	// Playfield is 0 and lastSeen is the last-connection time when offline; both flip when online.
+	//
+	// ⭐ `lastSeenUnix` is ONE u64, not the `[u32 unknown][u32 lastSeenUnix]` pair this used to carry (#464). The
+	// client's `GuildMember_c` reader `FUN_00566740` reads it with `FUN_0048f720` (ReadU64) and passes the result
+	// straight to `__ctime64` - it is a 64-bit `time_t`. So the "unknown" word was the HIGH HALF of the stamp, and
+	// its being 0 in every captured record is not a fact waiting to be explained: a `time_t` has a zero high word
+	// until 2106. #464 filed it as "invariant across the whole corpus - only a client-side CONSUMER can name them",
+	// which was right about the method and wrong about there being a field there at all.
 	// Byte-exact against the capture's Hoxxling 0x202F record (GuildPacketTests).
 	//
 	// A SUB-RECORD codec: it is composed into DispatchGuildUpdate (the self pointer AND every roster entry),
@@ -46,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 			r.ExpectU8(StreamVersion, "guild member stream version");
 			r.ExpectU8(StreamVersion, "guild member stream version (second)");
 
-			return new GuildMemberRecord(r.ReadU32Be(), r.ReadStringU16Length(), r.ReadU8(), r.ReadU8(), r.ReadU32Be(), r.ReadU8(), r.ReadU32Be(), r.ReadU32Be(), r.ReadU32Be(),
+			return new GuildMemberRecord(r.ReadU32Be(), r.ReadStringU16Length(), r.ReadU8(), r.ReadU8(), r.ReadU32Be(), r.ReadU8(), r.ReadU32Be(), r.ReadU64Be(),
 				r.ReadBytes(CounterBytes).ToArray());
 		}
 
@@ -62,8 +69,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 				.WriteUInt32(v.Playfield)
 				.WriteByte(v.Level)
 				.WriteUInt32(v.Class)
-				.WriteUInt32(v.Unknown)
-				.WriteUInt32(v.LastSeenUnix)
+				.WriteUInt64(v.LastSeenUnix)
 				.WriteArray(v.Counters);
 		}
 	}
@@ -77,8 +83,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		uint Playfield,
 		byte Level,
 		uint Class,
-		uint Unknown,
-		uint LastSeenUnix,
+		ulong LastSeenUnix,
 		byte[] Counters);
 
 	// The semantic forms of a GuildMemberRecord, as VALUE factories - a mapper off the DB row, not an encoder.
@@ -86,12 +91,12 @@ namespace Faolan.Core.Network.Codecs.Guild
 	{
 		// A stored character as a roster entry. `playfield` is their live map when online (0 otherwise) and
 		// `lastSeenUnix` the last-connection stamp when offline (0 when they are on).
-		public static GuildMemberRecord FromCharacter(Character member, bool online, uint playfield, uint lastSeenUnix)
+		public static GuildMemberRecord FromCharacter(Character member, bool online, uint playfield, ulong lastSeenUnix)
 		{
 			ArgumentNullException.ThrowIfNull(member);
 
 			// Level is a byte ON THE WIRE (the row carries a wider one) and the class word is the ConanClass id.
-			return new GuildMemberRecord(member.Id, member.Name!, (byte)member.GuildRank!, Convert.ToByte(online), playfield, (byte)member.Level, (uint)member.Class, 0,
+			return new GuildMemberRecord(member.Id, member.Name!, (byte)member.GuildRank!, Convert.ToByte(online), playfield, (byte)member.Level, (uint)member.Class,
 				lastSeenUnix, new byte[GuildMemberRecordCodec.CounterBytes]);
 		}
 	}

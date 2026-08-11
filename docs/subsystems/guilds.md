@@ -41,8 +41,14 @@ At login while guilded, the server pushes `0x203F` immediately after the Authent
 
 ```
 [03 03][charId u32][name s16][rank u8][online u8][playfield u32][level u8][class u32]
-[unknown u32][lastSeenUnix u32][48 bytes sparse renown/pvp counters]
+[lastSeenUnix u64][48 bytes sparse renown/pvp counters]
 ```
+
+⭐ **`lastSeenUnix` is ONE u64**, not the `[unknown u32][lastSeenUnix u32]` pair this used to read as (#464). The
+client's `GuildMember_c` reader `FUN_00566740` takes it with `FUN_0048f720` (ReadU64) and passes the result
+straight to `__ctime64` — a 64-bit `time_t`. So the "unknown" word was the stamp's **high half**, and its being 0
+in every captured record needed no explanation: a `time_t` has a zero high word until 2106. #464 had it filed as
+an invariant only a client-side consumer could name; the consumer named it by there being no field there at all.
 
 - rank 0 = fresh member (Kyloth, who could invite, had 5). **The guild LEADER is rank 4** — proven by the
   create-guild capture's member record (`docs/subsystems/create-guild-decode.md`); the server previously guessed 6.
@@ -270,7 +276,9 @@ string, not by a registration index. Confirmed so far (decompiles via `tools/ghi
   version mismatch! Got N wanted 3"). In-memory record size 0x88 (136 b). Case-3 field reads (confirms
   the wire member grammar): ReadString(name), ReadByte, ReadByte(bool online), ReadU32, ReadByte,
   ReadU32, ReadU64(time), then **6× ReadU64** — i.e. the member record's 48-byte tail = 6 u64 renown/pvp
-  counters (not opaque).
+  counters (not opaque). ⭐ The `ReadU64(time)` here is the whole `lastSeenUnix` field (#464) — see the record
+  layout above. The six counters are stored out of order (`+0x50 +0x58 +0x60 +0x70 +0x68 +0x78`), which is the
+  client's business and does not affect the wire.
 - Stream primitives (shared, from `ghidra_vtable_xref_readers`): `FUN_0048f900` ReadU32(BE),
   `FUN_004e0390` ReadByte, `FUN_0048f840` ReadString, `FUN_0048f720` ReadU64.
 
