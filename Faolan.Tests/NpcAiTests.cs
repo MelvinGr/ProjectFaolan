@@ -158,6 +158,36 @@ namespace Faolan.Tests
 			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval))); // no aggro -> no attack/combat effects
 		}
 
+		// #804: retail's `AIDefaults_ChaseDeaggroDelayTime` (5) - a mob that loses its target holds its ground for the
+		// delay before turning for home, so stepping out of aggro range and straight back in is ONE engagement.
+		[Fact]
+		public void LosingTheTarget_DoesNotTurnForHomeUntilTheDeaggroDelayHasPassed()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = NpcTemplate(1, 0, 0); // homes at the origin
+			npc.Position = new Vector3(10, 0, 0); // chased out, but well inside the leash
+			zone.Add(npc);
+
+			world.Tick(0.5); // no player anywhere: the target is lost, and the clock starts
+			Assert.NotNull(npc.TargetLostAt);
+			Assert.False(npc.Returning, "a mob that just lost its target should hold its ground, not turn for home");
+
+			// A player walking back into range inside the delay clears the stamp - one engagement, not two.
+			var player = Player(2, 11, 0);
+			zone.Add(player);
+			world.Tick(0.5);
+			Assert.Null(npc.TargetLostAt);
+			Assert.False(npc.Returning);
+
+			// Gone again, and this time the delay elapses.
+			zone.Remove(player.Handle);
+			world.Tick(0.5);
+			npc.TargetLostAt = npc.TargetLostAt!.Value.AddSeconds(-WorldState.NpcChaseDeaggroDelaySeconds);
+			world.Tick(0.5);
+			Assert.True(npc.Returning, "past the deaggro delay the mob should head home");
+		}
+
 		[Fact]
 		public void LeashedNpc_StopsChasingAndReturnsHome()
 		{

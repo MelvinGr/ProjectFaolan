@@ -567,7 +567,7 @@ it. Collapsing that into one map first silently gave four `Crocodile Pict` templ
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
 A hostile NPC aggros a player two ways: proximity — a player inside `NpcAggroRange` (20u) — or **being hit**,
-which engages it with its attacker for `NpcCombatMemorySeconds` (10s) regardless of distance
+which engages it with its attacker for `NpcIrritationForgetSeconds` regardless of distance
 (`WorldState.RecentAttackerOf`, off the attacker + timestamp `CombatService.ApplyNpcDamage` stamps on the NPC).
 The damage half applies none of the proximity gates (range, line of sight, the vertical band): those answer
 "would this mob notice you", and a mob that has been hit already has. The leash below still bounds the chase.
@@ -580,21 +580,32 @@ Once engaged, `WorldState.Tick` steps the NPC toward
 the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
 sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
 origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
-(`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (40u) from
-spawn it disengages, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival; losing
-the target out in the field also sends it home. WORKS in-client (it moves + leashes + stops on de-aggro).
+(`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (45u) from
+spawn it disengages *immediately*, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival.
+Losing the target out in the field also sends it home, but only after `NpcChaseDeaggroDelaySeconds` of standing
+its ground (`WorldEntity.TargetLostAt`), so stepping out of aggro range and straight back in is one engagement.
+WORKS in-client (it moves + leashes + stops on de-aggro).
+
+⭐ **Three AI clocks, and all but one are retail's own** (#804, from the client's tuning sheet RDB 1000516 —
+`docs/rdb/client-tweak-table.md`): `AIDefaults_MaximumChaseRadius` 45 → `NpcLeashRange`,
+`AIDefaults_IrritationForgetPeriod` 4 → `NpcIrritationForgetSeconds`, `AIDefaults_ChaseDeaggroDelayTime` 5 →
+`NpcChaseDeaggroDelaySeconds`. The anti-whittle gate below is the exception and is **ours** — retail's sheet
+states no such rule. They used to be one constant of 10 doing all three jobs, which is why none of the retail
+numbers could be adopted until it was split.
 
 A **patroller's** territory is its spawn *plus its whole beat* (`WorldEntity.BeyondLeash`), measured to the
 route's **polyline** rather than to its waypoints — the walk goes down the middle of each leg, and a sparsely
 sampled beat (the single-leg animal wanders on map 2070 run up to 228u end to end) has its entire middle
-further than 40u from both ends. Measuring to the vertices alone therefore read 28 of the 1,073 stored beats as
-"dragged too far from home" ~40u in, so those NPCs ping-ponged off their own route forever and never reached the
+further than a leash-radius from both ends. Measuring to the vertices alone therefore read 28 of the 1,073 stored
+beats as "dragged too far from home" ~40u in (the leash was still 40u when this was measured), so those NPCs ping-ponged off their own route forever and never reached the
 far end of it (#716).
 
 **Anti-whittle:** a disengaged NPC with its health down restores to full, so it cannot be worn down from
-outside its aggro range across separate approaches. The trigger is the combat memory lapsing — 10s since the
-last hit — **not** "no player currently in aggro range", which is a different question and, while damage did
-not aggro, fired between every pair of ranged hits.
+outside its aggro range across separate approaches. The trigger is `NpcAntiWhittleSeconds` (10s) since the last
+hit — **not** "no player currently in aggro range", which is a different question and, while damage did not
+aggro, fired between every pair of ranged hits. It is deliberately LONGER than either AI clock: it has to cover
+the gap between two casts of a slow spell (Smite is a 2s cast on a 1s recast) plus the walk into range, and at
+4s or 5s a full heal would land mid-fight.
 
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's

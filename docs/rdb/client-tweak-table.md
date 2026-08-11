@@ -104,12 +104,16 @@ the per-class/level curve `CharacterMaxStats.For` builds from RDB 1000511 (base 
 `MaxMovementModifierRate` 1.85 · `Quest_MaxGetDistance` 5 · `AIDefaults_MaximumChaseRadius` 45 ·
 `AIDefaults_ChaseDeaggroDelayTime` 5 · `Combat_PvE0ShieldBonus` 0.2 (PvE1 0.0, PvE2 −0.33, PvE3 −0.66).
 
-Note `AIDefaults_MaximumChaseRadius` = 45 and `AIDefaults_ChaseDeaggroDelayTime` = 5: our NPC chase/leash values
-were tunable guesses and this is what retail used. `WorldState.NpcLeashRange` is now the sheet's 45 (it was 40).
-⚠️ The two TIMERS are not adopted — retail keeps two clocks (`ChaseDeaggroDelayTime` 5,
-`IrritationForgetPeriod` 4) where we have one `NpcCombatMemorySeconds` doing both jobs *and* gating the
-anti-whittle heal, so swapping the number would change behaviours retail's constant says nothing about. Gitea
-#804.
+⭐ **All three `AIDefaults_*` are adopted** — our NPC chase/leash values were tunable guesses and this is what
+retail used. `WorldState.NpcLeashRange` is the sheet's 45 (it was 40), `NpcIrritationForgetSeconds` its 4 and
+`NpcChaseDeaggroDelaySeconds` its 5.
+
+The two TIMERS needed the constant they replaced to be SPLIT first (#804). One `NpcCombatMemorySeconds` of 10 was
+doing three jobs at once — how long a mob stays engaged with whoever hit it, how long it holds its ground after
+losing its target, and the gate on the anti-whittle full heal — so adopting either retail number would have
+changed the other two behaviours by accident. Split into the two clocks above plus `NpcAntiWhittleSeconds`, which
+stays 10 and is **ours**: the sheet says nothing about an anti-whittle rule, and the number has to cover the gap
+between two casts of a slow spell so a heal cannot land mid-fight.
 
 ⭐ **Two whole subsystems' numbers live here and were looked for everywhere else first**, which is the reason to
 check this sheet before deciding a number is missing from the client:

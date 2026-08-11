@@ -95,18 +95,36 @@ namespace Faolan.GameServer.World
 		// docs/rdb/client-tweak-table.md). It was a tuned guess of 40 until the sheet was indexed by family; the
 		// sheet ships 45 and there is no reason to prefer our guess to it.
 		//
-		// ⚠️ Its two TIMER siblings are deliberately NOT adopted here, because they do not map onto what we have:
-		// retail keeps `AIDefaults_ChaseDeaggroDelayTime` 5 and `AIDefaults_IrritationForgetPeriod` 4 as two separate
-		// clocks, while `NpcCombatMemorySeconds` below is one clock doing both jobs AND gating the anti-whittle heal.
-		// Halving it to match one of them would change the other two behaviours by accident. Tracked in Gitea #804.
+		// Its two TIMER siblings are the two constants below (#804). They could not be adopted while one
+		// combat-memory constant of 10 stood in for both of them AND gated the anti-whittle heal - halving it to
+		// match either would have changed the other two behaviours by accident, which is why the split came first.
 		public const float NpcLeashRange = 45f;
 
-		// How long a mob stays engaged with whoever last hit it, with no further hits and nobody in aggro range. It is
-		// the combat MEMORY: below this the mob is still fighting (so it chases, and does not reset its health), above
-		// it the fight is over and the anti-whittle full-heal is allowed. Long enough to cover the gap between two
-		// casts of a slow spell (Smite is a 2 s cast on a 1 s recast) plus the walk into range, so a ranged fight is
-		// one continuous engagement rather than a series of first hits.
-		public const double NpcCombatMemorySeconds = 10.0;
+		// How long a mob remembers WHO HIT IT, with no further hits: while this holds, its attacker is still its target
+		// even from outside aggro range, so a mob shot from range chases the shooter (#695).
+		//
+		// ⭐ RETAIL'S OWN NUMBER: `AIDefaults_IrritationForgetPeriod` 4 (RDB 1000516). "Irritation" is the client's word
+		// for the hate an attacker accrues, and forgetting it is exactly what this clock does.
+		public const double NpcIrritationForgetSeconds = 4.0;
+
+		// How long a mob that has LOST its target keeps standing where the chase ended before turning for home. It is a
+		// grace period, not a memory: a player who steps out of aggro range and straight back in is one engagement.
+		//
+		// ⭐ RETAIL'S OWN NUMBER: `AIDefaults_ChaseDeaggroDelayTime` 5 (RDB 1000516).
+		//
+		// ⚠️ It does NOT gate the leash. Being dragged past `NpcLeashRange` turns the mob for home immediately - that
+		// is a different decision ("this player has taken me too far") and delaying it would let a player camping the
+		// leash edge keep re-aggroing.
+		public const double NpcChaseDeaggroDelaySeconds = 5.0;
+
+		// How long after the last hit the fight counts as still ON for the anti-whittle full heal - below this a
+		// damaged mob does NOT reset its health, above it the fight is over and it heals to full.
+		//
+		// ⚠️ OURS, and named as ours: retail's sheet says nothing about an anti-whittle rule, so there is no number to
+		// adopt. It has to cover the gap between two casts of a slow spell (Smite is a 2 s cast on a 1 s recast) plus
+		// the walk into range, so a ranged fight reads as one engagement rather than a series of first hits - at either
+		// retail AI clock's value a heal would land mid-fight, which is the whole reason this is not one of them.
+		public const double NpcAntiWhittleSeconds = 10.0;
 
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
@@ -442,8 +460,20 @@ namespace Faolan.GameServer.World
 					// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
 					// spawn, walk it back home instead of leaving it standing where the chase ended. Patrollers are
 					// exempt - their route drives them; everyone else returns to origin (then heals on arrival, below).
-					if (target == null && homeDist > NpcMeleeRange && !entity.Patrols)
-						entity.Returning = true;
+					//
+					// ⭐ #804: after NpcChaseDeaggroDelaySeconds, not immediately - retail's own
+					// `AIDefaults_ChaseDeaggroDelayTime`. The mob holds its ground for the delay first, so a player who
+					// steps out of aggro range and straight back in is ONE engagement rather than a chase, a turn for
+					// home, and a fresh aggro. The stamp is cleared the moment it has a target again, so the delay only
+					// ever measures an uninterrupted absence.
+					if (target != null)
+						entity.TargetLostAt = null;
+					else if (homeDist > NpcMeleeRange && !entity.Patrols && !entity.Returning)
+					{
+						entity.TargetLostAt ??= DateTimeOffset.UtcNow;
+						if ((DateTimeOffset.UtcNow - entity.TargetLostAt.Value).TotalSeconds >= NpcChaseDeaggroDelaySeconds)
+							entity.Returning = true;
+					}
 
 					if (entity.Returning)
 					{
@@ -480,7 +510,7 @@ namespace Faolan.GameServer.World
 						// for the wander and the chase, which genuinely end.
 						if (entity.WalksRoute)
 						{
-							if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcCombatMemorySeconds))
+							if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
 								entity.Vitals.ReviveToFull();
 
 							WalkRoute(entity);
@@ -494,8 +524,8 @@ namespace Faolan.GameServer.World
 						// aggro range, which - because damage did not aggro (see the target line above) - meant a mob
 						// shot from range healed to full between every single hit. The anti-whittle intent is right;
 						// the trigger was "nobody stands next to me", which is not the same as "nobody is fighting me".
-						// NpcCombatMemorySeconds after the last hit is, and it is also what keeps the mob chasing.
-						if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcCombatMemorySeconds))
+						// NpcAntiWhittleSeconds after the last hit is; keeping the mob CHASING is a shorter, separate clock (#804).
+						if (entity.Vitals.Health < entity.Vitals.MaxHealth && !entity.InCombatWithin(NpcAntiWhittleSeconds))
 							entity.Vitals.ReviveToFull();
 						// #266 retail wander (capture-verified): a beach NPC drifts with a SINGLE short 2-point move to a
 						// nearby anchor every ~25-60s - NOT a continuous client-walked route. Server-driven: we move the
@@ -805,7 +835,7 @@ namespace Faolan.GameServer.World
 		// aggro" by GM fiat, and a GM who turns it on mid-fight should stop being chased.
 		private static WorldEntity? RecentAttackerOf(Zone zone, WorldEntity npc)
 		{
-			if (npc.LastAttackerHandle is not { } attacker || !npc.InCombatWithin(NpcCombatMemorySeconds))
+			if (npc.LastAttackerHandle is not { } attacker || !npc.InCombatWithin(NpcIrritationForgetSeconds))
 				return null;
 
 			return zone.TryGet(attacker, out var player) && player is { IsPlayer: true, Invisible: false }

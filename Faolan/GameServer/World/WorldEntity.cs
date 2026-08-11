@@ -592,6 +592,12 @@ namespace Faolan.GameServer.World
 		// camping the leash edge can't ping-pong it).
 		public bool Returning { get; set; }
 
+		// #804: when this NPC last found itself with NO target while away from home, or null if it has one. The tick
+		// only turns it for home once WorldState.NpcChaseDeaggroDelaySeconds have passed since - retail's
+		// `AIDefaults_ChaseDeaggroDelayTime`. Cleared on every tick that resolves a target, so it measures an
+		// uninterrupted absence rather than a total.
+		public DateTimeOffset? TargetLostAt { get; set; }
+
 		// The captured MoveTask record re-addressed to THIS entity. For a route walker this IS what the client is sent
 		// (#716) - the real multi-waypoint patrol form, issued once per cycle so the CLIENT walks the beat, rather than
 		// the 2-point chase form re-sent every ~6u.
