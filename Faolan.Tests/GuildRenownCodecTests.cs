@@ -55,9 +55,47 @@ namespace Faolan.Tests
 			Assert.Equal(0x0000_00A1_B2C3_D4E5UL, ClientAddGuildRenownCodec.Parse(built).Amount);
 		}
 
-		// #132's guild-bank pair. Neither body is captured, so what is actually gated here is the WIDTH: the amount and
-		// the balance are u64 (the client declares `uint64 amount` and `Guild.Cash` is a u64), and a u32 would silently
-		// truncate any guild bank past ~43 gold.
+		// ⭐ The guild bank's MONEY half, byte-exact against the one captured session that uses it (#795). The three
+		// bodies were recovered from the client and carried a `[V0: …]` each on the belief that no capture exercised
+		// the bank; `demol80-demonologist_login_gameplay_annotated_3` does, with the player narrating both halves in
+		// /say ("just deposited 1g to guild bank", "withdrew 50s"):
+		//
+		//   09:45:32.917 c2s GuildTransferMoney   (GameCharAgent 0x11)      0000000000086c47 00000000000f4240
+		//   09:45:33.036 s2c DispatchUpdateCash   (GameCharInterface 0x05)  0000000000da31e9 00000000
+		//   09:45:33.111 s2c DispatchGuildUpdateCash (CSPlayerInterface 0x52)  00000000000f4240
+		//   09:45:46.051 c2s GuildWithdrawMoney   (CSPlayerAgent 0x35)      000000000007a120
+		//   09:45:46.220 s2c DispatchGuildUpdateCash                        000000000007a120
+		//   09:45:46.337 s2c DispatchUpdateCash                             0000000000e1d309 00000000
+		//
+		// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json fr2385/2393/2458/2460]
+		[Fact]
+		public void GuildBankMoney_MatchesTheCapturedBodies()
+		{
+			const string capturedDeposit = "0000000000086c4700000000000f4240"; // guild 0x86C47, 1,000,000 tin = 1 gold
+			const string capturedWithdraw = "000000000007a120"; //                          500,000 tin = 50 silver
+			const string capturedGuildCashAfterDeposit = "00000000000f4240";
+			const string capturedGuildCashAfterWithdraw = "000000000007a120";
+
+			var deposit = GuildTransferMoneyCodec.Parse(Convert.FromHexString(capturedDeposit));
+			Assert.Equal(0x86C47UL, deposit.GuildInstance); // the same guild id the login's GuildHeader carries
+			Assert.Equal(1_000_000UL, deposit.AmountTin);
+			Assert.Equal(capturedDeposit, Convert.ToHexStringLower(GuildTransferMoneyCodec.Build(deposit)));
+
+			var withdraw = GuildWithdrawMoneyCodec.Parse(Convert.FromHexString(capturedWithdraw));
+			Assert.Equal(500_000UL, withdraw.AmountTin);
+			Assert.Equal(capturedWithdraw, Convert.ToHexStringLower(GuildWithdrawMoneyCodec.Build(withdraw)));
+
+			// ⭐ The update is the guild's BALANCE, not a delta, and the pair of frames is what proves it. The login's
+			// GuildHeader puts "Faolan" at cash 0, so the post-deposit 1,000,000 is equally consistent with either
+			// reading - but the post-withdraw value is 500,000, which is the balance (1,000,000 - 500,000). A delta
+			// would have had to be negative there; retail sends the same positive number the balance reading predicts.
+			Assert.Equal(1_000_000UL, GuildUpdateCashCodec.Parse(Convert.FromHexString(capturedGuildCashAfterDeposit)).CashTin);
+			Assert.Equal(500_000UL, GuildUpdateCashCodec.Parse(Convert.FromHexString(capturedGuildCashAfterWithdraw)).CashTin);
+			Assert.Equal(capturedGuildCashAfterWithdraw, Convert.ToHexStringLower(GuildUpdateCashCodec.Build(1_000_000UL - 500_000UL)));
+		}
+
+		// The WIDTH, which the captured amounts are too small to exercise: the amount and the balance are u64, and a
+		// u32 would silently truncate any guild bank past ~43 gold.
 		[Fact]
 		public void GuildBank_CarriesU64Amounts()
 		{
@@ -68,6 +106,9 @@ namespace Faolan.Tests
 
 			Assert.Equal(sizeof(ulong), GuildUpdateCashCodec.Build(amount).Length);
 			Assert.Equal(amount, GuildUpdateCashCodec.Parse(GuildUpdateCashCodec.Build(amount)).CashTin);
+
+			Assert.Equal(2 * sizeof(ulong), GuildTransferMoneyCodec.Build(1, amount).Length);
+			Assert.Equal(amount, GuildTransferMoneyCodec.Parse(GuildTransferMoneyCodec.Build(1, amount)).AmountTin);
 		}
 
 		[Fact]

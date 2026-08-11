@@ -139,14 +139,42 @@ server notifications rather than client packets. That was wrong, and the client 
 is listed in `GameCharAgent`'s **client_to_server** table with the signature `(uint64 i_nGuildInstance,
 Explicit64_c i_cAmount)`. Guild money is fed by the tax *and* by members paying in (#654).
 
-**None of it is captured** — `--report method-census --report-arg Bank` finds zero guild-bank frames across all
-120 captures, because no captured session ever opened the bank window. So the bodies come from the client's
-method table, and the LAYOUT is the measurable part: a `GameCharAgent` request body is its declared parameters
-concatenated big-endian with no header, at **ID32 = 8, int = 4, uint64 = 8**, which reproduces the captured length
-of every scalar-parameter method on the interface — `RequestBindLocation(ID32)` 8, `SetTradeCash(uint64)` 8,
+⭐ **The money half IS captured, and every predicted body is right** (#795). This section used to say a sweep
+found zero guild-bank frames; the sweep predates
+`Captures/demol80-demonologist_login_gameplay_annotated_3.tshark.json`, which carries one session's whole guild
+banking with the player narrating it in `/say`:
+
+| time | direction | message | body | annotation |
+|---|---|---|---|---|
+| login | s2c | `GuildHeader` for `Faolan` (`0x86C47`) | `cash = 0` | |
+| 09:45:09.520 | s2c | `DispatchGuildBankData` | the empty vault, container `0x6D` instance `0x86C47` | |
+| 09:45:32.917 | c2s | `GuildTransferMoney` | `0000000000086c47 00000000000f4240` | *"just deposited 1g to guild bank"* |
+| 09:45:33.036 | s2c | `DispatchUpdateCash` | `0000000000da31e9 00000000` | |
+| 09:45:33.111 | s2c | `DispatchGuildUpdateCash` | `00000000000f4240` (1,000,000) | |
+| 09:45:46.051 | c2s | `GuildWithdrawMoney` | `000000000007a120` (500,000) | *"withdrew 50s"* |
+| 09:45:46.220 | s2c | `DispatchGuildUpdateCash` | `000000000007a120` (500,000) | |
+| 09:45:46.337 | s2c | `DispatchUpdateCash` | `0000000000e1d309 00000000` | |
+
+Three things fall out that the method table could not give:
+
+1. ⭐ **`DispatchGuildUpdateCash` is the BALANCE, not a delta.** The guild started at cash 0, so the post-deposit
+   1,000,000 is consistent with either reading — but the post-withdraw value is 500,000, which is the balance
+   (1,000,000 − 500,000). A delta would have had to be negative there.
+2. **It is sent on the deposit too**, not only the withdrawal.
+3. **The player's own `DispatchUpdateCash` moves by exactly the amount** in both directions (15,299,113 →
+   14,299,113 → 14,799,113), confirming the wallet leg, and its order relative to the guild update is *not* fixed —
+   the two arrive on different tiers.
+
+`GuildRenownCodecTests.GuildBankMoney_MatchesTheCapturedBodies` pins all three bodies.
+
+The layout rule the bodies were originally *derived* from still holds and is still worth keeping, because it is
+what will predict the next uncaptured `GameCharAgent` body: a request body is its declared parameters concatenated
+big-endian with no header, at **ID32 = 8, int = 4, uint64 = 8**, which reproduces the captured length of every
+scalar-parameter method on the interface — `RequestBindLocation(ID32)` 8, `SetTradeCash(uint64)` 8,
 `BuyItem(ID32,int)` 12, `AddTradeItem(ID32,int,int)` 16, `SellItem(ID32,ID32,int)` 20,
 `SplitInventoryItem(ID32,int,int,int)` 20, `TryLootItem(ID32,int,ID32,int)` 24. Nine methods, no misses
-(`GuildBankTests`). Two 64-bit parameters therefore make a 16-byte body.
+(`GuildBankTests`). Two 64-bit parameters make a 16-byte body — and `GuildTransferMoney`'s captured body is
+exactly those 16 bytes, so the rule has now been *tested* rather than only fitted.
 
 ⚠️ **The reply ENDPOINTS are not recovered from anything.** The method table gives the method and its parameters;
 it says nothing about the RpcHeader, whose sender is a server OBJECT id only a capture reveals. And it is
@@ -171,7 +199,8 @@ Two deliberate choices, both about not minting money:
   one while being wrong — it does not know the wallet moved — and retail has a named message for exactly that.
 - **Leader only.** Retail has per-rank bank permissions and nothing pins which rung they hang off, so the rule is
   the narrowest one that cannot be abused, by that guild's own governing form (`GuildRankLadder.LeaderRank` — the
-  top rung is 3, 4 or 5 depending on the form).
+  top rung is 3, 4 or 5 depending on the form). ⚠️ The captured session does not settle this and cannot: the
+  member banking there is that guild's own leader, so a successful withdrawal is consistent with every threshold.
 
 ### The two renown messages (#104)
 

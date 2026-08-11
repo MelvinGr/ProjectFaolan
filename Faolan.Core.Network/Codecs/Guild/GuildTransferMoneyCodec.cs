@@ -11,18 +11,18 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// server, so the deposit is sent where the money is and the guild is credited across the tier seam. The
 	// withdrawal is the mirror image - `CSPlayerAgent.GuildWithdrawMoney` on the CS tier, where `Guild.Cash` lives.
 	//
-	// NOT capture-derived, and it cannot be: `--report method-census --report-arg Bank` finds ZERO guild-bank frames
-	// across all 120 captures, because no captured session ever opened the bank window. The body is recovered from
-	// the client's method table, and the LAYOUT is proven against captured siblings rather than assumed - a
-	// GameCharAgent body is its parameters concatenated big-endian at ID32=8, int=4, uint64=8, which reproduces the
-	// captured length of every scalar-parameter method on the interface (`GameCharAgentBodyLayoutTests`):
+	// ⭐ CAPTURED, and the body is exactly what the client's method table predicted (#795). It was written from the
+	// method table alone, under the belief - stated here and in `gaps.md` - that no captured session ever opened the
+	// bank window. One does: `demol80-demonologist_login_gameplay_annotated_3`, with the player narrating it in /say
+	// ("just deposited 1g to guild bank"). The sweep that reported zero guild-bank frames predates that capture.
 	//
-	//     RequestBindLocation(ID32) 8 · SetTradeCash(uint64) 8 · BuyItem(ID32,int) 12 · AddTradeItem(ID32,int,int) 16
-	//     SellItem(ID32,ID32,int) 20 · SplitInventoryItem(ID32,int,int,int) 20 · TryLootItem(ID32,int,ID32,int) 24
+	//   09:45:32.917 c2s  0000000000086c47 00000000000f4240
+	//                     guild 0x86C47     1,000,000 tin = 1 gold
 	//
-	// So two 64-bit parameters are a 16-byte body. `Explicit64_c` is the client's explicit-width 64-bit wrapper and
-	// occupies the same eight bytes as the `uint64` beside it.
-	// [V0: the guild deposit body - recovered from the client, layout corroborated by captured siblings]
+	// The guild instance is the same 0x86C47 the login's `GuildHeader` carries for "Faolan", and the amount is the
+	// gold the annotation names - so both parameters are pinned, not just the length. `Explicit64_c` is the client's
+	// explicit-width 64-bit wrapper and does occupy the same eight bytes as the `uint64` beside it.
+	// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json fr2385]
 	public static class GuildTransferMoneyCodec
 	{
 		public const uint Method = (uint)GameCharAgentMethods.GuildTransferMoney;

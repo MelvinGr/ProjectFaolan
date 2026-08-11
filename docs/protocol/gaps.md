@@ -376,27 +376,16 @@ is kick, which is promote, and whether promote is even permission-gated rather t
 from the table alone. We allow the LEADER only, the narrowest rule that cannot be abused, rather than guessing a
 threshold that would quietly let the wrong members remove people.
 
-### The guild bank's two message bodies
-**Tracked: Gitea #795.** [V0: the guild withdrawal body] [V0: the guild cash update body] `GuildWithdrawMoney`
-(c2s `0x2035`) and `DispatchGuildUpdateCash` (s2c `0x2052`) are the only guild-bank messages that exist —
-there is no deposit method, because guild money is fed by the guild TAX (`0x2029`). Neither body is captured, and
-that is not an accident of coverage: a sweep of all 215 captures finds **zero** guild-bank traffic, because no
-captured session ever opened the bank UI.
-
-Both are recovered from the client instead. Its method table declares `GuildWithdrawMoney(uint64 amount)` and
-`DispatchGuildUpdateCash(i_nCash)`, and every sibling scalar-parameter method on these interfaces writes its
-argument as a bare big-endian value with no header — so a one-parameter method's body IS its parameter. The u64
-width matches `Guild.Cash`. What that does NOT settle is whether the update carries the balance or a delta; we
-send the balance, because `i_nCash` names a total and the request already carried the amount.
-
-Closing this needs an in-client check (open the guild bank, withdraw, see whether the window updates), not a
-capture we could go and find.
-
 ### Which guild ranks may withdraw from the bank
 **Tracked: Gitea #795.** [V0: which guild ranks may withdraw from the bank] Retail has per-rank bank permissions;
 nothing in the corpus, the client's method table or RDB 1000518 (the rank-name ladder) says which rung they hang
 off. We allow the LEADER only — the narrowest rule that cannot be abused — and refuse everyone else, rather than
 guessing a threshold that would quietly let the wrong members drain the bank.
+
+⚠️ The one captured guild-banking session (`demol80-demonologist_login_gameplay_annotated_3`) does **not** settle
+it and cannot: the depositor is the guild's own leader, so a successful withdrawal there is consistent with every
+threshold. What it does close is the message bodies, which used to be tracked here — see
+`GuildTransferMoneyCodec` / `GuildWithdrawMoneyCodec` / `GuildUpdateCashCodec`, all now `[V2: …]`.
 
 ### What sets the MagicBuff apply payload's hostile flag
 **Tracked: Gitea #658.** [V0: what separates the 134 from those 554] `descriptor[4]` of the 54-byte

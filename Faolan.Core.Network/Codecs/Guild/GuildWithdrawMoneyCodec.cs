@@ -6,12 +6,16 @@ namespace Faolan.Core.Network.Codecs.Guild
 {
 	// c2s 0x2035 GuildWithdrawMoney(uint64 amount) - the guild-bank withdrawal the client sends from the guild window.
 	//
-	// NOT capture-derived, and it cannot be: a sweep of all 215 captures finds ZERO guild-bank traffic, because no
-	// captured session ever opened the bank UI (#132). The body is recovered from the client instead - its method
-	// table declares the single `uint64 amount` parameter, and every sibling scalar-parameter method on this
-	// interface writes its argument as a bare big-endian value with no header, which is what makes a one-parameter
-	// method's body its parameter. The width matches `Guild.Cash`, which is also a u64.
-	// [V0: the guild withdrawal body]
+	// ⭐ CAPTURED (#795), and it is the single bare big-endian `uint64` the client's method table predicted. This
+	// used to say a sweep of all 215 captures found ZERO guild-bank traffic; `demol80-demonologist_login_gameplay_
+	// annotated_3` has the whole transaction, annotated by the player in /say ("withdrew 50s"):
+	//
+	//   09:45:46.051 c2s  000000000007a120   = 500,000 tin = 50 silver
+	//
+	// ⚠️ There is a SECOND method of this name - `GameCharAgent.GuildWithdrawMoney(const ID32& i_cOfficer)` (0x12) -
+	// and it is a different message taking an officer id, not an amount. This is the CS-tier one, which is the one
+	// retail sends from the guild window; the game-tier twin appears in no capture.
+	// [V2: demol80-demonologist_login_gameplay_annotated_3.tshark.json fr2458]
 	public static class GuildWithdrawMoneyCodec
 	{
 		public const uint Method = (uint)CSPlayerAgentMethods.GuildWithdrawMoney;
