@@ -545,17 +545,27 @@ Shabaka. A `LIKE` match reads as a hit and wires the goal to the wrong NPC on th
 text (*"Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)"*), so a bare talk trigger
 would complete them early. They need the rank gate first.
 
-### A gated kill target is an editorial call, never a rule
+### A gated kill target is an editorial call, never a rule — and it is TWO calls
 
 Some kill targets are one-time story NPCs: they are streamed only to a player holding the quest active, and they
-do not respawn once killed (`WorldEntity.GateQuestIds` / `NoRespawn`, fed by
-`DatabaseRepository.GetQuestGatedNpcMap`). Saddur and Scavenger Tuut are the two, and retail solo-instances both.
+do not respawn once killed. Saddur and Scavenger Tuut are the two, and retail solo-instances both.
 
-Membership is the goal's own **`GatesTargetVisibility`** column, set by hand. It used to be *derived* from "a
-`Kill` goal that has a `TargetName`", which was true of the only two goals ever wired and false in general — it
-forces `NoRespawn`, which caps a goal at however many spawns exist. Filling the target names mechanically therefore
-turned quest 12057 (*kill 9 Vanir Polluters*, 8 spawns in the world) into a permanently uncompletable quest, stuck
-at 8/9 with nothing left alive.
+⚠️ **Those are two independent properties and they are two columns** (#708). Visibility is
+`GatesTargetVisibility` → `WorldEntity.GateQuestIds`, fed by `DatabaseRepository.GetQuestGatedNpcMap`; staying
+dead is `TargetStaysDead` → `WorldEntity.NoRespawn`, fed by `DatabaseRepository.GetStoryKillTargets`. Both of
+today's targets want both, which is exactly why one column answered both questions for so long — and the weld
+could not express the first case that wants only one: a quest-only target on a **repeatable or retryable** quest
+is gated and has to come back. Taking the gate forced `NoRespawn`; dropping it made the NPC visible to everyone.
+
+⚠️ They are also read differently, which is the second reason they are not one thing. The visibility map
+deliberately reveals a gated NPC to **every** quest that targets it (#574 — killing Tuut completes the only quest
+that was revealing him, so his looted-for key became unobtainable); `GetStoryKillTargets` is a property of the
+target and does no such widening.
+
+Membership is set by hand. It used to be *derived* from "a `Kill` goal that has a `TargetName`", which was true of
+the only two goals ever wired and false in general — it forced `NoRespawn`, which caps a goal at however many
+spawns exist. Filling the target names mechanically therefore turned quest 12057 (*kill 9 Vanir Polluters*,
+8 spawns in the world) into a permanently uncompletable quest, stuck at 8/9 with nothing left alive.
 
 The map is keyed by **template** (#521). It was keyed by name until that bit: the flag on the Tortage Island
 Saddur also gated the Stygian Galley one. `SeedContentTests.EveryGatedGoal_ResolvesToATemplate` holds the line,
@@ -564,7 +574,8 @@ hidden and starts respawning, and nothing in-client distinguishes that from "gat
 
 Whether a target is a unique story NPC or a population mob is not stated anywhere in the client data we can read,
 so it is a column and not a rule. `SeedContentTests.GatedKillTargets_HaveEnoughSpawnsToFinishTheGoal` asserts the
-property that makes setting one safe, rather than the current membership.
+property that makes setting one safe, rather than the current membership — and it reads `TargetStaysDead`, since
+that is the flag that makes the kill count a hard cap: a gated target that respawns can always be killed again.
 
 ### A goal can spring an AMBUSH
 

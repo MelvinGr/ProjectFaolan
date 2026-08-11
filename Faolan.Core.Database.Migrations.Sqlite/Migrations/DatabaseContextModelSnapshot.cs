@@ -3109,6 +3109,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("TargetStaysDead")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("TargetTemplateId")
                         .HasColumnType("INTEGER");
 

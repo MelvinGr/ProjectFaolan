@@ -180,20 +180,34 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(TargetTemplateId))]
 		public virtual NpcTemplate? TargetTemplate { get; set; }
 
-		// TRUE when killing this goal's target is a ONE-TIME STORY event, which makes that NPC quest-GATED: it is
-		// streamed only to a player holding this quest active, and it does not respawn once killed
-		// (DatabaseRepository.GetQuestGatedNpcMap -> WorldEntity.GateQuestIds / NoRespawn, #261). Saddur and Scavenger
-		// Tuut are the two, and retail solo-instances both.
+		// TRUE when this goal's target is streamed ONLY to a player holding this quest active
+		// (DatabaseRepository.GetQuestGatedNpcMap -> WorldEntity.GateQuestIds, #261). Saddur and Scavenger Tuut are
+		// the two, and retail solo-instances both.
 		//
 		// ⚠️ This used to be IMPLIED by "a Kill goal that has a TargetName", which held for the only two such goals ever
 		// wired and is false in general (#521). Two reasons it had to become a column:
 		//   - the gate keys on the NAME, so it hides EVERY same-named NPC from every player not on that quest;
-		//   - it forces NoRespawn, so a goal asking for N kills is capped at however many spawns the world holds.
+		//   - it forced NoRespawn, so a goal asking for N kills is capped at however many spawns the world holds.
 		// Quest 12057 asks for 9 Vanir Polluter kills and the world holds 8 spawns, so the implied rule turned the
 		// mechanical TargetName fill this issue asks for into a PERMANENTLY uncompletable quest - a goal stuck at 8/9
 		// with nothing left alive. Whether a kill target is a unique story NPC or a population mob is an editorial call
 		// the client's data does not state anywhere we can read, so it is a hand-set column, never a rule.
 		public bool GatesTargetVisibility { get; set; }
+
+		// TRUE when killing this goal's target is a ONE-TIME STORY event, so the NPC does not come back
+		// (-> WorldEntity.NoRespawn). Both of the two flagged goals want this AND the visibility gate above, which is
+		// why one column used to answer both (#708) - but they are independent properties of an NPC and the weld
+		// cannot express the first case that wants only one:
+		//   - a REPEATABLE or retryable quest whose target is quest-only: gated, but it has to respawn;
+		//   - a story kill target that everyone can see: stays dead, but not hidden.
+		// Under the weld, taking the gate forced NoRespawn and dropping it made the NPC visible to everyone; neither
+		// combination could be written down. Split with both set on the existing two, so behaviour is unchanged.
+		//
+		// ⚠️ Being a story kill target is why the gate is safe here and is NOT the same statement: `GetQuestGatedNpcMap`
+		// reveals a gated NPC to EVERY quest that targets it (#574 - killing Tuut completes the only quest that was
+		// revealing him, so his looted-for key became unobtainable), while this flag is read per target with no such
+		// widening. Editorial, like its neighbour: the client's data states neither anywhere we can read.
+		public bool TargetStaysDead { get; set; }
 
 		// A PRECONDITION the client states in the goal's own objective text, decoded with it (#520). Two shapes exist in
 		// the corpus and both are recorded even though only one can be enforced yet:

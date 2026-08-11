@@ -91,11 +91,12 @@ namespace Faolan.Importer.Rdb
 					fromLdb++;
 				}
 
-				// NOT set here, on purpose. Quest-gated visibility + NoRespawn is an editorial call about whether the
-				// target is a one-time story NPC, and applying it to a mechanically-resolved population mob hides its
-				// whole population and caps the kill count at however many spawns exist - see
-				// QuestGoalDefinition.GatesTargetVisibility.
+				// NEITHER is set here, on purpose. Quest-gated visibility and the one-time kill are both editorial
+				// calls about whether the target is a story NPC, and applying them to a mechanically-resolved
+				// population mob hides its whole population and caps the kill count at however many spawns exist -
+				// see QuestGoalDefinition.GatesTargetVisibility.
 				goal.GatesTargetVisibility = false;
+				goal.TargetStaysDead = false;
 			}
 
 			if (fromCatalog + fromLdb > 0)

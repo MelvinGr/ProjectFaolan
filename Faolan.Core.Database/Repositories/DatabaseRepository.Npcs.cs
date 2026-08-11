@@ -42,6 +42,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap();
+		Task<HashSet<uint>> GetStoryKillTargets();
 		Task<Dictionary<uint, uint>> GetQuestGiverMap();
 		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
@@ -346,6 +347,26 @@ namespace Faolan.Core.Database.Repositories
 			return targeted.Where(x => gated.Contains(x.TargetTemplateId) && !givers.Contains(x.TargetTemplateId))
 				.GroupBy(x => x.TargetTemplateId)
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+		}
+
+		// The NPC TEMPLATES a quest goal kills ONCE (`QuestGoalDefinition.TargetStaysDead` -> WorldEntity.NoRespawn).
+		// A separate question from the visibility gate above and a separate query for that reason (#708): the two used
+		// to be one column, so a quest-only target that must respawn - a repeatable or retryable quest - could not be
+		// expressed at all.
+		//
+		// ⚠️ NO widening here, unlike the gate. The gate deliberately reveals a gated NPC to every quest that targets
+		// it (#574); staying dead is a property of the TARGET, so it reads the flagged goals and nothing more. A goal
+		// whose target has not resolved to a template is absent from both, which is right: it cannot pin down an NPC
+		// that does not exist here.
+		public async Task<HashSet<uint>> GetStoryKillTargets()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return (await ctx
+					.QuestGoalDefinitions.Where(g => g.TargetStaysDead && g.TargetTemplateId != null)
+					.Select(g => g.TargetTemplateId!.Value)
+					.Distinct()
+					.ToListAsync())
+				.ToHashSet();
 		}
 
 		// Which quest each NPC TEMPLATE gives, derived from the dialogue graph's own grants (#646: keyed by template,

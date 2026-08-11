@@ -66,6 +66,30 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #708: staying dead is a SEPARATE query off a separate column. Both story targets want both today, which is
+		// what let one column answer both questions - the split is what makes the first quest-only target that must
+		// RESPAWN (a repeatable or retryable quest) expressible at all.
+		[Fact]
+		public async Task StayingDead_IsItsOwnFlag_NotImpliedByTheGate()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var stayDead = await Repo().GetStoryKillTargets();
+
+			Assert.Contains(Tuut, stayDead); // the story kill targets carry both flags
+			Assert.Contains(9500u, stayDead);
+			Assert.DoesNotContain(GalleySaddur, stayDead);
+
+			// The two columns are read independently: nothing derives one from the other, so a row could carry either
+			// alone. (No shipped row does today - that is data, not a rule, and this is what keeps it that way.)
+			foreach (var templateId in stayDead)
+			{
+				Assert.True(
+					await db.QuestGoalDefinitions.AnyAsync(g => g.TargetTemplateId == templateId && g.TargetStaysDead, ct),
+					$"template {templateId} stays dead, so some goal targeting it must carry TargetStaysDead");
+			}
+		}
+
 		private static DatabaseRepository Repo()
 		{
 			return new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));

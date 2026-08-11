@@ -2660,7 +2660,7 @@ namespace Faolan.Importer.Captures
 			// not a reach by kind alone (goal 11712 has RequiredCount 3 - the region SCOPES the objective). Its verb is
 			// what settles it, so it stays a seed until the "Enter <place>" shape is a rule (#704).
 			await SeedGoal(db, 10238, 1448, QuestGoalType.ReachArea);
-			await SeedGoal(db, 10238, 3490, QuestGoalType.Kill, "Saddur", gatesVisibility: true);
+			await SeedGoal(db, 10238, 3490, QuestGoalType.Kill, "Saddur", gatesVisibility: true, staysDead: true);
 			await Chain(db, 10238, 12369);
 		}
 
@@ -2674,7 +2674,7 @@ namespace Faolan.Importer.Captures
 			await Chain(db, 13479, 13563);
 			// gatesVisibility: Tuut is a one-time story target - hidden until 13479 is active, and he stays dead
 			// (retail solo-instances him). The only kill goal besides Saddur that gets it; see GatesTargetVisibility.
-			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1, gatesVisibility: true);
+			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1, gatesVisibility: true, staysDead: true);
 			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
 			// and takes the actual key, not just an empty source-matched bag. WHICH corpse holds WHICH quest item is in
 			// neither the wire goal record nor the RDB catalog, so this one is genuinely un-harvestable today (#705).
@@ -2733,7 +2733,7 @@ namespace Faolan.Importer.Captures
 		// re-import never clobbers trigger fields set by hand (the Quest editor) or a prior run. A newly-created goal is
 		// un-wired, so a fresh import still bootstraps.
 		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null,
-			uint? required = null, bool gatesVisibility = false)
+			uint? required = null, bool gatesVisibility = false, bool staysDead = false)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)
@@ -2756,9 +2756,12 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = type;
 			goal.TargetName = target;
 			goal.QuestItemId = questItemId;
-			// Editorial, and off by default: a one-time story target hides until its quest is active and stays dead.
-			// See QuestGoalDefinition.GatesTargetVisibility for why this is never derived from having a TargetName.
+			// Editorial, and off by default: a one-time story target hides until its quest is active, and stays dead.
+			// See QuestGoalDefinition.GatesTargetVisibility for why neither is ever derived from having a TargetName -
+			// and #708 for why they are two calls: a quest-only target on a REPEATABLE quest is the first case that
+			// wants the gate WITHOUT the one-time kill, and one column could not say it.
 			goal.GatesTargetVisibility = gatesVisibility;
+			goal.TargetStaysDead = staysDead;
 			if (required is { } r)
 				goal.RequiredCount = r;
 			if (goal.Sequence == 0)

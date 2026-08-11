@@ -126,6 +126,9 @@ namespace Faolan.GameServer.World
 		// an NPC in this map is streamed only to players holding one of its quests active (see WorldEntity.GateQuestIds
 		// / IsVisibleTo).
 		private Dictionary<uint, uint[]> _questGatedNpcs = null!;
+		// #708: the NPCs a quest kills ONCE. A separate set from _questGatedNpcs on purpose - visibility and respawn
+		// are independent, and one column answering both could not express a quest-only target that must come back.
+		private HashSet<uint> _storyKillTargets = null!;
 		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
 
 		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs,
@@ -1112,6 +1115,7 @@ namespace Faolan.GameServer.World
 
 			// #261 quest-gated spawns: NPC template id -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
+			_storyKillTargets ??= await _database.GetStoryKillTargets();
 			_escortHiddenNpcs ??= await _database.GetEscortHiddenNpcMap();
 
 			// NpcSpawns is the SOURCE OF TRUTH: the importer's burst-truth extraction (#266, BuildBurstTruthSpawns)
@@ -1183,15 +1187,15 @@ namespace Faolan.GameServer.World
 					entity.HideWhenQuestCompletedId = hideQuest;
 
 				if (_questGatedNpcs.TryGetValue(npc.NpcTemplateId, out var gateQuests))
-				{
 					entity.GateQuestIds = gateQuests;
-					// Quest-gated NPCs are one-time KILL TARGETS (the gate map is exactly the kill-goal targets that
-					// aren't quest givers). A story kill target must NOT respawn ~15s later - killing Scavenger Tuut
-					// for Casilda's quest completes the goal and he should stay dead (retail solo-instances him). So a
-					// gated NPC despawns after death instead of reviving; its loot bag (the quest key) is a separate
-					// entity and still drops.
+
+				// …and, SEPARATELY, whether it stays dead (#708). A story kill target must not respawn ~15s later -
+				// killing Scavenger Tuut for Casilda's quest completes the goal and he should stay dead (retail
+				// solo-instances him), so he despawns after death instead of reviving; his loot bag (the quest key) is
+				// a separate entity and still drops. ⚠️ Not implied by the gate: a quest-only target on a REPEATABLE
+				// quest is gated and must come back, which is the case the welded column could not express.
+				if (_storyKillTargets.Contains(npc.NpcTemplateId))
 					entity.NoRespawn = true;
-				}
 
 				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real

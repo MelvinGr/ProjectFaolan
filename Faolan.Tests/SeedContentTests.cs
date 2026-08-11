@@ -392,10 +392,11 @@ namespace Faolan.Tests
 				$"TargetNames that are a SHORT FORM of an NPC we hold, so the equality match can never fire: {string.Join(", ", shortForms)}");
 		}
 
-		// A goal flagged `GatesTargetVisibility` must have RESOLVED to a template (#521), because that flag is the only
-		// input to `GetQuestGatedNpcMap` and the map is keyed by template. An unresolved flagged goal is not a smaller
-		// gate - it is NO gate: the NPC stops being hidden and stops being NoRespawn, so a one-time story kill target
-		// respawns and is visible to everyone, silently. The flag would read as set and do nothing.
+		// A goal flagged `GatesTargetVisibility` or `TargetStaysDead` must have RESOLVED to a template (#521/#708),
+		// because those flags are the only input to `GetQuestGatedNpcMap` / `GetStoryKillTargets` and both are keyed by
+		// template. An unresolved flagged goal is not a smaller gate - it is NO gate: the NPC stops being hidden and
+		// stops being NoRespawn, so a one-time story kill target respawns and is visible to everyone, silently. The
+		// flag would read as set and do nothing.
 		//
 		// This is cheap to satisfy - both flagged goals carry a 51000 reference, so the rule's strongest source already
 		// resolves them - and it is exactly the case where a silent failure is most expensive, since nothing in-client
@@ -407,7 +408,7 @@ namespace Faolan.Tests
 			var ct = TestContext.Current.CancellationToken;
 
 			var flagged = await db
-				.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility)
+				.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility || g.TargetStaysDead)
 				.Select(g => new { g.GoalId, g.TargetName, g.TargetTemplateId })
 				.ToListAsync(ct);
 
@@ -416,7 +417,7 @@ namespace Faolan.Tests
 			var unresolved = flagged.Where(g => g.TargetTemplateId is null or 0).Select(g => $"goal {g.GoalId} '{g.TargetName}'").ToList();
 
 			Assert.True(unresolved.Count == 0,
-				$"GatesTargetVisibility goals with no TargetTemplateId - the flag is silently inert on these: {string.Join(", ", unresolved)}");
+				$"gated / stays-dead goals with no TargetTemplateId - the flag is silently inert on these: {string.Join(", ", unresolved)}");
 		}
 
 		// A resolved `TargetTemplateId` must AGREE with the goal's own typed reference wherever the goal carries one
@@ -638,7 +639,9 @@ namespace Faolan.Tests
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
-			var gated = await db.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility).ToListAsync(ct);
+			// #708: the flag that makes the kill count a HARD cap is `TargetStaysDead`, not the visibility gate - a
+			// gated target that respawns can always be killed again. So this reads the respawn column.
+			var gated = await db.QuestGoalDefinitions.Where(g => g.TargetStaysDead).ToListAsync(ct);
 			Assert.NotEmpty(gated); // the two story targets; an empty set would mean the flag was lost, not that it is unused
 
 			var spawnsByName = await db
@@ -648,12 +651,12 @@ namespace Faolan.Tests
 
 			foreach (var g in gated)
 			{
-				Assert.False(string.IsNullOrEmpty(g.TargetName), $"goal {g.GoalId} gates visibility but names no target");
+				Assert.False(string.IsNullOrEmpty(g.TargetName), $"goal {g.GoalId} kills a one-time target but names no target");
 				var spawns = spawnsByName.GetValueOrDefault(g.TargetName!, 0);
 				var needed = Math.Max(1, (int)g.RequiredCount);
 				Assert.True(spawns >= needed,
 					$"goal {g.GoalId} (quest {g.QuestDefinitionId}) needs {needed} kill(s) of '{g.TargetName}' but the world holds {spawns} spawn(s), " +
-					"and a gated target does not respawn - the quest can never complete.");
+					"and a TargetStaysDead target does not respawn - the quest can never complete.");
 			}
 		}
 
