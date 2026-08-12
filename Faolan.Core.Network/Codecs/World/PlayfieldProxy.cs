@@ -70,7 +70,16 @@ namespace Faolan.Core.Network.Codecs.World
 		// [0] for every proxy except the revive body's - and, per the note above, the NORMAL difficulty mode.
 		public const uint PlayfieldClass = 0x0000C79C;
 
-		// [0] on an EPIC instance (#511). Observed once, in a controlled A/B against the same map minutes earlier.
+		// [0] on an EPIC instance (#511), and the word is not merely correlated with the mode - it is the END of a
+		// chain the corpus shows whole, twice, 34 seconds apart on the SAME door and the SAME map:
+		//
+		//   LookAt(the Spider Caverns door 0x8C5) -> UseDynel -> DispatchScryShowMessageBox "Do you want to travel to
+		//   the Spider Caverns?" -> ScryMessageBoxAnswer[0] -> IntendedTeleportIIR + PlayfieldFIIR carrying THIS word
+		//
+		// and the only thing that differs between the two runs is the answer's OPTION INDEX: `1` -> 0xC79C and the
+		// player narrating "energed normal instance", `2` -> 0xCABC and "enered epic instance". So the difficulty is
+		// PICKED at the message box and CARRIED here, which is what makes this a decode rather than two separate
+		// observations that happen to agree. See ScryMessageBoxAnswerCodec for the picker's own half.
 		public const uint EpicPlayfieldClass = 0x0000CABC;
 
 		// [2] when the instance belongs to a TEAM - the team/guild class word, the same 0xDEA9 a team's own ID32 uses.
