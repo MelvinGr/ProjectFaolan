@@ -31,7 +31,7 @@ The `0x3F1` (1009) framing is the same list invariant as the quest journal / Gam
 ### Per record (`FUN_0077be70`)
 ```
 [u32 recipeId]                       # the list-key the loop maps by (== RequestRecipeInfo levelId)
-[u32 x3]                             # header (@c = 0xf4241 = 1000001, the tradeskill RDB type)
+[u32 x3]                             # header (@c = the tradeskill RDB type - 0xf4241/0xf4242/0xf4244)
 KEY1 = 0x3F1-list of 18-u32 elements # ingredients: item id + item DecryptionKeys (FUN_0077c4f0 / FUN_005d5150)
 [u32 x4]                             # mid header; word 1 (0x1F4) is the CRAFT DURATION in centiseconds (below)
 KEY2 = 0x3F1-list of u32             # id list (FUN_004d4c70)
@@ -50,14 +50,28 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
   `RecipeRecords.FromRow` mapping a stored `Recipe` row to a wire record.
   Fully decoded — no verbatim blob. `Parse` → `Build` round-trips the capture byte-for-byte,
   and so does the DB path (`Recipe` row → `RecipeRecords.FromRow` → `Build`); both are golden-gated in
-  `TradeskillReplyCodecTests`. Parse validates every folded constant (header word 0 == list-key, mid header,
-  element id-dup / key-dup / `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
+  `TradeskillReplyCodecTests`. Parse validates the folded constants (header word 0 == list-key, mid header,
+  `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
+
+  ⚠️ Three of those "constants" were not (#811), and each refused a whole recipe book rather than one element.
+  The `ProfessionId` census settles it from the shipped side too: the 708 rows carry **four** rdbTypes -
+  1000001 (99), 1000002 (504), 1000003 (60) and 1000004 (45) - so the gate was already narrower than the data.
+  * the header's **rdbType** was gated to `{0xf4241, 0xf4242}` because those are what NecroL80's two captures
+    carry; DemoL80's uses `0xf4244` (1000004) for all 45 of its records. One type per capture, not a shared
+    vocabulary - and the word is carried, so the gate could never have caught a mis-parse.
+  * the element's **id-dup** and **key-dup** are the ACG **template PAIR** and one TEA key per template
+    (`ACGItemTemplateID` / `ACGItemTemplateID2`, `keyN <-> templateN`), not an id and a redundant copy. They agree
+    on 2411 of 2412 captured elements; the one that does not carries the consecutive `0x3CAE32` / `0x3CAE33` a
+    pair's two variants have, with a distinct key each.
+
+  Recovering that book added **105 recipes, 324 recipe items and 96 items** to `faolan.db` - the whole DemoL80
+  book had been unreadable, so the importer had been dropping it silently.
 - **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `ProfessionId`
   (`0xf4241`/`0xf4242` — see below), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as
   `RefId0` (always present) + `RefId1` (nullable; every captured record has 1 or 2). No `Data` blob.
 - **Importer** `--only recipes` (`RecipesModule` / `CaptureRecipeImporter`) — scans captures for the reply
-  sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. Seeded 603
-  from the NecroL80 capture.
+  sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. 708 rows: 603
+  from the NecroL80 captures plus the 105 the DemoL80 book contributes.
 - **Handler** `HandleIirCarrier` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads `Database.GetRecipes()`
   (ordered by id = capture order, `Items` + their `Items` rows included), maps each via `ToRecord`, and sends the
   reply on the world framing.
@@ -110,7 +124,7 @@ the client's duration getter for it (`FUN_0114bf50`) answers per operation:
 
 | operation | duration | where it comes from |
 |---|---:|---|
-| craft | the recipe's own | `ClientTradeskillRecipe_c` `+0x24`, i.e. the record's mid-header word 1 — `0x1F4` on all 603 shipped recipes |
+| craft | the recipe's own | `ClientTradeskillRecipe_c` `+0x24`, i.e. the record's mid-header word 1 — `0x1F4` on every shipped recipe (the codec folds it as a constant) |
 | put a gem in a socket | 500 | hardcoded in the getter |
 | take a gem out | 0 | hardcoded — instant |
 | anything else | 100 | hardcoded |
@@ -153,7 +167,7 @@ unnoticed — and that is the day to columnize it.
   | crafting | Weaponsmith `321000` · Armorsmith `321300` · Alchemy `321600` · Architect `321900` · Gemcutter `322200` |
   | gathering | Woodcutting `323200` · Mining `323300` · Prospecting `323400` · Stonecutting `323500` · Weaver `327200` · Skinner `327500` |
 
-  Every one of the 603 recipes states the rung it needs in `RequiredFeatId`, and all of them resolve onto the
+  Every one of the 708 recipes states the rung it needs in `RequiredFeatId`, and all of them resolve onto the
   Weaponsmith and Armorsmith ladders — which is the finding the book itself carries: **our "catalog" is ONE
   character's book**, harvested from that character's `TradeskillReplyIIR`, so it holds their two professions and
   no others.
@@ -173,7 +187,7 @@ unnoticed — and that is the day to columnize it.
   Membership tests against the recipe's own `RequiredFeatId` hide most of a character's book from them; compare
   depths.
 
-  ⚠️ **The WORKSHOP requirement is not enforced.** 366 of the 603 recipes also carry a `RequiredWorkshopFeatId`
+  ⚠️ **The WORKSHOP requirement is not enforced.** 378 of the 708 recipes also carry a `RequiredWorkshopFeatId`
   (artisan rank and up, one workshop tier per rank), and a workshop is a guild-city BUILDING and where the
   character is standing — not a feat they train. Blocked on a guild-city model; see Gitea #761.
   [V3: TradeskillProfessionTests.TheElevenProfessionLadders_WalkOutOfTheShippedPrereqEdges]

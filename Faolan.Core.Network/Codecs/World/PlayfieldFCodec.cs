@@ -61,8 +61,15 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const uint Opcode = (uint)IirTypes.PlayfieldFIIR;
 
-		// The scene blob's leading word and its third word, constant in all 151 captured bodies.
-		private const uint SceneBlobHead = 0x00000001;
+		// The scene blob's leading word is a COUNT, not the constant 1 it looks like on 217 of the 218 captured
+		// bodies (#811 - the same trap the ListFrame notes describe, and this one is not even framed by 0x3F1). The
+		// one record carrying 2 is the TEAM-owned Amphitheatre of Karutonia entry, and its blob is 32 bytes rather
+		// than 24: the modelled entry, then eight more bytes `[the same token][0x0000CB24]`. So a second entry exists
+		// and is SHORTER than the first, i.e. the entry is kind-tagged (0xCB20 vs 0xCB24) rather than fixed-width.
+		// ⚠️ Deliberate interim: the extra entries ride as `SceneBlobTail` bytes so the record round-trips, because
+		// one sample cannot pin a kind-tagged grammar and the client does not decode the blob where it reads it
+		// (FUN_00CBF5D0 copies it into a nested stream for a later consumer).
+		public const uint SingleSceneEntry = 0x00000001;
 		private const uint SceneBlobWord2 = 0x0000CB20;
 
 		// The two words at obj+0x80 / +0x84, 0xFFFFFFFF in every capture.
@@ -106,13 +113,13 @@ namespace Faolan.Core.Network.Codecs.World
 			// The length-prefixed sub-blob: the client reads it through FUN_00cbf5d0, so its contents are a nested
 			// stream and not four more top-level words.
 			var blob = new SpanReader(r.ReadBytesU32Length(), nameof(PlayfieldFCodec) + ".sceneBlob");
-			blob.ExpectU32Be(SceneBlobHead, "scene blob head");
+			var sceneEntries = blob.ReadU32Be();
 			var blobToken = blob.ReadU32Be(); // the token again, inside the blob
 			blob.ExpectU32Be(SceneBlobWord2, "scene blob word 2");
 			var blobFloat1 = blob.ReadF32Be(); // 15.0 in all 218 captured bodies
 			var blobFloat2 = blob.ReadF32Be(); // 0.053 .. 14.796, always below it
 			var blobLastWord = blob.ReadU32Be(); // beach capture carries 0x3, retail Old Tarantia 0x0
-			blob.EnsureAtEnd();
+			var blobTail = blob.ReadRemaining().ToArray();
 
 			r.ExpectU32Be(TrailerSentinel, "trailer word obj+0x80");
 			r.ExpectU32Be(TrailerSentinel, "trailer word obj+0x84");
@@ -122,13 +129,13 @@ namespace Faolan.Core.Network.Codecs.World
 			if (blobToken != proxy.InstanceToken)
 				throw CodecParseException.Unexpected(nameof(PlayfieldFCodec), r.Position, $"the scene blob to repeat the proxy's playfield token 0x{proxy.InstanceToken:X8}", $"0x{blobToken:X8}");
 
-			return new PlayfieldFIIR(position, proxy, sceneWord, blobFloat1, blobFloat2, blobLastWord, fieldC, flags, classWord, handle, env);
+			return new PlayfieldFIIR(position, proxy, sceneWord, blobFloat1, blobFloat2, blobLastWord, fieldC, flags, classWord, handle, env, sceneEntries, blobTail);
 		}
 
 		internal static void Write(FaolanStream s, PlayfieldFIIR v)
 		{
 			using var blob = new FaolanStream();
-			blob.WriteUInt32(SceneBlobHead).WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.BlobFloat1).WriteFloat(v.BlobFloat2).WriteUInt32(v.BlobLastWord);
+			blob.WriteUInt32(v.SceneEntries).WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.BlobFloat1).WriteFloat(v.BlobFloat2).WriteUInt32(v.BlobLastWord).WriteArray(v.SceneBlobTail ?? []);
 
 			s.WriteUInt32(Opcode).WriteUInt32(v.ClassWord).WriteUInt32(v.Handle).WriteByte(v.Env).WriteVector3(v.Position);
 			v.Proxy.Write(s);
@@ -141,7 +148,7 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// ClassWord/Handle/Env are the IIR base carrier; the create-editor and world-entry paths both send them as 0.
 	public sealed record PlayfieldFIIR(Vector3 Position, PlayfieldProxy Proxy, uint SceneWord, float BlobFloat1, float BlobFloat2, uint BlobLastWord, uint FieldC, uint Flags,
-		uint ClassWord = 0, uint Handle = 0, byte Env = 0)
+		uint ClassWord = 0, uint Handle = 0, byte Env = 0, uint SceneEntries = PlayfieldFCodec.SingleSceneEntry, byte[]? SceneBlobTail = null)
 	{
 		public uint MapId => Proxy.MapId;
 

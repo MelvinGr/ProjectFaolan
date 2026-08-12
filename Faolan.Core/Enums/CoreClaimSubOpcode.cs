@@ -10,6 +10,13 @@ namespace Faolan.Core.Enums
 	public enum CoreClaimSubOpcode : ushort
 	{
 		List = 0x0001, // s2c: the claim list
+
+		// s2c, sent ONCE per login and refused outright until #811. The client reads it into the SAME slot the Redeem
+		// index goes to (`ReadSubClass` FUN_007AEC50 shares one `case 2: case 3:` arm reading a single u32), so the
+		// two really are one body. What the number IS is undecoded [V0]: NecroL80's four logins carry 112, 114, 116
+		// and 118 - exactly +2 per session - and HeraldL carries 90, i.e. a per-ACCOUNT monotonic counter rather than
+		// anything about the claim list beside it, which is the same 19 entries every time.
+		LoginCounter = 0x0002,
 		Redeem = 0x0003, // c2s: redeem the 1-based claim index
 		RedeemAck = 0x0005, // s2c: multi-charge redeem ack (one entry, decremented amount)
 		Request = 0x0007, // c2s: "send me my claims"

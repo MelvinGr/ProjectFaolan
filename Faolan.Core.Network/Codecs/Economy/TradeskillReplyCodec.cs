@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//   recipes x record. type 1 = a single RecipeLearnt (not modelled here); type 3 = the full book list.
 	// Each record:
 	//   [u32 listKey]                                  # the recipe id (== the map key, and == header word 0)
-	//   [u32 id=listKey][u32 header1][u32 rdbType]      # header (rdbType = 0xf4241/0xf4242, the tradeskill RDB type)
+	//   [u32 id=listKey][u32 header1][u32 rdbType]      # header (the tradeskill RDB type - 0xf4241/0xf4242/0xf4244)
 	//   0x3F1-list of 18-u32 elements                   # ingredients (see element layout below)
 	//   [u32 0][u32 0x1F4][u32 midFlag][u32 0]          # mid header (0x1F4 = the craft duration in centiseconds)
 	//   0x3F1-list of u32                               # ref-id list (1-2 opaque ids)
@@ -43,8 +43,12 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		public const uint Opcode = (uint)IirTypes.TradeskillReplyIIR;
 		public const uint Version = 1;
-		private const uint HeaderTypeA = 0xF4241; // rdbType value A (1000001)
-		private const uint HeaderTypeB = 0xF4242; // rdbType value B (1000002)
+		// ⚠️ There is no fixed set of rdbType values, and asserting one refused retail traffic (#811). It was
+		// {0xF4241, 0xF4242} because those are what NecroL80's two captures carry (297 + 1512 and 99 + 504); the
+		// DemoL80 capture uses 0xF4244 (1000004) for all 45 of its records - one type per capture, not a shared
+		// vocabulary. The word is CARRIED on the record and round-trips either way, so the gate only ever cost
+		// coverage: it could not have caught a mis-parse, because a wrong split would not have landed on a plausible
+		// RDB type by luck.
 
 		// Fixed record/element constants (invariant across all 603 captured records; validated on parse so a capture
 		// that breaks the assumption throws rather than silently mis-building).
@@ -131,8 +135,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		private static RecipeElement ReadElement(ref SpanReader r, bool hasTrailing)
 		{
-			var itemId = r.ReadU32Be(); //           [0] item id
-			r.ExpectU32Be(itemId, "element item-id duplicate"); // [1] item id (dup)
+			var itemId = r.ReadU32Be(); //           [0] ACG template1
+			var itemId2 = r.ReadU32Be(); //          [1] ACG template2 - equal to [0] on all but one captured element
 			r.ExpectU32Be(0, "element word[2]"); //  [2] = 0
 
 			var flag = r.ReadU32Be(); //             [3]
@@ -140,11 +144,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 			var k1 = r.ReadU32Be();
 			var k2 = r.ReadU32Be();
 			var k3 = r.ReadU32Be();
-			var k4 = r.ReadU32Be(); //               [5..8] item TEA key
-			r.ExpectU32Be(k1, "element key-dup [9]"); //  [9..12]
-			r.ExpectU32Be(k2, "element key-dup [10]");
-			r.ExpectU32Be(k3, "element key-dup [11]");
-			r.ExpectU32Be(k4, "element key-dup [12]");
+			var k4 = r.ReadU32Be(); //               [5..8] template1's TEA key
+			var j1 = r.ReadU32Be(); //               [9..12] template2's TEA key - the SAME key when the pair is
+			var j2 = r.ReadU32Be(); //                       one template twice, which is all but one element
+			var j3 = r.ReadU32Be();
+			var j4 = r.ReadU32Be();
 
 			for (var c = 0; c < 4; c++)
 				r.ExpectU32Be(NullIdentity.Pair[c], $"element const word [{13 + c}]"); // [13..16]
@@ -153,7 +157,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 				? r.ReadU32Be()
 				: 0u; // [17] (ingredients only)
 
-			return new RecipeElement(itemId, flag, hash, k1, k2, k3, k4, trailing);
+			return new RecipeElement(itemId, flag, hash, k1, k2, k3, k4, trailing, itemId2,
+				j1 == k1 && j2 == k2 && j3 == k3 && j4 == k4 ? 0 : j1, j2, j3, j4);
 		}
 
 		private static RecipeRecord ReadRecord(ref SpanReader r)
@@ -163,8 +168,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 			var header1 = r.ReadU32Be();
 			var rdbType = r.ReadU32Be();
-			if (rdbType != HeaderTypeA && rdbType != HeaderTypeB)
-				throw new CodecParseException($"TradeskillReplyCodec: recipe {listKey:x} rdbType {rdbType:x} not in {{0x{HeaderTypeA:x},0x{HeaderTypeB:x}}}");
 
 			var nIng = r.ReadListCount();
 			var ingredients = new List<RecipeElement>(nIng);
@@ -193,18 +196,18 @@ namespace Faolan.Core.Network.Codecs.Economy
 		{
 			body
 				.WriteUInt32(e.ItemId)
-				.WriteUInt32(e.ItemId)
+				.WriteUInt32(e.ItemId2 == 0 ? e.ItemId : e.ItemId2)
 				.WriteUInt32(0)
 				.WriteUInt32(e.Flag)
 				.WriteUInt32(e.Hash)
 				.WriteUInt32(e.Key1)
 				.WriteUInt32(e.Key2)
 				.WriteUInt32(e.Key3)
-				.WriteUInt32(e.Key4) // key
-				.WriteUInt32(e.Key1)
-				.WriteUInt32(e.Key2)
-				.WriteUInt32(e.Key3)
-				.WriteUInt32(e.Key4) // key (dup)
+				.WriteUInt32(e.Key4) // template1's key
+				.WriteUInt32(e.Item2Key1 == 0 ? e.Key1 : e.Item2Key1)
+				.WriteUInt32(e.Item2Key1 == 0 ? e.Key2 : e.Item2Key2)
+				.WriteUInt32(e.Item2Key1 == 0 ? e.Key3 : e.Item2Key3)
+				.WriteUInt32(e.Item2Key1 == 0 ? e.Key4 : e.Item2Key4) // template2's key
 				.WriteUInt32(NullIdentity.Pair[0])
 				.WriteUInt32(NullIdentity.Pair[1])
 				.WriteUInt32(NullIdentity.Pair[2])
@@ -258,7 +261,17 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 	// One ingredient (input) or result (output) item: the item id + its per-template TEA key (K1..K4) and hash,
 	// plus the element Flag and (ingredients only) Trailing word. Role/position are implied by list membership.
-	public readonly record struct RecipeElement(uint ItemId, uint Flag, uint Hash, uint Key1, uint Key2, uint Key3, uint Key4, uint Trailing);
+	// ⚠️ `ItemId`/`ItemId2` are the ACG TEMPLATE PAIR (`ACGItemTemplateID` / `ACGItemTemplateID2`), not an id and a
+	// redundant copy of it - see the ProtoAcgItem notes. They agree on 2411 of the 2412 captured elements, which is
+	// why [1] was asserted to mirror [0] and why the one that does not (0x3CAE32 / 0x3CAE33, consecutive as a pair's
+	// two variants are) refused the whole recipe book it was in (#811). `ItemId2` is 0 for a row built from the DB,
+	// where only one template is stored; the writer then mirrors [0], which is what every other element does anyway.
+	//
+	// The two 4-word TEA keys are one per TEMPLATE (`keyN <-> templateN`), which is why the second stops mirroring the
+	// first on exactly the element whose templates differ. `Item2Key1 == 0` means "the same key", the only shape a
+	// DB-built row can have and what 2411 of 2412 captured elements carry.
+	public readonly record struct RecipeElement(uint ItemId, uint Flag, uint Hash, uint Key1, uint Key2, uint Key3, uint Key4, uint Trailing, uint ItemId2 = 0,
+		uint Item2Key1 = 0, uint Item2Key2 = 0, uint Item2Key3 = 0, uint Item2Key4 = 0);
 
 	// The stored `Recipe` row -> wire record projection. A MAPPER, not a codec (#533): the per-element TEA key + hash
 	// live once on the referenced `Items` row (RecipeItem carries only id/flag/trailing).

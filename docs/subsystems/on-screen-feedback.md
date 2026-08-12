@@ -48,11 +48,21 @@ The packet body (after the 0x2000 opcode) is the IIR:
 [u32 instance]     the target GameInterface object = the receiver endpoint instance = ClientInstance
                    (verified: in the Strie capture all 1249 GameInterfaceType packets AND the feedback share 0x02165EFF)
 [u8  0x01]         lead flag (constant)
-[u64 0]            reserved (constant 0)
+[u32 subjectClass][u32 subjectHandle]   the entity the message is ABOUT, (0, 0) when it is about nobody
 [u32 typeFlags]    feedback type/priority (0x00000000 for the FIFO banner; 0x42000020 etc. for buff/attribute lines)
 [u16 xmlLen][remoteformat XML]      the message (no null terminator)
-[u32 footer]       trailing flag (0 or 1 in the captures)
+[u32 footer]       trailing flag (0, 1, 2 or 4 in the captures)
 ```
+
+⚠️ The subject pair was written here as `[u64 0] reserved (constant 0)` and asserted as such, which refused four
+captured records outright (#811). It IS zero on 427 of the 431 — and all four exceptions are the SAME message,
+LDB `162:23` = **"RESISTED"**, each naming a real entity (`0xC350` + a handle) and each carrying footer 4. A
+constant read off a corpus that is quiet about one form, in the same family as #809's four.
+
+⚠️ Those four also make `typeFlags` look like something other than flags: they carry `0x3F800000`, `0x44937E78`,
+`0xBF676DBC` and 0, i.e. `1.0f`, `1179.9f`, `-0.904f` and `0.0f`. Whether the slot is a per-message PARAMETER
+rather than a type is open; the `32.00003f` / `2.0000014f` readings of `0x42000020` / `0x40000006` are exactly the
+kind of coincidence that would make guessing it wrong.
 Because the target instance == the world receiver instance (`ClientInstance`), a live send is **fully addressable
 from the session** — not just a verbatim replay.
 

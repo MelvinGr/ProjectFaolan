@@ -9,11 +9,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// spell and damage-over-time numbers where DamageResultIIR renders the melee hit (#349), what the client's draining
 	// spellweave gauges tick on, and what the world uses to hurt a player who is not being attacked by anybody.
 	//
-	// ONE grammar: the carrier, then exactly SEVENTEEN big-endian words.
+	// The carrier, then seventeen big-endian words - or ELEVEN, and the carrier's own entity CLASS is what says which.
 	//
 	//   [subop][class][handle][u8 env]
-	//   [statValue][0][0][0][statId][count][i32 delta][school]
+	//   [statValue][0][0][0][statId][count]      <- these six ONLY when class != 0xC879
+	//   [i32 delta][school]
 	//   [casterClass][caster][idx][0][spellBaseId][magnitude][0][0][0]
+	//
+	// ⚠️ The class word was asserted to be 0xC350 Character until #811, which refused all 13 records carrying 0xC879
+	// (`EntityClass.Destructible`) - the player chipping at a harvest node or a breakable. The client says the branch
+	// outright: `StatDamageIIR_t::ReadSubClass` (FUN_008D57C0) opens with
+	//     if (this->carrier->type != 0xc879) { <six reads> }
+	// and only then reads delta, school and the caster pair. So it is not a shorter message that happens to fit - the
+	// six leading words are conditional on the target being a CHARACTER, which is the only kind of target that has a
+	// stat sheet for them to describe. The 13 captured destructible records fit exactly: 57 bytes = 13 + 11 words,
+	// delta 4676..17606 with school 7 and 10 alternating, caster = the player, and every trailing word zero.
 	//
 	// THREE emitters wrote those seventeen words under three different names before #530 wave 4 merged them, and the
 	// merge is the point of the rule: they are the same record, and reading them side by side is what shows it.
@@ -60,16 +70,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		internal static StatDamageIIR Read(ref SpanReader r)
 		{
 			r.ExpectU32Be(Opcode, "StatDamageIIR subop");
-			r.ExpectU32Be(EntityClass.Character, "entity class");
+			var entityClass = r.ReadU32Be();
 			var handle = r.ReadU32Be();
 			var env = r.ReadU8();
 
-			var statValue = r.ReadU32Be();
-			var word1 = r.ReadU32Be();
-			var word2 = r.ReadU32Be();
-			var word3 = r.ReadU32Be();
-			var statId = r.ReadU32Be();
-			var count = r.ReadU32Be();
+			// A destructible target has no stat sheet, so the six words describing one are simply not on the wire.
+			var describesAStat = entityClass != EntityClass.Destructible;
+			var statValue = describesAStat ? r.ReadU32Be() : 0;
+			var word1 = describesAStat ? r.ReadU32Be() : 0;
+			var word2 = describesAStat ? r.ReadU32Be() : 0;
+			var word3 = describesAStat ? r.ReadU32Be() : 0;
+			var statId = describesAStat ? r.ReadU32Be() : 0;
+			var count = describesAStat ? r.ReadU32Be() : 0;
 			var delta = r.ReadI32Be();
 			var school = (DamageSchool)r.ReadU32Be();
 			var casterClass = r.ReadU32Be();
@@ -80,22 +92,27 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var magnitude = r.ReadU32Be();
 
 			return new StatDamageIIR(handle, env, statValue, statId, count, delta, school, casterClass, caster, idx, spellBaseId, magnitude, word1, word2, word3, word11, r.ReadU32Be(),
-				r.ReadU32Be(), r.ReadU32Be());
+				r.ReadU32Be(), r.ReadU32Be(), entityClass);
 		}
 
 		internal static void Write(FaolanStream s, StatDamageIIR v)
 		{
 			s
 				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(v.EntityClass)
 				.WriteUInt32(v.Handle)
-				.WriteByte(v.Env)
-				.WriteUInt32(v.StatValue)
-				.WriteUInt32(v.Word1)
-				.WriteUInt32(v.Word2)
-				.WriteUInt32(v.Word3)
-				.WriteUInt32(v.StatId)
-				.WriteUInt32(v.Count)
+				.WriteByte(v.Env);
+
+			if (v.EntityClass != EntityClass.Destructible)
+				s
+					.WriteUInt32(v.StatValue)
+					.WriteUInt32(v.Word1)
+					.WriteUInt32(v.Word2)
+					.WriteUInt32(v.Word3)
+					.WriteUInt32(v.StatId)
+					.WriteUInt32(v.Count);
+
+			s
 				.WriteUInt32(v.Delta)
 				.WriteUInt32(v.School)
 				.WriteUInt32(v.CasterClass)
@@ -141,7 +158,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		uint Word11 = 0,
 		uint Word14 = 0,
 		uint Word15 = 0,
-		uint Word16 = 0);
+		uint Word16 = 0,
+
+		// The carrier's entity class, and a DISCRIMINATOR rather than a label: 0xC879 (`EntityClass.Destructible`)
+		// means the six stat-sheet words ahead of `Delta` are not on the wire at all - see the codec's note.
+		uint EntityClass = Constants.EntityClass.Character);
 
 	// The three semantic forms of a StatDamageIIR, as VALUE factories.
 	//

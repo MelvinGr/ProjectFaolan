@@ -83,6 +83,11 @@ namespace Faolan.Core.Network.Codecs.World
 					return new CoreClaimRedeemIIR(handle, r.ReadU32Be());
 				}
 
+				case CoreClaimSubOpcode.LoginCounter:
+				{
+					return new CoreClaimLoginCounterIIR(handle, r.ReadU32Be());
+				}
+
 				default:
 				{
 					throw CodecParseException.Unexpected(nameof(CoreClaimCodec), subOffset, "a modelled CoreClaim sub-opcode", $"0x{(ushort)sub:X4}");
@@ -112,6 +117,12 @@ namespace Faolan.Core.Network.Codecs.World
 				case CoreClaimRedeemIIR redeem:
 				{
 					s.WriteUInt32(redeem.Index);
+					break;
+				}
+
+				case CoreClaimLoginCounterIIR counter:
+				{
+					s.WriteUInt32(counter.Value);
 					break;
 				}
 			}
@@ -204,5 +215,12 @@ namespace Faolan.Core.Network.Codecs.World
 	public sealed record CoreClaimRedeemIIR(uint Handle, uint Index) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.Redeem;
+	}
+
+	// sub 0x0002 s2c - the once-per-login counter that shares the Redeem body. See CoreClaimSubOpcode.LoginCounter
+	// for what is and is not known about the number.
+	public sealed record CoreClaimLoginCounterIIR(uint Handle, uint Value) : CoreClaimIIR(Handle)
+	{
+		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.LoginCounter;
 	}
 }

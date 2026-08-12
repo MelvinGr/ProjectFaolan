@@ -24,11 +24,22 @@ namespace Faolan.Core.Network.Codecs.Text
 	//   [u32 0x0000C350]   standard IIR marker
 	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
 	//   [u8  0x01]         lead flag (constant)
-	//   [u64 0]            reserved (constant 0)
+	//   [u32 subjectClass][u32 subjectHandle]   the entity the message is ABOUT, or (0, 0) when it is about nobody
 	//   [u32 typeFlags]    feedback type/priority (0x00000000 for the area-name FIFO banner; 0x42000020 etc. for
 	//                      buff/attribute lines - kept verbatim, semantics loose)
 	//   [u16 xmlLen][remoteformat XML]      the message (no null terminator)
-	//   [u32 footer]       trailing flag (0 or 1 in the captures)
+	//   [u32 footer]       trailing flag (0, 1, 2 or 4 in the captures)
+	//
+	// ⚠️ The subject pair was read as `[u64 reserved]`, asserted zero, until #811. It IS zero on 427 of the 431
+	// captured records - and the other 4 are all the SAME message, LDB 162:23 = "RESISTED", each naming a real
+	// entity (`0xC350` + a handle) and each carrying footer 4. So the assert was a constant read off a corpus that
+	// is quiet about this one form, and it refused every record of it. Same shape as #809's four.
+	//
+	// ⚠️ Those four also make `typeFlags` look like something other than flags: they carry 0x3F800000, 0x44937E78,
+	// 0xBF676DBC and 0 - i.e. 1.0f, 1179.9f, -0.904f and 0.0f, which is not a flag word. It stays a bare `uint` here
+	// because that is what round-trips; whether the slot is a per-message PARAMETER rather than a type is #811's
+	// remaining question, and the 32.00003f / 2.0000014f readings of 0x42000020 / 0x40000006 are exactly the kind of
+	// coincidence that would make guessing it wrong.
 	public static class FormatFeedbackCodec
 	{
 		// typeFlags of the buff/effect feedback LINES (not the FIFO banner) - e.g. LostGraceEffect, AttributeChanged.
@@ -100,11 +111,12 @@ namespace Faolan.Core.Network.Codecs.Text
 			r.ExpectU32Be(EntityClass.Character, "the character entity class");
 			var instance = r.ReadU32Be();
 			r.ExpectU8(LeadFlag, "the lead flag");
-			r.ExpectU64Be(0, "the reserved word");
+			var subjectClass = r.ReadU32Be();
+			var subjectHandle = r.ReadU32Be();
 			var typeFlags = r.ReadU32Be();
 			var xml = r.ReadBytesU16Length().ToArray();
 
-			return new FormatFeedbackIIR(instance, typeFlags, r.ReadU32Be(), xml);
+			return new FormatFeedbackIIR(instance, typeFlags, r.ReadU32Be(), xml, subjectClass, subjectHandle);
 		}
 
 		internal static void Write(FaolanStream s, FormatFeedbackIIR v)
@@ -113,7 +125,8 @@ namespace Faolan.Core.Network.Codecs.Text
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(v.Instance)
 				.WriteByte(LeadFlag)
-				.WriteUInt64(0ul)
+				.WriteUInt32(v.SubjectClass)
+				.WriteUInt32(v.SubjectHandle)
 				.WriteUInt32(v.TypeFlags)
 				.WriteUInt16(v.Xml.Length)
 				.WriteArray(v.Xml)
@@ -121,7 +134,10 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	public sealed record FormatFeedbackIIR(uint Instance, uint TypeFlags, uint Footer, byte[] Xml);
+	// `SubjectClass`/`SubjectHandle` name the entity the message is ABOUT and are (0, 0) on every feedback form but
+	// "RESISTED" - see the codec's note. They default so the four Build overloads, which none of them uses, stay as
+	// they are.
+	public sealed record FormatFeedbackIIR(uint Instance, uint TypeFlags, uint Footer, byte[] Xml, uint SubjectClass = 0, uint SubjectHandle = 0);
 
 	// One feedback MESSAGE, as the thing FormatFeedbackCodec carries. Each form owns the `typeFlags`/`footer` retail
 	// sends it with, because those are properties of the message and not of the sender - passing them at the call site
