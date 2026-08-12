@@ -47,13 +47,30 @@ namespace Faolan.Importer.Cli
 			// flat against this value while the SCOPE statement says it is spell-owned - which points at a RELATIONAL
 			// property (how this apply reached this target) that no record sweep can see by construction.
 			var preceding = new Dictionary<string, int>();
+			var afterMapChange = new List<(uint Descriptor0, int SincePackets, uint SpellId)>();
+			var sinceFresh = new List<(uint Descriptor0, int Nth)>();
+			var applyOrdinal = new Dictionary<(string, uint, uint, int), int>();
 			foreach (var capture in captures)
 			{
 				// The last non-buff packet seen on this capture, as "0xIIR" or "m0xMETHOD". ⚠️ Reset PER CAPTURE:
 				// carrying it across would attribute one capture's last packet to the next one's first apply.
 				var previous = "(nothing)";
+				// #658: how many packets since the last MapChange (`PlayfieldFIIR`) in this capture, or -1 if none has
+				// been seen yet. A buff RE-SENT as part of playfield entry arrives in the burst right after one; a
+				// live application does not.
+				var sinceMapChange = -1;
+				var mapChanges = 0;
 				foreach (var p in capture.Packets)
 				{
+					if (sinceMapChange >= 0)
+						sinceMapChange++;
+
+					if (p.IsIirCarrier && p.SubOpcode == (uint)Faolan.Core.Enums.IirTypes.PlayfieldFIIR)
+					{
+						sinceMapChange = 0;
+						mapChanges++;
+					}
+
 				if (p is not { IsIirCarrier: true, SubOpcode: MagicBuffCodec.Opcode })
 				{
 					previous = p.IsIirCarrier ? $"IIR 0x{p.SubOpcode:X8}" : $"wire 0x{p.WireOpcode:X4}";
@@ -77,6 +94,17 @@ namespace Faolan.Importer.Cli
 
 				var beforeKey = $"d0={payload.Descriptor[0]}  after {previous}";
 				preceding[beforeKey] = preceding.GetValueOrDefault(beforeKey) + 1;
+
+				afterMapChange.Add((payload.Descriptor[0], sinceMapChange, buff.SpellBaseId));
+
+				// #658: how many times this (target, spell) has been applied SINCE THE LAST MAP CHANGE. ⚠️ The reset
+				// is what makes this different from the ticket's dead "first apply in the capture" test: a capture can
+				// open with a buff that has been running since before it started, so "first seen" is not "first
+				// applied". A map change rebuilds the client's buff state, so counting from there is a real ordinal.
+				var freshKey = (capture.Name, buff.ApplyTo, buff.SpellBaseId, mapChanges);
+				var nth = applyOrdinal.GetValueOrDefault(freshKey);
+				applyOrdinal[freshKey] = nth + 1;
+				sinceFresh.Add((payload.Descriptor[0], nth));
 
 				if (payload.Descriptor[1] != 0)
 					nonZeroSlots.Add($"descriptor[1]={payload.Descriptor[1]} on 0x{buff.SpellBaseId:X8} d0={payload.Descriptor[0]} from=0x{buff.ApplyFrom:X8} to=0x{buff.ApplyTo:X8}");
@@ -199,8 +227,11 @@ namespace Faolan.Importer.Cli
 			// ⚠️ Printed as the RATE of the minority value per predecessor, not as raw counts. Raw counts just rank
 			// the predecessors by how common they are - both values sit behind the same busy IIRs - and the question
 			// is whether any predecessor CONCENTRATES the rare value.
+			MapChangeProximity(afterMapChange);
+			RepeatOrdinal(sinceFresh);
 			PrecedingRate(preceding, applies);
 			BurstPosition(sequenced);
+			SplitSpellRuns(sequenced, mode);
 
 			ScopeStatement(scoped);
 			TwinRate(perSpell);
@@ -378,6 +409,145 @@ namespace Faolan.Importer.Cli
 		//
 		// ⚠️ "Same target, adjacent in the apply stream" is the window, and it is per CAPTURE - an entity handle is
 		// session-scoped, so comparing targets across captures would merge unrelated entities.
+
+		// ⭐ One SPLIT spell's applies in capture order, so the divergence can be READ rather than scored (#658).
+		//
+		// Six statistical surfaces are flat against `descriptor[0]`, and the remaining lead is the one thing a
+		// per-apply statistic structurally cannot do: look at a contiguous run. `--report-arg spell:<name>` prints
+		// every apply of a spell whose value retail SPLITS, grouped by capture and in order, with the target and the
+		// caster - which is the shape that named `bool2` (a scope observation, not another content sweep).
+
+		// ⭐ Is the minority `descriptor[0]` a buff RE-SENT on playfield entry? (#658)
+		//
+		// The hypothesis came from READING the split rather than scoring it: of the captures that carry both values
+		// of `Stagger` (3911037, 819x1 / 144x2), the two that open on `2` and change to `1` are named
+		// `changemap-accept_quest` and `randomActions-very_long_loading_screen_after_field_change`, and one capture
+		// that is ALL `2` is a mid-session login. That says the value is about how the buff ARRIVED - re-sent with
+		// the playfield entry burst, versus applied live.
+		//
+		// So this measures distance in packets from the last `PlayfieldFIIR` (MapChange). ⚠️ `-1` means no map change
+		// has been seen yet in that capture, which is NOT the same as "far from one" - a capture that opens
+		// mid-session has its whole first burst in that bucket, and lumping it in with the far bucket would hide
+		// exactly the population this is looking for.
+
+		// ⭐ Is the minority `descriptor[0]` a RE-APPLICATION of a buff already running? (#658)
+		//
+		// This ticket recorded "not a re-apply / refresh marker" on the grounds that the value appears on both the
+		// FIRST apply of a (capture, target, spell) and on later ones. ⚠️ That test is confounded: a capture can open
+		// with a buff that has been running since before it started, so "first seen in the capture" is not "first
+		// applied". `MapChangeProximity` is what exposes it - the minority value is essentially ABSENT in the first
+		// 200 packets after a MapChange, which is exactly the window where the client's buff state is genuinely
+		// fresh. So the ordinal is counted from the last map change rather than from the start of the capture.
+		private static void RepeatOrdinal(IReadOnlyList<(uint Descriptor0, int Nth)> rows)
+		{
+			if (rows.Count == 0)
+				return;
+
+			var minority = rows.GroupBy(r => r.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var overall = (double)rows.Count(r => r.Descriptor0 == minority.Key) / rows.Count;
+			Console.WriteLine();
+			Console.WriteLine($"Nth apply of this (target, spell) SINCE THE LAST MAP CHANGE, as the rate of "
+			                  + $"descriptor[0]={minority.Key} - overall {overall:P1} of {rows.Count:N0}:");
+			Console.WriteLine($"  {"nth",-10} {"applies",8} {"minority",9}   rate");
+
+			foreach (var (name, of) in new (string, Func<int, bool>)[]
+			         { ("1st", n => n == 0), ("2nd", n => n == 1), ("3rd-5th", n => n is >= 2 and <= 4), ("6th+", n => n >= 5) })
+			{
+				var inBucket = rows.Where(r => of(r.Nth)).ToList();
+				if (inBucket.Count == 0)
+					continue;
+
+				var rate = (double)inBucket.Count(r => r.Descriptor0 == minority.Key) / inBucket.Count;
+				Console.WriteLine($"  {name,-10} {inBucket.Count,8:N0} {inBucket.Count(r => r.Descriptor0 == minority.Key),9:N0}   {rate,7:P1}"
+				                  + (rate - overall > 0.25 ? "   <-- concentrates it" : ""));
+			}
+		}
+
+		private static void MapChangeProximity(IReadOnlyList<(uint Descriptor0, int SincePackets, uint SpellId)> rows)
+		{
+			if (rows.Count == 0)
+				return;
+
+			var minority = rows.GroupBy(r => r.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var overall = (double)rows.Count(r => r.Descriptor0 == minority.Key) / rows.Count;
+			Console.WriteLine();
+			Console.WriteLine($"distance from the last MapChange (PlayfieldFIIR), as the rate of descriptor[0]={minority.Key}"
+			                  + $" - overall {overall:P1} of {rows.Count:N0}:");
+			var capable = rows.Where(r => r.Descriptor0 == minority.Key).Select(r => r.SpellId).ToHashSet();
+			Console.WriteLine($"  {"packets since",-22} {"applies",8} {"minority",9}   rate    eligible (spell EVER takes it)");
+
+			var buckets = new (string Name, Func<int, bool> Of)[]
+			{
+				("none yet (-1)", n => n < 0), ("0-50", n => n is >= 0 and <= 50), ("51-200", n => n is > 50 and <= 200),
+				("201-1000", n => n is > 200 and <= 1000), ("1001+", n => n > 1000)
+			};
+
+			foreach (var (name, of) in buckets)
+			{
+				var inBucket = rows.Where(r => of(r.SincePackets)).ToList();
+				if (inBucket.Count == 0)
+					continue;
+
+				var rate = (double)inBucket.Count(r => r.Descriptor0 == minority.Key) / inBucket.Count;
+				// ⚠️ THE CONTROL, and without it this table is unreadable. `descriptor[0]` is nearly spell-owned, so
+				// a bucket full of spells that NEVER take the minority value would show 0% for a reason that has
+				// nothing to do with the bucket. `eligible` is the share of the bucket whose spell takes that value
+				// somewhere in the corpus - if it tracks the rate, the bucket is a population artefact.
+				var eligible = (double)inBucket.Count(r => capable.Contains(r.SpellId)) / inBucket.Count;
+				Console.WriteLine($"  {name,-22} {inBucket.Count,8:N0} {inBucket.Count(r => r.Descriptor0 == minority.Key),9:N0}   {rate,7:P1}"
+				                  + $"   eligible {eligible,6:P1}"
+				                  + (rate - overall > 0.25 ? "   <-- concentrates it" : ""));
+			}
+		}
+
+		private static void SplitSpellRuns(IReadOnlyList<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> sequenced,
+			string? mode)
+		{
+			const string Prefix = "spell:";
+			if (mode is null || !mode.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+				return;
+
+			var wanted = mode[Prefix.Length..].Trim();
+			if (!uint.TryParse(wanted, out var spellId))
+			{
+				Console.WriteLine($"buff-descriptor: --report-arg {Prefix}<spellId> (numeric). Got '{wanted}'.");
+				return;
+			}
+
+			var rows = sequenced.Where(a => a.SpellId == spellId).OrderBy(a => a.Capture).ThenBy(a => a.Order).ToList();
+			if (rows.Count == 0)
+			{
+				Console.WriteLine($"no applies of spell {spellId} in the corpus.");
+				return;
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"spell {spellId}: {rows.Count:N0} apply(ies), descriptor[0] "
+			                  + string.Join(" ", rows.GroupBy(r => r.Descriptor0).OrderBy(g => g.Key).Select(g => $"{g.Key}x{g.Count()}")));
+
+			foreach (var capture in rows.GroupBy(r => r.Capture))
+			{
+				var values = capture.Select(r => r.Descriptor0).Distinct().ToList();
+				Console.WriteLine();
+				Console.WriteLine($"  {capture.Key}  {capture.Count():N0} apply(ies), value(s) {string.Join("/", values)}"
+				                  + (values.Count > 1 ? "   <-- SPLITS INSIDE THIS CAPTURE" : ""));
+
+				// ⚠️ A capture carrying only one value cannot show the transition, so only the splitting ones are
+				// worth printing per-apply; the rest are summarised by the line above.
+				if (values.Count == 1)
+					continue;
+
+				foreach (var r in capture)
+					Console.WriteLine($"    order {r.Order,6}  d0={r.Descriptor0}  target 0x{r.Target:X8}  bool2={r.Bool2}");
+			}
+		}
+
 		private static void BurstPosition(IReadOnlyList<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> sequenced)
 		{
 			var minority = sequenced.GroupBy(a => a.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
