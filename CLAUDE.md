@@ -252,7 +252,9 @@ reintroduce it. Outside `Codecs/`, an `IirTypes` member may only appear as a `ca
 listener's routing switch. **Every allowlist is now EMPTY** — `UncomposedSubRecords` came off with #543 and
 `UnreadableInTheCorpus` with #545, so every codec with a standalone body Parses and re-Builds every captured body
 byte-exact, with nothing excused. An allowlist is not a place to silence a gate: re-adding an entry means naming
-the DECODE issue that removes it again. One follow-up remains: #533 (row↔value mapping).
+the DECODE issue that removes it again. The sweep has no follow-ups: #533 (row↔value mapping) was measured
+and closed - the mapping is already OUT of the codecs, and what is left on their surface is the delegating
+overload rule 1 explicitly permits.
 
 - **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly
   `byte[] Build(...)` and `T Parse(in ReadOnlySpan<byte> data)`, plus its `Opcode` / `HandledTypes`
@@ -329,8 +331,11 @@ the DECODE issue that removes it again. One follow-up remains: #533 (row↔value
   choosing between them by signature is exactly the ambiguity rule 1 removes. The same applies to everything
   next to a codec that is not encode/decode: row↔column mappers (`WorldObjectColumns`,
   `ConversationScreenColumns`), live-value policy (`RemoteFormatSession`, `GameClock`) and route/geometry math
-  (`PatrolRoute`) are named for what they are and stay off the codec's surface. Row↔value mapping proper is
-  Gitea #533.
+  (`PatrolRoute`) are named for what they are and stay off the codec's surface.
+  ⚠️ A DB-typed `Build` OVERLOAD is not the same thing and is legal (rule 1 names "a DB row" as one of the shapes
+  it may take). Measured over the nine that exist: three delegate straight into a named mapper
+  (`MailColumns.ToMessage`, `NpcChatterColumns.ToBark`, `ConversationScreenColumns.ToScreen`) and the rest are a
+  single-expression value construction, so there is no mapping left inside a codec to extract (#533, closed).
 - Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
   `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 
