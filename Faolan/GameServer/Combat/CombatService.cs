@@ -1000,6 +1000,17 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, phase)));
 		}
 
+		// The channel-COMPLETE twin of the above: the record that closes the cast bar when a server-timed channel ends
+		// (a spell cast, both directions of the mount toggle). Same request echo, emitted as form 0x000A - see
+		// BehaviorAcks.ChannelCompleteAck for why the callers must not reach that form by patching the request's bytes.
+		public static Task SendBehaviorChannelCompleteAck(INetworkClient client, byte[] rawPayload, uint phase)
+		{
+			if (rawPayload.Length < 26)
+				return Task.CompletedTask;
+
+			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.ChannelCompleteAck(rawPayload, client.Session.Character.Id, phase)));
+		}
+
 		// Sends the cast-interrupt abort BccAck (#347): the state=0x0007 reply to the client's cast-cancel that drops
 		// the cast bar, cancels the animation and pops the "Interrupted" text client-side. Built from the stored cast
 		// BEGIN args + the incoming cancel payload (behaviorId + tail). Phase = the begin's Mode.

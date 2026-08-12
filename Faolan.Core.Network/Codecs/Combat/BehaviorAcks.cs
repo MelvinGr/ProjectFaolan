@@ -100,12 +100,37 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// that take a pad (see above). `tailOverride` replaces the echoed tail wholesale.
 		public static BehaviorControlCenterIIR EchoAck(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null)
 		{
-			var request = ParseRequest(rawPayload);
+			return Ack(ParseRequest(rawPayload), instance, phase, tailOverride, null);
+		}
+
+		// ⭐ The CHANNEL-COMPLETE ack (#236): the same echo, emitted as form 0x000A instead of following the request's
+		// own seq progression. It is what CLOSES the cast bar at the end of a server-timed channel - a spell cast, and
+		// both directions of the mount toggle.
+		//
+		// It exists because the three call sites used to reach form 0x000A by CLONING the request's carrier bytes and
+		// stamping `seq = 9` over offsets 16/17, so that `AckSeq`'s +1 would land on 0x0A. That produced a record no
+		// grammar accepts: 0x09 is one of the phases whose record ENDS at the seq word (BehaviorControlCenterCodec's
+		// `CommandPhases`), yet the cloned bytes still carried the behaviourId + args + tail behind it. Once the codec
+		// became strict about accounting for every byte it stopped being a private trick and started THROWING inside
+		// the deferred resolve - so no complete-ack was sent at all, and the cast bar sat at 100% for ever, which is
+		// exactly the failure the recast comment in HandleBccCastSpell warns about.
+		//
+		// Stating the seq is also simply what the call sites meant. They do not want "the request's next phase", they
+		// want one specific form, and a byte patch is the least direct way to ask for it.
+		public static BehaviorControlCenterIIR ChannelCompleteAck(byte[] rawPayload, uint instance, uint phase)
+		{
+			return Ack(ParseRequest(rawPayload), instance, phase, null, ChannelCompleteSeq);
+		}
+
+		// The shared body of the two above: echo the request's behaviour + args under `instance`, splice the phase in,
+		// and pad the tail for the behaviours that take a pad. `seq` null = the request's own progression (AckSeq).
+		private static BehaviorControlCenterIIR Ack(BehaviorControlCenterIIR request, uint instance, uint phase, byte[]? tailOverride, ushort? seq)
+		{
 			var tail = tailOverride ?? request.Tail;
 			if (tailOverride != null || PaddedTailBehaviors.Contains(request.BehaviorId))
 				tail = [..tail, ..new byte[12]];
 
-			return new BehaviorControlCenterIIR(instance, AckSeq(request.Seq), request.BehaviorId, InsertBehaviorPhaseField(request.Args, phase), tail);
+			return new BehaviorControlCenterIIR(instance, seq ?? AckSeq(request.Seq), request.BehaviorId, InsertBehaviorPhaseField(request.Args, phase), tail);
 		}
 
 		// The TARGETED-HIT ack (#19/#228): the echo-ack's header and args, with the echoed tail REPLACED by the
@@ -318,6 +343,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The wire seq of the cast-interrupt abort.
 		private const ushort AbortSeq = 0x0007;
+
+		// The wire seq of the channel-COMPLETE ack - retail's BEGIN2/completion BCC (ice-strike idx481/534), the record
+		// that closes the cast bar. Not the form-4 begin, and not derived from the request's seq: see ChannelCompleteAck.
+		private const ushort ChannelCompleteSeq = 0x000A;
 
 		// The ack's seq. This was `seq + 1`, which is right for the common case and wrong for the other one.
 		//

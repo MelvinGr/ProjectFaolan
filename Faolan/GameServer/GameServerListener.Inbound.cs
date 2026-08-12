@@ -2127,14 +2127,7 @@ namespace Faolan.GameServer
 
 			if (dismounting)
 			{
-				var dismountAck = (byte[])rawPayload.Clone();
-				if (dismountAck.Length > 17)
-				{
-					dismountAck[16] = 0x00;
-					dismountAck[17] = 0x09;
-				}
-
-				await CombatService.SendBehaviorEchoAck(client, dismountAck, 3);
+				await CombatService.SendBehaviorChannelCompleteAck(client, rawPayload, 3);
 				Task.RunAfter(MountCatalog.DismountChannelMs, async () => // horse runs away during the channel, then unseat
 				{
 					if (client.Session.Account == null)
@@ -2151,13 +2144,7 @@ namespace Faolan.GameServer
 				if (client.Session.Account == null)
 					return;
 
-				if (mountCastPayload.Length > 17)
-				{
-					mountCastPayload[16] = 0x00;
-					mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
-				}
-
-				await CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+				await CombatService.SendBehaviorChannelCompleteAck(client, mountCastPayload, 3); // cast complete: mounts (form 0x0a closes the bar)
 				await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client))); // seat (#26)
 				var mountStats = new CharacterStatBlock
 				{
@@ -2366,17 +2353,13 @@ namespace Faolan.GameServer
 						await SendSpellCooldown(client, spell);
 					}
 
-				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
-				// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
-				// (cast-state complete). Without this the bar fills then hangs.
-				var completePayload = (byte[])rawPayload.Clone();
-				if (completePayload.Length > 17)
-				{
-					completePayload[16] = 0x00;
-					completePayload[17] = 0x09;
-				}
-
-				await CombatService.SendBehaviorEchoAck(client, completePayload, 3);
+				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC,
+				// ice-strike idx481/534), not the form-4 begin, with phase=3 (cast-state complete). Without this the
+				// bar fills then hangs. This used to reach form 0x0a by stamping seq=9 over offsets 16/17 of a CLONE of
+				// the request, so the echo-ack's +1 would land on it - which built a record the codec cannot read
+				// (phase 0x09 ends at the seq word) and, once the codec turned strict, THREW here inside the deferred
+				// resolve. That threw away the complete-ack entirely and left the bar at 100%. The form is stated now.
+				await CombatService.SendBehaviorChannelCompleteAck(client, rawPayload, 3);
 
 				// #439/#307: a cast whose effect is something the SERVER does - today a PET SUMMON (creature +
 				// PetIIR owner-assign + follow) - resolves as that instead of applying a target effect. This

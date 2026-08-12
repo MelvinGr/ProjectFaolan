@@ -74,6 +74,36 @@ namespace Faolan.Tests
 			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(request, Instance, 9)));
 		}
 
+		// The CHANNEL-COMPLETE ack - the record that closes the cast bar when a server-timed channel ends. Request is a
+		// live client's `Ice Strike` cast begin (phase 0x0003, behaviour 4, 21 args bytes + a 22-byte tail); the reply
+		// echoes it at form 0x000A with `18 03` (field3 = phase 3, cast-state complete) spliced in after field2 and the
+		// tail untouched - behaviour 4 is not one of the two that take a 12-byte pad.
+		[Fact]
+		public void ChannelCompleteAck_IsFormOxA_AndEchoesTheRequest()
+		{
+			var request = Convert.FromHexString("00000041642cd3d60000c3500802e5d4000300000004000000150" + "8c0e80a1001280a30005206" + "08d086031025" + "60c801"
+				+ "00000001000233bb01000000000000000000000000c800");
+			var expected = Convert.FromHexString("642cd3d60000c3500802e5d4000a00000004000000170" + "8c0e80a10011803280a30005206" + "08d086031025" + "60c801"
+				+ "00000001000233bb01000000000000000000000000c800");
+
+			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.ChannelCompleteAck(request, 0x0802E5D4, 3)));
+		}
+
+		// ⛔ ...and WHY that builder exists rather than the byte patch it replaced. The three channel-complete sites used
+		// to reach form 0x000A by stamping `seq = 9` over offsets 16/17 of a clone of the request, so the echo-ack's +1
+		// would land on it. Phase 0x09 is one of the phases whose record ENDS at the seq word, so the patched bytes are
+		// a record that says "no command follows" with a whole command block behind it - and once the codec started
+		// accounting for every byte, this THREW inside the deferred cast resolve. Nothing was sent, and the cast bar sat
+		// at 100% for ever. Gate the rejection so the patch cannot come back quietly.
+		[Fact]
+		public void TheOldSeq9BytePatch_IsRejectedByTheCodec()
+		{
+			var patched = Convert.FromHexString("00000041642cd3d60000c3500802e5d4000900000004000000150" + "8c0e80a1001280a30005206" + "08d086031025" + "60c801"
+				+ "00000001000233bb01000000000000000000000000c800");
+
+			Assert.Throws<CodecParseException>(() => BehaviorAcks.EchoAck(patched, 0x0802E5D4, 3));
+		}
+
 		[Fact]
 		public void UnarmedAirSwing_AckMatchesCapture() // frames 481 -> 486, Mode 8
 		{
