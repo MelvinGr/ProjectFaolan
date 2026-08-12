@@ -79,25 +79,29 @@ namespace Faolan.Tests
 			Assert.Equal(BarkTrigger.Ambient, NpcChatterBarks.TriggerOf(Bark("somethingnew")));
 		}
 
-		// The second evidence line for the same split, and it runs ONE WAY only: a bark carrying a session slot is
-		// never ambient - it names a player, so something must have picked that player - but the converse is false.
-		// The crier has TWO `sendtell` lines and only one of them (SayInChat 57, `DetectedChar.name`) names anybody;
-		// SayInChat 10 is an unaddressed tell. A tell still has exactly one recipient, so it is still detection-
-		// triggered, which is precisely why the CHANNEL is what the cue is read off and the slot is not a proxy for it.
+		// ⛔ **A session slot is never STORED with a value.** That is the invariant worth gating, and it is the one
+		// that failed silently: `IsSessionBarkSlot` tested `EndsWith(".name")`, template 21992's achievement herald
+		// carries `Target.displayname`, and its captured value - a real player's character name - was therefore filed
+		// as CONTENT, shipped in `faolan.sql` and re-sent verbatim to everyone in range (#692).
+		//
+		// It replaces a weaker claim that a session slot implies a non-ambient trigger. That claim has a
+		// counterexample and the leak is what surfaced it: `AchievementsPetHeraldOfDeeds` (21992) broadcasts on
+		// `broadcastcycle` - which `TriggerOf` reads as Ambient - and names the player whose deed it is announcing.
+		// So a bark CAN be on an ambient channel and still name somebody, and the trigger classification cannot be
+		// inferred from the slot. This gate does not depend on the trigger at all, which is why it survives that.
 		[Fact]
-		public void NoAmbientBark_CarriesASessionSlot()
+		public void NoSessionSlot_CarriesAStoredValue()
 		{
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var rows = db.NpcChatter.AsNoTracking().Include(c => c.Parameters).ToList();
 			Assert.NotEmpty(rows);
 
-			foreach (var row in rows)
-			{
-				if (NpcChatterBarks.TriggerOf(NpcChatterColumns.ToBark(row)) != BarkTrigger.Ambient)
-					continue;
+			var session = rows.SelectMany(r => r.Parameters).Where(p => RemoteFormatSession.IsSessionBarkSlot(p.Name)).ToList();
+			Assert.NotEmpty(session); // or the gate passes vacuously the moment the predicate stops matching anything
 
-				Assert.DoesNotContain(row.Parameters, p => RemoteFormatSession.IsSessionBarkSlot(p.Name));
-			}
+			Assert.All(session, p => Assert.True(string.IsNullOrEmpty(p.Value),
+				$"NPC {p.NpcTemplateId}'s `{p.Name}` stores '{p.Value}' - a session slot's value is the capturing "
+				+ "player's, and storing it re-sends one player's name to everybody"));
 		}
 
 		// The crier's greeting, and why there is exactly ONE of it.

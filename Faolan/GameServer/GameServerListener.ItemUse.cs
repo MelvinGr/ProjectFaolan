@@ -31,7 +31,7 @@ namespace Faolan.GameServer
 		//
 		//   - "one harvest empties it" came from reading the ENDS of the earlier captures and explaining the partial
 		//     values (901, 701, 382, ...) away as OTHER players on a shared node. They are the per-swing decrement.
-		//     Melvin's own gold vein runs 298 -> 198 -> 98 while he narrates "-10% each time".
+		//     The maintainer's own gold vein runs 298 -> 198 -> 98 while they narrate "-10% each time".
 		//   - the 40 came from the 4th u32 of the DispatchDisplayItemLootChatMessage that follows. That word is the
 		//     item's LEVEL (see HarvestCatalog.Yields); the count rides the ADD's stat_list 26, and it is 1 every time.
 		//

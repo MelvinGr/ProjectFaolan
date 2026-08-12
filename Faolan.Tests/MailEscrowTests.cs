@@ -51,7 +51,7 @@ namespace Faolan.Tests
 					// The seller's listed item: player-crafted, and gemmed. Both facts live ONLY on the row.
 					var listed = new ItemInstance
 					{
-						OwnerCharacterId = Seller, Container = ContainerKind.Bank, Slot = 6, TemplateId = SwordTemplate, Count = 1, CreatorName = "Melvin",
+						OwnerCharacterId = Seller, Container = ContainerKind.Bank, Slot = 6, TemplateId = SwordTemplate, Count = 1, CreatorName = "NecroL80",
 						Sockets = { new ItemInstanceSocket { SocketIndex = 0, GemItemId = GemTemplate } }
 					};
 					ctx.ItemInstances.Add(listed);
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 				var mail = await database.GetMailByWireId(mailId);
 				var escrowed = Assert.Single(mail!.Attachments).Escrowed;
 				Assert.NotNull(escrowed);
-				Assert.Equal("Melvin", escrowed!.CreatorName);
+				Assert.Equal("NecroL80", escrowed!.CreatorName);
 				Assert.Equal(GemTemplate, Assert.Single(escrowed.Sockets).GemItemId);
 
 				// The hand-over: the SAME row moves to the buyer.
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 				Assert.NotNull(delivered);
 				Assert.Equal(instanceId, delivered!.Id); // the same row, not a copy
 				Assert.Equal(Buyer, delivered.OwnerCharacterId);
-				Assert.Equal("Melvin", delivered.CreatorName);
+				Assert.Equal("NecroL80", delivered.CreatorName);
 				Assert.Equal(GemTemplate, Assert.Single(delivered.Sockets).GemItemId);
 
 				// ...and it is not still sitting in the seller's bank.

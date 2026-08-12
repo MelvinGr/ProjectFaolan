@@ -16,13 +16,13 @@ namespace Faolan.GameServer.Economy
 	// TradeskillRequestIIR -> TradeskillReplyIIR - but nothing consumed materials or produced an item.
 	//
 	// The whole transaction is captured in NecroL80_mage-necromancer_login_gameplay_annotated_5, and it is worth reading
-	// as one sequence because every step below is one of its lines. Melvin linked the item in /say before and after
+	// as one sequence because every step below is one of its lines. The maintainer linked the item in /say before and after
 	// and narrated "done" in between, which is how the craft is locatable at all.
 	//
 	//   18:45:25 c2s BehaviorControlCenter  BehaviorId.Tradeskill (0x27), tail [flag 1][recipe 15][count 1]
 	//   18:45:26 s2c   the behavior ack
 	//   18:45:30 s2c   DispatchSetItemStat x3   the destination cell's StaticInstance/Duration bookkeeping
-	//                  DispatchAddItem          the product, carrying creator_name "NecroL80"
+	//                  DispatchAddItem          the product, carrying the crafter's creator_name
 	//                  DispatchRemoveItem       bag 0x68 pos 19    - Plain Hilt Piece, consumed whole
 	//                  DispatchRemoveItem       resource 0x70 pos 13 - Copper, consumed whole
 	//                  DispatchSetItemStat      resource 0x70 pos 10 StackSize 2 - Silver, decremented

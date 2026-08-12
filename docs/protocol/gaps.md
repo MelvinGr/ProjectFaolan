@@ -23,7 +23,7 @@ import json, urllib.request, re
 tok = open('<your gitea token path>').read().strip()
 for n in sorted({int(m) for m in re.findall(r'Tracked: Gitea #(\d+)', open('docs/protocol/gaps.md').read())}):
     d = json.load(urllib.request.urlopen(urllib.request.Request(
-        'https://git.groenendaal.io/api/v1/repos/MelvinGr/projectfaolan/issues/%d' % n,
+        '<gitea api base>/repos/<owner>/projectfaolan/issues/%d' % n,   # the concrete host/owner is in the agent memory
         headers={'Authorization': 'token ' + tok})))
     if d['state'] == 'closed':
         print('⛔ #%d is CLOSED but still tracks a gap: %s' % (n, d['title']))

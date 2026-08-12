@@ -83,7 +83,7 @@ pair the rest of the behavior switch reads. The whole transaction, from
 18:45:25 c2s BehaviorControlCenter  Tradeskill(0x27), trailer 01 0000000F 00000001   -> recipe 15, one of them
 18:45:26 s2c   the behavior ack
 18:45:30 s2c   DispatchSetItemStat x3      destination-cell bookkeeping
-               DispatchAddItem             the product, carrying creator_name "NecroL80"
+               DispatchAddItem             the product, carrying the crafter's creator_name
                DispatchRemoveItem          bag 0x68 pos 19       - Plain Hilt Piece, consumed whole
                DispatchRemoveItem          resource 0x70 pos 13  - Copper, consumed whole
                DispatchSetItemStat         resource 0x70 pos 10 StackSize 2 - Silver, decremented

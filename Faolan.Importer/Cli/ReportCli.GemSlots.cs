@@ -36,7 +36,7 @@ namespace Faolan.Importer.Cli
 	//
 	// Of the five templates the dumps show sockets on, three carry three gems while declaring one slot
 	// (`Ornate Gold Ring`, `Ornate Gold Necklace`, `Filigree Steelsilk Cloak`). That reads as a refutation and is not
-	// one: Melvin's own characters are retail characters, and he identified these as items left over from an older
+	// one: the maintainer's own characters are retail characters, and they identified these as items left over from an older
 	// version of the game whose slot counts were later reduced.
 	//
 	// The client agrees, because it has a WORD for it. `ItemInfoView.cpp` carries a `GemOverflow` token, a

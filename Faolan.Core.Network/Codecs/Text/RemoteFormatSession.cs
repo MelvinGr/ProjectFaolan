@@ -36,7 +36,14 @@ namespace Faolan.Core.Network.Codecs.Text
 		{
 			ArgumentNullException.ThrowIfNull(name);
 
-			return name.EndsWith(".name", StringComparison.OrdinalIgnoreCase);
+			// ⚠️ `.displayname` is a SECOND spelling and missing it stored a real player's name in the seed. The
+			// crier's slot is `DetectedChar.name` and this predicate was written for it; template 21992's
+			// broadcast carries `Target.displayname`, which does NOT end in `.name` - so its captured value
+			// (`<stringentry string="<the capturing player>" flags="m" >`) was filed as CONTENT, shipped in
+			// `faolan.sql`, and re-sent verbatim to everyone in range. Both spellings name the same thing: the
+			// per-viewer entity the bark is about (#692).
+			return name.EndsWith(".name", StringComparison.OrdinalIgnoreCase)
+			       || name.EndsWith(".displayname", StringComparison.OrdinalIgnoreCase);
 		}
 
 		public static bool IsStringEntry(string innerRaw)

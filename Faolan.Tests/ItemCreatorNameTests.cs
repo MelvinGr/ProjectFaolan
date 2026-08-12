@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	// the only per-instance channel we knew of. The crafting capture refutes that: it is
 	// ProtoInventoryGameEntry.creator_name - field 5, a plain Latin1 STRING on the entry itself, no stat involved.
 	//
-	// Oracle: NecroL80_mage-necromancer_login_gameplay_annotated_5, the one captured craft. Melvin linked the item in
+	// Oracle: NecroL80_mage-necromancer_login_gameplay_annotated_5, the one captured craft. The maintainer linked the item in
 	// /say before (18:45:24) and after (18:46:09) and narrated "done"; the server's DispatchAddItem lands between
 	// them at 18:45:30 (frame 17401) and is the only add in all 125 dumps that carries field 5.
 	//
@@ -33,8 +33,8 @@ namespace Faolan.Tests
 		                                   "001a530a140de4b8eaf515a728315e1d73ebf3122560dfce2012140de4b8eaf515a728315e1d73ebf3122560dfce201a140d" +
 		                                   "e4b8eaf515a728315e1d73ebf3122560dfce2025c36502002dc3650200382845514c58382a064d656c6c696500000000";
 
-		// The bare ProtoInventoryGameEntry (i_cEntry) out of that body. Ends `2a 06 "NecroL80"` - creator_name last,
-		// after the item block.
+		// The bare ProtoInventoryGameEntry (i_cEntry) out of that body. Ends with a `2a 06` creator_name field
+		// carrying the crafter's name - creator_name last, after the item block.
 		private const string CraftedEntry = "08f89fddceb3ec8aec201204080010111204080810001206081710bcd8361204082e10001a530a140de4b8eaf515a728315e1d" +
 		                                    "73ebf3122560dfce2012140de4b8eaf515a728315e1d73ebf3122560dfce201a140de4b8eaf515a728315e1d73ebf31225" +
 		                                    "60dfce2025c36502002dc3650200382845514c58382a064d656c6c6965";
@@ -47,7 +47,10 @@ namespace Faolan.Tests
 		private const uint BloodsilverKhopeshId = 157123;
 		private const ulong ItemId = 2366689309355364344;
 		private const ulong RecordId = 896060;
-		private const string Crafter = "NecroL80";
+		// personal-name-ok: this is RETAIL BYTES, not a fixture value. The captured entry above ends
+		// `2a 06 4d 65 6c 6c 69 65`, so the literal has to be the crafter's real six-character name or the length
+		// prefix stops matching and the byte-exact assertion below is asserting a different string.
+		private const string Crafter = "NecroL80"; // personal-name-ok
 
 		// The shipped template + the captured per-instance state rebuild the retail add byte for byte, creator line
 		// included. Note the crafted add's stat list is its own shape again - 0x00=17, Duration 0, no StackSize,
@@ -110,7 +113,8 @@ namespace Faolan.Tests
 			var entry = SnapshotItems.ListEntry(0, ItemId, RecordId, 1, item, item.Hash, creatorName: Crafter).Item;
 
 			Assert.Equal(Crafter, entry.CreatorName);
-			Assert.EndsWith(Convert.ToHexStringLower("\x2a\x06NecroL80"u8.ToArray()), Convert.ToHexStringLower(entry.ToProtobuf()));
+			// personal-name-ok: the expectation IS the captured tail - see the Crafter remark.
+			Assert.EndsWith(Convert.ToHexStringLower("\x2a\x06NecroL80"u8.ToArray()), Convert.ToHexStringLower(entry.ToProtobuf())); // personal-name-ok
 
 			// The stat triple is untouched - creator_name rides beside it, not instead of it.
 			Assert.Equal([0u, 23u, 26u], entry.StatLists.Select(s => s.Stat));

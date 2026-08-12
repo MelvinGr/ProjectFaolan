@@ -155,7 +155,7 @@ namespace Faolan.Importer.Cli
 		}
 
 		// ⭐⭐ A DIAGNOSTIC, NOT A DEFECT LIST. A cross-map pair is TWO TRUE OBSERVATIONS, and both rows are wanted
-		// (#728, settled by Melvin: *"spawns are for the map (id) they are on"*).
+		// (#728, settled by the maintainer: *"spawns are for the map (id) they are on"*).
 		//
 		// A row means "retail streamed this NPC to a client standing in this playfield". Near a sub-area boundary
 		// retail streams the neighbour's NPCs across it, so it genuinely sends that Wharf Rat both to a player in the

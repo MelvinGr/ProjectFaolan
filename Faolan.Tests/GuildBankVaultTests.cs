@@ -88,7 +88,7 @@ namespace Faolan.Tests
 
 			// It is the SAME row - a deposit is an update, not a re-mint, which is what keeps a crafted or gemmed
 			// item intact through the vault.
-			Assert.Equal("Melvin", item.CreatorName);
+			Assert.Equal("NecroL80", item.CreatorName);
 			Assert.Single(outbound.Moves);
 			Assert.Equal(GuildId, (await database.GetGuildBankItems(GuildId)).Single().OwnerGuildId);
 		}
@@ -183,7 +183,7 @@ namespace Faolan.Tests
 
 				ctx.ItemInstances.Add(new ItemInstance
 				{
-					OwnerCharacterId = Depositor, Container = ContainerKind.Bag, Slot = BagSlot, TemplateId = Template, Count = 1, CreatorName = "Melvin"
+					OwnerCharacterId = Depositor, Container = ContainerKind.Bag, Slot = BagSlot, TemplateId = Template, Count = 1, CreatorName = "NecroL80"
 				});
 				if (secondBagSlot is { } second)
 					ctx.ItemInstances.Add(new ItemInstance { OwnerCharacterId = Depositor, Container = ContainerKind.Bag, Slot = second, TemplateId = Template, Count = 1 });

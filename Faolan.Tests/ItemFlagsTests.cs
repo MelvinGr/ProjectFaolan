@@ -101,7 +101,7 @@ namespace Faolan.Tests
 		}
 
 		// The bind message, byte-exact against retail's own bytes. This is the last packet of the equip sequence in
-		// demol80-demonologist_login_gameplay_annotated_3 at 09:47:00.842, the one Melvin annotated "just eqpuied item,
+		// demol80-demonologist_login_gameplay_annotated_3 at 09:47:00.842, the one the maintainer annotated "just eqpuied item,
 		// it is now bound": equipped(0x65) container, character 0x110099BD, slot 2, stat 0, value 0x04000001.
 		[Fact]
 		public void TheBindMessage_IsByteExactAgainstTheCapture()

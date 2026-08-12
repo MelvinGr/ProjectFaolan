@@ -24,7 +24,7 @@ PROCESSES by playfield, on one host:
 | 1243.3 | `…:7028` | 1090 Ymir's Pass — back to the same port as before |
 | 1503.1 | `…:7029` | 2000 Old Tarantia |
 
-(`NecroL80_…_chat-annotated-4`.) ⭐ Two things fall out. A **re-sent `PlayfieldFIIR` for the map you are already on
+(`NecroL80_..._chat-annotated-4`.) ⭐ Two things fall out. A **re-sent `PlayfieldFIIR` for the map you are already on
 carries NO redirect** — only a genuine change does, so the redirect is the transition, not the announce. And an
 **instance gets its own port** (`:7031` for the Amphitheatre) alongside the outdoor zones, which is what
 `(mapId, instanceId)` looks like when a live service implements it: one process per copy.

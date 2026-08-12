@@ -82,7 +82,7 @@ namespace Faolan.Core.Database.Tables
 		// plain Latin1 string) and NOT as a stat. #727 predicted the carrier was the ItemOrigin stat (0x554) holding
 		// the crafter's character id, on the reasoning that a u32 stat cannot hold a name; the crafting capture
 		// refutes that. It rides both the world-entry snapshot (620 sightings across the dumps, 5 distinct crafters)
-		// and the live DispatchAddItem. [V2: NecroL80...annotated_5 fr17401]
+		// and the live DispatchAddItem. [V2: NecroL80_..._annotated_5 fr17401]
 		[MaxLength(128)]
 		public string? CreatorName { get; set; }
 

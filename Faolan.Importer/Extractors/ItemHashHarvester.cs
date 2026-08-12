@@ -425,7 +425,7 @@ namespace Faolan.Importer.Extractors
 		//
 		// ⚠️ This was `into.TryAdd`, and first-record-wins silently cost us the hash for every item whose FIRST
 		// sighting was a hash-less source. The Claims/Redeem list is exactly that: it carries the identity quad but
-		// sends hash 0 (retail does not put one in a claim row), so nine of Melvin's claim items sat at Hash 0 in the
+		// sends hash 0 (retail does not put one in a claim row), so nine of the maintainer's claim items sat at Hash 0 in the
 		// shipped DB even though the SAME capture delivers them again seconds later via a live 0x2020 add that DOES
 		// carry the hash. `TryAdd` threw the good record away because the claim row got there first (#719).
 		//
