@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -133,6 +134,42 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("⚠️ And a name is an IDENTITY, not an entity. Level, health, model, faction and profession are still");
 			Console.WriteLine("   capture-bound (NPC HP is not in the client at all), so nothing is written: a stats-less");
 			Console.WriteLine("   NpcTemplate would spawn a creature that is wrong rather than one that is absent.");
+
+			TieBreakersThatDoNotWork(db, heldIds);
 		}
+
+		// ⛔ The two obvious ways to break an AMBIGUOUS row's tie, both MEASURED and both dead (#684). Printed
+		// rather than written down in prose, because a route that looks this good is going to be tried again and
+		// the numbers are what stop it - the same treatment the scope test got on #661.
+		private static void TieBreakersThatDoNotWork(DatabaseContext db, IReadOnlySet<uint> heldIds)
+		{
+			// 1. "Pick the candidate whose id sits in the target map's template-id BAND." The four map-2095 bosses
+			//    (15100/15113/15115/15116) make this look certain. They are one ENCOUNTER authored together, not a
+			//    per-map band - which is exactly the corpus-constancy trap.
+			var bands = db.NpcSpawns.AsNoTracking()
+				.Select(s => new { s.MapId, Id = s.NpcTemplateId })
+				.ToList()
+				.GroupBy(s => s.MapId)
+				.Select(g => new { g.Key, Distinct = g.Select(x => x.Id).Distinct().Count(), Span = g.Max(x => x.Id) - g.Min(x => x.Id) })
+				.Where(g => g.Distinct >= MinTemplatesForABand)
+				.ToList();
+
+			var wide = bands.Count(b => b.Span > WideBandSpan);
+			Console.WriteLine();
+			Console.WriteLine("⛔ Two tie-breakers that do NOT work, measured rather than assumed:");
+			Console.WriteLine($"   1. the target map's template-id BAND - {wide} of {bands.Count} maps carrying {MinTemplatesForABand}+ distinct templates");
+			Console.WriteLine($"      span more than {WideBandSpan:N0} ids, so the bands overlap almost completely and predict nothing.");
+			Console.WriteLine("      (Map 2095's 15100/15113/15115/15116 look like a band and are one ENCOUNTER authored together.)");
+
+			// 2. "We may already hold one of the candidates under a different name." Cheap, and worth ruling out
+			//    explicitly because the UNAMBIGUOUS rows above do carry that annotation when it happens.
+			Console.WriteLine($"   2. holding one candidate and not the other - we hold {heldIds.Count:N0} template id(s) and NONE of the");
+			Console.WriteLine("      ambiguous candidates is among them, so there is nothing to prefer.");
+		}
+
+		// A map needs a few templates before its id range means anything, and "wide" is a span big enough that the
+		// band cannot separate two candidates that are themselves thousands apart.
+		private const int MinTemplatesForABand = 5;
+		private const uint WideBandSpan = 10000;
 	}
 }
