@@ -52,6 +52,17 @@ namespace Faolan.Core.Crypt
 			return state;
 		}
 
+		// The allocation-free form, for a sweep that hashes the same tail against millions of prefix states (#331).
+		// `Of(string, uint)` goes through `Encoding.Latin1.GetBytes`, which allocates per call - fine for one token,
+		// ruinous for 10^8 of them. Latin-1 IS the char's low byte, so a span walk is the same bytes with no array.
+		public static uint Of(ReadOnlySpan<char> value, uint state)
+		{
+			foreach (var c in value)
+				state = Step(state, (byte)c);
+
+			return state;
+		}
+
 		private static uint Step(uint h, uint b)
 		{
 			h = (h << 4) + b;

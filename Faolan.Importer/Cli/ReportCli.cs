@@ -572,6 +572,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "chatter-groups":
+				{
+					ChatterGroups(RdbDir());
+					return 0;
+				}
+
 				case "rdb-names":
 				{
 					RdbNames(RdbDir(), arg);

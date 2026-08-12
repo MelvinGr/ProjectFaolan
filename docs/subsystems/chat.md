@@ -289,3 +289,46 @@ snapshot-sourced row: `chat-itemref` goes through `CaptureItemImporter.UpsertAsy
 EMPTY one and a level only fills a 0. `ChatItemLinks.In` counts the anchors it could not read rather than
 swallowing them.
 [V3: ItemRefLinkCodecTests.ALinkedItemWeHold_AgreesWithTheStoredKeyQuad]
+
+## ⛔ The CamelCase sweep is a closed route (#331)
+
+The plan recorded here was: the bark group names are the 5,810 lowercased identifiers in `1020004/1010029`, the
+token hash is case-sensitive, so restore the CamelCase and sweep. `--report chatter-groups` implements exactly
+that - vocabulary from every English LDB page plus the name table's filename parts, iterative-deepening
+segmentation, and the proposed acceptance test of **two or more** `sayinchat(N)` hits. It does not work, and the
+report exists to say so with numbers.
+
+| | |
+|---|---:|
+| casings swept | 152,183 |
+| probes | 2,493,366,272 |
+| (casing, channel, count) combinations passing the two-hit rule | 3,848 |
+| pool names passing it | 781 |
+| **…of those, passing under MORE THAN ONE contradictory casing** | **350 (45%)** |
+
+⚠️ **The two-hit rule assumes the hits are independent and they are not.** The sweep gives every
+(casing, channel, K) 256 chances - one per `N` - and the ELF-28 hash's low bits depend only on the last few
+characters, so every candidate for one group lands in the same narrow band:
+
+```
+sayinchat(137)|broadcastcycle(6)|AchievementsPetHeraldOfDeeds  ->  0x0a93eb03
+sayinchat(138)|broadcastcycle(6)|AchievementsPetHeraldOfDeeds  ->  0x0d93eb03
+```
+
+The effective space is far smaller than 2²⁸, so hits are cheap. `AchievementsPetHeraldOfDeeds` (correct) and
+`AchievementsPetHeRaLdoFdeEds` (nonsense) both resolve nine or more lines.
+
+⛔ **Ranking by hit count does not rescue it.** The two known groups the vocabulary can reach do rank first -
+`RenownCrier sendtell(3)` 18 lines and `AchievementsPetHeraldOfDeeds broadcastcycle(6)` 13, both matching their
+captured `NpcChatter` rows - but the overall top of the ranking is `HalloweenSnakeBoSscOmbAt` (24 lines) and
+`PlayerLocalTeLePoRt` (22). And the control settles it: for `renownbystanderlovers`, whose true casing is known
+from a capture, the sweep accepts a casing and it is **not** the true one.
+
+⚠️ **There is also a vocabulary floor no client-derived source can lift.** `bystander` occurs **nowhere** in the
+client - not in the 152 English LDB pages, not in any of the 192,291 name-table entries - except inside the four
+`renownbystander*` names themselves. An authoring word the game never says out loud cannot be recovered from the
+game's words, so four of the six known groups are unreachable by segmentation whatever the acceptance test.
+
+**What that leaves.** Group discovery from the client alone is closed by this measurement. The lines themselves
+remain fully readable once a group name is known, so the route back in is a capture that carries the token - the
+same route that produced the six groups already harvested.

@@ -31,17 +31,25 @@ namespace Faolan.Importer.Cli
 				.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
 			if (needles.Length == 0)
 			{
-				Console.WriteLine("rdb-text-scan needs one or more strings: --report-arg RenownBystanderLovers,RenownCrier[:local][:<type>]");
+				Console.WriteLine("rdb-text-scan needs one or more strings: --report-arg RenownBystanderLovers,RenownCrier[:local][:case][:<type>]");
 				return;
 			}
 
 			var options = parts.Skip(1).ToArray();
 			var localOnly = options.Any(o => o.Equals("local", StringComparison.OrdinalIgnoreCase));
+
+			// ⭐ `:case` makes the search CASE-SENSITIVE (#331). The default fold is right for "does the client know
+			// this word at all", and WRONG for the question that fold cannot even express: *in which case* does it
+			// store it. `RenownBystanderLovers` hits `1000010` either way, because that table is lowercased by the
+			// build - so a case-insensitive hit there says nothing about whether the CamelCase spelling the token
+			// hash needs exists anywhere. Only a case-sensitive sweep can answer that, in either direction.
+			var caseSensitive = options.Any(o => o.Equals("case", StringComparison.OrdinalIgnoreCase));
 			var onlyType = options.Select(o => uint.TryParse(o, out var t) ? t : (uint?)null).FirstOrDefault(t => t != null);
 
 			using var rdb = OpenRdb(rdbDir);
 			Console.WriteLine($"rdb-text-scan: looking for {string.Join(", ", needles.Select(n => $"\"{n}\""))}" +
 				(onlyType is { } ot ? $" in type {ot} only" : " across every record type") +
+				(caseSensitive ? " CASE-SENSITIVELY (:case)" : "") +
 				(localOnly
 					? " -- LOCAL RECORDS ONLY (:local): a miss here means 'not in the local packs', NOT 'not in the game'"
 					: " including CDN-backed records (fetched through the mirror - slow, and the reason a miss is meaningful)"));
@@ -49,7 +57,7 @@ namespace Faolan.Importer.Cli
 			// Both widths of each needle, lower-cased, as byte patterns: an 8-bit Latin-1 run and a UTF-16LE one.
 			var patterns = needles.ToDictionary(
 				n => n,
-				n => new[] { Encoding.Latin1.GetBytes(n.ToLowerInvariant()), Encoding.Unicode.GetBytes(n.ToLowerInvariant()) });
+				n => new[] { Encoding.Latin1.GetBytes(caseSensitive ? n : n.ToLowerInvariant()), Encoding.Unicode.GetBytes(caseSensitive ? n : n.ToLowerInvariant()) });
 
 			var hits = needles.ToDictionary(n => n, _ => new SortedDictionary<uint, int>());
 			var samples = needles.ToDictionary(n => n, _ => new List<string>());
@@ -85,9 +93,13 @@ namespace Faolan.Importer.Cli
 
 				// Lower-case the body ONCE per record rather than once per needle: the case-fold is the expensive part
 				// and every needle searches the same bytes.
-				var lower = new byte[body.Length];
-				for (var i = 0; i < body.Length; i++)
-					lower[i] = body[i] is >= (byte)'A' and <= (byte)'Z' ? (byte)(body[i] + 32) : body[i];
+				var lower = body;
+				if (!caseSensitive)
+				{
+					lower = new byte[body.Length];
+					for (var i = 0; i < body.Length; i++)
+						lower[i] = body[i] is >= (byte)'A' and <= (byte)'Z' ? (byte)(body[i] + 32) : body[i];
+				}
 
 				foreach (var (needle, forms) in patterns)
 				{
