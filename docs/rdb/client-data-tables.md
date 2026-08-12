@@ -284,7 +284,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 
 | type | class | count | header | stride | note |
 |---|---|---|---|---|---|
-| 1000042 | `Feat_t` | 6593 | 20 B | 48 B | first two words are `(wireFeatId, templateId)` |
+| 1000042 | `Feat_t` | 6593 | 20 B | 48 B | 12 words, 2 of them read and DISCARDED — decoded below |
 | 1000043 | `FeatClassTable_c` | 9916 | 20 B | 40 B | |
 | 1000044 | `FeatPointsTable_c` | 71 | 16 B | 12 B | `[level 10..80][points][tsPoints]` |
 | 1000071 | `TexScriptMeshGroupValues_c` | 1220 | 20 B | 8 B | |
@@ -309,7 +309,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B), 1000520
 (29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Decoded past their shape: 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
+Decoded past their shape: 1000042 (layout), 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
 1000517, 1000518, 1000520, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
@@ -860,3 +860,35 @@ build, never 2).
 `FeatIdMaps.WireFeatId` or `.TemplateId`, not any column of 1000042 `Feat_t`, not `Items.Id` or `Spells.Id`, and
 `LDB` has no string at it in any category. Stated as an open question rather than guessed at; tracked in Gitea
 #469.
+
+
+## 1000042 `Feat_t` — the layout, from the loader's own parse callback
+
+The loader is `FUN_00788E20` (its failure log names it: *"FeatTable_t::LoadStaticData() Unavailable Feat data
+%d:%d"*, with `0xF426A` = 1000042). Its parse callback — the second argument to `FUN_0104D760` — is
+`FUN_00788EF0`, and it states the record layout exactly rather than leaving it to be inferred from the bytes.
+
+It opens with `(*this+0x18)(0xc, 0, 1)`: **twelve** columns. Then two header reads, a COUNT and a **MODE** word,
+and a per-record loop of ten unconditional reads plus two conditional ones:
+
+| word | what the callback does with it |
+|---:|---|
+| 0 | kept, and **also divided by 100** into a second slot |
+| 1–6 | kept |
+| **7** | ⚠️ **read and discarded** |
+| 8 | kept |
+| **9** | ⚠️ **read and discarded** |
+| 10, 11 | read as a pair; **which one is used depends on the header's MODE word** — mode 1 takes word 11, mode 2 takes word 10, and the taken value **replaces** word 0's `/100` |
+
+so nine of the twelve reach `FUN_0078B490`, the row constructor, and two never leave the stream.
+
+⭐ The arithmetic corroborates the column count independently: the decompressed resource is **316,484 B**, and
+`20 + 6593 × 48` is exactly that — 12 words per record, 6,593 records, a 20-byte header.
+
+⚠️ Two consequences for anyone reading this table by stride. The `/100` slot means **word 0 is not in the units it
+looks like**, and the mode-selected pair means **the last two columns are not both live** — one of them is dead on
+any given build, and which one is not a property of the record at all. `RdbFeatImporter.ReadIdMapAndPrereqs`
+currently reads words 0, 1 and 10 (`(wireId, templateId)` and the base index) and is unaffected by either.
+
+What the nine kept columns MEAN is still open — that is step 3 of the method above (`DumpXrefsTo` on the
+accessor, then the consumers' log strings), and it is what Gitea #469 tracks for this table.
