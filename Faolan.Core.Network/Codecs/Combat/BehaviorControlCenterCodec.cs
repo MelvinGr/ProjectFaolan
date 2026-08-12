@@ -53,8 +53,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The one phase whose record carries an EXTRA u32 in front of the behaviorId - see BehaviorControlCenterIIR.
 		private const byte DelayPhase = 0x0E;
 
-		// The two phases that carry a bare u32 INSTEAD of a command - see BehaviorControlCenterIIR.StateWord.
-		private static readonly byte[] StatePhases = [0x0B, 0x0C];
+		// The two phases that carry a bare SUBSTATE ID instead of a command: 0x0B enters it, 0x0C leaves it
+		// (#810) - see BehaviorControlCenterIIR.SubstateId.
+		private static readonly byte[] SubstatePhases = [0x0B, 0x0C];
 
 		// The phases that read a COMMAND (client `ReadSubClass`'s first switch arm, plus the delay phase). Every other
 		// phase byte - 6/8/9/0xD/0x11 explicitly, and anything unlisted through the `default:` arm - ends at the seq
@@ -72,8 +73,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 			if ((value.DelayCentiseconds != null) != IsDelayPhase(value.Seq))
 				throw new ArgumentException($"DelayCentiseconds is carried by phase 0x{DelayPhase:X2} and only by it (seq 0x{value.Seq:X4}, delay {value.DelayCentiseconds?.ToString() ?? "none"})", nameof(value));
 
-			if ((value.StateWord != null) != IsStatePhase(value.Seq))
-				throw new ArgumentException($"StateWord is carried by phases 0x0B/0x0C and only by them (seq 0x{value.Seq:X4}, state {value.StateWord?.ToString() ?? "none"})", nameof(value));
+			if ((value.SubstateId != null) != IsSubstatePhase(value.Seq))
+				throw new ArgumentException($"SubstateId is carried by phases 0x0B/0x0C and only by them (seq 0x{value.Seq:X4}, substate {value.SubstateId?.ToString() ?? "none"})", nameof(value));
 
 			if (!CarriesCommand(value.Seq) && (value.BehaviorId != 0 || value.Args.Length != 0 || value.Tail.Length != 0))
 				throw new ArgumentException($"phase 0x{(byte)value.Seq:X2} carries no command block, so it has nowhere to put one (seq 0x{value.Seq:X4}, behavior 0x{value.BehaviorId:X}, {value.Args.Length} args + {value.Tail.Length} tail bytes)", nameof(value));
@@ -98,8 +99,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var actor = r.ReadU32Be();
 			var seq = r.ReadU16Be();
 
-			if (IsStatePhase(seq))
-				return new BehaviorControlCenterIIR(actor, seq, 0, [], [], StateWord: r.ReadU32Be());
+			if (IsSubstatePhase(seq))
+				return new BehaviorControlCenterIIR(actor, seq, 0, [], [], SubstateId: r.ReadU32Be());
 
 			if (!CarriesCommand(seq))
 				return new BehaviorControlCenterIIR(actor, seq, 0, [], []);
@@ -124,9 +125,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(v.Actor)
 				.WriteUInt16(v.Seq);
 
-			if (v.StateWord is { } state)
+			if (v.SubstateId is { } substate)
 			{
-				s.WriteUInt32(state);
+				s.WriteUInt32(substate);
 				return;
 			}
 
@@ -153,9 +154,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return (byte)seq == DelayPhase;
 		}
 
-		private static bool IsStatePhase(ushort seq)
+		private static bool IsSubstatePhase(ushort seq)
 		{
-			return Array.IndexOf(StatePhases, (byte)seq) >= 0;
+			return Array.IndexOf(SubstatePhases, (byte)seq) >= 0;
 		}
 
 		// Whether this phase reads a behaviorId + args + tail at all. The client's `default:` arm reads NOTHING, so an
@@ -189,12 +190,22 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// client's classmap registers - the shape of the "third registration site" #549 was opened to find. There is no
 	// third site: every one of the ten is a Magic:Attack (0x04) or ObjectInteraction (0x2A) read one field out of step.
 	//
-	// ⚠️ `StateWord` is present for phases 0x0B/0x0C and ONLY for them, and like the delay it is a different record
+	// ⭐ `SubstateId` is present for phases 0x0B/0x0C and ONLY for them, and like the delay it is a different record
 	// SHAPE rather than optional data: those two arms of `ReadSubClass` read one u32 into `this+0x28` and return, so
-	// the record carries NO command at all and is 18 bytes on the wire. Nine such records are captured (#809) - the
-	// codec used to refuse every one of them, looking for a behaviorId that is not there. What the word MEANS is
-	// undecoded [V0]: it is 60 on four records from four different actors and captures, 84 on three from one NPC
-	// (0x0B once then 0x0C twice, over the ~15 s before that NPC dies), 33 and 83 once each. All nine are s2c, so the
-	// client only ever reads the field and no client-side call site names it.
-	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null, uint? StateWord = null);
+	// the record carries NO command at all and is 18 bytes on the wire. Nine such records are captured (#809).
+	//
+	// **0x0B ENTERS a substate and 0x0C LEAVES it; the word is the substate id** (#810). The client names it itself.
+	// `BccIIR`'s vtable slot 2 (`FUN_005E1C70`) is the executor, and it is the only other function that touches
+	// `+0x28`: its `case 0xb` calls `FUN_005EB5C0(bcc, id)` and its `case 0xc` calls `FUN_005EB890`, gated on one
+	// predicate and its negation. `FUN_005EB5C0` scans the BCC's ACTIVE-SUBSTATE list for the id and logs
+	// "Tried to enter substate %d. Already in it!" on a hit, or "Tried to enter substate %d, but did not find it in
+	// this bcc (%d)" when the id does not resolve - both messages are about the argument, which is what names it.
+	// Corroborated from a second direction: the same function reads stats 0x14 and 0x15, whose client-side names are
+	// `BCCState` and `BCC`, and `Substate` is already a known GameAction key (174 / 0x4B6) across ten kinds.
+	//
+	// ⚠️ **The id is scoped to the BCC, not global** - the client's own message says "in this bcc". So the captured
+	// values cannot be named without the target's BCC resource, and 60 appearing on four different actors is only a
+	// shared default if those actors share a behaviour tree. Do not build a global substate enum from them.
+	// [V0: naming the individual ids - 33, 60, 83, 84 - needs the BCC resource decoded, tracked in Gitea]
+	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null, uint? SubstateId = null);
 }

@@ -24,12 +24,42 @@ are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`B
 below. Most other types the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) go straight to the commandId, which
 is why reading them all one way looked right for so long.
 
-⚠️ **`0x0B` and `0x0C` carry a bare `u32` and NO command at all**, and the corpus has nine of them — 18-byte
-records that `BehaviorControlCenterCodec` refused outright until #809, running out of bytes looking for an
-`argsLen` that is not there. The writer (`FUN_005e2650`) mirrors the reader exactly: its `case 0xb: case 0xc:`
-writes one word and returns. What the word means is undecoded: all nine are s2c, so no client-side call site
-names it, and it is 60 on four records from four different actors and captures, 84 on three from one NPC
-(`0x0B` once then `0x0C` twice, over the ~15 s before that NPC dies), 33 and 83 once each.
+⭐ **`0x0B` ENTERS a substate and `0x0C` LEAVES it; the bare `u32` is the SUBSTATE ID** (#810). Both carry NO
+command at all — the corpus has nine, 18-byte records that `BehaviorControlCenterCodec` refused outright until
+#809, running out of bytes looking for an `argsLen` that is not there. The writer (`FUN_005e2650`) mirrors the
+reader exactly: its `case 0xb: case 0xc:` writes one word and returns.
+
+The client names the field itself, and the route in is a FIELD-xref rather than a call-xref — all nine records are
+s2c, so no client-side *call* site names it. `ReadSubClass` stores the word at `this+0x28`, and exactly one other
+function in the image touches that offset on this object: **`BccIIR`'s vtable slot 2, `FUN_005E1C70`, the
+executor**. Its two arms are one predicate and its negation:
+
+```c
+case 0xb:  if (FUN_005dc110() == 0)  FUN_005EB5C0(bcc, this->word);   // enter
+case 0xc:  if (FUN_005dc110() != 0)  FUN_005EB890();                  // leave
+```
+
+`FUN_005EB5C0` scans the BCC's **active-substate list** for the value, and its two log strings are both about that
+argument:
+
+```
+"Tried to enter substate %d. Already in it!"                              <- the id is already in the list
+"Tried to enter substate %d, but did not find it in this bcc (%d)"        <- the id does not resolve
+```
+
+On neither, it inserts the id into the list in priority order and activates it. The same list is what the
+`:: Substate list ::` debug dump walks, printing ` %2d : %s` per entry — an id and a NAME.
+
+Two independent corroborations: `FUN_005EB5C0` reads stats `0x14` and `0x15`, whose client-side names are
+**`BCCState`** and **`BCC`**; and **`Substate` is already a known GameAction key** (174 / `0x4B6`) across ten
+GameAction kinds in [`gameaction-keylists.tsv`](gameaction-keylists.tsv).
+
+⚠️ **The id is scoped to the BCC, not global.** The client's own message says *"in this bcc"*, and the resolution
+path is a per-BCC registry keyed by stat `0x15`. So the captured values cannot be named without the target's BCC
+resource, and 60 appearing on four different actors in four captures is only a shared default *if those actors
+share a behaviour tree* — do not build a global substate enum from them. The captured values are 60 ×4, 84 ×3 on
+one Tortage NPC (`0x0B` once then `0x0C` twice, over the ~15 s before it dies — enter, leave, and a redundant
+leave), and 33 and 83 once each.
 
 ⚠️ **The `default:` arm reads nothing**, so an unlisted phase byte ends the record at the phase word exactly like
 the explicitly terminal `6/8/9/0xD/0x11` do. `CommandPhases` in the codec is therefore a POSITIVE list: guessing

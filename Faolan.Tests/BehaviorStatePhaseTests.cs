@@ -22,13 +22,13 @@ namespace Faolan.Tests
 		[Theory]
 		[InlineData(StatePhase0CRecord, 0x000C, 0x01316DC2u, 60u)]
 		[InlineData(StatePhase0BRecord, 0x000B, 0x021667CCu, 33u)]
-		public void ReadsTheStateWordAndEndsThere(string hex, int seq, uint actor, uint state)
+		public void ReadsTheSubstateIdAndEndsThere(string hex, int seq, uint actor, uint state)
 		{
 			var bcc = BehaviorControlCenterCodec.Parse(Convert.FromHexString(hex));
 
 			Assert.Equal((ushort)seq, bcc.Seq);
 			Assert.Equal(actor, bcc.Actor);
-			Assert.Equal(state, bcc.StateWord);
+			Assert.Equal(state, bcc.SubstateId);
 
 			// No command block at all - not an empty one.
 			Assert.Equal(0u, bcc.BehaviorId);
@@ -41,15 +41,15 @@ namespace Faolan.Tests
 		// The phase byte is what says which shape a record is, so a value that disagrees with it would build a body
 		// the client reads out of step - the same guard the delay word already had.
 		[Fact]
-		public void RefusesAStateWordOnACommandPhase()
+		public void RefusesASubstateIdOnACommandPhase()
 		{
-			Assert.Throws<ArgumentException>(() => BehaviorControlCenterCodec.Build(new BehaviorControlCenterIIR(0x021667CC, 0x0004, 0, [], [], StateWord: 33)));
+			Assert.Throws<ArgumentException>(() => BehaviorControlCenterCodec.Build(new BehaviorControlCenterIIR(0x021667CC, 0x0004, 0, [], [], SubstateId: 33)));
 		}
 
 		[Fact]
 		public void RefusesACommandOnAStatePhase()
 		{
-			Assert.Throws<ArgumentException>(() => BehaviorControlCenterCodec.Build(new BehaviorControlCenterIIR(0x021667CC, 0x000B, 0x0F, [], [], StateWord: 33)));
+			Assert.Throws<ArgumentException>(() => BehaviorControlCenterCodec.Build(new BehaviorControlCenterIIR(0x021667CC, 0x000B, 0x0F, [], [], SubstateId: 33)));
 		}
 
 		// The client's `default:` arm reads nothing, so an unlisted phase ends at the seq word exactly like the
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 			var bcc = BehaviorControlCenterCodec.Parse(Convert.FromHexString("642cd3d60000c35001316dc20009"));
 
 			Assert.Equal(0x0009, bcc.Seq);
-			Assert.Null(bcc.StateWord);
+			Assert.Null(bcc.SubstateId);
 			Assert.Empty(bcc.Args);
 		}
 	}
