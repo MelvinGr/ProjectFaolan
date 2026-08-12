@@ -770,6 +770,12 @@ namespace Faolan.Core.Enums
 		WeaponTrailEndAlpha = 0x438,
 		WeaponTrailTime = 0x439,
 		AttackIgnoreLevel = 0x43A,
+
+		// ⭐ 0x43B..0x446 (1083..1094) are SIX consecutive value/Max PAIRS - Endurance, Runspeed, Subtlety,
+		// Recovery, FastRecovery, Skulk - and that structure is the point (#468). Feat records carry the family with
+		// values 100..900, and because LDB 615 (a stale Anarchy Online display table) names none of them they read as
+		// junk that a stat WHITELIST would silence. The exe's own descriptor registry names all twelve
+		// (docs/re/aoc-client-stat-names.tsv), so they are deliberate stealth/movement stats, not noise.
 		Endurance = 0x43B,
 		MaxEndurance = 0x43C,
 		MaxRunspeed = 0x43E,
