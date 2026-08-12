@@ -41,9 +41,23 @@ namespace Faolan.Core.Rdb.Assets
 			//   unknown2  1 on every single-image format, and 6 on MIXD - the one CONTAINER format, which this
 			//             converter already has to special-case as several concatenated maps.
 			//
-			// ⚠️ And unknown2 is NOT merely a format tag: one MIXD carries 2 where the other 217 carry 6. A value
-			// that varies WITHIN a format is a count, not a label - which is what makes "the number of sub-maps" the
-			// reading to test, and it is the only thing left open on this header.
+			// ⭐ RESOLVED at a larger sample (#464, 4,397 textures): the MIXD outlier is NINE textures, not one, and
+			// unknown2 is NOT a sub-map COUNT - the reading the smaller sample suggested. The two groups separate by
+			// PAYLOAD PER PIXEL with no overlap at all, and the bands are 1.36x apart where a 6-vs-2 count would have
+			// to be 3x:
+			//
+			//   MIXD u2=6   x706   payload/px 2.500-2.576
+			//   MIXD u2=2   x9     payload/px 1.834-1.848
+			//
+			// ⚠️ It is a real CONTENT split rather than a size artefact: the two groups OVERLAP on dimensions and mip
+			// count (both carry 512x512, both carry mips 6/8/9), so nothing about the image size explains it. So
+			// unknown2 selects between two MIXD channel LAYOUTS - which sub-textures the container holds - and the
+			// number itself is a layout id, not a count. Naming the two layouts needs the client's MIXDTextureLoader.
+			//
+			// ⚠️ The superseded reading, recorded because the smaller sample genuinely supported it and someone will
+			// re-derive it otherwise: "a value that varies WITHIN a format is a count, not a label, so unknown2 is
+			// the number of sub-maps". It is the right INSTINCT and the wrong answer, and only a payload measurement
+			// separates the two - a distribution never could.
 			var unknown1 = payload.ReadU32Le(4);
 			var unknown2 = payload.ReadU32Le(8);
 			int width = payload.ReadU16Le(12);

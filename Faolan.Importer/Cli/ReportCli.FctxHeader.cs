@@ -108,6 +108,30 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {group.Key,-8} {group.Count(),8:N0} {group.Select(r => r.U1).Distinct().Count(),12:N0}"
 				                  + $" {group.Select(r => r.U2).Distinct().Count(),12:N0}  (0x{modal.Key.U1:X}, 0x{modal.Key.U2:X}) x{modal.Count():N0}");
 			}
+
+			// ⭐ The one thing #464 left open on this header: `unknown2` is 6 on every MIXD but one, which carries 2.
+			// A value that varies WITHIN a format is a count rather than a label, and "the number of sub-maps" is the
+			// reading to test - so every fourcc whose word is not constant gets broken out by that word, with the
+			// dimensions and payload beside it. A count of sub-maps has to show up as a SIZE difference; a label
+			// does not.
+			Console.WriteLine();
+			Console.WriteLine("  formats whose unknown2 is NOT constant, broken out - a sub-map COUNT must move the payload:");
+			var split = rows.GroupBy(r => r.FourCc).Where(g => g.Select(r => r.U2).Distinct().Count() > 1).ToList();
+			if (split.Count == 0)
+			{
+				Console.WriteLine("    none in this sample - raise --report-arg to reach the outliers.");
+			}
+
+			foreach (var group in split)
+			foreach (var byWord in group.GroupBy(r => r.U2).OrderByDescending(g => g.Count()))
+			{
+				var bytesPerPixel = byWord.Select(r => r.Width * r.Height == 0 ? 0 : (double)r.Payload / (r.Width * r.Height)).ToList();
+				Console.WriteLine($"    {group.Key} u2=0x{byWord.Key:X}  x{byWord.Count(),-5:N0}"
+				                  + $"  dims {string.Join("/", byWord.Select(r => $"{r.Width}x{r.Height}").Distinct().Take(3))}"
+				                  + $"  mips {string.Join("/", byWord.Select(r => r.Mip).Distinct().OrderBy(m => m).Take(4))}"
+				                  + $"  payload/px {bytesPerPixel.Min():0.000}-{bytesPerPixel.Max():0.000}"
+				                  + (byWord.Count() <= 3 ? $"   ids {string.Join(",", byWord.Select(r => $"{r.Type}:{r.Id}"))}" : ""));
+			}
 		}
 
 		// The FCTX header the converter reads: magic[4], two u32s, w/h u16, mips, fourcc[4].
