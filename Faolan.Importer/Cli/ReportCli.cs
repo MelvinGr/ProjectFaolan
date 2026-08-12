@@ -244,6 +244,15 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #643: is the graph fold append-stable? Folds the corpus, then folds it again with each capture held
+				// out, and counts the node ids that MOVE when it is added back. The measurement that ticket asks for
+				// before its option (b) can be believed.
+				case "conversation-fold-stability":
+				{
+					ConversationFoldStability(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "handle-recycling":
 				{
 					HandleRecycling(NamedCapture.LoadAll(capturesDir));

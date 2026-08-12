@@ -136,7 +136,21 @@ The write strategy is an explicit, selectable dimension — orthogonal to *which
 Rules and edge cases:
 
 - **Per-module support.** Not every module supports every mode (`SupportedModes`). Conversations are *always*
-  a clean rebuild (handle-keyed stale rows must be purged), so it advertises `overwrite` only. Characters advertise
+  a clean rebuild, so it advertises `overwrite` only — the fold is a global partition over every harvested walk
+  (which screens merge, and which need a `Discriminator`, is decided by comparing them against each other), so
+  folding one capture against a database that no longer remembers the rest cannot reproduce the classification.
+
+  ⭐ **How badly that actually bites is measured, not assumed** — `--report conversation-fold-stability` (#643)
+  folds the corpus, then folds it again with each capture held out in turn, and counts the node ids that MOVE
+  when it is added back. Today: **37 of 37 dialogue-carrying captures are append-stable, zero ids move.**
+
+  ⚠️ And the reason is a fact about the DATA, not about the fold. A node's id is
+  `ComputeId(template, contentKey, discriminator)` and the discriminator is the class's **index** within its
+  `(template, contentKey)` group, so an append can only move an existing id by renumbering a group that holds
+  more than one class. The corpus has **zero** nodes above discriminator 0 — the mechanism that forces
+  overwrite-only has never fired. An incremental importer could be built on that, but it would want this report
+  in its acceptance path (or a discriminator derived from the class rather than from its position, which removes
+  the failure mode outright). Characters advertise
   `insert` (the default: add what is missing, never touch an existing row) and `overwrite`, which is the
   **refresh** (#753): a character whose row carries `Character.ImportedFromCapture` is deleted and rebuilt from
   the current corpus, so a re-dumped capture can update an imported bag / worn set / stat sheet that would
