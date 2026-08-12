@@ -288,11 +288,11 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000042 | `Feat_t` | 6593 | 20 B | 48 B | 12 words, 2 of them read and DISCARDED — decoded below |
 | 1000043 | `FeatClassTable_c` | 9916 | 20 B | 40 B | |
 | 1000044 | `FeatPointsTable_c` | 71 | 16 B | 12 B | `[level 10..80][points][tsPoints]` |
-| 1000071 | `TexScriptMeshGroupValues_c` | 1220 | 20 B | 8 B | |
+| 1000071 | `TexScriptMeshGroupValues_c` | 1220 | **20 B** | 8 B | `[i32 groupValue][u32 meshRdbId]` — decoded below |
 | 1000080 | `RDBHairReplacement` (default) | 8 | 16 B | 8 B | |
 | 1000081 | `RDBHairReplacement` (override) | 100 | 16 B | 12 B | |
 | 1000099 | `FeatClassTable_c` | 3096 | 20 B | 12 B | count is the FIFTH word; the feat POINT COST table — decoded below |
-| 1000505 | `RDBPlayerClassData_c` | 17 | — | — | does not divide — variable-width |
+| 1000505 | `RDBPlayerClassData_c` | 17 | 16 B | — | variable-width `[id][len][name][tier]`, 380/380 B — decoded below |
 | 1000506 | `FeatClassTable_c` (not `RDBPlayerClassData_c`) | 27 / 16 | 16 B | 8 B | the archetype → class MEMBERSHIP table — decoded below |
 | 1000507 | `RDBPlayerClassData_c` | 48 / 56 | 16 B | 8 B | two entries |
 | 1000508 | the CREATURE RACE table (not `RDBPlayerClassData_c`) | 109 | 16 B | — | variable-width: `[id][len][name]`, decoded above |
@@ -310,9 +310,36 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B), 1000520
 (29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Decoded past their shape: 1000042 (layout), 1000043, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
+Decoded past their shape: 1000042 (layout), 1000043, 1000071, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
 1000517, 1000518, 1000520, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
+
+⭐ **`--report data-table --report-arg <type>[:<id>]` renders any of the fixed-width ones as ROWS**, with
+`raceId`/`classId`/`archetypeId` columns resolved to names through 1000508 and 1000505. It SOLVES the count word
+and the header length rather than assuming them, because the two vary independently: most tables are
+count-in-word-3 with a 16-byte header, 1000511 is count-in-word-4 with 20, and **1000071 is count-in-word-3 with
+20**. ⚠️ A table where no candidate divides the body is REFUSED rather than rendered - 1000505 does not divide
+because it is variable-width, and printing it as fixed-width rows yields a plausible table of nonsense.
+
+## Decoded: 1000071 `TexScriptMeshGroupValues_c` — a mesh GROUP membership list
+
+1220 rows of `[i32 groupValue][u32 meshRdbId]` after a **20-byte** header. The second column resolves in the RDB
+index as type **1010001** (meshes) - checked, not assumed. The first is a small NEGATIVE i32, and it is the
+*group*, not a per-mesh property: **890 distinct meshes over 1220 rows, and 224 of them appear under more than one
+value** (`793114` under -1, -3 and -4). So the table is a group → members adjacency list, the same shape 1000506
+has for archetypes.
+
+| group | meshes |
+|---:|---:|
+| -4 | 649 |
+| -3 | 256 |
+| -1 | 199 |
+| -2 | 70 |
+| -5 | 45 |
+| 0 | 1 |
+
+⚠️ **What the five groups MEAN is not decoded** - that needs the consumer side (the TexScript the class is named
+for), which is this page's step-3 method rather than its step-1 one.
 
 ## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
 
