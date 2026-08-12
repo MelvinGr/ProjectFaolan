@@ -861,10 +861,21 @@ namespace Faolan.Importer.Cli
 		// ⚠️ The crit clause's value is a FLOAT, unlike the DPS clause's int: `CVTSI2SS` off key 67's slot then
 		// `MULSS [0x020b5944]`, and that constant is **0.025**. So `Annihilate`'s stored 1000 draws as 25.
 		//
-		// ⚠️ The HATE and DAMAGE-TYPE clauses are gated but not rendered, and deliberately: no shipped element
-		// carries either key, so the hate scale is unmeasured and the damage-type `%s` has no resolved name space.
-		// An element that grew one returns null and lands in the census's unrendered bucket, which SAYS so - rather
-		// than being drawn with an invented number.
+		// ⭐ The DAMAGE-TYPE clause's `%s` IS a resolved name space - **LDB category 600, keyed by key 69's value**.
+		// The client says so outright at `0x014A226D`: `PUSH 0x258 ; PUSH EDI ; CALL 0x0060ECE0`, where `0x258` is
+		// 600 and `EDI` is the key it just fetched. Category 600 is the DAMAGE-SCHOOL name table and its ids are
+		// `DamageSchool`'s exactly - 1 slashing, 4 fire, 6 holy, 7 unholy, 8 poison.
+		//
+		// All 29 shipped elements that reach this clause are one spell, `Prince of Terror` (4281690), and every one
+		// carries key 69 = 7. Three statements agree on what that draws: the client's own lookup, our enum, and the
+		// spell's own description - *"causes all combo finishers to deal UNHOLY damage"*.
+		//
+		// ⚠️ Its gate is `TEST/JZ` then `JLE`, so a NEGATIVE key 69 skips the clause exactly as zero does - and a
+		// missing LDB row drops it too (the client's `ESP+0xe` success byte gates the append).
+		//
+		// ⚠️ The HATE clause stays gated-but-unrendered, and deliberately: no shipped element carries key 68, so its
+		// scale is unmeasured. An element that grew one returns null and lands in the census's unrendered bucket,
+		// which SAYS so - rather than being drawn with an invented number.
 		private static (string? Format, object?[]? Args) InheritedWeaponAttackSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
 		{
 			var header = element.Value(GameActionTypes.KeyComboAttackSlot) switch
@@ -882,8 +893,8 @@ namespace Faolan.Importer.Cli
 			var hate = element.Value(ComboAttackHateKey) ?? 0;
 			var damageType = element.Value(ComboAttackDamageTypeKey) ?? 0;
 
-			if (hate != 0 || damageType != 0)
-				return (null, null); // see the remarks - unmeasured, so not drawn
+			if (hate != 0)
+				return (null, null); // see the remarks - the hate scale is unmeasured, so it is not drawn
 
 			var clauses = new List<string>();
 			// ⚠️ `Increase` is the DEFAULT and `Decrease` is taken only when the value is NEGATIVE - the client loads
@@ -895,6 +906,14 @@ namespace Faolan.Importer.Cli
 			// ⛔ The sign comes from `dps`, not from `crit`. That is the client's bug, reproduced - see the remarks.
 			if (crit != 0 && Clause(ctx, dps < 0 ? "DecreaseComboCriticalChance" : "IncreaseComboCriticalChance", crit * ComboCriticalScale) is { } critLine)
 				clauses.Add(critLine);
+
+			// The damage-type clause: its `%s` is LDB category 600 keyed by the value itself. `> 0` rather than
+			// `!= 0` because the client's gate is JZ then JLE - a negative skips it like a zero does.
+			if (damageType > 0
+			    && ctx.Ldb.TryGetValue((DamageSchoolNameCategory, (uint)damageType), out var schoolName)
+			    && ctx.SentenceForToken("ChangeComboDamageType") is { } typeFormat
+			    && LdbFormat.TryApply(typeFormat, [schoolName], out var typeLine))
+				clauses.Add(typeLine);
 
 			if (clauses.Count == 0)
 				return (header, []);
@@ -1598,6 +1617,10 @@ namespace Faolan.Importer.Cli
 
 		private const uint AddPercentSkillModifierKind = 53189;
 		private const uint AddSpellLineProcKind = 53070;
+		// LDB category 600 - the DAMAGE-SCHOOL name table, keyed by `DamageSchool`. The client fetches it as
+		// `PUSH 0x258` at 0x014A226D to fill `ChangeComboDamageType`'s `%s`.
+		private const uint DamageSchoolNameCategory = 600;
+
 		private const uint ChangeInheritedWeaponAttackKind = 53250;
 		private const uint AreaFormulaKind = 53087;
 		private const uint AttackAddTargetsKind = 53273;

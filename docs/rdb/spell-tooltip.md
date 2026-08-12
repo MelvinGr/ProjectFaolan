@@ -403,10 +403,22 @@ the crit clause always takes its Increase arm.
 not one sentence. `--report spell-tooltip` draws one line per element, so it joins them with `"; "` — that
 separator is the report's presentation, not something the client ships.
 
-⚠️ The HATE and DAMAGE-TYPE clauses are gated but **not rendered**, deliberately: no shipped element carries
-either key, so the hate scale is unmeasured and the damage-type `%s` has no resolved name space. An element that
-grew one is left unrendered so the census says so, rather than drawn with an invented number — which is the 29
-elements still in that bucket.
+⭐ **The DAMAGE-TYPE clause's `%s` is LDB category 600, keyed by key 69's value** (#782). The client says so
+outright at `0x014A226D` — `PUSH 0x258 ; PUSH EDI ; CALL 0x0060ECE0`, where `0x258` is 600 and `EDI` is the key it
+has just fetched. Category 600 is the DAMAGE-SCHOOL name table and its ids are `DamageSchool`'s exactly:
+`1 slashing`, `4 fire`, `6 holy`, `7 unholy`, `8 poison`.
+
+All 29 shipped elements that reach the clause are one spell — `Prince of Terror` (4281690) — and every one carries
+key 69 = **7**. Three statements agree on what it draws, and none of them is the others: the client's own lookup,
+our `DamageSchool` enum, and the spell's own description, *"causes all combo finishers to deal **unholy**
+damage"*. It now renders `Finishing attack: Changes damage type to unholy`.
+
+⚠️ Its gate is `TEST/JZ` then **`JLE`**, so a NEGATIVE key 69 skips the clause exactly as a zero does — and a
+missing LDB row drops it too, which is what the client's `ESP+0xe` success byte is for.
+
+⚠️ The HATE clause remains gated but **not rendered**, deliberately: no shipped element carries key 68, so its
+scale is unmeasured. An element that grew one is left unrendered so the census says so, rather than drawn with an
+invented number.
 
 ### `AddSpellLineProc` (53070): it COMPOSES its line, so no sentence lookup could ever have found one
 
