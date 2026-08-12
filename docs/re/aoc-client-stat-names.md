@@ -321,3 +321,28 @@ the only AoC-era evidence there is. Where they disagree and the id is user-facin
 
 ⚠️ It also still carries **Anarchy Online** vocabulary in places (`NanoFocusLevel` for `355`, where this table
 says `LastPvPXP`), which is a second reason not to treat an internal name as a decode result.
+
+
+## ⚠️ The table does not start at 0 — ids 0, 1 and 2 are absent, and stat 1 is REAL
+
+The dump's lowest entry is **3 `AttackSpeed`**. That is a property of the table, not of the id space, and reading
+"not in the exe registry" as "not a stat" gets exactly three ids wrong — one of which is common.
+
+**Stat `1` is `HealthMax`** (LDB 615 calls it `Health`, and our `CharacterStatId.HealthMax = 0x0001`). It is used
+across every subsystem that carries stat modifiers:
+
+| table | rows with `StatId = 1` | of |
+|---|---:|---:|
+| `FeatEffects` | 1,397 | 23,033 |
+| `SpellStatEffects` | 505 | 25,716 |
+| `ItemStatModifiers` | 245 | 6,167 |
+
+and the feats carrying it are named for what it is — `HP 40-60 4`, `HP 60-80 5`, fourteen rows each.
+
+⭐ This is what #468's item 1 turned out to be. That item recorded ~81 "bad" feat-effect rows as noise "spread
+thin across other kinds"; re-measured against this table the residual is **1,397 rows over exactly two
+`(statId, kind)` pairs — both `statId = 1`**, on `Modify` (53045) and `InterpolatedModify` (53220). Not thin, not
+spread, and not bad: a real stat below the dump's floor.
+
+So when using this file as a name oracle, treat a miss on an id **below 3** as "outside the dump" rather than as
+"unnamed", and fall back to `CharacterStatId` / LDB 615 for those three.
