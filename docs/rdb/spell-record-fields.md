@@ -104,7 +104,14 @@ the yardstick every other row is read against.
 | 2 | 1,778 | **mana cost is a percent of the pool** (#630) — the control |
 | 24 | 3,189 | **hide from tooltip** (#789) — from the client's own `FUN_014a3b30` |
 | 16 | 11,610 | **gates the timed-effect path** — the client only computes and applies a duration behind it (#632, below) |
-| 25 | 185 | a strict SUBSET of the duration-carrying records (185/185) — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
+| 1 | 1,349 | **opts out of the global spell modifier** — the Ferocity scaling, unless the spell is on the `GlobalModIncludedSpellLine` tuning line (below) |
+| 20 | 2,289 | **the stated duration is neither drawn nor counted down** — 98.51% inside bit 16, so a modifier on the timed-effect path rather than a flag of its own (below) |
+| 25 | 185 | 100% inside bit 16 — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
+
+⚠️ **Every row above is named from the CLIENT's own reads, not from its predicate score**, and two of them score
+badly on purpose: bit 1 is at chance against all twelve predicates because it is about a *tuning line* no column
+knows, and bit 20 scores +9.3 *with* "carries a duration", which reads as a contradiction until you see that a
+record has to state a duration for the bit to have anything to suppress.
 
 ### ⚠️ The raw agreement percentage is the wrong measure, and it inverted the answer
 
@@ -186,13 +193,66 @@ bit 21  x2     bit 23  x1     bit 24  x3     bit 26  x2     bit 29  x1     bit 3
 **Bits 9, 10, 12, 13, 17, 18, 22, 25, 27, 28 and 31 are read nowhere** — including bit 25, which the predicate
 sweep flagged as a clean 185/185 subset of the duration-carrying records. A bit the client never reads cannot
 mean anything to the client, so that entry is a property of the DATA (a subset relation among stored values), not
-of the protocol.
+of the protocol. (The containment table below says *which* stored values: bit 25 is 100% inside bit 16.)
 
 ⚠️ The tool cannot know the base register holds a spell — `+0xC8` is a common displacement — so read the
 **addresses**, not the counts. The magic subsystem's own range (`0x0076xxxx`–`0x008Dxxxx`, plus the tooltip
 builder at `0x0149xxxx`–`0x014Axxxx`) is where the known bits 2, 16 and 24 all land, and it is the range a new
-lead has to land in before it is about this word at all. Bits 1 (x17) and 15 (x15) are the next two worth
-reading, and both have most of their sites there.
+lead has to land in before it is about this word at all.
+
+### ⭐ Read: bit 1 is an OPT-OUT of the global spell modifier
+
+Bit 1's 17 sites cluster in the magic subsystem and in **the tooltip's own value-modifier helpers**
+(`FUN_014a9f90`, `FUN_014a9da0`) — the pair #782 decoded as
+`(GetStat(0x57B) × 0.1 × 0.01 × w + 1) × value`. Stat `0x57B` is **`Ferocity`**. Their gate is:
+
+```c
+if (spell != 0 && ( onLine(GlobalModExcludedSpellLine)
+                    || ((flags >> 1 & 1) && !onLine(GlobalModIncludedSpellLine)) ))
+    return value unmodified;              // no global modifier
+```
+
+and the APPLY side runs the same predicate negated (`FUN_007f5360` adds its `base[i]` term only when the gate
+passes). Two independent code paths, one predicate.
+
+⭐ **`onLine(x)` is a spell-LINE membership test.** `FUN_00768f90` walks eight stat ids on the spell —
+`0x80 SpellLine`, `0x50B..0x50E SpellLine2..5`, `0x513..0x515 SpellLine6..8` — and returns whether any equals its
+argument.
+
+⭐ **And its two arguments are named tuning values.** Both are `GameTweak<int>` objects built at first use from a
+string, with the value at `object + 8`:
+
+| global | tweak |
+|---|---|
+| `0x3b9f880` / `0x29c8454` | `GlobalModIncludedSpellLine` |
+| `0x3b9f870` / `0x29c8464` | `GlobalModExcludedSpellLine` |
+
+`tools/ghidra/DumpTweakInit.java` is the tool: a tweak's constructor is nowhere near its read site, so a local
+window never finds the name, and the global reads as an opaque `DAT_xxxxxxxx`.
+
+So **bit 1 means "this spell opts out of the global modifier"**, overridable by the include-line tuning value, and
+an excluded line opts out regardless of the bit. It scores nothing against any DB predicate (+2.3 vs `duration`,
+the rest at chance), which is correct: it is about a *tuning line*, and no column knows one.
+
+### ⭐ Read: bit 20 is a duration that is neither DRAWN nor COUNTED DOWN
+
+Bit 20's five sites include both of bit 16's own consumers plus the tooltip:
+
+* `FUN_01499b10` — the tooltip's **duration line**. It walks the record's chained spells (types `0xCF3B`, `0xCF4A`,
+  `0xCF5F`, `0xCFE8`, `0xD00B`), takes the max of each referenced spell's `+0x118`, and formats it through
+  `FUN_00807ae0`, the client's duration formatter. **Bit 20 set → it renders the empty string and returns.**
+* `FUN_007ee710` — `CoreMagicHolder::UpdateBuff`. When a buff's remaining time reaches ≤ 0 it logs
+  `"CoreMagicHolder::UpdateBuff <id> remaining time <t>"`; **bit 20 suppresses that warning.**
+* `FUN_007f43a0` — `CoreMagicHolder::Magic` passes it into the apply call beside bit 16.
+
+⚠️ **It scores +9.3 WITH "carries a duration", which reads as a contradiction of "permanent" and is not one.** The
+bit only has something to suppress on a record that STATES a duration — and `--report spell-flags`'s containment
+table settles the relation structurally: **bit 20 is 98.51% inside bit 16**. It is a modifier on the timed-effect
+path, not a flag of its own.
+
+That table also places two of this ticket's older leads. **Bit 25 is 100% inside bit 16** — so the "clean 185/185
+subset of the duration-carrying records" was a subset of *bit 16's* set, and since the client reads bit 25
+nowhere it is authoring-side. **Bit 29 is 100% inside bit 2**, the mana-mode bit.
 
 ### ⭐ Read: bit 16 gates RE-INSTANTIATING a magic on the SPAWN path
 
@@ -285,8 +345,9 @@ but nothing has attributed them, so the table is printed row by row instead of a
 but derived: an internal effect record carries no element list, so it lands on the floor, and a castable carries
 several. The correlation was with the record's *content*, not with a kind word.
 
-⚠️ What is left is not bytes but ONE meaning: the flags word's unnamed bits. Every byte of `Hellfire Stream` is
-inside a named region.
+⚠️ What is left is not bytes but ONE meaning: the flags word's remaining unnamed bits — bits 1, 2, 16, 20 and 24
+are named from the client's own reads, 11 more are proven dead, and the rest are enumerated with a site count and
+an address range each. Every byte of `Hellfire Stream` is inside a named region.
 
 **The field ids are the same id space as wire stat ids** — `CharacterStatId` names them. That is what turns the
 field run from a numbered blob into a readable property bag: most already have a client name, out of the
