@@ -20,6 +20,21 @@
 // ⚠️ It anchors on the GETTER CALL, not on the `PUSH 0xaa`. Two branches can share one category push and then load
 // different tokens (`IncreasesHitPercent` / `DecreasesHitPercent` at 0x014a01aa), so a per-push window reports the
 // first of the pair and silently drops the second.
+//
+// ⚠️⚠️ And it emits EVERY token pointer in the window, not the nearest one. A branch that picks between two tokens
+// with a conditional loads BOTH before the getter runs:
+//
+//     JLE  <decrease arm>
+//     MOV  EDX,0x208d480          ; "UpgradeCombo_IncreaseDamage"    <- fall-through arm
+//     ...
+//     MOV  EDX,0x208d49c          ; "UpgradeCombo_DecreaseDamage"    <- the arm the backward scan reaches first
+//     PUSH 0xaa
+//     CALL 0x0060f2f0
+//
+// so a nearest-match scan reports the Decrease half of the pair and drops the Increase half - which is exactly how
+// `UpgradeCombo_Increase{Damage,Cooldown}` and `FinishingComboAttack` went missing from the artifact (#782). The
+// cost of emitting all of them is a row that names a candidate SET rather than one token, which is what the
+// kind -> token file already says a row means.
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.*;
@@ -51,19 +66,26 @@ public class DumpTooltipTokens extends GhidraScript {
             if (!in.getMnemonicString().equals("CALL") || !isGetter(in))
                 continue;
 
-            String token = null;
-            String at = null;
-            // The token pointer is the nearest preceding immediate that resolves to a printable string.
-            for (int j = i - 1; j >= 0 && j > i - WINDOW && token == null; j--) {
+            // EVERY preceding immediate in the window that resolves to a printable string - see the header: a
+            // conditional loads both arms' tokens before the getter runs, so the nearest one is only half the answer.
+            List<String> tokens = new ArrayList<>(), addrs = new ArrayList<>();
+            for (int j = i - 1; j >= 0 && j > i - WINDOW; j--) {
                 Scalar s = scalarOf(body.get(j));
                 if (s == null || s.getUnsignedValue() < 0x400000) continue;
                 String text = stringAt(toAddr(s.getUnsignedValue()));
-                if (text == null) continue;
-                token = text;
-                at = "0x" + Long.toHexString(s.getUnsignedValue());
+                // A `%` means it is a printf FORMAT the branch glues its pieces with, not a token name - the
+                // composing branches (53070, 53211) push both into the same window. Formats are recorded beside
+                // their branch in docs/rdb/spell-tooltip.md; a token never contains one.
+                if (text == null || text.indexOf('%') >= 0 || tokens.contains(text)) continue;
+                tokens.add(text);
+                addrs.add("0x" + Long.toHexString(s.getUnsignedValue()));
             }
 
-            println(in.getAddress() + "\t" + (at == null ? "-" : at) + "\t" + (token == null ? "-" : token));
+            if (tokens.isEmpty())
+                println(in.getAddress() + "\t-\t-");
+            else
+                for (int k = 0; k < tokens.size(); k++)
+                    println(in.getAddress() + "\t" + addrs.get(k) + "\t" + tokens.get(k));
         }
     }
 

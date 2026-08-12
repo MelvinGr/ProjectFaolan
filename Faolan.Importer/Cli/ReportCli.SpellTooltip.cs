@@ -73,6 +73,10 @@ namespace Faolan.Importer.Cli
 		// same key means something else on `Disarm`/`InterpolatedHit`, so it stays scoped to the binders below).
 		private const int KeyAreaMaxTargets = 170;
 
+		// How many carriers `kind:<typeId>` prints before it only counts - a kind can be on thousands of records and
+		// the point is a handful to read, with the TOTAL stated so the cap is never silent.
+		private const int KindSampleLimit = 12;
+
 		// How deep the effect chain is followed. A spell chain is a graph and it is cycle-guarded by id, so this is
 		// only a display bound - it exists so a pathological record cannot print forever.
 		private const int MaxChainDepth = 6;
@@ -85,11 +89,22 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
+			// `kind:<typeId>` - the spells that CARRY a GameAction kind, rendered. Every pass on #782 has begun by
+			// hunting for "a spell that carries this kind" so its branch could be checked against ground truth, and
+			// nothing answered that question; the census knows one sample and this walks the catalog for more.
+			if ((arg ?? "").Trim().StartsWith("kind:", StringComparison.OrdinalIgnoreCase)
+			    && uint.TryParse(arg!.Trim()[5..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var wantedKind))
+			{
+				SpellTooltipByKind(rdbDir, wantedKind);
+				return;
+			}
+
 			var (ids, level) = ParseTooltipArg(arg);
 			if (ids.Count == 0)
 			{
 				Console.WriteLine("spell-tooltip: --report-arg is <spellId>[,<spellId>...][@<casterLevel>]  e.g. 221070@80");
 				Console.WriteLine("               --report-arg census scores the WHOLE catalog instead of rendering one spell.");
+				Console.WriteLine("               --report-arg kind:<typeId> lists the spells carrying one GameAction kind.");
 				return;
 			}
 
@@ -102,6 +117,53 @@ namespace Faolan.Importer.Cli
 				RenderSpell(context, id, 0, []);
 				Console.WriteLine();
 			}
+		}
+
+		// `kind:<typeId>` - which spells carry one GameAction kind, with the element's raw key list and the line the
+		// renderer makes of it. The tool #782's per-branch passes kept needing and never had: reading a branch is only
+		// half the job, and the other half is a shipped record to check the reading against (`SpellAreaEffects.
+		// RadiusMetres` is what settled `ConeFormula`, and `Annihilate`'s own prose is what caught an inverted sign).
+		private static void SpellTooltipByKind(string rdbDir, uint kind)
+		{
+			using var rdb = OpenRdb(rdbDir);
+			var ldb = LdbStringIndex.EnglishPlaintext(rdb);
+			var ctx = new TooltipContext(rdb, ldb, null);
+
+			var carriers = 0;
+			var shownCarriers = 0;
+			foreach (var entry in rdb.EntriesOfType(SpellTemplateType).Where(rdb.CanRead))
+			{
+				byte[] record;
+				try
+				{
+					record = rdb.ReadDecompressed(entry);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (record.Length < 12)
+					continue;
+
+				var matching = ItemTemplateStatModifiers.ParseElements(record.AsSpan(12)).Where(e => e.Kind == kind).ToList();
+				if (matching.Count == 0)
+					continue;
+
+				carriers++;
+				if (shownCarriers >= KindSampleLimit)
+					continue;
+
+				shownCarriers++;
+				Console.WriteLine($"{ctx.SpellName(entry.Id)} ({entry.Id})");
+				foreach (var element in matching)
+				foreach (var line in RenderElement(ctx, element))
+					Console.WriteLine($"  {line}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"{GameActionTypes.Get(kind)?.Name ?? "?"} ({kind}) is carried by {carriers:N0} spell record(s)"
+			                  + (carriers > shownCarriers ? $"; the first {shownCarriers} are above" : ""));
 		}
 
 		// The same renderer run over the WHOLE catalog, scored rather than printed: how many elements it can turn into
@@ -131,6 +193,13 @@ namespace Faolan.Importer.Cli
 			var noSentenceByConstruction = new Dictionary<uint, int>();
 			var notDrawn = new Dictionary<uint, int>();
 			var unbound = new Dictionary<uint, int>();
+			// Elements whose sentence is in hand and whose NUMBER lives on the casting character rather than in the
+			// record - settled the same way NoSentenceReason's entries are, and per ELEMENT rather than per kind
+			// because it is one arm of a branch, not a whole kind (see UnrenderableReason).
+			var liveState = new Dictionary<uint, int>();
+			// ⭐ One example spell id per bucketed kind. Every pass on #782 has had to go hunting for "a spell that
+			// carries this kind" before it could read one, and the census is the one place that already knows.
+			var sampleOf = new Dictionary<uint, uint>();
 
 			foreach (var entry in rdb.EntriesOfType(SpellTemplateType).Where(rdb.CanRead))
 			{
@@ -205,6 +274,16 @@ namespace Faolan.Importer.Cli
 					elements++;
 					elementBytes += element.WidthBytes;
 
+					// Before anything is looked up: an element the client itself cannot draw from the template is
+					// settled, not debt. Counted per ELEMENT because it is one ARM of a branch that renders
+					// perfectly well on its others.
+					if (UnrenderableReason(element) != null)
+					{
+						liveState[element.Kind] = liveState.GetValueOrDefault(element.Kind) + 1;
+						sampleOf.TryAdd(element.Kind, entry.Id);
+						continue;
+					}
+
 					var (format, args) = Sentence(ctx, element);
 					if (format == null)
 					{
@@ -217,13 +296,19 @@ namespace Faolan.Importer.Cli
 							: GameActionTooltip.NoSentenceReason(element.Kind) != null ? noSentenceByConstruction
 							: noSentence;
 						bucket[element.Kind] = bucket.GetValueOrDefault(element.Kind) + 1;
+						sampleOf.TryAdd(element.Kind, entry.Id);
 						continue;
 					}
 
 					if (args != null && LdbFormat.TryApply(format, args, out _))
+					{
 						rendered++;
+					}
 					else
+					{
 						unbound[element.Kind] = unbound.GetValueOrDefault(element.Kind) + 1;
+						sampleOf.TryAdd(element.Kind, entry.Id);
+					}
 				}
 			}
 
@@ -237,7 +322,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  elements rendered as a sentence     : {rendered:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * rendered / elements):0.0}%");
 			// The honest headline: an element the CLIENT draws nothing for is accounted for too, so the outstanding
 			// work is what is left after both.
-			var accountedElements = rendered + notDrawn.Values.Sum() + noSentenceByConstruction.Values.Sum();
+			var accountedElements = rendered + notDrawn.Values.Sum() + noSentenceByConstruction.Values.Sum() + liveState.Values.Sum();
 			Console.WriteLine($"  ...or accounted for                 : {accountedElements:N0} / {elements:N0} = {(elements == 0 ? 0 : 100.0 * accountedElements / elements):0.0}%"
 			                  + "   (rendered, or a kind whose blank line is the client's own behaviour)");
 			Console.WriteLine();
@@ -253,15 +338,26 @@ namespace Faolan.Importer.Cli
 			foreach (var (kind, count) in noSentenceByConstruction.OrderByDescending(k => k.Value))
 				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   {GameActionTooltip.NoSentenceReason(kind)}");
 
+			// Printed only when it has a population: the guard arms (see UnrenderableReason) are expected to be empty
+			// in a shipped catalog, and a permanent "0 elements over 0 kinds" line reads as a bucket to work off.
+			if (liveState.Count > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine($"  elements the TEMPLATE cannot fill - settled, not outstanding"
+				                  + $" ({liveState.Values.Sum():N0} elements over {liveState.Count} kinds):");
+				foreach (var (kind, count) in liveState.OrderByDescending(k => k.Value))
+					Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   e.g. spell {sampleOf.GetValueOrDefault(kind)}");
+			}
+
 			Console.WriteLine();
 			Console.WriteLine($"  kinds WITH a branch but no sentence we can find ({noSentence.Values.Sum():N0} elements over {noSentence.Count} kinds):");
 			foreach (var (kind, count) in noSentence.OrderByDescending(k => k.Value).Take(20))
-				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}");
+				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   e.g. spell {sampleOf.GetValueOrDefault(kind)}");
 
 			Console.WriteLine();
 			Console.WriteLine($"  kinds WITH a sentence this report cannot fill ({unbound.Values.Sum():N0} elements over {unbound.Count} kinds):");
 			foreach (var (kind, count) in unbound.OrderByDescending(k => k.Value).Take(20))
-				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   \"{ctx.SentenceFor(kind)}\"");
+				Console.WriteLine($"    {kind}  {GameActionTypes.Get(kind)?.Name ?? "?",-40} {count,7:N0}   e.g. spell {sampleOf.GetValueOrDefault(kind)}   \"{ctx.SentenceFor(kind)}\"");
 
 			Console.WriteLine();
 			Console.WriteLine($"  spells carrying the hide-from-tooltip bit (flags bit {HiddenFromTooltipBit}, #789): {hidden:N0} / {records:N0}"
@@ -460,6 +556,14 @@ namespace Faolan.Importer.Cli
 				? string.Join(" ", element.Values.Select((v, i) => $"[{i}]={(int)v}"))
 				: string.Join(" ", type.Keys.Select((k, i) => $"{k}={(i < element.Values.Length ? ((int)element.Values[i]).ToString(CultureInfo.InvariantCulture) : "-")}"));
 
+			// An element whose number lives on the CASTER says so - "slot binding not established" would read as decode
+			// debt for a case the client itself cannot draw from a template either.
+			if (UnrenderableReason(element) is { } live)
+			{
+				yield return $"?? {typeName}  {raw}{period}   [{live}]{hidden}";
+				yield break;
+			}
+
 			yield return format == null
 				? $"?? {typeName}  {raw}{period}   [no LDB 170 sentence for this type]{hidden}"
 				: $"?? {typeName}  {raw}{period}   [\"{format}\" - slot binding not established]{hidden}";
@@ -511,6 +615,53 @@ namespace Faolan.Importer.Cli
 			return flagged.Count == 0
 				? ""
 				: $"   ⚠️ retail draws nothing here - {string.Join("/", flagged)} carries the hide-from-tooltip bit (#789)";
+		}
+
+		/// <summary>
+		///     Why this ELEMENT cannot be drawn from its template at all - or null when it can.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         ⭐ The twin of <see cref="GameActionTooltip.NoSentenceReason" />, one level down. That one is per
+		///         KIND; these are one ARM of a branch whose other arms render perfectly well, so the whole kind
+		///         cannot be written off and neither can the arm be counted as debt. Both are settled facts about
+		///         retail rather than gaps in our decode, which is why the census counts them apart from
+		///         "cannot fill" (#782).
+		///     </para>
+		///     <para>
+		///         ⚠️ Each entry must be a case the TEMPLATE genuinely cannot answer, not one where the report is
+		///         merely missing a binding - the whole point of the split is that this bucket can never be worked
+		///         off. Both below are measured:
+		///         <list type="bullet">
+		///             <item>
+		///                 <b><c>HitPercentage</c> mode 1/2</b> - branch <c>0x014a0b99</c> tests the mode word
+		///                 first (<c>iVar7 == 2 || iVar7 == 1</c>), fetches the local player through
+		///                 <c>FUN_01107340</c>, reads the key-1 stat off it with a virtual call and renders
+		///                 <c>charStat x value x 0.01</c>. With no player it draws NOTHING - the whole arm sits
+		///                 inside <c>if (player != 0)</c>. ⚠️ No shipped element takes it, so this is a GUARD
+		///                 rather than a population: without it a mode-1/2 element would fall through to the
+		///                 stored-value arms and draw a confidently wrong number.
+		///             </item>
+		///             <item>
+		///                 <b>A Stat slot that is present and ZERO</b> - the element names no stat, so the stat
+		///                 slot of its sentence has nothing to fill it. `Storyteller` (4695200) carries exactly one
+		///                 element, `Modify 0=0 39=0`, and the client's own stat-name lookup answers nothing for
+		///                 id 0. That is a record that states no modifier, not a binding we are missing.
+		///             </item>
+		///         </list>
+		///     </para>
+		/// </remarks>
+		private static string? UnrenderableReason(ItemTemplateStatModifiers.Element element)
+		{
+			if (element.Kind == HitPercentageKind && element.Value(KeyHitPercentMode) is 1 or 2)
+				return "mode 1/2 renders the CASTER's own key-1 stat x value x 0.01; retail draws nothing without a character";
+
+			// Scoped to the kinds whose sentence NAMES the stat, so a kind that merely happens to declare a Stat key
+			// it does not draw cannot be swallowed by this.
+			return element.Kind is ModifyKind or SkillKind or HitKind or SpecialHitKind or InterpolatedHitKind
+			       && element.Value(GameActionTypes.KeyStat) == 0
+				? "the record names no stat (key 0 = 0), so the sentence's stat slot has nothing to fill it"
+				: null;
 		}
 
 		/// <summary>
@@ -634,6 +785,14 @@ namespace Faolan.Importer.Cli
 			// `ChangeInheritedWeaponAttack` (branch 0x014a1da2) - the same composing shape with more clauses.
 			if (element.Kind == ChangeInheritedWeaponAttackKind)
 				return InheritedWeaponAttackSentence(ctx, element);
+
+			// `UpgradeCombo` (branch 0x014a1817) - two independent clauses, same composing shape again.
+			if (element.Kind == UpgradeComboKind)
+				return UpgradeComboSentence(ctx, element);
+
+			// `AddSpellProc` (branch 0x0149f3f7) - a CHANCE plus up to two sides, glued with literal formats.
+			if (element.Kind == AddSpellProcKind)
+				return SpellProcSentence(ctx, element);
 
 			// `AddComboProc` picks its sentence by WHICH of its two spell slots are present (branch 0x0149ec8e): key
 			// 88 is the proc run on SELF and key 236 the one run on the TARGET, and the branch has a token for each
@@ -804,6 +963,112 @@ namespace Faolan.Importer.Cli
 			return (SpellLineProcWrapper, [string.Join($" {and} ", pieces), (int)perMinute.Value, rate]);
 		}
 
+		// `UpgradeCombo` (53209), branch 0x014a1817 - a composer like `AddSpellLineProc`, with two clauses instead of
+		// two sides. The `Upgrade combo: %s, damage modifier: %d, recharge adjust: %d` sitting at its own type id is
+		// NOT what the client draws; each clause is a separate line built from a token sentence.
+		//
+		//     key 66  (0x315)  the DAMAGE delta    UpgradeCombo_{Increase,Decrease}Damage    unit "%"  (0x1fbcf18)
+		//     key 67  (0x316)  the COOLDOWN delta  UpgradeCombo_{Increase,Decrease}Cooldown  unit ""   (0x2c23bf8)
+		//
+		// ⭐ The `Increase*` half of BOTH pairs is a token no dump had: `gameaction-tooltip-kinds.tsv` lists only the
+		// two `Decrease` strings for this kind, because `DumpTooltipTokens.java` walks call sites and the Increase
+		// arms are the fall-through. Same shape as `FinishingComboAttack` on 53250.
+		//
+		// ⚠️ Both magnitudes are HUNDREDTHS (`CVTSI2SS ; MULSS [0x01f2800c]` = x0.01), like `ChangeHitPercent` and
+		// unlike `AddPercentSkillModifier`'s plain percent.
+		//
+		// ⚠️ The token is picked by `JLE`, so ZERO takes the DECREASE arm here - the opposite of 53250, where the
+		// client loads Increase first and overwrites it under `JNS`. Written out per clause rather than shared,
+		// because the two kinds genuinely disagree and a shared helper would have to pick one.
+		private static (string? Format, object?[]? Args) UpgradeComboSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var damage = (int)(element.Value(UpgradeComboDamageKey) ?? 0);
+			var cooldown = (int)(element.Value(UpgradeComboCooldownKey) ?? 0);
+
+			var clauses = new List<string>();
+			if (damage != 0 && Clause(ctx, damage > 0 ? "UpgradeCombo_IncreaseDamage" : "UpgradeCombo_DecreaseDamage", damage * 0.01, "%") is { } damageLine)
+				clauses.Add(damageLine);
+
+			if (cooldown != 0 && Clause(ctx, cooldown > 0 ? "UpgradeCombo_IncreaseCooldown" : "UpgradeCombo_DecreaseCooldown", cooldown * 0.01, "") is { } cooldownLine)
+				clauses.Add(cooldownLine);
+
+			// Both keys zero is the client drawing nothing at all - neither clause is entered.
+			// ⚠️ Handed back as an ARGUMENT to a bare `%s` rather than as the format: a composed line contains a
+			// literal `%` (the damage clause's unit), and LdbFormat would read that as a conversion and fail.
+			return clauses.Count == 0 ? (null, null) : (ComposedLine, [string.Join("; ", clauses)]);
+
+			// One clause: its token sentence with the signed value in its single slot.
+			static string? Clause(TooltipContext ctx, string token, double value, string unit)
+			{
+				var format = ctx.SentenceForToken(token);
+				return format != null && LdbFormat.TryApply(format, [SignedValue(value) + unit], out var text) ? text : null;
+			}
+		}
+
+		// The client's own signed-number formatter, `FUN_0149a5c0` - `<font color="%s">%+.Nf%s</font>`, where the
+		// colour is `tooltip_positive`/`tooltip_negative` (`FUN_0149a6c0`) and the trailing `%s` is the unit. The font
+		// markup is dropped here for the same reason LdbFormat drops it: the report diffs against a screenshot's TEXT.
+		//
+		// ⚠️ The PRECISION is picked from the value, not fixed - `modf` splits it and the three arms are
+		// `%+.2f` (no integer part and a fraction under 0.05), `%+.0f` (an integer part and a fraction under 0.05)
+		// and `%+.1f` for everything else. So a stored 1500 hundredths draws "+15", not "+15.0".
+		private static string SignedValue(double value)
+		{
+			var whole = Math.Truncate(value);
+			var fraction = Math.Abs(value - whole);
+			var text = fraction <= 0.05
+				? whole == 0 ? value.ToString("+0.00;-0.00", CultureInfo.InvariantCulture) : value.ToString("+0;-0", CultureInfo.InvariantCulture)
+				: value.ToString("+0.0;-0.0", CultureInfo.InvariantCulture);
+			return text;
+		}
+
+		// `AddSpellProc` (53211), branch 0x0149f3f7. Another composer, and the reason no sentence lookup found one:
+		// its three tokens are FRAGMENTS (`ChanceOf`, `OnSelf`, `OnTarget`) glued by literal formats at the push
+		// sites - `"%.0f%% %s "` for the chance, `"%s %s "` per side, `"%s "` for the joiner. Same shape as 53070,
+		// whose joiner word (`And`) likewise comes out of LDB category 100.
+		//
+		// ⭐ The CHANCE is computed, not stored. `FUN_0149bc20` reads key 237 (the rate) and key 187 (a spell), loads
+		// that spell and takes its property 294 - the cast time in centiseconds, the same field the importer reads -
+		// then returns `min(100, castSeconds x rate x 1.67)`. 1.67 is 100/60, so the line is the familiar
+		// procs-per-minute -> per-cast percentage: a 20 PPM proc on a 3-second cast draws 100%.
+		//
+		// ⚠️ When the key-187 spell is missing or its cast time is <= 0 the client falls back to a literal 50
+		// centiseconds - a HALF-SECOND cast, not zero - so an unresolvable reference still draws a number.
+		private static (string? Format, object?[]? Args) SpellProcSentence(TooltipContext ctx, ItemTemplateStatModifiers.Element element)
+		{
+			var onSelf = element.Value(GameActionTypes.KeyProcSelfSpell) ?? 0;
+			var onTarget = element.Value(GameActionTypes.KeyProcTargetSpell) ?? 0;
+			var rate = element.Value(GameActionTypes.KeyProcAmount);
+			if (rate is null)
+				return (null, null);
+
+			var chanceOf = ctx.SentenceForToken("ChanceOf");
+			var self = ctx.SentenceForToken("OnSelf");
+			var target = ctx.SentenceForToken("OnTarget");
+			var and = ctx.CommonWord("And");
+			if (chanceOf == null || self == null || target == null || and == null)
+				return (null, null);
+
+			var castTime = ctx.SpellCastTimeCentiseconds(element.Value(SpellProcCastTimeSpellKey) ?? 0);
+			var castCentiseconds = castTime > 0 ? castTime : SpellProcDefaultCastCentiseconds;
+			var chance = Math.Min(SpellProcChanceCap, castCentiseconds * 0.01 * (int)rate.Value * SpellProcRateToPercent);
+
+			var pieces = new List<string> { $"{chance:0}% {chanceOf}" };
+			if (onSelf != 0)
+				pieces.Add($"{ctx.SpellName(onSelf)} ({onSelf}) {self}");
+
+			if (onTarget != 0)
+			{
+				if (onSelf != 0)
+					pieces.Add(and);
+
+				pieces.Add($"{ctx.SpellName(onTarget)} ({onTarget}) {target}");
+			}
+
+			// As above: the composed line carries a literal `%`, so it is an argument and not the format.
+			return (ComposedLine, [string.Join(" ", pieces)]);
+		}
+
 		// `HitPercentage` (53007), keys [Stat, Value, Line, 71]. Its own type id carries `%s %s by %d%% of %s %s`, and
 		// the client draws none of it: branch 0x014a0b99 reads all four slots plus key 32, and picks one of five token
 		// sentences.
@@ -820,25 +1085,18 @@ namespace Faolan.Importer.Cli
 			if (stat is null or 0 || value is null || otherStat is null)
 				return (null, null);
 
-			// ⛔ Mode 1 or 2 takes a different path entirely: the client reads the CHARACTER'S OWN value of the key-1
-			// stat and renders `charStat * value * 0.01` through the damage/heal renderer. That number is a property
-			// of the caster, not of the record, so this report cannot produce it.
-			// The SENTENCE is still determinable (the computed value keeps the stored one's sign, and the renderer is
-			// the `Hit` family's), so this reports as "cannot fill" rather than "no sentence" - the number is what is
-			// missing, not the string.
-			if (element.Value(KeyHitPercentMode) is 1 or 2)
-				return (ctx.SentenceForToken(GameActionTooltip.HitSentenceToken(stat.Value, (int)value.Value)), null);
-
+			// Mode 1/2 never reaches here - UnrenderableReason takes it, because the number is the caster's.
 			var signed = (int)value.Value;
 			var range = ctx.RawRange(signed, signed);
 
 			if (stat == GameActionTooltip.HealthStatId)
 			{
-				// ⛔ The DAMAGE arm's second slot is a damage SCHOOL name, resolved by `FUN_0149a8f0` through an
-				// enum-name table keyed on key 71 (values 1..14) - the resolver is not decoded, so binding this arm
-				// would leave a `%s` in the middle of a finished-looking line.
 				if (signed <= 0)
-					return (ctx.SentenceForToken("HitPercentDamage"), null);
+				{
+					var damage = ctx.SentenceForToken("HitPercentDamage");
+					var school = ctx.DamageSchool(element.Value(KeyDamageSchool) ?? 0);
+					return (damage, damage == null || school == null ? null : [range, school]);
+				}
 
 				var heal = ctx.SentenceForToken("HitPercentHeal");
 				return (heal, heal == null ? null : [range]);
@@ -1025,6 +1283,33 @@ namespace Faolan.Importer.Cli
 					return metres is null ? null : [(int)metres.Value];
 				}
 
+				// `Absorbs 1 point of #1%s for each #2%.2f point(s) of damage. / capped to #3%.0f points of damage
+				// per attack, / or #4%.0f% of the damage dealt` - four slots, and branch 0x0149eaed appends them in
+				// sentence order: the stat's NAME, then keys 70, 33 and 34, each x0.01.
+				//
+				// ⭐ The stat slot is the pin. The branch's `FUN_0060f0e0(0x267, ...)` passes key 0's value in ESI,
+				// and 0x267 = 615 is the client's stat-name category - the same `FUN_0060ebb0(0x267, statId)` that
+				// 53007's arms use to name a stat. That is what says #1 is the stat and not the end spell.
+				//
+				// ⚠️ Its second line - the `AddAbsorbEndSpell` token filled with key 88's spell - is only drawn when
+				// that spell is present AND does not carry the hide-from-tooltip bit (#789). Not composed here: the
+				// report draws one line per element, and the absorb numbers are what the ticket is about.
+				case AddAbsorbKind:
+				{
+					var absorbStat = element.Value(GameActionTypes.KeyStat);
+					var perPoint = element.Value(AbsorbPerPointKey);
+					var perAttackCap = element.Value(AbsorbPerAttackCapKey);
+					var damageShare = element.Value(AbsorbDamageShareKey);
+					if (absorbStat is null or 0 || perPoint is null || perAttackCap is null || damageShare is null)
+						return null;
+
+					return
+					[
+						ctx.StatName(absorbStat.Value), (int)perPoint.Value * 0.01, (int)perAttackCap.Value * 0.01,
+						(int)damageShare.Value * 0.01
+					];
+				}
+
 				// `Team Formula %s` / `Team effect %s` - one slot, and the branch reads exactly key 88.
 				case TeamFormulaKind:
 				case TeamPropagatedBuffKind:
@@ -1066,6 +1351,38 @@ namespace Faolan.Importer.Cli
 				{
 					var centiseconds = element.Value(GameActionTypes.KeyValue);
 					return centiseconds is null ? null : [centiseconds.Value / 100.0];
+				}
+
+				// `Modify recast time by <font color="tooltip_positive">%s</font>` - ONE slot, key 39, and it is a
+				// DURATION rather than a number: branch 0x014a02b4 hands the raw centiseconds to `FUN_00807ae0`.
+				// ⚠️ The `tooltip_positive` colour is baked into the LDB string, so a negative delta still draws in
+				// the positive colour. Reproduced by dropping the markup, the same as everywhere else here.
+				// 53069 `ChangeLineRecastTime` shares the branch AND the sentence (GameActionTooltip.SentenceKinds).
+				case ChangeRecastTimeKind:
+				case ChangeLineRecastTimeKind:
+				{
+					var delta = element.Value(GameActionTypes.KeyValue);
+					if (delta is null)
+						return null;
+
+					var duration = ctx.Duration((int)delta.Value);
+					return duration == null ? null : [duration];
+				}
+
+				// `Change hit percent by #2%d%% for spell #1%s #3%s` - and the branch (0x0149fdda) appends exactly
+				// TWO arguments: the NAME behind key 0 (`FUN_008d76b0` resolves the id through the spell catalog and
+				// looks its name up in LDB 50210) and key 39 as an int.
+				// ⚠️ `#3` is never supplied by the client either, so it draws empty. Passed as "" rather than left
+				// unbound, because the alternative is refusing to draw a line retail does draw - and an empty tail
+				// slot invents no number, which is the failure this kind of bind has to avoid.
+				case CastingLevelModifierKind:
+				{
+					var spell = element.Value(GameActionTypes.KeyStat);
+					var percent = element.Value(GameActionTypes.KeyValue);
+					if (spell is null || percent is null)
+						return null;
+
+					return [$"{ctx.SpellName(spell.Value)} ({spell.Value})", (int)percent.Value, ""];
 				}
 
 				default:
@@ -1232,7 +1549,53 @@ namespace Faolan.Importer.Cli
 		};
 
 		// The GameAction kinds this renderer binds by hand; the rest go through the generic (Stat, magnitude) rule.
+		private const uint AddAbsorbKind = 53046;
 		private const uint AddComboProcKind = 53212;
+		private const uint AddSpellProcKind = 53211;
+		private const uint CastingLevelModifierKind = 53223;
+		private const uint ChangeLineRecastTimeKind = 53069;
+		private const uint ChangeRecastTimeKind = 53031;
+		private const uint ModifyKind = 53045;
+		private const uint SkillKind = 53012;
+		private const uint UpgradeComboKind = 53209;
+
+		// `AddAbsorb`'s three magnitudes, all HUNDREDTHS (each is `CVTSI2SS ; MULSS [0x01f2800c]` in the branch).
+		// Per-TYPE names like every unnamed key - 33/34 are the `Hit` family's magnitude pair elsewhere.
+		private const int AbsorbPerPointKey = 70;
+		private const int AbsorbPerAttackCapKey = 33;
+		private const int AbsorbDamageShareKey = 34;
+
+		// `UpgradeCombo`'s two clause keys. Per-TYPE: 66/67 are the SOURCE and TARGET stats on
+		// `AddPercentSkillModifier` and the DPS/crit deltas on `ChangeInheritedWeaponAttack`.
+		private const int UpgradeComboDamageKey = 66;
+		private const int UpgradeComboCooldownKey = 67;
+
+		// `AddSpellProc`'s chance arithmetic, all of it out of `FUN_0149bc20`: the SPELL whose cast time scales the
+		// rate (key 187), the 1.67 = 100/60 that turns procs-per-minute into a per-cast percentage, the 100% cap, and
+		// the half-second the client falls back to when that spell has no positive cast time of its own.
+		private const int SpellProcCastTimeSpellKey = 187;
+		private const double SpellProcRateToPercent = 1.67;
+		private const double SpellProcChanceCap = 100.0;
+		private const int SpellProcDefaultCastCentiseconds = 50;
+
+		// A line this report COMPOSED rather than looked up, handed to LdbFormat as an argument. A composed line can
+		// contain a literal `%` (a unit, a percentage), and LdbFormat would read that as a conversion.
+		private const string ComposedLine = "%s";
+
+		// The spell record's cast time in centiseconds (property 294) - the same field RdbSpellImporter reads, needed
+		// here because `AddSpellProc` scales its chance by ANOTHER spell's cast time.
+		private const uint CastTimeField = 294;
+
+		// `FUN_00807ae0`'s two-minute threshold, above which it stops drawing seconds - see TooltipContext.Duration.
+		private const int DurationMinutesThresholdCentiseconds = 12000;
+
+		// The DAMAGE SCHOOL an element states (key 71), and the LDB category naming one - see
+		// TooltipContext.DamageSchool. The 1..14 window is the client's own bounds check (`CMP EAX,0xd ; JA`).
+		private const int KeyDamageSchool = 71;
+		private const uint LdbDamageSchoolCategory = 600;
+		private const uint FirstDamageSchool = 1;
+		private const uint LastDamageSchool = 14;
+
 		private const uint AddPercentSkillModifierKind = 53189;
 		private const uint AddSpellLineProcKind = 53070;
 		private const uint ChangeInheritedWeaponAttackKind = 53250;
@@ -1453,6 +1816,98 @@ namespace Faolan.Importer.Cli
 				return (RdbSpellImporter.ReadFlagsWord(record.AsSpan(12), runStart) >> HiddenFromTooltipBit & 1) == 1;
 			}
 
+			/// <summary>
+			///     The client's DURATION formatter, <c>FUN_00807ae0(centiseconds)</c> - what a recast delta's single
+			///     slot is filled with.
+			/// </summary>
+			/// <remarks>
+			///     <para>
+			///         Four arms, on <c>|centiseconds|</c>: under 1 it draws the EMPTY string; over 12,000 (two
+			///         minutes) it switches to a d/h/m/s breakdown (<c>FUN_005451e0</c> splits by 86400/3600/60) under
+			///         the literal <c>%s%s</c> at <c>0x1fcdbb4</c>; otherwise it takes a common-word (category 100)
+			///         sentence - <c>TimeFormatSeconds</c> with an INT when the value is whole seconds, and
+			///         <c>TimeFloatFormatSeconds</c> with a float when it is not.
+			///     </para>
+			///     <para>
+			///         ⚠️ Returns null for the over-two-minutes arm rather than composing one. The breakdown's own
+			///         sentence is not read out, and no shipped recast delta reaches it - a fabricated "2 minutes"
+			///         would be exactly the confident-wrong-line failure this report exists to avoid (#782).
+			///     </para>
+			/// </remarks>
+			public string? Duration(int centiseconds)
+			{
+				var magnitude = Math.Abs(centiseconds);
+				if (magnitude < 1)
+					return "";
+
+				if (magnitude > DurationMinutesThresholdCentiseconds)
+					return null;
+
+				var whole = centiseconds % 100 == 0;
+				var format = CommonWord(whole ? "TimeFormatSeconds" : "TimeFloatFormatSeconds");
+				if (format == null)
+					return null;
+
+				object arg = whole ? centiseconds / 100 : centiseconds * 0.01;
+				return LdbFormat.TryApply(format, [arg], out var text) ? text : null;
+			}
+
+			/// <summary>
+			///     The DAMAGE-SCHOOL phrase a hit's second slot is filled with - <c>FUN_0149a8f0(buf, damageType)</c>.
+			/// </summary>
+			/// <remarks>
+			///     <para>
+			///         ⭐ Two lookups, in two categories. The client bounds-checks the type (<c>type - 1 &gt; 13</c>,
+			///         i.e. 1..14 pass) and inside the range fetches LDB 170's <c>DamageType</c> sentence and fills
+			///         its slot with the school's NAME out of <b>category 600</b> - <c>1 slashing, 2 piercing,
+			///         3 crushing, 4 fire, 5 electrical, 6 holy, 7 unholy, 8 poison, 9 siege</c>. Outside the range
+			///         it returns LDB 170's <c>GenericDamage</c> whole, which is also the DEFAULT text the in-range
+			///         lookup falls back to.
+			///     </para>
+			///     <para>
+			///         ⚠️ Category 600 is what made this look undecodable. The note this replaces recorded that
+			///         <c>elf28("DamageType&lt;n&gt;")</c> misses in category 170 for every n in 0..14, and that is
+			///         true - the per-school word was never in 170 at all, and <c>FUN_00a8f470</c> (the hash the
+			///         resolver calls) turns out to be plain elf28 over the single literal <c>"DamageType"</c>.
+			///     </para>
+			/// </remarks>
+			public string? DamageSchool(uint damageType)
+			{
+				if (damageType is < FirstDamageSchool or > LastDamageSchool)
+					return SentenceForToken("GenericDamage");
+
+				var sentence = SentenceForToken("DamageType");
+				var school = Ldb.GetValueOrDefault((LdbDamageSchoolCategory, damageType));
+				if (sentence == null || school == null)
+					return SentenceForToken("GenericDamage");
+
+				return LdbFormat.TryApply(sentence, [school], out var text) ? text : null;
+			}
+
+			/// <summary>
+			///     Another spell's cast time in centiseconds (property 294), or 0 when it has none - what
+			///     <c>AddSpellProc</c>'s chance is scaled by.
+			/// </summary>
+			public uint SpellCastTimeCentiseconds(uint spellId)
+			{
+				if (spellId == 0 || !Rdb.TryGet(SpellTemplateType, spellId, out var entry))
+					return 0;
+
+				byte[] record;
+				try
+				{
+					record = Rdb.ReadDecompressed(entry);
+				}
+				catch
+				{
+					return 0;
+				}
+
+				return record.Length < 12
+					? 0
+					: RdbSpellImporter.ReadIncreasingFields(record.AsSpan(12)).GetValueOrDefault(CastTimeField);
+			}
+
 			public string StatName(uint statId)
 			{
 				if (Ldb.TryGetValue((LdbStringIndex.StatNameCategory, statId), out var name) && !string.IsNullOrWhiteSpace(name))
@@ -1543,15 +1998,33 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				// A conversion: [flags/width/precision][conversion char]. Only the precision matters for the output.
+				// A conversion: `%[flags][width][.precision]<conv>`. Only the precision matters for the output.
+				//
+				// ⚠️ The scan is STRICT about what may sit between the `%` and the conversion letter, and it has to
+				// be: a lone `%` that is not a conversion is a literal in these strings, and a loose scan runs
+				// forward until it finds an `s`/`d`/`f` in ordinary WORDS. `AddAbsorb`'s sentence ends
+				// `#4%.0f% of the damage dealt` - a single `%` where the client's own author meant `%%` - and the
+				// loose form read `% o` + the `f` of "of" as a fifth conversion, so a fully bound four-slot sentence
+				// failed to render (#782).
 				var end = i + 1;
-				while (end < format.Length && !"sdfiu".Contains(format[end]))
+				while (end < format.Length && "-+ #0".Contains(format[end]))
 					end++;
 
-				if (end >= format.Length)
+				while (end < format.Length && char.IsAsciiDigit(format[end]))
+					end++;
+
+				if (end < format.Length && format[end] == '.')
 				{
-					output.Append(format, i, format.Length - i);
-					break;
+					end++;
+					while (end < format.Length && char.IsAsciiDigit(format[end]))
+						end++;
+				}
+
+				if (end >= format.Length || !"sdfiu".Contains(format[end]))
+				{
+					// Not a conversion after all - the `%` stands for itself.
+					output.Append(c);
+					continue;
 				}
 
 				var spec = format[(i + 1)..end];

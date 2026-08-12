@@ -146,11 +146,11 @@ Two decodes it exercises that a flat read would not:
 ```
 record bytes inside a parsed region : 8,175,543 / 8,241,205 = 99.2%
 property-run field ids read         : 16 / 83
-elements rendered as a sentence     : 50,733 / 61,840 = 82.0%
-...or accounted for                 : 60,689 / 61,840 = 98.1%
+elements rendered as a sentence     : 51,849 / 61,840 = 83.8%
+...or accounted for                 : 61,811 / 61,840 = 100.0%
 ```
 
-⭐ **The second line is the honest one.** Four buckets, and only two of them are our debt:
+⭐ **The second line is the honest one.** Five buckets, and only one of them is still our debt:
 
 - **the client draws nothing either** — 9,124 elements over 83 kinds whose type id reaches no branch of
   `FUN_0149e450` at all, led by `DPSHit` (2,660), `StartServerSideScryScriptWithParams` (1,597) and
@@ -162,13 +162,28 @@ elements rendered as a sentence     : 50,733 / 61,840 = 82.0%
   `InheritedComboAttack` (753) is the opposite shape: its sentence IS found (`PerSecond`, "%s per second") and
   the `%s` is a number the record does not contain — branch `0x014a103e` computes it as
   `key224 × 0.01 × [ESI] / [EBX]`, two floats out of the INVOCATION context. Rendering it would invent a number;
-- **a branch but no sentence we can find** — 30 over 2 kinds, and what is left of it is the tail of
-  `ChangeInheritedWeaponAttack` (29 elements whose hate / damage-type clause is deliberately not drawn, below);
-- **a sentence whose slots are not bound** — 1,121 over 8 kinds, led by `HitPercentage`'s live-state arms,
-  `UpgradeCombo` and `AddSpellProc`.
+- **the TEMPLATE cannot fill it** — 6 elements over 2 kinds, and this one is per ELEMENT rather than per kind
+  (`ReportCli.UnrenderableReason`), because it is one ARM of a branch whose others render perfectly well. Both
+  entries are measured: a `HitPercentage` in mode 1 or 2 renders the CASTER's own key-1 stat (a guard — no
+  shipped element takes it, and without the guard such an element would fall through to the stored-value arms
+  and draw a confidently wrong number), and an element whose Stat slot is present and **zero** names no stat at
+  all, so there is nothing for the sentence's stat slot to hold. `Storyteller` (4695200) is the whole of the
+  second case: one element, `Modify 0=0 39=0`;
+- **a branch but no sentence we can find** — 29 elements over 1 kind, all of them the tail of
+  `ChangeInheritedWeaponAttack` whose hate / damage-type clause is deliberately not drawn (below);
+- **a sentence whose slots are not bound** — **empty**. This was 1,121 elements over 8 kinds and is the whole of
+  #782's second half; the bindings that closed it are `AddAbsorb`, `UpgradeCombo`, `AddSpellProc`,
+  `ChangeRecastTime`/`ChangeLineRecastTime`, `CastingLevelModifier` and `HitPercentage`'s damage arm, each
+  written up below.
 
 Nothing half-binds: a sentence with a conversion the binder cannot fill prints as its raw key list instead, and
 `LdbFormat.TryApply` fails rather than leaving a stray `%s` in a line that would otherwise read as confident.
+
+⚠️ **`LdbFormat`'s conversion scan has to be STRICT about what may sit between the `%` and its letter**, and was
+not. `AddAbsorb`'s sentence ends `#4%.0f% of the damage dealt` — a single `%` where the author meant `%%` — and a
+loose scan (forward to the first `s`/`d`/`f`/`i`/`u`) read `% o` plus the **`f` of "of"** as a fifth conversion, so
+a fully bound four-slot sentence failed to render and the kind read as unbindable. A `%` that is not followed by
+`[flags][width][.precision]<conv>` stands for itself.
 
 ## What it cannot produce
 
@@ -192,8 +207,26 @@ JMP   dword ptr [EAX*0x4 + 0x14a2de8]     ; target table
 ```
 
 `DumpSwitchTable.java` with `BASE=cf0a COUNT=f9 BYTES=14a2e90 TARGETS=14a2de8` yields 249 `type id -> branch`
-rows; a token's call site then attributes to the branch it falls inside. Result:
-**`docs/re/gameaction-tooltip-kinds.tsv`, 33 of the 36 tokens placed onto 22 kinds.**
+rows; a token's call site then attributes to the branch it falls inside (the greatest branch target ≤ the site).
+Result: **`docs/re/gameaction-tooltip-kinds.tsv`, 53 call sites onto 30 kinds.**
+
+⚠️ **The dumper used to report only the NEAREST token before each getter call, and that lost one arm of every
+conditional pair.** A branch that picks between two tokens loads both before the getter runs:
+
+```
+JLE  <decrease arm>
+MOV  EDX,0x208d480          ; "UpgradeCombo_IncreaseDamage"   <- fall-through arm
+...
+MOV  EDX,0x208d49c          ; "UpgradeCombo_DecreaseDamage"   <- the one a backward scan reaches first
+PUSH 0xaa
+CALL 0x0060f2f0
+```
+
+so `UpgradeCombo_IncreaseDamage` / `…IncreaseCooldown` appeared in no dump at all, and the artifact listed only
+the two `Decrease` halves — which reads as "this kind only ever decreases". `DumpTooltipTokens.java` now emits
+every token pointer in the window (filtering strings containing a `%`, which are the composing branches' printf
+glue rather than token names), and the regenerated file is a strict SUPERSET of the old one: every previously
+attributed token still lands on the same kind.
 
 ⚠️ **`kind -> token` is one-to-many BY CONSTRUCTION.** Several kinds dispatch to one branch, and a branch picks
 between its tokens on its own inner conditions — `53250` reaches five (`OpeningComboAttack`,
@@ -465,3 +498,116 @@ verbatim, and suppressing on an unproven bit makes lines *disappear* — the fai
 where over-drawing is the one it can. So an element whose referenced spell carries the bit renders normally with
 a `⚠️ retail draws nothing here` marker. Flip it to a real suppression once it is confirmed in-client. Open work
 and the falsified hypotheses are in Gitea #789.
+
+### `AddAbsorb` (53046): four slots in sentence order, and the first is a STAT
+
+Branch `0x0149eaed`, keys `[0 Stat, 70, 33, 34, 88]`, fetched in that order and appended in it:
+
+| slot | key | what |
+|---|---|---|
+| `#1%s` | 0 | the absorbing STAT's name |
+| `#2%.2f` | 70 | ×0.01 — points of damage absorbed per point of the stat |
+| `#3%.0f` | 33 | ×0.01 — the per-attack cap, in points of damage |
+| `#4%.0f%` | 34 | ×0.01 — the same cap as a share of the attack |
+
+⭐ **What pins `#1` as the stat rather than the end spell** is the lookup the branch uses for it:
+`FUN_0060f0e0(0x267, …)` passes key 0's value in `ESI`, and `0x267` = **615** is the client's stat-name category —
+the same `FUN_0060ebb0(0x267, statId)` that `HitPercentage`'s arms call. The shipped data agrees from the other
+side: `Sustaining Faith (Rank 2)` absorbs into **Mana** and `Claws of Stone (Rank 2)` into **Health**.
+
+The second line — `AddAbsorbEndSpell` filled with key 88's spell — is only drawn when that spell is present and
+does not carry the hide-from-tooltip bit (#789). The report draws one line per element and does not compose it.
+
+### `UpgradeCombo` (53209): two independent clauses, and BOTH signs have a token
+
+Branch `0x014a1817` is a composer, not a sentence lookup. The
+`Upgrade combo: %s, damage modifier: %d, recharge adjust: %d` sitting at its own type id is a leftover the client
+never fetches.
+
+| clause | gate | tokens | unit |
+|---|---|---|---|
+| damage | key 66 (`0x315`) | `UpgradeCombo_{Increase,Decrease}Damage` | `%` (`0x1fbcf18`) |
+| cooldown | key 67 (`0x316`) | `UpgradeCombo_{Increase,Decrease}Cooldown` | `""` (`0x2c23bf8`) |
+
+Both magnitudes are HUNDREDTHS (`CVTSI2SS ; MULSS [0x01f2800c]`), and the number is drawn by `FUN_0149a5c0` —
+`<font color="%s">%+.Nf%s</font>`, where the colour is `tooltip_positive` / `tooltip_negative` (`FUN_0149a6c0`)
+and the precision comes from the value: `%+.2f` when it has no integer part and a fraction under 0.05, `%+.0f`
+when it has an integer part and a fraction under 0.05, `%+.1f` otherwise.
+
+⚠️ **The token is picked by `JLE`, so ZERO takes the DECREASE arm here** — the opposite of `53250`, which loads
+Increase first and overwrites it under `JNS`. The two kinds genuinely disagree; neither reading generalises.
+
+⚠️ And the two clauses set the colour flag on OPPOSITE arms: `[ESP+0x20]` is cleared on *decrease* for damage and
+on *increase* for cooldown, which is the semantics (a longer cooldown is the bad direction). It only reaches the
+value-modifier annotation, which is empty without a viewing character.
+
+`Disarming Aggression` renders `+4% Increase to Damage Per Second` at rank 1 and `+8%` at rank 2.
+
+### `AddSpellProc` (53211): a computed CHANCE plus up to two sides
+
+Branch `0x0149f3f7`, another composer — its three tokens are fragments (`ChanceOf`, `OnSelf`, `OnTarget`) glued
+by literal formats at the push sites: `"%.0f%% %s "` for the chance, `"%s %s "` per side, and `"%s "` around the
+`And` that LDB category **100** supplies (the same joiner `AddSpellLineProc` uses).
+
+⭐ **The chance is computed, not stored.** `FUN_0149bc20` reads key 237 (the rate) and key 187 (a SPELL), loads
+that spell and takes its property **294** — the cast time in centiseconds, the field the importer already reads —
+then returns
+
+```
+min(100, castSeconds × rate × 1.67)          1.67 = 100/60, i.e. procs-per-minute -> per-cast percent
+```
+
+⚠️ When the key-187 spell is missing or its cast time is ≤ 0 the client substitutes a literal **50 centiseconds**,
+so an unresolvable reference still draws a number rather than zero.
+
+`Degradation of Set (Rank 2)` states 200 procs/minute on a 3-second cast → `3 × 200 × 1.67 = 1002`, capped to
+**100% chance of Degradation of Set (Rank 2) (205647) on target**. The cap is not always hit: the same binding
+renders 8%, 42% and 53% elsewhere in the catalog.
+
+### `ChangeRecastTime` (53031) / `ChangeLineRecastTime` (53069): one slot, and it is a DURATION
+
+Branch `0x014a02b4` (shared — 53069 draws with 53031's sentence) reads key 39 and hands the raw centiseconds to
+`FUN_00807ae0`, which is the client's duration formatter rather than a number-to-string:
+
+| `|centiseconds|` | what it draws |
+|---|---|
+| `< 1` | the empty string |
+| `> 12000` | a d/h/m/s breakdown (`FUN_005451e0` splits by 86400/3600/60) under the literal `%s%s` |
+| whole seconds | LDB **100** `TimeFormatSeconds`, with an INT |
+| otherwise | LDB **100** `TimeFloatFormatSeconds`, with a float |
+
+⚠️ The `<font color="tooltip_positive">` is baked into the LDB **string**, so a negative delta still draws in the
+positive colour — `Stunning Bolt` renders *"Modify recast time by -20 seconds"*. ⚠️ The report does not compose the
+over-two-minutes arm: its own sentence is unread and no shipped recast delta reaches it.
+
+### `CastingLevelModifier` (53223): the client fills two of the sentence's three slots
+
+Branch `0x0149fdda` appends exactly two arguments to `Change hit percent by #2%d%% for spell #1%s #3%s` — the NAME
+behind key 0 (`FUN_008d76b0` resolves the id through the spell catalog, reads its property 23 and looks that up in
+LDB **50210**) and key 39 as an int. `#3` is never supplied by the client either, so it draws empty. One shipped
+element carries this kind: a dev record naming `Test Nuke`.
+
+### `HitPercentage` (53007): the damage arm's second slot is a DAMAGE SCHOOL
+
+The Health-damage arm hands key 71 to `FUN_0149a8f0`, and that resolver is **two lookups in two categories**:
+
+```
+if (type - 1 > 13)                      ; i.e. type outside 1..14
+    return LDB170[elf28("GenericDamage")]
+sentence = LDB170[elf28("DamageType")]
+name     = <category 600>[type]         ; 1 slashing 2 piercing 3 crushing 4 fire 5 electrical
+return sentence filled with name        ;   6 holy 7 unholy 8 poison 9 siege
+```
+
+⭐ **Category 600 is what made this look undecodable.** The previous note recorded that `elf28("DamageType<n>")`
+misses in category 170 for every `n` in 0..14 — true, and beside the point: the per-school word was never in 170
+at all, and `FUN_00a8f470` (the hash the resolver calls on its way in) is plain **elf28** over the single literal
+`"DamageType"`. This is also an independent naming of the damage schools, from a different client source than the
+combat-side numbering.
+
+### Finding a spell that carries a kind
+
+`--report spell-tooltip --report-arg kind:<typeId>` lists the spells carrying one GameAction kind with the line
+the renderer makes of each. Reading a branch is half the job; the other half is a shipped record to check the
+reading against — `SpellAreaEffects.RadiusMetres` is what settled `ConeFormula`, and `Annihilate`'s own prose is
+what caught an inverted sign on `53250`.
