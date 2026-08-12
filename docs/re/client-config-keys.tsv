@@ -1,0 +1,28 @@
+# The client's BOOLEAN UniversalConfig keys - the complete set, recovered from the binary (#448).
+#
+# The getter is FUN_00A7E1F0(default), and a call site builds its key first with FUN_0040EC10(<literal>, <len>) -
+# the shape FUN_00A7EBE0 uses for `IsDeveloperUniverse`. Walking every caller of the getter back to that literal
+# enumerates the keys exhaustively: 21 call sites, 15 distinct keys, none unrecovered.
+#
+# These are settable with NO patch: the loader FUN_00A7CF90 merges SelfConfig.xml, UniversalConfig.xml and
+# LocalConfig.xml (only the last ships in a retail install), self-context `Universe/Client/`, values `True`/`False`.
+#
+# ⚠️ This is the BOOL getter only. A key read through an int/string/float sibling would not appear here - but
+# every name on #448's dev-lever backlog was checked by xref and NONE of them is a config key of any kind; see
+# docs/subsystems/client-dev-levers.md for what each one turned out to be instead.
+key	site	function
+DisableBackgroundScheduler	0043f5d7	FUN_0043ea20
+DontUpdateLocalCache	0064d7c7	FUN_0064d3f0
+EnableAlternateAdvancement	00412d66	FUN_00412990
+EnableDownloadLog	0043f144	FUN_0043ea20
+EnableDownloadReports	0043f188	FUN_0043ea20
+EnableDownloadScheduler	01059873	FUN_010596d0
+EnableOfflineAaTraining	00412cf6	FUN_00412990
+EnableOfflineLeveling	00412c86	FUN_00412990
+EnableToolConnection	0116f153	FUN_0116ef30
+IsBugReportOn	00a7ec91	FUN_00a7ec50
+IsDeveloperUniverse	00a7ec1a	FUN_00a7ebe0
+NetworkLogger	00595624	FUN_00595450
+NetworkLoggerCnt	00597483	FUN_00597440
+NetworkLoggerDelta	005979ac	FUN_00597970
+UseCorePhysics	005966f5	FUN_00596660
