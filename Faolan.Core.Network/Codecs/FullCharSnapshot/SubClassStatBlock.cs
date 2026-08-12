@@ -67,7 +67,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.MinigamesAbandoned, 0x0), (CharacterStatId.PvPSiegeMatchesLostSeasonal, 0x0), (CharacterStatId.SiegeLosses, 0x0), (CharacterStatId.PvPSiegeMatchesWonSeasonal, 0x0), (CharacterStatId.SiegeWins, 0x0),
 			(CharacterStatId.PvPCTFMatchesLostSeasonal, 0x0), (CharacterStatId.CaptureSkullLosses, 0x0), (CharacterStatId.PvPCTFMatchesWonSeasonal, 0x0), (CharacterStatId.CaptureSkullWins, 0x0), (CharacterStatId.PvPAnnihilationMatchesLostSeasonal, 0x0),
 			(CharacterStatId.AnnihilationLosses, 0x0), (CharacterStatId.PvPAnnihilationMatchesWonSeasonal, 0x0), (CharacterStatId.AnnihilationWins, 0x0), (CharacterStatId.PvPFatalitiesSeasonal, 0x0), (CharacterStatId.Fatalities, 0x0),
-			(CharacterStatId.PvPTotalDeathsSeasonal, 0x0), (CharacterStatId.Deaths, 0x0), (CharacterStatId.PvPTotalKillsSeasonal, 0x0), (CharacterStatId.Kills, 0x0)
+			(CharacterStatId.PvPTotalDeathsSeasonal, 0x0), (CharacterStatId.PvPTotalDeaths, 0x0), (CharacterStatId.PvPTotalKillsSeasonal, 0x0), (CharacterStatId.PvPTotalKills, 0x0)
 		];
 
 		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes

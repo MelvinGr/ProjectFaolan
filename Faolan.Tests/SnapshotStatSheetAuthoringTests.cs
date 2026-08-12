@@ -120,8 +120,8 @@ namespace Faolan.Tests
 
 			var sheet = SnapshotStatSheet.For(veteran, null, null);
 
-			Assert.Equal(239u, Value(sheet, CharacterStatId.Kills));
-			Assert.Equal(37u, Value(sheet, CharacterStatId.Deaths));
+			Assert.Equal(239u, Value(sheet, CharacterStatId.PvPTotalKills));
+			Assert.Equal(37u, Value(sheet, CharacterStatId.PvPTotalDeaths));
 		}
 
 		// The LOGIN snapshot and the LIVE stat packet must put the same wire number on the same stat. They are built

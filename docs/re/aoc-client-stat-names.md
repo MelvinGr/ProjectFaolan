@@ -7,9 +7,8 @@ run is unnamed there too, while this table names both.
 Data: [`aoc-client-stat-names.tsv`](aoc-client-stat-names.tsv) — **1,511** ids,
 `statId <tab> hex <tab> clientName`. 1,234 of them are members of `CharacterStatId`; the rest are ids the enum
 already carried, which keep the names whatever decoded them first rather than being renamed out from under their
-callers. One id is deliberately absent: `0x542`, whose client name is `Deaths` — a name this enum already uses for
-`0x292` (from LDB 615, where the client's own table calls that one `PvPTotalDeaths`). That is a genuine two-source
-disagreement, not a duplicate name in the client.
+callers. ⭐ **`0x542` is no longer absent** (#625): `0x292` moved to the registry's `PvPTotalDeaths`, which freed
+the name `Deaths` for the id that actually carries it. See "The two `Deaths` ids" below.
 
 Regenerate with:
 
@@ -192,6 +191,31 @@ The neighbouring config keys say what the subsystem is embedded in: `PvEXPFromPv
 - **`0x292` is `PvPTotalDeaths`, not `Deaths`**, sitting in a coherent run — `656 PvPTotalKills`,
   `657 PvPFinishingBlows`, `658 PvPTotalDeaths`, `659 PvPMatchesWon`, `660 PvPMatchesLost`. So the client does NOT
   use `Deaths` twice, and the belief that it did was the old sweep mispairing `0x542`'s name onto a neighbour.
+
+### ⭐ The two `Deaths` ids, settled (#625)
+
+Both names are the registry's and they name **different counters**, which is why neither had to give way:
+
+| id | client name | what it is |
+|---|---|---|
+| `0x292` | `PvPTotalDeaths` | the PvP **career** total — 0x290 `PvPTotalKills`, 0x291 `PvPFinishingBlows`, 0x293 `PvPMatchesWon`, 0x294 `PvPMatchesLost` either side of it |
+| `0x542` | `Deaths` | a per-match **minigame scoreboard** column — 0x53C `DamageDone`, 0x53D `HealingDone`, 0x53E `CrowdControlDone`, 0x53F `DamageAbsorbed`, 0x540 `EnemyFlagsTaken`, 0x541 `KillingBlows`, this, 0x543 `TimeInDominationZone` |
+
+Three independent statements put `0x292` in the PvP career run, and the third is the strongest because it is not
+a name at all:
+
+1. the registry says so;
+2. **contiguity** — `0x291`, `0x293` and `0x294` are ids this enum ALREADY agreed with the registry on, so a bare
+   `Deaths` at `0x292` was a hole punched in an otherwise-matching run. Same argument that settled the
+   `0x45B`–`0x461` misplacement;
+3. ⭐ **retail's own captured `SubClassStatBlock`** pairs each of the two with its `*Seasonal` twin — `0x566`
+   `PvPTotalKillsSeasonal` and `0x567` `PvPTotalDeathsSeasonal` — four slots apart. A seasonal twin's partner is
+   the career total of the same thing, and that is wire evidence rather than a naming judgment.
+
+⚠️ **The names are settled and what rides them is not.** The server increments its own `Kills`/`Deaths` on every
+kill and death, PvE included, and sends them in these two slots, while the client's separate `NPCKills` (`0x298`)
+and `NPCDeaths` (`0x299`) go unwritten — so a mob kill currently lands on the player's PvP record. That is #808,
+and it wants a capture before anything moves.
 - The engine's Anarchy-Online lineage shows through the low ids — `4 Breed`, `13 MagicBurden`, `17
   MemorizationSlot` — which is itself a check on the range: those are names nothing in this codebase would invent.
 

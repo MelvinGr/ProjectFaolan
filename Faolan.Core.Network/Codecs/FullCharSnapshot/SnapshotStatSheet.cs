@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[
 			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
 			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase,
-			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths, CharacterStatId.PlayerId,
+			CharacterStatId.Money, CharacterStatId.PvPTotalKills, CharacterStatId.PvPTotalDeaths, CharacterStatId.PlayerId,
 			// Authored CONDITIONALLY - only for the levels SkillPointCurve has actually measured (#507). Declared here
 			// regardless, because the slot varies across captured characters and this is where that is accounted for.
 			CharacterStatId.SkillPoints,
@@ -105,8 +105,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// The kill/death counters the sheet shows. They were on the not-modelled list as "not tracked", which was
 			// true of the COLUMNS rather than of the events: the server already knew, at the XP award and at the
 			// death persist, and was throwing the count away.
-			yield return (CharacterStatId.Kills, character.Kills);
-			yield return (CharacterStatId.Deaths, character.Deaths);
+			yield return (CharacterStatId.PvPTotalKills, character.Kills);
+			yield return (CharacterStatId.PvPTotalDeaths, character.Deaths);
 
 			// The character's SEX. The fresh skeleton hardcodes 3 (the captured character's), and the corpus shows the
 			// slot taking 0, 2 and 3 - so it is per-character, and the enum's values ARE the wire codes.

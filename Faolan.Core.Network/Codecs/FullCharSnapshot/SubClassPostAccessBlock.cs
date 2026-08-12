@@ -94,8 +94,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public uint Deaths
 		{
-			get => GetStat(CharacterStatId.Deaths);
-			set => SetStat(CharacterStatId.Deaths, value);
+			get => GetStat(CharacterStatId.PvPTotalDeaths);
+			set => SetStat(CharacterStatId.PvPTotalDeaths, value);
 		}
 
 		// Authors the whole per-class vitals block (#4/#186): current AND max for each vital, x100. The parameters

@@ -63,10 +63,21 @@ namespace Faolan.Core.Enums
 		StaminaMax = 0x01F9,
 		ManaCurrent = 0x01FA,
 		ManaMax = 0x01FB,
-		// The PvP scoreboard counters, named as the client's own LDB 615 names them (2026-07-27) - they were singular
-		// and one was an interpretation ("killing blows" for what the client just calls kills).
-		Kills = 0x0290,
-		Deaths = 0x0292,
+		// The PvP CAREER counters. ⭐ Renamed from `Kills`/`Deaths` in #625, on three independent statements that
+		// they are the PvP totals and not general ones:
+		//   * the exe's compiled registry calls them `PvPTotalKills` / `PvPTotalDeaths` (docs/re/aoc-client-stat-names.tsv),
+		//     and this ticket established that the registry beats LDB 615 wherever they differ;
+		//   * CONTIGUITY - 0x291 `PvPFinishingBlows`, 0x293 `PvPMatchesWon` and 0x294 `PvPMatchesLost` are ids this
+		//     enum ALREADY agreed with the registry on, so a bare `Deaths` at 0x292 was a hole punched in an
+		//     otherwise-matching run. That is the same argument that settled the 0x45B-0x461 misplacement;
+		//   * ⭐ RETAIL'S OWN BLOCK - the captured `SubClassStatBlock` pairs each of these with its `*Seasonal` twin
+		//     (0x566 `PvPTotalKillsSeasonal`, 0x567 `PvPTotalDeathsSeasonal`) four slots apart. A seasonal twin's
+		//     partner is the career total of the SAME thing, which is wire evidence rather than a name.
+		//
+		// ⚠️ The server increments these on EVERY kill and death, PvE included, while the client has separate
+		// `NPCKills` (0x298) / `NPCDeaths` (0x299) counters - see #808. The names are correct; what rides them is not.
+		PvPTotalKills = 0x0290,
+		PvPTotalDeaths = 0x0292,
 		AnnihilationWins = 0x029A,
 		AnnihilationLosses = 0x029B,
 		CaptureSkullWins = 0x029C,
@@ -532,8 +543,8 @@ namespace Faolan.Core.Enums
 		//
 		// ⚠ The sub-768 exclusion is LIFTED - see the block at the bottom of this enum (#625). And the note that used
 		// to sit here, "the client uses `Deaths` for BOTH 0x292 and 0x542", was an artifact of the old sweep's
-		// mispairing: the client calls 0x292 `PvPTotalDeaths` and 0x542 `Deaths`, two distinct names. 0x542 stays out
-		// only because THIS enum's 0x292 is called `Deaths` (from LDB 615), which is a real two-source disagreement.
+		// mispairing: the client calls 0x292 `PvPTotalDeaths` and 0x542 `Deaths`, two distinct names. Both are now
+		// carried under those names - 0x292 above, 0x542 in the minigame scoreboard run below.
 		HasKnubotData = 0x300,
 		GameAction_Icon = 0x301,
 		GameAction_Sex = 0x302,
@@ -1034,6 +1045,12 @@ namespace Faolan.Core.Enums
 		DamageAbsorbed = 0x53F,
 		EnemyFlagsTaken = 0x540,
 		KillingBlows = 0x541,
+		// ⭐ The MINIGAME scoreboard's death column, and the id the client actually calls `Deaths` (#625). Its
+		// neighbours are what say so: 0x53C-0x543 is one run of per-match scoreboard columns (`DamageDone`,
+		// `HealingDone`, `CrowdControlDone`, `DamageAbsorbed`, `EnemyFlagsTaken`, `KillingBlows`, this, and
+		// `TimeInDominationZone`), and this enum already carried the two either side of it under the registry's own
+		// names. It is a per-match column, NOT the career total - that is `PvPTotalDeaths` (0x292).
+		Deaths = 0x542,
 		TimeInDominationZone = 0x543,
 		ItemEquipSkill = 0x544,
 		ResurrectionTime = 0x545,
@@ -1198,9 +1215,9 @@ namespace Faolan.Core.Enums
 		// strict widening rather than a re-reading. See docs/re/aoc-client-stat-names.md.
 		//
 		// Same rule as the block above: an id the enum ALREADY carries keeps the name whatever decoded it first, so
-		// nothing is renamed out from under a caller. 186 of those disagree with the client's own word and are worth a
-		// pass of their own (#625) - `0x292` is the sharp one, `Deaths` here and `PvPTotalDeaths` to the client, which
-		// is why the client's real `Deaths` (`0x542`) still cannot take that name.
+		// nothing is renamed out from under a caller - unless the existing name is a GUESS or a stale-source reading,
+		// which is what #625 spent its passes separating. `0x292` was the sharp one and is settled: it is
+		// `PvPTotalDeaths` (above), which freed the name `Deaths` for the id that actually carries it, `0x542`.
 		//
 		// ⚠ A name here is strong evidence, not a citation - the same caveat the block above carries.
 		AttackSpeed = 0x3,
