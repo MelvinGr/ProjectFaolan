@@ -32,6 +32,9 @@ namespace Faolan.Importer.Cli
 			}
 
 			var applies = new List<(uint SpellId, uint Descriptor0, byte Bool2)>();
+			// #658: (caster, target, spell, value) per apply - the input to the SCOPE statement below, which is the
+			// measurement that named `bool2` and which no per-spell table can make.
+			var scoped = new List<(uint Caster, uint Target, uint SpellId, uint Descriptor0)>();
 			// #658: the same applies with enough CONTEXT to ask whether descriptor[0] is per-cast STATE rather than a
 			// property of the spell - which capture, in what order, on whom, and the whole 54 bytes so the question
 			// "does d0 gate any OTHER byte" can be asked of all of them instead of only [1] and [4].
@@ -51,6 +54,8 @@ namespace Faolan.Importer.Cli
 
 				var payload = MagicBuffDataCodec.Parse(buff.Data);
 				applies.Add((buff.SpellBaseId, payload.Descriptor[0], payload.Bool2));
+				if (buff.ApplyFrom is { } caster)
+					scoped.Add((caster, buff.ApplyTo, buff.SpellBaseId, payload.Descriptor[0]));
 				sequenced.Add((capture.Name, sequenced.Count, buff.ApplyTo, buff.SpellBaseId, payload.Descriptor[0], payload.Bool2, buff.Data.ToArray()));
 
 				// The within-payload cross-tab. `descriptor` is seven words and only [2] (the spell id) and [3] (the
@@ -175,6 +180,9 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine();
 			Console.WriteLine("* = the spell is SPLIT: retail sent more than one value for it, so no per-spell source can be the whole story.");
+
+			ScopeStatement(scoped);
+			TwinRate(perSpell);
 		}
 
 		// `--report buff-descriptor --report-arg rdb`
@@ -186,6 +194,127 @@ namespace Faolan.Importer.Cli
 		//
 		// ⚠️ A record carries a property field or it does not, and ABSENT is not zero. Absent records are dropped from
 		// that field's tally rather than folded into the clear side, where they would manufacture agreement.
+
+		// The FLAGS word's bits against the MINORITY value, as a RATE rather than as purity.
+		//
+		// ⚠️ **A purity sweep structurally cannot see this**, which is why it sits beside one rather than inside it.
+		// `descriptor[0]` is 2 on ~15% of spells, so a bit that lifts that to 60% - a decisive association - still
+		// leaves 40% of its records in the majority class and scores BELOW an 84% baseline. Purity answers "does this
+		// bit SPLIT the population cleanly"; the question here is "does it CONCENTRATE the rare value", and the two
+		// come apart exactly when the value is rare. See the `purity_sweep_cannot_see_a_rate_lift` note.
+		//
+		// Word 13 is the flags word (#632, `docs/rdb/spell-record-fields.md`), so its bits are the ones with named
+		// meanings to test against - bit 26 in particular, which marks the propagated/derived COPY of a buff and is
+		// the obvious candidate for "this apply is not the cast a player performed".
+		private static void MinorityRateLift(IReadOnlyList<(uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)> records,
+			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram)
+		{
+			const int FlagsWord = 13;
+
+			var usable = records.Where(r => (FlagsWord + 1) * 4 <= r.Body.Length).ToList();
+			if (usable.Count == 0 || histogram.Count < 2)
+				return;
+
+			// The rarest value that is not a one-off: a class of 1 or 2 records has no rate to lift.
+			var minority = histogram.Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var overall = (double)usable.Count(r => value(r.SpellId) == minority.Key) / usable.Count;
+			Console.WriteLine($"  word {FlagsWord} (the FLAGS word) by bit, as the RATE of the minority value {minority.Key} "
+			                  + $"- overall {overall:P1} of {usable.Count}:");
+
+			var rows = new List<(int Bit, int Set, double Rate)>();
+			for (var bit = 0; bit < 32; bit++)
+			{
+				var set = usable.Where(r => (System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(r.Body.AsSpan(FlagsWord * 4, 4)) >> bit & 1) == 1).ToList();
+				if (set.Count < 5)
+					continue;
+
+				rows.Add((bit, set.Count, (double)set.Count(r => value(r.SpellId) == minority.Key) / set.Count));
+			}
+
+			foreach (var row in rows.OrderByDescending(r => r.Rate).Take(8))
+			{
+				var lift = row.Rate - overall;
+				Console.WriteLine($"    bit {row.Bit,2}  {row.Rate,7:P1}  ({row.Set,3} set)   lift {lift,+7:P1}"
+				                  + (lift > 0.15 ? "   <-- concentrates it" : ""));
+			}
+		}
+
+
+		// ⭐ The SCOPE statement: does `descriptor[0]` belong to the SPELL, the CASTER, or the pair?
+		//
+		// This is the measurement that named `bool2` on this ticket after every content-based sweep had come back at
+		// baseline, and it is worth having as a report rather than as a one-off because it answers a question no
+		// per-spell table can ask. A per-spell table can only say "the spell does not determine it"; it cannot say
+		// WHOSE field it is, and those are different findings.
+		//
+		// The form is a pair of conditional-variation rates:
+		//   * of the casters that cast MORE THAN ONE distinct spell, how many vary the value?   -> 0 means caster-owned
+		//   * of the spells cast by MORE THAN ONE distinct caster, how many vary it?            -> 0 means spell-owned
+		//
+		// ⚠️ **Both restrictions matter.** An entity that only ever casts one spell, or a spell only ever cast by one
+		// entity, is consistent with EITHER owner and contributes nothing - counting it inflates whichever side you
+		// were hoping for. `bool2` came out 0-of-159 caster-side against 4-of-128 spell-side, which is what a
+		// caster-owned field looks like; a field owned by neither shows variation on both sides.
+
+		// ⭐ Does `descriptor[0]`'s minority value mark ONE MEMBER of a same-NAME family?
+		//
+		// The same measurement that named the spell record's flags bit 26 (#632): a value that marks the derived copy
+		// of a spell shows up as "almost every record carrying it has a same-name sibling that does NOT". Several of
+		// the `descriptor[0]=2` spells here are one of several ids sharing a name - `Blessed Blade` is four ids,
+		// `Furious Inspiration` five - so the question is whether that is the rule or just what a rank family looks
+		// like.
+		//
+		// ⚠️ The baseline is what makes it readable: rank families are common in this catalog, so a high twin rate is
+		// only evidence if the value's twin rate BEATS the catalog's. Printed together for that reason.
+		private static void TwinRate(IReadOnlyList<SpellDescriptor> perSpell)
+		{
+			var byName = perSpell.GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.ToList());
+			bool Twinned(SpellDescriptor s, Func<SpellDescriptor, bool> lacks) => byName[s.Name].Any(o => o.SpellId != s.SpellId && lacks(o));
+
+			Console.WriteLine();
+			Console.WriteLine("does descriptor[0] mark one member of a same-NAME family? (the #632 bit-26 test)");
+			foreach (var value in perSpell.Select(s => s.Descriptor0).Distinct().OrderBy(v => v))
+			{
+				var carrying = perSpell.Where(s => s.Descriptor0 == value).ToList();
+				var twinned = carrying.Count(s => Twinned(s, o => o.Descriptor0 != value));
+				Console.WriteLine($"  descriptor[0]={value}: {twinned,3} of {carrying.Count,3} have a same-name spell with a DIFFERENT value"
+				                  + $"   ({(carrying.Count == 0 ? 0 : (double)twinned / carrying.Count):P1})");
+			}
+
+			var anyTwin = perSpell.Count(s => byName[s.Name].Count > 1);
+			Console.WriteLine($"  baseline: {anyTwin} of {perSpell.Count} spells share their name with another at all "
+			                  + $"({(double)anyTwin / perSpell.Count:P1}) - a value cannot beat this by much and mean anything.");
+		}
+
+		private static void ScopeStatement(IReadOnlyList<(uint Caster, uint Target, uint SpellId, uint Descriptor0)> scoped)
+		{
+			if (scoped.Count == 0)
+				return;
+
+			Console.WriteLine();
+			Console.WriteLine($"SCOPE of descriptor[0] over {scoped.Count:N0} applies that name a caster:");
+
+			foreach (var (label, key, other) in new (string, Func<(uint Caster, uint Target, uint SpellId, uint Descriptor0), uint>,
+				         Func<(uint Caster, uint Target, uint SpellId, uint Descriptor0), uint>)[]
+			         {
+				         ("caster", a => a.Caster, a => a.SpellId),
+				         ("spell", a => a.SpellId, a => a.Caster),
+				         ("target", a => a.Target, a => a.SpellId)
+			         })
+			{
+				// Only groups that actually VARY the other dimension can testify.
+				var groups = scoped.GroupBy(key).Where(g => g.Select(other).Distinct().Count() > 1).ToList();
+				var varying = groups.Count(g => g.Select(a => a.Descriptor0).Distinct().Count() > 1);
+				Console.WriteLine($"  of the {groups.Count,4} {label,-6} that span >1 other, {varying,4} vary descriptor[0]"
+				                  + $"   ({(groups.Count == 0 ? 0 : (double)varying / groups.Count):P1})"
+				                  + (groups.Count > 0 && varying == 0 ? "   <-- the field belongs to this" : ""));
+			}
+		}
+
+
 		private static void BuffDescriptorRdbSweep(IReadOnlyList<NamedCapture> captures, string rdbDir)
 		{
 			// The per-spell class: the modal value of each field, restricted to spells retail never split.
@@ -286,6 +415,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine("  single BITS of a head word:");
 				foreach (var b in headBits.OrderByDescending(b => b.Purity).Take(8))
 					Console.WriteLine($"    word {b.Word,2} bit {b.Bit,2}  {b.Purity,7:P1}  ({b.Set} of {records.Count} set){(b.Purity > baseline + 0.02 ? "   <-- beats the baseline" : "")}");
+
+				MinorityRateLift(records, value, histogram);
 
 				// 2. the property run, by value and then bit by bit.
 				var fieldRanked = new List<(uint Field, int Covered, int Values, double Purity)>();
