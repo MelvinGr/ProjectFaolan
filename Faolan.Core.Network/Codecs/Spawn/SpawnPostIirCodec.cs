@@ -198,10 +198,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					slot.IdListTerminatorRank = rank;
 					for (var n = 0; n < tailCount; n++)
 					{
-						r.ExpectU32Be(EntityClass.Character, $"ID-list tail record {n} entity class");
-						var refId = r.ReadU32Be();
-						r.ExpectU32Be(0, $"ID-list tail record {n} zero field");
-						slot.IdListTail.Add(new ScaffoldTailRef(refId, r.ReadU8()));
+						// ⚠️ The third word is a SLOT SELECTOR, not a zero constant - `PetHolder_c::RegisterPet`
+						// tests it for 1 and routes that pet to the holder's single primary slot (#466). It is 0 on
+						// every captured spawn only because no captured character had a primary pet out, so
+						// asserting it would have thrown on a body retail can legitimately send.
+						r.ExpectU32Be(EntityClass.Character, $"pet record {n} entity class");
+						var petInstance = r.ReadU32Be();
+						var slotSelector = r.ReadU32Be();
+						slot.Pets.Add(new ScaffoldPetRef(petInstance, r.ReadU8(), slotSelector));
 					}
 
 					return slot;
@@ -310,9 +314,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				s.WriteByte(entry.Rank).WriteUInt32(entry.Id);
 
 			// ForCount(0) IS 0x3F1, so a spawn with an empty tail regenerates the exact byte it always did.
-			s.WriteByte(slot.IdListTerminatorRank).WriteUInt32(ListFrame.ForCount(slot.IdListTail.Count));
-			foreach (var tail in slot.IdListTail)
-				s.WriteUInt32(EntityClass.Character).WriteUInt32(tail.Id).WriteUInt32(0).WriteByte(tail.Kind);
+			s.WriteByte(slot.IdListTerminatorRank).WriteUInt32(ListFrame.ForCount(slot.Pets.Count));
+			foreach (var pet in slot.Pets)
+				s.WriteUInt32(EntityClass.Character).WriteUInt32(pet.PetInstance).WriteUInt32(pet.SlotSelector).WriteByte(pet.Kind);
 		}
 
 		private static void WriteNpcSlot(FaolanStream s, NpcEntrySlot slot)

@@ -131,12 +131,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// exactly the body's end, so it is a carried value and not a corruption.
 		public byte IdListTerminatorRank { get; set; }
 
-		// The list that CLOSES the ID list. Its count word is what the grammar long called "the 0x3F1 terminator":
-		// 0x3F1 is ListFrame.ForCount(0), so on the ~200 spawns whose list is empty the word reads as a constant and
-		// the mistake is invisible. 17 captured spawns carry ForCount(1) or ForCount(2) and the parser walked
-		// straight into the records. Semantics unknown: the [u32 0xC350][u32 id] head is the wire's entity-reference
-		// shape and the ids are small (39859, 39860, 43517), so these reference something rather than describing it.
-		public List<ScaffoldTailRef> IdListTail { get; } = [];
+		// ⭐ The character's active PETS. The list that CLOSES the ID list; its count word is what the grammar long
+		// called "the 0x3F1 terminator" (0x3F1 is ListFrame.ForCount(0), so on the ~200 spawns whose list is empty
+		// the word reads as a constant and the mistake is invisible). 17 captured spawns carry ForCount(1) or
+		// ForCount(2). See ScaffoldPetRef for how the client names them.
+		public List<ScaffoldPetRef> Pets { get; } = [];
 	}
 
 	// The NPC's slot: the APPEARANCE / morph table, then two words.
@@ -166,9 +165,40 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// break the order (a re-trained/re-ordered list), so the order is carried as captured rather than enforced.
 	public readonly record struct ScaffoldIdEntry(byte Rank, uint Id);
 
-	// One 13-byte record closing the ID list: [u32 0xC350][u32 Id][u32 0][u8 Kind]. Kind is 0x01 or 0x04 in the
-	// captures. The leading 0xC350 and the zero word are fixed and asserted on parse rather than carried.
-	public readonly record struct ScaffoldTailRef(uint Id, byte Kind);
+	/// <summary>
+	///     One 13-byte record closing the ID list - <c>[u32 50000][u32 PetInstance][u32 SlotSelector][u8 Kind]</c>,
+	///     and it is one of the character's PETS (#466).
+	/// </summary>
+	/// <remarks>
+	///     <para>
+	///         ⭐ Named from the client, end to end. The reader is <c>FUN_0145ba10</c> (ListFrame'd, count capped at
+	///         0x7531) over the element reader <c>FUN_014578e0</c>, which fills a 16-byte struct. The spawn APPLY
+	///         (<c>FUN_01458d40</c>) then walks that vector with stride 0x10 and hands each record to
+	///         <c>FUN_0081b960</c>, which allocates a <b><c>BasePet_c</c></b> (RTTI <c>.?AVBasePet_c@@</c>, 0x28
+	///         bytes) and registers it through <c>FUN_0081b670</c> - whose own assert cites
+	///         <b><c>CoreCharacter\Pets\petholder.cpp</c></b> and its parameter <c>i_pcNewPet</c>, and which logs
+	///         <c>"PetHolder_c::RegisterPet: Pet registered (instance %i)!"</c> on channel <c>GameCode/Pets</c>.
+	///     </para>
+	///     <para>
+	///         The fields land on <c>BasePet_c</c> as: <c>Kind</c> → <c>+0x0C</c>, the leading 50000 →
+	///         <c>+0x18</c>, <c>PetInstance</c> → <c>+0x1C</c>, <c>SlotSelector</c> → <c>+0x20</c>. 50000 is
+	///         <see cref="Constants.EntityClass.Character" />, and the consumer special-cases exactly that value to
+	///         resolve the referent - so the pair is the ordinary <c>(class, instance)</c> entity reference.
+	///         <c>PetInstance</c> is what the log line prints and what <c>RegisterPet</c> de-dupes on.
+	///     </para>
+	///     <para>
+	///         ⚠️ <b><c>SlotSelector</c> was asserted to be ZERO and is not a constant.</b> <c>RegisterPet</c> tests
+	///         <c>pet->+0x20 == 1</c> and puts that pet in the holder's SINGLE slot at <c>+0x4c</c>, releasing
+	///         whatever was there; anything else joins the general list. It is 0 on every captured spawn because no
+	///         captured character had a primary pet out - so a player who did would have failed the parse. Carried
+	///         now, not asserted.
+	///     </para>
+	///     <para>
+	///         <c>Kind</c> is 0x01 or 0x04 in the captures and is <c>BasePet_c</c>'s own field at <c>+0x0C</c>;
+	///         nothing has named it yet.
+	///     </para>
+	/// </remarks>
+	public readonly record struct ScaffoldPetRef(uint PetInstance, byte Kind, uint SlotSelector = 0);
 
 	// One 8-byte pair [u32 id][s32 value] in the three lists that CLOSE a post-IIR stream. ⚠️ The 8-byte shape is
 	// shared by TWO unrelated families, which is why the framing differs: lists 1 and 2 are the FACTION-REPUTATION

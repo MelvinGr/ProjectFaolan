@@ -153,7 +153,7 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     morphs and its closer is out of order.
   - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending (ranks are
     small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability ids). The list is CLOSED by a group whose "id" is
-    a **`ListFrame` word**, followed by that many **13-byte records** `[u32 0xC350][u32 id][u32 0][u8 kind]`.
+    a **`ListFrame` word**, followed by that many **13-byte records** — ⭐ the character's **PETS**, see below.
     `0x3F1` is `ForCount(0)`, which is why the close was long written down as a terminator constant; 17 captured
     spawns carry `ForCount(1)`/`ForCount(2)`. The closing group's rank byte is nonzero on 23 spawns and is
     carried, not asserted. Iff count==0: a bare `[u32 0x3F1]` instead.
@@ -161,6 +161,34 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     are decades 10,20,...,110; DemoL80 has both lists non-empty), then a THIRD pair list that is **count-framed**
     (`[u32 ListFrame word][n x (u32 id, s32 value)]`). That word is what used to be called the final `0x3F1`
     marker.
+
+### ⭐ The 13-byte tail records are the character's PETS (#466)
+
+Named from the client end to end, which is what the ticket asked for:
+
+| step | function |
+|---|---|
+| the list | `FUN_0145ba10` — `ListFrame`'d, count capped at `0x7531` |
+| the element | `FUN_014578e0` — three u32s and a byte into a 16-byte struct |
+| the APPLY | `FUN_01458d40` (the spawn apply) walks that vector with **stride 0x10** and hands each record to `FUN_0081b960` |
+| the object | `FUN_0081b960` allocates **`BasePet_c`** (RTTI `.?AVBasePet_c@@`, 0x28 bytes) |
+| the register | `FUN_0081b670` — its own assert cites **`CoreCharacter\Pets\petholder.cpp`** with parameter `i_pcNewPet`, and it logs `"PetHolder_c::RegisterPet: Pet registered (instance %i)!"` on channel `GameCode/Pets` |
+
+```
+[u32 50000][u32 PetInstance][u32 SlotSelector][u8 Kind]
+     +0x18        +0x1C           +0x20          +0x0C     <- on BasePet_c
+```
+
+`50000` is `EntityClass.Character` and the consumer special-cases exactly that value to resolve the referent, so
+the leading pair is the ordinary `(class, instance)` entity reference. `PetInstance` is what the log line prints
+and what `RegisterPet` de-dupes on (it compares `+0x18` and `+0x1C` against the pet already held).
+
+⚠️ **`SlotSelector` was asserted to be ZERO and is not a constant.** `RegisterPet` tests `pet->+0x20 == 1` and
+puts that pet in the holder's SINGLE slot at `+0x4c`, releasing whatever was there; anything else joins the
+general list. It is 0 on every captured spawn because no captured character had a primary pet out — so a player
+who did would have failed our parse. Carried now.
+
+`Kind` (0x01 / 0x04 in the captures) is `BasePet_c`'s own field at `+0x0C` and is still unnamed.
 
 ### ⭐ The third pair list is a STAT list, and that is what the asymmetric framing was saying (#466)
 
