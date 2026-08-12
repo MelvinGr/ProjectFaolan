@@ -71,6 +71,20 @@ namespace Faolan.Core.Database.Tables
 		// A roll between the two is the caller's business; what this table owes it is both ends.
 		public int? MaxAmount { get; set; }
 
+		// The stat the magnitude is a PERCENTAGE OF, non-null only on kind 53189 `AddPercentSkillModifier` (#807).
+		// That kind is the one whose `Amount` is not a quantity in `StatId`'s own units: the record means "raise
+		// `StatId` by `Amount`% of `SourceStatId`", and the client's tooltip branch picks between a same-stat and a
+		// different-stat sentence by comparing the two.
+		//
+		// ⚠️ Its percentage is PLAIN (2..20), not the ×100 that kind 53067 stores - so the two cannot share a scale
+		// constant, and `BuffStatEffects` converts on the way in rather than storing a rescaled value here. The row
+		// stays the template's own number, like every other row in this table.
+		//
+		// ⚠️ NULL is the overwhelming case and means "the amount is in StatId's units", NOT "source == target". A
+		// same-stat 53189 row carries `SourceStatId == StatId` explicitly, because the two readings differ for every
+		// other kind and a null would make 53189's degenerate case indistinguishable from a flat `Modify`.
+		public CharacterStatId? SourceStatId { get; set; }
+
 		// How often this record applies, in CENTISECONDS - the element's 0x2d6. **0 = once, instantly.** The same slot
 		// that carries an area's aura period (`SpellAreaEffect.PeriodCentiseconds`), which is what makes it a general
 		// grammar rather than an area-specific one: `0x2d5 = 1, 0x2d6 = 0` is the instant form and

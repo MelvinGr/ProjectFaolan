@@ -163,13 +163,37 @@ namespace Faolan.Tests
 		// its `StatId` column is a stat rather than whatever field happened to sit in payload word 0. 1,191 rows
 		// failed this before - `StartParticleEffect` filing a string's BYTE LENGTH as a stat id, `NanoResistance`
 		// filing key 152, `SetSpellLineRecastTime` filing a spell LINE.
+		//
+		// ⚠️ **53189 `AddPercentSkillModifier` came OFF this list** (#807), and it is the one member that ever will:
+		// the list means "this kind has no stat to file", and 53189 turned out to have TWO. Its stat is not at key 0 -
+		// which is why the key-addressed read could not find one and dropping the kind was right at the time - but the
+		// client's own tooltip branch reads it as `key 67 += key 39 % of key 66`, naming both. The row now carries the
+		// target in `StatId` and the source in `SourceStatId`, and `SourceStatIdIsSetExactlyOnTheDerivedKind` below is
+		// what holds that. Every other member here genuinely has nowhere to put a stat.
 		[Fact]
 		public void EveryStoredRowsKind_ActuallyCarriesAStat()
 		{
-			var kindsWithoutAStat = new[] { 53238u, 53239u, 53162u, 53189u, 53097u, 53077u, 53043u, 53256u, 53010u, 53105u };
+			var kindsWithoutAStat = new[] { 53238u, 53239u, 53162u, 53097u, 53077u, 53043u, 53256u, 53010u, 53105u };
 			var offenders = Scalar($"SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind IN ({string.Join(",", kindsWithoutAStat)})");
 
 			Assert.Equal(0u, offenders);
+		}
+
+		// ⭐ #807: `SourceStatId` is set on exactly the kind whose magnitude is a percentage OF ANOTHER STAT, and on
+		// nothing else. Both directions matter and they fail differently:
+		//   * a 53189 row WITHOUT it is a row whose Amount cannot be read at all - the percentage has no referent;
+		//   * any OTHER kind WITH it would mean the column had leaked into the general path, where `Amount` is already
+		//     in `StatId`'s own units and a consumer reading a percentage there would be off by the stat's scale.
+		[Fact]
+		public void SourceStatIdIsSetExactlyOnTheDerivedKind()
+		{
+			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53189 AND SourceStatId IS NULL"));
+			Assert.Equal(0u, Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind <> 53189 AND SourceStatId IS NOT NULL"));
+
+			// And the kind is actually PRESENT - the two assertions above pass vacuously on an empty population, which
+			// is exactly the state this ticket found (the rows were being deleted at import).
+			Assert.True(Scalar("SELECT COUNT(*) FROM SpellStatEffects WHERE EffectKind = 53189") > 90,
+				"the 53189 rows are missing again - they were 105 when #807 restored them");
 		}
 
 		private static uint Scalar(string sql)

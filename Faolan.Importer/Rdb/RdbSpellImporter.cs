@@ -677,6 +677,20 @@ namespace Faolan.Importer.Rdb
 			if (stale.Count > 0)
 				db.SpellStatEffects.RemoveRange(stale);
 
+			// ⛔ The effect CRITERIA are deleted EXPLICITLY, and must be - the `ON DELETE CASCADE` on their FK never
+			// fires here. The effect rows above are removed and re-added with the SAME (SpellId, Sequence) key in one
+			// unit of work, and EF collapses a delete-then-add of one key into an UPDATE: no DELETE statement ever
+			// reaches SQLite, so no cascade runs.
+			//
+			// That made this importer NOT IDEMPOTENT, and invisibly: the criteria insert below worked exactly once -
+			// the run that first populated the table, when it was empty - and every later run died on
+			// `UNIQUE constraint failed: SpellStatEffectCriteria.SpellId, Sequence, Pos`. It was never noticed because
+			// the module is opt-in and had not been re-run since #791 added the table. A cascade you cannot observe is
+			// not a cascade; the sibling deletes below are explicit for the same reason and this one was the omission.
+			var staleCriteria = await db.SpellStatEffectCriteria.Where(c => affected.Contains(c.SpellId)).ToListAsync();
+			if (staleCriteria.Count > 0)
+				db.SpellStatEffectCriteria.RemoveRange(staleCriteria);
+
 			// #772: same delete-then-insert scoped to every record PARSED, for the same reason as the stat effects -
 			// keying the delete off the RESULTS would let a spell whose area list becomes empty keep its old rows for
 			// ever, so a change that REMOVES bad data would leave the bad data sitting there.
@@ -737,6 +751,9 @@ namespace Faolan.Importer.Rdb
 						Amount = (int)effect.WireAmount,
 						// Null on every kind that states ONE number rather than a range (#783).
 						MaxAmount = effect.MaxAmount,
+						// Non-null only on 53189, where Amount is a percentage OF this stat rather than a quantity
+						// in StatId's units (#807).
+						SourceStatId = (CharacterStatId?)effect.SourceStatId,
 						// Null on every kind but the interpolated families (#599/#783).
 						HighAmount = effect.Ramp?.HighValue,
 						MaxHighAmount = effect.MaxRamp?.HighValue,

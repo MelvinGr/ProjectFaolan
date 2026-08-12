@@ -45,6 +45,14 @@ namespace Faolan.Core.Rdb
 		// hits without needing a full whitelist here (the importer whitelists to the stats it applies).
 		private const uint MaxStatId = 0x1000;
 
+		// `AddPercentSkillModifier` and its two stat slots (#807). The kind carries NO key 0, so it is invisible to
+		// the stat-slot rule `ParseSpellStatEffects` uses for every other kind; these are the keys the client's own
+		// tooltip branch reads it by. Per-TYPE, like every unnamed key - 66/67 are the damage and cooldown deltas on
+		// `UpgradeCombo` and the DPS/crit slots on `ChangeInheritedWeaponAttack`.
+		public const uint PercentOfStatKind = 53189;
+		private const int PercentOfStatSourceKey = 66;
+		private const int PercentOfStatTargetKey = 67;
+
 		// All stat-modifier records in a decrypted template BODY (the span AFTER the 12-byte RDB-Id header), in file
 		// order. Signature-anchored; statId bounded to the real range. Duplicates are preserved (a template never
 		// repeats a stat id in the corpus, but the parser stays faithful to what's on the wire).
@@ -431,6 +439,26 @@ namespace Faolan.Core.Rdb
 				if (e.Type is not { } type)
 					continue;
 
+				// ⭐ `AddPercentSkillModifier` is the one kind whose stat is not findable by the rule below, and it is
+				// not an omission in its key list - it carries TWO stats and neither is key 0 (#807). The client's own
+				// tooltip branch (0x014a1b52) reads it as `key 67 += key 39 % of key 66`, picking between a same-stat
+				// and a different-stat sentence by comparing the two, which is what names them: 66 is the SOURCE and
+				// 67 the stat being raised. Its 69 rows used to be stored under the positional read - with whatever
+				// word sat at slot 0 as their "stat" - and the by-key fix then dropped them entirely, correctly, since
+				// nothing yet said where the stat was. Now something does.
+				if (e.Kind == PercentOfStatKind)
+				{
+					var target = e.Value(PercentOfStatTargetKey);
+					var source = e.Value(PercentOfStatSourceKey);
+					var pct = e.Value(GameActionTypes.KeyValue);
+					if (target is null or 0 or >= MaxStatId || source is null or 0 or >= MaxStatId || pct is null)
+						continue;
+
+					mods.Add(new Modifier(e.Kind, target.Value, pct.Value, e.Ramp, e.Fixed2d6, e.MaxAmount, e.MaxRamp,
+						[.. e.Criteria], source.Value));
+					continue;
+				}
+
 				var statSlot = type.SlotOf(GameActionTypes.KeyStat);
 				if (statSlot < 0 || statSlot + 1 >= type.Keys.Length)
 					continue; // this kind carries no stat, or no slot after it to hold a magnitude
@@ -489,8 +517,13 @@ namespace Faolan.Core.Rdb
 		// ⭐ `Criteria` is the element's own condition run, carried through rather than dropped (#791). An element
 		// that states one applies only when it evaluates - without it a conditional bonus is granted always, which is
 		// what 987 of the catalog's 1,117 apparent duplicate elements actually differ by.
+		// ⭐ `SourceStatId` is non-null only on `AddPercentSkillModifier` (53189), the one kind whose magnitude is a
+		// percentage OF ANOTHER STAT rather than a quantity in the target stat's own units (#807): the record means
+		// "raise `StatId` by `WireAmount`% of `SourceStatId`". When the two ids are EQUAL - 86 of the catalog's 106
+		// elements - it degenerates to a plain percent of the stat itself, which is the existing 53067 model at a
+		// different scale (a PLAIN percent here, where 53067 stores percent x100).
 		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null, uint PeriodCentiseconds = 0, int? MaxAmount = null,
-			LevelRamp? MaxRamp = null, IReadOnlyList<Criterion>? Criteria = null);
+			LevelRamp? MaxRamp = null, IReadOnlyList<Criterion>? Criteria = null, uint? SourceStatId = null);
 
 		/// <summary>
 		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order

@@ -44,6 +44,16 @@ namespace Faolan.GameServer.Combat
 		// than adding to it, which is why it needed a model of its own (#436).
 		internal const uint PercentKind = 53067;
 
+		// ⭐ #807: `AddPercentSkillModifier`, the OTHER percent kind, and the one whose rows this table used to delete.
+		// It states "raise stat B by N% of stat A" and, on 86 of the catalog's 106 elements, A and B are the SAME stat
+		// - which is the 53067 model exactly, at a different scale.
+		internal const uint PercentOfStatKind = ItemTemplateStatModifiers.PercentOfStatKind;
+
+		// ...and that scale is the whole reason the two cannot share a constant: 53067 stores percent x100 (200 = 2%)
+		// while 53189 stores a PLAIN percent (8 = 8%, measured across its whole population - 1..20). Converted on the
+		// way into the catalog rather than at the row, so the table keeps the template's own number.
+		private const int PercentOfStatToHundredths = 100;
+
 		// A percentage's denominator: 10000 == +100%. Retail uses the same x10000 scale for the multiplier STATS it
 		// keeps a percentage in - a live read of the fatality buff shows stat 536 "Magic Damage Modifier" moving
 		// 10000 -> 12000 for a +20% effect, i.e. 10000 IS 1.00.
@@ -54,12 +64,14 @@ namespace Faolan.GameServer.Combat
 		// the spell's rank ladder and the client's description text (Fend +1000 Armor / +500 Protection, Battle Cry
 		// +62 Hit Rating, "Augmente la Dextérité de 1" for the 0x32E=1 record).
 		//
-		// 53189 `AddPercentSkillModifier` used to be here and is deliberately gone. It carries NO stat key at all
-		// (`[66 SkillType, 67, 39]`), so under the old positional read its 69 rows were applied to whatever word sat
-		// at slot 0; the by-key fix stopped storing them, and `SpellPoolEffectTests.EveryStoredRowsKind_ActuallyCarries
-		// AStat` now gates the kind out of the table entirely. Leaving it listed here was dead policy reading as live -
-		// the same rot this file warns about below - and it made 53189 look like the attribute kind when every
-		// attribute row is in fact 53045. (It remains a real kind on the ITEM side, where its key list is read whole.)
+		// 53189 `AddPercentSkillModifier` is not here, and is not missing either - it is a PERCENT kind, handled
+		// beside 53067 (#807). It carries no key 0, so under the old positional read its rows were applied to whatever
+		// word sat at slot 0, the by-key fix stopped storing them, and for a while a test gated the kind out of the
+		// table entirely. What changed is that the client named its two stats: its tooltip branch reads it as
+		// `key 67 += key 39 % of key 66`, so the row has a target (`StatId`), a source (`SourceStatId`) and a
+		// percentage. When the two stats are EQUAL - 85 of the 105 shipped rows - it is a percent of the stat itself
+		// and goes down the 53067 path; when they differ it is a DERIVED stat this engine cannot express, and
+		// `Gate.DerivedFromOtherStat` counts it rather than guessing.
 		//
 		// ⚠️ 53220/53221 are additive but NOT flat: they are a LEVEL RAMP whose Amount is only the low endpoint, and
 		// the row's three ramp columns carry the rest (#599). Honored through LevelRamp at the carrier's level - see
@@ -273,6 +285,21 @@ namespace Faolan.GameServer.Combat
 
 		public static Gate Classify(SpellStatEffect row)
 		{
+			// ⚠️ 53189 is classified FIRST and on its own, because whether it is usable turns on a column no other
+			// kind sets. Same source and target is a percent of the stat itself and goes down the 53067 path; a
+			// DIFFERENT source is a derived stat - "+2% of your Strength onto your Immunity Rating" - and this engine
+			// has no model for one: `Buffed` resolves each stat independently, so a derived term would have to read
+			// another stat's FINAL value and the two would need an ordering. Declined rather than half-built, and
+			// nothing is lost by that today: both stats the shipped rows derive onto (490 `ImmunityRating`, 711
+			// `CriticalDamageBonusRating`) are unmodelled anyway, so they would fall at the next gate regardless.
+			if (row.EffectKind == PercentOfStatKind)
+			{
+				if (row.SourceStatId != row.StatId)
+					return Gate.DerivedFromOtherStat;
+
+				return HonoredStats.ContainsKey(row.StatId) ? Gate.Percent : Gate.PercentOnUnmodelledStat;
+			}
+
 			var isPercent = row.EffectKind == PercentKind;
 			if (!isPercent && !FlatKinds.Contains(row.EffectKind) && !OverrideKinds.Contains(row.EffectKind))
 				return Gate.UnhandledKind;
@@ -292,7 +319,7 @@ namespace Faolan.GameServer.Combat
 		{
 			var honored = new Dictionary<uint, List<Delta>>();
 			var percent = new Dictionary<uint, List<Delta>>();
-			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0;
+			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0, derivedSkipped = 0;
 			// ⚠️ `DistinctBy(Statement)`: a record states the same element twice (`Hellfire Stream` repeats two of its
 			// five bands verbatim), and a repeated statement is one statement - see `SpellStatEffect.Statement`.
 			foreach (var row in rows.DistinctBy(r => r.Statement))
@@ -316,9 +343,15 @@ namespace Faolan.GameServer.Combat
 						statSkipped++;
 						continue;
 					}
+
+					case Gate.DerivedFromOtherStat:
+					{
+						derivedSkipped++;
+						continue;
+					}
 				}
 
-				var isPercent = row.EffectKind == PercentKind;
+				var isPercent = row.EffectKind is PercentKind or PercentOfStatKind;
 
 				// A percentage is NOT in the stat's units - it is x100 of a percent - so it is carried raw, while a
 				// flat amount converts to display units here.
@@ -334,9 +367,15 @@ namespace Faolan.GameServer.Combat
 				var conditions = criteria?[(row.SpellId, row.Sequence)]
 					.Select(c => new ItemTemplateStatModifiers.Criterion(c.CriterionId, c.Value, c.Operator))
 					.ToArray();
-				var delta = new Delta(row.StatId, isPercent || ramp is not null
-					? row.Amount
-					: row.Amount / (int)SpellScale(row.StatId), ramp, conditions is { Length: > 0 } ? conditions : null,
+				// 53189's percentage is PLAIN where 53067's is x100, so it converts here - the one place that knows
+				// both conventions - rather than either scale leaking into the table or into `Buffed`.
+				var amount = row.EffectKind == PercentOfStatKind
+					? row.Amount * PercentOfStatToHundredths
+					: isPercent || ramp is not null
+						? row.Amount
+						: row.Amount / (int)SpellScale(row.StatId);
+
+				var delta = new Delta(row.StatId, amount, ramp, conditions is { Length: > 0 } ? conditions : null,
 					OverrideKinds.Contains(row.EffectKind));
 
 				var into = isPercent ? percent : honored;
@@ -344,7 +383,7 @@ namespace Faolan.GameServer.Combat
 			}
 
 			return new Catalog(honored.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()),
-				percent.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped);
+				percent.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped, derivedSkipped);
 		}
 
 		// The recompute, as a pure function over an entity + a catalog: `(gear + flat buffs) x (1 + percent buffs)` per
@@ -519,9 +558,11 @@ namespace Faolan.GameServer.Combat
 				_catalog = catalog;
 				_logger.LogInformation(
 					"BuffStatEffects: {Spells} spell(s) with flat stat effects and {PercentSpells} with percent ones, out of {Rows} imported records " +
-					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats - see #367); " +
+					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats, " +
+					"{Derived} derived-from-another-stat - see #367/#807); " +
 					"{Conditional} honored delta(s) carry CONDITIONS and are evaluated per carrier (#791).",
 					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped,
+					catalog.DerivedSkipped,
 					catalog.BySpellBase.Values.Concat(catalog.PercentBySpellBase.Values).Sum(d => d.Count(x => x.Criteria != null)));
 				return catalog;
 			}
@@ -541,7 +582,12 @@ namespace Faolan.GameServer.Combat
 			Percent,
 			UnhandledKind,
 			UnmodelledStat,
-			PercentOnUnmodelledStat
+			PercentOnUnmodelledStat,
+
+			// 53189 with a source stat DIFFERENT from its target - a derived stat, which this engine cannot express
+			// (#807). Its own member rather than folded into UnhandledKind, because the kind IS handled: it is the
+			// row's two-stat SHAPE that is not, and the load summary should say which of the two it dropped.
+			DerivedFromOtherStat
 		}
 
 		// One honored delta a spell carries: which stat, and what it is worth. Not a bare amount because a delta is
@@ -576,6 +622,7 @@ namespace Faolan.GameServer.Combat
 			IReadOnlyDictionary<uint, Delta[]> PercentBySpellBase,
 			int PercentSkipped,
 			int KindSkipped,
-			int StatSkipped);
+			int StatSkipped,
+			int DerivedSkipped = 0);
 	}
 }

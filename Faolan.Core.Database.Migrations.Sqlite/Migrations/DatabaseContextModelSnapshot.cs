@@ -3698,6 +3698,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("PeriodCentiseconds")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("SourceStatId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("StatId")
                         .HasColumnType("INTEGER");
 
