@@ -206,6 +206,55 @@ namespace Faolan.Importer.Cli
 		// Word 13 is the flags word (#632, `docs/rdb/spell-record-fields.md`), so its bits are the ones with named
 		// meanings to test against - bit 26 in particular, which marks the propagated/derived COPY of a buff and is
 		// the obvious candidate for "this apply is not the cast a player performed".
+
+		// ⭐ The spell's GAMEACTION ELEMENTS against the minority value, as a rate lift (#658 / #632).
+		//
+		// `--report spell-record-coverage` measured that the elements are **45.9%** of a spell record - by far the
+		// largest thing it carries, and the only substantial surface this sweep did not touch. It sweeps head words
+		// and property fields; a field that is nearly spell-owned and whose `3` form is ALREADY known to pair with a
+		// combo id (an element-carried thing) has an obvious reason to be element-derived.
+		//
+		// ⚠️ A rate lift and not a purity sweep, for the same reason as `MinorityRateLift`: the minority value is
+		// ~15% of spells, so an element kind that lifts it to 60% still scores below an 84% purity baseline.
+		private static void ElementKindRateLift(IReadOnlyList<(uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)> records,
+			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram,
+			Faolan.Core.Rdb.RdbReader rdb)
+		{
+			var minority = histogram.Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var kindsOf = records.ToDictionary(r => r.SpellId,
+				r => Faolan.Core.Rdb.ItemTemplateStatModifiers.ParseElements(r.Body).Select(e => e.Kind).Distinct().ToHashSet());
+
+			var overall = (double)records.Count(r => value(r.SpellId) == minority.Key) / records.Count;
+			Console.WriteLine($"  element KINDS by the rate of the minority value {minority.Key} - overall {overall:P1} of {records.Count} "
+			                  + $"(elements are 45.9% of a spell record, and the only surface this sweep did not cover):");
+
+			var rows = new List<(uint Kind, int Carrying, double Rate)>();
+			foreach (var kind in kindsOf.Values.SelectMany(k => k).Distinct())
+			{
+				var carrying = records.Where(r => kindsOf[r.SpellId].Contains(kind)).ToList();
+				if (carrying.Count < 5)
+					continue;
+
+				rows.Add((kind, carrying.Count, (double)carrying.Count(r => value(r.SpellId) == minority.Key) / carrying.Count));
+			}
+
+			if (rows.Count == 0)
+			{
+				Console.WriteLine("    no element kind is carried by 5+ of these spells.");
+				return;
+			}
+
+			foreach (var row in rows.OrderByDescending(r => r.Rate).Take(10))
+			{
+				var lift = row.Rate - overall;
+				Console.WriteLine($"    kind {row.Kind,6} (0x{row.Kind:X4})  {row.Rate,7:P1}  ({row.Carrying,3} carry it)   lift {lift,+7:P1}"
+				                  + (lift > 0.20 ? "   <-- concentrates it" : ""));
+			}
+		}
+
 		private static void MinorityRateLift(IReadOnlyList<(uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)> records,
 			Func<uint, uint> value, IReadOnlyList<IGrouping<uint, (uint SpellId, byte[] Body, Dictionary<uint, uint> Fields)>> histogram)
 		{
@@ -417,6 +466,7 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine($"    word {b.Word,2} bit {b.Bit,2}  {b.Purity,7:P1}  ({b.Set} of {records.Count} set){(b.Purity > baseline + 0.02 ? "   <-- beats the baseline" : "")}");
 
 				MinorityRateLift(records, value, histogram);
+				ElementKindRateLift(records, value, histogram, rdb);
 
 				// 2. the property run, by value and then bit by bit.
 				var fieldRanked = new List<(uint Field, int Covered, int Values, double Purity)>();
