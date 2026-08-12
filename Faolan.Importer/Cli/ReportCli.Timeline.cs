@@ -540,8 +540,13 @@ namespace Faolan.Importer.Cli
 
 				case "LootRemoveItemsIIR":
 				{
+					// The cash take and the item take are the same message and strict alternatives (#811), so saying
+					// "loses slot(s)" with an empty list - which is what a cash take used to print - names the wrong
+					// half of it.
 					var removed = LootRemoveItemsCodec.Parse(content);
-					return $"bag {Ent(labels, removed.BagHandle)} loses slot(s) {string.Join(", ", removed.RemovedPositions)}";
+					return $"bag {Ent(labels, removed.BagHandle)} loses " + (removed.Cash > 0
+						? $"{removed.Cash} tin"
+						: $"slot(s) {string.Join(", ", removed.RemovedPositions)}");
 				}
 
 				case "AreaFormulaIIR":
