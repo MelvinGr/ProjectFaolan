@@ -50,6 +50,31 @@ namespace Faolan.Tests.Support
 			((uint)IirTypes.MagicBuffIIR, 4666)
 		];
 
+		// The SHAPE floor, and the reason it exists beside the body-count floor rather than instead of it.
+		//
+		// The count ratchet catches a regeneration that covers FEWER BODIES. It cannot catch one that keeps the
+		// bodies and loses a grammar PATH - 8,332 of one SimpleDynel shape plus one Wharf Door is the same count as
+		// 8,333 of the common one, and the Wharf Door is the row that found a lift failure (c015345a).
+		//
+		// ⚠️ Distinct body LENGTH is a proxy for that path, not a measure of it - two different grammars can share a
+		// length, so this is a floor on coverage rather than a proof of it. It is worth pinning anyway because it
+		// fails on a whole class of narrowing the count floor is blind to, and because it is the assertion that
+		// SURVIVES #555's representative selection: one body per (IIR, length) keeps every number below while
+		// collapsing every number above, so a shrunken archive can keep this gate and must replace the other.
+		private static readonly (uint Iir, int Lengths)[] ExpectedShapes =
+		[
+			((uint)IirTypes.SimpleCharFullUpdateIIR, 1191),
+			((uint)IirTypes.MoveTaskIIR, 137),
+			((uint)IirTypes.SimpleDynelFullUpdateIIR, 101),
+			((uint)IirTypes.FullPlayerCharacterIIR, 76),
+			((uint)IirTypes.QuestFullUpdateIIR, 28),
+			((uint)IirTypes.QuestJournalIIR, 14),
+			((uint)IirTypes.MainQuestUpdateIIR, 13),
+			((uint)IirTypes.MagicBuffIIR, 2),
+			((uint)IirTypes.PlayfieldFIIR, 2),
+			((uint)IirTypes.TradeskillReplyIIR, 1)
+		];
+
 		private static readonly Lazy<List<Entry>> Entries = new Lazy<List<Entry>>(Load);
 
 		public static string Path => FixtureArchive.Path;
@@ -85,6 +110,18 @@ namespace Faolan.Tests.Support
 					throw new InvalidDataException($"Corpus extract covers only {actual} packets of IIR 0x{iir:X8}, expected at least {expected}. " +
 					                               "It was probably regenerated against a partial capture corpus - the whole-corpus gates would " +
 					                               "still pass while testing less. Regenerate with the full corpus, or update ExpectedCounts if " + "the corpus itself legitimately changed.");
+				}
+			}
+
+			foreach (var (iir, expected) in ExpectedShapes)
+			{
+				var actual = entries.Where(e => e.Iir == iir).Select(e => e.Body.Length).Distinct().Count();
+				if (actual < expected)
+				{
+					throw new InvalidDataException($"Corpus extract covers only {actual} distinct body lengths of IIR 0x{iir:X8}, expected at least {expected}. " +
+					                               "The body COUNT can be unchanged while a grammar path disappears - that is what this floor catches " +
+					                               "and the count floor cannot. Regenerate with the full corpus, or update ExpectedShapes if the corpus " +
+					                               "itself legitimately changed.");
 				}
 			}
 		}
