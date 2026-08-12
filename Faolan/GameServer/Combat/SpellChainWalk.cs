@@ -25,6 +25,18 @@ namespace Faolan.GameServer.Combat
 		internal const int MaxApplications = 32;
 
 		private readonly HashSet<uint> _visited = [];
+		private bool _sealed;
+
+		// ⭐ A walk that refuses EVERY edge, for a carrier whose 53051 rows are a candidate REGISTRY rather than a
+		// chain - "these are the things that can hang off this event", with something else deciding which one
+		// actually does. `FatalityService` is the proven case and carries the evidence; see its header.
+		//
+		// It is a walk rather than a flag on the caller because the refusal has to hold for the carrier's whole
+		// sub-tree: an edge suppressed at the top must not be reachable through a second edge further down.
+		internal static SpellChainWalk Registry()
+		{
+			return new SpellChainWalk { _sealed = true };
+		}
 
 		// Whether the cap stopped this walk short. The caller logs it naming the carrier, so the spell that hit it can
 		// be looked at rather than inferred.
@@ -35,6 +47,11 @@ namespace Faolan.GameServer.Combat
 		// no-op rather than an infinite re-apply.
 		internal bool TryEnter(uint spellBaseId)
 		{
+			// A registry walk claims nothing, so `ApplySpell`'s own seeding call is a no-op too and every edge below
+			// it is refused. The carrier itself is applied by the caller before the walk is consulted.
+			if (_sealed)
+				return false;
+
 			if (!_visited.Add(spellBaseId))
 				return false;
 

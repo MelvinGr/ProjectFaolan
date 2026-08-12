@@ -11,7 +11,10 @@ namespace Faolan.GameServer.Combat
 	{
 		// Apply a spell to the player as a self-buff (ApplySpell, caster == subject). Takes the WIRE id
 		// ((base << 8) | rank), the same form every ApplySpell send path uses.
-		Task ApplySelfBuff(INetworkClient client, uint wireSpellId);
+		//
+		// `walkChain: false` applies the spell ALONE, leaving its 53051 rows unwalked - for a carrier whose rows are a
+		// candidate REGISTRY rather than #784's "when this lands, also run X". See FatalityService.
+		Task ApplySelfBuff(INetworkClient client, uint wireSpellId, bool walkChain = true);
 
 		// Summon a creature TYPE as the player's pet. Returns false when no spawnable type matches the name - a
 		// content gap the caller reports rather than swallows.

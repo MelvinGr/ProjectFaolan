@@ -48,10 +48,12 @@ namespace Faolan.GameServer
 		// ISpellEffectOutbound (#439) - the three wire ops a SpellEffect row needs, so SpellEffectService dispatches
 		// data-driven effects without holding the listener. All three already existed for their original callers; this
 		// only names them as one seam.
-		Task ISpellEffectOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
+		Task ISpellEffectOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId, bool walkChain)
 		{
 			var self = client.Session.Character.Id;
-			return ApplySpell(client, self, self, wireSpellId);
+			return ApplySpell(client, self, self, wireSpellId, walkChain
+				? null
+				: SpellChainWalk.Registry());
 		}
 
 		async Task<bool> ISpellEffectOutbound.SummonPet(INetworkClient client, string template, bool combat)

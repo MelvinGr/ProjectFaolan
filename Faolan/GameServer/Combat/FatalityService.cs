@@ -83,8 +83,19 @@ namespace Faolan.GameServer.Combat
 			if (Random.Shared.Next(100) >= chance)
 				return;
 
-			await _outbound.ApplySelfBuff(killer, FatalityBuffA << 8);
-			await _outbound.ApplySelfBuff(killer, FatalityBuffB << 8);
+			// ⛔ `walkChain: false`, because a Fatality row's 53051 elements are a candidate REGISTRY - not #784's
+			// "when this lands, also run X". `791221`'s five edges are `Frozen Hatred`, `Companion Spirit`,
+			// `Furious Inspiration`, `XX Daily Fatality Counter` and a second `Fatality` row: three different classes'
+			// fatality procs, a dev counter, and a sibling carrier. They are the things that CAN hang off a fatality,
+			// and the killer's own state decides which one does - which is what `ForFatality` below resolves.
+			//
+			// The capture settles it: over its 36 fatality bursts, ALL 36 carry the two Fatality ids and only 21 carry
+			// the Frozen Hatred proc. If the edges were applied wholesale, the other four would be in all 36; they are
+			// in none. Walking them handed a level-80 NECROMANCER `Companion Spirit`, an ungated `Frozen Hatred` she
+			// had not armed, and - through the chained rank ladder below `Furious Inspiration`'s nameless line header
+			// - all TEN ranks of a class-44 buff at once, eleven icons expiring together 15 s later.
+			await _outbound.ApplySelfBuff(killer, FatalityBuffA << 8, walkChain: false);
+			await _outbound.ApplySelfBuff(killer, FatalityBuffB << 8, walkChain: false);
 
 			// Whatever the killer is carrying that procs on a fatality rides the SAME burst in the capture (fr1267:
 			// both Fatality ids then Frozen Hatred's 3666099, one frame).
