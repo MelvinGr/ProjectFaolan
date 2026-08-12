@@ -774,6 +774,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spell-record-coverage":
+				{
+					await SpellRecordCoverage(RdbDir());
+					return 0;
+				}
+
 				case "bcc-trees":
 				{
 					BccTrees(RdbDir());

@@ -287,6 +287,32 @@ spelling (`FUN_007ea480`, `FUN_007ebe70`, `FUN_007eddc0`, `FUN_007ee710`, `FUN_0
 `FUN_008da660`); the duration computation above is in one of them, and the others are guards on the same
 condition rather than second meanings.
 
+### ⭐ How much of a record is actually accounted for: 99.6%
+
+This page's opening measurement — *"the reader accounts for roughly 13% of it; the other ~87% is a fixed struct
+head plus a large trailing region that nothing reads"* — counts only `ReadIncreasingFields`. It is a true statement
+about **one** reader and a misleading one about the record. `--report spell-record-coverage` attributes every byte
+of all 21,502 records to a region, marking the readers with EXACT spans first so the result is a partition rather
+than four overlapping claims:
+
+| region | share |
+|---|---:|
+| **GameAction elements** (`ItemTemplateStatModifiers.ParseElements`) | **45.9%** |
+| head, once the rest is taken | 49.5% |
+| property run (`ReadIncreasingFields`) | 4.1% |
+| name/description block (`ReadStringBlock`) | 0.2% |
+| **UNATTRIBUTED** | **0.4%** |
+
+⭐ **The "large trailing region that nothing reads" IS the element region, and it is read.** A `Dark Knowledge`
+record's last 572 bytes decode as repeating element blocks carrying `0xCFE4` (GameAction 53220) with sequential
+ids — exactly what `ParseElements` walks. Only **0.4%** of the catalog's bytes are claimed by no reader at all.
+
+⚠️ **What is least understood is a LEADING region, not a trailing one**: the 49.5% that sits before the property
+run and that no element claims. And that share is inflated by the READER rather than by the format —
+`ReadIncreasingFields` returns the *longest* ascending run, so on a record whose longest run happens to sit late,
+everything before it is counted as "head" regardless of what it is. The "72-byte fixed head" is the head of the
+four records this page sampled, not of the catalog.
+
 ### The bits the client READS AT ALL — the census, and why it needed a second spelling
 
 [`DumpFlagBitReads.java`](../../tools/ghidra/DumpFlagBitReads.java) enumerates every bit of the word the client
