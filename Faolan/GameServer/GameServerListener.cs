@@ -198,6 +198,9 @@ namespace Faolan.GameServer
 		private HashSet<uint>? _approachConversationNpcs;
 		private readonly FatalityService _fatality;
 
+		// #310: Khitai reputation - awards standing on a kill and restores it at world entry.
+		private readonly FactionService _factions;
+
 		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect
 		// table. See Combat/SpellEffectService.cs.
 		private readonly SpellEffectService _spellEffects;
@@ -340,7 +343,11 @@ namespace Faolan.GameServer
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_poolEffects = new SpellPoolEffects(database, logger);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
+			// #310: the Khitai reputation engine. Built BEFORE CombatService because a kill is its one wired trigger,
+			// and it reaches the wire through a delegate seam rather than the listener (one outbound op, so a Func
+			// rather than a named port - CLAUDE.md).
+			_factions = new FactionService(database, logger, SendFactionStanding);
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality, _factions);
 			_spellweave = new SpellweaveService(logger, this);
 			// #506/#514: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs), and is
 			// built BEFORE the dialogue runtime because the travel TRIGGER is a conversation node (a wagoneer's

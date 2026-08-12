@@ -63,6 +63,7 @@ namespace Faolan.GameServer.Combat
 		// narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
 		private readonly Func<INetworkClient, uint, Task> _learnSpell;
 		private readonly FatalityService _fatality; // #140: the fatality burst on a killing blow
+		private readonly FactionService _factions; // #310: Khitai reputation, awarded on a kill
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
@@ -72,8 +73,10 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			Func<INetworkClient, Ability, Task> announceAddSpecialAbility, Func<INetworkClient, uint, Task> learnSpell, FatalityService fatality)
+			Func<INetworkClient, Ability, Task> announceAddSpecialAbility, Func<INetworkClient, uint, Task> learnSpell, FatalityService fatality,
+			FactionService factions)
 		{
+			_factions = factions;
 			_fatality = fatality;
 			_sim = sim;
 			_database = database;
@@ -755,6 +758,9 @@ namespace Faolan.GameServer.Combat
 					BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter, npcEntity.DeathActivationTime)));
 
 				await AwardKillXp(killer, npcEntity.Level);
+				// #310: Khitai reputation. A no-op for every base-game NPC - the faction ids are Khitai's and a
+				// creature with no `NpcStatCore.FactionId` moves nothing.
+				await _factions.AwardForKill(killer, npcEntity.FactionId);
 				await AnnounceKillChain(killer);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,

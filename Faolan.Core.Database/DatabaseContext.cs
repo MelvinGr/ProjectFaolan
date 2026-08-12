@@ -55,6 +55,9 @@ namespace Faolan.Core.Database
 		DbSet<ClassComboScaling> ClassComboScalings { get; }
 		DbSet<ClassSpell> ClassSpells { get; }
 		DbSet<Combo> Combos { get; }
+		DbSet<Faction> Factions { get; }
+		DbSet<FactionKillAward> FactionKillAwards { get; }
+		DbSet<CharacterFactionStanding> CharacterFactionStandings { get; }
 		DbSet<ConversationEdge> ConversationEdges { get; }
 		DbSet<ConversationEntry> ConversationEntries { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
@@ -167,6 +170,9 @@ namespace Faolan.Core.Database
 		public DbSet<ClassComboScaling> ClassComboScalings { get; set; }
 		public DbSet<ClassSpell> ClassSpells { get; set; }
 		public DbSet<Combo> Combos { get; set; }
+		public DbSet<Faction> Factions { get; set; }
+		public DbSet<FactionKillAward> FactionKillAwards { get; set; }
+		public DbSet<CharacterFactionStanding> CharacterFactionStandings { get; set; }
 		public DbSet<ConversationEdge> ConversationEdges { get; set; }
 		public DbSet<ConversationEntry> ConversationEntries { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
@@ -307,6 +313,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter (#646)
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
+			modelBuilder.Entity<Faction>().Property(f => f.Id).ValueGeneratedNever(); // the client's own faction id (10, 20, ... 330), #310
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();

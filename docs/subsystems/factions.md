@@ -138,7 +138,39 @@ that belonged to something else would have no reason to land there.
 ⚠️ The thresholds are absolute point counts, not deltas, and the tweak names carry no per-faction dimension — one
 ladder for all sixteen.
 
+## What we implement
+
+The catalog, the ladder and the kill payout are shipped and wired (#310).
+
+| piece | where |
+|---|---|
+| catalog + payout matrix, imported from the two client sources | `--report`-free module `rdb-factions` → `Faction` / `FactionKillAward` |
+| the ladder — bounds, neutral band, rank thresholds | `FactionLadder` (`Faolan.Core/Rules`), every number from RDB 1000516 |
+| per-character standing | `CharacterFactionStanding` (signed points; the RANK is derived, never stored) |
+| the two dispatches | `ApplyFactionPointsCodec` 0x50 / `ApplyFactionRankCodec` 0x4F |
+| award on a kill | `FactionService.AwardForKill`, from `CombatService.OnNpcKilled` |
+| restore at world entry | `FactionService.SendAll`, after the burst-less entry |
+
+⭐ **A kill moves SEVERAL factions, not one** — the payout list costs the victim's own faction and grants the same
+amount to its rival, which is why the award path takes a list rather than a delta. A standing already pinned at a
+bound is neither written nor sent, so a grind at the ceiling stops churning the row.
+
+⚠️ **Both dispatches go out together.** The client keeps the two halves in different places — the bar off the
+POINTS, the rank title off the RANK — so a server that moved only one leaves the other showing whatever it was
+last told. Points first, then rank, since a rank is a threshold *on* the points.
+
 ## What is still missing
 
-Implementation rather than decode: the `Faction` / `FactionStanding` model, the kill hooks that award points, and
-the standing-gated faction vendors. Nothing about the DATA is open any more.
+- **The encounter TIER.** Tiers 1–5 (solo boss, group normal/boss, raid normal/boss) are imported and only tier 0
+  is selectable, because the tier is a property of the ENCOUNTER — how many players engaged it, and whether the
+  creature is a boss — and the simulation models neither. Paying tier 0 for everything **under**-grants a group
+  kill rather than over-granting it, which is the safe direction, and the file's own "proportional to 60" rule
+  makes tier 0 exactly one player's share of the group rate.
+- **The other triggers.** The client also drives standing from scry scripts (`changefactionpoints`,
+  `changefactionrank`) and from an `ApplyFactionRankGameAction` element, i.e. quests. That machinery exists and
+  has no faction consumer yet.
+- **Standing-gated faction vendors** — the shop path with a standing predicate on it.
+- ⚠️ **Nothing is verifiable in-client**, and will not be: the corpus has no Khitai play, and neither dispatch has
+  ever been observed. The bodies follow the client's own method table and #132's scalar rule, and the tests assert
+  round-trips and the client's own numbers rather than a golden byte string — a self-authored golden here would
+  only be testing our encoder against itself.

@@ -228,8 +228,10 @@ we've seen_, and names the gaps). Regenerate with
 
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (#309). Group instances are now owned
   by the team (#512, above); what is still decoded-but-unbuilt is the difficulty an instance is entered at (#511)
-- ⬜ Factions & reputation — the Khitai faction ranks, vendors and companions. The Factions window populates for
-  imported characters; the catalog and the reputation changes from quests and kills are missing (#310, #315)
+- 🟨 Factions & reputation — the Khitai faction ranks, vendors and companions. The 16-faction catalog and its kill
+  payout matrix are imported from the client's own files, the ladder is its tuning sheet's, standing is awarded on
+  a kill and restored at world entry. Missing: the encounter TIER (only solo-normal pays), quest/script triggers,
+  and standing-gated vendors (#310, #315)
 
 ### Guild base & large-scale (not started)
 

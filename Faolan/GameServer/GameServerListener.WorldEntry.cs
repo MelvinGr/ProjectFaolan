@@ -813,6 +813,12 @@ namespace Faolan.GameServer
 			// to add "the replay survives as an internal safety net for a map with no quest definition" - it does not:
 			// that case now logs an error and aborts the entry.)
 			await SendBurstlessWorldEntry(client, mapId);
+
+			// #310: restore the character's Khitai faction standings. Sent AFTER the world entry for the same reason
+			// abilities are - they draw into a window rather than into the initial load, so nothing toasts - and only
+			// for the factions the character has a row for: a faction at neutral has no row and needs no message,
+			// since zero is what the client shows for one it has never been told about.
+			await _factions.SendAll(client);
 		}
 
 		private async Task SendWorldHandoff(INetworkClient client)

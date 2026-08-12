@@ -569,6 +569,24 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("CharacterCombos");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFactionStanding", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FactionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CharacterId", "FactionId");
+
+                    b.HasIndex("FactionId");
+
+                    b.ToTable("CharacterFactionStandings");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
                 {
                     b.Property<uint>("CharacterId")
@@ -1253,6 +1271,48 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         {
                             t.HasCheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
                         });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Faction", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasPlayerRanks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("IconId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("RivalFactionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Factions");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FactionKillAward", b =>
+                {
+                    b.Property<uint>("VictimFactionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Tier")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FactionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("VictimFactionId", "Tier", "FactionId");
+
+                    b.ToTable("FactionKillAwards");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Feat", b =>
@@ -4184,6 +4244,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFactionStanding", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithMany()
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Faction", "Faction")
+                        .WithMany()
+                        .HasForeignKey("FactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+
+                    b.Navigation("Faction");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -4570,6 +4649,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Screen");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FactionKillAward", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Faction", "VictimFaction")
+                        .WithMany("KillAwards")
+                        .HasForeignKey("VictimFactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VictimFaction");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboAttackModifier", b =>
@@ -5835,6 +5925,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreen", b =>
                 {
                     b.Navigation("Parameters");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Faction", b =>
+                {
+                    b.Navigation("KillAwards");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>

@@ -1257,6 +1257,9 @@ namespace Faolan.GameServer.World
 				// The loot container this type drops on death (Bag by default, a bigger chest for bosses) - picked by
 				// the kill-drop path (SpawnLootBagAt) via its LootContainerTemplate variant.
 				entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId;
+				// #310: the Khitai faction this creature belongs to, so a kill can pay reputation. Null for every
+				// base-game NPC - the ids are the expansion's.
+				entity.FactionId = npc.NpcTemplate.StatCore?.FactionId;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
@@ -1655,6 +1658,7 @@ namespace Faolan.GameServer.World
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 			entity.Hostile = killable && entity.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = npc.NpcTemplate.LootContainerTemplateId; // drop this type's container on death
+			entity.FactionId = npc.NpcTemplate.StatCore?.FactionId; // #310
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death
 

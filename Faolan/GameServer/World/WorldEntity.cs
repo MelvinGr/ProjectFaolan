@@ -131,6 +131,10 @@ namespace Faolan.GameServer.World
 		// "Halen van Dummy"). 0 for players (they aren't shop/conversation NPCs).
 		public uint NpcTemplateId { get; init; }
 
+		// The Khitai faction this creature belongs to (`NpcStatCore.FactionId`), or null - which is every base-game
+		// NPC, since the faction ids are the expansion's. Read by the kill path to award reputation (#310).
+		public uint? FactionId { get; set; }
+
 		// #363 ambient spawner: the NpcSpawnArea this NPC is a member of (its spawn-group pool), or null for a
 		// capture-placed / named / summoned NPC. When set, the area POOL maintains this creature's population (respawns
 		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
