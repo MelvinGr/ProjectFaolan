@@ -156,7 +156,7 @@ namespace Faolan.Importer.Cli
 
 			var wide = bands.Count(b => b.Span > WideBandSpan);
 			Console.WriteLine();
-			Console.WriteLine("⛔ Two tie-breakers that do NOT work, measured rather than assumed:");
+			Console.WriteLine("⛔ Three tie-breakers that do NOT work, measured rather than assumed:");
 			Console.WriteLine($"   1. the target map's template-id BAND - {wide} of {bands.Count} maps carrying {MinTemplatesForABand}+ distinct templates");
 			Console.WriteLine($"      span more than {WideBandSpan:N0} ids, so the bands overlap almost completely and predict nothing.");
 			Console.WriteLine("      (Map 2095's 15100/15113/15115/15116 look like a band and are one ENCOUNTER authored together.)");
@@ -165,6 +165,15 @@ namespace Faolan.Importer.Cli
 			//    explicitly because the UNAMBIGUOUS rows above do carry that annotation when it happens.
 			Console.WriteLine($"   2. holding one candidate and not the other - we hold {heldIds.Count:N0} template id(s) and NONE of the");
 			Console.WriteLine("      ambiguous candidates is among them, so there is nothing to prefer.");
+
+			// 3. "Another LDB category might key only one of them." The obvious next move once 51000 turns out to name
+			//    both, and it is worth stating as measured because a `Refuge Corpse-Waker` search DOES return a second
+			//    category (55701) - which makes "some creatures carry more LDB rows than others" look like a lever.
+			//    It is not one here: checked on the `Shark` pair (`--report ldb-strings --report-arg id:#<templateId>`),
+			//    templates 10027 and 18210 each appear in category 51000 and in NOTHING else, so there is no second
+			//    row to prefer either by. The 55701 hit was on the STRING, not on a template id.
+			Console.WriteLine("   3. a SECOND LDB category keying only one candidate - both `Shark` templates (10027, 18210) appear in");
+			Console.WriteLine("      category 51000 and in no other, so there is no extra row to break the tie with.");
 		}
 
 		// A map needs a few templates before its id range means anything, and "wide" is a span big enough that the
