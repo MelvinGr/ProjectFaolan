@@ -112,7 +112,7 @@ namespace Faolan.GameServer
 		// path registers nothing, which is right: the world tick owns a mob's buff registry.
 		Task IWorldOutbound.SendSpellApplication(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId, uint durationCentiseconds)
 		{
-			return SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, CasterLevel(client)));
+			return SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
 		}
 
 		Task IWorldOutbound.ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId)

@@ -76,9 +76,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The form every live buff send uses: `casterLevel` fills BOTH the descriptor slot and CastingLevel (see the
 		// [V0] note above). It has no default ON PURPOSE, so a new call site has to say whose level it is rather than
 		// inheriting an 80 that is only right for a level-80 character.
-		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, uint? targetLevel = null)
+		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, bool casterIsPlayer, uint? targetLevel = null)
 		{
-			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, expiryStamp, casterLevel, targetLevel));
+			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, expiryStamp, casterLevel, casterIsPlayer, targetLevel));
 		}
 
 		public static MagicBuffData Parse(in ReadOnlySpan<byte> data)
@@ -124,8 +124,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The semantic forms of a MagicBuffData, as VALUE factories.
 	public static class MagicBuffDatas
 	{
-		// Descriptor[0] - the only descriptor word that is a non-zero constant across every captured apply.
-		private const uint DescriptorLead = 1;
+		// Descriptor[0]. ⚠️ NOT a constant - "the only descriptor word that is a non-zero constant across every
+		// captured apply" was true of the four rows it was written from and is false of the corpus, where it is 1
+		// x3055, 2 x367 and 3 x2 over 3,424 applies (#658). `3` is decoded: it says descriptor[1] names the COMBO
+		// that applied the buff (MagicBuffCorpusTests.DescriptorZeroIsThree_ExactlyWhenDescriptorOneNamesACombo).
+		// `2` is not, and the obvious readings are all measured DEAD - see MagicBuffCorpusTests. 1 is what a plain
+		// cast sends and is what we build.
+		private const uint PlainCastDescriptorLead = 1;
 
 		// The APPLY form every buff we send uses. `expiryStamp` is an ABSOLUTE instant on the server's uptime-milli
 		// clock (`ServerUptimeClock.Milliseconds`), not a duration and not an opaque nonce - see the codec's header.
@@ -141,22 +146,30 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// call sites) and is what the single-argument form always assumed. A call site applying a buff to someone
 		// ELSE should pass the target's level.
 		// [V3: MagicBuffCorpusTests.TheTwoLevelSlots_AreTheCastersAndTheTargets]
-		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, uint? targetLevel = null)
+		//
+		// ⚠️ `bool2` is "the CASTER is a player character", not the constant 1 this used to write (#658). It splits
+		// the corpus perfectly - 1 on all 2,090 applies whose caster is a player and 0 on all 1,334 whose caster is
+		// an NPC or absent, 3,424 of 3,424 - and it is a property of the caster rather than of the spell: of the 159
+		// casters that cast more than one distinct spell, ZERO vary it, while 4 of the 128 spells cast by more than
+		// one caster do.
+		// [V3: MagicBuffCorpusTests.Bool2_IsWhetherTheCasterIsAPlayer]
+		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel, bool casterIsPlayer, uint? targetLevel = null)
 		{
-			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x01, [DescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0],
-				targetLevel ?? casterLevel, expiryStamp);
+			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, casterIsPlayer ? (byte)0x01 : (byte)0x00,
+				[PlainCastDescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0], targetLevel ?? casterLevel, expiryStamp);
 		}
 
 		// The APPLY form for a buff starting NOW and running for `durationCentiseconds` - the shape every live cast
 		// wants, with the stamp sourced rather than invented. Kept beside Apply so a call site cannot half-source it.
-		public static MagicBuffData ApplyNow(uint spellBaseId, uint durationCentiseconds, uint casterLevel, uint? targetLevel = null)
+		public static MagicBuffData ApplyNow(uint spellBaseId, uint durationCentiseconds, uint casterLevel, bool casterIsPlayer, uint? targetLevel = null)
 		{
-			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel, targetLevel);
+			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel, casterIsPlayer, targetLevel);
 		}
 
 		// The APPLY form of a buff with NO CASTER - the wire writes a zero class word where the entity reference would
-		// be (MagicBuffCodec.Read), and the data region differs from `Apply` in exactly two slots: `Bool2` is 0 rather
-		// than 1, and Descriptor[3] is 0 rather than the level. Both hold on all 11 casterless applies in the corpus,
+		// be (MagicBuffCodec.Read), and the data region differs from a player's `Apply` in exactly two slots: `Bool2`
+		// is 0 (no caster is not a player caster, so this is the same rule, not an exception) and Descriptor[3] is 0
+		// rather than the level. Both hold on all 11 casterless applies in the corpus,
 		// 11 of 11, and the level still rides in `CastingLevel` - which is what makes this a distinct FORM rather than
 		// `Apply` with a null caster.
 		//
@@ -164,7 +177,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// [V2: NecroL80_..._chat-annotated-4 fr9793/fr11539, NecroL80_..._combat fr6160, Hakotep_..._gameplay0 fr812]
 		public static MagicBuffData ApplyNoCaster(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint level)
 		{
-			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x00, [DescriptorLead, 0, spellBaseId, 0, 0, 0, 0], level, expiryStamp);
+			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x00, [PlainCastDescriptorLead, 0, spellBaseId, 0, 0, 0, 0], level, expiryStamp);
 		}
 
 		// The same, starting NOW - the shape a live send wants, with the stamp sourced rather than invented.

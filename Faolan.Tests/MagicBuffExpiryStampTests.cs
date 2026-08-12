@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			var serverTimeMs = (((ulong)pong.ReadUInt32() << 32) | pong.ReadUInt32()) / 1000;
 
 			// 2. What we send it, through the factory every live cast uses.
-			var payload = MagicBuffDatas.ApplyNow(0x31EB15, durationCs, casterLevel: 80);
+			var payload = MagicBuffDatas.ApplyNow(0x31EB15, durationCs, casterLevel: 80, casterIsPlayer: true);
 			var stamp = MagicBuffDataCodec.Parse(MagicBuffDataCodec.Build(payload)).ExpiryStamp;
 			// Bracket the second clock read from the outside, so the gap between the two senders' reads is MEASURED
 			// rather than assumed short: a fixed window would depend on machine load, and did fail under a loaded
@@ -102,7 +102,7 @@ namespace Faolan.Tests
 			const uint remainingCs = 8_509_794; // what retail's captured world-entry restore carries (21.7 min in)
 
 			var before = ServerUptimeClock.Milliseconds;
-			var resumed = MagicBuffDatas.ApplyNow(0x31EB15, remainingCs, 80);
+			var resumed = MagicBuffDatas.ApplyNow(0x31EB15, remainingCs, 80, casterIsPlayer: true);
 			var serverTimeMs = ServerUptimeClock.Milliseconds;
 			var recovered = ((long)resumed.ExpiryStamp - (long)serverTimeMs) / 10;
 
@@ -119,7 +119,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheStampIsAWholeU64_NotJustItsLowWord()
 		{
-			var built = MagicBuffDataCodec.Build(MagicBuffDatas.Apply(0x31EB15, 8_640_000, 0x0000_0004_1560_F9BBuL, 80));
+			var built = MagicBuffDataCodec.Build(MagicBuffDatas.Apply(0x31EB15, 8_640_000, 0x0000_0004_1560_F9BBuL, 80, casterIsPlayer: true));
 
 			Assert.Equal(MagicBuffDataCodec.Length, built.Length);
 			Assert.Equal(0x0000_0004_1560_F9BBuL, MagicBuffDataCodec.Parse(built).ExpiryStamp);

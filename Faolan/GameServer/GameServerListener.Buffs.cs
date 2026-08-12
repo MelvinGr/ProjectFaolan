@@ -33,6 +33,18 @@ namespace Faolan.GameServer
 			return client.Session.Character?.Level ?? 1;
 		}
 
+		// Whether a buff's CASTER is a player character - `MagicBuffData`'s `bool2` and nothing else (#658). Answered
+		// from the world model rather than from the handle's shape: retail's split is by what the caster IS, and a
+		// handle-range test would be a coincidence that happens to hold on the corpus's own id allocation.
+		// An unknown handle is not a player, which is also what retail sends when there is no caster at all.
+		private bool CasterIsPlayer(INetworkClient client, uint casterHandle)
+		{
+			var player = _simulation.PlayerWorldEntity(client);
+
+			return player != null && (player.Handle == casterHandle
+				|| (_simulation.World.ZoneForEntity(player).TryGet(casterHandle, out var caster) && caster.IsPlayer));
+		}
+
 		// ISpellEffectOutbound (#439) - the three wire ops a SpellEffect row needs, so SpellEffectService dispatches
 		// data-driven effects without holding the listener. All three already existed for their original callers; this
 		// only names them as one seam.
@@ -177,7 +189,7 @@ namespace Faolan.GameServer
 			{
 				var effectWireId = effect.Id << 8;
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
-				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.ApplyNow(effect.Id, effect.DurationMs / 10, CasterLevel(client)));
+				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.ApplyNow(effect.Id, effect.DurationMs / 10, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
 				await ApplyPoolEffects(client, applyTo, effect.Id);
 
 				// BOTH records' chain edges (#784). The carrier is what was cast and the effect is what landed, they are
@@ -227,7 +239,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
 			await ApplyPoolEffects(client, applyTo, spellId >> 8);
 			await ApplyChainedSpells(client, applyTo, applyFrom, spellId >> 8, chain);
 		}
@@ -339,7 +351,7 @@ namespace Faolan.GameServer
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
 		}
 
 		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
@@ -413,7 +425,7 @@ namespace Faolan.GameServer
 				// measurement rather than implemented. The stamp is still sourced from the same remaining time, which
 				// also keeps it correct before the client has learned our clock at all - it learns that only from a
 				// DispatchPong, and world entry can precede the first LatencyCheck.
-				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDatas.ApplyNow(spellBase, remainingCs, CasterLevel(client)));
+				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDatas.ApplyNow(spellBase, remainingCs, CasterLevel(client), casterIsPlayer: true));
 				restored++;
 			}
 
@@ -721,7 +733,7 @@ namespace Faolan.GameServer
 		{
 			var spell = await Database.GetSpell(spellBase);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client)));
+			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client), casterIsPlayer: true));
 		}
 
 		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh

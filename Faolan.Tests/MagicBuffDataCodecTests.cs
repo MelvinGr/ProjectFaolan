@@ -24,7 +24,7 @@ namespace Faolan.Tests
 		// capturing server's uptime clock, so at runtime it comes from ours (`ServerUptimeClock`), never from here.
 		public void BuildBuffDataLong_MatchesSpellweaveCapture(uint spellBase, uint durationCs, ulong expiryStamp, string expected)
 		{
-			var bytes = MagicBuffDataCodec.Build(spellBase, durationCs, expiryStamp, 80); // the spellweave capture is a level-80 necro
+			var bytes = MagicBuffDataCodec.Build(spellBase, durationCs, expiryStamp, 80, casterIsPlayer: true); // the spellweave capture is a level-80 necro
 			Assert.Equal(expected.Replace(" ", ""), Convert.ToHexStringLower(bytes));
 		}
 
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PayloadExtractors_RecoverDuration_FromBuffPayload()
 		{
-			var payload = MagicBuffDatas.Apply(0x37F298, 640000, 0x195DA1FE, 80);
+			var payload = MagicBuffDatas.Apply(0x37F298, 640000, 0x195DA1FE, 80, casterIsPlayer: true);
 			Assert.Equal(54, MagicBuffDataCodec.Build(payload).Length);
 			Assert.Equal(6400000u, ActiveBuff.DurationMsFromPayload(payload)); // 640000 cs -> ms
 

@@ -39,6 +39,10 @@ namespace Faolan.Tests
 		private const int DurationOffset = 8;
 		private const int Bool1Offset = 12;
 		private const int Bool2Offset = 13;
+
+		// Above every session-local entity handle in the corpus and below every player's character id - see
+		// Bool2_IsWhetherTheCasterIsAPlayer.
+		private const uint PlayerHandleFloor = 0x0100_0000;
 		private const int Descriptor0Offset = 14;
 		private const int Descriptor1Offset = 18;
 		private const int SpellIdOffset = 22; // descriptor[2]
@@ -156,14 +160,36 @@ namespace Faolan.Tests
 			var descriptor0 = applies.GroupBy(a => a.Buff.Data.ReadU32Be(Descriptor0Offset)).ToDictionary(g => g.Key, g => g.Count());
 			Assert.Equal(new Dictionary<uint, int> { [1] = 2606, [2] = 321, [3] = 2 }, descriptor0);
 
-			var bool2 = applies.GroupBy(a => a.Buff.Data[Bool2Offset]).ToDictionary(g => g.Key, g => g.Count());
-			Assert.Equal(new Dictionary<byte, int> { [1] = 1806, [0] = 1123 }, bool2);
 
 			Assert.Equal(728, applies.Count(a => a.Buff.Data.ReadU32Be(LevelOffset) != a.Buff.Data.ReadU32Be(CastingLevelOffset)));
 
 			// descriptor[1] and [4] are near-zero rather than zero, so they are not in the verified set above.
 			Assert.Equal(2, applies.Count(a => a.Buff.Data.ReadU32Be(Descriptor1Offset) != 0));
 			Assert.Equal(134, applies.Count(a => a.Buff.Data.ReadU32Be(Descriptor4Offset) != 0));
+		}
+
+		// ⭐ `bool2` is whether the CASTER IS A PLAYER (#658), not the constant 1 the builder used to write - which was
+		// true of the four hand-picked rows it was generalised from. It splits the whole corpus with no exceptions,
+		// and it is a property of the CASTER rather than of the spell. That scope statement is what identified it, and
+		// it needs the whole dumps rather than this slice, so it is measured there instead of gated here: of the 159
+		// casters that cast more than one distinct spell, ZERO vary `bool2`, while 4 of the 128 spells cast by more
+		// than one caster do (`--report codec-sweep`'s corpus, 3,424 applies).
+		//
+		// A no-caster apply is 0, which is the same rule rather than a third case - and is what `ApplyNoCaster`
+		// already wrote, from the other direction.
+		[Fact]
+		public void Bool2_IsWhetherTheCasterIsAPlayer()
+		{
+			var applies = CapturedApplies();
+
+			// A player's handle IS their character id, so it sits far above the session-local handles the world hands
+			// out to creatures. The threshold is the READING here, not the finding - what makes it a decode is that a
+			// single cut separates the whole population with nothing either side of it.
+			var wrong = applies.Where(a => (a.Buff.Data[Bool2Offset] != 0) != a.Buff.ApplyFrom is > PlayerHandleFloor).ToList();
+
+			Assert.True(wrong.Count == 0, $"{wrong.Count} of {applies.Count} applies disagree, e.g. {wrong.FirstOrDefault().Source}");
+			Assert.Contains(applies, a => a.Buff.Data[Bool2Offset] == 1); // both arms are populated, so the rule is not vacuous
+			Assert.Contains(applies, a => a.Buff.Data[Bool2Offset] == 0);
 		}
 
 		// ⭐ descriptor[0] is an ARITY tag, not a flag (#658). The two applies where it is `3` are EXACTLY the two

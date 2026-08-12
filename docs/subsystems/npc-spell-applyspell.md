@@ -179,8 +179,24 @@ names its source combo. That reframes the whole field: a builder must not write 
 hostile/debuff marker on a cast at someone else. It is not merely "not self": 554 of the 688 non-self applies
 leave it clear. [V0: what separates the 134 from those 554]
 
-**⚠️ `descriptor[0]`'s 1-vs-2 split and `bool2` are NOT in the spell's RDB record, and that is now measured
-rather than assumed.** Both are nearly per-spell (varying within a spell on 7 and 3 of 256), which is what pointed
+### ⭐ `bool2` is whether the CASTER IS A PLAYER (#811's corpus, #658)
+
+Not a constant 1, and not a property of the spell at all — which is why every sweep below came back at baseline.
+Over all **3,424** captured applies in the dumps it splits with **no exceptions**: 1 on all 2,090 whose caster is
+a player, 0 on all 1,334 whose caster is a creature or absent. The scope statement is what found it — of the 159
+casters that cast more than one distinct spell, **zero** vary `bool2`, while 4 of the 128 spells cast by more than
+one caster do, so the field belongs to the caster and not to the spell.
+
+A no-caster apply carrying 0 is the same rule rather than a third case, which is what `ApplyNoCaster` had already
+written from the other direction.
+
+`MagicBuffDatas.Apply` now takes `casterIsPlayer` and every call site states it; the listener answers it from the
+world model (`CasterIsPlayer`) rather than from the handle's shape, because retail's split is by what the caster
+IS and a handle-range test would be a coincidence of this corpus's own id allocation.
+[V3: MagicBuffCorpusTests.Bool2_IsWhetherTheCasterIsAPlayer]
+
+**⚠️ `descriptor[0]`'s 1-vs-2 split is NOT in the spell's RDB record, and that is now measured
+rather than assumed.** It is nearly per-spell (varying within a spell on 7 of 256), which is what pointed
 at the record in the first place — but `--report buff-descriptor --report-arg rdb` sweeps, over the 248 unsplit
 spells with a readable 1040005 record:
 
@@ -192,8 +208,13 @@ spells with a readable 1040005 record:
 | every property field, bit by bit | same, all on tiny populations | 83.5% |
 | every word of the common 36-word prefix | 97.2% at word 23, 119 distinct values | 83.5% |
 
-Nothing coarse separates them. The same sweep answered #630's mana-mode question at a single bit, so the shape
+Nothing coarse separates it. The same sweep answered #630's mana-mode question at a single bit, so the shape
 does work when the answer is there — its absence here says the source is not a single field of the spell record.
+⭐ For `bool2` that negative is now EXPLAINED rather than open: it is a caster property, so no spell field could
+ever have separated it. `descriptor[0]` stays open, and the readings ruled out for it since are that it is not an
+arity count (its `2` form populates no extra descriptor slot, unlike the decoded `3`), not a re-apply/refresh
+marker (it appears on both the first and later applies of one target+spell), and not the player-ness of either
+endpoint.
 Neither is it any `Spells` column we hold (16 candidates, all at baseline) nor catalog MEMBERSHIP
 (`ClassSpells`, `Combos.GameActionId`, `SpellEffects`, `SpellStatEffects`, `NpcSpells`, `FeatSpellGrants` — all at
 baseline). The `descriptor[0] == 2` set is characterised only by its names so far, and they are all combo- or

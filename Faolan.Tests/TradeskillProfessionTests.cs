@@ -83,10 +83,12 @@ namespace Faolan.Tests
 			Assert.NotEmpty(required);
 			Assert.All(required, feat => Assert.Contains(ladders, l => l.RankOfFeat(feat) != null));
 
-			// ...and only two professions are represented, which is the finding the book itself carries: the 603 rows
-			// were harvested from ONE character's TradeskillReplyIIR, so they are that character's professions.
+			// ...and the professions represented are exactly the ones the captured books belong to, which is the
+			// finding a shipped recipe set carries: rows are harvested per CHARACTER, so the catalog is the union of
+			// the professions the captured characters had trained. It was Armorsmith + Weaponsmith while NecroL80's
+			// 603-row book was the only readable one; DemoL80's became readable in #811 and brought its own two.
 			var professions = required.Select(f => ladders.Single(l => l.RankOfFeat(f) != null).Name).Distinct().Order().ToList();
-			Assert.Equal(["Armorsmith", "Weaponsmith"], professions);
+			Assert.Equal(["Alchemy", "Armorsmith", "Gemcutter", "Weaponsmith"], professions);
 		}
 
 		// ⚠️ A character holds SEVERAL rungs of one ladder, not one: AddCharacterFeats keeps the highest rank per
@@ -187,7 +189,7 @@ namespace Faolan.Tests
 			var book = await service.BookFor(characterId, catalog);
 
 			Assert.Equal(504, book.Count);
-			Assert.Equal(603, catalog.Count); // the rest is Weaponsmith, which they have not trained
+			Assert.Equal(708, catalog.Count); // the rest is the other three professions, which they have not trained
 		}
 
 		// #779: the GATHERING gate. Retail refused a Stonecutting APPRENTICE a Marble node and named `Stonecutting

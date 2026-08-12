@@ -70,14 +70,15 @@ namespace Faolan.Core.Network.Constants
 		// old hardcoded 80 came from (#438). Returns the VALUE; MagicBuffCodec composes it (#539).
 		public static MagicBuffData RideBuffPayload(uint riderLevel)
 		{
-			return MagicBuffDatas.ApplyNow(RideSpell >> 8, RideBuffDurationCentiseconds, riderLevel);
+			// The rider is the player, so the payload's caster-is-a-player bit is set (#658).
+			return MagicBuffDatas.ApplyNow(RideSpell >> 8, RideBuffDurationCentiseconds, riderLevel, casterIsPlayer: true);
 		}
 
 		// The same payload with the expiry stamp supplied - for the golden test, which reproduces one captured send and
 		// therefore has to pin that session's stamp rather than this process's uptime.
 		public static MagicBuffData RideBuffPayload(uint riderLevel, ulong expiryStamp)
 		{
-			return MagicBuffDatas.Apply(RideSpell >> 8, RideBuffDurationCentiseconds, expiryStamp, riderLevel);
+			return MagicBuffDatas.Apply(RideSpell >> 8, RideBuffDurationCentiseconds, expiryStamp, riderLevel, casterIsPlayer: true);
 		}
 	}
 }
