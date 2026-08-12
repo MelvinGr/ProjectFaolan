@@ -156,9 +156,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// attributes read as tag=value/value=0x3F800000 (weight 1.0), the feats as tag=(type<<8|subindex)/value=float
 	// bits.
 	//
-	// Flag was asserted to be ZERO, and is on every entry of all but 2 captured spawns. Those two carry a 1 on their
-	// LAST entry, and that entry's Value is a plain integer (300, 400) where a flag-0 entry's Value is float bits -
-	// so it discriminates how Value is read, rather than being padding. Carried, not interpreted.
+	// Flag was asserted to be ZERO. Twelve of the 296 captured spawns with a non-empty entry table carry a 1, and
+	// the shape is tight enough to be a constraint rather than an observation (#466):
+	//
+	//   * NEVER more than one per spawn, and ALWAYS the LAST entry;
+	//   * its Value is a ROUND HUNDRED in 100..400, where a flag-0 entry's Value is IEEE float bits - so the flag
+	//     discriminates how Value is READ, rather than being padding;
+	//   * its Tag is in its own space: 7 distinct tags across the twelve, none of which collides with any of the 268
+	//     distinct flag-0 `(type << 8 | subindex)` feat/attribute tags.
+	//
+	// Seven different characters carry one, so it is not one account's quirk. Carried, not interpreted - naming it
+	// needs a client-side consumer, since the tag matches nothing we hold.
+	// [V3: SpawnPostIirGrammarTests.TheEntryTablesFlaggedEntry_IsAtMostOneRoundHundredAtTheEnd]
 	public readonly record struct ScaffoldEntry(uint Index, ushort Tag, uint Value, uint Flag = 0);
 
 	// One 5-byte ID-list group [u8 rank][u32 id]. Ids USUALLY ascend and were long asserted to - 17 captured spawns

@@ -22,6 +22,63 @@ namespace Faolan.Tests
 	// protocol constant - they are only constant for the player, which is exactly how they came to be literals.
 	public class SpawnPostIirGrammarTests
 	{
+
+		// ⭐ #466 item 2: the entry table's `flag` word. It was pinned from two spawns as "a 1 on the LAST entry whose
+		// Value is a plain integer (300, 400)". Over the whole corpus the shape is far sharper than that, and every
+		// part of it is a constraint a generated spawn would otherwise have to guess:
+		//
+		//   * 12 of the 296 spawns with a non-empty entry table carry one, and NEVER more than one;
+		//   * it is ALWAYS the LAST entry - not merely observed last, but last on all twelve;
+		//   * its Value is always a ROUND HUNDRED in 100..400 (100, 200, 300 x3, 400 x2), where a flag-0 entry's
+		//     Value is IEEE float bits;
+		//   * its Tag lives in its own space - 7 distinct tags across the twelve, and ZERO of them collide with any
+		//     of the 268 distinct flag-0 tags, which are the `(type << 8 | subindex)` feat/attribute tags.
+		//
+		// Seven different characters carry one (their per-char `EntryTableX` all differ), so it is not one account's
+		// quirk. What it MEANS is still undecoded [V0: the entry table's flag-1 tag and value] - naming it needs a
+		// client-side consumer, since the tag matches nothing we hold. This gate is here so the shape cannot drift
+		// while that is open.
+		[Fact]
+		public void TheEntryTablesFlaggedEntry_IsAtMostOneRoundHundredAtTheEnd()
+		{
+			var flagged = new List<ScaffoldEntry>();
+			var tagsFlag0 = new HashSet<ushort>();
+			var tagsFlag1 = new HashSet<ushort>();
+			var carriers = 0;
+			var tables = 0;
+
+			foreach (var (body, _) in Streams())
+			{
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || spawn.Post.Slot is not PlayerEntrySlot slot || slot.Entries.Count == 0)
+					continue;
+
+				tables++;
+				foreach (var entry in slot.Entries)
+					(entry.Flag == 0 ? tagsFlag0 : tagsFlag1).Add(entry.Tag);
+
+				var flags = slot.Entries.Where(e => e.Flag != 0).ToList();
+				if (flags.Count == 0)
+					continue;
+
+				carriers++;
+				Assert.Single(flags); // never more than one
+				Assert.Equal(slot.Entries[^1].Index, flags[0].Index); // and it is the LAST entry
+				flagged.Add(flags[0]);
+			}
+
+			Assert.Equal(296, tables);
+			Assert.Equal(12, carriers);
+			Assert.All(flagged, e => Assert.Equal(1u, e.Flag));
+
+			// A round hundred, and small - the reading that says its Value is an integer rather than float bits.
+			Assert.All(flagged, e => Assert.True(e.Value % 100 == 0 && e.Value is >= 100 and <= 400, $"value {e.Value} is not a round hundred in 100..400"));
+
+			// Its tag is in a DIFFERENT space from the feat/attribute tags, which is the structural reason it reads
+			// as a different KIND of entry rather than a feat with an odd value.
+			Assert.Empty(tagsFlag0.Intersect(tagsFlag1));
+			Assert.Equal(7, tagsFlag1.Count);
+		}
+
 		// The MINIMAL forms, whose entry slot and pair lists are all empty: what is being pinned here is the header
 		// the two codecs used to disagree about, and the fact that one reader now covers both families.
 		[Fact]
