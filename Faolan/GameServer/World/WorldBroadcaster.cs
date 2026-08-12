@@ -888,8 +888,15 @@ namespace Faolan.GameServer.World
 			var records = new List<Rpc>();
 			var npcs = new List<WorldEntity>();
 
+			// ⚠️ Gated on the player having a live ENTITY, which is what this check always MEANT. It used to read
+			// `entity?.SpawnBody == null`, and #429 then stopped a player from ever having a SpawnBody at all (a
+			// player's record is rebuilt from live state per send, because the cached one described them as they were
+			// at LOGIN). That commit converted the two other places SpawnBody had "quietly doubled as the is-this-
+			// spawnable-yet flag" and missed this one - so from that day every login took the early return and the
+			// entry burst shipped ZERO NPCs, reporting `0 in-range NPCs` on a map holding 168 of them. Nothing here
+			// needs the player's own body: the records this builds are the NPCS'.
 			var entity = _sim.PlayerWorldEntity(client);
-			if (entity?.SpawnBody == null)
+			if (entity == null)
 				return (records, npcs);
 
 			// Seed the player's active/completed quest set first so quest-gated NPCs (#261 Scavenger Tuut, #262 hide-
