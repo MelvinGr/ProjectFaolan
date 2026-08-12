@@ -126,6 +126,21 @@ second way that agrees: it selects a targeting mode (5 when the bit is clear, 3 
 and that is expected rather than a problem — none of the twelve predicates is "is this spell hostile", so this is
 another row named from the client's reads and NOT from its score, like bits 1 and 20 before it.
 
+### The unnamed bits, narrowed to their SHAPE (#632)
+
+Two more are no longer "a bit with N read sites" even though neither has a name yet, and both turn out to be
+SUPPRESSORS — the inverse of the 23/30 enabling pair:
+
+* **bit 21** (1,576 set) suppresses one magic-side call pair, at both of its sites — and so does **bit 0 of stat
+  `0xB1` `MoreFlags`**, tested right beside it in `FUN_007F17D0`. So naming `MoreFlags` bit 0 names bit 21 too;
+  they gate the same thing from two different records.
+* **bits 19 and 8** (7,692 and 2,389 set) appear in ONE guard together — `(bit19 == 0) && ((flags & 0x100) == 0)`
+  — so either one set suppresses the same action. They are a pair the way 23/30 are, and should be named
+  together rather than separately.
+
+⚠️ Neither suppressed action carries a log string, which is why they stop here: the technique that named bits 1,
+15, 20, 23 and 30 is the client's own English, and these two call into code that says nothing.
+
 ### ⭐ Bits 23 and 30: one gate, named by the client's own log strings
 
 `FUN_007EF6B0` tests them **together** — `(flags >> 0x17 | flags >> 0x1E) & 1` — and when NEITHER is set it skips
