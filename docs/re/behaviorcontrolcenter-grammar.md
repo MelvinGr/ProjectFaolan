@@ -54,12 +54,49 @@ Two independent corroborations: `FUN_005EB5C0` reads stats `0x14` and `0x15`, wh
 **`BCCState`** and **`BCC`**; and **`Substate` is already a known GameAction key** (174 / `0x4B6`) across ten
 GameAction kinds in [`gameaction-keylists.tsv`](gameaction-keylists.tsv).
 
-⚠️ **The id is scoped to the BCC, not global.** The client's own message says *"in this bcc"*, and the resolution
-path is a per-BCC registry keyed by stat `0x15`. So the captured values cannot be named without the target's BCC
-resource, and 60 appearing on four different actors in four captures is only a shared default *if those actors
-share a behaviour tree* — do not build a global substate enum from them. The captured values are 60 ×4, 84 ×3 on
-one Tortage NPC (`0x0B` once then `0x0C` twice, over the ~15 s before it dies — enter, leave, and a redundant
-leave), and 33 and 83 once each.
+### ⭐ The substate table: RDB 1010203 is plain-text XML
+
+There was nothing to decode. `BCCTree_c::Load` (`FUN_00603D70`) tries the **merged binary** resource **1010501**
+(`0xF6B45`) first, and in its own words falls "back to text XML" — the individual **1010203** (`0xF6A1B`) entries.
+Both carry the same 29 trees, and the text half reads straight out:
+
+```xml
+<bctmesh name="Character">
+  <substate id="84" name="Charged" priority="17"> <inherit group="misc"  grouprdbid="3812796"/> </substate>
+  <state    id="25" name="Bandaging">             <inherit group="death" grouprdbid="12474"/>  </state>
+</bctmesh>
+```
+
+`priority` is the field `FUN_005EB5C0` orders the active-substate list on (`entry + 0x24`). `--report bcc-trees`
+prints the whole table; the 20 substates across the 29 shipped trees are:
+
+| id | name | prio | | id | name | prio |
+|---:|---|---:|---|---:|---|---:|
+| 11 | `SneakHiding` | 5 | | 60 | **`FrenzyStance`** | 2 |
+| 18 | `Stunned` | 18 | | 62 | `FreeFire` | 2 |
+| 19 | `Charmed` | 14 | | 65 | `Snared` | 15 |
+| 20 | `Feared` | 16 | | 73 | `AbilityBridge` | 2 |
+| 24 | `Knockbacked` | 19 | | 74 | `RangedCrossbowSniper` | 2 |
+| 30 | `Rooted` | 17 | | 75 | `Blocking` | 3 |
+| 33 | **`DefensiveStance`** | 2 | | 83 | **`Crouching`** | 3 |
+| 38 | `Cinematic` | — | | 84 | **`Charged`** | 17 |
+| 55 | `RangedVolley` | 2 | | 85 | `MountedSneakHiding` | — |
+| 56 | `RangedSnipe` | 2 | | 59 | `RangedSpider` | 2 |
+
+**All four captured values resolve**: 60 `FrenzyStance` ×4, 84 `Charged` ×3 on one Tortage NPC (`0x0B` once then
+`0x0C` twice over the ~15 s before it dies — enter, leave, and a redundant leave that finds nothing in the list),
+33 `DefensiveStance` and 83 `Crouching` once each. The recurring 60 is a combat STANCE, which is why four
+unrelated actors carry it — not a default.
+
+⚠️ **Substate ids are per-BCC by the client's RULE, but do not collide in the shipped DATA — and state ids DO.**
+The error says an id is resolved *"in this bcc"*, so scoping is per-tree by construction. Measured over all 29
+trees the two halves come apart: every substate id that appears in more than one tree carries the **same name and
+the same priority** in all of them (zero collisions over 20 ids), while **state** id 11 is `LoopingEmote` in one
+tree and `SneakHiding` in another. So a substate id→name map is publishable and a state one is not. `--report
+bcc-trees` prints both collision counts on every run rather than asserting either, because a tree added by a
+patch could break the substate half — the ids being consistent is a fact about this build's data, not a
+guarantee from the format.
+
 
 ⚠️ **The `default:` arm reads nothing**, so an unlisted phase byte ends the record at the phase word exactly like
 the explicitly terminal `6/8/9/0xD/0x11` do. `CommandPhases` in the codec is therefore a POSITIVE list: guessing

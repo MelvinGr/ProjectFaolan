@@ -203,9 +203,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Corroborated from a second direction: the same function reads stats 0x14 and 0x15, whose client-side names are
 	// `BCCState` and `BCC`, and `Substate` is already a known GameAction key (174 / 0x4B6) across ten kinds.
 	//
-	// ⚠️ **The id is scoped to the BCC, not global** - the client's own message says "in this bcc". So the captured
-	// values cannot be named without the target's BCC resource, and 60 appearing on four different actors is only a
-	// shared default if those actors share a behaviour tree. Do not build a global substate enum from them.
-	// [V0: naming the individual ids - 33, 60, 83, 84 - needs the BCC resource decoded, tracked in Gitea]
+	// ⭐ **The table is RDB 1010203, and it is plain-text XML** (#812) - `<substate id="84" name="Charged"
+	// priority="17">`, where `priority` is what `FUN_005EB5C0` orders the active list on. All four captured values
+	// resolve: 33 `DefensiveStance`, 60 `FrenzyStance`, 83 `Crouching`, 84 `Charged`. The recurring 60 is a combat
+	// STANCE, which is why four unrelated actors carry it - not a default. `--report bcc-trees` prints the table.
+	//
+	// ⚠️ **Scoping is per-BCC by the client's RULE** - its error says "in this bcc" - but the shipped data does not
+	// collide: over all 29 trees every shared substate id carries the same name AND priority, while STATE id 11 is
+	// `LoopingEmote` in one tree and `SneakHiding` in another. So this stays a plain `uint` here rather than an enum:
+	// the consistency is a fact about this build's data, not a guarantee from the format, and the report is where it
+	// gets re-checked.
 	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null, uint? SubstateId = null);
 }

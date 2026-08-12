@@ -774,6 +774,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "bcc-trees":
+				{
+					BccTrees(RdbDir());
+					return 0;
+				}
+
 				case "terrain-export":
 				{
 					await TerrainExport(RdbDir(), _options.TerrainOut ?? "Terrain");

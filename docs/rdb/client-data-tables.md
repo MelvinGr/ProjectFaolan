@@ -54,6 +54,7 @@ from what the table appears to hold.
 | 1000044 | `FUN_00844890` | `FeatPointsTable_c` — the FEATPOINTS per-level table |
 | 1000071 | `FUN_00d8fab0` | `TexScriptMeshGroupValues_c` (named elsewhere; not in a vtable) |
 | 1000076 | `FUN_0103f2d0` | `RDBMorphNameIDs_c` — the morph-target registry |
+| 1010203, 1010501 | `FUN_00603d70` | **`BCCTree_c`** — the behaviour-control-centre trees. ⭐ **1010203 is plain-text XML**, 1010501 its merged binary twin; `Load` tries the binary and falls back to the text. 29 trees, `<state>`/`<substate>` with `id`/`name`/`priority` — the substate table the BCC IIR's wire phases `0x0B`/`0x0C` index into (#810, #812, `--report bcc-trees`) |
 | 1000080, 1000081 | `FUN_0100d220` | **`RDBHairReplacement`** — named from its asserts' source path, not RTTI (decoded below) |
 | 1000505–1000508 | `FUN_00708690` | `RDBPlayerClassData_c` |
 | 1000509, 1000510, 1000512 | `FUN_00911930` | `PlayfieldPvPData_c` |

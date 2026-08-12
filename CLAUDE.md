@@ -44,6 +44,8 @@ dotnet run --project Faolan.Importer -- --report timeline --report-arg <capture>
 # absent from the file bytes. Search DECOMPRESSED bodies instead (this is how the ambient-bark group names were found
 # after the docs had recorded them as "appearing zero times as text anywhere in the client"):
 dotnet run --project Faolan.Importer -- --report rdb-text-scan --report-arg "SomeName,Other:local"
+dotnet run --project Faolan.Importer -- --report bcc-trees   # the behaviour-tree substate id->name table; RDB
+#   1010203 is PLAIN-TEXT XML (its 1010501 twin is the merged binary) - some RDB types need no decode at all.
 dotnet run --project Faolan.Importer -- --report rdb-names --report-arg index:1010029  # id->NAME table (1000010/1);
 #   index:<rdbType> lists one type's names (1010029 = the server-side script catalog). ⚠️ names are LOWERCASED.
 # ^ ONE capture as a flat chronological story, ids resolved + LDB text decrypted inline (`./run.sh --timeline <dump>`;
