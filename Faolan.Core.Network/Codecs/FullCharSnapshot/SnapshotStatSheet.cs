@@ -102,11 +102,16 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// truncating the low word would look like a robbery.
 			yield return (CharacterStatId.Money, character.Money > uint.MaxValue ? uint.MaxValue : (uint)character.Money);
 
-			// The kill/death counters the sheet shows. They were on the not-modelled list as "not tracked", which was
-			// true of the COLUMNS rather than of the events: the server already knew, at the XP award and at the
-			// death persist, and was throwing the count away.
-			yield return (CharacterStatId.PvPTotalKills, character.Kills);
-			yield return (CharacterStatId.PvPTotalDeaths, character.Deaths);
+			// The PvP CAREER pair - and only that pair (#808). These two slots sit in a contiguous PvP/minigame block
+			// (`CaptureSkullWins`/`Losses` are the next ids along), and retail's live level-80 holder carries 239/521
+			// in them, which is a PvP record rather than the record of a character who levelled on mobs.
+			//
+			// ⛔ The PvE counters go NOWHERE. `NPCKills` (0x298) and `NPCDeaths` (0x299) are the only two ids of that
+			// 0x290-0x29F run ABSENT from that same holder's 240 stats - the client names them and retail does not
+			// populate them - so `character.NpcKills`/`NpcDeaths` stay server-side bookkeeping. Sending them would be
+			// inventing a message retail does not.
+			yield return (CharacterStatId.PvPTotalKills, character.PvpKills);
+			yield return (CharacterStatId.PvPTotalDeaths, character.PvpDeaths);
 
 			// The character's SEX. The fresh skeleton hardcodes 3 (the captured character's), and the corpus shows the
 			// slot taking 0, 2 and 3 - so it is per-character, and the enum's values ARE the wire codes.

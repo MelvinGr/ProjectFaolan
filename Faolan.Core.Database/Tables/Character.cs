@@ -204,12 +204,25 @@ namespace Faolan.Core.Database.Tables
 		public ulong Money { get; set; }
 		public ushort Level { get; set; }
 
-		// Kill/death counters, shown on the character sheet (snapshot stats Kills 0x2A2 / Deaths 0x292). They vary per
-		// character across the captured corpus, so carrying them at the captured character's value shipped someone
-		// else's record to everyone (#447). Incremented where the server already knows: CombatService on a kill,
-		// WorldSimulation when the player dies.
-		public uint Kills { get; set; }
-		public uint Deaths { get; set; }
+		// TWO pairs, because the client keeps two (#808). Retail's live level-80 StatHolder settles which is which:
+		// `PvPTotalKills` 0x290 = 239 and `PvPTotalDeaths` 0x292 = 521 sit in a contiguous PvP/minigame career block
+		// with `CaptureSkullWins` 0x29C = 13 and `CaptureSkullLosses` 0x29D = 10 beside them - and dying more than
+		// twice per kill is a PvP record, not the record of a character who levelled to 80 on mobs.
+		//
+		// ⚠️ `NPCKills` (0x298) and `NPCDeaths` (0x299) are the ONLY two ids of that 0x290-0x29F run ABSENT from the
+		// live holder's 240 stats. The client names them; retail does not populate them. So these two columns are
+		// server-side bookkeeping and must NOT be sent - see SnapshotStatSheet.
+		//
+		// Incremented where the server already knows: CombatService on a kill, WorldSimulation when the player dies.
+		// Both of those are PvE-only paths today, which is exactly why they used to feed the PvP slots wrongly.
+		public uint NpcKills { get; set; }
+		public uint NpcDeaths { get; set; }
+
+		// The PvP CAREER pair the snapshot's 0x290/0x292 carry. Nothing increments them yet - the server has no PvP
+		// kill path - and 0 is what retail sends for a character with no PvP record, so they are correct at rest
+		// rather than merely unimplemented (#808).
+		public uint PvpKills { get; set; }
+		public uint PvpDeaths { get; set; }
 
 		// The PvP MURDER POINTS pool (#503), in WIRE units - the value that goes on stat 0x449 ("Murder Points", named
 		// by the client's own LDB string table). Retail put 3500 on it for a single player kill, and the player read

@@ -266,9 +266,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset?>("CriminalUntil")
                         .HasColumnType("TEXT");
 
-                    b.Property<uint>("Deaths")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Experience")
                         .HasColumnType("INTEGER");
 
@@ -285,9 +282,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDead")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Kills")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Language")
@@ -320,6 +314,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<uint>("NpcDeaths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("NpcKills")
+                        .HasColumnType("INTEGER");
+
                     b.Property<float>("PositionX")
                         .HasColumnType("REAL");
 
@@ -328,6 +328,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<float>("PositionZ")
                         .HasColumnType("REAL");
+
+                    b.Property<uint>("PvpDeaths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PvpKills")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Race")
                         .HasColumnType("INTEGER");

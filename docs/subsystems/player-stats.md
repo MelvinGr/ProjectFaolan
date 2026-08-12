@@ -163,13 +163,29 @@ data sources, not a disagreement with the client.
 | `0x001B` | HealthCurrent | 127000 | 1270 | 1270 / 1270 ✓ |
 | `0x01FA` | ManaCurrent | 7400 | 74 | 74 / 74 ✓ |
 | `0x01F8` | StaminaCurrent | 114800 | 1148 | 1148 / 1148 ✓ |
-| `0x0290` | KillingBlows | 9 | 9 | Kills overall 9 ✓ |
-| `0x0292` | Death | 11 | 11 | Deaths overall 11 ✓ |
+| `0x0290` | PvPTotalKills | 9 | 9 | Kills overall 9 ✓ |
+| `0x0292` | PvPTotalDeaths | 11 | 11 | Deaths overall 11 ✓ |
 | `0x0033` | PvpExp | 0 | 0 | PvP exp 0 ✓ |
 | `0x0161` | PvpMaxExp | 3500 | 3500 | PvP exp `/ 3500` ✓ |
 | `0x0046` | PvpLevel | 0 | 0 | PvP level 0 ✓ |
 | `0x0034` | Exp | 242199 | — | cumulative total (sheet shows within-level 11959/33400) |
 | `0x015E` | MaxExp | 263640 | — | cumulative total |
+
+⚠️ Those two were called `KillingBlows` / `Death` here until #808. The client's own compiled registry calls them
+`PvPTotalKills` / `PvPTotalDeaths` (#625), and the screenshot's own wording is the corroboration rather than a
+contradiction: **"overall"** is the opposite of *seasonal*, and both ids have a `*Seasonal` twin four slots apart
+(`0x566` / `0x567`). It is a career PvP total, not a total of all kills.
+
+Three statements agree, and they are independent of each other:
+
+* the compiled registry's names;
+* the CONTIGUITY - retail's live level-80 holder carries `0x290 = 239`, `0x292 = 521`, `CaptureSkullWins`
+  `0x29C = 13` and `CaptureSkullLosses` `0x29D = 10`, i.e. one unbroken PvP/minigame career block;
+* the RATIO - 239 kills against 521 deaths is a PvP record. No character levels to 80 dying twice per kill.
+
+⛔ And `NPCKills` (`0x298`) / `NPCDeaths` (`0x299`) are the **only two ids of that `0x290`-`0x29F` run absent from
+that holder's 240 stats**. The client names them; retail does not populate them. So the PvE counters our server
+keeps (`Character.NpcKills`/`NpcDeaths`) stay server-side and go nowhere on the wire.
 
 The screenshot was at full, so the Health/Mana/Stamina **current** ids above read the same as max. The matching
 **max** ids were recovered separately from the vitals packet — see next section.

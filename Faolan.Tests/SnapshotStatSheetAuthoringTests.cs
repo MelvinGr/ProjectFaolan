@@ -115,8 +115,8 @@ namespace Faolan.Tests
 		public void TheKillAndDeathCounters_ReachTheSheet()
 		{
 			var veteran = Character(level: 40, exp: 0, Sex.Male);
-			veteran.Kills = 239;
-			veteran.Deaths = 37;
+			veteran.PvpKills = 239;
+			veteran.PvpDeaths = 37;
 
 			var sheet = SnapshotStatSheet.For(veteran, null, null);
 

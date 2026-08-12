@@ -697,12 +697,11 @@ namespace Faolan.GameServer.Combat
 
 			// The sheet's kill counter (#447). Persisted here rather than at autosave for the same reason the XP is:
 			// a kill is earned once, and a crash between the kill and the save loses it.
-			// ⚠️ This counts EVERY kill and the snapshot sends it as `PvPTotalKills` (0x290), the client's PvP CAREER
-			// slot - while the client carries a separate `NPCKills` (0x298) nothing writes. So a mob kill currently
-			// lands on the player's PvP record. Naming settled in #625; the split is #808, which wants a capture
-			// before anything moves.
-			character.Kills++;
-			await _database.SetCharacterKillCounts(character.Id, character.Kills, character.Deaths);
+			// This is the NPC counter, not the PvP one (#808): the slot the snapshot sends as `PvPTotalKills` (0x290)
+			// is a PvP CAREER total, and a mob kill used to land on it. `AwardKillXp` is reached only for a creature
+			// kill - it takes the NPC's level - so every increment here is PvE by construction.
+			character.NpcKills++;
+			await _database.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
 
 			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
 			character.Experience = remaining;
