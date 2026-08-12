@@ -498,7 +498,7 @@ namespace Faolan.Importer.Cli
 				{
 					var teleport = TeleportCodec.Parse(content);
 					var destination = teleport.Proxy.MapId;
-					var where = teleport is N3TeleportIIR n3 ? $" to {Pos(n3.Position)}" : "";
+					var where = teleport is N3TeleportIIR n3 ? $" to {Pos(n3.ArrivalPosition)}" : "";
 					return $"teleport{where} on playfield {destination}"
 					       + (look.Maps.TryGetValue(destination, out var mapName) ? $" \"{mapName}\"" : "");
 				}
@@ -758,11 +758,11 @@ namespace Faolan.Importer.Cli
 
 				case KnubotCloseChatWindowIIR close:
 				{
-					// The close carries a string list that is the EMPTY sentinel in every capture - LDB[100][0], which
+					// The close carries one screen that is the EMPTY sentinel in every capture - LDB[100][0], which
 					// resolves to "" now that the plaintext categories are readable (#561). Printing it would leave a
-					// dangling colon, so an all-empty list renders as nothing rather than as an empty quote.
-					var closing = close.Strings.Select(look.Text).Where(t => t.Length > 0).ToList();
-					return $"closes dialogue with {who}" + (closing.Count > 0 ? ": " + string.Join(" | ", closing) : "");
+					// dangling colon, so an empty screen renders as nothing rather than as an empty quote.
+					var closing = look.Text(close.Text);
+					return $"closes dialogue with {who}" + (closing.Length > 0 ? ": " + closing : "");
 				}
 
 				default:

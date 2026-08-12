@@ -162,7 +162,7 @@ namespace Faolan.GameServer.World
 		// The actual position move to the res point: the revive n3Teleport (0x5A32F0D7) carrying the destination
 		// position. The IntendedTeleport above only confirms the playfield (no move); retail follows it with THIS to
 		// relocate the player (#214, decoded from the beach resurrect sequence IntendedTeleport -> n3Teleport).
-		Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ);
+		Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, Quaternion rotation);
 
 		// The same-map revive teleport (IntendedTeleport 0x10D27BC0) relocating the revived player to the chosen res
 		// point with NO loading screen. playfieldToken MUST be the client's LIVE token (Zone.PlayfieldToken) so the

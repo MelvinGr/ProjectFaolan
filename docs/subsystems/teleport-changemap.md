@@ -47,19 +47,39 @@ Reader `FUN_005bfce0` = the PlayfieldProxy + a trailing bool.
 
 ## n3TeleportIIR_t (0x5A32F0D7) — destination announce
 
-Reader `FUN_005d1ae0`: 7 leading words, the PlayfieldProxy, 2 words, a **length-prefixed blob** (`FUN_00cbf5d0`,
-the spawn position), and a trailing bool. Every byte of the captured body is reader-accounted (108/108):
+Reader `FUN_005d1ae0`: an arrival transform, the PlayfieldProxy, 2 words, a **length-prefixed blob**
+(`FUN_00cbf5d0`, the spawn position), and a trailing bool. **One grammar covers all 128 captured records**
+[V3: TeleportHandoffTests.ParseSameMapDestBody_ReadsTheRotationAsAQuaternion]:
 
 ```
-[u32 0x5A32F0D7][u32 0xC350][u32 clientInstance][u8 env=0x00]   # carrier
-[6x u32 0][f32 1.0]                                # 7 leading words -> obj+0x2c.. (the 7th = 1.0)
-[u8 'b'][u32 0xC79C][u32 destMap]                  # PlayfieldProxy (FUN_00a6a600): version + u32[0..1]
-[u32 0][u32 0][u32 0]                               #   u32[2..4] = 0
-[u32 1][u32 0x9C50][u32 destPlayfieldToken][u8 0]  #   u32[5]=ready-flag, [6]=0x9C50, [7]=token, + bool
+[u32 0x5A32F0D7][u32 0xC350][u32 clientInstance][u8 env]   # carrier; env 0 s2c (113), 1 on the client's echo (15)
+[f32 x][f32 y][f32 z]                              # the ARRIVAL position    -> obj+0x2c..
+[f32 qx][f32 qy][f32 qz][f32 qw]                   # the ARRIVAL rotation, a unit quaternion
+[u8 'b'][u32 classWord][u32 destMap]               # PlayfieldProxy (FUN_00a6a600): version + u32[0..1]
+[u32 0][u32 owner][u32 0]                          #   u32[2..4] - the owner pair, see PlayfieldProxy
+[u32 slot5][u32 0x9C50][u32 destPlayfieldToken][u8 0]  #   u32[5..7] + the proxy bool
 [u32 0][u32 0]                                     # -> obj+0x6c / +0x70
-[u32 len=20][u32 0x00018704][pos x/y/z f32 BE][u32 destDescriptor]  # the spawn-position blob (FUN_00cbf5d0)
-[u8 0]                                             # n3TeleportIIR trailing bool -> obj+0x90
+[u32 len][u32 0x00018704][pos x/y/z f32 BE][u32 destDescriptor]  # the spawn-position blob (FUN_00cbf5d0)
+[u8 trailing]                                      # n3TeleportIIR trailing bool -> obj+0x90
 ```
+
+### The two forms are the blob's LENGTH, not two grammars
+
+The census splits cleanly and the length word states which side a record is on — no heuristic:
+
+| | records | leading transform | blob | trailing | proxy class |
+|---|---:|---|---|---:|---|
+| **cross-map announce** (a loading screen) | 92 | zero + identity | 20 B — the arrival | `0` | `0xC79C` (`0xCABC` once, epic) |
+| **same-map relocate** (no loading screen) | 36 | the arrival | **absent**, `len = 0` | `1` | `0xC7A0` |
+
+⚠️ This used to be read as two grammars told apart by the leading block ("six zero words and a `1.0f`"). That
+block is the same position + quaternion pair at zero and **identity**, which is why it read as a discriminating
+constant — the same trap the `0x3F1` list-frame notes describe, one field wider.
+
+⚠️ And the four words after the position are a **quaternion**, not `facingX, 0, facingZ` with two zero words:
+`x²+y²+z²+w²` is 1.0 to within 1e-4 on every one of the 128 records, including the 34 whose `x` and `z` are
+non-zero. Deriving a horizontal facing direction and writing it into two of those slots — which is what the
+revive path did — encodes a rotation of twice the intended yaw.
 
 The fields earlier carried as "loose" are now placed precisely: **`0x9C50` and the playfield token are
 `proxy[6]`/`proxy[7]` INSIDE the PlayfieldProxy** (with `proxy[5]=1` a ready/valid flag), and the **position +

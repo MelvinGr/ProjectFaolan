@@ -235,7 +235,7 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
-		public Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ)
+		public Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, Quaternion rotation)
 		{
 			return Task.CompletedTask;
 		}

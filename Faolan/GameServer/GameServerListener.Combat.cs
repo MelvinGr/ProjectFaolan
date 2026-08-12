@@ -79,12 +79,12 @@ namespace Faolan.GameServer
 				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Revive(handle, respawnPointId)))));
 		}
 
-		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ)
+		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, Quaternion rotation)
 		{
 			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
 			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, facingX, facingZ))));
+				b => b.WriteArrayUInt32Length(TeleportCodec.Build(handle, mapId, handle, position, rotation))));
 		}
 
 		async Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)

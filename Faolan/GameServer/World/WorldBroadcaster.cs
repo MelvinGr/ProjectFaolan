@@ -1853,6 +1853,16 @@ namespace Faolan.GameServer.World
 			return cash;
 		}
 
+		// The bag-window side of a cash take (#809): retail answers every TryLootCash with a LootRemoveItems carrying
+		// the amount and an EMPTY position list - the money row leaving the open window, the exact counterpart of the
+		// item take's slot list. Measured on the eight cash loots in
+		// xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city, where the value equals the DispatchUpdateCash
+		// delta every time. We were crediting the wallet and never sending this, so the window kept showing the coins.
+		public Task AfterLootCash(INetworkClient client, uint bagHandle, uint cash)
+		{
+			return WorldIir.Send(client, LootRemoveItemsCodec.Build(new LootRemoveItemsIIR(bagHandle, [], cash)));
+		}
+
 		// #363 `.togglenpcgroup`: flip the dev spawn-area nameplate labels for the WHOLE server, then immediately
 		// re-apply to every labelled NPC the caller already knows in their zone - pushing the area label when turning ON,
 		// or restoring the plain creature name (which matches the client's LDB name) when turning OFF - so the toggle is

@@ -10,8 +10,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// the generic action pulse, animations aimed at world objects, the equip/interact acks, the death transition and
 	// the revive.
 	//
-	// ONE grammar, always:
-	//   [u32 subop][u32 class=0xC350][u32 actor][u16 seq][u32 delay if seq==0x0E][u32 behaviorId][u32 argsLen][args protobuf][tail]
+	// The grammar is chosen by the PHASE byte, and the client's own reader (`BccIIR::ReadSubClass`, FUN_005e24e0) is
+	// the spec - four shapes, mirrored exactly by its writer (FUN_005e2650):
+	//
+	//   2,3,4,5,7,0xA,0xF,0x10,0x12 : [u32 behaviorId][u32 argsLen][args protobuf][tail]   - a COMMAND
+	//   0x0E                        : [u32 delay][u32 behaviorId][u32 argsLen][args][tail] - a command, deferred
+	//   0x0B,0x0C                   : [u32 stateWord]                                      - and nothing else
+	//   6,8,9,0xD,0x11              : (nothing at all)
+	//
+	// so a record is `[u32 subop][u32 class=0xC350][u32 actor][u16 seq][ the phase's own payload ]`.
 	//
 	// That is what collapsed FIVE emitters into this one codec (#530 wave 4). They had each named the same six fields
 	// differently and two of them did not realise they were writing this record at all: the death BCC called `seq` a
@@ -46,15 +53,30 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The one phase whose record carries an EXTRA u32 in front of the behaviorId - see BehaviorControlCenterIIR.
 		private const byte DelayPhase = 0x0E;
 
+		// The two phases that carry a bare u32 INSTEAD of a command - see BehaviorControlCenterIIR.StateWord.
+		private static readonly byte[] StatePhases = [0x0B, 0x0C];
+
+		// The phases that read a COMMAND (client `ReadSubClass`'s first switch arm, plus the delay phase). Every other
+		// phase byte - 6/8/9/0xD/0x11 explicitly, and anything unlisted through the `default:` arm - ends at the seq
+		// word. This is a positive list precisely because `default:` reads nothing: guessing the other way round would
+		// make an unseen phase byte parse as a command and swallow the next record.
+		private static readonly byte[] CommandPhases = [0x02, 0x03, 0x04, 0x05, 0x07, 0x0A, 0x0E, 0x0F, 0x10, 0x12];
+
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(BehaviorControlCenterIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
 
-			// The phase byte alone decides whether the delay word is on the wire, so a value that disagrees with it
-			// would build a body the client reads one field out of step - refuse rather than silently drop/insert.
+			// The phase byte alone decides the record's SHAPE, so a value that disagrees with it would build a body
+			// the client reads out of step - refuse rather than silently drop/insert a field.
 			if ((value.DelayCentiseconds != null) != IsDelayPhase(value.Seq))
 				throw new ArgumentException($"DelayCentiseconds is carried by phase 0x{DelayPhase:X2} and only by it (seq 0x{value.Seq:X4}, delay {value.DelayCentiseconds?.ToString() ?? "none"})", nameof(value));
+
+			if ((value.StateWord != null) != IsStatePhase(value.Seq))
+				throw new ArgumentException($"StateWord is carried by phases 0x0B/0x0C and only by them (seq 0x{value.Seq:X4}, state {value.StateWord?.ToString() ?? "none"})", nameof(value));
+
+			if (!CarriesCommand(value.Seq) && (value.BehaviorId != 0 || value.Args.Length != 0 || value.Tail.Length != 0))
+				throw new ArgumentException($"phase 0x{(byte)value.Seq:X2} carries no command block, so it has nowhere to put one (seq 0x{value.Seq:X4}, behavior 0x{value.BehaviorId:X}, {value.Args.Length} args + {value.Tail.Length} tail bytes)", nameof(value));
 
 			using var s = new FaolanStream();
 			Write(s, value);
@@ -75,7 +97,20 @@ namespace Faolan.Core.Network.Codecs.Combat
 			r.ExpectU32Be(EntityClass.Character, "entity class");
 			var actor = r.ReadU32Be();
 			var seq = r.ReadU16Be();
+
+			if (IsStatePhase(seq))
+				return new BehaviorControlCenterIIR(actor, seq, 0, [], [], StateWord: r.ReadU32Be());
+
+			if (!CarriesCommand(seq))
+				return new BehaviorControlCenterIIR(actor, seq, 0, [], []);
+
 			var delay = IsDelayPhase(seq) ? r.ReadU32Be() : (uint?)null;
+
+			// `case 0xe` reads the commandId only when the delay is non-zero - a zero delay ends the record there.
+			// No captured record takes that arm (all eight are 0.50-0.71 s), but the reader's shape is the contract.
+			if (delay == 0)
+				return new BehaviorControlCenterIIR(actor, seq, 0, [], [], delay);
+
 			var behaviorId = r.ReadU32Be();
 			var args = r.ReadBytesU32Length().ToArray();
 			return new BehaviorControlCenterIIR(actor, seq, behaviorId, args, r.ReadRemaining().ToArray(), delay);
@@ -89,8 +124,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(v.Actor)
 				.WriteUInt16(v.Seq);
 
+			if (v.StateWord is { } state)
+			{
+				s.WriteUInt32(state);
+				return;
+			}
+
+			if (!CarriesCommand(v.Seq))
+				return;
+
 			if (v.DelayCentiseconds is { } delay)
+			{
 				s.WriteUInt32(delay);
+				if (delay == 0)
+					return; // see Read: a zero delay ends the record before the commandId
+			}
 
 			s
 				.WriteUInt32(v.BehaviorId)
@@ -103,6 +151,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private static bool IsDelayPhase(ushort seq)
 		{
 			return (byte)seq == DelayPhase;
+		}
+
+		private static bool IsStatePhase(ushort seq)
+		{
+			return Array.IndexOf(StatePhases, (byte)seq) >= 0;
+		}
+
+		// Whether this phase reads a behaviorId + args + tail at all. The client's `default:` arm reads NOTHING, so an
+		// unlisted phase ends at the seq word exactly like the terminal ones - which is why the two are one test here.
+		private static bool CarriesCommand(ushort seq)
+		{
+			return Array.IndexOf(CommandPhases, (byte)seq) >= 0;
 		}
 	}
 
@@ -128,5 +188,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Missing that extra word is what made those ten look like commands 0x32/0x35/0x39/0x3A/0x47, none of which the
 	// client's classmap registers - the shape of the "third registration site" #549 was opened to find. There is no
 	// third site: every one of the ten is a Magic:Attack (0x04) or ObjectInteraction (0x2A) read one field out of step.
-	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null);
+	//
+	// ⚠️ `StateWord` is present for phases 0x0B/0x0C and ONLY for them, and like the delay it is a different record
+	// SHAPE rather than optional data: those two arms of `ReadSubClass` read one u32 into `this+0x28` and return, so
+	// the record carries NO command at all and is 18 bytes on the wire. Nine such records are captured (#809) - the
+	// codec used to refuse every one of them, looking for a behaviorId that is not there. What the word MEANS is
+	// undecoded [V0]: it is 60 on four records from four different actors and captures, 84 on three from one NPC
+	// (0x0B once then 0x0C twice, over the ~15 s before that NPC dies), 33 and 83 once each. All nine are s2c, so the
+	// client only ever reads the field and no client-side call site names it.
+	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null, uint? StateWord = null);
 }

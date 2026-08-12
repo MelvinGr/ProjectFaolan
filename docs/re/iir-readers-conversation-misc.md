@@ -49,7 +49,21 @@ The Knubot conversation carrier nests **both** endpoints: the player is the carr
 | `0x4D7D9123` | `KnubotAnswerIIR_c` | `9a5d90` | `[u32]` (selected answer id) |
 | `0x045B0B0F` | `KnubotOpenChatWindowIIR_c` | `9a5590` | `[u8]` |
 | `0x7446F3FA` | `KnubotFinishTradeIIR_c` | `9a7c20` | `[u32 bool][u64]` |
-| `0x4A3D899A` | `KnubotAppendTextIIR_c` | `9a4de0` | `[u32][u16 strLen][str][u8 bool]` |
+| `0x4A3D899A` | `KnubotAppendTextIIR_c` | `9a4de0` | `[u32 TextType][u16 strLen][str][u8 bool]` |
+| `0xC4AF39EB` | `KnubotCloseChatWindowIIR_c` | `9a58d0` | `[u32 TextType][u16 strLen][str]` |
+| `0xF164A4A5` | `KnubotAnswerListIIR_c` | `9a3a10` | `[u32 nAnswerCount][ count × ([u16 len][str]) ]` |
+
+**`TextType`** is the client's own name for the leading word: `KnubotAppendTextIIR_c::WriteSubClass`
+(`FUN_009A4EC0`) logs *"NPC %d speaking with Character %d: TextType %d, Text length = %d"*. It is 1 on 897 of the
+907 captured dialogue lines and 6 on the other 10; what those select is undecoded.
+
+⚠️ **`KnubotCloseChatWindow` is NOT the AnswerList body** (#809). The two are indistinguishable on all 179
+captured s2c closes, every one of which carries `[00000001][005F][<a 95-byte empty remoteformat>]` — identical
+bytes whether the leading 1 is a list COUNT with one string after it, or a `TextType` with one string after it.
+The readers settle it: `9a3a10` validates `nAnswerCount` into 1..1000 **by name** and then loops, while `9a58d0`
+reads one `u32` into `this+0x34` and ONE `std::string` into `this+0x38` with no loop — and its `WriteSubClass`
+logs that string as *"Text length"*. Reading the close as a list is what refused the 7 captured **c2s** records,
+whose `[00000000][0000]` is a `TextType` of 0 and an EMPTY text.
 
 **`KnubotAppendTextIIR_c`** is the NPC dialogue line: its length-prefixed string is the
 `remoteformat` **XML dialogue payload**, e.g.

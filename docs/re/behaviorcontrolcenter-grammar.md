@@ -21,8 +21,19 @@ the looked-up Command object's reader (another vtable hop). The combat-relevant 
 are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
 
 ⚠️ **Type `0x0E` is the one branch that puts an extra word in front of the commandId** — see "The delay phase"
-below. Every other type the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) goes straight to the commandId, which
+below. Most other types the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) go straight to the commandId, which
 is why reading them all one way looked right for so long.
+
+⚠️ **`0x0B` and `0x0C` carry a bare `u32` and NO command at all**, and the corpus has nine of them — 18-byte
+records that `BehaviorControlCenterCodec` refused outright until #809, running out of bytes looking for an
+`argsLen` that is not there. The writer (`FUN_005e2650`) mirrors the reader exactly: its `case 0xb: case 0xc:`
+writes one word and returns. What the word means is undecoded: all nine are s2c, so no client-side call site
+names it, and it is 60 on four records from four different actors and captures, 84 on three from one NPC
+(`0x0B` once then `0x0C` twice, over the ~15 s before that NPC dies), 33 and 83 once each.
+
+⚠️ **The `default:` arm reads nothing**, so an unlisted phase byte ends the record at the phase word exactly like
+the explicitly terminal `6/8/9/0xD/0x11` do. `CommandPhases` in the codec is therefore a POSITIVE list: guessing
+the other way round would make an unseen phase parse as a command and swallow whatever followed it.
 
 ## The Command catalog — `InstantiateCommand::classmap` (#536)
 

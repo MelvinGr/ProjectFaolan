@@ -6,9 +6,23 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// LootRemoveItemsIIR (0x70010162) - the per-take ACK that tells the client which display slot(s) to remove from
-	// the open bag window; the client removes them and compacts the window. 25 B for the single-slot case:
-	//   [subop][0xC87A LootBag][bagHandle][u32 0][u8 0][ListFrame count][u32 removedPos ...]
+	// LootRemoveItemsIIR (0x70010162) - the per-take ACK that tells the client what to remove from the open bag
+	// window; the client removes it and compacts the window. 25 B for the single-slot case:
+	//   [subop][0xC87A LootBag][bagHandle][u8 env][u32 cash][ListFrame count][u32 removedPos ...]
+	//
+	// ⚠️ The two fields after the handle used to be read as `[u32 reserved][u8 marker]`, both required to be zero -
+	// a MISALIGNED split that is invisible while both are (#809). The client's own reader says otherwise: after the
+	// carrier's standard `[u8 env]`, `LootRemoveItemsIIR_c::ReadSubClass` (FUN_007A5950) reads ONE u32 into
+	// `this+0x3c` and then the count-framed list (FUN_004D4EF0, the generic `word/0x3F1 - 1` reader). Straddling
+	// those two made the u32 look like a zero word plus a stray byte, and 48 of the 148 captured records - every one
+	// carrying a non-zero value - were refused outright.
+	//
+	// ⭐ That u32 is the CASH taken out of the bag. Proven on the eight cash loots in
+	// `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city`: each `TryLootCash` is answered by a
+	// `DispatchUpdateCash` and this record, and the value equals the player's cash DELTA exactly, every time
+	// (21, 1, 30, 1, 3, 1, 3, 36). It is a strict alternative to the position list across all 148 captured records:
+	// a cash take sends `[cash=N][empty list]`, an item take `[cash=0][the slots]`, and neither ever sends both.
+	//
 	// The removed positions are a COUNT-FRAMED LIST, not a landmark plus a value. This used to be written as
 	// `[u32 0x00000007][u8 0xE2]`, straddling the word boundary, and described as "the 0x000007E2 landmark is a
 	// fixed constant here" - the exact mistake the project rule names: 0x7E2 is ListFrame.ForCount(1), every
@@ -46,6 +60,7 @@ namespace Faolan.Core.Network.Codecs.World
 			return Build(new LootRemoveItemsIIR(bagHandle, removedPositions));
 		}
 
+
 		public static LootRemoveItemsIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(LootRemoveItemsCodec));
@@ -59,23 +74,24 @@ namespace Faolan.Core.Network.Codecs.World
 			r.ExpectU32Be(Opcode, "LootRemoveItemsIIR subop");
 			r.ExpectU32Be(EntityClass.LootBag, "entity class");
 			var bagHandle = r.ReadU32Be();
-			r.ExpectU32Be(0, "reserved word");
-			r.ExpectU8(0, "record marker");
+			var env = r.ReadU8();
+			var cash = r.ReadU32Be();
 			var count = r.ReadListCount();
 			var positions = new List<uint>(count);
 			for (var i = 0; i < count; i++)
 				positions.Add(r.ReadU32Be());
-			return new LootRemoveItemsIIR(bagHandle, positions);
+			return new LootRemoveItemsIIR(bagHandle, positions, cash, env);
 		}
 
 		internal static void Write(FaolanStream s, LootRemoveItemsIIR v)
 		{
-			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.LootBag).WriteUInt32(v.BagHandle).WriteUInt32(0).WriteByte(0x00).WriteUInt32(ListFrame.ForCount(v.RemovedPositions.Count));
+			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.LootBag).WriteUInt32(v.BagHandle).WriteByte(v.Env).WriteUInt32(v.Cash).WriteUInt32(ListFrame.ForCount(v.RemovedPositions.Count));
 			foreach (var pos in v.RemovedPositions)
 				s.WriteUInt32(pos);
 		}
 	}
 
-	// LootRemoveItemsIIR (0x70010162).
-	public sealed record LootRemoveItemsIIR(uint BagHandle, IReadOnlyList<uint> RemovedPositions);
+	// LootRemoveItemsIIR (0x70010162). `Cash` and `RemovedPositions` are alternatives - a take is one or the other,
+	// never both (148/148 captured records). `Env` is the carrier's env byte, 0 on every captured record.
+	public sealed record LootRemoveItemsIIR(uint BagHandle, IReadOnlyList<uint> RemovedPositions, uint Cash = 0, byte Env = 0);
 }

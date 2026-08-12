@@ -227,6 +227,11 @@ namespace Faolan.Tests
 			body.WriteU32Be(4, 0x642CD3D6);
 			body.WriteU32Be(8, 0x0000C350);
 			body.WriteU32Be(12, instance);
+			// The BCC phase. It used to be left at 0, which retail never sends - the corpus carries 2/3/4/5/7/0xA/
+			// 0xB/0xC/0xE/0xF/0x10 and nothing else, and the client's reader ends the record at the phase word for
+			// anything it does not list, so a zero here is a record with no command at all (#809). 2 is what a c2s
+			// UseCharacter (0x16) talk actually carries.
+			body.WriteU16Be(16, 0x0002);
 			body.WriteU32Be(18, 0x16);
 			body.WriteU32Be(22, (uint)args.Length);
 			args.CopyTo(body, 26);

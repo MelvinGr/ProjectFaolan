@@ -138,10 +138,19 @@ Per-packet byte layouts (server→client):
    larger variant carries the full `lootbag_open` TreasureChestScript remoteformat; the server echoes it.
 3. **`0xD06568C8` `NewCurrentLooterIIR_c`** + **`0x1E2E0139` `NewAllowedLooterIIR_c`** (server→client, 21 B):
    `<subop> [c87a] [bagHandle] 00 0000c350 [playerHandle]` = "bag → current/allowed looter = this player".
-4. **Remove** — **`0x70010162` `LootRemoveItemsIIR_c`** (25 B): `<subop> [c87a] [bagHandle] 00000000 [slot/count]
-   [5B tail]` removing the item from the bag. No separate "take" upload → Tortage starter loot is **auto-loot on
-   use**. The item lands in the player's bag **client-side** (no server add-item packet; the snapshots
-   `0x79F8C7A1`/`0x63268258` seen here are quest updates, not an inventory grant).
+4. **Remove** — **`0x70010162` `LootRemoveItemsIIR_c`** (25 B for one slot):
+   `<subop> [c87a] [bagHandle] [u8 env] [u32 cash] [ListFrame count] [u32 pos …]`, removing what was taken from the
+   bag window. `LootRemoveItemsIIR_c::ReadSubClass` (`FUN_007A5950`) is one `u32` into `this+0x3c` and then the
+   generic count-framed list reader (`FUN_004D4EF0`, `word/0x3F1 - 1`).
+   ⭐ **That `u32` is the CASH.** On the eight cash loots in
+   `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` it equals the `DispatchUpdateCash` delta exactly
+   (21, 1, 30, 1, 3, 1, 3, 36), and across all 148 captured records it is a strict alternative to the position list:
+   a cash take sends `[cash=N][empty list]`, an item take `[cash=0][the slots]`, never both.
+   ⚠️ Written here as `00000000 [slot/count] [5B tail]` until #809 — a split one byte out of step, invisible while
+   the cash is zero, which made every cash record unreadable.
+   No separate "take" upload → Tortage starter loot is **auto-loot on use**. The item lands in the player's bag
+   **client-side** (no server add-item packet; the snapshots `0x79F8C7A1`/`0x63268258` seen here are quest updates,
+   not an inventory grant).
 5. **`0x66180B20` `n3ToClientFadeIIR_t`** (fade, 17 B): `<subop> [c87a] [bagHandle] 00 [float fadeSeconds]` (e.g.
    `40400000`=3.0). The **graceful despawn** variant: marker `0x00` + a FLOAT fade-time, vs `n3ToClientQuit`'s marker
    `0x01` + u32 playfield token (`protocol_despawn_n3toclientquit`). Good fit for loot expiry (and possibly death).

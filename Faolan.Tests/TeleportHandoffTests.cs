@@ -65,5 +65,37 @@ namespace Faolan.Tests
 			Assert.Equal(145.31f, body.ReadF32Be(95));
 			Assert.Equal(704.9f, body.ReadF32Be(99));
 		}
+
+		// The SAME-MAP announce (#809). Stihetfv frame 1277, the beach resurrect on map 0xFAA: 88 bytes, an arrival
+		// transform in the leading slot, an EMPTY spawn blob and trailing 1. This form had no golden, which is how our
+		// builder came to emit 89 bytes - a second trailing byte the wire does not carry.
+		[Fact]
+		public void BuildSameMapDestBody_MatchesCapture()
+		{
+			var body = TeleportCodec.Build(0x021663DD, 0x0FAA, 0x021663DD, new Vector3(336.30899f, 148.372513f, 660.968018f),
+				new Quaternion(0f, -0.9993636f, 0f, -0.035696145f));
+
+			Assert.Equal(88, body.Length);
+			Assert.Equal(
+				"5a32f0d70000c350021663dd0043a8278d43145f5d44253df400000000bf7fd64b00000000bd12361f620000c7a000000faa00000000021663dd000000000000000000000000000000000000000000000000000000000001",
+				Convert.ToHexStringLower(body));
+		}
+
+		// A PITCHED arrival - the shape the old "facingX, 0, facingZ" model could not express at all, and refused.
+		// Hoxxling gameplay2 frame 9112: all four rotation words non-zero, and they normalise to 1.0.
+		[Fact]
+		public void ParseSameMapDestBody_ReadsTheRotationAsAQuaternion()
+		{
+			var captured = Convert.FromHexString(
+				"5a32f0d70000c3500802e5d400437f999a431a654f43d48ccdbc2b72cd3e04265c3ab222c53f7dd84b620000c7a0000003fc0000000000000000000000000000000000000000000000000000000000000000000000000001");
+
+			var parsed = Assert.IsType<N3TeleportIIR>(TeleportCodec.Parse(captured));
+
+			Assert.Null(parsed.Spawn); // no blob: the arrival is the leading transform
+			Assert.Equal(1f, parsed.Rotation.Length(), 4);
+			Assert.Equal(parsed.Position, parsed.ArrivalPosition);
+			Assert.Equal((byte)0x01, parsed.Trailing);
+			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
+		}
 	}
 }

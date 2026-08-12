@@ -73,10 +73,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 				case IirTypes.KnubotAppendTextIIR:
 				{
-					var field = r.ReadU32Be();
+					var textType = r.ReadU32Be();
 					var xml = r.ReadBytesU16Length().ToArray();
 
-					return new KnubotAppendTextIIR(player, npc, env, field, xml, r.ReadU8());
+					return new KnubotAppendTextIIR(player, npc, env, textType, xml, r.ReadU8());
 				}
 
 				case IirTypes.KnubotAnswerListIIR:
@@ -86,7 +86,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 				case IirTypes.KnubotCloseChatWindowIIR:
 				{
-					return new KnubotCloseChatWindowIIR(player, npc, env, ReadStrings(ref r));
+					return new KnubotCloseChatWindowIIR(player, npc, env, r.ReadU32Be(), r.ReadBytesU16Length().ToArray());
 				}
 
 				case IirTypes.KnubotAnswerIIR:
@@ -114,7 +114,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 				case KnubotAppendTextIIR text:
 				{
-					Header(s, IirTypes.KnubotAppendTextIIR, text).WriteUInt32(text.Field).WriteUInt16(text.Xml.Length).WriteArray(text.Xml).WriteByte(text.Trailing);
+					Header(s, IirTypes.KnubotAppendTextIIR, text).WriteUInt32(text.TextType).WriteUInt16(text.Xml.Length).WriteArray(text.Xml).WriteByte(text.Trailing);
 
 					break;
 				}
@@ -128,7 +128,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 				case KnubotCloseChatWindowIIR close:
 				{
-					WriteStrings(Header(s, IirTypes.KnubotCloseChatWindowIIR, close), close.Strings);
+					Header(s, IirTypes.KnubotCloseChatWindowIIR, close).WriteUInt32(close.TextType).WriteUInt16(close.Text.Length).WriteArray(close.Text);
 
 					break;
 				}
@@ -158,10 +158,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				.WriteUInt32(v.NpcHandle);
 		}
 
-		// KnubotAnswerListIIR_c (0xF164A4A5) + KnubotCloseChatWindowIIR_c (0xC4AF39EB) share one body (verified
-		// 197/197 + 48/48): `[u32 count][ count x ([u16 len][remoteformat string]) ]`. The answer list is the
-		// screen's option buttons; the close-window is the same shape with a single empty remoteformat (id="0"),
-		// retail's "nothing (more) to say" reply. ⚠️ The count is a PLAIN u32, not a ListFrame word.
+		// KnubotAnswerListIIR_c (0xF164A4A5): `[u32 count][ count x ([u16 len][remoteformat string]) ]` - the screen's
+		// option buttons. The client's reader (FUN_009A3A10) validates the count into 1..1000 by name
+		// (`nAnswerCount`), so this really is the list it looks like. ⚠️ The count is a PLAIN u32, not a ListFrame word.
+		//
+		// ⚠️ KnubotCloseChatWindowIIR does NOT share this body (#809) - see KnubotCloseChatWindowIIR.
 		private static List<byte[]> ReadStrings(ref SpanReader r)
 		{
 			var count = checked((int)r.ReadU32Be());
@@ -186,11 +187,22 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	public sealed record KnubotAnswerListIIR(uint PlayerInstance, uint NpcHandle, byte Env, IReadOnlyList<byte[]> Strings) : KnubotIIR(PlayerInstance, NpcHandle, Env);
 
 	// KnubotAppendTextIIR_c (0x4A3D899A) - an NPC dialogue line. The string is the `remoteformat` XML (the same
-	// shape ChatText/Feedback use).
-	public sealed record KnubotAppendTextIIR(uint PlayerInstance, uint NpcHandle, byte Env, uint Field, byte[] Xml, byte Trailing) : KnubotIIR(PlayerInstance, NpcHandle, Env);
+	// shape ChatText/Feedback use). `TextType` is the client's OWN name for the leading word: its WriteSubClass logs
+	// "NPC %d speaking with Character %d: TextType %d, Text length = %d" (FUN_009A4EC0). It is 1 on 897 of the 907
+	// captured lines and 6 on the other 10; what those select is undecoded [V0].
+	public sealed record KnubotAppendTextIIR(uint PlayerInstance, uint NpcHandle, byte Env, uint TextType, byte[] Xml, byte Trailing) : KnubotIIR(PlayerInstance, NpcHandle, Env);
 
-	// KnubotCloseChatWindowIIR_c (0xC4AF39EB) - the AnswerList body carrying retail's empty "nothing more to say".
-	public sealed record KnubotCloseChatWindowIIR(uint PlayerInstance, uint NpcHandle, byte Env, IReadOnlyList<byte[]> Strings) : KnubotIIR(PlayerInstance, NpcHandle, Env);
+	// KnubotCloseChatWindowIIR_c (0xC4AF39EB) - retail's "nothing (more) to say", closing the dialogue window.
+	//
+	// ⚠️ This is `[u32 TextType][u16 len][text]` - the SAME body as KnubotAppendText minus its trailing bool, NOT the
+	// AnswerList's count-framed string list (#809). The two are indistinguishable on the 179 captured s2c records,
+	// every one of which carries `[00000001][005F][<a 95-byte empty remoteformat>]` - identical bytes whether that
+	// leading 1 is a list COUNT with one string after it or a TextType with one string after it. The client settles
+	// it: `KnubotCloseChatWindowIIR_c::ReadSubClass` (FUN_009A58D0) reads one u32 into `this+0x34` and then ONE
+	// std::string into `this+0x38`, with no loop, and its WriteSubClass logs that string as "Text length". Reading it
+	// as a list is what refused the 7 captured c2s records, whose `[00000000][0000]` is a TextType of 0 and an EMPTY
+	// text - and, under the list reading, a zero count with two bytes left over.
+	public sealed record KnubotCloseChatWindowIIR(uint PlayerInstance, uint NpcHandle, byte Env, uint TextType, byte[] Text) : KnubotIIR(PlayerInstance, NpcHandle, Env);
 
 	// KnubotOpenChatWindowIIR_c (0x045B0B0F) - opens the dialogue window. A single trailing byte.
 	public sealed record KnubotOpenChatWindowIIR(uint PlayerInstance, uint NpcHandle, byte Env, byte Value) : KnubotIIR(PlayerInstance, NpcHandle, Env);

@@ -22,7 +22,12 @@ namespace Faolan.Tests
 
 		private const string OpenChatWindowBody = "00000018045b0b0f0000c35001316e710000010000c35000017e0300";
 
-		// AnswerList + CloseChatWindow share the [u32 count][ count x string ] grammar.
+		// The c2s close, from the corpus (#809). All 7 captured picks are 29 bytes: the KnubotBase header, TextType 0
+		// and an EMPTY text. Under the old "count-framed string list" reading this was a zero count with two stray
+		// bytes after it, so every one of them was refused.
+		private const string CloseChatWindowC2SBody = "0000001dc4af39eb0000c35001316e710000010000c3500003fc08000000000000";
+
+		// AnswerList really is a count-framed string list; CloseChatWindow only looks like one (#809).
 		[Fact]
 		public void AnswerList_BuildsByteExact()
 		{
@@ -61,9 +66,21 @@ namespace Faolan.Tests
 		{
 			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(CapturedRecord.Bytes(CloseChatWindowBody));
 
-			Assert.Single(p.Strings);
-			Assert.StartsWith("<remoteformat id=\"0\"", Encoding.ASCII.GetString(p.Strings[0]));
+			Assert.Equal(1u, p.TextType);
+			Assert.StartsWith("<remoteformat id=\"0\"", Encoding.ASCII.GetString(p.Text));
 			Assert.Equal(CapturedRecord.Hex(CloseChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+		}
+
+		[Fact]
+		public void CloseChatWindow_C2S_BuildsByteExact()
+		{
+			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(CapturedRecord.Bytes(CloseChatWindowC2SBody));
+
+			Assert.Equal(0x01316E71u, p.PlayerInstance);
+			Assert.Equal(0x0003FC08u, p.NpcHandle);
+			Assert.Equal(0u, p.TextType);
+			Assert.Empty(p.Text);
+			Assert.Equal(CapturedRecord.Hex(CloseChatWindowC2SBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
 		[Fact]

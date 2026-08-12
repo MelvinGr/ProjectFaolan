@@ -539,12 +539,12 @@ namespace Faolan.GameServer.Dialogue
 			if (p.SubOpcode == ConversationSubOpcode.KnubotAppendText)
 				return KnubotCodec.Build(new KnubotAppendTextIIR(liveInstance, npcHandle, env, p.Field ?? 1, Screen(0), p.Flag ?? 1));
 
-			// AnswerList + CloseChatWindow: the string-list grammar.
-			var strings = screens.Select((_, i) => Screen(i)).ToList();
+			// CloseChatWindow carries ONE screen behind a TextType word, not a string list (#809) - the stored Field
+			// is that word. Every captured close holds exactly one screen, so this picks the same bytes it always did.
+			if (p.SubOpcode == ConversationSubOpcode.KnubotCloseChatWindow)
+				return KnubotCodec.Build(new KnubotCloseChatWindowIIR(liveInstance, npcHandle, env, p.Field ?? 1, screens.Count == 0 ? [] : Screen(0)));
 
-			return KnubotCodec.Build(p.SubOpcode == ConversationSubOpcode.KnubotCloseChatWindow
-				? new KnubotCloseChatWindowIIR(liveInstance, npcHandle, env, strings)
-				: new KnubotAnswerListIIR(liveInstance, npcHandle, env, strings));
+			return KnubotCodec.Build(new KnubotAnswerListIIR(liveInstance, npcHandle, env, screens.Select((_, i) => Screen(i)).ToList()));
 
 			byte[] Screen(int i)
 			{

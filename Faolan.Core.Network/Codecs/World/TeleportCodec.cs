@@ -14,11 +14,34 @@ namespace Faolan.Core.Network.Codecs.World
 	// Both embed a PlayfieldProxy stream (FUN_00a6a600): `[u8 version='b'(0x62)][u32 x8][u8 bool]`, where u32[0] is
 	// a playfield-class word and u32[1] the destination map. The "begin" proxy carries only those two (the
 	// destination instance isn't pinned yet); the dest-announce proxy is fully specified - u32[5]=1 (a valid/ready
-	// flag), u32[6]=0x9C50, u32[7]=the destination's playfield-INSTANCE token. The dest body then carries the spawn
-	// position inside a length-prefixed blob (FUN_00cbf5d0). Every byte is reader-accounted (TeleportHandoffTests).
+	// flag), u32[6]=0x9C50, u32[7]=the destination's playfield-INSTANCE token.
 	//
 	// A FAMILY (#530 rule 5a): both IIRs are [carrier][env][...][PlayfieldProxy][...], so the base TeleportIIR really
 	// does hold what they share and Parse discriminates on the subop.
+	//
+	// ⚠️ n3Teleport is ONE grammar, not two (#809). It used to be read as a "cross-map" and a "same-map" form told
+	// apart by a leading-block HEURISTIC (six zero words + 1.0f), and the same-map branch then required two trailing
+	// bytes where retail sends one - so every one of the 36 captured same-map records was REFUSED and our own builder
+	// emitted 89 bytes where retail emits 88. Read straight through, all 128 captured records are one shape:
+	//
+	//   [u32 sub][u32 0xC350][u32 clientInstance][u8 env]
+	//   [Vector3 position][Quaternion rotation]        <- the ARRIVAL transform
+	//   [PlayfieldProxy]
+	//   [u32 0][u32 0]                                 <- obj+0x6c / obj+0x70
+	//   [u32 blobLen][ blob: u32 tag 0x00018704, Vector3 position, u32 descriptor ]
+	//   [u8 trailing]
+	//
+	// The "two forms" are just whether the length-prefixed spawn blob is EMPTY, which the length word states
+	// outright - no heuristic. The census is exact: 92 records carry the 20-byte blob, and every one of those has a
+	// ZERO leading position, an IDENTITY rotation, trailing 0 and a 0xC79C/0xCABC proxy (the cross-map announce,
+	// which states its arrival in the blob); the other 36 carry no blob, a REAL leading position, trailing 1 and a
+	// 0xC7A0 proxy (the same-map relocate). `env` is the direction - 0 on all 113 s2c records, 1 on all 15 c2s
+	// echoes.
+	//
+	// ⭐ The four words after the position are a QUATERNION, not "facingX, 0, facingZ" with two zero words: x²+y²+z²+w²
+	// is 1.0 to within 1e-4 on all 128 records, including the 34 whose x and z are non-zero (a pitched arrival the
+	// old model could not express and refused outright). The cross-map form's "six zero words and a 1.0f" is that
+	// same pair at zero/identity, which is why it looked like a discriminating constant.
 	public static class TeleportCodec
 	{
 		// The IIR types this codec constructs or parses.
@@ -62,8 +85,8 @@ namespace Faolan.Core.Network.Codecs.World
 			return Build(new IntendedTeleportIIR(clientInstance, 0x01, PlayfieldProxy.ForInstance(mapId, playfieldToken) with { OwnerId = playerHandle }, 0x01));
 		}
 
-		// 0x5A32F0D7 CROSS-MAP destination announce: carrier + 7 leading words (the last = 1.0f) + the fully-specified
-		// destination PlayfieldProxy + 2 words + a length-prefixed spawn-position blob + a trailing bool.
+		// 0x5A32F0D7 CROSS-MAP destination announce: carrier + a zero arrival transform + the fully-specified
+		// destination PlayfieldProxy + 2 words + the spawn-position blob + a trailing bool.
 		// destPlayfieldToken is the destination playfield-INSTANCE token (NOT a per-map constant - the captured
 		// 0x00503570 was that session's instance); the live change-map path sources it from the destination map's
 		// burst via WorldBroadcaster.ResolveMapPlayfieldToken so it matches the reconnect's world-entry stamp (#211).
@@ -71,21 +94,23 @@ namespace Faolan.Core.Network.Codecs.World
 		// not yet derivable from the data. Both default to the map-2010 capture values for the golden / a burst-less map.
 		public static byte[] Build(uint clientInstance, uint destMapId, Vector3 position, uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
 		{
-			return Build(new N3TeleportIIR(clientInstance, 0x00, position, PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken), N3TeleportForm.CrossMap, DestDescriptor: destDescriptor));
+			// The arrival transform stays zero/identity: a cross-map announce states its arrival in the blob.
+			return Build(new N3TeleportIIR(clientInstance, 0x00, Vector3.Zero, Quaternion.Identity,
+				PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken), new N3TeleportSpawn(position, destDescriptor)));
 		}
 
 		// The SAME-MAP destination announce: the n3Teleport (0x5A32F0D7) that actually relocates the player on their
 		// CURRENT playfield with no loading screen. Retail sends it for BOTH the death revive (#214, after the revive
 		// IntendedTeleport) AND a same-playfield zone-line door - e.g. the Thirsty Dog Inn, which repositions within
 		// City of Tortage rather than change-mapping (WorldSimulation.RelocateSameMap reaches it via
-		// SendReviveDestination; WorldTeleportExtractor decodes this same variant). Its grammar DIFFERS from the
-		// cross-map form: the spawn position is right after env (not in a trailing length-prefixed blob), the proxy
-		// carries 0xC7A0 (not 0xC79C) + map + player handle with the instance slots ZERO, and there's no leading
-		// 6-zero/1.0f block. Decoded byte-for-byte from the beach resurrect (Stihetfv #1277, map 0xFAA).
-		public static byte[] Build(uint clientInstance, uint mapId, uint playerHandle, Vector3 position, float facingX, float facingZ)
+		// SendReviveDestination; WorldTeleportExtractor decodes this same variant). It differs from the cross-map form
+		// only in the fields, not the grammar: the arrival rides the leading transform so NO spawn blob is sent, the
+		// proxy carries 0xC7A0 (not 0xC79C) + map + player handle with the instance slots ZERO, and the trailing bool
+		// is 1. Decoded byte-for-byte from the beach resurrect (Stihetfv #1277, map 0xFAA).
+		public static byte[] Build(uint clientInstance, uint mapId, uint playerHandle, Vector3 position, Quaternion rotation)
 		{
 			// Instance slots zero: a same-map move does not re-pin the playfield instance.
-			return Build(new N3TeleportIIR(clientInstance, 0x00, position, new PlayfieldProxy(mapId, RevivePlayfieldClass, playerHandle), N3TeleportForm.SameMap, facingX, facingZ, Trailing2: 0x01));
+			return Build(new N3TeleportIIR(clientInstance, 0x00, position, rotation, new PlayfieldProxy(mapId, RevivePlayfieldClass, playerHandle), Spawn: null, Trailing: 0x01));
 		}
 
 		public static TeleportIIR Parse(in ReadOnlySpan<byte> data)
@@ -113,40 +138,26 @@ namespace Faolan.Core.Network.Codecs.World
 			if (subop != IirTypes.N3TeleportIIR)
 				throw CodecParseException.Unexpected(nameof(TeleportCodec), subopOffset, "IntendedTeleportIIR or n3TeleportIIR", $"0x{(uint)subop:X8}");
 
-			// The two n3Teleport forms are told apart by their LEADING BLOCK: the cross-map announce opens with six
-			// zero words and a 1.0f, the same-map one with the arrival position and a 2D heading. They are only
-			// ambiguous for a same-map move to exactly (0,0,0) with facingX 0 and facingZ 1.0 - no playfield has a
-			// walkable origin, so that shape does not occur.
-			var w0 = r.ReadU32Be();
-			var w1 = r.ReadU32Be();
-			var w2 = r.ReadU32Be();
-			var w3 = r.ReadU32Be();
-			var w4 = r.ReadU32Be();
-			var w5 = r.ReadU32Be();
-			var w6 = r.ReadU32Be();
-			if ((w0 | w1 | w2 | w3 | w4 | w5) == 0 && w6 == BitConverter.SingleToUInt32Bits(1.0f))
+			var arrival = r.ReadVector3Be();
+			var rotation = r.ReadQuaternionBe();
+			var n3Proxy = PlayfieldProxy.Read(ref r);
+			r.ExpectU32Be(0, "obj+0x6c");
+			r.ExpectU32Be(0, "obj+0x70");
+
+			// The spawn blob's LENGTH says whether this announce carries one - 20 bytes on a cross-map arrival, 0 on a
+			// same-map relocate, which states its arrival in the leading transform instead.
+			var blobBytes = r.ReadBytesU32Length();
+			N3TeleportSpawn? spawn = null;
+			if (!blobBytes.IsEmpty)
 			{
-				var proxy = PlayfieldProxy.Read(ref r);
-				r.ExpectU32Be(0, "obj+0x6c");
-				r.ExpectU32Be(0, "obj+0x70");
-				var blob = new SpanReader(r.ReadBytesU32Length(), nameof(TeleportCodec) + ".positionBlob");
+				var blob = new SpanReader(blobBytes, nameof(TeleportCodec) + ".positionBlob");
 				blob.ExpectU32Be(PositionBlobTag, "spawn-position blob tag");
 				var position = blob.ReadVector3Be();
-				var descriptor = blob.ReadU32Be();
+				spawn = new N3TeleportSpawn(position, blob.ReadU32Be());
 				blob.EnsureAtEnd();
-				return new N3TeleportIIR(clientInstance, env, position, proxy, N3TeleportForm.CrossMap, DestDescriptor: descriptor, Trailing: r.ReadU8());
 			}
 
-			var arrival = new Vector3(BitConverter.UInt32BitsToSingle(w0), BitConverter.UInt32BitsToSingle(w1), BitConverter.UInt32BitsToSingle(w2));
-			if (w3 != 0 || w5 != 0)
-				throw CodecParseException.Unexpected(nameof(TeleportCodec), r.Position - 16, "the same-map heading's two zero words", $"0x{w3:X8} / 0x{w5:X8}");
-
-			var sameMapProxy = PlayfieldProxy.Read(ref r);
-			r.ExpectU32Be(0, "same-map trailing word 0");
-			r.ExpectU32Be(0, "same-map trailing word 1");
-			r.ExpectU32Be(0, "same-map trailing word 2");
-			return new N3TeleportIIR(clientInstance, env, arrival, sameMapProxy, N3TeleportForm.SameMap,
-				BitConverter.UInt32BitsToSingle(w4), BitConverter.UInt32BitsToSingle(w6), Trailing: r.ReadU8(), Trailing2: r.ReadU8());
+			return new N3TeleportIIR(clientInstance, env, arrival, rotation, n3Proxy, spawn, r.ReadU8());
 		}
 
 		internal static void Write(FaolanStream s, TeleportIIR v)
@@ -161,37 +172,22 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 				}
 
-				case N3TeleportIIR { Form: N3TeleportForm.CrossMap } dest:
+				case N3TeleportIIR dest:
 				{
 					using var blob = new FaolanStream();
-					blob.WriteUInt32(PositionBlobTag).WriteVector3(dest.Position).WriteUInt32(dest.DestDescriptor);
+					if (dest.Spawn is { } spawn)
+						blob.WriteUInt32(PositionBlobTag).WriteVector3(spawn.Position).WriteUInt32(spawn.Descriptor);
 
 					s.WriteUInt32(IirTypes.N3TeleportIIR)
 						.WriteUInt32(EntityClass.Character)
 						.WriteUInt32(dest.ClientInstance)
 						.WriteByte(dest.Env)
-						.WriteArray(new byte[24]) // 6 leading words = 0
-						.WriteFloat(1.0f); // 7th leading word = 1.0
+						.WriteVector3(dest.Position)
+						.WriteQuaternion(dest.Rotation);
 					dest.Proxy.Write(s);
 					s.WriteUInt32(0).WriteUInt32(0) // obj+0x6c / +0x70
 						.WriteArrayUInt32Length(blob.ToArray())
 						.WriteByte(dest.Trailing); // n3TeleportIIR trailing bool
-					break;
-				}
-
-				case N3TeleportIIR sameMap:
-				{
-					s.WriteUInt32(IirTypes.N3TeleportIIR)
-						.WriteUInt32(EntityClass.Character)
-						.WriteUInt32(sameMap.ClientInstance)
-						.WriteByte(sameMap.Env)
-						.WriteVector3(sameMap.Position)
-						.WriteUInt32(0)
-						.WriteFloat(sameMap.FacingX)
-						.WriteUInt32(0)
-						.WriteFloat(sameMap.FacingZ);
-					sameMap.Proxy.Write(s);
-					s.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).WriteByte(sameMap.Trailing).WriteByte(sameMap.Trailing2);
 					break;
 				}
 
@@ -203,13 +199,6 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 	}
 
-	// Which n3Teleport grammar a record uses - the cross-map announce (a loading screen) or the same-map relocate.
-	public enum N3TeleportForm
-	{
-		CrossMap,
-		SameMap
-	}
-
 	// What the two teleport records share: the addressed client instance, the carrier's env byte, and the
 	// PlayfieldProxy naming the destination playfield.
 	public abstract record TeleportIIR(uint ClientInstance, byte Env, PlayfieldProxy Proxy);
@@ -218,7 +207,17 @@ namespace Faolan.Core.Network.Codecs.World
 	// cross-map begin, 1 for the same-map one.
 	public sealed record IntendedTeleportIIR(uint ClientInstance, byte Env, PlayfieldProxy Proxy, byte Trailing) : TeleportIIR(ClientInstance, Env, Proxy);
 
-	// n3TeleportIIR_t (0x5A32F0D7) - the destination announce, in whichever of its two forms.
-	public sealed record N3TeleportIIR(uint ClientInstance, byte Env, Vector3 Position, PlayfieldProxy Proxy, N3TeleportForm Form,
-		float FacingX = 0f, float FacingZ = 0f, uint DestDescriptor = 0, byte Trailing = 0, byte Trailing2 = 0) : TeleportIIR(ClientInstance, Env, Proxy);
+	// n3TeleportIIR_t (0x5A32F0D7) - the destination announce. `Position`/`Rotation` are the arrival transform a
+	// SAME-MAP relocate carries; a CROSS-MAP announce leaves them zero/identity and states its arrival in `Spawn`
+	// instead. `Trailing` is the IIR's own bool - 0 cross-map, 1 same-map on all 128 captured records.
+	public sealed record N3TeleportIIR(uint ClientInstance, byte Env, Vector3 Position, Quaternion Rotation, PlayfieldProxy Proxy,
+		N3TeleportSpawn? Spawn = null, byte Trailing = 0) : TeleportIIR(ClientInstance, Env, Proxy)
+	{
+		/// <summary>Where the player actually arrives, from whichever of the two slots this announce used.</summary>
+		public Vector3 ArrivalPosition => Spawn?.Position ?? Position;
+	}
+
+	// The length-prefixed spawn-position blob (tag 0x00018704) a CROSS-MAP announce carries. `Descriptor` is a
+	// per-zone word (0x14 on map 2010, 0xBE on map 2000) not yet derivable from the data - #665.
+	public sealed record N3TeleportSpawn(Vector3 Position, uint Descriptor);
 }

@@ -257,7 +257,7 @@ namespace Faolan.GameServer.World
 
 			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
 			await _output.SendReviveTeleport(client!, entity.Handle, character.MapId, liveToken);
-			await _output.SendReviveDestination(client!, entity.Handle, character.MapId, destination, 1f, 0f);
+			await _output.SendReviveDestination(client!, entity.Handle, character.MapId, destination, character.Rotation);
 			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
@@ -742,13 +742,11 @@ namespace Faolan.GameServer.World
 			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
 			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
 
+			// The record's rotation slot is the res point's QUATERNION verbatim (#809): the four words after the
+			// position normalise to 1.0 on all 128 captured records, so the horizontal facing DIRECTION this used to
+			// derive and stuff into two of them was a rotation of twice the intended yaw.
 			var rot = new Quaternion(point.RotationX, point.RotationY, point.RotationZ, point.RotationW);
-			var fwd = Vector3.Transform(Vector3.UnitZ, rot);
-			var hlen = MathF.Sqrt(fwd.X * fwd.X + fwd.Z * fwd.Z);
-			var (facingX, facingZ) = hlen > 1e-4f
-				? (fwd.X / hlen, fwd.Z / hlen)
-				: (1f, 0f);
-			await _output.SendReviveDestination(client, entity.Handle, character.MapId, dest, facingX, facingZ);
+			await _output.SendReviveDestination(client, entity.Handle, character.MapId, dest, rot);
 			_logger.LogInformation("Combat: {Player} relocated to '{Spot}' {Dest} (token 0x{Token:X}).", character.Name, point.Name, dest, liveToken);
 		}
 

@@ -159,9 +159,9 @@ namespace Faolan.Importer.Extractors
 					// an all-zero inline slot means the record does not name one.
 					// The box only counts as this trip's confirmation when it named the map the trip then went to -
 					// otherwise it belongs to something else that happened in the window.
-					if (destMap != 0 && (arrive.Form == N3TeleportForm.CrossMap || arrive.Position != Vector3.Zero))
+					if (destMap != 0 && (arrive.Spawn != null || arrive.Position != Vector3.Zero))
 					{
-						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrive.Position.X, arrive.Position.Y, arrive.Position.Z, confirmMapId == destMap
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrive.ArrivalPosition.X, arrive.ArrivalPosition.Y, arrive.ArrivalPosition.Z, confirmMapId == destMap
 							? confirmKey
 							: ""));
 					}

@@ -67,13 +67,13 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return record switch
 			{
 				KnubotOpenChatWindowIIR open => new Columns((ConversationSubOpcode)sub, open.Env, null, open.Value, [], senderInstance),
-				KnubotAppendTextIIR text => new Columns((ConversationSubOpcode)sub, text.Env, text.Field, text.Trailing, [Latin1(text.Xml)], senderInstance),
+				KnubotAppendTextIIR text => new Columns((ConversationSubOpcode)sub, text.Env, text.TextType, text.Trailing, [Latin1(text.Xml)], senderInstance),
 				KnubotAnswerListIIR list => new Columns((ConversationSubOpcode)sub, list.Env, null, null, list.Strings.Select(Latin1).ToList(), senderInstance),
 
-				// The close's stored Field is its string COUNT - the column has carried that since the grammar was
-				// read as [u32 field][one screen], which for the single-element case every capture holds is the same
-				// word. Kept so a re-import produces the same rows.
-				KnubotCloseChatWindowIIR close => new Columns((ConversationSubOpcode)sub, close.Env, (uint)close.Strings.Count, null, close.Strings.Select(Latin1).ToList(), senderInstance),
+				// The close's stored Field is its TextType, the same slot AppendText's is (#809). It used to be read
+				// as the string COUNT of a list that is not there; the two agree on every s2c record, which all carry
+				// TextType 1 and one screen, so a re-import produces the same rows.
+				KnubotCloseChatWindowIIR close => new Columns((ConversationSubOpcode)sub, close.Env, close.TextType, null, [Latin1(close.Text)], senderInstance),
 				_ => null
 			};
 		}

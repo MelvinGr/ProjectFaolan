@@ -61,6 +61,32 @@ namespace Faolan.Tests
 			Assert.Equal("700101620000c87a000021fe0000000000000003f1", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag)));
 		}
 
+		// The CASH form (#809): xxx_mage-necromancer_login_play1 frame 3156, bag 0x42e4 - 21 tin, and 21 is exactly
+		// what the DispatchUpdateCash beside it moves the wallet by. This is the shape the codec refused, because the
+		// value straddled a `[u32 reserved][u8 marker]` split that only reads right while the cash is zero.
+		[Fact]
+		public void LootRemoveItems_Cash_MatchesCapture()
+		{
+			var captured = "700101620000c87a000042e40000000015000003f1";
+
+			Assert.Equal(captured, Convert.ToHexStringLower(LootRemoveItemsCodec.Build(new LootRemoveItemsIIR(0x000042e4, [], 21))));
+
+			var parsed = LootRemoveItemsCodec.Parse(Convert.FromHexString(captured));
+			Assert.Equal(21u, parsed.Cash);
+			Assert.Empty(parsed.RemovedPositions);
+		}
+
+		// The two are strict alternatives across all 148 captured records: a cash take names no slot, a slot take
+		// carries no cash. Reading one grammar both ways is what makes that checkable at all.
+		[Fact]
+		public void LootRemoveItems_SlotTake_CarriesNoCash()
+		{
+			var parsed = LootRemoveItemsCodec.Parse(Convert.FromHexString("700101620000c87a000021fe0000000000000007e200000000"));
+
+			Assert.Equal(0u, parsed.Cash);
+			Assert.Equal([0u], parsed.RemovedPositions);
+		}
+
 		[Fact]
 		public void NewAllowedLooterReset_MatchesCapture()
 		{
