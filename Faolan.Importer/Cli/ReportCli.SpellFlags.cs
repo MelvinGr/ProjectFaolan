@@ -63,7 +63,16 @@ namespace Faolan.Importer.Cli
 			(20, "the magic's stated duration is neither DRAWN nor counted down - the tooltip's duration line renders empty "
 			     + "(`FUN_01499b10`) and `CoreMagicHolder::UpdateBuff` suppresses its 'remaining time' warning when it "
 			     + "expires; it rides into the spawn apply beside bit 16 (`FUN_007f43a0`)"),
-			(24, "hide this spell's line from a tooltip (#789)")
+			(23, "one of the two bits that make a cast consult the target's RUNNING buffs first - see bit 30"),
+			(24, "hide this spell's line from a tooltip (#789)"),
+			(30, "the other one. `FUN_007ef6b0` tests bits 23 and 30 together (`(f >> 0x17 | f >> 0x1e) & 1`) and skips "
+			     + "the running-buff lookup entirely when NEITHER is set, so either bit alone enables it. What that "
+			     + "lookup decides is named by the function's own log strings: \"Cant cast spell X since the target "
+			     + "already have the spell\", \"Allowing cast of X because of lower or same stackingorder\", \"it will "
+			     + "override spell Y running (higher stackingorder)\", \"since we have room for more in stack "
+			     + "nCurrentStacked: N nMaxStack: M\" - i.e. the STACKING / OVERRIDE decision. Which of the two bits "
+			     + "selects which half of it is not separable from the corpus: they are set on 434 and 38 records and "
+			     + "the branch is a plain OR")
 		];
 
 		// The floor and the threshold for the bit ⊂ bit table. A bit set a handful of times is inside almost anything

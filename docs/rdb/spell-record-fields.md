@@ -107,6 +107,32 @@ the yardstick every other row is read against.
 | 1 | 1,349 | **opts out of the global spell modifier** — the Ferocity scaling, unless the spell is on the `GlobalModIncludedSpellLine` tuning line (below) |
 | 20 | 2,289 | **the stated duration is neither drawn nor counted down** — 98.51% inside bit 16, so a modifier on the timed-effect path rather than a flag of its own (below) |
 | 25 | 185 | 100% inside bit 16 — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
+| 23 + 30 | 434 + 38 | **the cast consults the target's RUNNING buffs first** — the STACKING / OVERRIDE decision (below) |
+
+### ⭐ Bits 23 and 30: one gate, named by the client's own log strings
+
+`FUN_007EF6B0` tests them **together** — `(flags >> 0x17 | flags >> 0x1E) & 1` — and when NEITHER is set it skips
+a lookup over the target's running buffs entirely, so either bit alone enables it. What that lookup decides needs
+no inference, because the function logs it in English on channel `GameCode/Magic`:
+
+```
+"Cant cast spell X ... since the target already have the spell Y"
+"Allowing cast of spell X ... because of lower or same stackingorder. Running: Y"
+"... it will override spell Y running (higher stackingorder)"
+"... since we have room for more in stack nCurrentStacked: N nMaxStack: M"
+"... since there is at least one running buff we can override"
+```
+
+So the pair marks a spell whose cast is subject to **stacking**: does the target already have it, is this one's
+stacking order higher, and is there room in the stack. ⚠️ Which of the two bits selects which half is **not
+separable** — the branch is a plain OR, and the two are set on 434 and 38 records with no predicate telling them
+apart. Named as a pair rather than guessed into halves.
+
+⚠️ The same offset `+0xC8` is a protobuf HASBIT mask on several unrelated classes, and a naive scan of the bit
+reads finds a coherent-looking cluster of four sibling functions at `0x01759xxx` reading bits 1/2/5/6/7/8 of
+"the same word". They are `Write(fieldNumber, value, stream)` serializers and the bits are field-presence flags —
+the exact false positive `DumpFlagBitReads.java` warns about. Filter the read sites to the magic/combat address
+ranges before reading anything into them.
 
 ⚠️ **Every row above is named from the CLIENT's own reads, not from its predicate score**, and two of them score
 badly on purpose: bit 1 is at chance against all twelve predicates because it is about a *tuning line* no column
