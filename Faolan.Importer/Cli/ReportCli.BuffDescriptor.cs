@@ -200,6 +200,7 @@ namespace Faolan.Importer.Cli
 			// the predecessors by how common they are - both values sit behind the same busy IIRs - and the question
 			// is whether any predecessor CONCENTRATES the rare value.
 			PrecedingRate(preceding, applies);
+			BurstPosition(sequenced);
 
 			ScopeStatement(scoped);
 			TwinRate(perSpell);
@@ -368,6 +369,43 @@ namespace Faolan.Importer.Cli
 		// ⚠️ The immediate predecessor is a weak proxy for that and this reports it as such. A buff applied as part of
 		// an effect chain can be several packets after whatever caused it, and the corpus interleaves every entity in
 		// range - so a flat result here rules out "the packet directly before it" and NOT "how it was produced".
+
+		// ⭐ Is the minority `descriptor[0]` a FOLLOW-ON in a burst on the same target? (#658)
+		//
+		// The relational reading, tested at the level the corpus actually supports: a buff applied as one link of an
+		// effect chain arrives immediately after another apply on the SAME target, while a directly-cast one does
+		// not. That is a causal WINDOW rather than the literal previous packet, which came back flat.
+		//
+		// ⚠️ "Same target, adjacent in the apply stream" is the window, and it is per CAPTURE - an entity handle is
+		// session-scoped, so comparing targets across captures would merge unrelated entities.
+		private static void BurstPosition(IReadOnlyList<(string Capture, int Order, uint Target, uint SpellId, uint Descriptor0, byte Bool2, byte[] Payload)> sequenced)
+		{
+			var minority = sequenced.GroupBy(a => a.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var ordered = sequenced.OrderBy(a => a.Capture).ThenBy(a => a.Order).ToList();
+			var lead = new List<bool>();
+			for (var i = 0; i < ordered.Count; i++)
+			{
+				// A FOLLOW-ON is an apply whose immediate predecessor in the same capture hit the same target.
+				var follow = i > 0 && ordered[i - 1].Capture == ordered[i].Capture && ordered[i - 1].Target == ordered[i].Target;
+				lead.Add(follow);
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"is descriptor[0]={minority.Key} a FOLLOW-ON in a same-target burst?");
+			Console.WriteLine($"  {"",14} {"follow-on",11} {"first",11}   rate");
+			foreach (var value in ordered.Select(a => a.Descriptor0).Distinct().OrderBy(v => v))
+			{
+				var idx = Enumerable.Range(0, ordered.Count).Where(i => ordered[i].Descriptor0 == value).ToList();
+				var follows = idx.Count(i => lead[i]);
+				Console.WriteLine($"  {$"d0={value}",14} {follows,11:N0} {idx.Count - follows,11:N0}   {(double)follows / idx.Count,7:P1}");
+			}
+
+			Console.WriteLine($"  {"ALL",14} {lead.Count(l => l),11:N0} {lead.Count(l => !l),11:N0}   {(double)lead.Count(l => l) / lead.Count,7:P1}");
+		}
+
 		private static void PrecedingRate(Dictionary<string, int> preceding, IReadOnlyList<(uint SpellId, uint Descriptor0, byte Bool2)> applies)
 		{
 			var minority = applies.GroupBy(a => a.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
