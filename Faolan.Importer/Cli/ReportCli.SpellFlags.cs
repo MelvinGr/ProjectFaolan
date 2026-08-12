@@ -69,16 +69,35 @@ namespace Faolan.Importer.Cli
 			(20, "the magic's stated duration is neither DRAWN nor counted down - the tooltip's duration line renders empty "
 			     + "(`FUN_01499b10`) and `CoreMagicHolder::UpdateBuff` suppresses its 'remaining time' warning when it "
 			     + "expires; it rides into the spawn apply beside bit 16 (`FUN_007f43a0`)"),
-			(23, "one of the two bits that make a cast consult the target's RUNNING buffs first - see bit 30"),
+			(4, "SHAPE ONLY. Its single read site `FUN_007e0820` writes 5 instead of 1 into one field of a struct it "
+			    + "builds - the same 1/3/5 mode family bit 15 selects from in `FUN_007f4120`. The enum is not "
+			    + "recovered, so this is a narrowing rather than a name (249 records)"),
+			(11, "a HOSTILE spell that does NOT raise the hostile-act signal. `CoreMagicHolder::CastMagicSpell()` "
+			     + "(`FUN_007ea480`, named by its own log text) ends in `if (bit26 == 0) { if (bit15 == 0 || bit11 || "
+			     + "bit1) emitA(); else if (target is CoreCharacter) emitB(); }`, and emitB (`FUN_007f8100`) is emitted "
+			     + "from exactly two places in the whole image: that branch and DealDamage (`FUN_0114efa0`, likewise "
+			     + "self-named). So bit 11 diverts a hostile cast onto the benign path. ⚠️ It is only OPERATIVE on the "
+			     + "523 of its 2,086 records that are hostile - the rest take that branch on bit 15 alone"),
+			(23, "`NoAutomaticReplace` - refuse the cast when the target already has THIS spell running. See bit 30 for "
+			     + "how the two names split"),
 			(24, "hide this spell's line from a tooltip (#789)"),
-			(30, "the other one. `FUN_007ef6b0` tests bits 23 and 30 together (`(f >> 0x17 | f >> 0x1e) & 1`) and skips "
-			     + "the running-buff lookup entirely when NEITHER is set, so either bit alone enables it. What that "
-			     + "lookup decides is named by the function's own log strings: \"Cant cast spell X since the target "
-			     + "already have the spell\", \"Allowing cast of X because of lower or same stackingorder\", \"it will "
-			     + "override spell Y running (higher stackingorder)\", \"since we have room for more in stack "
-			     + "nCurrentStacked: N nMaxStack: M\" - i.e. the STACKING / OVERRIDE decision. Which of the two bits "
-			     + "selects which half of it is not separable from the corpus: they are set on 434 and 38 records and "
-			     + "the branch is a plain OR")
+			(26, "the cast raises NO post-cast notification at all, and it changes which record the stacking "
+			     + "comparison reads. It is the outer guard of the `CastMagicSpell` block quoted under bit 11 - set, and "
+			     + "neither signal fires - and in `FUN_007ef6b0` it selects which object\'s `+0x34` is compared against "
+			     + "the stacking value. ⭐ The data says what kind of record that is: 264 spells, 258 of them "
+			     + "NON-hostile, 238 of them (90%) one half of a same-NAME pair whose twin lacks the bit - against a "
+			     + "~23% twin rate catalog-wide - and the lowest-id member is the designers\' own "
+			     + "`TeamPropagatedBuff Test Slave`. So it marks the propagated/derived copy of a buff rather than the "
+			     + "cast a player performs. Check it with `--report spell-flags --report-arg 26`"),
+			(30, "`NoAutomaticStackReplace` - refuse the cast when the target already has ANY spell of the same "
+			     + "stackingline running. ⭐ This SPLITS the 23/30 pair, which was recorded as inseparable. "
+			     + "`FUN_007ef6b0` names two flags in its own log text - \"since its flagged as NoAutomaticReplace and "
+			     + "the target already have it running\" and \"since its flagged as NoAutomaticStackReplace and the "
+			     + "target already have a spell in the stackingline running\" - and it tests exactly three bits of this "
+			     + "word: 23, 26 and 30. The StackReplace message is guarded on bit 30 ALONE, which pins it; two names "
+			     + "over two bits then leaves Replace to 23, and the semantics agree (the exact-spell lookup vs the "
+			     + "stackingline lookup). ⚠️ The Replace message itself fires under `bit23 || bit30`, so its own guard "
+			     + "does not separate them - the split rests on bit 30\'s solo guard plus that elimination")
 		];
 
 		// The floor and the threshold for the bit ⊂ bit table. A bit set a handful of times is inside almost anything
@@ -156,7 +175,7 @@ namespace Faolan.Importer.Cli
 			// disagrees with the code is the data being described, not the bit being redefined - which is exactly the
 			// shape of bit 20 below.
 			Console.WriteLine("  bits named from the CLIENT's own reads (tools/ghidra/DumpFlagBitReads.java finds the sites):");
-			foreach (var (bit, meaning) in NamedBits)
+			foreach (var (bit, meaning) in NamedBits.OrderBy(n => n.Bit))
 				Console.WriteLine($"    bit {bit,2}  {meaning}");
 
 			Console.WriteLine();
@@ -198,10 +217,59 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {bit,3} {set,7:N0}   " + string.Join("  ", cells));
 			}
 
+			if (only is { } drill)
+				BitMembers(rows, (int)drill);
+
 			// ⭐ The strongest row, examined rather than summarised. A bit that IS a predicate has a residual you can
 			// characterise; one that merely correlates has a residual that looks like the rest of the catalog.
 			DurationBitResidual(rows);
 			BitContainment(rows);
+		}
+
+
+		// The spells carrying one bit, NAMED, plus the cross-tab against bit 15 (hostile).
+		//
+		// ⭐ It exists because the predicate table cannot check a bit the client named. Bits 11 and 26 were read out
+		// of `CoreMagicHolder::CastMagicSpell()` as modifiers of the HOSTILE path (#632), and a claim about the
+		// hostile path is only checkable against which spells are hostile - which is bit 15, not a DB column. So the
+		// cross-tab is the assertion and the names are the sanity check on it.
+		//
+		// ⚠️ The names are a SAMPLE and the counts are not. Reading a mechanism off the first 40 rows is the mistake
+		// the header of this report exists to prevent; the cross-tab above them is the measurement.
+		private static void BitMembers(IReadOnlyList<FlagsRow> rows, int bit)
+		{
+			const int HostileBit = 15;
+			const int Sample = 40;
+
+			var withBit = rows.Where(r => (r.Flags >> bit & 1) == 1).ToList();
+			if (withBit.Count == 0)
+				return;
+
+			int Both(bool b, bool h) => rows.Count(r => ((r.Flags >> bit & 1) == 1) == b && ((r.Flags >> HostileBit & 1) == 1) == h);
+
+			Console.WriteLine();
+			Console.WriteLine($"  bit {bit} x bit {HostileBit} (hostile):");
+			Console.WriteLine($"    {"",14} {"hostile",9} {"not",9}");
+			Console.WriteLine($"    {$"bit {bit} set",14} {Both(true, true),9:N0} {Both(true, false),9:N0}");
+			Console.WriteLine($"    {$"bit {bit} clear",14} {Both(false, true),9:N0} {Both(false, false),9:N0}");
+
+			// ⚠️ The two numbers a name-shaped hypothesis dies on. A bit that marks the "slave" copy of a
+			// duplicated spell has to be BOTH untrainable and twinned; measuring only the sample the listing prints
+			// is how a mixed set reads as a clean one - `Aura of Infusion`'s bit-26 twin is untrainable and
+			// `Divine Vigor`'s is not, and eight rows cannot tell those apart from a rule.
+			var byName = rows.GroupBy(r => r.Name).ToDictionary(g => g.Key, g => g.ToList());
+			var twinned = withBit.Count(r => byName[r.Name].Any(o => o.Id != r.Id && (o.Flags >> bit & 1) == 0));
+			Console.WriteLine($"    trainable: {withBit.Count(r => r.Trainable):N0} / {withBit.Count:N0}" +
+			                  $"   (catalog-wide {rows.Count(r => r.Trainable) * 100.0 / rows.Count:0.0}%)");
+			Console.WriteLine($"    has a same-NAME twin WITHOUT the bit: {twinned:N0} / {withBit.Count:N0}");
+
+			Console.WriteLine();
+			Console.WriteLine($"  {withBit.Count:N0} spell(s) with bit {bit}; first {Math.Min(Sample, withBit.Count)} by id:");
+			foreach (var row in withBit.OrderBy(r => r.Id).Take(Sample))
+			{
+				var hostile = (row.Flags >> HostileBit & 1) == 1 ? "hostile" : "-";
+				Console.WriteLine($"    {row.Id,8}  {hostile,-7}  0x{row.Flags:X8}  {row.Name}");
+			}
 		}
 
 		// ⭐ Which bits are SUBSETS of other bits - the question a bit-vs-predicate table structurally cannot ask.

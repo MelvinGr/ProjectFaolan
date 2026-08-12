@@ -107,7 +107,10 @@ the yardstick every other row is read against.
 | 1 | 1,349 | **opts out of the global spell modifier** — the Ferocity scaling, unless the spell is on the `GlobalModIncludedSpellLine` tuning line (below) |
 | 20 | 2,289 | **the stated duration is neither drawn nor counted down** — 98.51% inside bit 16, so a modifier on the timed-effect path rather than a flag of its own (below) |
 | 25 | 185 | 100% inside bit 16 — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
-| 23 + 30 | 434 + 38 | **the cast consults the target's RUNNING buffs first** — the STACKING / OVERRIDE decision (below) |
+| 23 | 434 | **`NoAutomaticReplace`** — refuse the cast when the target already has THIS spell running (below) |
+| 30 | 38 | **`NoAutomaticStackReplace`** — refuse it when the target has ANY spell of the same stackingline running (below) |
+| 26 | 264 | **no post-cast notification at all**, and it switches which record the stacking comparison reads — it marks the propagated/derived COPY of a buff (below) |
+| 11 | 2,086 | **a hostile spell that does not raise the hostile-act signal** — operative only on its 523 hostile members (below) |
 | 15 | 12,069 | **the spell is HOSTILE** — the client picks "afflict" over "affect" on it (below) |
 
 ### ⭐ Bit 15: HOSTILE, and the client says it in English
@@ -139,9 +142,9 @@ SUPPRESSORS — the inverse of the 23/30 enabling pair:
   together rather than separately.
 
 ⚠️ Neither suppressed action carries a log string, which is why they stop here: the technique that named bits 1,
-15, 20, 23 and 30 is the client's own English, and these two call into code that says nothing.
+11, 15, 20, 23, 26 and 30 is the client's own English, and these two call into code that says nothing.
 
-### ⭐ Bits 23 and 30: one gate, named by the client's own log strings
+### ⭐ Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
 
 `FUN_007EF6B0` tests them **together** — `(flags >> 0x17 | flags >> 0x1E) & 1` — and when NEITHER is set it skips
 a lookup over the target's running buffs entirely, so either bit alone enables it. What that lookup decides needs
@@ -155,10 +158,70 @@ no inference, because the function logs it in English on channel `GameCode/Magic
 "... since there is at least one running buff we can override"
 ```
 
-So the pair marks a spell whose cast is subject to **stacking**: does the target already have it, is this one's
-stacking order higher, and is there room in the stack. ⚠️ Which of the two bits selects which half is **not
-separable** — the branch is a plain OR, and the two are set on 434 and 38 records with no predicate telling them
-apart. Named as a pair rather than guessed into halves.
+So the pair marks a spell whose cast is subject to **stacking**. This was recorded here as a pair that could not
+be split; **it can**, and the same function does it — because two of its messages name the flags outright:
+
+```
+"... since its flagged as NoAutomaticReplace and the target already have it running"
+"... since its flagged as NoAutomaticStackReplace and the target already have a spell in the stackingline running"
+```
+
+⭐ **`NoAutomaticStackReplace` is guarded on bit 30 ALONE**, which pins that half directly. The function tests
+exactly three bits of this word — 23, 26 and 30 — and names exactly two flags, so the remaining name goes to the
+remaining bit, and the semantics agree: *Replace* sits on the exact-spell lookup and *StackReplace* on the
+stackingline lookup.
+
+⚠️ **The `NoAutomaticReplace` message itself fires under `bit23 || bit30`**, so its own guard does not separate
+them. The split rests on bit 30's solo guard plus that elimination — worth stating, because it is a different
+strength of evidence from the two-message symmetry it looks like at a glance.
+
+### ⭐ Bit 26: the propagated COPY of a buff
+
+Bit 26 is the third bit `FUN_007EF6B0` reads, and it is not a refusal: it selects which object's `+0x34` is
+compared against the stacking value. Its other site is the end of **`CoreMagicHolder::CastMagicSpell()`**
+(`FUN_007EA480`, named by its own log text), where it is the outer guard of the whole post-cast notification:
+
+```c
+if (bit26 == 0) {
+    if (bit15 == 0 || bit11 || bit1)  { if (bit16 || bit1) emitA(); }
+    else if (target is CoreCharacter) { emitB(); }
+}
+```
+
+So a bit-26 spell raises **neither** signal. ⭐ **What kind of record that is, the data says** — measured with
+`--report spell-flags --report-arg 26`:
+
+* 264 records, **258 of them non-hostile** (against a 58% hostile base rate),
+* **238 of them (90%) are one half of a same-NAME pair whose twin lacks the bit**, against a ~23% twin rate
+  catalog-wide,
+* and the lowest-id member is the designers' own **`TeamPropagatedBuff Test Slave`**, followed by `Divine Shelter`,
+  `Aura of Infusion`, `Symbol of Protection`, `Grizzled Hide` and the rest of the aura and group-buff lines.
+
+So it marks the propagated/derived copy of a buff rather than the cast a player performs — which is exactly why
+the client raises no cast notification for it.
+
+⚠️ **It is not "the untrainable copy"**, and that reading dies on the data: 50 of the 264 are trainable, and the
+twins disagree with each other — `Aura of Infusion`'s bit-26 copy is untrainable while `Divine Vigor`'s is not.
+The twin RATE is the finding; trainability is not.
+
+### ⭐ Bit 11: a hostile spell that raises no hostile-act signal
+
+The inner branch of the block above. `emitB` (`FUN_007F8100`) is emitted from exactly **two** places in the whole
+image: that branch, and **DealDamage** (`FUN_0114EFA0`, self-named by its `"Dealdamage (hit N) damage: X (of
+maxdamage: …)"` log on channel `GameCode/Combat`). Both emit it on a target `dynamic_cast` to `CoreCharacter`
+with the same boolean. A signal emitted by dealing damage and by casting a hostile spell at a character is the
+hostile-act notification, and bit 11 diverts a hostile cast off it onto `emitA`.
+
+⚠️ **It is only OPERATIVE on 523 of its 2,086 records.** The other 1,563 are not hostile, so they take that
+branch on bit 15 alone and the bit changes nothing for them. A bit whose effect is confined to a quarter of the
+records that carry it is not a contradiction — the guard is a disjunction — but it does mean the catalog-wide
+counts are the wrong denominator for it.
+
+### Bit 4, narrowed but not named
+
+Its single read site `FUN_007E0820` writes **5 instead of 1** into one field of a struct it builds. That is the
+same small mode family bit 15 selects from in `FUN_007F4120` (3 vs 5), so bit 4 is a mode selector on the same
+enum — which is not recovered, so this stays a shape rather than a name. 249 records, 81 of them hostile.
 
 ⚠️ The same offset `+0xC8` is a protobuf HASBIT mask on several unrelated classes, and a naive scan of the bit
 reads finds a coherent-looking cluster of four sibling functions at `0x01759xxx` reading bits 1/2/5/6/7/8 of
