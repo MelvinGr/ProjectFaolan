@@ -200,6 +200,52 @@ baseline). The `descriptor[0] == 2` set is characterised only by its names so fa
 proc-applied: `Wrath` (21 ranks), `Spiritual Torment`, `Furious Inspiration`, `Mutilation`, `Chill`, `Momentum`,
 `Blessed Blade`, `Renewal`, `Ripping Revenge`, `Sacrarial Guard`, `Covenant of Vengeance`, `Stunned`.
 
+### ⭐ The buff object is `BuffInfo_c`, and it is a plain data struct (#658)
+
+`bool2` lands in the client's own buff model, and the object it lands on is now named rather than described.
+`CoreMagicHolder::AddBuffInfo` (`FUN_007eca90`) allocates it inline —
+
+```
+PUSH 0xc8 ; CALL FUN_00c9cce0        ; 200 bytes
+MOV  ESI,EAX ; CALL FUN_00849770     ; the constructor
+```
+
+— and that constructor installs the vtable at `0x1fd2b78`, whose RTTI CompleteObjectLocator names
+`.?AVBuffInfo_c@@`. Its base is `PtrTarget_c` (vtable `0x200cde4`), which is why `AddBuffInfo`'s `param_2` is a
+`Ptr` and every field write goes through `*param_2`.
+
+⛔ **And that kills the route this ticket proposed for it.** "Identify the class and sweep ITS methods" assumes
+the class has methods: `BuffInfo_c`'s vtable has **7 slots and all seven are `PtrTarget_c`'s refcount
+interface**. It is a plain data struct with no virtual accessors, so there is neither a method set to sweep nor
+a slot for the `name_a_virtual_slot_by_who_overrides_it` technique to work on.
+
+What DOES narrow it is scoping the offset sweep to `CoreMagicHolder`'s own band (`0x007e8000`–`0x007f8000`):
+**13 functions** touch `+0x20` there, not the 90 the earlier attempt reported over a wider range. All 13 read
+out; four of them write it as a **byte**, which is a different object (`AddBuffInfo` stores `bool2` as a u32).
+
+⛔ **A second plausible-and-wrong consumer, recorded so it is not re-found.** `FUN_007eaf40` iterates a pointer
+vector and tests `*(int *)(elem + 0x20) == 0 || == 6` — an **enum** test, which is exactly what this ticket
+predicted from the u32 widening ("a field the client keeps as a word is more likely an enum than a flag"). It is
+not the buff: the same element's `+0x18` is compared against **50000**, an LDB category, while `BuffInfo_c`'s
+`+0x18`/`+0x1c` are written from the duration path. That is the second candidate on this ticket that looks
+exactly like the answer and is a different object wearing the same offset — `FUN_007f1760` was the first.
+
+### ⭐ `BuffInfo_c` has its own SERIALIZATION pair, and `+0x20` is field 4 of it
+
+The one genuinely new route out of that sweep. `FUN_007ed9b0` allocates a `BuffInfo_c` — the same
+`FUN_00c9cce0(200, 4, 0)` + `FUN_00849770` pair — and then fills it from a stream cursor (`FUN_0048f900()`,
+called once per field) in offset order:
+
+```
++0x14  +0x18  +0x1c  +0x20  +0x24  (+0x28 +0x2c)  +0xa8  +0xac  +0xb8  +0xbc  +0xc0
+```
+
+`FUN_007edac0` and `FUN_007f17a0` are the writer side of the same layout — `FUN_007edac0` loads `+0x14`,
+byte-swaps it when a flag byte on the writer is set, and hands it to `FUN_00cba060(&value, 4)`.
+
+So the client persists/transports a buff in a layout whose fourth field IS `bool2`, and that is a place a value
+can be lined up against something observable — which none of the five closed routes offered.
+
 ### Two readings killed, and the one the numbers now favour (#658)
 
 ⛔ **`descriptor[0]` gates NOTHING in the payload.** The old cross-tab asked that of slots `[1]` and `[4]` only,
