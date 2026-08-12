@@ -227,7 +227,10 @@ namespace Faolan.GameServer
 			// this is where our model puts a combo's damage: in the finisher's spell. The per-ATTACK bonuses of
 			// kind 53250 are the other half and ride the swings themselves, in SendNormalAttackResponse.
 			var comboDamageBonus = _simulation.PlayerWorldEntity(client)?.ComboBonus(swing.Combo.Id).SpellDamagePercentHundredths ?? 0;
-			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, comboDamageBonus);
+			// #710: the finisher is an ordinary cast as far as the spell-scoped modifiers go - a feat or buff aimed at
+			// this spell moves its crit numbers here exactly as it does on a manual cast.
+			var finisherModifiers = await _spellModifiers.For(client.Session.Character.Id, _simulation.PlayerWorldEntity(client), spellId);
+			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, comboDamageBonus, finisherModifiers);
 
 			// ⭐ And what the combo's own NAME says it does. `Guardian_20b_knockback_Shield_Sweep_II` is a knockback,
 			// and 25 player combos across six classes are - `Shield Sweep`, `Clobber`, `Ferocious Smack`, `Batter

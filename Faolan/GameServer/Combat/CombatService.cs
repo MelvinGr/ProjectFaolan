@@ -210,7 +210,8 @@ namespace Faolan.GameServer.Combat
 		// `extraPercentHundredths` is a caller-supplied boost on top of the caster's own spell-line feat boost - the
 		// combo finisher passes the whole-combo damage its feats grant (#697), which is a property of the COMBO
 		// rather than of the spell and so cannot be read off the caster here.
-		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId, int extraPercentHundredths = 0)
+		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId, int extraPercentHundredths = 0,
+			SpellModifiers? modifiers = null)
 		{
 			var caster = _sim.PlayerWorldEntity(client);
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
@@ -223,9 +224,19 @@ namespace Faolan.GameServer.Combat
 			// the 20,278 that say nothing. Like a melee crit this is NOT a distinct wire flag - retail conveys it by
 			// the larger number alone.
 			var spell = await _database.GetSpell(spellId);
-			var critChanceHundredths = CombatResolver.SpellCritChanceHundredths(spell?.CriticalChanceHundredths ?? 0, caster?.CriticalRating ?? 0);
+
+			// ⭐ #710: a trained FEAT or a live BUFF can move the spell's OWN crit numbers before the caster's rating
+			// is added. `Spell Critical Chance` (147) and `Spell Critical Damage` (129) are the two commonest stats
+			// in the spell-scoped modifier table - 269 and 340 rows - and they were imported and inert: this is the
+			// "a live buff that makes your next Fireball crit harder" the ticket is named for. Both are already in
+			// the column's own hundredths, which is the unit `SpellModifiers.Apply` expects.
+			var mods = modifiers ?? SpellModifiers.None;
+			var spellCritChance = (uint)mods.Apply((int)(spell?.CriticalChanceHundredths ?? 0), CharacterStatId.SpellCriticalChance);
+			var spellCritDamage = (uint)mods.Apply((int)(spell?.CriticalDamageHundredths ?? 0), CharacterStatId.SpellCriticalDamage);
+
+			var critChanceHundredths = CombatResolver.SpellCritChanceHundredths(spellCritChance, caster?.CriticalRating ?? 0);
 			if (critChanceHundredths > 0 && Random.Shared.Next(SpellCritRollScale) < critChanceHundredths)
-				damage = CombatResolver.ApplySpellCritDamage(damage, spell?.CriticalDamageHundredths ?? 0, caster?.CriticalDamageRating ?? 0);
+				damage = CombatResolver.ApplySpellCritDamage(damage, spellCritDamage, caster?.CriticalDamageRating ?? 0);
 
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));

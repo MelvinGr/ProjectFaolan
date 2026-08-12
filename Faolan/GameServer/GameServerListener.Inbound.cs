@@ -2439,7 +2439,7 @@ namespace Faolan.GameServer
 				}
 
 				if (targetHandle != 0 && targetHandle != casterHandle)
-					await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+					await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId, modifiers: castModifiers);
 			}
 		}
 
