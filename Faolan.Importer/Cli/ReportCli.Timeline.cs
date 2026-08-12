@@ -3,14 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
+using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using ProtoBuf;
 
@@ -83,6 +88,7 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 
 			var suppressed = new Dictionary<string, int>();
+			var refused = new Dictionary<string, int>();
 			foreach (var e in events)
 			{
 				if (TimelineNoise.Contains(e.Name))
@@ -92,7 +98,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				var seconds = (e.Ticks - events[0].Ticks) / (double)TimeSpan.TicksPerSecond;
-				var detail = Describe(e, look, labels);
+				var detail = Describe(e, look, labels, refused);
 				var hex = Convert.ToHexString(e.Raw).ToLowerInvariant();
 				if (hex.Length > 72)
 					hex = hex[..72] + "\u2026";
@@ -104,7 +110,7 @@ namespace Faolan.Importer.Cli
 				                  + (hex.Length > 0 ? $"   [{hex}]" : ""));
 			}
 
-			TimelineFooter(events, look, suppressed);
+			TimelineFooter(events, look, suppressed, refused);
 		}
 
 		// A line the PLAYER typed, as opposed to one the server pushed at them. The c2s side is the honest test: an
@@ -148,7 +154,8 @@ namespace Faolan.Importer.Cli
 
 		// The only trailing block. NOT a section of the narrative - it is the part of the capture our own data could
 		// not name, which is the finding a timeline run exists to surface, and it is silent when there is nothing.
-		private static void TimelineFooter(List<TimelineEvent> events, TimelineLookups look, Dictionary<string, int> suppressed)
+		private static void TimelineFooter(List<TimelineEvent> events, TimelineLookups look, Dictionary<string, int> suppressed,
+			Dictionary<string, int> refused)
 		{
 			Console.WriteLine();
 			if (suppressed.Count > 0)
@@ -166,6 +173,16 @@ namespace Faolan.Importer.Cli
 				.Select(e => e.Name).Distinct().Order().ToList();
 			if (unnamedMethod.Count > 0)
 				Console.WriteLine($"# methods not in Opcodes.cs: {string.Join(", ", unnamedMethod)}");
+
+			// ⭐ The decode-coverage line. A codec that THROWS on retail traffic models a shape the live service does
+			// not send, and one such line is invisible in ten thousand - as a per-message count over a session it is a
+			// finding. It is deliberately separate from the two lists above: those are messages we cannot NAME, this
+			// one is messages we name and then fail to read.
+			if (refused.Count > 0)
+			{
+				var counts = string.Join(", ", refused.OrderByDescending(k => k.Value).Select(k => $"{k.Key} x{k.Value}"));
+				Console.WriteLine($"# {refused.Values.Sum()} record(s) a codec REFUSED (its Parse threw): {counts}");
+			}
 		}
 
 		// handle -> label. Entity handles are SESSION-VOLATILE, so they cannot be looked up; they are resolved through
@@ -274,7 +291,8 @@ namespace Faolan.Importer.Cli
 		// traffic must not die on one message: the line degrades to its raw hex, which is still the evidence, and the
 		// run continues. Swallowing it here is deliberate and is NOT a licence for a codec to be wrong - the raw hex
 		// on the line is exactly what shows a decode is missing.
-		private static string Describe(TimelineEvent e, TimelineLookups look, Dictionary<uint, string> labels)
+		private static string Describe(TimelineEvent e, TimelineLookups look, Dictionary<uint, string> labels,
+			Dictionary<string, int> refused)
 		{
 			try
 			{
@@ -282,6 +300,10 @@ namespace Faolan.Importer.Cli
 			}
 			catch (Exception ex)
 			{
+				// ⭐ Counted, not just printed. A codec that throws on retail traffic is the most useful thing a
+				// timeline run can find, and one line in ten thousand is invisible - the footer says which codecs
+				// refused how many records, which is a decode-coverage measurement over a whole session.
+				refused[e.Name] = refused.GetValueOrDefault(e.Name) + 1;
 				return $"(undecoded: {ex.GetType().Name})";
 			}
 		}
@@ -432,9 +454,177 @@ namespace Faolan.Importer.Cli
 					return $"quit {Ent(labels, raw.ReadU32Be(12))}";
 				}
 
-				case "SimpleDynelVisualChangeIIR" when raw.Length > 20:
+				case "SimpleDynelVisualChangeIIR":
 				{
-					return $"{Ent(labels, raw.ReadU32Be(12))} visual state 0x{raw[20]:x2}";
+					// Through the codec rather than off byte 20: `Kind` is the client's own visual-change selector and
+					// several of them carry a resource NAME (an animation, a mesh) that byte 20 could never show.
+					var visual = SimpleDynelVisualChangeCodec.Parse(content);
+					var named = string.IsNullOrEmpty(visual.Name) ? "" : $" \"{visual.Name}\"";
+					var words = visual.Words.Count == 0 ? "" : " " + string.Join(" ", visual.Words.Select(w => $"0x{w:x}"));
+					return $"{Ent(labels, visual.Handle)} visual kind 0x{visual.Kind:x2}{named}{words}";
+				}
+
+				// ⭐ The single busiest non-noise record in a gameplay capture - 720 of them in the herald play2 dump,
+				// every one of which used to print as raw hex. `BehaviorId` is the CLIENT's own command catalog and
+				// `Args` is a `CommandMessage`, so a line can say what the entity actually DID.
+				case "BehaviorControlCenterIIR":
+				{
+					return Behavior(BehaviorControlCenterCodec.Parse(content), look, labels);
+				}
+
+				case "StatUpdateIIR":
+				{
+					var update = StatUpdateCodec.Parse(content);
+					var stats = string.Join(", ", update.Stats.Records.Select(r =>
+						$"{look.Stats.GetValueOrDefault((uint)r.StatId, $"stat {(uint)r.StatId}")} {r.RawValue}"));
+					return $"{Ent(labels, update.EntityHandle)} {stats}";
+				}
+
+				// The three POSE records. Position is what a reader is after in all of them, and `StopIIR` doubly so -
+				// it is where an NPC came to rest, which is the evidence a patrol/leash reading is checked against.
+				case "StopIIR":
+				{
+					var stop = StopCodec.Parse(content);
+					return $"{Ent(labels, stop.Handle)} stops at {Pos(stop.Position)}";
+				}
+
+				case "SetPosIIR":
+				{
+					var pos = SetPosCodec.Parse(content);
+					return $"{Ent(labels, pos.Handle)} placed at {Pos(pos.Position)}" + (pos.Flag == 0 ? "" : $" flag {pos.Flag}");
+				}
+
+				case "N3TeleportIIR" or "IntendedTeleportIIR":
+				{
+					var teleport = TeleportCodec.Parse(content);
+					var destination = teleport.Proxy.MapId;
+					var where = teleport is N3TeleportIIR n3 ? $" to {Pos(n3.Position)}" : "";
+					return $"teleport{where} on playfield {destination}"
+					       + (look.Maps.TryGetValue(destination, out var mapName) ? $" \"{mapName}\"" : "");
+				}
+
+				case "ThreatLevelIIR":
+				{
+					var threat = ThreatLevelCodec.Parse(content);
+					return $"{Ent(labels, threat.Handle)} threat {threat.Threat} flag {threat.Flag}";
+				}
+
+				case "LockedToChangedIIR":
+				{
+					var locked = LockedToChangedCodec.Parse(content);
+					return $"{Ent(labels, locked.Handle)} locked to "
+					       + (locked.TargetInstance == 0 ? "nothing" : Ent(labels, locked.TargetInstance));
+				}
+
+				case "NewCurrentLooterIIR" or "NewAllowedLooterIIR":
+				{
+					var looter = NewLooterCodec.Parse(content);
+					return $"bag {Ent(labels, looter.BagHandle)} -> "
+					       + (looter.LooterHandle == 0 ? "nobody" : Ent(labels, looter.LooterHandle));
+				}
+
+				case "CharInPlayIIR":
+				{
+					return $"{Ent(labels, CharInPlayCodec.Parse(content).Handle)} in play";
+				}
+
+				case "QuestFullUpdateIIR":
+				{
+					var full = QuestFullUpdateCodec.Parse(content);
+					var record = full.Record;
+					var area = look.Line(record.Area);
+					return $"quest {record.QuestId} (line {record.QuestLineId})"
+					       + (area.Length > 0 ? $" in \"{area}\"" : "")
+					       + (record.Summary.Length > 0 ? $": \"{look.Line(record.Summary)}\"" : "");
+				}
+
+				case "LootRemoveItemsIIR":
+				{
+					var removed = LootRemoveItemsCodec.Parse(content);
+					return $"bag {Ent(labels, removed.BagHandle)} loses slot(s) {string.Join(", ", removed.RemovedPositions)}";
+				}
+
+				case "AreaFormulaIIR":
+				{
+					var area = AreaFormulaCodec.Parse(content);
+					var at = area.Positions.Length > 0 ? $" at {Pos(area.Positions[0])}" : "";
+					return $"{Ent(labels, area.Handle)} area effect{at}, {area.Refs.Length} ref(s)";
+				}
+
+				case "UpdateSimpleDynelIIR":
+				{
+					var dynel = UpdateSimpleDynelCodec.Parse(content);
+					return $"{Ent(labels, dynel.Handle)} 0x{dynel.Word0:x} 0x{dynel.Word1:x} [{dynel.B0:x2} {dynel.B1:x2} {dynel.B2:x2} {dynel.B3:x2}]";
+				}
+
+				case "TemplateActionIIR":
+				{
+					var action = TemplateActionCodec.Parse(content);
+					return $"{Ent(labels, action.Handle)} template action, {action.Template.Length} B template";
+				}
+
+				case "UpdateInventoryIIR":
+				{
+					var inventory = UpdateInventoryCodec.Parse(content);
+					return $"{Ent(labels, inventory.Handle)} inventory, {inventory.InventoryProtobuf.Length} B";
+				}
+
+				case "GameTimeIIR":
+				{
+					var clock = GameTimeCodec.Parse(content);
+					return $"day {clock.GameDay}, {TimeSpan.FromSeconds(clock.DayTimeSeconds):hh\\:mm\\:ss} in-game, rate x{clock.Rate:0.##}";
+				}
+
+				case "DispatchLockTemplate":
+				{
+					var locked = LockTemplateCodec.Parse(content);
+					var what = look.Spells.TryGetValue(locked.TemplateId, out var sn) ? $"\"{sn}\"" : $"template {locked.TemplateId}";
+					return $"{what} locked for {locked.SecondsRemaining:0.##}s";
+				}
+
+				case "DispatchRemoveItem":
+				{
+					var removed = RemoveItemCodec.Parse(content);
+					return $"{removed.Container} slot {removed.ItemPos}"
+					       + (removed.AmountToRemove == 0 ? "" : $" x{removed.AmountToRemove}");
+				}
+
+				case "DispatchValidResurrectionSpots":
+				{
+					var spots = ValidResurrectionSpotsCodec.Parse(content);
+					return $"{spots.Spots.Count} resurrection spot(s) from {Pos(spots.ReferencePosition)}";
+				}
+
+				case "CoreClaimIIR":
+				{
+					return CoreClaimCodec.Parse(content) switch
+					{
+						CoreClaimListIIR list => $"{list.Claims.Count} claim(s) available",
+						CoreClaimRedeemAckIIR ack => $"claim {ack.Claim.Index} redeemed"
+						                             + (look.Items.TryGetValue(ack.Claim.ItemTemplateId, out var claimed) ? $" = \"{claimed}\"" : ""),
+						_ => "new claims"
+					};
+				}
+
+				// ⚠️ `DynelHandle` is the element's TYPE ID, not a handle - `Build(frameHandle, action)` passes
+				// `action.TypeId` into that slot. Printing it as an entity would name it after whatever spawn happened
+				// to share the number. The generic text scrape still runs, because several action types carry a
+				// RESOURCE NAME in the tail ("Ignore.particleeffect") and that is the readable half of the line.
+				case "GameActionListIIR":
+				{
+					var list = GameActionListCodec.Parse(content);
+					var kind = GameActionTypes.Get(list.DynelHandle)?.Name ?? $"type {list.DynelHandle}";
+					var text = look.Text(raw);
+					return $"{Ent(labels, list.FrameHandle)} {kind}, {list.ActionTail.Length} B"
+					       + (text.Length > 0 ? $" {text}" : "");
+				}
+
+				case "DispatchSetItemStat":
+				{
+					var itemStat = SetItemStatCodec.Parse(content);
+					var statName = look.Stats.GetValueOrDefault(itemStat.StatId, $"stat {itemStat.StatId}");
+					return $"{itemStat.Container} slot {itemStat.Slot} {statName} = {itemStat.Value}"
+					       + (itemStat.Value == uint.MaxValue ? " (cleared)" : "");
 				}
 
 				case "DispatchAddItem":
@@ -464,6 +654,74 @@ namespace Faolan.Importer.Cli
 				}
 			}
 		}
+
+		private static string Pos(Vector3 p)
+		{
+			return $"({p.X:F1}, {p.Y:F1}, {p.Z:F1})";
+		}
+
+		// One behaviour record: WHO, which command, which phase of it, and what the CommandMessage says about it.
+		//
+		// This is the busiest record in a gameplay capture by a wide margin and it used to print as raw hex - which
+		// meant every swing, cast, combo step, equip and object interaction in a session was invisible in the one
+		// report meant to say what the session did.
+		//
+		// Three sources make the line readable, and all three are already gated elsewhere:
+		//   * `BehaviorId` is the CLIENT's own command classmap (#536), so `0x0F` reads `CombatMelee` and not a number;
+		//   * `Seq` is the phase - `BehaviorAnimations.SeqBegin` and its siblings name the four that matter;
+		//   * `Args` is a `CommandMessage` protobuf, which carries the combo step, the execution status and the
+		//     animation id the record is otherwise silent about.
+		//
+		// ⚠️ The args are parsed defensively. `Describe`'s catch would degrade the WHOLE line to hex on a body whose
+		// args a future field breaks, and the actor/command/phase are worth having without them.
+		private static string Behavior(BehaviorControlCenterIIR bcc, TimelineLookups look, Dictionary<uint, string> labels)
+		{
+			var command = Enum.IsDefined(typeof(BehaviorId), bcc.BehaviorId)
+				? Enum.GetName(typeof(BehaviorId), bcc.BehaviorId)!
+				: $"command 0x{bcc.BehaviorId:x2}";
+			var phase = BehaviorPhases.GetValueOrDefault(bcc.Seq, $"phase 0x{bcc.Seq:x}");
+			var delay = bcc.DelayCentiseconds is { } cs ? $" +{cs / 100.0:0.##}s" : "";
+
+			var detail = new List<string>();
+			try
+			{
+				var args = Serializer.Deserialize<CommandMessage>(new ReadOnlyMemory<byte>(bcc.Args));
+				if (args.ShouldSerializeBccActionId())
+					detail.Add($"action {args.BccActionId}");
+
+				// ⭐ The combo id IS the `Combos` primary key, so a swing names its own combo with no correlation -
+				// and combos are not in `Spells`, which is why the obvious lookup would miss every one.
+				if (args.ShouldSerializeComboId())
+					detail.Add("combo " + (look.Combos.TryGetValue(args.ComboId, out var comboName)
+						           ? $"\"{comboName}\" ({args.ComboId})"
+						           : args.ComboId.ToString())
+					           + (args.ShouldSerializeComboAttackNum() ? $" step {args.ComboAttackNum}" : ""));
+
+				if (args.ShouldSerializeExecutionStatus())
+					detail.Add($"status {args.ExecutionStatus}");
+
+				if (args.ShouldSerializeFlags())
+					detail.Add($"flags 0x{args.Flags:x}");
+			}
+			catch (Exception ex)
+			{
+				detail.Add($"(args undecoded: {ex.GetType().Name})");
+			}
+
+			// The tail belongs to the COMMAND rather than to this record (see BehaviorControlCenterCodec), so its
+			// LENGTH is what a timeline can honestly say - and it is a real signal: a no-tail command and a 39-byte
+			// PlayAnimation are the same record shape until you look at it.
+			var tail = bcc.Tail.Length == 0 ? "" : $" +{bcc.Tail.Length} B tail";
+			return $"{Ent(labels, bcc.Actor)} {command} {phase}{delay}"
+			       + (detail.Count > 0 ? " " + string.Join(" ", detail) : "") + tail;
+		}
+
+		// `Seq`'s named values - the phases of one behaviour, from BehaviorAnimations / BehaviorAcks. Everything else
+		// prints as its number rather than being guessed at.
+		private static readonly Dictionary<ushort, string> BehaviorPhases = new Dictionary<ushort, string>
+		{
+			[0x0004] = "begin", [0x0007] = "abort", [0x000A] = "complete", [0x000E] = "delay", [0x000F] = "commit"
+		};
 
 		// One conversation message, through KnubotCodec - which NPC, and what was said or picked.
 		//

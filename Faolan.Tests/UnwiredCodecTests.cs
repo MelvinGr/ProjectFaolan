@@ -73,6 +73,13 @@ namespace Faolan.Tests
 		// Everything that could legitimately CALL a codec: the server, the importer, the web tier and the MCP server.
 		// `Codecs/` itself is excluded (a codec composing another is not a live trigger) and so is the test project
 		// (a golden proving a builder is exactly the situation this looks for).
+		//
+		// ⚠️ **And so is `Faolan.Importer/Cli/ReportCli.*` - the `--report` diagnostics.** Those are read-only by
+		// definition, so one of them calling `Parse` says a message can be READ, never that anything SENDS it. Letting
+		// a report count as a caller would take a codec off this list without wiring it to anything in the world -
+		// silently, which is precisely the rot this gate exists to catch. It surfaced the moment `--report timeline`
+		// started decoding `AreaFormulaIIR`: the area/cone target selection is still unimplemented, and the gate would
+		// have declared it wired.
 		private static IReadOnlyList<string> CallerSources()
 		{
 			string[] roots =
@@ -83,12 +90,14 @@ namespace Faolan.Tests
 			];
 
 			var codecs = TestPaths.Repo("Faolan.Core.Network", "Codecs") + Path.DirectorySeparatorChar;
+			var reports = TestPaths.Repo("Faolan.Importer", "Cli") + Path.DirectorySeparatorChar + "ReportCli";
 
 			return
 			[
 				.. roots.Where(Directory.Exists)
 					.SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
 					.Where(f => !f.StartsWith(codecs, StringComparison.Ordinal))
+					.Where(f => !f.StartsWith(reports, StringComparison.Ordinal))
 					.Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
 					            !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
 					.Select(File.ReadAllText)

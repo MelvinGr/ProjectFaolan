@@ -92,6 +92,17 @@ namespace Faolan.Importer.Cli
 
 		public Dictionary<uint, string> Abilities { get; private set; } = [];
 
+		/// <summary>
+		///     Combo id -> the combo's name, for the <c>combo_id</c> a behaviour record's <c>CommandMessage</c> carries.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The wire value IS the `Combos` primary key, so a swing's combo resolves with no correlation at all -
+		///     `3536865` is `Slave_1_AOE_2hb_Sweep_2`. Worth stating because combos are NOT in `Spells` (they live in
+		///     their own catalog, see the `combos_are_in_classspells_and_are_not_spellbook_spells` note), so the
+		///     obvious lookup misses every one of them.
+		/// </remarks>
+		public Dictionary<uint, string> Combos { get; private set; } = [];
+
 		public Dictionary<uint, string> AbilityBySlot { get; private set; } = [];
 
 		public Dictionary<uint, List<Placed>> NpcSpawns { get; private set; } = [];
@@ -110,7 +121,9 @@ namespace Faolan.Importer.Cli
 				Maps = await db.Maps.AsNoTracking().ToDictionaryAsync(m => m.Id, m => m.Name),
 				Items = await db.Items.AsNoTracking().Where(i => i.Name != null && i.Name != "")
 					.ToDictionaryAsync(i => i.Id, i => i.Name!),
-				Spells = await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name)
+				Spells = await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name),
+				Combos = await db.Set<Core.Database.Tables.Combo>().AsNoTracking()
+					.Where(c => c.Name != "").ToDictionaryAsync(c => c.Id, c => c.Name)
 			};
 
 			var abilities = await db.Set<Core.Database.Tables.Ability>().AsNoTracking()

@@ -49,9 +49,20 @@ BACKWARDS: by the time a line is typed the event is over, and the player's NEXT 
 the window. Attribute traffic only when the message text, a named token or a matching id corroborates
 it - adjacency is not evidence.
 
-**Read the trailing `#` lines first.** They list the IIR types and methods the capture used that
-`Opcodes.cs` does not name. Anything there is a finding — and so is an id printed raw mid-timeline (a
-template, spell or ability that did not resolve).
+**Read the trailing `#` lines first.** Three findings live there and they are three different things:
+
+- **IIR types / methods `Opcodes.cs` does not name** — a message we cannot even label;
+- **records a codec REFUSED** — a message we label and then fail to READ. Its `Parse` threw on retail
+  traffic, which means the codec models a shape the live service does not send. This is the sharpest of
+  the three, because the codec claims to know the message.
+- an id printed raw mid-timeline (a template, spell or ability that did not resolve) — a content gap
+  rather than a protocol one.
+
+**Combat reads as combat.** `BehaviorControlCenterIIR` is the busiest record in a gameplay capture by a
+wide margin, and it is decoded: the actor, the client's own command name (`CombatMelee`, `MagicAttack`,
+`UseDynel`, …), the phase (`begin` / `abort` / `complete` / `commit`), and out of its `CommandMessage`
+args the combo — **by name**, since the wire's `combo_id` is the `Combos` primary key. So a swing line
+reads `another player 0x1316e65 CombatMelee begin combo "Slave_1_AOE_2hb_Sweep_2" (3536865) step 1`.
 
 ## 3. Deeper text than the session itself used
 
