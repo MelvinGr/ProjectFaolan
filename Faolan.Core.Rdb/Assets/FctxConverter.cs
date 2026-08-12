@@ -32,6 +32,18 @@ namespace Faolan.Core.Rdb.Assets
 				return Result.Fail("FCTX payload shorter than its 24-byte header");
 
 			// FCTX header: magic[4], unknown1 u32, unknown2 u32, width u16, height u16, mip1 u8, mip2 u8, unk3 u16, fourcc[4].
+			//
+			// ⭐ The two words are CENSUSED, not unknown-shaped (#464, `--report fctx-header` over 2,808 textures):
+			// neither is per-texture data and neither predicts any size, dimension or mip count.
+			//
+			//   unknown1  2 on every fourcc-tagged texture (DXT1 2,475 / DXT5 115 / MIXD 218), 1 on the 7 whose
+			//             fourcc slot holds no readable tag - so it separates "carries a fourcc" from "does not".
+			//   unknown2  1 on every single-image format, and 6 on MIXD - the one CONTAINER format, which this
+			//             converter already has to special-case as several concatenated maps.
+			//
+			// ⚠️ And unknown2 is NOT merely a format tag: one MIXD carries 2 where the other 217 carry 6. A value
+			// that varies WITHIN a format is a count, not a label - which is what makes "the number of sub-maps" the
+			// reading to test, and it is the only thing left open on this header.
 			var unknown1 = payload.ReadU32Le(4);
 			var unknown2 = payload.ReadU32Le(8);
 			int width = payload.ReadU16Le(12);
@@ -271,6 +283,8 @@ namespace Faolan.Core.Rdb.Assets
 			return ms.ToArray();
 		}
 
+		// `Unknown1`/`Unknown2` keep their names deliberately: the census above says what they CORRELATE with and
+		// not what they mean, and a name like `SubMapCount` would be a claim the measurement does not support.
 		public readonly record struct FctxHeader(string FourCc, int Width, int Height, int MipCount, uint Unknown1, uint Unknown2);
 
 		public readonly record struct Result(bool Ok, byte[] Dds, FctxHeader Header, string? Warning)

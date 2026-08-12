@@ -175,6 +175,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB only, no corpus: #464's one entry whose evidence was never the capture corpus - the two u32s after
+			// an FCTX texture's magic, censused against the header fields around them.
+			if (report == "fctx-header")
+			{
+				FctxHeaderCensus(RdbDir(), arg);
+				return 0;
+			}
+
 			// RDB only, no corpus: a spell's in-client TOOLTIP rendered out of our own decode, chain and all - the
 			// end-to-end gate on the spell record (#775). --report-arg <spellId>[,<id>...][@<casterLevel>].
 			if (report == "spell-tooltip")
