@@ -472,6 +472,26 @@ Rating** based on the sum of **Strength** and **Dexterity**"* — which is exact
 `UpgradeCombo` (53209) carry. The sentence has no literal `%`, so the suffix belongs to the value string, which is
 what the branch's own value formatter appends.
 
+### Both arms are now honored by the runtime (#807)
+
+`SpellStatEffect` carries the pair as `StatId` (the target, key 67) + `SourceStatId` (the source, key 66), and
+`BuffStatEffects` splits them the same way the client's branch does:
+
+| shipped rows | arm | what happens |
+|---:|---|---|
+| 85 | equal | a percent of the stat itself — the 53067 path, at a different scale (plain percent → ×100) |
+| 10 | differ | **derived**: `Will of the Sublime` adds 3–15% of *Intelligence* **and** of *Strength* onto `CriticalDamageRating` |
+| 10 | differ | dropped: `Arcane Plunder` targets 490 `ImmunityRating`, which the combat model does not consume |
+
+⚠️ A derived term reads its source's **own** value — gear + flat, scaled by that stat's own percentages — and not
+its `Buffed` one. That is what keeps the evaluation non-recursive, and it is right on every shipped row, whose
+sources are all base attributes and so carry no derived term themselves. A cycle would otherwise be expressible in
+data we do not control.
+
+⚠️ The two terms of one rank share a TARGET, so level-banding them by stat alone picks one band across the pair and
+silently drops a source. `Applicable` bands by (target, **source**); for every other kind `SourceStat` is null and
+the key degenerates to the stat it always was.
+
 ### `AddComboProc` (53212): the sentence is chosen by which SIDE is present
 
 Branch `0x0149ec8e` reads key 88 (the proc run on SELF), key 236 (the one run on the TARGET) and key 237, and

@@ -82,6 +82,67 @@ namespace Faolan.Tests
 			Assert.Equal(2, catalog.PercentSkipped);
 		}
 
+		// ⭐ #807: `AddPercentSkillModifier` (53189) with a source stat DIFFERENT from its target - "raise stat B by
+		// N% of stat A". `Will of the Sublime` is the shipped case: +3..15% of Intelligence AND of Strength onto
+		// Critical Damage Rating, two terms per rank.
+		//
+		// Both terms have to land. They share a target, so banding them together would pick one band across the pair
+		// and silently drop a source - which is what grouping `Applicable` by stat alone did.
+		[Fact]
+		public void DerivedStat_AddsAPercentageOfEachSourceStat()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Derived(4281110, CharacterStatId.CriticalDamageRating, CharacterStatId.Intelligence, 3),
+				Derived(4281110, CharacterStatId.CriticalDamageRating, CharacterStatId.Strength, 3)
+			]);
+
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int>
+			{
+				[CharacterStatId.CriticalDamageRating] = 100,
+				[CharacterStatId.Intelligence] = 200,
+				[CharacterStatId.Wisdom] = 0
+			};
+
+			entity.ActiveBuffs[4281110 << 8] = new ActiveBuff(4281110 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			// 100 + 3% of Intelligence 200 + 3% of Strength (whatever the entity's own is) - the Intelligence term
+			// alone is +6, so the pair cannot both have been collapsed into one.
+			Assert.True(entity.CriticalDamageRating >= 106, $"expected at least 106, got {entity.CriticalDamageRating}");
+
+			entity.ActiveBuffs.Clear();
+			BuffStatEffects.Recompute(entity, catalog);
+			Assert.Equal(100u, entity.CriticalDamageRating); // and it comes back off
+		}
+
+		// The other end of the same rule: a derived row whose SOURCE we cannot resolve is dropped, and says so
+		// separately from an unmodelled TARGET - the two are different gaps.
+		[Fact]
+		public void DerivedStat_FromAnUnresolvedSource_IsCountedNotGuessed()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Derived(4281011, CharacterStatId.CriticalDamageRating, (CharacterStatId)1234, 2)
+			]);
+
+			Assert.Empty(catalog.DerivedBySpellBase ?? new Dictionary<uint, BuffStatEffects.Delta[]>());
+			Assert.Equal(1, catalog.DerivedSkipped);
+		}
+
+		// An unmodelled TARGET falls at the target gate, ahead of the source question - `Arcane Plunder` derives onto
+		// 490 `ImmunityRating`, which nothing in the combat model consumes.
+		[Fact]
+		public void DerivedStat_OntoAnUnmodelledTarget_FallsAtTheTargetGate()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Derived(4281011, (CharacterStatId)490, CharacterStatId.Strength, 2)
+			]);
+
+			Assert.Empty(catalog.DerivedBySpellBase ?? new Dictionary<uint, BuffStatEffects.Delta[]>());
+			Assert.Equal(1, catalog.PercentSkipped);
+			Assert.Equal(0, catalog.DerivedSkipped);
+		}
+
 		// #436: a percentage SCALES the flat total rather than adding to it - "+2% Critical Rating" is worth more on a
 		// well-geared character, which is the whole reason it needed a model of its own.
 		[Fact]
@@ -646,6 +707,19 @@ namespace Faolan.Tests
 		private static WorldEntity Player()
 		{
 			return new WorldEntity(0x1000, 2040, true, "Tester", null!);
+		}
+
+		// A 53189 row: the kind that names a TARGET and a SOURCE stat plus a plain percentage.
+		private static SpellStatEffect Derived(uint spellId, CharacterStatId target, CharacterStatId source, int percent)
+		{
+			return new SpellStatEffect
+			{
+				SpellId = spellId,
+				StatId = target,
+				SourceStatId = source,
+				EffectKind = BuffStatEffects.PercentOfStatKind,
+				Amount = percent
+			};
 		}
 
 		private static SpellStatEffect Row(uint spellId, CharacterStatId stat, uint kind, int amount)

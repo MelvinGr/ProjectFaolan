@@ -256,9 +256,13 @@ namespace Faolan.GameServer.Combat
 			if (deltas.Count <= 1)
 				return deltas;
 
+			// ⚠️ Grouped by (target, SOURCE), not by target alone. For everything but a derived row `SourceStat` is
+			// null and the key degenerates to the stat, so this is the same grouping it always was - but a derived
+			// spell states one term PER SOURCE at each rank (`Will of the Sublime` is 5 ranks x Intelligence and
+			// Strength), and banding those together picks one band across both and drops the other source (#807).
 			var applicable = new List<Delta>(deltas.Count);
-			foreach (var stat in deltas.Select(d => d.Stat).Distinct())
-				applicable.AddRange(SpellEffectBands.ForLevel([.. deltas.Where(d => d.Stat == stat)], level, d => d.Band));
+			foreach (var key in deltas.Select(d => (d.Stat, d.SourceStat)).Distinct())
+				applicable.AddRange(SpellEffectBands.ForLevel([.. deltas.Where(d => (d.Stat, d.SourceStat) == key)], level, d => d.Band));
 
 			return applicable;
 		}
@@ -287,17 +291,27 @@ namespace Faolan.GameServer.Combat
 		{
 			// ⚠️ 53189 is classified FIRST and on its own, because whether it is usable turns on a column no other
 			// kind sets. Same source and target is a percent of the stat itself and goes down the 53067 path; a
-			// DIFFERENT source is a derived stat - "+2% of your Strength onto your Immunity Rating" - and this engine
-			// has no model for one: `Buffed` resolves each stat independently, so a derived term would have to read
-			// another stat's FINAL value and the two would need an ordering. Declined rather than half-built, and
-			// nothing is lost by that today: both stats the shipped rows derive onto (490 `ImmunityRating`, 711
-			// `CriticalDamageBonusRating`) are unmodelled anyway, so they would fall at the next gate regardless.
+			// DIFFERENT source is a DERIVED stat - "+3% of your Intelligence onto your Critical Damage Rating" - and
+			// needs BOTH ends to be resolvable, so it is gated twice.
+			//
+			// ⚠️ This used to refuse every derived row outright, on the stated grounds that "both stats the shipped
+			// rows derive onto (490 ImmunityRating, 711 CriticalDamageBonusRating) are unmodelled anyway". Half of
+			// that was wrong: 711 is 0x2C7 = `CriticalDamageRating`, which IS honored and IS consumed by the combat
+			// resolver - so `Will of the Sublime`'s ten rows were being dropped for a reason that did not apply to
+			// them. `Arcane Plunder`'s ten really do target an unmodelled stat and still fall at the target gate.
 			if (row.EffectKind == PercentOfStatKind)
 			{
-				if (row.SourceStatId != row.StatId)
-					return Gate.DerivedFromOtherStat;
+				if (!HonoredStats.ContainsKey(row.StatId))
+					return Gate.PercentOnUnmodelledStat;
 
-				return HonoredStats.ContainsKey(row.StatId) ? Gate.Percent : Gate.PercentOnUnmodelledStat;
+				if (row.SourceStatId == row.StatId)
+					return Gate.Percent;
+
+				// A derived term reads the SOURCE's resolved value, so a source we do not resolve is as fatal as an
+				// unmodelled target - and it is a different drop, so it says so.
+				return row.SourceStatId is { } source && (HonoredStats.ContainsKey(source) || VitalAttributes.IsAttribute(source))
+					? Gate.Derived
+					: Gate.DerivedFromOtherStat;
 			}
 
 			var isPercent = row.EffectKind == PercentKind;
@@ -318,6 +332,7 @@ namespace Faolan.GameServer.Combat
 			ILookup<(uint SpellId, uint Sequence), SpellStatEffectCriterion>? criteria = null)
 		{
 			var honored = new Dictionary<uint, List<Delta>>();
+			var derivedOf = new Dictionary<uint, List<Delta>>();
 			var percent = new Dictionary<uint, List<Delta>>();
 			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0, derivedSkipped = 0;
 			// ⚠️ `DistinctBy(Statement)`: a record states the same element twice (`Hellfire Stream` repeats two of its
@@ -375,15 +390,19 @@ namespace Faolan.GameServer.Combat
 						? row.Amount
 						: row.Amount / (int)SpellScale(row.StatId);
 
+				var derived = Classify(row) == Gate.Derived;
 				var delta = new Delta(row.StatId, amount, ramp, conditions is { Length: > 0 } ? conditions : null,
-					OverrideKinds.Contains(row.EffectKind));
+					OverrideKinds.Contains(row.EffectKind), derived ? row.SourceStatId : null);
 
-				var into = isPercent ? percent : honored;
+				// A DERIVED row is a percentage too, but of a DIFFERENT stat - so it cannot join `percent`, whose
+				// entries all scale their own stat's total. Its own table, read by `Buffed` after that scaling.
+				var into = derived ? derivedOf : isPercent ? percent : honored;
 				(into.TryGetValue(row.SpellId, out var list) ? list : into[row.SpellId] = []).Add(delta);
 			}
 
 			return new Catalog(honored.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()),
-				percent.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped, derivedSkipped);
+				percent.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped, derivedSkipped,
+				derivedOf.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()));
 		}
 
 		// The recompute, as a pure function over an entity + a catalog: `(gear + flat buffs) x (1 + percent buffs)` per
@@ -397,6 +416,9 @@ namespace Faolan.GameServer.Combat
 			// …except an OVERRIDE, which does not sum with anything (#805): it replaces the gear + flat total for its
 			// stat, the way the client's own `SetStatOverride` executor does.
 			var overrides = new Dictionary<CharacterStatId, int>();
+			// #807: "raise stat B by N% of stat A". Keyed by the TARGET, because that is what `Buffed` is asked for;
+			// each entry names the source it reads and the percentage of it to add.
+			var derived = new Dictionary<CharacterStatId, List<(CharacterStatId Source, int Percent)>>();
 			//
 			// The carrier's LEVEL is what resolves a ramped delta (#599) - the same buff is worth +887 health on a
 			// level-20 character and +17500 on a level-80 one - so a level change has to re-run this. It already
@@ -406,6 +428,7 @@ namespace Faolan.GameServer.Combat
 			{
 				Sum(catalog.BySpellBase, buffId >> 8, flat, level);
 				Sum(catalog.PercentBySpellBase, buffId >> 8, percent, level);
+				SumDerived(catalog.DerivedBySpellBase, buffId >> 8, level);
 			}
 
 			// #584: the ATTRIBUTES are resolved and pushed into the entity FIRST, before the loop below, because the
@@ -471,6 +494,27 @@ namespace Faolan.GameServer.Combat
 			// take a stat to 0, never negative.
 			int Buffed(CharacterStatId stat)
 			{
+				var total = Own(stat);
+
+				// #807: a DERIVED term adds a percentage of ANOTHER stat. It reads that stat's OWN value rather than
+				// its `Buffed` one, which is what keeps this non-recursive - and is right on every shipped row, whose
+				// sources are all base attributes and so carry no derived term of their own. A cycle would otherwise
+				// be expressible in data we do not control.
+				if (derived.TryGetValue(stat, out var terms))
+				{
+					foreach (var (source, pct) in terms)
+						total += (int)((long)Own(source) * pct / PercentScale);
+				}
+
+				return total > 0
+					? total
+					: 0;
+			}
+
+			// One stat's own total: the gear + flat base (or an override) scaled by its own percentages, and nothing
+			// derived from anywhere else.
+			int Own(CharacterStatId stat)
+			{
 				// An override replaces the gear + flat base and nothing else: a percentage still scales the result,
 				// because a percent record is a separate element on a separate stat table entry either way.
 				var total = overrides.TryGetValue(stat, out var overridden)
@@ -480,9 +524,21 @@ namespace Faolan.GameServer.Combat
 				if (pct != 0)
 					total = (int)((long)total * (PercentScale + pct) / PercentScale);
 
-				return total > 0
-					? total
-					: 0;
+				return total;
+			}
+
+			void SumDerived(IReadOnlyDictionary<uint, Delta[]>? from, uint spellBase, uint carrierLevel)
+			{
+				if (from == null || !from.TryGetValue(spellBase, out var deltas))
+					return;
+
+				foreach (var delta in Applicable(deltas, carrierLevel))
+				{
+					if (delta.SourceStat is not { } source)
+						continue;
+
+					(derived.TryGetValue(delta.Stat, out var terms) ? terms : derived[delta.Stat] = []).Add((source, delta.Amount));
+				}
 			}
 
 			void Sum(IReadOnlyDictionary<uint, Delta[]> from, uint spellBase, Dictionary<CharacterStatId, int> into, uint level)
@@ -557,11 +613,12 @@ namespace Faolan.GameServer.Combat
 				var catalog = BuildCatalog(rows, criteria);
 				_catalog = catalog;
 				_logger.LogInformation(
-					"BuffStatEffects: {Spells} spell(s) with flat stat effects and {PercentSpells} with percent ones, out of {Rows} imported records " +
+					"BuffStatEffects: {Spells} spell(s) with flat stat effects, {PercentSpells} with percent ones and {DerivedSpells} with a stat DERIVED from another, " +
+					"out of {Rows} imported records " +
 					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats, " +
-					"{Derived} derived-from-another-stat - see #367/#807); " +
+					"{Derived} derived from a stat we do not resolve - see #367/#807); " +
 					"{Conditional} honored delta(s) carry CONDITIONS and are evaluated per carrier (#791).",
-					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped,
+					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, catalog.DerivedBySpellBase?.Count ?? 0, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped,
 					catalog.DerivedSkipped,
 					catalog.BySpellBase.Values.Concat(catalog.PercentBySpellBase.Values).Sum(d => d.Count(x => x.Criteria != null)));
 				return catalog;
@@ -584,9 +641,13 @@ namespace Faolan.GameServer.Combat
 			UnmodelledStat,
 			PercentOnUnmodelledStat,
 
-			// 53189 with a source stat DIFFERENT from its target - a derived stat, which this engine cannot express
-			// (#807). Its own member rather than folded into UnhandledKind, because the kind IS handled: it is the
-			// row's two-stat SHAPE that is not, and the load summary should say which of the two it dropped.
+			// 53189 with a source stat DIFFERENT from its target, and BOTH ends resolvable - "raise stat B by N% of
+			// stat A" (#807).
+			Derived,
+
+			// The same shape with a SOURCE we cannot resolve. Its own member rather than folded into UnhandledKind,
+			// because the kind IS handled: it is this row's source that is not, and the load summary should say which
+			// of the two ends it dropped.
 			DerivedFromOtherStat
 		}
 
@@ -596,7 +657,8 @@ namespace Faolan.GameServer.Combat
 		// <paramref name="Override" /> is #805: the delta REPLACES the stat rather than adding to it, because the
 		// client's own executor for the kind is `SetStatOverride` - see OverrideKinds.
 		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null,
-			IReadOnlyList<ItemTemplateStatModifiers.Criterion>? Criteria = null, bool Override = false)
+			IReadOnlyList<ItemTemplateStatModifiers.Criterion>? Criteria = null, bool Override = false,
+			CharacterStatId? SourceStat = null)
 		{
 			// The LEVEL BAND this delta states its numbers for, or null when it is level-independent - the ramp's own
 			// two levels, because a record that bands a stat bands it by ramping each band separately (#783).
@@ -623,6 +685,7 @@ namespace Faolan.GameServer.Combat
 			int PercentSkipped,
 			int KindSkipped,
 			int StatSkipped,
-			int DerivedSkipped = 0);
+			int DerivedSkipped = 0,
+			IReadOnlyDictionary<uint, Delta[]>? DerivedBySpellBase = null);
 	}
 }

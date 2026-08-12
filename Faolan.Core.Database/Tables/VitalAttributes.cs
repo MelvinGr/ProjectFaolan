@@ -19,6 +19,16 @@ namespace Faolan.Core.Database.Tables
 		public static VitalAttributes LevelOneBase { get; } = new VitalAttributes(1, 1, 1, 1, 1);
 
 		/// <summary>
+		///     Whether a stat id is one of the five ATTRIBUTES this struct carries. Named here rather than as a set
+		///     beside each caller, because "the five" is this type's own definition and a second list of them drifts.
+		/// </summary>
+		public static bool IsAttribute(CharacterStatId stat)
+		{
+			return stat is CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence
+				or CharacterStatId.Wisdom or CharacterStatId.Dexterity;
+		}
+
+		/// <summary>
 		///     A character's totals from the two sources the world model carries: the class/level base (#444,
 		///     <c>ClassAttributeBases</c>, in the RAW WIRE scale) and the display-unit gear/feat bonuses
 		///     (<c>MaxStatAggregator</c>). Absent entries count as zero on both sides - an undecoded (class, level)
