@@ -43,11 +43,22 @@ namespace Faolan.Importer.Cli
 			var nonZeroSlots = new List<string>();
 			var descriptor4 = new Dictionary<uint, int>();
 			var descriptor4Spells = new Dictionary<uint, int>();
+			// #658: what PRECEDED each apply, keyed by descriptor[0]. Every field OF the spell record is now swept
+			// flat against this value while the SCOPE statement says it is spell-owned - which points at a RELATIONAL
+			// property (how this apply reached this target) that no record sweep can see by construction.
+			var preceding = new Dictionary<string, int>();
 			foreach (var capture in captures)
-			foreach (var p in capture.Packets)
 			{
+				// The last non-buff packet seen on this capture, as "0xIIR" or "m0xMETHOD". ⚠️ Reset PER CAPTURE:
+				// carrying it across would attribute one capture's last packet to the next one's first apply.
+				var previous = "(nothing)";
+				foreach (var p in capture.Packets)
+				{
 				if (p is not { IsIirCarrier: true, SubOpcode: MagicBuffCodec.Opcode })
+				{
+					previous = p.IsIirCarrier ? $"IIR 0x{p.SubOpcode:X8}" : $"wire 0x{p.WireOpcode:X4}";
 					continue;
+				}
 
 				if (!p.TryParse(MagicBuffCodec.Parse, out var buff) || buff.Form != MagicBuffIds.FormApply || buff.Data.Length != MagicBuffDataCodec.Length)
 					continue;
@@ -64,6 +75,9 @@ namespace Faolan.Importer.Cli
 				var key = $"d0={payload.Descriptor[0]} bool2={payload.Bool2} d1!=0:{payload.Descriptor[1] != 0} d4!=0:{payload.Descriptor[4] != 0} self:{buff.ApplyFrom == buff.ApplyTo}";
 				crossTab[key] = crossTab.GetValueOrDefault(key) + 1;
 
+				var beforeKey = $"d0={payload.Descriptor[0]}  after {previous}";
+				preceding[beforeKey] = preceding.GetValueOrDefault(beforeKey) + 1;
+
 				if (payload.Descriptor[1] != 0)
 					nonZeroSlots.Add($"descriptor[1]={payload.Descriptor[1]} on 0x{buff.SpellBaseId:X8} d0={payload.Descriptor[0]} from=0x{buff.ApplyFrom:X8} to=0x{buff.ApplyTo:X8}");
 
@@ -71,6 +85,7 @@ namespace Faolan.Importer.Cli
 				{
 					descriptor4[payload.Descriptor[4]] = descriptor4.GetValueOrDefault(payload.Descriptor[4]) + 1;
 					descriptor4Spells[buff.SpellBaseId] = descriptor4Spells.GetValueOrDefault(buff.SpellBaseId) + 1;
+				}
 				}
 			}
 
@@ -180,6 +195,11 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine();
 			Console.WriteLine("* = the spell is SPLIT: retail sent more than one value for it, so no per-spell source can be the whole story.");
+
+			// ⚠️ Printed as the RATE of the minority value per predecessor, not as raw counts. Raw counts just rank
+			// the predecessors by how common they are - both values sit behind the same busy IIRs - and the question
+			// is whether any predecessor CONCENTRATES the rare value.
+			PrecedingRate(preceding, applies);
 
 			ScopeStatement(scoped);
 			TwinRate(perSpell);
@@ -336,6 +356,48 @@ namespace Faolan.Importer.Cli
 			var anyTwin = perSpell.Count(s => byName[s.Name].Count > 1);
 			Console.WriteLine($"  baseline: {anyTwin} of {perSpell.Count} spells share their name with another at all "
 			                  + $"({(double)anyTwin / perSpell.Count:P1}) - a value cannot beat this by much and mean anything.");
+		}
+
+
+		// What PRECEDED each apply, as the rate of the minority `descriptor[0]` (#658).
+		//
+		// The relational question no record sweep can ask: every field OF the spell record is swept flat against this
+		// value while the scope statement says it is spell-owned, which points at how the apply was PRODUCED rather
+		// than at what the spell is.
+		//
+		// ⚠️ The immediate predecessor is a weak proxy for that and this reports it as such. A buff applied as part of
+		// an effect chain can be several packets after whatever caused it, and the corpus interleaves every entity in
+		// range - so a flat result here rules out "the packet directly before it" and NOT "how it was produced".
+		private static void PrecedingRate(Dictionary<string, int> preceding, IReadOnlyList<(uint SpellId, uint Descriptor0, byte Bool2)> applies)
+		{
+			var minority = applies.GroupBy(a => a.Descriptor0).Where(g => g.Count() >= 5).OrderBy(g => g.Count()).FirstOrDefault();
+			if (minority == null)
+				return;
+
+			var overall = (double)applies.Count(a => a.Descriptor0 == minority.Key) / applies.Count;
+
+			// The keys are "d0=<v>  after <what>"; regroup them by the predecessor.
+			var byPredecessor = new Dictionary<string, (int Minority, int Total)>();
+			foreach (var (key, count) in preceding)
+			{
+				var split = key.IndexOf("  after ", StringComparison.Ordinal);
+				if (split < 0)
+					continue;
+
+				var who = key[(split + 8)..];
+				var isMinority = key[..split] == $"d0={minority.Key}";
+				var (m, t) = byPredecessor.GetValueOrDefault(who);
+				byPredecessor[who] = (m + (isMinority ? count : 0), t + count);
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"what PRECEDED each apply, as the rate of descriptor[0]={minority.Key} - overall {overall:P1} of {applies.Count:N0}:");
+			foreach (var row in byPredecessor.Where(p => p.Value.Total >= 20).OrderByDescending(p => (double)p.Value.Minority / p.Value.Total).Take(10))
+			{
+				var rate = (double)row.Value.Minority / row.Value.Total;
+				Console.WriteLine($"  {row.Key,-18} {rate,7:P1}  ({row.Value.Total,5:N0} applies)   lift {rate - overall,+7:P1}"
+				                  + (rate - overall > 0.25 ? "   <-- concentrates it" : ""));
+			}
 		}
 
 		private static void ScopeStatement(IReadOnlyList<(uint Caster, uint Target, uint SpellId, uint Descriptor0)> scoped)
