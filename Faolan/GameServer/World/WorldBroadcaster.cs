@@ -247,8 +247,21 @@ namespace Faolan.GameServer.World
 		// `moveBody: null` makes this Spawn/Despawn only; the movement itself already rides BroadcastNpcMove / the
 		// issued patrol. The mover arguments are left null on purpose: they only drive world-OBJECT streaming, and a
 		// static object cannot walk into range.
+		//
+		// ⚠️ It is the ONE sender that reaches a client on nobody's schedule but the tick's, so it is also the one that
+		// can reach a client that is still ENTERING. World entry places the player in the zone (which is what makes
+		// them visible to this sweep) seconds before it flushes its own packets, and in that window the sweep would
+		// stream every in-range NPC to a client that has not been told which playfield it is in - handing it spawns
+		// stamped with the zone's minted fallback token instead of the map's. The client drops every one of them, and
+		// because the sweep SEEDS them into the player's Known set, the entry burst then finds nothing in range and
+		// never corrects it: every NPC in the entry radius stays invisible for the whole session while remaining
+		// fully alive server-side. Hence the gate on the entry actually having been DELIVERED, not merely begun
+		// (Session.WorldEntered is set well before the packets are built - see the two flags' own comments).
 		public async Task ResolveInterest(INetworkClient client)
 		{
+			if (!client.Session.WorldEntryDelivered)
+				return;
+
 			var entity = _sim.PlayerWorldEntity(client);
 			if (entity == null)
 				return;

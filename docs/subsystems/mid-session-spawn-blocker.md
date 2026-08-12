@@ -17,6 +17,17 @@
 > conversation provably alive — did NOT make the client poll a mid-session spawn. So conversation liveness is not the
 > gate; the playfield-token match is. (Parts 1–7 kept below as the investigation record; part 3 was right.)
 >
+> ⚠️ **The token has to be right at PLACEMENT time, not at first use (2026-08-12).** The rewrite above only helps if
+> `Zone.PlayfieldToken` already holds the map's token when a sender reads it, and the entry path used to stamp it
+> several seconds *after* it put the player into the zone. The world tick's 1 Hz interest sweep (#778) sees a player
+> the moment they are in the zone, so it got there first and streamed every in-range NPC with the zone's *minted
+> fallback* token (`0x00A00002` against map 4010's `0x01EAFAE7`) - dropped by exactly the lookup this page decodes.
+> Because the sweep also SEEDS those handles into the player's `Known` set, the entry burst then reported
+> `0 in-range NPCs` and never corrected them: every NPC inside the entry radius stayed invisible for the whole
+> session while remaining fully alive server-side (it dealt damage and died to AoE). So the stamp now sits on the
+> line after the placement, and the sweep is gated on `Session.WorldEntryDelivered` - a client cannot be streamed to
+> before it has been told which playfield it is in.
+>
 > ⚠️ **Correction to the parenthesis, 2026-08-10:** there is no "retail steady stream" to match. Those ~1,206 records
 > are `BehaviorId.BccAction`, and 1,250 of that capture's 1,353 go to ONE actor — the necromancer's Nemedian
 > Deathstalker pet — in bursts of ~60 inside a single second. Across the corpus retail sends this record **p50 once

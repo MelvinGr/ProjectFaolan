@@ -92,12 +92,36 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(NpcHandle, player.Known);
 		}
 
+		// ⛔ ...and it does NOT run for a player whose world entry has not yet DELIVERED its packets. World entry places
+		// the player in the zone (which is what makes them visible to this sweep) seconds before it flushes the
+		// MapChange/snapshot/NPC burst, so without this gate the tick got there first: it streamed every in-range NPC
+		// to a client that had not been told which playfield it was in, stamped with the zone's minted fallback token
+		// rather than the map's. The client drops those, and because the sweep SEEDS them into Known the entry burst
+		// then finds nothing in range ("0 in-range NPCs") and never corrects it - every NPC in the entry radius stays
+		// invisible for the whole session while remaining alive server-side, taking and dealing damage.
+		[Fact]
+		public async Task AnEnteringPlayer_IsNotStreamedToBeforeTheirEntryBurstIsDelivered()
+		{
+			var (broadcaster, client, player, npc) = Harness();
+			client.Session.WorldEntryDelivered = false; // placed in the zone, entry packets not flushed yet
+			npc.Position = new Vector3(40f, 0, 0); // well inside the interest range
+
+			await broadcaster.ResolveInterest(client);
+
+			Assert.Empty(client.Sent);
+			// and crucially NOT seeded: a seeded handle is one the entry burst will skip as already known.
+			Assert.DoesNotContain(NpcHandle, player.Known);
+		}
+
 		private (WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc) Harness()
 		{
 			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);
 			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
+			// The sweep only runs for a client whose world entry has FLUSHED its packets; a player standing still is
+			// past that by definition. The window where it is false has its own gate below.
+			client.Session.WorldEntryDelivered = true;
 			var player = new WorldEntity(PlayerHandle, MapId, true, "Standing", client);
 			sim.Players[client] = player;
 			var zone = _zone = sim.World.Place(player, MapId, Vector3.Zero, Quaternion.Identity);

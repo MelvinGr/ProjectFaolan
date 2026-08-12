@@ -488,6 +488,11 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
+			// Nothing has been handed to the client for THIS entry yet - so the tick's interest sweep must stay off
+			// them until the burst below is flushed (see INetworkClientSession.WorldEntryDelivered). Cleared here
+			// rather than only initialised, because a re-entry (create-world -> world) reuses the connection.
+			client.Session.WorldEntryDelivered = false;
+
 			// EVERY item the character holds - worn (container Equipped) and carried alike, since #750 - which is both
 			// the four snapshot containers and the spawn's visible gear, from one read.
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
@@ -540,6 +545,26 @@ namespace Faolan.GameServer
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
 				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id));
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
+
+			// #305: the playfield-instance token is sourced PER-MAP (Map.PlayfieldToken), falling back to the beach
+			// default for maps with no captured token. Threaded identically through the map-change, snapshot, world
+			// objects, spawn transform and the ZONE, so they agree BY CONSTRUCTION - the client scopes the character to
+			// the playfield it loaded, so a token that disagrees across those packets hides the abilities tab, and a
+			// spawn stamped with a disagreeing one is silently dropped. (A wrong (beach) token in a mountable zone like
+			// Old Tarantia made the client read it as the no-mount Tortage beach.)
+			//
+			// ⚠️ Stamped HERE, on the line after the player is placed, and not further down where it is first USED. The
+			// moment the player entity is in the zone the world tick can see it and stream spawns to them (#778's
+			// sweep), and every one of those reads Zone.PlayfieldToken. This entry then spends seconds in DB work
+			// before it reaches its own burst, so a stamp any later ships the zone's MINTED fallback token to the
+			// client and it drops the lot. The zone must never be reachable with a stale token, which is a property of
+			// WHERE this line is - so keep it adjacent to the placement.
+			var mapToken = map.PlayfieldToken;
+			var playfieldToken = mapToken != 0
+				? mapToken
+				: BeachPlayfieldId;
+			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
+
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
 			// from there instead of re-querying per entry.
@@ -571,21 +596,6 @@ namespace Faolan.GameServer
 			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
 			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
 			var statSheet = (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray();
-			// The playfield-instance token is BeachPlayfieldId - the ONE value already threaded through the map-change, the
-			// player-spawn transform, and the world objects. Thread it into the SNAPSHOT (stat slot 0xBF, via
-			// BuildFromScratch) and the zone as well, so all of them AGREE BY CONSTRUCTION. The client scopes the character
-			// to the playfield it loaded, so a snapshot token that disagrees with the map-change/spawn hides the abilities
-			// tab (a server-minted id fails exactly this way). No more extract-the-token-back-out-of-the-snapshot. (Per-map
-			// sourcing is a follow-up - the beach id is used for every map for now, exactly as the spawn/map-change do.)
-			// #305: the token is now sourced PER-MAP (Map.PlayfieldToken), falling back to the beach default for maps with
-			// no captured token. Threaded identically through the map-change, snapshot, world objects, spawn transform and
-			// the zone so they still agree by construction - only the source value changes. A wrong (beach) token in a
-			// mountable zone like Old Tarantia made the client read it as the no-mount Tortage beach.
-			var mapToken = map?.PlayfieldToken ?? 0;
-			var playfieldToken = mapToken != 0
-				? mapToken
-				: BeachPlayfieldId;
-			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
 			var completedJournal = isCreateEntry
 				? []
@@ -652,6 +662,11 @@ namespace Faolan.GameServer
 
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
+
+			// The client now HAS the world - MapChange first, then the objects/spawn/snapshot/NPC burst - so the tick's
+			// interest sweep may start streaming to it. Until this point the sweep would have been the first sender to
+			// reach the client, with a spawn for a playfield it had not loaded yet.
+			client.Session.WorldEntryDelivered = true;
 
 			await RestoreEntryBuffs(client);
 

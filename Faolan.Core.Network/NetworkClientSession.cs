@@ -135,7 +135,23 @@ namespace Faolan.Core.Network
 		// Gates the in-world behaviours that must not fire on a connection that hasn't entered the world: the
 		// 0x2020 -> 0x2008 SpawnCheck responder, the NPC conversation system, and the dialogue-close fallback.
 		// (The create-world flow tests EntryMode == CreateWorld alongside this.)
+		//
+		// ⚠️ It is set EARLY in the entry - before the entry packets are built, because the client starts polling
+		// (0x2020) the spawns in the burst while the burst is still flushing, and the responder above is gated on
+		// this. So it does NOT mean "the client has the world"; for that, see WorldEntryDelivered.
 		bool WorldEntered { get; set; }
+
+		// True once the world-entry packets have actually been FLUSHED to this client - MapChange first, then the
+		// world objects / player spawn / snapshot / NPC burst. Distinct from WorldEntered, which is set several
+		// seconds earlier (see above).
+		//
+		// It gates the world tick's interest sweep (#778), which is the one sender that reaches a client on nobody's
+		// schedule but its own. Streaming an NPC before the MapChange lands hands the client a spawn for a playfield
+		// it has not loaded, stamped with the zone's minted fallback token rather than the map's - the client drops
+		// every one of them, and because the sweep SEEDS them into the player's Known set the entry burst then finds
+		// nothing in range and never corrects it. That is what made every NPC in the entry radius permanently
+		// invisible while remaining fully alive server-side (damage landed, AoE killed them).
+		bool WorldEntryDelivered { get; set; }
 
 		// The in-flight cast's begin ARGS block + its Mode, held only while a timed cast is pending (#347). The client
 		// cancels the cast on a mid-cast move (its own cancel BCC); the server answers with the state=0x0007 abort that
@@ -333,6 +349,7 @@ namespace Faolan.Core.Network
 		public bool SeatedHoldConfirmed { get; set; }
 		public ActiveVistaScene? ActiveVista { get; set; }
 		public bool WorldEntered { get; set; }
+		public bool WorldEntryDelivered { get; set; }
 		public byte[] PendingCastArgs { get; set; } = null!;
 
 		public int CreateWorldChunkIndex { get; set; }
