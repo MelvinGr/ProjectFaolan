@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli
@@ -55,7 +56,7 @@ namespace Faolan.Importer.Cli
 				// The last non-buff packet seen on this capture, as "0xIIR" or "m0xMETHOD". ⚠️ Reset PER CAPTURE:
 				// carrying it across would attribute one capture's last packet to the next one's first apply.
 				var previous = "(nothing)";
-				// #658: how many packets since the last MapChange (`PlayfieldFIIR`) in this capture, or -1 if none has
+				// #658: how many packets since the last MapChange in this capture, or -1 if none has
 				// been seen yet. A buff RE-SENT as part of playfield entry arrives in the burst right after one; a
 				// live application does not.
 				var sinceMapChange = -1;
@@ -65,7 +66,7 @@ namespace Faolan.Importer.Cli
 					if (sinceMapChange >= 0)
 						sinceMapChange++;
 
-					if (p.IsIirCarrier && p.SubOpcode == (uint)Faolan.Core.Enums.IirTypes.PlayfieldFIIR)
+					if (p.IsIirCarrier && p.SubOpcode == PlayfieldFCodec.Opcode)
 					{
 						sinceMapChange = 0;
 						mapChanges++;
