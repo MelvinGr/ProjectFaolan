@@ -184,11 +184,20 @@ namespace Faolan.Core.Network.Codecs.Combat
 		//                     (0x00 x2692, 0x20 x602, 0x30 x18, 0x70 x1) - which is what confirms the bit split
 		//   3  Command+0x19C   zero on 3,312 of 3,313; one sighting of 0x6BE
 		//   4  Command+0x44    0xC9/0xCA/0xCB on 292 tails - the same alphabet as the result type below, but
-		//                     INDEPENDENT of it and of word 5 (all nine combinations occur)
+		//                     INDEPENDENT of it and of word 5 (all nine combinations occur), and never present on a
+		//                     lower-arc swing at all
 		//   5  Command+0xD0    ⭐ the swing's DIRECTION, as an Abilities id: 769094 Upper Left, 769095 Upper Right,
 		//                     769099 Overhead. Zero on an NPC's swing, which has no ability to name.
-		//   6/7 Command+0x188 / +0x18C   read back together by one accessor, so ONE pair (a class+handle shape);
-		//                     four sightings, (0x003C7D4B, 2)
+		//   6/7 Command+0x188 / +0x18C   ONE pair, behind a presence test (vtable slot 0x9C) and a pair getter
+		//                     (slot 0xA0); four sightings, (0x003C7D4B, 2)
+		//
+		// ⭐ FOUR of the eight are never READ (#661). The class is `AttackCommandMelee_c` (RTTI off the vtable that
+		// holds the reader), and decompiling all 68 of its virtual slots plus every register-relative access in both
+		// its own and its BASE's address band leaves words 3, 4, 6 and 7 stored, echoed back onto the c2s wire,
+		// copied - and consumed by nothing. Slot 0xA0's own contract says the same for the 6/7 pair: `Command_c` and
+		// 34 sibling commands return `(0, 0)` from it, only the five Attack commands return the field, and there is
+		// no `CALL [reg+0xA0]` anywhere in the combat module. So those four are SERVER-side values the client is a
+		// courier for, which is why no corpus test on them ever found a client-side owner.
 		//
 		// Word 1 must stay 1 - it is the selector, and any other value changes the block's own length.
 		private static readonly uint[] MiddleWords = [0, 1, 0, 0, 0, 0, 0, 0];

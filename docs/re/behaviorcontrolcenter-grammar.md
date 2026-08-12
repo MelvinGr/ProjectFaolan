@@ -361,10 +361,67 @@ So the field is **stored, transported both ways and copied, and nothing in the C
 behaviour.** (The other `[reg+0x44]` hits in range belong to unrelated objects — `FUN_01150340` and `FUN_0115277x`
 show the `MOV EDX,[EDX+0x44]` / `LEA ECX,[ESI+0x44]` pair that is a string or container member, not this.)
 
-Two readings survive, and offset-granularity RE cannot separate them: the consumer is reached indirectly (a
-virtual call the offset scan cannot follow), or the client genuinely only echoes the word. **The next step is to
-name the CLASS** — its RTTI or vtable — and then find its consumers by class rather than by offset, which is what
-`DumpClassVtable.java` / `DumpVirtualSlotAcrossClasses.java` are for. Open work tracked in Gitea #661.
+### ⭐ The class is `AttackCommandMelee_c`, and the by-class route ELIMINATES one of the two readings
+
+The step above was taken. The tail reader `FUN_01151170` is referenced from exactly one data address —
+`0x0204255c`, a vtable slot — and that vtable starts at `0x020424dc`, whose RTTI CompleteObjectLocator names
+`.?AVAttackCommandMelee_c@@`. Its siblings, from the slot sweep below, are `AttackCommandBase_c`,
+`AttackCommandBaseArmed_c`, `AttackCommandRanged_c` and `AttackCommandUnarmed_c`.
+
+⚠️ **And the earlier restriction was the flaw in the previous pass.** `+0x44` is a field of the BASE, not of the
+derived class — the Command base constructor `FUN_007dc7a0` zeroes it (`MOV [ESI+0x44],EBX`) alongside `+0x48`,
+`+0xb4`, `+0xbc` and `+0xf4`. The base's methods live at `0x007dxxxx`–`0x007exxxx`, which the offset sweep above
+had dismissed as "unrelated objects". So the negative result was measured over the wrong band.
+
+Redone properly — **all 68 functions in the class's vtable decompiled**, plus every register-relative `[reg+0x44]`
+access in *both* bands:
+
+| what touches `Command + 0x44` | |
+|---|---|
+| `FUN_01151170` | the s2c tail READER — the only writer |
+| `FUN_01151030` | the c2s writer — reads it back onto the wire |
+| `FUN_011516a0` | the copy |
+| everything else in range | a **virtual call at vtable offset `0x44`** (`(**(code **)(*obj + 0x44))(…)`, which is slot 17 and has nothing to do with the field), or a `LEA` of a sub-object on a different struct |
+
+⭐ **So the "consumer behind a virtual call" reading is eliminated: the class's entire virtual surface has now been
+read and none of it consumes the field.** What stands is that the client only ECHOES the word — it is a value the
+SERVER decides and the client is a courier for.
+
+That retro-explains every corpus test on this ticket at once. The scope-stability test failed even on its own
+control because word 4 has no client-side owner to be stable within; "independent of word 5 and the result type"
+is what a server-chosen value looks like from the client side.
+
+### ⭐ Word 3 is echo-only too, and words 6/7 are an OPTIONAL two-word reference
+
+The same sweep over the class settles the other two open slots:
+
+* **word 3 (`+0x19C`)** — read by the c2s writer and by nothing else. Same answer as word 4.
+* **words 6/7 (`+0x188` / `+0x18C`)** — the class exposes them through a matched accessor PAIR:
+
+```c
+slot 0x9C  FUN_011457e0:  return *(int *)(this + 0x188) != 0;              // a presence test
+slot 0xA0  FUN_011457f0:  out[0] = this->0x188;  out[1] = this->0x18c;     // the pair getter
+```
+
+`DumpVirtualSlotAcrossClasses.java SLOT=0xa0` says what that slot IS across the Command hierarchy: `Command_c`
+and 34 sibling command classes inherit `FUN_007de050`, which writes `(0, 0)` — *"I have no such reference"* — and
+only the five Attack commands override it to return the field. So it is an **optional two-word reference that
+only an attack carries**, which corroborates the `(class, handle)` shape the corpus's four `(0x003C7D4B, 2)`
+sightings suggested, from the client's own structure rather than from the value.
+
+⚠️ **And nothing calls it.** There are **eight** `CALL dword ptr [reg + 0xa0]` sites in the whole image and not
+one is in the combat module. So the pair is written, exposed and never consumed either.
+
+### The block, split by whether the client uses it
+
+| words | |
+|---|---|
+| 0, 1, 2, 5 | **consumed** — the charge float, the selector, the three bit flags, the direction ability |
+| 3, 4, 6, 7 | **stored, transported both ways, copied, exposed through accessors, and never read** |
+
+That is as far as the client can take these four. A meaning for them is a SERVER-side fact, and the only evidence
+that could carry it is a capture where one of them varies against something observable — the corpus has 1, 292
+and 4 sightings respectively.
 
 Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
 `ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into
