@@ -94,4 +94,47 @@ licence, and it was never going to anchor a fit that has no free parameters to a
 data lookup — read the playfield's extent pair — not a decode.
 
 So the image is usable as a picture today; substituting it for 1010209 in a spawn render needs that extent pair
-read for the map being rendered. Open work tracked in Gitea #492.
+read for the map being rendered — which `tools/maps/render_spawn_map.py` already does, via `--playfield`.
+
+## Carving and stitching: `tools/maps/stitch_map_tiles.py`
+
+```zsh
+dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1010013:<mapId> \
+    --out <dir> --captures <data-repo>/Captures
+python3 tools/maps/stitch_map_tiles.py <dir>/1010013_<mapId>.bin -o <mapId>.png
+```
+
+It emits a plain PNG, which is what `render_spawn_map.py --map-image` accepts — so with the transform above
+already implemented there, this is the whole of the swap.
+
+⚠️ **Three things the "1 + 9 + 36 + 144 + 576 = 766" reading above gets wrong, all of them Tortage-specific.**
+The tool solves each from the images instead:
+
+| map | overview | 256px tiles | level-1 grid | level 4 |
+|---|---|---:|---|---|
+| 4010 Tortage Island | 512×512 | 765 | 3×3 | 6144×6144 |
+| 2000 Old Tarantia | **160×160** | 765 | 3×3 | 6144×6144 |
+| 1010 Conall's Valley | **512×384** | 1020 | **4×3** | **8192×6144** |
+
+* the overview is **not always 512** — map 2000's is 160×160;
+* the grid is **not always square** — map 1010 is 4×3, and it is one of the 15 playfields whose extent is not
+  square either;
+* so the total is not always 766.
+
+What IS invariant is that pyramid tiles are 256px and the overview is not, so the tool finds the tiles **by
+size** rather than by position. That also drops a junk slice map 2000 carries for free.
+
+⭐ **The overview's own aspect splits `a*b` into `a` and `b`, and it cross-checks against a different source.**
+Map 1010's overview is 512×384 and its level-4 stitch is 8192×6144; its playfield `1070003 <tilemap>` extent is
+2048×1536. Both are exactly 4:3 and neither number went into computing the other.
+
+⚠️ Two refusals, both deliberate. **Not every 1010013 entry is a tile container** — map 44's body is 1,814 B and
+holds no JPEG at all. And a container with **no overview** does not state its aspect, so the tool asks for
+`--aspect WxH` rather than assuming square: guessing 1:1 on a 4:3 map transposes the whole basemap silently,
+which is exactly the failure the extent-pair note above warns about from the other axis.
+
+⚠️ Carving on the `FF D8 FF` SOI alone **over-counts**: a JPEG may embed an EXIF thumbnail carrying its own SOI,
+which is what made map 2000 read as 768 tiles. Each image is taken from its SOI to its own `FF D9` EOI and the
+scan resumes after that.
+
+Open work tracked in Gitea #492.
