@@ -253,7 +253,15 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 ## Diagnostics (`--report`)
 
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
-`--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
+`--report <name>` (
+`codec-sweep` (#809: EVERY codec against EVERY captured record of the IIR type it declares, across all the dumps —
+`Parse`, re-`Build`, byte-compare. Two findings and they differ: **REFUSED** = the codec models a shape retail does
+not send; **MISMATCH** = it parsed the body without accounting for all of it, so a field is being dropped. This is
+the whole-corpus form of the `--report timeline` footer that found #809's four, and it is a REPORT rather than a
+test on purpose — `CodecSurfaceConventionTests.BuildParseRoundTripsOverTheCorpus` asks the same question of
+`fixtures.bin`'s frozen slice and would fail the moment a capture is added. `--report-arg <IirTypeName>` narrows to
+one type and dumps every offending body in full),
+`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
 `class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
 `spell-flags` (#632: sweeps the spell record's FLAGS word bit by bit against what the DB knows, so "which bit says
 X" can be asked rather than argued. Bit 2 is printed as the CONTROL - it is a known predicate and scores 100.00%,

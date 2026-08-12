@@ -42,6 +42,7 @@ namespace Faolan.Importer.Cli
 				// an existing report gets rebuilt. The switch is the catalog; these are the ones worth knowing about
 				// without going to look.
 				Console.WriteLine("\nReports (read-only, ~90 of them - `grep 'case \"' Faolan.Importer/Cli/ReportCli.cs` for the full set):");
+				Console.WriteLine("  codec-sweep   EVERY codec vs EVERY captured record of its type: Parse + re-Build, byte-compared");
 				Console.WriteLine("  coverage | conversation-states | anim | bcc-census | combo-swings | creature-races | method-census | worldobj");
 				Console.WriteLine("  rdb-tweaks | rdb-class-vitals | item-stat-scaling | rdb-types | rdb-id | rdb-dump | rdb-search");
 				Console.WriteLine("  rdb-names <id|substring|index:<rdbType>>   the client's global id -> NAME table (RDB 1000010/1)");

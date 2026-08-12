@@ -367,6 +367,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #809's generalisation: every codec against every captured record of the type it declares, over all
+				// the dumps. Parse then re-Build, byte-compared.
+				case "codec-sweep":
+				{
+					CodecSweep(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				// #781: every death record's `field12` against the creature that died - is the animation's length the
 				// CREATURE's, or the animation's?
 				case "death-timing":

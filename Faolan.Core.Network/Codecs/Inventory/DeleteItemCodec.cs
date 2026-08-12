@@ -26,8 +26,13 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// correctly by luck; anything reading the destination on the drop path would have read a template id as a
 	// container kind.
 	//
-	// The captures cannot settle it (the corpus contains ZERO DeleteItemIIR packets), so the CLIENT is the oracle -
-	// its DeleteItemIIR_t constructor (FUN_008d62f0 in AgeOfConan.exe) sets
+	// ⚠️ "The corpus contains ZERO DeleteItemIIR packets" was true when this was written and is NOT any more - a
+	// whole-corpus sweep (`--report codec-sweep`) finds 15, all in NecroL80's captures, and they CONFIRM
+	// the client-derived reading rather than merely permitting it: every one carries fields 1-3 and stops, while all
+	// 54 captured MoveInventoryItemIIR bodies carry a FOURTH (`20 <varint>`). Protobuf would have decoded a move into
+	// this message without complaint, so the confirmation is the absence of that field, not the parse succeeding.
+	//
+	// The client was the oracle that settled it - its DeleteItemIIR_t constructor (FUN_008d62f0 in AgeOfConan.exe) sets
 	//     unaff_ESI[7] = ProtoDeleteItemIIR::vftable;
 	// and fills exactly three fields, while the MoveInventoryItemIIR_t constructor (FUN_008d6090) sets
 	// ProtoMoveInventoryItemIIR::vftable and fills a FOURTH (hasbit | 8). Recovered by
