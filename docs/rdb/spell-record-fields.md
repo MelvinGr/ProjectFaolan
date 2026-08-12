@@ -108,6 +108,23 @@ the yardstick every other row is read against.
 | 20 | 2,289 | **the stated duration is neither drawn nor counted down** — 98.51% inside bit 16, so a modifier on the timed-effect path rather than a flag of its own (below) |
 | 25 | 185 | 100% inside bit 16 — but the client reads this bit **nowhere**, so it is a property of the data, not of the protocol |
 | 23 + 30 | 434 + 38 | **the cast consults the target's RUNNING buffs first** — the STACKING / OVERRIDE decision (below) |
+| 15 | 12,069 | **the spell is HOSTILE** — the client picks "afflict" over "affect" on it (below) |
+
+### ⭐ Bit 15: HOSTILE, and the client says it in English
+
+The combat-feedback builders pick their VERB on this bit. `FUN_007E9B50`:
+
+```
+if ((flags >> 0xf & 1) == 0)  "YouAffectOtherByEffect"    else  "YouAfflictOtherByEffect"
+if ((flags >> 0xf & 1) == 0)  "OtherAffectsYouByEffect"   else  "OtherAfflictsYouByEffect"
+```
+
+— **affect** when clear, **afflict** when set, in both directions of the sentence. `FUN_007F4120` uses it a
+second way that agrees: it selects a targeting mode (5 when the bit is clear, 3 when it is set).
+
+12,069 of 20,847 spells carry it. ⚠️ Its predicate scores are unremarkable (area +4.4, elements +2.4, cast +2.3)
+and that is expected rather than a problem — none of the twelve predicates is "is this spell hostile", so this is
+another row named from the client's reads and NOT from its score, like bits 1 and 20 before it.
 
 ### ⭐ Bits 23 and 30: one gate, named by the client's own log strings
 

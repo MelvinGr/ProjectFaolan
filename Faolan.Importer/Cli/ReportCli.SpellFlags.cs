@@ -59,6 +59,12 @@ namespace Faolan.Importer.Cli
 			    + "when it is set, unless the spell is on the `GlobalModIncludedSpellLine` tuning line; the apply side "
 			    + "(`FUN_007f5360`) runs the same predicate negated"),
 			(2, "the mana cost is a PERCENT of the caster's pool (#629/#630) - the control row"),
+			(15, "the spell is HOSTILE. The client's combat-feedback builders pick their VERB on it and say so in "
+			     + "English: `FUN_007E9B50` does `if ((flags >> 0xf & 1) == 0) \"YouAffectOtherByEffect\" else "
+			     + "\"YouAfflictOtherByEffect\"`, and the same if/else again for `OtherAffectsYouByEffect` / "
+			     + "`OtherAfflictsYouByEffect` - affect when clear, AFFLICT when set. `FUN_007F4120` uses it a second "
+			     + "way that agrees: it selects a targeting mode (5 when clear, 3 when set). 12,069 of 20,847 spells "
+			     + "carry it"),
 			(16, "the client RE-CREATES this magic and computes its duration (`FUN_007ee710`, stat 0x1D0 DurationModifier)"),
 			(20, "the magic's stated duration is neither DRAWN nor counted down - the tooltip's duration line renders empty "
 			     + "(`FUN_01499b10`) and `CoreMagicHolder::UpdateBuff` suppresses its 'remaining time' warning when it "
