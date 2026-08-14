@@ -141,8 +141,16 @@ namespace Faolan.Importer.Extractors
 					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchACGTeleportChoice))
 					{
 						var acg = AcgTeleportChoiceCodec.Parse(q.Body);
-						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, acg.MapId, null, null, null,
-							AcgPlayfieldClass: acg.Proxy.ClassWord));
+
+						// The ARRIVAL is not in this exchange - the eventual n3Teleport names a spawn POINT rather
+						// than coordinates (#814), and it only fires once the player accepts, after a server redirect.
+						// So it is read from where the player actually STOOD on arrival: the origin of the
+						// DispatchValidResurrectionSpots the destination playfield sends at world entry, which is the
+						// live player position (in a capture where the player had walked first, that origin has moved
+						// with them). Scanned forward without the normal window, because the accept came 48 s later.
+						var landed = AcgArrival(packets, j, acg.MapId);
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, acg.MapId,
+							landed?.X, landed?.Y, landed?.Z, AcgPlayfieldClass: acg.Proxy.ClassWord));
 						break;
 					}
 
@@ -212,6 +220,35 @@ namespace Faolan.Importer.Extractors
 		// Merge duplicate harvests (the same door walked through in several captures) by (source map + name + spawn
 		// position), keeping the first. Consistent captures yield the same destination; a genuine ambiguity would show
 		// as two entries with the same source but different destinations (none observed).
+		// Where the player stood after an ACG instance entry: the first DispatchValidResurrectionSpots origin sent
+		// AFTER the destination playfield announces itself. Null when the capture never followed the trip through -
+		// a box the player declined, or one raised at the very end of a capture.
+		private static Vector3? AcgArrival(IReadOnlyList<CapturedPacket> packets, int from, uint destMapId)
+		{
+			var entered = false;
+			for (var k = from + 1; k < packets.Count; k++)
+			{
+				var q = packets[k];
+				if (q is { IsDownload: true, IsIirCarrier: true, SubOpcode: PlayfieldFCodec.Opcode })
+				{
+					if (q.TryParse(PlayfieldFCodec.Parse, out var change))
+						entered = change.MapId == destMapId;
+
+					continue;
+				}
+
+				if (!entered || q is not { IsDownload: true, IsIirCarrier: false })
+					continue;
+
+				if (q.WireOpcode != CapturedPacket.Wire(GameCharInterfaceMethods.DispatchValidResurrectionSpots))
+					continue;
+
+				return ValidResurrectionSpotsCodec.Parse(q.Body).ReferencePosition;
+			}
+
+			return null;
+		}
+
 		public static List<TeleportLink> Merge(IEnumerable<TeleportLink> all)
 		{
 			var seen = new Dictionary<(uint, string, float, float, float), TeleportLink>();
