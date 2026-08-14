@@ -285,12 +285,22 @@ namespace Faolan.Core.Network
 		// is why retail needs no server-side script thread for it, and neither do we. Cleared on the answer, and
 		// replaced (not queued) if a second box goes out: only the newest box can be the one being answered.
 		PendingTravelConfirm? PendingTravelConfirm { get; set; }
+
+		PendingAcgTeleport? PendingAcgTeleport { get; set; }
 	}
 
 	// A zone-line trip a client has been asked to confirm: the correlation pair the box carried, plus where the trip
 	// goes. Position is null for a door whose arrival no capture states - the teleport then falls back to the
 	// destination map's default spawn, exactly as it does without a box.
 	public sealed record PendingTravelConfirm(uint ThreadCtxId, ulong Cookie, uint DestinationMapId, Vector3? ArrivalPosition);
+
+	// The ACG instance bind box currently on the player's screen (#821). Held because `RequestACGTeleport` carries only
+	// the destination proxy and no character or door - so without this, any client could name any map and be moved
+	// there. The pending offer is what the request is checked AGAINST.
+	//
+	// ⚠️ There is no decline message: a player who says no sends nothing at all, so this is cleared on the next offer
+	// and on world exit rather than by an answer.
+	public sealed record PendingAcgTeleport(uint DestinationMapId, Vector3? ArrivalPosition);
 
 	// The achievement vista scene a player is inside (#780): the catalog row plus the LIVE handle of the object they
 	// used. The handle is what the camera action attaches to and what the lid records address, and it is per-zone-load
@@ -387,5 +397,7 @@ namespace Faolan.Core.Network
 		// The outstanding feat-untrain confirm token (see the interface); null when no untrain dialog is pending.
 		public uint? PendingFeatUntrainToken { get; set; }
 		public PendingTravelConfirm? PendingTravelConfirm { get; set; }
+
+		public PendingAcgTeleport? PendingAcgTeleport { get; set; }
 	}
 }

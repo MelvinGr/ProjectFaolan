@@ -1057,6 +1057,29 @@ namespace Faolan.GameServer
 				// earlier - the wagoner trip teleports straight off the destination pick with no box at all. So the
 				// only box we raise is the zone-line one (#637), and the echo is what resumes its trip: no server-side
 				// script thread is involved, here or in retail.
+				// #821: the player accepted the ACG instance bind box. There is no decline - sending this IS the yes -
+				// so the only thing to check is that we actually offered it. The body carries the destination proxy and
+				// nothing else: no character, no door, so without the pending offer any client could name any map.
+				case GameCharAgentMethods.RequestACGTeleport:
+				{
+					var request = AcgTeleportRequestCodec.Parse(body.ReadRemainingArray());
+					var offered = client.Session.PendingAcgTeleport;
+					client.Session.PendingAcgTeleport = null;
+
+					if (offered == null || offered.DestinationMapId != request.MapId)
+					{
+						Logger.LogInformation("RequestACGTeleport for map {MapId} from character {CharacterId} - matches no outstanding bind box ({Offered}).",
+							request.MapId, client.Session.Character.Id, offered?.DestinationMapId.ToString() ?? "none");
+
+						break;
+					}
+
+					Logger.LogInformation("Character {CharacterId} accepted the instance bind for map {MapId}.", client.Session.Character.Id, request.MapId);
+					await DoTeleport(client.Session.Character.Id, offered.DestinationMapId, offered.ArrivalPosition);
+
+					break;
+				}
+
 				case GameCharAgentMethods.ScryMessageBoxAnswer:
 				{
 					var reply = ScryMessageBoxAnswerCodec.Parse(body.ReadRemainingArray());
@@ -2509,6 +2532,12 @@ namespace Faolan.GameServer
 					else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
 						// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
 						await _simulation.RelocateSameMap(client, samePos);
+					else if (dest.AcgPlayfieldClass != 0)
+						// #821: an INSTANCED destination (the Tortage rowboat to White Sands). Retail raises its own
+						// bind box - "this instance will be bound to you" - instead of teleporting, and the trip only
+						// runs when the player accepts, which lands in the RequestACGTeleport handler. Checked BEFORE
+						// the #637 scry box: this destination has its own confirmation and must not get two.
+						await SendAcgTeleportChoice(client, dest.DestMapId, dest.AcgPlayfieldClass, dest.ArrivalPosition);
 					else if (await Database.GetMap(dest.DestMapId) is { TravelConfirmKey: { IsEmpty: false } } confirming)
 						// #637: retail asks "Do you want to travel to <map>?" before entering this destination. The
 						// trip resumes in HandleScryMessageBoxAnswer when the player confirms; a decline drops it.

@@ -53,6 +53,21 @@ namespace Faolan.Core.Database.Tables
 		// from its own name against the client's playfield table, and no arrival at all - see DestinationPosition.
 		public uint? DestinationMapId { get; set; }
 
+		// The destination playfield's CLASS word, when a capture watched this object be used and the server answered
+		// with an ACG bind box rather than teleporting (#821). Null on every ordinary zone-line.
+		//
+		// ⚠️ It is stored as the WIRE VALUE rather than as a bool, because the bool would be an interpretation we
+		// cannot yet justify. 0xC7A6 is what the Tortage rowboat's `DispatchACGTeleportChoice` carries, where an
+		// ordinary cross-map announce carries `PlayfieldProxy.PlayfieldClass` (0xC79C) - one observation, so the
+		// server tests for the value it has actually seen and a second ACG destination can either confirm it or show
+		// the marker is something else.
+		//
+		// ⛔ Do NOT try to derive this from `Maps`: `PlayfieldInstanced` is 1 on 529 of the 530 maps we hold, so
+		// ordinary doors point at "instanced" maps constantly - City of Tortage included. `InstanceMode` and
+		// `PlayfieldFieldA` are both 0 for White Sands Night. Nothing we store about a MAP distinguishes it; only the
+		// wire does, which is why this is harvested per OBJECT.
+		public uint? DestinationPlayfieldClass { get; set; }
+
 		// #262: an AFTER-QUEST EFFECT. When the viewing player has EffectQuestId ACTIVE or COMPLETED, this object is
 		// shown with the SimpleDynel visual-change state EffectDynelState (instead of its default), pushed both at world
 		// entry and the instant the player reaches that quest state. Generalises the Casilda beach "wall drop" (the chain

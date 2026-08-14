@@ -1594,7 +1594,7 @@ namespace Faolan.GameServer.World
 
 			var name = obj.Name ?? WorldObjectDisplay.ToWire(obj) ?? "?";
 			var teleport = obj.DestinationMapId is { } destMap
-				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
+				? new ZoneLineDestination(destMap, obj.DestinationPosition, name, obj.DestinationPlayfieldClass ?? 0)
 				: new ZoneLineDestination(0, null, name);
 			return Task.FromResult(new UsedObjectInteraction(obj.InteractAction, teleport, obj.Id));
 		}
@@ -3177,7 +3177,10 @@ namespace Faolan.GameServer.World
 		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
 		// them on it. DestMapId == 0 means the object IS a teleporter but its destination hasn't been captured yet -
 		// the caller surfaces a message instead of silently dropping the player somewhere (no fallbacks).
-		public readonly record struct ZoneLineDestination(uint DestMapId, Vector3? ArrivalPosition, string DestinationName);
+		// `AcgPlayfieldClass` is non-zero when this destination is entered through the ACG instance BIND box rather
+		// than by teleporting straight through (#821) - harvested per object, because nothing about the destination
+		// MAP distinguishes it (see WorldObject.DestinationPlayfieldClass).
+		public readonly record struct ZoneLineDestination(uint DestMapId, Vector3? ArrivalPosition, string DestinationName, uint AcgPlayfieldClass = 0);
 
 		// The column-driven interaction of a USED world object: its InteractAction (what the object does) plus, for a
 		// teleporter, the resolved Teleport destination. Action is None when the handle isn't a DB world object at all

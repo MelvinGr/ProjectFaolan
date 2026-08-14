@@ -993,6 +993,25 @@ namespace Faolan.GameServer
 				client.Session.Character.Id, cookie);
 		}
 
+		// #821: the ACG INSTANCE BIND box - the confirmation retail raises instead of teleporting when the destination
+		// is a personal instance. The client answers with RequestACGTeleport (or, if the player declines, with nothing
+		// at all), so the offer is recorded on the session for the handler to check against.
+		//
+		// The proxy is built for the DESTINATION: its class word is what marks the playfield as ACG, and it is echoed
+		// back verbatim in the request. The instance token is 0 - we do not mint per-player instance tokens (#268), and
+		// the capture's token is that session's, not a per-map constant.
+		private async Task SendAcgTeleportChoice(INetworkClient client, uint destinationMapId, uint playfieldClass, Vector3? arrival)
+		{
+			client.Session.PendingAcgTeleport = new PendingAcgTeleport(destinationMapId, arrival);
+
+			var proxy = PlayfieldProxy.ForMap(destinationMapId) with { ClassWord = playfieldClass };
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x56), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchACGTeleportChoice,
+				AcgTeleportChoiceCodec.Build(new AcgTeleportChoice(client.Session.Character.Id, proxy))));
+
+			Logger.LogInformation("ACG bind box for map {MapId} sent to character {CharacterId}.", destinationMapId, client.Session.Character.Id);
+		}
+
 		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{

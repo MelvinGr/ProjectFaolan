@@ -3976,6 +3976,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("DestinationMapId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("DestinationPlayfieldClass")
+                        .HasColumnType("INTEGER");
+
                     b.Property<float?>("DestinationX")
                         .HasColumnType("REAL");
 

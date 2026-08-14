@@ -1082,6 +1082,7 @@ namespace Faolan.Importer.Modules
 					o.InteractAction = InteractAction.None;
 					o.DestinationMapId = null;
 					o.DestinationX = o.DestinationY = o.DestinationZ = null;
+					o.DestinationPlayfieldClass = null;
 					cleared++;
 				}
 			}
@@ -1109,6 +1110,11 @@ namespace Faolan.Importer.Modules
 				row.DestinationX = link.DestX;
 				row.DestinationY = link.DestY;
 				row.DestinationZ = link.DestZ;
+				// #821: non-zero only when the server answered this door with an ACG bind box. Stored as the wire
+				// class word rather than a bool - see WorldObject.DestinationPlayfieldClass for why.
+				row.DestinationPlayfieldClass = link.AcgPlayfieldClass == 0
+					? null
+					: link.AcgPlayfieldClass;
 				matched++;
 			}
 

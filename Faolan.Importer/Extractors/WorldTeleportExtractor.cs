@@ -20,7 +20,10 @@ namespace Faolan.Importer.Extractors
 	// localized-format key of the DispatchScryShowMessageBox the server sent between the use and the teleport. Empty for
 	// a door that teleports straight through - which is most of them. The box's `id` is always the destination map and
 	// its category always 520, so the key is the only per-door datum in it.
-	public sealed record TeleportLink(uint SourceMapId, string SourceName, float SrcX, float SrcY, float SrcZ, uint DestMapId, float DestX, float DestY, float DestZ, string ConfirmKey = "");
+	// `AcgPlayfieldClass` is non-zero when the server answered this door with an ACG bind box instead of teleporting
+	// (#821); such a link carries NO arrival, because the box's own n3Teleport names a spawn POINT rather than
+	// coordinates (#814). A null arrival is already a real state here - the teleport falls back to the map default.
+	public sealed record TeleportLink(uint SourceMapId, string SourceName, float SrcX, float SrcY, float SrcZ, uint DestMapId, float? DestX, float? DestY, float? DestZ, string ConfirmKey = "", uint AcgPlayfieldClass = 0);
 
 	// Harvests zone-line teleport destinations from captured gameplay: a client UseObject (BehaviorControlCenterIIR
 	// actionType 0x12) on a door (DoorFullUpdateIIR 0x33A56FB0 OR SimpleDynelFullUpdateIIR 0x66AEDD50) followed by the
@@ -125,6 +128,37 @@ namespace Faolan.Importer.Extractors
 						}
 
 						continue;
+					}
+
+					// #821: the ACG INSTANCE BIND box. When the destination is a personal instance the server answers the
+					// use with this instead of teleporting - and the teleport itself only follows if the player says
+					// yes, 48 s later in the capture, far outside this window. So the box CLOSES the sequence: it
+					// states the destination map outright, and the arrival is deliberately left null because the
+					// eventual n3Teleport names a spawn POINT rather than coordinates (#814).
+					// ⚠️ Parsed straight off `Body`, NOT through `TryParse` - that helper is for IIR carriers and returns
+					// false on a plain RPC body, which silently dropped this link. The scry-box branch above reads its
+					// body the same direct way for the same reason.
+					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchACGTeleportChoice))
+					{
+						var acg = AcgTeleportChoiceCodec.Parse(q.Body);
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, acg.MapId, null, null, null,
+							AcgPlayfieldClass: acg.Proxy.ClassWord));
+						break;
+					}
+
+					// #821: the ACG INSTANCE BIND box. When the destination is a personal instance the server answers the
+					// use with this instead of teleporting - and the teleport only follows if the player says yes,
+					// 48 s later in the capture and far outside this window. So the box CLOSES the sequence: it states
+					// the destination map outright, and the arrival stays null because the eventual n3Teleport names a
+					// spawn POINT rather than coordinates (#814). A null arrival is already a real state here.
+					if (q is { IsDownload: true, IsIirCarrier: false } && q.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchACGTeleportChoice))
+					{
+						if (!q.TryParse(AcgTeleportChoiceCodec.Parse, out var acg))
+							continue;
+
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, acg.MapId, null, null, null,
+							AcgPlayfieldClass: acg.Proxy.ClassWord));
+						break;
 					}
 
 					if (!q.IsIirCarrier || !q.IsDownload || !TeleportCodec.HandledTypes.Contains((IirTypes)q.SubOpcode))
