@@ -176,6 +176,7 @@ namespace Faolan.GameServer
 		// lasting stat deltas (#702).
 		private readonly SpellPoolEffects _poolEffects;
 		private readonly ClaimService _claims;
+		private readonly QuestRewardService _questRewards;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
@@ -329,7 +330,8 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos);
 			// `this` as IEconomyOutbound: a Deliver goal's hand-in takes the goods out of the inventory, which is an
 			// economy op the listener owns - the same seam ShopService/BankService reach the wallet and grants through.
-			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, logger);
+			_questRewards = new QuestRewardService(database, _broadcaster, this, logger);
+			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, _questRewards, logger);
 			// #439: what a spell makes the SERVER do (summon a pet, arm a proc) - dispatched from the SpellEffect rows
 			// instead of from spell ids hardcoded into the cast path. Reaches the wire through ISpellEffectOutbound,
 			// which this listener implements (GameServerListener.Buffs.cs).

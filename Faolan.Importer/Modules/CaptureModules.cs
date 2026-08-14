@@ -1355,6 +1355,37 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-quest pick-one-of-N reward offers (#815), harvested from the QuestRewardNotifyIIR the server sends when a
+	// quest completes. See QuestRewardOptionExtractor for why this cannot come from the client's quest catalog.
+	// Depends on `quests` (the QuestDefinition to hang off) and `items` (the FK, and the template the client renders).
+	public sealed class QuestRewardsModule : IImportModule
+	{
+		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(ItemsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert,
+			WriteMode.Overwrite
+		};
+
+		public ImportSource Source => ImportSource.Captures;
+
+		public string Description => "Per-quest reward CHOICE lists (QuestRewardNotifyIIR offers) - the pick-one-of-N a quest completion presents.";
+		public string Name => "quest-rewards";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var offers = QuestRewardOptionExtractor.Merge(ctx.Captures.SelectMany(c => QuestRewardOptionExtractor.Extract(c.Packets)));
+			var (written, skippedQuest, skippedItem) = await ImportOps.ImportQuestRewardOptions(ctx.Db, offers);
+
+			var skipped = skippedQuest + skippedItem == 0
+				? ""
+				: $"; {skippedQuest} for a quest and {skippedItem} for an item we do not hold (dropped rather than FK-failed)";
+			return new ImportResult($"{written} reward option(s) across {offers.Select(o => o.QuestId).Distinct().Count()} quest(s){skipped}.");
+		}
+	}
+
 	// Summonable mount creatures (#27) into the dedicated never-loaded Mounts map. Isolated; NOT in the default
 	// set, so opt-in via --only mounts.
 	public sealed class MountsModule : IImportModule

@@ -374,6 +374,23 @@ namespace Faolan.GameServer.World
 				s => s.WriteArrayUInt32Length(QuestCodec.Build(client.Session.Character.Id, questId, state))));
 		}
 
+		// Sends the pick-one-of-N reward OFFER (#815). The addressed instance is the character id, the same slot every
+		// other quest packet here uses.
+		public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options)
+		{
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(QuestRewardNotifyCodec.Build(client.Session.Character.Id, questId, options))));
+		}
+
+		// The confirm: the same IIR with NO options. Retail's carried the chosen index in the trailing block's fourth
+		// word - undecoded, so it is placed exactly where the capture put it and nothing else is claimed about it.
+		public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index)
+		{
+			var confirm = new QuestRewardNotifyIIR(client.Session.Character.Id, 0x01, questId, [], [0, 0, 0, index, 0]);
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(QuestRewardNotifyCodec.Build(confirm))));
+		}
+
 		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
 		// entry point (e.g. Casilda after her rescue stage), keyed by NAME since handles are session-volatile. No-op
 		// (returns false) if no such NPC is loaded in the zone.

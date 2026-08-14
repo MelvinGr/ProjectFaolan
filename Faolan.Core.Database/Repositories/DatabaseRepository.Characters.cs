@@ -224,6 +224,9 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
 
+		// Record the pick-one-of-N reward `characterId` took for `questId` (#815) - the idempotence guard for the grant.
+		Task SetCharacterQuestReward(uint characterId, uint questId, uint chosenPos);
+
 		/// <summary>Records the Tortage tutorial hints a character has been shown, as a bitmask (#461).</summary>
 		Task SetCharacterTutorialSteps(uint characterId, ulong stepsSeen);
 		Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress);
@@ -1353,6 +1356,15 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Experience, experience).SetProperty(c => c.Level, level));
+		}
+
+		// Record which pick-one-of-N reward the character took for a quest (#815). Writing it is what makes the grant
+		// idempotent - the selection is an ordinary c2s packet and can arrive any number of times.
+		public async Task SetCharacterQuestReward(uint characterId, uint questId, uint chosenPos)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.CharacterQuests.Where(q => q.CharacterId == characterId && q.QuestId == questId)
+				.ExecuteUpdateAsync(s => s.SetProperty(q => q.RewardChosenPos, chosenPos));
 		}
 
 		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null)

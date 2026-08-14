@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//
 	// Level was 5 on all three captured options; Code was 4 zero bytes (a quest reward carries no redemption code, so
 	// the slot the claim list uses for one is empty). Both are carried verbatim rather than assumed constant.
-	public sealed record QuestRewardOption(uint ItemTemplateId, ulong Level, byte[] Code, byte[] DecryptionKey, byte[] BatchGuid, uint Trailing = 1)
+	public sealed record QuestRewardEntry(uint ItemTemplateId, ulong Level, byte[] Code, byte[] DecryptionKey, byte[] BatchGuid, uint Trailing = 1)
 	{
 		public const int BatchGuidLength = 8;
 		public const int CodeLength = 4;

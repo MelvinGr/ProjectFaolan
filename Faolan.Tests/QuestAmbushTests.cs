@@ -111,7 +111,7 @@ namespace Faolan.Tests
 
 			var database = new DatabaseRepository(new Factory(options));
 			var outbound = new RecordingQuestOutbound();
-			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), NullLogger.Instance);
+			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), new QuestRewardService(database, outbound, null!, NullLogger.Instance), NullLogger.Instance);
 
 			var client = new RecordingNetworkClient(CharacterId);
 			await service.Grant(client, QuestId, nameof(QuestAmbushTests));
@@ -136,6 +136,8 @@ namespace Faolan.Tests
 			public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update) => Task.CompletedTask;
 			public Task SendQuestIir(INetworkClient client, uint questId, uint state) => Task.CompletedTask;
 			public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds) => Task.CompletedTask;
+			public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options) => Task.CompletedTask;
+			public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index) => Task.CompletedTask;
 			public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow) => false;
 		}
 

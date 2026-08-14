@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// the chosen index in the trailing block.
 	//
 	//   [u32 sub][u32 0xC350 Character][u32 clientInstance][u8 env]
-	//   [u32 quest][u32 0][u32 count][count x QuestRewardOption]
+	//   [u32 quest][u32 0][u32 count][count x QuestRewardEntry]
 	//   [u32 t0][u32 t1][u32 t2][u32 t3][u32 t4]
 	//
 	// ⚠️ The five trailing words are NOT decoded and are carried verbatim [V0]. The offer sent (1,0,0,1,1) and the
@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return s.ToArray();
 		}
 
-		public static byte[] Build(uint clientInstance, uint questId, IReadOnlyList<QuestRewardOption> options)
+		public static byte[] Build(uint clientInstance, uint questId, IReadOnlyList<QuestRewardEntry> options)
 		{
 			return Build(new QuestRewardNotifyIIR(clientInstance, 0x01, questId, options, OfferTrailing));
 		}
@@ -69,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			r.ExpectU32Be(0, "reward header word");
 
 			var count = r.ReadU32Be();
-			var options = new List<QuestRewardOption>((int)count);
+			var options = new List<QuestRewardEntry>((int)count);
 			for (var i = 0u; i < count; i++)
 				options.Add(ReadOption(ref r));
 
@@ -97,20 +97,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 				s.WriteUInt32(word);
 		}
 
-		private static QuestRewardOption ReadOption(ref SpanReader r)
+		private static QuestRewardEntry ReadOption(ref SpanReader r)
 		{
 			var template = r.ReadU32Be();
 			r.ExpectU32Be(template, "the mirrored item-template id");
 			var level = r.ReadU64Be();
-			var code = r.ReadBytes(QuestRewardOption.CodeLength).ToArray();
-			var key = r.ReadBytes(QuestRewardOption.KeyLength).ToArray();
-			r.ReadBytes(QuestRewardOption.KeyLength); // key (dup)
-			var guid = r.ReadBytes(QuestRewardOption.BatchGuidLength).ToArray();
-			r.ReadBytes(QuestRewardOption.BatchGuidLength); // guid (dup)
-			return new QuestRewardOption(template, level, code, key, guid, r.ReadU32Be());
+			var code = r.ReadBytes(QuestRewardEntry.CodeLength).ToArray();
+			var key = r.ReadBytes(QuestRewardEntry.KeyLength).ToArray();
+			r.ReadBytes(QuestRewardEntry.KeyLength); // key (dup)
+			var guid = r.ReadBytes(QuestRewardEntry.BatchGuidLength).ToArray();
+			r.ReadBytes(QuestRewardEntry.BatchGuidLength); // guid (dup)
+			return new QuestRewardEntry(template, level, code, key, guid, r.ReadU32Be());
 		}
 
-		private static void WriteOption(FaolanStream s, QuestRewardOption option)
+		private static void WriteOption(FaolanStream s, QuestRewardEntry option)
 		{
 			s.WriteUInt32(option.ItemTemplateId)
 				.WriteUInt32(option.ItemTemplateId)
@@ -126,7 +126,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 	// QuestRewardNotifyIIR_c - the reward offer (Options non-empty) or its confirm (Options empty). Trailing is the
 	// five-word block the codec carries verbatim; see QuestRewardNotifyCodec for what is and is not known about it.
-	public sealed record QuestRewardNotifyIIR(uint ClientInstance, byte Env, uint QuestId, IReadOnlyList<QuestRewardOption> Options, IReadOnlyList<uint> Trailing)
+	public sealed record QuestRewardNotifyIIR(uint ClientInstance, byte Env, uint QuestId, IReadOnlyList<QuestRewardEntry> Options, IReadOnlyList<uint> Trailing)
 	{
 		public const int TrailingWords = 5;
 	}

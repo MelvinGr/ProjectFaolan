@@ -726,6 +726,52 @@ namespace Faolan.Importer.Captures
 		// a handle -> name entry for NpcSpellExtractor to join on (measured: all 317 player-backed spawns in the
 		// corpus are excluded, NpcSpellExtractorPlayerFilterTests). Keep both - this one also catches the capture's
 		// OWN player once imported, whose spawn is dropped by handle rather than by message.
+		// The harvested pick-one-of-N reward lists (#815). Replaces a quest's set wholesale rather than merging into it:
+		// the offer is one list, so a stale position left behind by a shorter re-harvest would be a reward the client
+		// can select and the server cannot explain.
+		//
+		// ⚠️ A row whose quest or item we do not hold is DROPPED with a count, not inserted. Both are hard FKs and a
+		// violation would abort the whole import over one un-harvested template, which is the wrong trade for a
+		// capture-sourced table - the count is what keeps the drop from being silent.
+		public static async Task<(int Written, int SkippedQuest, int SkippedItem)> ImportQuestRewardOptions(DatabaseContext db, List<QuestRewardOffer> offers)
+		{
+			ArgumentNullException.ThrowIfNull(offers);
+
+			var knownQuests = (await db.QuestDefinitions.Select(q => q.QuestId).ToListAsync()).ToHashSet();
+			var knownItems = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
+
+			int written = 0, skippedQuest = 0, skippedItem = 0;
+			foreach (var quest in offers.GroupBy(o => o.QuestId))
+			{
+				if (!knownQuests.Contains(quest.Key))
+				{
+					skippedQuest += quest.Count();
+					continue;
+				}
+
+				var usable = quest.Where(o => knownItems.Contains(o.ItemTemplateId)).OrderBy(o => o.Pos).ToList();
+				skippedItem += quest.Count() - usable.Count;
+				if (usable.Count == 0)
+					continue;
+
+				await db.QuestRewardOptions.Where(o => o.QuestId == quest.Key).ExecuteDeleteAsync();
+				foreach (var o in usable)
+				{
+					db.QuestRewardOptions.Add(new QuestRewardOption
+					{
+						QuestId = o.QuestId,
+						Pos = o.Pos,
+						ItemTemplateId = o.ItemTemplateId,
+						Level = o.Level
+					});
+					written++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return (written, skippedQuest, skippedItem);
+		}
+
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n!.ToLowerInvariant()).ToHashSet();

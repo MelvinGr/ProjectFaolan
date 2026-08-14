@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.CsPlayerAgent;
@@ -249,7 +250,7 @@ namespace Faolan.Tests
 				outbound.Place(id);
 
 			var questOutbound = new RecordingQuestOutbound();
-			var progression = new QuestProgressionService(database, questOutbound, null!, null!, null!, NullLogger.Instance);
+			var progression = new QuestProgressionService(database, questOutbound, null!, null!, null!, new QuestRewardService(database, questOutbound, null!, NullLogger.Instance), NullLogger.Instance);
 			var service = new QuestSharingService(database, new FixedRoster(roster), outbound, progression, NullLogger.Instance);
 
 			return new Harnessed(service, database, outbound, questOutbound);
@@ -346,6 +347,8 @@ namespace Faolan.Tests
 
 			public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update) => Task.CompletedTask;
 			public Task SendQuestIir(INetworkClient client, uint questId, uint state) => Task.CompletedTask;
+			public Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options) => Task.CompletedTask;
+			public Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index) => Task.CompletedTask;
 			public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow) => false;
 		}
 

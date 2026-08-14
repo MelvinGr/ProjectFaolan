@@ -666,6 +666,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("QuestId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("RewardChosenPos")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("State")
                         .HasColumnType("INTEGER");
 
@@ -3294,6 +3297,27 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("QuestLineRewards");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestRewardOption", b =>
+                {
+                    b.Property<uint>("QuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ItemTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("QuestId", "Pos");
+
+                    b.HasIndex("ItemTemplateId");
+
+                    b.ToTable("QuestRewardOptions");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
                 {
                     b.Property<uint>("QuestId")
@@ -5574,6 +5598,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Line");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestRewardOption", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "Quest")
+                        .WithMany()
+                        .HasForeignKey("QuestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("Quest");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>

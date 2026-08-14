@@ -35,10 +35,13 @@ namespace Faolan.Tests
 			["KnubotStartTradeCodec"] = "the NPC trade window is not implemented",
 			["KnubotFinishTradeCodec"] = "the NPC trade window is not implemented",
 			["ClientAddGuildRenownCodec"] = "guild renown is never awarded, so nothing calls it",
-			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it",
-			["QuestRewardNotifyCodec"] = "quest reward CHOICE is decoded but not wired - nothing offers a reward list or grants the pick yet (#815)",
-			["QuestRewardSelectionCodec"] = "the c2s half of the same unwired exchange - no handler consumes the player's pick yet (#815)"
+			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it"
 		};
+
+		// The quest reward pair came OFF this list when #815 was wired: QuestRewardService now sends the offer from
+		// QuestProgressionService.CompleteObjective and the listener routes the c2s pick into it. That is the gate
+		// working in the direction it was built for - the entry said "no live trigger yet", and building the trigger
+		// made the entry a lie, which failed the run rather than rotting quietly.
 
 		// LockedToChanged came OFF the list in the same pass that wrote it (#405): retail sends it in the NPC-aggro
 		// bundle, right after HateListUpdate/ThreatLevel, and we now send all three. This is the gate doing its job in

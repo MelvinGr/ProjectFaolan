@@ -22,6 +22,10 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map[]> GetMaps();
 		Task<QuestLine[]> GetQuestLines();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
+
+		// The pick-one-of-N reward list `questId`'s completion offers - harvested capture rows first, the quest line's
+		// optional set as a fallback on the line's final quest. Empty when the quest offers no choice.
+		Task<QuestRewardOption[]> GetQuestRewardOptions(uint questId);
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
 		Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
@@ -148,6 +152,54 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.QuestLines.OrderBy(a => a.QuestLineId).ToArrayAsync();
+		}
+
+		// The pick-one-of-N reward list a quest's completion offers (#815), resolved CAPTURE-FIRST.
+		//
+		// Two sources, and they are not equals. A harvested `QuestRewardOptions` row is retail's own offer, read off the
+		// wire; the client's quest catalog only ever states rewards on the LINE, and for the single offer we have
+		// captured the two DISAGREE - quest 10928 offered three Acolyte weapons while its line 386 holds one
+		// "Exponent's Gloves" and those three ids appear on no line at all. Where a capture and the client's data
+		// disagree the capture wins, so the harvested set is taken whole and the catalog is not consulted.
+		//
+		// The catalog fallback covers the 615 lines that carry a genuine multi-item optional set and that no capture
+		// has ever watched complete. It fires only on the line's FINAL quest (the one with no successor), because a
+		// line reward is the payoff for finishing the line - offering it on every step would hand it out once per stage.
+		// ⚠️ That timing is a DECISION, not an observation: no capture shows a line-sourced offer, so nothing here is
+		// evidence for when retail sends one.
+		public async Task<QuestRewardOption[]> GetQuestRewardOptions(uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var harvested = await ctx.QuestRewardOptions.AsNoTracking()
+				.Where(o => o.QuestId == questId)
+				.OrderBy(o => o.Pos)
+				.ToArrayAsync();
+			if (harvested.Length > 0)
+				return harvested;
+
+			var quest = await ctx.QuestDefinitions.AsNoTracking().FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null || quest.NextQuestId != null)
+				return [];
+
+			// Projected onto the same row type so the caller has one shape to build from. Pos is re-numbered densely
+			// from the catalog's own order: the client answers with an INDEX into the list we send, which is not the
+			// catalog's `Pos` (that numbers fixed and optional rewards in one sequence).
+			var line = await ctx.QuestLineRewards.AsNoTracking()
+				.Where(r => r.QuestLineId == quest.QuestLineId && r.Optional)
+				.OrderBy(r => r.Pos)
+				.Select(r => r.ItemTemplateId)
+				.ToArrayAsync();
+
+			return line.Distinct()
+				.Select((template, i) => new QuestRewardOption
+				{
+					QuestId = questId,
+					Pos = (uint)i,
+					ItemTemplateId = template,
+					Level = 0 // the catalog states no level; the offer falls back to the item's own
+				})
+				.ToArray();
 		}
 
 		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)

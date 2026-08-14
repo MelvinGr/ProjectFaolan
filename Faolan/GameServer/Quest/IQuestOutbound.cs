@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.GameServer.Quest
 {
@@ -53,6 +54,13 @@ namespace Faolan.GameServer.Quest
 
 		// QuestIIR (0x97E02314): add/update `questId` in the journal at `state` (StateActive 2 / StateCompleted 4).
 		Task SendQuestIir(INetworkClient client, uint questId, uint state);
+
+		// QuestRewardNotifyIIR (0x8BB2799C) with options: the pick-one-of-N reward window a completing quest presents
+		// (#815). Each entry carries the item's own ProtoDecryptionKey, which is what lets the client render it.
+		Task SendQuestRewardOffer(INetworkClient client, uint questId, IReadOnlyList<QuestRewardEntry> options);
+
+		// The same IIR with NO options - the confirm that closes the reward window, echoing the chosen index.
+		Task SendQuestRewardConfirm(INetworkClient client, uint questId, uint index);
 
 		// #262: the quest-driven companion trigger - the NPC of TEMPLATE id `templateId` (the Escort goal's TrailingRefId)
 		// follows (or stops following) the player. Id-based (data-driven escort, not a hard-coded name). No-op if no such

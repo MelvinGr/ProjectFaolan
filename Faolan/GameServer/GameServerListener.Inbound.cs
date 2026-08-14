@@ -457,6 +457,17 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case IirTypes.QuestRewardSelectionIIR:
+				{
+					// The player picked one of the rewards a completing quest offered (#815). The body names its own
+					// quest, so QuestRewardService re-checks that this character actually completed it and has not
+					// already been rewarded - the packet is not evidence of either.
+					var pick = QuestRewardSelectionCodec.Parse(body.ToArray());
+					await _questRewards.TryGrant(client, pick.QuestId, pick.Index);
+
+					break;
+				}
+
 				case IirTypes.FeatIIR:
 				{
 					// Feat TRAIN: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See

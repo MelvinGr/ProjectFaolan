@@ -55,8 +55,21 @@ namespace Faolan.Tests
 				[NpcWeapon.Shield] = "hield" // Shield/shield - the NPC rows capitalise it, the player ones do not
 			};
 
+			// ⚠️ The premise here is a HEURISTIC - that a designer's internal name predicts the client's own category -
+			// and the client disagrees on this row. 355300 "NPC_Vanir_axe_uber2_2hEdge_(W_YMIRGIANT_ONLY)" is
+			// SearchCategory 30011 (one-hand edge) and has been for as long as we have shipped it; what changed is that
+			// `rdb-ldb-names` filled 530 previously-EMPTY item names, so a row that had no name to read now has one that
+			// says 2hEdge. The category is the client's field and wins; the name is prose. Listed rather than filtered
+			// by a pattern so the exception stays countable - a second one should fail again and be looked at, not
+			// disappear into a wildcard.
+			var nameDisagreesWithTheClient = new HashSet<uint>
+			{
+				355300
+			};
+
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var named = db.Items.Where(i => tokens.Keys.Contains(i.SearchCategory)).Select(i => new { i.SearchCategory, i.Name }).ToList();
+			var named = db.Items.Where(i => tokens.Keys.Contains(i.SearchCategory) && !nameDisagreesWithTheClient.Contains(i.Id))
+				.Select(i => new { i.SearchCategory, i.Name }).ToList();
 
 			foreach (var (category, token) in tokens)
 			{

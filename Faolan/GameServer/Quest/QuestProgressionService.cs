@@ -42,16 +42,18 @@ namespace Faolan.GameServer.Quest
 		private readonly IEconomyOutbound _economy;
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
+		private readonly QuestRewardService _rewards;
 		private readonly QuestHandlerService _questHandler;
 
 		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, QuestHandlerService questHandler,
-			IChatServerDispatcher agents, ILogger logger)
+			IChatServerDispatcher agents, QuestRewardService rewards, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
 			_economy = economy;
 			_questHandler = questHandler;
 			_agents = agents;
+			_rewards = rewards;
 			_logger = logger;
 		}
 
@@ -550,6 +552,12 @@ namespace Faolan.GameServer.Quest
 				await ObjectiveCompleteAwaitTurnIn(client, character, quest, goal.GoalId, required); // legacy #47 (chainless kill)
 			else
 				await CompleteFinal(client, character, quest, goal.GoalId, required); // chainless loot/talk -> just complete
+
+			// #815: a quest that offers a CHOICE of rewards presents it now. Deliberately NOT on the turn-in path above
+			// - that one leaves the quest Active awaiting a hand-in, and the reward belongs to completion. The capture
+			// puts the offer inside the completion burst, after the QuestIIR state flip, which is where this lands.
+			if (goal.GoalType != QuestGoalType.Kill || def.NextQuestId is not null)
+				await _rewards.OfferOnCompletion(client, quest.QuestId);
 		}
 
 		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
