@@ -35,7 +35,9 @@ namespace Faolan.Tests
 			["KnubotStartTradeCodec"] = "the NPC trade window is not implemented",
 			["KnubotFinishTradeCodec"] = "the NPC trade window is not implemented",
 			["ClientAddGuildRenownCodec"] = "guild renown is never awarded, so nothing calls it",
-			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it"
+			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it",
+			["AcgTeleportChoiceCodec"] = "the ACG instance bind box is decoded but not wired - nothing decides WHICH destinations need one (#821)",
+			["AcgTeleportRequestCodec"] = "the c2s half of the same unwired exchange - no handler answers the player's yes (#821)"
 		};
 
 		// The quest reward pair came OFF this list when #815 was wired: QuestRewardService now sends the offer from
