@@ -45,7 +45,7 @@ namespace Faolan.GameServer.Quest
 		/// </summary>
 		public async Task OfferOnCompletion(INetworkClient client, uint questId)
 		{
-			var character = client?.Session.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return;
 
@@ -74,7 +74,7 @@ namespace Faolan.GameServer.Quest
 		/// </summary>
 		public async Task<bool> TryGrant(INetworkClient client, uint questId, uint index)
 		{
-			var character = client?.Session.Character;
+			var character = client.Session.Character;
 			if (character == null)
 				return false;
 
