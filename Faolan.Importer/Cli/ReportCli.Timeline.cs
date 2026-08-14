@@ -208,13 +208,37 @@ namespace Faolan.Importer.Cli
 		{
 			var labels = new Dictionary<uint, string>();
 			uint mapId = 0;
-			foreach (var e in events)
+
+			// ⚠️ The map each event was seen ON, not "the map the capture ended on" (#818). This used to resolve every
+			// entity in the session against a single `mapId` - whatever the LAST MapChange left behind - so a capture
+			// that visited two playfields could only ever name the entities of one of them. It showed up as an
+			// asymmetry between two halves of one session: play4 ends in Tortage and named Redrik/Cramaleico/Delia
+			// while every White Sands entity stayed a bare handle, and play3 ends in White Sands and could not name
+			// Tina or anyone else in the city. Same shape as the spawn-importer bug this ticket is about - one
+			// "current" variable outliving the thing it was current for.
+			var mapAt = new uint[events.Count];
+			for (var i = 0; i < events.Count; i++)
 			{
+				var e = events[i];
+				mapAt[i] = mapId;
 				switch (e.Name)
 				{
-					case "PlayfieldFIIR" when e.Raw.Length >= 38:
+					// Same rule as the spawn importer (#818): a MapChange we cannot read CLEARS the map rather than
+					// leaving the previous one standing. Entities are named by matching their position against the
+					// current map's spawn table, so a stale id here would label this playfield's NPCs with the names
+					// of the one the player just left - the report's own version of the mis-attribution that bug caused.
+					case "PlayfieldFIIR":
 					{
-						mapId = e.Raw.ReadU32Be(34);
+						try
+						{
+							mapId = PlayfieldFCodec.Parse(e.Content).MapId;
+						}
+						catch (CodecParseException)
+						{
+							mapId = 0;
+						}
+
+						mapAt[i] = mapId; // the MapChange itself belongs to the map it announces
 						break;
 					}
 
@@ -232,10 +256,11 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			var npcs = look.NpcSpawns.GetValueOrDefault(mapId) ?? [];
-			var objects = look.WorldObjects.GetValueOrDefault(mapId) ?? [];
-			foreach (var e in events)
+			for (var i = 0; i < events.Count; i++)
 			{
+				var e = events[i];
+				var npcs = look.NpcSpawns.GetValueOrDefault(mapAt[i]) ?? [];
+				var objects = look.WorldObjects.GetValueOrDefault(mapAt[i]) ?? [];
 				var isChar = e.Name is "SimpleCharFullUpdateIIR";
 				if (!isChar && e.Name is not ("SimpleDynelFullUpdateIIR" or "DoorFullUpdateIIR"
 					    or "ClimbingDynelFullUpdateIIR"))
@@ -322,9 +347,14 @@ namespace Faolan.Importer.Cli
 					return $"account \"{Encoding.Latin1.GetString(raw, 2, Math.Min(raw.ReadU16Be(0), raw.Length - 2))}\"";
 				}
 
-				case "PlayfieldFIIR" when raw.Length >= 38:
+				// Through the CODEC, not a fixed offset (#818). Reading the map at raw+34 printed the right number
+				// while PlayfieldFCodec was REFUSING these bodies outright - so the footer's "codecs refused" census,
+				// the most valuable thing this report produces, stayed silent about the refusal that was actively
+				// corrupting the spawn import. A report that decodes a message its own codec cannot read is not a
+				// coverage measurement.
+				case "PlayfieldFIIR":
 				{
-					var pf = raw.ReadU32Be(34);
+					var pf = PlayfieldFCodec.Parse(content).MapId;
 					return $"playfield {pf}" + (look.Maps.TryGetValue(pf, out var m) ? $" \"{m}\"" : "");
 				}
 				case "FullPlayerCharacterIIR":
