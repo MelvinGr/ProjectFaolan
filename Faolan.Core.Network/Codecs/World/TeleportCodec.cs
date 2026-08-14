@@ -47,6 +47,11 @@ namespace Faolan.Core.Network.Codecs.World
 		// The IIR types this codec constructs or parses.
 		public static readonly IirTypes[] HandledTypes = [IirTypes.IntendedTeleportIIR, IirTypes.N3TeleportIIR];
 
+		// The destination-announce half of the family, named so a caller can select it without naming an IirTypes
+		// member of its own - an IIR opcode belongs inside Codecs/ (#530 wave 8), and the importer needs to pick the
+		// n3Teleport out of a packet stream to harvest a changemap-shaped dialogue trip (#820).
+		public const uint N3Opcode = (uint)IirTypes.N3TeleportIIR;
+
 		// The length-prefixed spawn blob is itself TAGGED, and its first word says which arm follows (#814). #809
 		// settled that n3Teleport is one grammar and that the "two forms" are only whether this blob is present; what
 		// it did not cover is that a PRESENT blob still has two shapes. 0x…04 states the arrival as literal

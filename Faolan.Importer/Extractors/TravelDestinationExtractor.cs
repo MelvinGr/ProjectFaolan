@@ -130,6 +130,40 @@ namespace Faolan.Importer.Extractors
 
 					found.Add(new Entry(name, fromContentKey, optionId, trip.DestinationMapId, spentInConversation, trip.X, trip.Y, trip.Z));
 				}
+
+				// The CHANGEMAP-shaped trip (#820). A wagoneer's ride is a `Local=1` GameActionList and stays on the
+				// same server; the Destiny day/night switch is not that at all - picking Tina's
+				// "(Night - Single Player)" sends a scry script, an IntendedTeleport, an n3Teleport and a
+				// DispatchRedirectToServer, i.e. a full playfield change. Both are nonetheless "this dialogue branch
+				// moves the player there", which is exactly what a TravelDestination row states, so the same table
+				// carries them and the destination/arrival come off the n3Teleport instead of the travel action.
+				//
+				// ⚠️ Gated on an ACTIVE conversation with a named NPC and a resolved branch, so the ordinary
+				// zone-line door - which also sends an n3Teleport, with no conversation anywhere near it - cannot be
+				// mistaken for a dialogue trip. Those are the `world-teleports` module's, keyed by the door.
+				if (p is { IsDownload: true, SubOpcode: TeleportCodec.N3Opcode } && active && npc != 0 && fromContentKey.Length > 0)
+				{
+					if (!p.TryParse(TeleportCodec.Parse, out var teleport) || teleport is not N3TeleportIIR n3)
+						continue;
+
+					// A NAMED spawn point states no coordinates (#814), so there is no arrival to record - the ACG
+					// rowboat is that shape and stays unharvested rather than being written at the origin.
+					if (n3.ArrivalPosition is not { } arrival)
+						continue;
+
+					// ⚠️ Only a real CHANGEMAP. The same-map relocate form leaves the proxy's map at 0 (it is not
+					// changing playfield, so it names none), and dialogue drives plenty of those - Nadini, Redrik,
+					// Turach and Tina all reposition the player inside one playfield. Those are not trips: writing
+					// them would fill the table with rows whose destination is "map 0", which the wiring step then
+					// discards one by one. Harvest the ones that state where they are going.
+					if (n3.Proxy.MapId == 0)
+						continue;
+
+					if (namesByHandle.GetValueOrDefault(npc) is not { Length: > 0 } changeMapNpc)
+						continue;
+
+					found.Add(new Entry(changeMapNpc, fromContentKey, optionId, n3.Proxy.MapId, spentInConversation, arrival.X, arrival.Y, arrival.Z));
+				}
 			}
 
 			return Merge(found);

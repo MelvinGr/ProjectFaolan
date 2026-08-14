@@ -110,6 +110,16 @@ namespace Faolan.Importer.Modules
 				if (ctx.ModeFor(Name) == WriteMode.Insert)
 					continue;
 
+				// ⚠️ A row sourced from a `{teleportplayer}` DIRECTIVE is not refreshed from the wire (#820). The two
+				// state different things about the same trip: the directive is the decoded grammar
+				// (`{teleportplayer <x> <z> [y <y>] <map>}`, where a MISSING height means ground-snap at run time and
+				// is stored as a NULL Y), while an n3Teleport states one session's actual arrival. Overwriting the
+				// first with the second silently replaces a [V2]-cited decode with a sample - it turned Sigurd's
+				// (55.7, 158.1, 113.9) into (55, 158, 113) and gave Wagoner Polus a height his directive deliberately
+				// omits. The directive is the better source for the rows it owns, so it wins.
+				if (row.FromDialogueDirective)
+					continue;
+
 				row.NpcName = trip.NpcName;
 				row.DestinationMapId = trip.DestinationMapId;
 				row.Cost = trip.Cost;
