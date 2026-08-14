@@ -355,7 +355,7 @@ namespace Faolan.GameServer
 			// built BEFORE the dialogue runtime because the travel TRIGGER is a conversation node (a wagoneer's
 			// destination pick), so ConversationService drives it.
 			_travel = new TravelService(database, this, logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel);
+			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);

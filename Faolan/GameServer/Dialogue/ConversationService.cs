@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -53,15 +54,18 @@ namespace Faolan.GameServer.Dialogue
 			0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x3E
 		];
 
+		private readonly IChatServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly TravelService _travel;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, TravelService travel)
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, TravelService travel,
+			IChatServerDispatcher agents)
 		{
 			_database = database;
+			_agents = agents;
 			_logger = logger;
 			_broadcaster = broadcaster;
 			_questProgression = questProgression;
@@ -181,7 +185,32 @@ namespace Faolan.GameServer.Dialogue
 			if (eligible.Length == 0)
 				eligible = roots; // the captures only ever caught this NPC on the other meeting - serve what we have
 
-			var opening = PickByLatestQuest(eligible, quests) ?? Array.Find(eligible, r => r.ConditionQuestId == null);
+			var opening = PickByLatestQuest(eligible, quests);
+			if (opening == null)
+			{
+				// ⚠️ No gate matched. For an NPC whose greetings are quest-GATED, that means the player is in a state
+				// no capture ever recorded - and its unconditional root is NOT a default, it is the greeting harvested
+				// for somebody else's progress. Serving it hands the player plausible, wrong dialogue: a level-80 with
+				// the Destiny line finished got Tina's mid-quest opener, because hers is the only ungated root we hold.
+				// Say so instead. This is the silent-fallback rule (CLAUDE.md): an uncaptured state is a gap to report,
+				// not a hole to fill with the nearest thing.
+				//
+				// Scoped to NPCs that HAVE a gate: the 107 NPCs whose only root is unconditional are unaffected, and
+				// their one greeting really is for everyone. 10 NPCs carry both shapes and are the ones this covers.
+				if (Array.Exists(eligible, r => r.ConditionQuestId != null))
+				{
+					_logger.LogInformation("Conversation: npc={Name} ({Template}) has quest-gated greetings but none match this player's state - no capture of it, so nothing is served.",
+						roots[0].NpcName, npcTemplateId);
+
+					if (character != null)
+						await _agents.CharacterSay(npcHandle, $"({roots[0].NpcName}: no dialogue captured for this quest state yet)", [character.Id]);
+
+					return null;
+				}
+
+				opening = Array.Find(eligible, r => r.ConditionQuestId == null);
+			}
+
 			if (opening == null)
 				return null;
 
