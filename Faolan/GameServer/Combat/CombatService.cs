@@ -437,8 +437,9 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// Damages every attackable NPC within the spell's blast radius of `target` for one tick: shows the floating
-		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
-		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).
+		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Only HOSTILE NPCs are hit -
+		// friendly AND neutral bystanders are spared, the same rule melee splash follows; players never (no PvP
+		// model). ⚠️ It used to hit neutral too, which is what made an aura rake civilians in a town.
 		// Re-evaluated each call so NPCs that wander in/out of the blast are picked up per tick. Returns the count hit.
 		// #772: applies one of a spell's AREA effects - "apply spell X to up to N entities within R metres of the
 		// caster". The two shapes share this entirely and differ only in WHO calls it:
@@ -485,9 +486,13 @@ namespace Faolan.GameServer.Combat
 
 			// The cap the client renders as "up to N targets" (SpellAreaEffect.MaxTargets). 0 = the element stated
 			// none, so everything in range is hit - not "nothing", which is what treating 0 as the cap would mean.
+			// Same gate as melee splash and the ground blast. ⚠️ This used to read
+			// `Disposition != DispositionFriendly`, so an aura swept up NEUTRAL bystanders (yellow-name civilians)
+			// that a sword swing beside them would have spared - reported in-client against Gangrenous Stench, whose
+			// 7 m aura re-ticks every 4 s for 25 s and so rakes a whole street corner.
 			var inRange = zone
 				.EntitiesInRange(source.Position, radius, sourceHandle)
-				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
+				.Where(e => e is { IsPlayer: false, Hostile: true, IsDead: false })
 				.Select(e => e.Handle);
 
 			var victims = (maxTargets > 0 ? inRange.Take((int)maxTargets) : inRange).ToList();
@@ -528,10 +533,20 @@ namespace Faolan.GameServer.Combat
 				? spell.AreaRadius
 				: GroundAoeRadiusUnits;
 
+			// The SAME gate melee splash uses (CombatTargeting.CleaveTargets) - "vendors standing nearby must never
+			// take splash" applies no less to a blast than to a sword.
+			//
+			// ⚠️ It used to read `Disposition != DispositionFriendly`, which also hits NEUTRAL (disposition 2) - 386
+			// templates, 279 of them yellow-name civilians - while melee spared them. An AoE dropped in a town centre
+			// therefore damaged bystanders a swing would not have touched. (Unknown disposition was never the
+			// problem: the spawn path maps NULL to FRIENDLY, so `entity.Disposition` is never null and an
+			// un-polled NPC was already spared by either test.)
+			//
+			// `IsDead` was missing as well, so corpses kept taking ticks.
 			var victims = _sim
 				.World.ZoneForEntity(player)
 				.EntitiesInRange(target, radius, casterHandle)
-				.Where(e => !e.IsPlayer && e.Disposition != WorldEntity.DispositionFriendly)
+				.Where(e => e is { IsPlayer: false, Hostile: true, IsDead: false })
 				.Select(e => e.Handle)
 				.ToList();
 
