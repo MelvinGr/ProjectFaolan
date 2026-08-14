@@ -341,7 +341,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var r = await RdbQuestCatalogImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			var r = await RdbQuestCatalogImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			return new ImportResult(
 				$"lines +{r.LinesAdded} ({r.LinesNamed} named, {r.PlaceholderLines} placeholder); quests +{r.QuestsAdded} ({r.QuestsNamed} named); " +
 				$"goals +{r.GoalsAdded} ({r.GoalsNamed} named); {r.Rewards} item rewards; {r.GoalsOrphaned} goals with no quest.");

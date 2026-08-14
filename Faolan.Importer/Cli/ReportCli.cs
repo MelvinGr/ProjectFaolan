@@ -4130,7 +4130,15 @@ namespace Faolan.Importer.Cli
 		// Honours `--rdb-proxy`, which the reports used to ignore in favour of the hardcoded default.
 		private static RdbReader OpenRdb(string? rdbDir = null)
 		{
-			return new RdbReader(rdbDir ?? RdbDir(), _options.RdbProxy ?? _options.Configuration.CdnPublicAddress);
+			return new RdbReader(rdbDir ?? RdbDir(), ReportRdbProxy());
+		}
+
+		// The CDN base a REPORT run reads through. ⚠️ Resolving it touches `_options`, which only the `--report` entry
+		// point assigns - so anything shared with the IMPORT path must take the base as a parameter instead of calling
+		// this (#819). It is a separate method rather than inline so that dependency is visible at each call site.
+		private static string? ReportRdbProxy()
+		{
+			return _options.RdbProxy ?? _options.Configuration.CdnPublicAddress;
 		}
 
 		private static string RdbDir()

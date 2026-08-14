@@ -32,9 +32,9 @@ namespace Faolan.Importer.Rdb
 			int Rewards,
 			int GoalsOrphaned);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? cdnBase)
 		{
-			var catalog = ReportCli.ReadQuestCatalog(rdbDir)
+			var catalog = ReportCli.ReadQuestCatalog(rdbDir, cdnBase)
 			              ?? throw new InvalidOperationException(
 				              "RDB type 1000104 (RDBQUESTGIVERS) not found - is RdbDir pointing at the client's RDB folder?");
 

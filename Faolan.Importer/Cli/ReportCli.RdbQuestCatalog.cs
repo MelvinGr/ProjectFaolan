@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Protobuf;
+using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
@@ -39,7 +40,7 @@ namespace Faolan.Importer.Cli
 		private static async Task RdbQuestCatalog(string rdbDir, string? arg)
 		{
 			var wanted = ParseIdFilter(arg);
-			var catalog = ReadQuestCatalog(rdbDir);
+			var catalog = ReadQuestCatalog(rdbDir, ReportRdbProxy());
 			if (catalog == null)
 			{
 				Console.WriteLine($"rdb-quest-catalog: RDB type {QuestCatalogRdbType} not found - is RdbDir pointing at the client's RDB folder?");
@@ -513,7 +514,7 @@ namespace Faolan.Importer.Cli
 		//     a QuestGoal is fields 1-5 with no unaccounted space for them to hide in.
 		private static void RawFieldCensus(string rdbDir)
 		{
-			var payload = ReadQuestCatalogPayload(rdbDir);
+			var payload = ReadQuestCatalogPayload(rdbDir, ReportRdbProxy());
 			if (payload == null)
 				return;
 
@@ -662,9 +663,15 @@ namespace Faolan.Importer.Cli
 
 		// The record's protobuf payload - everything after the 12-byte RDB-Id header. Null when the client's RDB has
 		// no such entry.
-		private static byte[]? ReadQuestCatalogPayload(string rdbDir)
+		//
+		// ⚠️ Takes the CDN base EXPLICITLY rather than reaching for it through OpenRdb (#819). OpenRdb resolves the
+		// proxy off ReportCli's static `_options`, which only the `--report` entry point ever assigns - so this
+		// function, which is deliberately shared with the import module, threw a NullReferenceException on every
+		// import run and took the whole `rdb-quest-catalog` module (and everything sequenced after it) down with it.
+		// Every other RDB importer already takes the base as a parameter; this is that same shape.
+		private static byte[]? ReadQuestCatalogPayload(string rdbDir, string? cdnBase)
 		{
-			using var rdb = OpenRdb(rdbDir);
+			using var rdb = new RdbReader(rdbDir, cdnBase);
 			if (!rdb.TryGet(QuestCatalogRdbType, 0, out var entry))
 				return null;
 
@@ -676,9 +683,9 @@ namespace Faolan.Importer.Cli
 
 		// Shared with the importer module so the RDB type, the header width and the protobuf entry point are
 		// stated once. Returns null when the client's RDB has no such entry.
-		internal static QuestGiverList? ReadQuestCatalog(string rdbDir)
+		internal static QuestGiverList? ReadQuestCatalog(string rdbDir, string? cdnBase)
 		{
-			var payload = ReadQuestCatalogPayload(rdbDir);
+			var payload = ReadQuestCatalogPayload(rdbDir, cdnBase);
 			if (payload == null)
 				return null;
 
