@@ -2090,10 +2090,21 @@ namespace Faolan.GameServer.World
 			//   * not held, but the line has not reached it -> SILVER. This is Turach at login in
 			//     `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: his "The Quarry" is step 5 of line 241
 			//     and the player has done none of steps 1-4, so retail greys him rather than drawing no marker;
-			//   * held and in progress, or turned in -> SILVER, he is still part of the chain with nothing to give.
+			//   * held and in progress -> SILVER, he is still part of the chain with nothing to give;
+			//   * COMPLETED -> no marker at all, which retail states outright (see the branch below).
 			if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
 				return QuestMarkerTurnIn;
 
+			// ⛔ A COMPLETED quest draws NO marker. Retail is explicit about it: in
+			// xxx_mage-necromancer_login_play3 Tina carries '?' (0x04) at t=59.3 and 69.6, quest 10287 completes at
+			// t=101.7, and at t=102.0 she is set to 0x00 - three packets, the instant it finishes. This branch used to
+			// return SILVER for `held != null`, which is true of a completed quest too, so every giver a character had
+			// ever finished wore a permanent "available soon" marker. Found on a level-80 with the whole Destiny line
+			// done: every Tortage giver was silver.
+			if (held is { State: QuestState.Completed })
+				return QuestMarkerNone;
+
+			// Held and still in progress: silver, he is part of the chain with nothing to give right now.
 			if (held != null)
 				return QuestMarkerUnavailable;
 
