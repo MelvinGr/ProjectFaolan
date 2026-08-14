@@ -195,9 +195,19 @@ namespace Faolan.GameServer.Dialogue
 				// Say so instead. This is the silent-fallback rule (CLAUDE.md): an uncaptured state is a gap to report,
 				// not a hole to fill with the nearest thing.
 				//
+				// ⚠️ But only when the player is PAST the gated states, not before them. The ungated root is the
+				// harvested greeting for a character with no chain progress (see
+				// docs/subsystems/knubot-conversation-packets.md - "the least-informed class is the unconditional
+				// fallback"), so a FRESH character matches no gate for the ordinary reason and must still be served
+				// it, or they can never start the chain. It is only once they have COMPLETED a gating quest that
+				// falling through means "a state after everything we captured".
+				//
 				// Scoped to NPCs that HAVE a gate: the 107 NPCs whose only root is unconditional are unaffected, and
 				// their one greeting really is for everyone. 10 NPCs carry both shapes and are the ones this covers.
-				if (Array.Exists(eligible, r => r.ConditionQuestId != null))
+				var pastTheGates = Array.Exists(eligible,
+					r => r.ConditionQuestId is { } gate && quests.Any(q => q.QuestId == gate && q.State == QuestState.Completed));
+
+				if (pastTheGates)
 				{
 					_logger.LogInformation("Conversation: npc={Name} ({Template}) has quest-gated greetings but none match this player's state - no capture of it, so nothing is served.",
 						roots[0].NpcName, npcTemplateId);
