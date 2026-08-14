@@ -53,6 +53,25 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedIirContent, Convert.ToHexString(PlayfieldFCodec.Build(parsed)).ToLowerInvariant());
 		}
 
+		// #818: an instanced playfield sends ZERO scene entries, so the blob is its count word alone - 4 bytes rather
+		// than 24, and the whole record 83 bytes rather than 103. Refused before the fix, and the refusal did not stay
+		// contained in the codec: NpcSpawnExtractor kept the PREVIOUS map on an unreadable MapChange, so White Sands
+		// Night's NPCs were harvested as City of Tortage Night spawns while the row counts looked healthy.
+		// xxx_mage-necromancer_login_play4 frame 48 - the login straight into White Sands Night (10803).
+		[Fact]
+		public void Parse_ReadsAZeroSceneEntryBlob()
+		{
+			var captured = Convert.FromHexString(
+				"5d85bfc700000000000000000043fa42f64257f1d244530381620000c7a600002a3300000000007c7568000000000000000100009c5001ef143e00000000000000000400000000ffffffffffffffff0000000700000000");
+
+			var parsed = PlayfieldFCodec.Parse(captured);
+
+			Assert.Equal(10803u, parsed.MapId); // White Sands Night
+			Assert.Equal(0u, parsed.SceneEntries);
+			Assert.Equal(7u, parsed.FieldC);
+			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(PlayfieldFCodec.Build(parsed)));
+		}
+
 		[Fact]
 		public void Parse_RejectsANonMapChangeAndAShortBody()
 		{

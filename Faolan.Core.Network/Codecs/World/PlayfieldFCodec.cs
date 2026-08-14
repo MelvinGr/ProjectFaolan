@@ -21,8 +21,13 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [u32 len = 24][24-byte blob]       the FUN_00cbf5d0 length-prefixed sub-stream      @59..86
 	//   [u32][u32][u32 fieldC][u32 flags]  -> obj+0x80 / +0x84 / +0x88 / +0x8C             @87..102
 	//
-	// Validated over all 151 captured PlayfieldFIIR bodies: every one is 103 bytes, carries the proxy's 'b' version
-	// byte at @21, and its blob length word reads exactly 24 so that 59 + 4 + 24 + 16 == 103. Zero failures.
+	// Validated over the captured PlayfieldFIIR bodies: every one carries the proxy's 'b' version byte at @21.
+	//
+	// ⚠️ The body is NOT a fixed 103 bytes - that held only while every captured blob happened to carry exactly one
+	// scene entry. The blob is length-prefixed and its first word is a COUNT (see SingleSceneEntry below), so the
+	// body is 59 + 4 + blobLen + 16. Three sizes are captured: blobLen 24 (one entry, the common case, 103 bytes
+	// total), 32 (two entries, the Amphitheatre of Karutonia) and **4 (ZERO entries, 83 bytes total)** - the last
+	// being White Sands Night (10803) and every other instanced playfield entered the same way (#818).
 	//
 	// Neither `sceneWord` nor the blob's last word is semantically pinned - `sceneWord` is 0 on maps 4020/4022 and 1
 	// on 1000/1010/2000/2010/2040/3000/5007/11040 while 4000 and 4010 carry both, and `blobLastWord` takes 0/1/2/3
@@ -114,12 +119,28 @@ namespace Faolan.Core.Network.Codecs.World
 			// stream and not four more top-level words.
 			var blob = new SpanReader(r.ReadBytesU32Length(), nameof(PlayfieldFCodec) + ".sceneBlob");
 			var sceneEntries = blob.ReadU32Be();
-			var blobToken = blob.ReadU32Be(); // the token again, inside the blob
-			blob.ExpectU32Be(SceneBlobWord2, "scene blob word 2");
-			var blobFloat1 = blob.ReadF32Be(); // 15.0 in all 218 captured bodies
-			var blobFloat2 = blob.ReadF32Be(); // 0.053 .. 14.796, always below it
-			var blobLastWord = blob.ReadU32Be(); // beach capture carries 0x3, retail Old Tarantia 0x0
-			var blobTail = blob.ReadRemaining().ToArray();
+
+			// ⚠️ A count of ZERO means the blob is the count word and NOTHING ELSE - 4 bytes, not 24 (#818). This is
+			// the same trap the comment above describes, one step further on: #811 established the leading word is a
+			// count rather than the constant 1, but only 1 and 2 were in the corpus, so reading an entry
+			// unconditionally still looked safe. White Sands Night (10803) sends 0, and reading the absent entry threw
+			// - which is how the whole playfield went missing from the spawn harvest.
+			var blobToken = proxy.InstanceToken;
+			var blobFloat1 = 0f;
+			var blobFloat2 = 0f;
+			var blobLastWord = 0u;
+			var blobTail = Array.Empty<byte>();
+			if (sceneEntries > 0)
+			{
+				blobToken = blob.ReadU32Be(); // the token again, inside the blob
+				blob.ExpectU32Be(SceneBlobWord2, "scene blob word 2");
+				blobFloat1 = blob.ReadF32Be(); // 15.0 in all 218 captured bodies
+				blobFloat2 = blob.ReadF32Be(); // 0.053 .. 14.796, always below it
+				blobLastWord = blob.ReadU32Be(); // beach capture carries 0x3, retail Old Tarantia 0x0
+				blobTail = blob.ReadRemaining().ToArray();
+			}
+
+			blob.EnsureAtEnd();
 
 			r.ExpectU32Be(TrailerSentinel, "trailer word obj+0x80");
 			r.ExpectU32Be(TrailerSentinel, "trailer word obj+0x84");
@@ -135,7 +156,10 @@ namespace Faolan.Core.Network.Codecs.World
 		internal static void Write(FaolanStream s, PlayfieldFIIR v)
 		{
 			using var blob = new FaolanStream();
-			blob.WriteUInt32(v.SceneEntries).WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.BlobFloat1).WriteFloat(v.BlobFloat2).WriteUInt32(v.BlobLastWord).WriteArray(v.SceneBlobTail ?? []);
+			blob.WriteUInt32(v.SceneEntries);
+			// A zero-entry blob is the count word alone - see Read.
+			if (v.SceneEntries > 0)
+				blob.WriteUInt32(v.Proxy.InstanceToken).WriteUInt32(SceneBlobWord2).WriteFloat(v.BlobFloat1).WriteFloat(v.BlobFloat2).WriteUInt32(v.BlobLastWord).WriteArray(v.SceneBlobTail ?? []);
 
 			s.WriteUInt32(Opcode).WriteUInt32(v.ClassWord).WriteUInt32(v.Handle).WriteByte(v.Env).WriteVector3(v.Position);
 			v.Proxy.Write(s);

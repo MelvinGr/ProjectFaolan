@@ -88,8 +88,11 @@ namespace Faolan.Importer.Extractors
 
 				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					if (p.TryParse(PlayfieldFCodec.Parse, out var change))
-						currentMap = change.MapId;
+					// ⚠️ A MapChange we cannot READ must clear the map, never leave the previous one standing (#818).
+					// Keeping it silently re-attributes everything that follows to the playfield the player just LEFT:
+					// when PlayfieldFCodec refused the zero-scene-entry body, White Sands Night's NPCs were imported
+					// as City of Tortage Night spawns, and the row counts looked like a healthy +50.
+					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) ? change.MapId : 0;
 					continue;
 				}
 
@@ -117,10 +120,8 @@ namespace Faolan.Importer.Extractors
 			{
 				if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
 				{
-					if (!p.TryParse(PlayfieldFCodec.Parse, out var change))
-						continue;
-
-					currentMap = change.MapId;
+					// Clear rather than keep the previous map on an unreadable MapChange - see Extract (#818).
+					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) ? change.MapId : 0;
 					sawPoll = false;
 					continue;
 				}
