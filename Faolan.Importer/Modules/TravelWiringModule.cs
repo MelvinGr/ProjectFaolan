@@ -110,7 +110,7 @@ namespace Faolan.Importer.Modules
 				if (ctx.ModeFor(Name) == WriteMode.Insert)
 					continue;
 
-				// ⚠️ A row sourced from a `{teleportplayer}` DIRECTIVE is not refreshed from the wire (#820). The two
+				// ⚠️ A row sourced from a `{teleportplayer}` DIRECTIVE is not refreshed from the wire (#821). The two
 				// state different things about the same trip: the directive is the decoded grammar
 				// (`{teleportplayer <x> <z> [y <y>] <map>}`, where a MISSING height means ground-snap at run time and
 				// is stored as a NULL Y), while an n3Teleport states one session's actual arrival. Overwriting the

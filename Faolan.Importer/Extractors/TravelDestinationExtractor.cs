@@ -131,7 +131,7 @@ namespace Faolan.Importer.Extractors
 					found.Add(new Entry(name, fromContentKey, optionId, trip.DestinationMapId, spentInConversation, trip.X, trip.Y, trip.Z));
 				}
 
-				// The CHANGEMAP-shaped trip (#820). A wagoneer's ride is a `Local=1` GameActionList and stays on the
+				// The CHANGEMAP-shaped trip (#821). A wagoneer's ride is a `Local=1` GameActionList and stays on the
 				// same server; the Destiny day/night switch is not that at all - picking Tina's
 				// "(Night - Single Player)" sends a scry script, an IntendedTeleport, an n3Teleport and a
 				// DispatchRedirectToServer, i.e. a full playfield change. Both are nonetheless "this dialogue branch
