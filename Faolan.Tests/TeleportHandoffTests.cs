@@ -97,5 +97,56 @@ namespace Faolan.Tests
 			Assert.Equal((byte)0x01, parsed.Trailing);
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
 		}
+
+		// #814: the spawn blob's SECOND arm - the arrival stated as a spawn-point NAME with no coordinates on the wire.
+		// xxx_mage-necromancer_login_play3 frame 4735: the Tortage harbour rowboat into White Sands Night (10803),
+		// which is the ACG/instanced travel path and the only capture of it in the corpus. This body was REFUSED before
+		// the fix, because the codec asserted the 0x00018704 tag that the other 94 captured blobs happen to carry.
+		[Fact]
+		public void ParseCrossMapDestBody_ReadsANamedSpawnPointArm()
+		{
+			var captured = Convert.FromHexString(
+				"5a32f0d70000c35001317cf8000000000000000000000000000000000000000000000000003f800000620000c7a600002a3300000000007c7568000000000000000100009c5001ef143e00000000000000000000000016000187060010506c61796572537061776e506f696e7400");
+
+			var parsed = Assert.IsType<N3TeleportIIR>(TeleportCodec.Parse(captured));
+
+			var point = Assert.IsType<N3TeleportSpawnPoint>(parsed.Spawn);
+			Assert.Equal("PlayerSpawnPoint", point.Name);
+			Assert.Equal(10803u, parsed.Proxy.MapId); // White Sands Night
+			// The record states no coordinates, and the leading transform is genuinely zero - so the arrival must read
+			// as ABSENT rather than as the origin.
+			Assert.Null(parsed.ArrivalPosition);
+			Assert.Equal(Vector3.Zero, parsed.Position);
+			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
+		}
+
+		// The positional arm still round-trips unchanged, and still reports its arrival - the same session's inn
+		// zone-line into City of Tortage Night (play3 frame 758), 6 minutes before the rowboat above.
+		[Fact]
+		public void ParseCrossMapDestBody_StillReadsThePositionalArm()
+		{
+			var captured = Convert.FromHexString(
+				"5a32f0d70000c35001317cf8000000000000000000000000000000000000000000000000003f800000620000c79c00000fb6000000026bb0704c000000000000000100009c5001ef14240000000000000000000000001400018704425c0000431e000042e20000ffffffff00");
+
+			var parsed = Assert.IsType<N3TeleportIIR>(TeleportCodec.Parse(captured));
+
+			var at = Assert.IsType<N3TeleportSpawnPosition>(parsed.Spawn);
+			Assert.Equal(new Vector3(55f, 158f, 113f), at.Position);
+			Assert.Equal(0xFFFFFFFFu, at.Descriptor);
+			Assert.Equal(new Vector3(55f, 158f, 113f), parsed.ArrivalPosition);
+			Assert.Equal(4022u, parsed.Proxy.MapId); // City of Tortage Night
+			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(TeleportCodec.Build(parsed)));
+		}
+
+		// An unknown tag must still be REFUSED rather than read past - the fix widens the grammar to the arm retail
+		// actually sends, it does not make the blob tolerant.
+		[Fact]
+		public void ParseCrossMapDestBody_RejectsAnUnknownSpawnBlobTag()
+		{
+			var captured = Convert.FromHexString(
+				"5a32f0d70000c35001317cf8000000000000000000000000000000000000000000000000003f800000620000c79c00000fb60000000226bb704c000000000000000100009c5001ef14240000000000000000000000001400018799425c0000431e000042e20000ffffffff00");
+
+			Assert.Throws<CodecParseException>(() => TeleportCodec.Parse(captured));
+		}
 	}
 }

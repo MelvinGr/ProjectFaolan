@@ -20,6 +20,14 @@ namespace Faolan.Core.Enums
 		Redeem = 0x0003, // c2s: redeem the 1-based claim index
 		RedeemAck = 0x0005, // s2c: multi-charge redeem ack (one entry, decremented amount)
 		Request = 0x0007, // c2s: "send me my claims"
-		NewClaims = 0x0009 // s2c: the "you have new claims" glow on the Claims button
+		NewClaims = 0x0009, // s2c: the "you have new claims" glow on the Claims button
+
+		// c2s, payload-less, and refused outright until #816. The name records the POSITION it was observed in, not a
+		// decoded meaning [V0]: the client sends it 0.0s after the server's List lands and ~20s BEFORE any Redeem, so
+		// it is not the redeem itself. n=1 in the whole corpus (xxx_mage-necromancer_login_play4 frame 11237, the only
+		// capture of a claims window being opened rather than replayed), so treat the reading as unconfirmed - what IS
+		// certain is the shape, because the length word states it. Nothing followed it on the wire and the client went
+		// on to redeem four claims normally, so ignoring it inbound is what retail's own client tolerates.
+		ListAck = 0x000A
 	}
 }

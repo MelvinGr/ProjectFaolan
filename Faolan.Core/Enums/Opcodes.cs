@@ -723,6 +723,8 @@ namespace Faolan.Core.Enums
 		QuestGoalIIR = 0x0774C8C1, // QuestGoalIIR_c  (x27)
 		QuestIIR = 0x97E02314, // QuestIIR_c  (x34) - "DeleteQuest"
 		QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
+		QuestRewardNotifyIIR = 0x8BB2799C, // QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward OFFER, and its confirm (#815)
+		QuestRewardSelectionIIR = 0x80138D7B, // QuestRewardSelectionIIR_c - c2s: the reward the player picked (#815)
 		// MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel. Named QuestLogListIIR here until
 		// #545, which is a name we INVENTED (BKDR-31("QuestLogListIIR") == 0xB80D3852, not this id); the client's own
 		// class name hashes exactly, and its Activate() switch is what the leading word selects.

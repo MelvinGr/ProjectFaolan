@@ -78,6 +78,11 @@ namespace Faolan.Core.Network.Codecs.World
 					return new CoreClaimRequestIIR(handle);
 				}
 
+				case CoreClaimSubOpcode.ListAck:
+				{
+					return new CoreClaimListAckIIR(handle);
+				}
+
 				case CoreClaimSubOpcode.Redeem:
 				{
 					return new CoreClaimRedeemIIR(handle, r.ReadU32Be());
@@ -209,6 +214,13 @@ namespace Faolan.Core.Network.Codecs.World
 	public sealed record CoreClaimRequestIIR(uint Handle) : CoreClaimIIR(Handle)
 	{
 		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.Request;
+	}
+
+	// sub 0x000A c2s - no payload; sent immediately after the List lands and before any Redeem. See
+	// CoreClaimSubOpcode.ListAck for why the name states the position rather than a decoded meaning.
+	public sealed record CoreClaimListAckIIR(uint Handle) : CoreClaimIIR(Handle)
+	{
+		public override CoreClaimSubOpcode Sub => CoreClaimSubOpcode.ListAck;
 	}
 
 	// sub 0x0003 c2s - redeem the 1-based claim index into the last-sent list.

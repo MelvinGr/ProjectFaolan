@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**81** IIR carrier types · **70 V3** (70 with an auto-cited golden). The
+**83** IIR carrier types · **72 V3** (72 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -67,6 +67,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestGoalIIR` | `0x0774C8C1` | `QuestGoalCodec` | [V3: QuestTests.BuildQuestGoal_MatchesCapture] |
 | V3 | `QuestIIR` | `0x97E02314` | `QuestCodec` | [V3: QuestTests.BuildQuestIir_MatchesCapture] |
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `QuestJournalCodec` | [V3: QuestTests.BuildQuestJournal_MatchesCasildaCapture] |
+| V3 | `QuestRewardNotifyIIR` | `0x8BB2799C` | `QuestRewardNotifyCodec` | [V3: QuestRewardCodecTests.ParseOffer_ReadsTheThreeOptionsAndRoundTrips] |
+| V3 | `QuestRewardSelectionIIR` | `0x80138D7B` | `QuestRewardSelectionCodec` | [V3: QuestRewardCodecTests.ParseSelection_ReadsTheChosenIndexAndRoundTrips] |
 | V3 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` | [V3: CreateEditorRecordTests.RegenIir_MatchesCapturedBytes] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScriptCodec` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |

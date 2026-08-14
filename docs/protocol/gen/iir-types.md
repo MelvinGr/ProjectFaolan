@@ -15,7 +15,7 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **81** ids: client type name recovered + BKDR-31-verified.
+- **83** ids: client type name recovered + BKDR-31-verified.
 
 | Type id | Recovered client name | Our enum name | Note |
 |---------|-----------------------|---------------|------|
@@ -67,8 +67,10 @@ external doc; the enum + the hash function are the whole source.
 | `0x737A6DF9` | `FullPlayerCharacterIIR` ✓ | `FullPlayerCharacterIIR` | FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below |
 | `0x7446F3FA` | `KnubotFinishTradeIIR_c` ✓ | `KnubotFinishTradeIIR` | KnubotFinishTradeIIR_c  (x2) |
 | `0x79F8C7A1` | `QuestJournalIIR_c` ✓ | `QuestJournalIIR` | QuestJournalIIR_c  (x17) |
+| `0x80138D7B` | `QuestRewardSelectionIIR_c` ✓ | `QuestRewardSelectionIIR` | QuestRewardSelectionIIR_c - c2s: the reward the player picked (#815) |
 | `0x864CFEF8` | `CharInPlayIIR_t` ✓ | `CharInPlayIIR` | CharInPlayIIR_t  (x74) - "ReadyForPlayScreen" |
 | `0x8A01E5A1` | `HateListUpdateIIR` ✓ | `HateListUpdateIIR` | HateListUpdateIIR  (x61) |
+| `0x8BB2799C` | `QuestRewardNotifyIIR_c` ✓ | `QuestRewardNotifyIIR` | QuestRewardNotifyIIR_c - s2c: the pick-one-of-N reward OFFER, and its confirm (#815) |
 | `0x8D5A8B6B` | `FormatFeedbackIIR_t` ✓ | `FormatFeedbackIIR` | FormatFeedbackIIR_t  (x68) |
 | `0x9062D559` | `TradeskillReplyIIR_c` ✓ | `TradeskillReplyIIR` | TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94) |
 | `0x96B8DC59` | `StatUpdateIIR_c` ✓ | `StatUpdateIIR` | StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/re/quests-and-combat.md |

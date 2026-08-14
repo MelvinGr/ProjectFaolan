@@ -498,7 +498,13 @@ namespace Faolan.Importer.Cli
 				{
 					var teleport = TeleportCodec.Parse(content);
 					var destination = teleport.Proxy.MapId;
-					var where = teleport is N3TeleportIIR n3 ? $" to {Pos(n3.ArrivalPosition)}" : "";
+					// A named arrival ships no coordinates - print the spawn point the destination playfield resolves.
+					var where = teleport switch
+					{
+						N3TeleportIIR { Spawn: N3TeleportSpawnPoint point } => $" to spawn point \"{point.Name}\"",
+						N3TeleportIIR { ArrivalPosition: { } arrival } => $" to {Pos(arrival)}",
+						_ => ""
+					};
 					return $"teleport{where} on playfield {destination}"
 					       + (look.Maps.TryGetValue(destination, out var mapName) ? $" \"{mapName}\"" : "");
 				}
@@ -600,6 +606,25 @@ namespace Faolan.Importer.Cli
 					return $"{spots.Spots.Count} resurrection spot(s) from {Pos(spots.ReferencePosition)}";
 				}
 
+				// The pick-one-of-N reward exchange (#815). The offer names each option through the item catalog, so a
+				// reward list reads as the three weapons the player was actually shown rather than three template ids.
+				case "QuestRewardNotifyIIR":
+				{
+					var notify = QuestRewardNotifyCodec.Parse(content);
+					if (notify.Options.Count == 0)
+						return $"quest {notify.QuestId} reward confirmed";
+
+					var options = notify.Options.Select(o =>
+						look.Items.TryGetValue(o.ItemTemplateId, out var name) ? $"\"{name}\"" : $"template {o.ItemTemplateId}");
+					return $"quest {notify.QuestId} offers {notify.Options.Count} reward(s): {string.Join(" | ", options)}";
+				}
+
+				case "QuestRewardSelectionIIR":
+				{
+					var pick = QuestRewardSelectionCodec.Parse(content);
+					return $"picks reward {pick.Index} for quest {pick.QuestId}";
+				}
+
 				case "CoreClaimIIR":
 				{
 					return CoreClaimCodec.Parse(content) switch
@@ -607,6 +632,10 @@ namespace Faolan.Importer.Cli
 						CoreClaimListIIR list => $"{list.Claims.Count} claim(s) available",
 						CoreClaimRedeemAckIIR ack => $"claim {ack.Claim.Index} redeemed"
 						                             + (look.Items.TryGetValue(ack.Claim.ItemTemplateId, out var claimed) ? $" = \"{claimed}\"" : ""),
+						CoreClaimRedeemIIR redeem => $"redeem claim {redeem.Index}",
+						CoreClaimRequestIIR => "requests the claim list",
+						CoreClaimListAckIIR => "claim list received",
+						CoreClaimLoginCounterIIR counter => $"login counter {counter.Value}",
 						_ => "new claims"
 					};
 				}

@@ -47,7 +47,16 @@ namespace Faolan.Core.Network.Codecs.World
 		// The IIR types this codec constructs or parses.
 		public static readonly IirTypes[] HandledTypes = [IirTypes.IntendedTeleportIIR, IirTypes.N3TeleportIIR];
 
-		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
+		// The length-prefixed spawn blob is itself TAGGED, and its first word says which arm follows (#814). #809
+		// settled that n3Teleport is one grammar and that the "two forms" are only whether this blob is present; what
+		// it did not cover is that a PRESENT blob still has two shapes. 0x…04 states the arrival as literal
+		// coordinates; 0x…06 states it as a spawn-point NAME and ships no coordinates at all, leaving the destination
+		// playfield to resolve it. Corpus census over 144 records: 94 carry 0x…04, 49 carry no blob, 1 carries 0x…06.
+		// That one is the ACG/instanced travel arrival (the Tortage harbour rowboat into White Sands Night,
+		// xxx_mage-necromancer_login_play3 frame 4735) - and play3 is the first capture to contain the ACG teleport
+		// flow at all, so the named arm is 1-of-1 within its own population rather than a rarity within a captured one.
+		private const uint SpawnPositionTag = 0x00018704; // arm A: [Vector3 position][u32 descriptor]
+		private const uint SpawnPointNameTag = 0x00018706; // arm B: [u16 len][latin1 spawn-point name]
 
 		// The revive body's proxy uses this class word instead of PlayfieldProxy.PlayfieldClass; which of
 		// 0xC79C/0xC79E/0xC7A0 a packet carries is per-PACKET and undecoded (see ResurrectionSpotsBody).
@@ -96,7 +105,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			// The arrival transform stays zero/identity: a cross-map announce states its arrival in the blob.
 			return Build(new N3TeleportIIR(clientInstance, 0x00, Vector3.Zero, Quaternion.Identity,
-				PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken), new N3TeleportSpawn(position, destDescriptor)));
+				PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken), new N3TeleportSpawnPosition(position, destDescriptor)));
 		}
 
 		// The SAME-MAP destination announce: the n3Teleport (0x5A32F0D7) that actually relocates the player on their
@@ -144,16 +153,21 @@ namespace Faolan.Core.Network.Codecs.World
 			r.ExpectU32Be(0, "obj+0x6c");
 			r.ExpectU32Be(0, "obj+0x70");
 
-			// The spawn blob's LENGTH says whether this announce carries one - 20 bytes on a cross-map arrival, 0 on a
-			// same-map relocate, which states its arrival in the leading transform instead.
+			// The spawn blob's LENGTH says whether this announce carries one - 0 on a same-map relocate, which states
+			// its arrival in the leading transform instead. A present blob then names its own arm in its first word.
 			var blobBytes = r.ReadBytesU32Length();
 			N3TeleportSpawn? spawn = null;
 			if (!blobBytes.IsEmpty)
 			{
-				var blob = new SpanReader(blobBytes, nameof(TeleportCodec) + ".positionBlob");
-				blob.ExpectU32Be(PositionBlobTag, "spawn-position blob tag");
-				var position = blob.ReadVector3Be();
-				spawn = new N3TeleportSpawn(position, blob.ReadU32Be());
+				var blob = new SpanReader(blobBytes, nameof(TeleportCodec) + ".spawnBlob");
+				var tagOffset = blob.Position;
+				var tag = blob.ReadU32Be();
+				spawn = tag switch
+				{
+					SpawnPositionTag => new N3TeleportSpawnPosition(blob.ReadVector3Be(), blob.ReadU32Be()),
+					SpawnPointNameTag => new N3TeleportSpawnPoint(blob.ReadStringU16Length()),
+					_ => throw CodecParseException.Unexpected(nameof(TeleportCodec), tagOffset, "a spawn-blob tag (0x00018704 position or 0x00018706 named)", $"0x{tag:X8}")
+				};
 				blob.EnsureAtEnd();
 			}
 
@@ -175,8 +189,16 @@ namespace Faolan.Core.Network.Codecs.World
 				case N3TeleportIIR dest:
 				{
 					using var blob = new FaolanStream();
-					if (dest.Spawn is { } spawn)
-						blob.WriteUInt32(PositionBlobTag).WriteVector3(spawn.Position).WriteUInt32(spawn.Descriptor);
+					switch (dest.Spawn)
+					{
+						case N3TeleportSpawnPosition at:
+							blob.WriteUInt32(SpawnPositionTag).WriteVector3(at.Position).WriteUInt32(at.Descriptor);
+							break;
+
+						case N3TeleportSpawnPoint named:
+							blob.WriteUInt32(SpawnPointNameTag).WriteString(named.Name);
+							break;
+					}
 
 					s.WriteUInt32(IirTypes.N3TeleportIIR)
 						.WriteUInt32(EntityClass.Character)
@@ -213,11 +235,27 @@ namespace Faolan.Core.Network.Codecs.World
 	public sealed record N3TeleportIIR(uint ClientInstance, byte Env, Vector3 Position, Quaternion Rotation, PlayfieldProxy Proxy,
 		N3TeleportSpawn? Spawn = null, byte Trailing = 0) : TeleportIIR(ClientInstance, Env, Proxy)
 	{
-		/// <summary>Where the player actually arrives, from whichever of the two slots this announce used.</summary>
-		public Vector3 ArrivalPosition => Spawn?.Position ?? Position;
+		/// <summary>
+		/// Where the player actually arrives, from whichever slot this announce used - null when the record does not
+		/// state one in coordinates at all, which is a NAMED spawn point the destination playfield has to resolve.
+		/// Callers must handle that rather than substituting the zero vector: the leading transform really is
+		/// (0,0,0) on a cross-map announce, so a fallback would be indistinguishable from a genuine origin arrival.
+		/// </summary>
+		public Vector3? ArrivalPosition => Spawn switch
+		{
+			N3TeleportSpawnPosition at => at.Position,
+			N3TeleportSpawnPoint => null,
+			_ => Position
+		};
 	}
 
-	// The length-prefixed spawn-position blob (tag 0x00018704) a CROSS-MAP announce carries. `Descriptor` is a
-	// per-zone word (0x14 on map 2010, 0xBE on map 2000) not yet derivable from the data - #665.
-	public sealed record N3TeleportSpawn(Vector3 Position, uint Descriptor);
+	// The length-prefixed spawn blob a CROSS-MAP announce carries, in whichever of its two tagged arms (#814).
+	public abstract record N3TeleportSpawn;
+
+	// Arm 0x00018704 - the arrival stated as literal coordinates. `Descriptor` is a per-zone word (0x14 on map 2010,
+	// 0xBE on map 2000, 0xFFFFFFFF on the Tortage inn zone-line) not yet derivable from the data - #665.
+	public sealed record N3TeleportSpawnPosition(Vector3 Position, uint Descriptor) : N3TeleportSpawn;
+
+	// Arm 0x00018706 - the arrival stated as a spawn-point NAME ("PlayerSpawnPoint"), with no coordinates on the wire.
+	public sealed record N3TeleportSpawnPoint(string Name) : N3TeleportSpawn;
 }

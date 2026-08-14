@@ -155,13 +155,15 @@ namespace Faolan.Importer.Extractors
 							: currentMap;
 					}
 
-					// A cross-map record states its arrival in the position blob; a same-map one carries it inline, and
-					// an all-zero inline slot means the record does not name one.
+					// A cross-map record states its arrival in the spawn blob; a same-map one carries it inline, and
+					// an all-zero inline slot means the record does not name one. A NAMED spawn point (#814) states no
+					// coordinates at all, so there is no arrival to harvest and the link is skipped rather than
+					// recorded at the origin - a TeleportLink exists to carry the destination coordinates.
 					// The box only counts as this trip's confirmation when it named the map the trip then went to -
 					// otherwise it belongs to something else that happened in the window.
-					if (destMap != 0 && (arrive.Spawn != null || arrive.Position != Vector3.Zero))
+					if (destMap != 0 && arrive.ArrivalPosition is { } arrival && (arrive.Spawn != null || arrival != Vector3.Zero))
 					{
-						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrive.ArrivalPosition.X, arrive.ArrivalPosition.Y, arrive.ArrivalPosition.Z, confirmMapId == destMap
+						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, arrival.X, arrival.Y, arrival.Z, confirmMapId == destMap
 							? confirmKey
 							: ""));
 					}

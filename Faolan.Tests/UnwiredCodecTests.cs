@@ -35,7 +35,9 @@ namespace Faolan.Tests
 			["KnubotStartTradeCodec"] = "the NPC trade window is not implemented",
 			["KnubotFinishTradeCodec"] = "the NPC trade window is not implemented",
 			["ClientAddGuildRenownCodec"] = "guild renown is never awarded, so nothing calls it",
-			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it"
+			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it",
+			["QuestRewardNotifyCodec"] = "quest reward CHOICE is decoded but not wired - nothing offers a reward list or grants the pick yet (#815)",
+			["QuestRewardSelectionCodec"] = "the c2s half of the same unwired exchange - no handler consumes the player's pick yet (#815)"
 		};
 
 		// LockedToChanged came OFF the list in the same pass that wrote it (#405): retail sends it in the NPC-aggro
