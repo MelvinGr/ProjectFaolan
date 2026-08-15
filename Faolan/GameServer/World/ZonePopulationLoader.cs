@@ -302,13 +302,15 @@ namespace Faolan.GameServer.World
 				//     unique across all 1,208 templates where the generic idle 42024 is shared by 1,008. It ships in
 				//     the spawn record, so every stream-in re-asserted the chains no matter what BCC pose followed;
 				//     she stood up the moment the record carried the ordinary idle.
-				//   * the MODE. She has no patrol route, so she fell through to her type's stored mode 2 = RUN while
-				//     the server steps a follower at walk pace - the client ran the gap and got corrected, which is
-				//     what "sliding / teleporting over the floor" was. An escort walks (#714, mode 1).
-				//
 				// Built here rather than at the rescue because this is where the row is in hand.
+				//
+				// ⚠️ The MODE is deliberately left as the type's (mode 2, run) and is NOT forced to walk. Forcing walk
+				// was tried and made things worse: a follower is stepped by the server at `NpcMoveSpeed` (7 u/s, the
+				// chase constant) while the client animates at the per-mode speed from ITS OWN template data (#714), so
+				// walk mode widened the gap the 6-unit segment broadcast then closes by snapping her forward. The
+				// remaining slide is that same server-step vs client-speed mismatch and is NOT fixed here - see #829.
 				if (entity.IsQuestEscortee)
-					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, SpawnPostIirs.MovementModeWalk, GenericIdleAnimationId);
+					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
