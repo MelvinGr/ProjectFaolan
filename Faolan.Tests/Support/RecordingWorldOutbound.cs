@@ -120,6 +120,11 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
+		public Task BroadcastNpcFollow(WorldEntity npc, WorldEntity leader)
+		{
+			return Task.CompletedTask;
+		}
+
 		public Task BroadcastNpcPatrol(WorldEntity npc)
 		{
 			return Task.CompletedTask;

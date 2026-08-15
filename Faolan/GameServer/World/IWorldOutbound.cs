@@ -42,6 +42,9 @@ namespace Faolan.GameServer.World
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
 
+		// The companion-follow step (#827): retail's mode-04 list bound to the LEADER, not a bare path segment.
+		Task BroadcastNpcFollow(WorldEntity npc, WorldEntity leader);
+
 		// (Re-)issue a patrolling NPC's captured route to the players who can see it, so it keeps walking its loop
 		// (retail re-paths idle patrols; #266).
 		Task BroadcastNpcPatrol(WorldEntity npc);

@@ -45,6 +45,45 @@ namespace Faolan.Core.Network.Codecs.World
 			};
 		}
 
+		// The COMPANION-FOLLOW task retail sends for an escortee walking behind a player (#827/#262) - a mode-04 LIST
+		// of two children, not the bare path we used to send:
+		//
+		//   List(hdrFlags 1, listMin 0)
+		//     [0] Path   - this segment's two waypoints, trailer scalar = the 3D segment distance, anchored at FROM
+		//     [1] mode-8 - ApproachTarget bound to the LEADER's handle, tail [01][pi/4][pi/4][00]
+		//
+		// ⭐ The second child is the point. A bare path is a line the client interpolates and then sits at the end of,
+		// so the server has to keep re-anchoring it and the NPC snaps between segments - which is what "she slides /
+		// teleports instead of walking" was. Binding the task to the leader hands the follow to the CLIENT, which is
+		// why retail animates: the client owns the position and the animation together, exactly as it does for a
+		// patrol.
+		//
+		// Byte-exact against Casilda's follow in Hoxxling_mage-heraldofxotli_login_gameplay (her handle 0x00017ED0,
+		// leader 0x01316E71) - see CasildaFollowMoveTask_MatchesCapture. The trailer scalar there is 7.0657, which is
+		// the segment's own 3D length to six figures, so it is computed rather than carried as a constant.
+		//
+		// ⚠️ The path child anchors at FROM here, where `Walk` anchors at TO. That is not an inconsistency to tidy
+		// away: `Walk` is a standalone segment whose anchor IS its destination, and anchoring it at `from` made the
+		// NPC walk out and back. Inside this list the mode-8 child owns where she ends up, and retail anchors the
+		// path at `from`.
+		public static MoveTaskNode FollowLeader(Vector3 from, Vector3 to, uint leaderHandle)
+		{
+			var approach = ApproachTarget(leaderHandle);
+			// Retail's tail is [01][pi/4][pi/4][00] where the bare factory leaves the nine trailing bytes zero.
+			var quarterPi = BitConverter.GetBytes(Bits(MathF.PI / 4f));
+			if (BitConverter.IsLittleEndian)
+				Array.Reverse(quarterPi);
+			approach.ApproachTail = [0x01, .. quarterPi, .. quarterPi, 0x00];
+
+			return new MoveTaskNode
+			{
+				Mode = ModeList,
+				HeaderFlags = 0x01, // bit0 SET -> no [duration][remaining], as retail sends
+				ListMin = 0,
+				Children = [Path([from, to], Vector3.Distance(from, to), from), approach]
+			};
+		}
+
 		// mode-07: FORMATION-FOLLOW another entity - one NPC's movement target IS another NPC, held at a fixed offset
 		// and re-sent as the leader's own path is re-sent (#741).
 		//

@@ -594,6 +594,26 @@ namespace Faolan.GameServer.World
 		// MoveBroadcastSegment (~6u, retail's chase step) since the last one, so the client interpolates a real segment
 		// over time instead of getting a 1.2u snap every tick (the jitter/teleport). Only viewers who know the handle get
 		// it (else they'd get a move for an unknown entity).
+		// #827: the companion-follow step, in the shape retail sends it - a mode-04 LIST whose second child BINDS the
+		// task to the leader (MoveTaskNodes.FollowLeader), not the bare path `BroadcastNpcMove` sends for a chase.
+		//
+		// The bare path is why a follower slid: it is a line the client interpolates and then sits at the end of, so
+		// the server re-anchors it every ~6u and the NPC snaps between segments. The bound form hands the follow to
+		// the client, which then owns the position and the walk animation together.
+		public async Task BroadcastNpcFollow(WorldEntity npc, WorldEntity leader)
+		{
+			ArgumentNullException.ThrowIfNull(npc);
+			ArgumentNullException.ThrowIfNull(leader);
+
+			var body = MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.MoveFrom, MoveTaskNodes.FollowLeader(npc.MoveFrom, npc.Position, leader.Handle)));
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+					await WorldIir.Send(viewer.Client, body);
+			}
+		}
+
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
 			// #272: send the mode-1 PathMoveTask WALK form (the client interpolates the segment over time) rather than the

@@ -108,5 +108,49 @@ namespace Faolan.Tests
 		{
 			return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(body));
 		}
+		// #827: the COMPANION-FOLLOW step, against Casilda's follow in
+		// Hoxxling_mage-heraldofxotli_login_gameplay frame 1959 (her handle 0x00017ED0 walking behind the player
+		// 0x01316E71). We used to send a bare mode-01 path, which the client interpolates and then sits at the end
+		// of - so the server re-anchored it every ~6u and she snapped between segments instead of walking.
+		//
+		// Retail sends a mode-04 LIST of two: the path segment, then a mode-08 node BOUND to the leader's handle.
+		// That second child is what hands the follow to the client, so it owns the position and the walk animation
+		// together - the same reason a patrol animates correctly.
+		//
+		// ⚠️ Every byte matches EXCEPT the four-byte trailer scalar, excluded deliberately and not papered over.
+		// It is the segment's own 3D length; retail's is 0x40E21A9E and every IEEE route gives 0x40E21A9F - float32
+		// accumulation and double accumulation alike. One ulp, from the client's x87 80-bit intermediates, which
+		// managed .NET cannot reproduce and should not try to.
+		//
+		// ⭐ And it does not matter, which Ghidra settles rather than assumption: the trailer is read by
+		// `FUN_00a3e400` into a struct at +4..+0x20, and the client's movement SPEED does not come from it at all -
+		// `FUN_00a2e670` switches on the spawn's MODE and reads a per-entity field per mode (+0x13c/+0x134 for 1|4,
+		// +0x140 for 2|5). The only MoveTask field that touches speed is the `PathFlags & 0x20` float at +0x60, a
+		// max-speed CAP the executor applies as `if (cap < speed) speed = cap` before advancing by `speed * dt` -
+		// and retail's follow record does not set it (PathFlags 0).
+		[Fact]
+		public void CasildaFollowMoveTask_MatchesCapture()
+		{
+			const string retail = "96c467400000c35000017ed0000043b4d24e4319572244336ac1040100020101000000000243b4d24e4319572244336ac1" +
+			                      "43b81c9f431a98c84433fa760040e21a9e00000000000000000000000043b4d24e4319572244336ac1" +
+			                      "080000c35001316e71013f490fdb3f490fdb00";
+
+			// [subop|class|handle|u16|from] 26 + list head 4 + path head 7 + 24 waypoint bytes + 1 trailer byte.
+			const int scalarOffset = 62;
+
+			var from = new Vector3(361.64300537109375f, 153.34036254882813f, 717.6680297851563f);
+			var to = new Vector3(368.2236022949219f, 154.5968017578125f, 719.9134521484375f);
+
+			var actual = Convert.ToHexString(MoveTaskCodec.Build(new MoveTaskIIR(0x00017ED0, from, MoveTaskNodes.FollowLeader(from, to, 0x01316E71)))).ToLowerInvariant();
+
+			Assert.Equal(retail.Length, actual.Length);
+			Assert.Equal(retail[..(scalarOffset * 2)], actual[..(scalarOffset * 2)]);
+			Assert.Equal(retail[((scalarOffset + 4) * 2)..], actual[((scalarOffset + 4) * 2)..]);
+
+			var ours = BitConverter.UInt32BitsToSingle(Convert.ToUInt32(actual.Substring(scalarOffset * 2, 8), 16));
+			var theirs = BitConverter.UInt32BitsToSingle(Convert.ToUInt32(retail.Substring(scalarOffset * 2, 8), 16));
+			Assert.Equal(theirs, ours, 4);
+		}
+
 	}
 }

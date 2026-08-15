@@ -54,6 +54,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcMove(npc);
 		}
 
+		Task IWorldOutbound.BroadcastNpcFollow(WorldEntity npc, WorldEntity leader)
+		{
+			return _broadcaster.BroadcastNpcFollow(npc, leader);
+		}
+
 		Task IWorldOutbound.BroadcastNpcPatrol(WorldEntity npc)
 		{
 			return _broadcaster.BroadcastNpcPatrol(npc);

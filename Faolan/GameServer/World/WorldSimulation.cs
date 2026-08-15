@@ -915,7 +915,14 @@ namespace Faolan.GameServer.World
 
 								case WorldTickEffectType.NpcFollow:
 								{
-									await _output.BroadcastNpcMove(effect.Entity); // companion-follow step - ungated (not combat), #262
+									// #827: bound to the LEADER, which is what makes the client walk her rather than
+									// interpolate a bare segment and be re-anchored. Falls back to the plain step if the
+									// leader is somehow gone by the time the effect is drained.
+									if (effect.Target is { } leader)
+										await _output.BroadcastNpcFollow(effect.Entity, leader);
+									else
+										await _output.BroadcastNpcMove(effect.Entity);
+
 									break;
 								}
 
