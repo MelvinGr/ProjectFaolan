@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
-using Faolan.Core.Rules;
+using Faolan.Core.Progression;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World

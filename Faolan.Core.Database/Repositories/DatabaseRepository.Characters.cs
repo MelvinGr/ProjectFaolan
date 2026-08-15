@@ -7,6 +7,7 @@ using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Progression;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Repositories

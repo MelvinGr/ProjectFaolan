@@ -1,4 +1,4 @@
-namespace Faolan.Core.Database
+namespace Faolan.Core.Progression
 {
 	/// <summary>
 	///     What a character's trained feats do to ONE combo (#697), summed across every feat that names it.

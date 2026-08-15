@@ -16,6 +16,7 @@ using Faolan.Core.Network.Codecs.Feats;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Progression;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Feats

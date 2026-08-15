@@ -1,4 +1,4 @@
-using Faolan.GameServer;
+using Faolan.Core.Progression;
 using Xunit;
 
 namespace Faolan.Tests

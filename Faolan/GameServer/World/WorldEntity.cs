@@ -8,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 
 namespace Faolan.GameServer.World

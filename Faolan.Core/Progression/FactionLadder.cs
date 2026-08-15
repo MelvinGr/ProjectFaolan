@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Core.Rules
+namespace Faolan.Core.Progression
 {
 	// The Khitai reputation LADDER (Gitea #310): the bounds a standing is clamped to, the neutral band, and the
 	// point thresholds a rank title is earned at.

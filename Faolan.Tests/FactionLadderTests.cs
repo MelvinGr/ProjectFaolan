@@ -1,7 +1,7 @@
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Faction;
-using Faolan.Core.Rules;
+using Faolan.Core.Progression;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using System;

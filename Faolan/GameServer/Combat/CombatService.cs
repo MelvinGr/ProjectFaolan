@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network;
+using Faolan.Core.Progression;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
