@@ -25,22 +25,22 @@ namespace Faolan.GameServer.Combat
 
 		// The combo CATALOG below this layer - consulted for the stamina price of the swing that just completed.
 		private readonly ComboService _combos;
-		private readonly KnockbackService _knockback;
+		private readonly WorldBroadcaster _broadcaster;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
 		// #710: a feat or buff aimed at the finisher's spell moves its numbers, exactly as on a manual cast.
 		private readonly SpellModifierService _spellModifiers;
 
-		public ComboFinisher(WorldSimulation sim, CombatService combat, BuffService buffs, ComboService combos,
-			SpellModifierService spellModifiers, KnockbackService knockback, ILogger logger)
+		public ComboFinisher(WorldSimulation sim, WorldBroadcaster broadcaster, CombatService combat, BuffService buffs, ComboService combos,
+			SpellModifierService spellModifiers, ILogger logger)
 		{
 			_sim = sim;
+			_broadcaster = broadcaster;
 			_combat = combat;
 			_buffs = buffs;
 			_combos = combos;
 			_spellModifiers = spellModifiers;
-			_knockback = knockback;
 			_logger = logger;
 		}
 
@@ -90,7 +90,8 @@ namespace Faolan.GameServer.Combat
 			// Aside`, `Stagger`, `Volley Backwards`. The name is the ONLY place that is stated: every one of those
 			// combos resolves to a spell with a zero duration and no stat effects, so the payload says nothing.
 			//
-			// `KnockbackService` existed with no gameplay trigger at all - a GM command was its only caller.
+			// The shove itself is `WorldBroadcaster.Knock`, which had no gameplay trigger at all before this - a GM
+			// command was its only caller.
 			await ApplyKnockback(client, swing, targetHandle);
 		}
 
@@ -108,7 +109,7 @@ namespace Faolan.GameServer.Combat
 			if (_sim.World.ZoneForEntity(caster) is not { } zone || !zone.TryGet(targetHandle, out var victim))
 				return;
 
-			if (await _knockback.Knock(victim, caster.Position))
+			if (await _broadcaster.Knock(victim, caster.Position))
 				_logger.LogInformation("Combo '{Combo}' knocked {Victim} back.", swing.Combo.Name, victim.Name);
 		}
 	}

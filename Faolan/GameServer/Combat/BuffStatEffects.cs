@@ -167,7 +167,7 @@ namespace Faolan.GameServer.Combat
 			// 370 imported rows on the floor: `Turtle Formation` +100 knockback resistance, `Phoenix Cloak` +40/+50
 			// damage deflection, and the `-20 Chance of Being Staggered` every horse's `Mounted` buff carries.
 			//
-			// KnockbackResistance is the one with a live consumer: `KnockbackService` already reads it off
+			// KnockbackResistance is the one with a live consumer: `WorldBroadcaster.Knock` already reads it off
 			// `BuffedStats` and falls back to the gear bonus, so honoring it here is what makes a knockback-resisting
 			// BUFF actually resist one rather than only a knockback-resisting item.
 			//

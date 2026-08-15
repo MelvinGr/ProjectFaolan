@@ -442,7 +442,7 @@ five of the six ladders. That is a measurement I got wrong before the gate caugh
 [V3: ComboEffectTests.TheShippedCatalog_CarriesTheKnockbackCombos]
 
 **Wired today: `knockback`.** The finisher of a knockback combo shoves its target away from the caster through
-`KnockbackService`, whose only caller before this was a GM command — the mechanism existed with no gameplay
+`WorldBroadcaster.Knock`, whose only caller before this was a GM command — the mechanism existed with no gameplay
 trigger. Six classes' ladders do it: `Shield Sweep` (Guardian), `Clobber` (Barbarian), `Ferocious Smack` (Bear
 Shaman), `Batter Aside` (Conqueror), `Stagger` (Halberdier), `Volley Backwards` (Ranger). The victim's
 `KnockbackResistance` is consulted, which is what a resisting buff now moves (#699).

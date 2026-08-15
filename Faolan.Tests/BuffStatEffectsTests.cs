@@ -270,7 +270,7 @@ namespace Faolan.Tests
 			Assert.Equal(-20, catalog.BySpellBase[3271454][0].Amount);
 		}
 
-		// KnockbackResistance is the one of the three with a LIVE consumer - `KnockbackService` reads it off
+		// KnockbackResistance is the one of the three with a LIVE consumer - `WorldBroadcaster.Knock` reads it off
 		// `BuffedStats` before falling back to the gear bonus - so honoring it is what makes a resisting BUFF resist a
 		// knockback rather than only a resisting item.
 		[Fact]

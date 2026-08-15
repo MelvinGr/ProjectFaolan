@@ -198,8 +198,6 @@ namespace Faolan.GameServer
 		private readonly EnvironmentService _environment;
 
 		// Composed collaborator: knockback - the server shoving an entity along a segment it did not walk (#496). See
-		// World/KnockbackService.cs.
-		private readonly KnockbackService _knockback;
 
 		// Composed collaborator: local travel - the NPCs who move a player for a fee (#506). See World/TravelService.cs.
 		private readonly TravelService _travel;
@@ -313,7 +311,7 @@ namespace Faolan.GameServer
 			_trade = new TradeService(database, logger, this);
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
 			_questRewards = new QuestRewardService(database, _broadcaster, this, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, _questRewards, logger);
 			_spellEffects = new SpellEffectService(database, this, logger);
@@ -346,8 +344,7 @@ namespace Faolan.GameServer
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 			_skillPoints = new SkillPointService(database, logger);
 			_environment = new EnvironmentService(database, this, logger);
-			_knockback = new KnockbackService(_simulation, _broadcaster, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id), logger);
-			_comboFinisher = new ComboFinisher(_simulation, _combat, _buffs, _combos, _spellModifiers, _knockback, logger);
+			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
 
 			InitGmCommands();
 		}

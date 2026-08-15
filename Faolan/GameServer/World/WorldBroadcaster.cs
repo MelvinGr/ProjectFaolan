@@ -142,13 +142,21 @@ namespace Faolan.GameServer.World
 		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
 		private int _nextRuntimeHandle = 0x00090000;
 
-		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler, ComboService combos)
+		// The listener's ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) -
+		// one shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
+		// knockback uses it (retail applies "Knockback immunity" in the same batch as the displacement).
+		// Null-safe for tests that construct the broadcaster without it.
+		private readonly Func<INetworkClient, uint, Task>? _applySelfBuff;
+
+		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler, ComboService combos,
+			Func<INetworkClient, uint, Task>? applySelfBuff = null)
 		{
 			_sim = sim;
 			_database = database;
 			_logger = logger;
 			_questHandler = questHandler;
 			_combos = combos;
+			_applySelfBuff = applySelfBuff;
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
@@ -802,6 +810,54 @@ namespace Faolan.GameServer.World
 		// client hasn't built). No-op solo / when the caster is unseen.
 		// Knockback (#496): shove a PLAYER from where they stand to `to`, and make everyone who can see them watch it.
 		//
+		// KNOCKBACK (#496): the server shoving an entity along a segment it did not walk. Decides WHERE the victim
+		// lands, then hands the pair of records below the job of saying so.
+		//
+		// The wire form is decoded and byte-exact; the GAMEPLAY around it is not, and the split is worth keeping in
+		// mind: the whole corpus has exactly ONE knockback, so distance, direction and how KnockbackResistance scales
+		// it are a single measurement plus a reasonable shape (see Knockback). Nothing here should be quoted as
+		// retail-confirmed except the packets it sends.
+		//
+		// ⚠️ Until #139's combo finisher wired it, nothing TRIGGERED this - a GM command was its only caller. The
+		// captured knockback came from an NPC ability, but the ApplySpell in that batch is the "Knockback immunity"
+		// guard rather than the knocking ability, so the corpus still does not say WHICH NPC abilities knock back;
+		// guessing would put a shove on attacks that never had one.
+		//
+		// Returns false when the geometry is degenerate (source and victim on the same spot) or the victim resists it
+		// outright.
+		public async Task<bool> Knock(WorldEntity victim, Vector3 source, float distance = Knockback.DefaultDistance)
+		{
+			// Read the victim's own resistance rather than assuming none - the stat exists (0x040D) and this is the
+			// one place that consults it. It is normally absent, in which case ResistanceScale returns 1.
+			var resistance = victim.BuffedStats.GetValueOrDefault(CharacterStatId.KnockbackResistance,
+				(uint)victim.GearBonuses.GetValueOrDefault(CharacterStatId.KnockbackResistance));
+
+			var to = Knockback.Resolve(source, victim.Position, distance, resistance);
+			if (to == victim.Position)
+			{
+				_logger.LogInformation("Knockback: {Victim} not displaced (resistance {Resistance}, source {Source} vs position {Pos}).", victim.Name, resistance, source, victim.Position);
+				return false;
+			}
+
+			// Ground-snap so the shove follows the terrain instead of leaving the victim at their old altitude - the
+			// difference between being pushed down a slope and being pushed into the air above it. Degrades to the
+			// unsnapped point when no terrain is loaded for the map, which is the documented no-terrain behaviour
+			// rather than a silent failure.
+			var ground = _sim.Terrain?.GroundHeight(victim.MapId, to.X, to.Z);
+			if (ground is { } y)
+				to = to with { Y = y };
+			else if (_sim.Terrain is { Available: true })
+				_logger.LogDebug("Knockback: no ground height at ({X:F1}, {Z:F1}) on map {Map}; leaving the destination unsnapped.", to.X, to.Z, victim.MapId);
+
+			// Retail applies "Knockback immunity" to the victim in the same batch as the displacement. Sent before the
+			// move so a client that acts on it has it in hand when the shove lands.
+			if (victim.Client != null && _applySelfBuff != null)
+				await _applySelfBuff(victim.Client, Knockback.ImmunitySpellId << 8);
+
+			await BroadcastKnockback(victim, to);
+			return true;
+		}
+
 		// Two records, in retail's own order (the annotated dungeon capture, 18:49:54.284 -> 18:49:56.020):
 		//   1. the forced-move MoveTask (mode 0x05) carrying from -> to, which is what the client ANIMATES;
 		//   2. a SetPos pinning the destination ~1.7 s later, which is what makes it authoritative.
