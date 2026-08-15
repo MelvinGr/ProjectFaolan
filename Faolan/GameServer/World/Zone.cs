@@ -38,7 +38,7 @@ namespace Faolan.GameServer.World
 		public uint PlayfieldToken { get; set; }
 
 		// The map's STATIC world objects (props, doors, climbing vines, destructibles), loaded once per zone by
-		// WorldBroadcaster.EnsureZoneWorldObjects rather than re-queried per world entry (#424). They are deliberately
+		// ZonePopulationLoader.EnsureZoneWorldObjects rather than re-queried per world entry (#424). They are deliberately
 		// NOT WorldEntities: they do not move, think, fight or tick, so putting ~1000 inert props in _entities would
 		// buy nothing and cost the simulation a pass over all of them. What they DO need is interest streaming, which
 		// is why they live on the zone - see WorldObjectsInRange.

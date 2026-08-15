@@ -608,7 +608,7 @@ A capture that caught either one caught the **trigger firing**, so harvesting it
 failure one level over. `ImportOps.BuildBurstTruthSpawns` excludes both from the burst-truth set exactly as it
 excludes summoned pets, and for the reason already written beside that exclusion: *a trigger spawn is not a world
 placement, and a type with no `NpcSpawn` row is an established shape.* The **type** still survives via
-`observedTypes` — that is what the trigger spawns from. `WorldBroadcaster.EnsureZoneNpcs` skips them too, as the
+`observedTypes` — that is what the trigger spawns from. `ZonePopulationLoader.EnsureZoneNpcs` skips them too, as the
 second net for a database built before the rule.
 
 ⚠️ This was an **accident** before it was a rule. The Bat Demon really did stand in the quarry; the encounter boss

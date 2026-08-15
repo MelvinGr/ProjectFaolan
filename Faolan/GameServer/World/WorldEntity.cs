@@ -154,6 +154,20 @@ namespace Faolan.GameServer.World
 		// stands inside the radius.
 		public bool EncounterBarked { get; set; }
 
+		// Stamp this entity as the LURE of `encounter` (a no-op when it has none, which is the common case - most NPCs
+		// are not part of a scripted encounter). Both the zone load and the lure RESTORE arm an entity the same way,
+		// which is why it lives on the entity rather than on either caller.
+		public void ArmEncounter(NpcEncounter? encounter)
+		{
+			if (encounter == null)
+				return;
+
+			EncounterBossTemplateId = encounter.BossNpcTemplateId;
+			EncounterBarkRadius = encounter.BarkRadius;
+			EncounterTriggerRadius = encounter.TriggerRadius;
+			EncounterBarked = false;
+		}
+
 		// On the boss: the lure type to put back, and where. Position comes from the boss itself - it spawned on the
 		// lure's exact spot, so restoring means spawning the lure type where the boss stood.
 		public uint? EncounterLureTemplateId { get; set; }

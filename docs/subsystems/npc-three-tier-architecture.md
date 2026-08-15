@@ -200,7 +200,7 @@ one captain each hold a different corner of a 3×3 grid with their own slot inde
 would stack every follower of that type in the same spot. The runtime derives its own slot from the follower's
 handle instead — the same deterministic fan-out a player's pets already use.
 
-At zone load `WorldBroadcaster.BindFormationFollowers` binds each follower to the **nearest** live leader of a type
+At zone load `ZonePopulationLoader.BindFormationFollowers` binds each follower to the **nearest** live leader of a type
 it walks with, within `FormationBindRange`. Nearest matters: a map carries several groups of the same two types
 (five separate `Nemedian Deathstalker` groups in one capture, four `Ginger`/`Scruffy` pairs across three), so
 binding to "any leader of that type" would march a follower across the zone. The range is **ours** — the corpus
@@ -447,7 +447,7 @@ everywhere else, which is what keeps every ordinary spawn behaving exactly as be
 - The `npcs` module's scoped overwrite covers the `(map, class)` pairs a run produced, so importing one class's
   capture never deletes another's copy of the armory.
 
-**Runtime.** `WorldBroadcaster.EnsureZoneNpcs` takes the entering character's class and populates the copy from
+**Runtime.** `ZonePopulationLoader.EnsureZoneNpcs` takes the entering character's class and populates the copy from
 `GetNpcSpawns(mapId, forClass)`; class-agnostic rows always belong, class-stamped ones only to their own class.
 A class we hold no capture for is a **gap, and is reported as one**: `WorldBroadcaster.DescribeMissingClassImport`
 makes the zone-line refuse with an in-game message instead of dropping the player into an empty room (which, on a map
