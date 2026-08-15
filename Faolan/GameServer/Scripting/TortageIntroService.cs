@@ -80,18 +80,38 @@ namespace Faolan.GameServer.Scripting
 		//    retail alternates 159428/159427 each phase but a single registration loops it).
 		//  - FREED = her slot-9 locomotion behavior 42010 (field5 24) WITH the 20-byte bound tail (boundA 0x12), the
 		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
-		public Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
+		public async Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
 		{
 			// The whole record comes off BehaviorControlCenterCodec, sub-opcode included. It used to be built through the
 			// create-burst helper, which slices the sub-op off for its own sender - so this path had to write the
 			// 0x642CD3D6 word back on by hand, and a BCC record that does not start with it is dropped by the client.
-			var body = BehaviorControlCenterCodec.Build(captive
-				? BehaviorAnimations.Registration(casildaHandle, 5, 159428, 1, 24, 0)
-				: BehaviorAnimations.Registration(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0));
-			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
-				? "CAPTIVE"
-				: "freed", casildaHandle, client.Session.Character.Name);
-			return WorldIir.Send(client, body);
+			if (captive)
+			{
+				await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 5, 159428, 1, 24, 0)));
+				_logger.LogInformation("#267: sent Casilda CAPTIVE pose (handle 0x{Handle:X8}) to {Player}.", casildaHandle, client.Session.Character.Name);
+				return;
+			}
+
+			// ⚠️ FREEING HER TAKES TWO RECORDS, and sending only the first left her walking around still playing the
+			// chained struggle - reported in-client (#827). A registration is per SLOT, and the struggle lives in slot
+			// 5: writing her locomotion into slot 9 adds a behaviour, it does not replace the one that is looping.
+			//
+			// Retail's rescue in Hoxxling_..._login_gameplay is three consecutive records on her handle 0x00017ED0,
+			// 4 frames apart, and the third is the one that stops the struggle:
+			//
+			//   idx 2104  slot 7  159428  + a large field4     an END stamp on the captive behaviour (see below)
+			//   idx 2106  slot 9   42010  + bound tail 0x12    her locomotion - the only one we used to send
+			//   idx 2110  slot 5  142007  field12 260          OVERWRITES the struggle registration in slot 5
+			//
+			// So slot 5 goes from 159428 (struggle) to 142007, which is what actually un-chains her.
+			//
+			// ⛔ 2104 is deliberately NOT replayed: its field4 is a large absolute value that reads as a timestamp, and
+			// replaying one capture's clock is the kind of thing that looks right until it is not. She frees correctly
+			// without it; if a residual artefact ever shows up at the rescue, that record is the first suspect.
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0)));
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 5, 142007, 8, 24, 0, field12: 260)));
+			_logger.LogInformation("#267: sent Casilda freed pose (handle 0x{Handle:X8}) to {Player} - locomotion 42010 (slot 9) + slot-5 behaviour 142007 replacing the struggle.",
+				casildaHandle, client.Session.Character.Name);
 		}
 
 		// The template id of the escortee the player is (or was) escorting - the Escort goal's TrailingRefId on any

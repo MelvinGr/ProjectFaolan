@@ -32,6 +32,27 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 
+		// #827: FREEING Casilda takes TWO records, and we shipped one - so she followed the player still playing the
+		// chained struggle. A registration is per SLOT and the struggle lives in slot 5, so writing her locomotion
+		// into slot 9 ADDS a behaviour rather than replacing the looping one.
+		//
+		// Retail's rescue is three consecutive records on her handle 0x00017ED0 in
+		// Hoxxling_mage-heraldofxotli_login_gameplay - idx 2104 (slot 7, an end stamp), 2106 (slot 9, locomotion) and
+		// 2110 (slot 5, 142007). This pins the one that was missing, byte-exact against frame 1847.
+		//
+		// ⚠️ Its sibling 2106 is deliberately NOT pinned here: the captured record carries a full behaviour-state tail
+		// (six NullIdentity pairs + three trailing ones, 124 bytes) where we send the short 20-byte bound form. That
+		// difference predates this fix and she does walk on it, so it is recorded rather than quietly "corrected" -
+		// widening it is a byte-exact job of its own.
+		[Fact]
+		public void CasildasFreedSlot5Behaviour_MatchesCapture()
+		{
+			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x00017ED0, 5, 142007, 8, 24, 0, field12: 260));
+
+			Assert.Equal("642cd3d60000c35000017ed00004000000050000000d08b7d508180828183000608402", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
+
 		// The one thing that separates the ranged result block from the melee one: a single trailing 0x00. That is
 		// the whole reason every captured ranged tail is one byte longer than the melee tail of the same shape
 		// (82 against 81 with one result), and getting it wrong makes the client read past the record.
