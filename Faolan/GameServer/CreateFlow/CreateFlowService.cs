@@ -21,6 +21,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.CreateFlow
@@ -31,7 +32,7 @@ namespace Faolan.GameServer.CreateFlow
 	// (the create-world handshake, the destiny-cutscene Scry scripts, and the Retail*Burst editor bursts) all
 	// live in this file. Verbatim/byte-exact burst builders stay `static` so the golden tests reach them
 	// unchanged (CreateFlowService.SendRetailCreateEditorInitialBurst / ...). The Kalanthes cutscene MoveTask
-	// builders moved to QuestHandlerService (#353); the cutscene flow calls them statically.
+	// builders moved to TortageIntroService (#353); the cutscene flow calls them statically.
 	//
 	// Cross-cutting deps follow the house pattern (CLAUDE.md "composed collaborators"): the world model comes in by
 	// ctor, and the one listener-owned outbound op the cutscene needs (SendBurstlessWorldEntry, also used by the
@@ -672,7 +673,7 @@ namespace Faolan.GameServer.CreateFlow
 					await SendScry(client, ScryScriptCodec.Build(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
 					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
-					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await TortageIntroService.SendKalanthesMoveTask(client, TortageIntroService.BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					break;
 				}
 
@@ -697,7 +698,7 @@ namespace Faolan.GameServer.CreateFlow
 				case "Move":
 				{
 					// Kalanthes walks up to the player (f890 path), then kneels.
-					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await TortageIntroService.SendKalanthesMoveTask(client, TortageIntroService.BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					await SendScry(client, ScryScriptCodec.Build(id, "Kneel"));
 					break;
 				}

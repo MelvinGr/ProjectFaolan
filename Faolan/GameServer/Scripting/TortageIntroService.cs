@@ -9,9 +9,9 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.Quest
+namespace Faolan.GameServer.Scripting
 {
-	// The scripted Tortage-intro narrative handling, pulled out of WorldBroadcaster + CreateFlowService (#353): the
+	// The scripted TORTAGE-INTRO narrative, pulled out of WorldBroadcaster + CreateFlowService (#353): the
 	// Kalanthes create-cutscene walk-up and the Casilda beach-rescue sequence (drop the invisible chain-wall, the
 	// captive/freed poses, the freed-check). Keeps this bespoke story logic in one place instead of scattered across
 	// the generic broadcaster/create-flow. Reads quest state (`IDatabaseRepository`) and resolves live entities via
@@ -20,7 +20,7 @@ namespace Faolan.GameServer.Quest
 	// It depends only on the simulation + DB (constructed before WorldBroadcaster), so the broadcaster's interest
 	// stream can call INTO it (Casilda's captive pose on stream-in) without a construction cycle - it never depends
 	// back on the broadcaster.
-	public sealed class QuestHandlerService
+	public sealed class TortageIntroService
 	{
 		// ---- Casilda beach rescue --------------------------------------------------------------------------------
 		// Casilda's NPC template. Her captive/freed poses (below) are decoded byte-exact for HER alone, so anything that
@@ -42,7 +42,7 @@ namespace Faolan.GameServer.Quest
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public QuestHandlerService(IDatabaseRepository database, WorldSimulation sim, ILogger logger)
+		public TortageIntroService(IDatabaseRepository database, WorldSimulation sim, ILogger logger)
 		{
 			_database = database;
 			_sim = sim;

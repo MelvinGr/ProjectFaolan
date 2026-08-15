@@ -11,6 +11,7 @@ using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using System.Numerics;
+using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
@@ -44,15 +45,15 @@ namespace Faolan.GameServer.Quest
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
 		private readonly QuestRewardService _rewards;
-		private readonly QuestHandlerService _questHandler;
+		private readonly TortageIntroService _tortageIntro;
 
-		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, QuestHandlerService questHandler,
+		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, TortageIntroService tortageIntro,
 			IChatServerDispatcher agents, QuestRewardService rewards, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
 			_economy = economy;
-			_questHandler = questHandler;
+			_tortageIntro = tortageIntro;
 			_agents = agents;
 			_rewards = rewards;
 			_logger = logger;
@@ -518,7 +519,7 @@ namespace Faolan.GameServer.Quest
 				// (data-driven off WorldObject.EffectQuestId; map-scoped, so it no-ops off the beach). Then clear the
 				// escortee's captive struggle pose so she stands/walks as she follows.
 				await _outbound.ApplyQuestWorldEffects(client);
-				await _questHandler.ClearCasildaCaptivePose(client);
+				await _tortageIntro.ClearCasildaCaptivePose(client);
 			}
 
 			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, nextQuestId, nextGoal?.GoalType,

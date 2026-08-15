@@ -226,7 +226,7 @@ namespace Faolan.GameServer
 			// beach chain-wall collision, so the returning player isn't re-blocked by the world-entry burst's chain
 			// dynel), and clear the escortee's captive pose if she's already freed. Both data-driven / no-op when N/A.
 			await _broadcaster.ApplyQuestWorldEffects(client);
-			await _questHandler.ClearCasildaCaptivePose(client); // TODO: This should be gated more / moved to 'quest handler service'
+			await _tortageIntro.ClearCasildaCaptivePose(client); // it IS in the intro service now; the gating is Gitea's, not a TODO here
 
 			// Bind the character on entry if it has never bound. Every recall targets BindRespawnPointId - the Totem of
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or

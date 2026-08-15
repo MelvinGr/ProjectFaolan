@@ -23,6 +23,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Quest;
+using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
@@ -112,10 +113,10 @@ namespace Faolan.GameServer.World
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
-		// _questHandler is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
+		// _tortageIntro is constructed before the broadcaster (it needs only the sim + DB), so the interest stream can
 		// call into it (Casilda's captive pose on stream-in) without a construction cycle.
 		private readonly ComboService _combos;
-		private readonly QuestHandlerService _questHandler;
+		private readonly TortageIntroService _tortageIntro;
 
 		private readonly WorldSimulation _sim;
 
@@ -148,13 +149,13 @@ namespace Faolan.GameServer.World
 		// Null-safe for tests that construct the broadcaster without it.
 		private readonly Func<INetworkClient, uint, Task>? _applySelfBuff;
 
-		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, QuestHandlerService questHandler, ComboService combos,
+		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, TortageIntroService tortageIntro, ComboService combos,
 			Func<INetworkClient, uint, Task>? applySelfBuff = null)
 		{
 			_sim = sim;
 			_database = database;
 			_logger = logger;
-			_questHandler = questHandler;
+			_tortageIntro = tortageIntro;
 			_combos = combos;
 			_applySelfBuff = applySelfBuff;
 		}
@@ -1666,8 +1667,8 @@ namespace Faolan.GameServer.World
 				await SendQuestMarkerIfGiver(client, npc);
 
 				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
-				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
-					await _questHandler.SendCasildaPose(client, npc.Handle, true);
+				if (npc.NpcTemplateId == TortageIntroService.CasildaTemplateId && client.Session.Character != null && !await _tortageIntro.IsCasildaFreed(client.Session.Character.Id))
+					await _tortageIntro.SendCasildaPose(client, npc.Handle, true);
 
 				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
 				if (_debugAreaLabels && npc.OverheadNameOverride is { } overrideName)
@@ -2270,9 +2271,9 @@ namespace Faolan.GameServer.World
 							ev.Subject.RoutePatrolDelayRemaining = WorldState.RoutePatrolDelaySeconds;
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-						if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null &&
-						    !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
-							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
+						if (ev.Subject is { IsPlayer: false, NpcTemplateId: TortageIntroService.CasildaTemplateId } && recipient.Session.Character != null &&
+						    !await _tortageIntro.IsCasildaFreed(recipient.Session.Character.Id))
+							await _tortageIntro.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}
 

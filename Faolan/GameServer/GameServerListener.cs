@@ -31,6 +31,7 @@ using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
+using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -247,7 +248,7 @@ namespace Faolan.GameServer
 		private readonly PlayerPersistenceService _persistence;
 
 		// Scripted Tortage-intro narrative (Kalanthes create-cutscene walk + Casilda beach rescue), #353.
-		private readonly QuestHandlerService _questHandler;
+		private readonly TortageIntroService _tortageIntro;
 
 		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
 		private readonly QuestProgressionService _questProgression;
@@ -309,11 +310,11 @@ namespace Faolan.GameServer
 			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_trade = new TradeService(database, logger, this);
-			_questHandler = new QuestHandlerService(database, _simulation, logger);
+			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
 			_questRewards = new QuestRewardService(database, _broadcaster, this, logger);
-			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, _questRewards, logger);
+			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, logger);
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellAreas = new SpellAreaCatalog(database);
 			_spellModifiers = new SpellModifierService(database);
