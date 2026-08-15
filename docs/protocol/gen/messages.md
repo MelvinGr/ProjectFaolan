@@ -82,7 +82,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SkillIIR` | `0xD558FF16` | `SkillCodec` | [V3: SkillPointTests.CapturedSpendBodies_AreAListFrameNotTwoConstants] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `StatDamageCodec` | [V3: CombatDamageCodecTests.EnvironmentalDamage_IsByteIdentical] |
 | V3 | `StatIIR` | `0xF98E10B3` | `StatCodec` | [V3: CreateEditorRecordTests.StatIir_FlagOne_MatchesCapturedBytes] |
-| V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame] |
+| V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: BehaviorAnimationsTests.CasildasRescueBccState_MatchesCapture] |
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
