@@ -65,6 +65,10 @@ namespace Faolan.GameServer.Combat
 		private readonly FatalityService _fatality; // #140: the fatality burst on a killing blow
 		private readonly FactionService _factions; // #310: Khitai reputation, awarded on a kill
 		private readonly IDatabaseRepository _database;
+
+		// Content:KillStreaks - whether a kill CHAIN is tracked and announced at all (#446). Read once at construction
+		// like the terrain dir, not per kill: it is a content switch for the server, not per-session state.
+		private readonly bool _killStreaks;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 
@@ -74,8 +78,9 @@ namespace Faolan.GameServer.Combat
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
 			Func<INetworkClient, Ability, Task> announceAddSpecialAbility, Func<INetworkClient, uint, Task> learnSpell, FatalityService fatality,
-			FactionService factions)
+			FactionService factions, bool killStreaks)
 		{
+			_killStreaks = killStreaks;
 			_factions = factions;
 			_fatality = fatality;
 			_sim = sim;
@@ -1169,6 +1174,12 @@ namespace Faolan.GameServer.Combat
 		// kill counters the client's stat-name table names; the chain is a live announcement and nothing else.
 		private async Task AnnounceKillChain(INetworkClient killer)
 		{
+			// Content:KillStreaks off means the chain is never STARTED, which is the whole feature off in one place:
+			// the tick's closing 0 (WorldSimulation.TickKillChains) can only fire for a chain a kill registered here,
+			// so there is nothing left for it to close.
+			if (!_killStreaks)
+				return;
+
 			var player = _sim.PlayerWorldEntity(killer);
 			if (player?.RegisterKillInChain(DateTimeOffset.UtcNow) is not { } count)
 				return;

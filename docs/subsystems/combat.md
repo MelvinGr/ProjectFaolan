@@ -842,6 +842,10 @@ whole corpus **0 of the 67 arrivals coincide with a move of `106`, `1000069` or 
 persisted daily kill counters the client's own stat-name table names (`DailyPvEKills` / `DailyPvPKills`); the
 chain is a live announcement and nothing else. Modelling them is still open.
 
+**The whole feature is one content switch.** `Content:KillStreaks` (default `true`, retail's behaviour) gates
+`CombatService.AnnounceKillChain`, which is where a chain is *started* — with it off nothing is tracked, so the
+tick's closing `0` has nothing to close either and no `ChainKillIIR` is ever sent.
+
 The body was never the gap either — `ChainKillCodec` has read it byte-exact off the client's own reader
 (`FUN_0079c0b0`) since the V1 IIR sweep. What was missing was only *when to send one*.
 

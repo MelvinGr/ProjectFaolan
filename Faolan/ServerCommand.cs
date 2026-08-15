@@ -38,7 +38,7 @@ namespace Faolan
 		// non-generic Option[]: this is a list of settings, not a list of strings.
 		private static readonly Option[] ConfigOptions = FaolanSettings.Options(
 			Keys.DatabaseProvider, Keys.DatabaseConnectionString, Keys.ServerPublicAddress, Keys.ServerUniverseAgentPort, Keys.ServerPlayerAgentPort,
-			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.ServerPrivateKey,
+			Keys.ServerWelcomeString, Keys.ContentTerrainDir, Keys.ContentClientVersion, Keys.ContentKillStreaks, Keys.ServerPrivateKey,
 			Keys.McpEnabled, Keys.McpPort, Keys.LogFile, Keys.LogPacketBytes,
 			Keys.AccountPremium, Keys.AccountPremiumCharSlots, Keys.AccountFreeCharSlots);
 

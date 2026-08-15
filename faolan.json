@@ -39,6 +39,8 @@
 	"Content": {
 		// The client build the protocol was decoded against. Another build is WARNED about, never refused.
 		"ClientVersion": "v5.01.0@602248",
+		// Announce a player's kill STREAK - the running count of kills strung together inside nine seconds. Off, no chain is tracked and the client is told nothing.
+		"KillStreaks": true,
 		// The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it.
 		"RdbDir": null,
 		// Where the baked terrain lives. Without it the server still runs, with ground-snap and line-of-sight disabled.

@@ -10,7 +10,6 @@ using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -37,7 +36,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
+		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -111,22 +111,6 @@ namespace Faolan.GameServer
 		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
-
-		// (Tortage Beach, Map.TortageBeachId, is the universal fallback world - its burst is always seeded, so a
-		// character whose own map has no usable burst still enters a real rendered world. The world-entry path reads
-		// it directly; there is no hand-built login/teleport path anymore, so no constant here selects it.)
-
-		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
-		// Faolan.Core.Network/Constants/StartingData.cs.
-
-		// Equipped-container slot ids = the CharacterEquipmentSlot enum itself, read through the CharacterEquipment
-		// indexer (the same source PlayerSpawnEquipment.BuildInventoryEntries walks for the spawn). This was a
-		// hand-maintained parallel table of the 18 WORN slots, which silently dropped the 6 VANITY slots (1002+) out of
-		// the snapshot's equipped container: the avatar rendered its vanity off the FA015807 spawn, but the client's
-		// equipment/vanity panel came up empty because the container the panel reads never carried them. Retail DOES
-		// ship vanity here - NecroL80's L80 snapshot's equipped container holds pos 1002/1007/1011/1014/1018 alongside the
-		// worn set. FirstPosBag (17) is NOT an enum member and stays handled separately (bagFirst).
-		private static readonly CharacterEquipmentSlot[] InventoryEquippedSlots = Enum.GetValues<CharacterEquipmentSlot>();
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
@@ -306,54 +290,31 @@ namespace Faolan.GameServer
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
-			// The team roster lives on the CS tier; LeaveTeam/KickFromTeam arrive HERE, so they are routed over there.
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
-			// Server-side terrain (ground-snap + line-of-sight, #284) from the importer-baked terrain files - the game
-			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
 			var terrain = new TerrainService(configuration.ContentTerrainDir, logger);
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
-			// create-editor/cutscene/enter-world flow. The handoff seam washes the new character ashore before the
-			// redirect (#234: changemap-prep IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7 to the Tortage Beach
-			// spawn - Blablabla create capture f444/449, dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32 - else
-			// the player stays at the drowning cutscene's underwater end position), then hands off like DoTeleport.
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
 			{
 				await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
 				await SendWorldHandoff(client);
 			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
-			_trade = new TradeService(database, logger, this); // player<->player trade (#101); reaches the wire via ITradeOutbound
-			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call
-			// into it (Casilda's captive pose) without a construction cycle.
+			_trade = new TradeService(database, logger, this);
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler, _combos);
-			// `this` as IEconomyOutbound: a Deliver goal's hand-in takes the goods out of the inventory, which is an
-			// economy op the listener owns - the same seam ShopService/BankService reach the wallet and grants through.
 			_questRewards = new QuestRewardService(database, _broadcaster, this, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, _questRewards, logger);
-			// #439: what a spell makes the SERVER do (summon a pet, arm a proc) - dispatched from the SpellEffect rows
-			// instead of from spell ids hardcoded into the cast path. Reaches the wire through ISpellEffectOutbound,
-			// which this listener implements (GameServerListener.Buffs.cs).
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellAreas = new SpellAreaCatalog(database);
-			// #710: the per-cast overrides a caster's trained feats and live buffs put on a spell's own properties.
-			// One service for both sources - the client states the identical record on a feat and on a spell.
 			_spellModifiers = new SpellModifierService(database);
-			// #140: the fatality burst. The buffs that PROC on a fatality are SpellEffect rows now, so this owns only
-			// the roll + the two Fatality ids every captured burst carries.
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_poolEffects = new SpellPoolEffects(database, logger);
-			// #310: the Khitai reputation engine. Built BEFORE CombatService because a kill is its one wired trigger,
-			// and it reaches the wire through a delegate seam rather than the listener (one outbound op, so a Func
-			// rather than a named port - CLAUDE.md).
 			_factions = new FactionService(database, logger, SendFactionStanding);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality, _factions);
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality, _factions,
+				configuration.ContentKillStreaks);
 			_spellweave = new SpellweaveService(logger, this);
-			// #506/#514: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs), and is
-			// built BEFORE the dialogue runtime because the travel TRIGGER is a conversation node (a wagoneer's
-			// destination pick), so ConversationService drives it.
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
@@ -365,17 +326,13 @@ namespace Faolan.GameServer
 			_equipment = new EquipmentService(database, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
-			_tradepost = new TradepostService(database, logger, this); // auction house + mailbox (#200)
+			_tradepost = new TradepostService(database, logger, this);
 			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 			_skillPoints = new SkillPointService(database, logger);
-			// #495/#504: "the world damaged you" - fall damage and the scripted hazard volumes. Driven from the move
-			// handler (both triggers are edges on the player's own position stream), reaching the wire through
-			// IEnvironmentOutbound, which this listener implements (GameServerListener.Combat.cs).
 			_environment = new EnvironmentService(database, this, logger);
-			// #496: knockback. The buff apply is a single shared op, so it comes in as a delegate seam rather than a port.
 			_knockback = new KnockbackService(_simulation, _broadcaster, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id), logger);
 
 			InitGmCommands();

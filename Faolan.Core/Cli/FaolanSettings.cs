@@ -39,6 +39,7 @@ namespace Faolan.Core.Cli
 			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Requires Mcp:Enabled; off still leaves the reply tool working.", false),
 			Setting(Keys.ChatBridgePollMs, "How often the chat bridge looks for new messages, in milliseconds.", 1500),
 			Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. Another build is WARNED about, never refused.", "v5.01.0@602248"),
+			Setting(Keys.ContentKillStreaks, "Announce a player's kill STREAK - the running count of kills strung together inside nine seconds. Off, no chain is tracked and the client is told nothing.", true),
 			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it."),
 			Setting(Keys.ContentTerrainDir, "Where the baked terrain lives. Without it the server still runs, with ground-snap and line-of-sight disabled.", "./terrain"),
 			Setting(Keys.DatabaseConnectionString, "The database to serve from. One with no game content in it is filled from faolan.sql on first run.", "Data Source=faolan.db"),
@@ -87,6 +88,7 @@ namespace Faolan.Core.Cli
 			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgePollMs));
 
 			public string ContentClientVersion => config[Keys.ContentClientVersion]!;
+			public bool ContentKillStreaks => Value<bool>(config, Keys.ContentKillStreaks);
 			public string? ContentRdbDir => config[Keys.ContentRdbDir];
 			public string? ContentTerrainDir => config[Keys.ContentTerrainDir];
 
@@ -205,6 +207,7 @@ namespace Faolan.Core.Cli
 			public const string ChatBridgeEnabled = "ChatBridge:Enabled";
 			public const string ChatBridgePollMs = "ChatBridge:PollMs";
 			public const string ContentClientVersion = "Content:ClientVersion";
+			public const string ContentKillStreaks = "Content:KillStreaks";
 			public const string ContentRdbDir = "Content:RdbDir";
 			public const string ContentTerrainDir = "Content:TerrainDir";
 			public const string DatabaseConnectionString = "Database:ConnectionString";

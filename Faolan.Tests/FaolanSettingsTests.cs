@@ -41,6 +41,7 @@ namespace Faolan.Tests
 			Assert.Equal(7011, config.ServerPlayerAgentPort);
 			Assert.Equal("Welcome to Project Faolan!", config.ServerWelcomeString);
 			Assert.Equal("v5.01.0@602248", config.ContentClientVersion);
+			Assert.True(config.ContentKillStreaks); // retail announces one, so the default is retail's behaviour
 			Assert.True(config.AccountPremium);
 			Assert.Equal(10u, config.AccountPremiumCharSlots);
 			Assert.Equal(4u, config.AccountFreeCharSlots);
