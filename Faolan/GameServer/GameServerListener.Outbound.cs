@@ -957,7 +957,7 @@ namespace Faolan.GameServer
 				return;
 
 			var self = character.Id;
-			await ApplySpell(client, self, self, MountCatalog.DismountSpell);
+			await _buffs.ApplySpell(client, self, self, MountCatalog.DismountSpell);
 			var stats = new CharacterStatBlock
 			{
 				[CharacterStatId.Mount] = 0

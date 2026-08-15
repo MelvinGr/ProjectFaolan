@@ -112,7 +112,7 @@ namespace Faolan.GameServer
 		// path registers nothing, which is right: the world tick owns a mob's buff registry.
 		Task IWorldOutbound.SendSpellApplication(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId, uint durationCentiseconds)
 		{
-			return SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, CasterLevel(client), CasterIsPlayer(client, applyFrom)));
+			return _buffs.SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, BuffService.CasterLevel(client), _buffs.CasterIsPlayer(client, applyFrom)));
 		}
 
 		Task IWorldOutbound.ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId)
@@ -220,7 +220,7 @@ namespace Faolan.GameServer
 
 			// ApplySpell takes the WIRE buff id ((base << 8) | rank); the catalog carries the bare base, same as
 			// the cast path (#274).
-			await ApplySpell(client, targetHandle, casterHandle, spellId << 8);
+			await _buffs.ApplySpell(client, targetHandle, casterHandle, spellId << 8);
 
 			// #697: the WHOLE-combo damage the player's feats grant (GameAction 53209 `UpgradeCombo` - "improves the
 			// damage inflicted by the Blood for Aid combos"). It lands here rather than on a step's swing because

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
 
@@ -108,7 +109,7 @@ namespace Faolan.Tests
 			var buff = new ActiveBuff(wireSpellId, entity.Handle, DateTimeOffset.UtcNow, 600f);
 
 			Assert.True(SpellweaveCatalog.IsTranceBuff(wireSpellId));
-			Assert.False(GameServerListener.ShouldPersistBuff(entity, buff));
+			Assert.False(BuffService.ShouldPersistBuff(entity, buff));
 		}
 
 		// The exclusion is the trance, not "buffs that look like it" - an ordinary self-buff still survives a relog,
@@ -121,7 +122,7 @@ namespace Faolan.Tests
 			var entity = Entity();
 
 			Assert.False(SpellweaveCatalog.IsTranceBuff(wireSpellId));
-			Assert.True(GameServerListener.ShouldPersistBuff(entity, new ActiveBuff(wireSpellId, entity.Handle, DateTimeOffset.UtcNow, 600f)));
+			Assert.True(BuffService.ShouldPersistBuff(entity, new ActiveBuff(wireSpellId, entity.Handle, DateTimeOffset.UtcNow, 600f)));
 		}
 
 		private static WorldEntity Entity()

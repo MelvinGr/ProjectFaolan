@@ -771,10 +771,10 @@ every playfield change — #342 confirmed that for the mount, whose feedback was
 stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
 the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
 and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded
-at save time so they aren't double-applied on entry (`GameServerListener.ShouldPersistBuff`).
+at save time so they aren't double-applied on entry (`BuffService.ShouldPersistBuff`).
 
 **Shield of the Risen (#221) — RESOLVED + in-client verified.** `SendShieldOfTheRisen`
-(`GameServerListener.Buffs.cs`) applies the newbie-protection self-buff from `RestoreEntryBuffs` in the world-entry
+(`BuffService`) applies the newbie-protection self-buff from `RestoreEntryBuffs` in the world-entry
 flush (#423 — it used to run from `FlushPendingPost205FFollowUp`), so it re-asserts on login AND every playfield
 change, silently, in the position the changemap capture shows retail using. The one entry that does **not** get it is
 `WorldEntryMode.CreateWorld` — a character's very first arrival is the intro cutscene, where the player has no
@@ -790,7 +790,7 @@ playfield, the 10h in the shared open world (we select by `Map.InstanceMode`, tr
 `TickBuffExpiry`, like any timed buff), a manual `CancelBuff`, or — the newbie-protection rule — the **first
 aggressive action**.
 
-**Shield breaks on the first aggressive action.** `BreakShieldOnAggression` (`GameServerListener.Buffs.cs`) drops
+**Shield breaks on the first aggressive action.** `BreakShieldOnAggression` (`BuffService`) drops
 the shield the instant the player commits an aggressive action — an offensive cast (target ≠ self), a ground AoE,
 or a melee/unarmed swing — matching retail's "protected until you attack." For a *cast* it fires at **cast begin**
 (the aggression is known upfront from the target/ground-cast), not when the cast time elapses. It sends the
@@ -1764,7 +1764,7 @@ else. Both places a spell LANDS now walk it, on the **same subject** the carrier
 
 | landing | walker |
 | --- | --- |
-| a cast, a self-buff, a spell effect on the player | `GameServerListener.ApplyChainedSpells` (off `ApplySpell`) |
+| a cast, a self-buff, a spell effect on the player | `BuffService.ApplyChainedSpells` (off `ApplySpell`) |
 | an area's effect landing on a mob | `WorldSimulation.ApplyEffectToEntity` |
 
 ⚠️ **The walk needs a termination guard, and not defensively — the shipped catalog does not terminate

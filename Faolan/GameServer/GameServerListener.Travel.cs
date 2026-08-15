@@ -9,6 +9,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 
 namespace Faolan.GameServer
@@ -67,7 +68,7 @@ namespace Faolan.GameServer
 			// go through SendMagicBuffIir - that path is for buffs with a caster, and it would also register a
 			// half-second buff in the tracker and send an end twin retail only sends on a cross-map trip.
 			var racer = MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, MagicBuffIds.BaseOf(TravelCatalog.RacerSpell), MagicBuffIds.FormOf(TravelCatalog.RacerSpell), null,
-				MagicBuffDataCodec.Build(TravelCatalog.RacerPayload(CasterLevel(client)))));
+				MagicBuffDataCodec.Build(TravelCatalog.RacerPayload(BuffService.CasterLevel(client)))));
 
 			await SendWorldRecord(client, racer);
 		}

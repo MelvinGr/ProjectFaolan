@@ -1438,11 +1438,11 @@ namespace Faolan.GameServer
 					// with only the registry drop) - the server has to drive it. Send retail's rank-1 end twin, which
 					// clears the icon live (byte-exact vs the captured buff-end twin, NecroL80_..._castle-exit rec#735).
 					// No capture oracle for the cancel reply exists, so this is the in-client-proven behaviour.
-					await SendBuffRemoval(client, self, self, appliedId);
+					await _buffs.SendBuffRemoval(client, self, self, appliedId);
 
 					if (entity != null && entity.ActiveBuffs.TryRemove(appliedId, out _))
 					{
-						await SyncBuffStats(client); // #367: drop whatever stats the cancelled buff was granting
+						await _buffs.SyncBuffStats(client); // #367: drop whatever stats the cancelled buff was granting
 						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", appliedId, charId);
 					}
 					else
@@ -1997,7 +1997,7 @@ namespace Faolan.GameServer
 					{
 						// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 						// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
-						await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
+						await _buffs.BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
 						var targetHandle = args.Target?.Instance ?? 0;
 
 						// #139: the swing NAMES its combo and step (CommandMessage.combo_id / combo_attack_num), so
@@ -2021,7 +2021,7 @@ namespace Faolan.GameServer
 						// Retail's reply is the plain behavior echo-ack - no result block (combat capture
 						// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
 						// hit air, so the damage part is an extension pending in-client validation).
-						await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
+						await _buffs.BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
 						await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, args.Target?.Instance ?? 0);
 
 						break;
@@ -2179,7 +2179,7 @@ namespace Faolan.GameServer
 					return;
 
 				await CombatService.SendBehaviorChannelCompleteAck(client, mountCastPayload, 3); // cast complete: mounts (form 0x0a closes the bar)
-				await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client))); // seat (#26)
+				await _buffs.SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(BuffService.CasterLevel(client))); // seat (#26)
 				var mountStats = new CharacterStatBlock
 				{
 					[CharacterStatId.Mount] = mount.CreatureId,
@@ -2313,7 +2313,7 @@ namespace Faolan.GameServer
 			// no shield tracked anyway). Done here at begin so the protection drops as the player starts to
 			// attack, matching retail; the effect itself still resolves after castMs below.
 			if (isGroundCast || (targetHandle != 0 && targetHandle != casterHandle))
-				await BreakShieldOnAggression(client);
+				await _buffs.BreakShieldOnAggression(client);
 
 			// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
 			// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
@@ -2435,7 +2435,7 @@ namespace Faolan.GameServer
 				// bare BASE id (the Spells key) - shift it to rank 0. Unshifted, the client resolved
 				// base=spellId>>8 / rank=spellId's low byte, neither of which is a real spell, and
 				// silently rendered no icon while the server-side lifecycle looked correct (#274).
-				await ApplySpell(client, targetHandle == 0
+				await _buffs.ApplySpell(client, targetHandle == 0
 					? casterHandle
 					: targetHandle, casterHandle, spellId << 8);
 				await _combat.SpendCasterMana(client, spellId, castModifiers);
@@ -2731,7 +2731,7 @@ namespace Faolan.GameServer
 					{
 						justBound = await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
 						// What is WORN changed, so the live gear aggregate is stale - see RefreshGearBonuses.
-						await RefreshGearBonuses(client);
+						await _buffs.RefreshGearBonuses(client);
 					}
 
 					// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
@@ -2762,7 +2762,7 @@ namespace Faolan.GameServer
 					// Unequip is identified by the source equip slot (the trailing handle is 0);
 					// `target` is the bag cell the item lands in.
 					await _equipment.PersistUnequip(client, fromSlot, (int)target);
-					await RefreshGearBonuses(client);
+					await _buffs.RefreshGearBonuses(client);
 
 					// Retail's reply: the behavior ack with null identity + a 0x201C entry
 					// (prefix 0x68, state 0). Capture frames 320-321.

@@ -425,7 +425,7 @@ namespace Faolan.GameServer
 		private async Task RestoreEntryBuffs(INetworkClient client)
 		{
 			await RestoreMount(client);
-			await RestoreBuffs(client);
+			await _buffs.RestoreBuffs(client);
 
 			// NOT on the character's very first entry. Shield of the Risen is newbie protection for someone arriving in
 			// the world, and the create-world entry is not that: it is the intro cutscene, where the character is
@@ -438,7 +438,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await SendShieldOfTheRisen(client);
+			await _buffs.SendShieldOfTheRisen(client);
 		}
 
 		// Re-seats a persisted mount on world entry (login and every teleport/changemap re-entry), only where the map
@@ -466,7 +466,7 @@ namespace Faolan.GameServer
 				return;
 
 			var self = character.Id;
-			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client)));
+			await _buffs.SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(BuffService.CasterLevel(client)));
 			await SendStatUpdate(client, new CharacterStatBlock
 			{
 				[CharacterStatId.Mount] = mount.CreatureId,

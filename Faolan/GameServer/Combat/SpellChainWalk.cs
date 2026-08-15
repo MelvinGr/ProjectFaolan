@@ -18,11 +18,11 @@ namespace Faolan.GameServer.Combat
 	//     (spell 3475257) and a single landing that emitted 78 `ApplySpell` carriers would be a wire flood for one cast.
 	//     Truncation is logged by the caller rather than silently accepted, because a chain that hits the cap is a
 	//     question about the data, not a normal outcome.
-	internal sealed class SpellChainWalk
+	public sealed class SpellChainWalk
 	{
 		// Bigger than every closure the corpus needs (p90 = 10) and far below the largest (78), so it only ever bites
 		// on the pathological tail.
-		internal const int MaxApplications = 32;
+		public const int MaxApplications = 32;
 
 		private readonly HashSet<uint> _visited = [];
 		private bool _sealed;
@@ -33,19 +33,19 @@ namespace Faolan.GameServer.Combat
 		//
 		// It is a walk rather than a flag on the caller because the refusal has to hold for the carrier's whole
 		// sub-tree: an edge suppressed at the top must not be reachable through a second edge further down.
-		internal static SpellChainWalk Registry()
+		public static SpellChainWalk Registry()
 		{
 			return new SpellChainWalk { _sealed = true };
 		}
 
 		// Whether the cap stopped this walk short. The caller logs it naming the carrier, so the spell that hit it can
 		// be looked at rather than inferred.
-		internal bool Truncated { get; private set; }
+		public bool Truncated { get; private set; }
 
 		// Claim `spellBaseId` for this walk. False = already applied here (a cycle or a diamond), or the cap is spent.
 		// Callers seed it with the spell that STARTED the walk, so a chain edge pointing back at the carrier is a
 		// no-op rather than an infinite re-apply.
-		internal bool TryEnter(uint spellBaseId)
+		public bool TryEnter(uint spellBaseId)
 		{
 			// A registry walk claims nothing, so `ApplySpell`'s own seeding call is a no-op too and every edge below
 			// it is refused. The carrier itself is applied by the caller before the walk is consulted.

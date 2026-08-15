@@ -19,6 +19,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Microsoft.Extensions.Logging;
 
@@ -641,7 +642,7 @@ namespace Faolan.GameServer
 				character.CriminalUntil = null;
 				character.MurderPoints = 0;
 				await Database.SetCharacterCriminalState(character.Id, null, 0);
-				await SendBuffRemoval(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8);
+				await _buffs.SendBuffRemoval(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8);
 				await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, 0), character.Id);
 				await _agentServerDispatcher.SendSystemMessage(character.Id, "Criminal status cleared.");
 				return;
@@ -653,8 +654,8 @@ namespace Faolan.GameServer
 
 			// The wire side: the "Criminal" debuff plus the murder-point stat, the two things the capture shows moving.
 			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
-			await SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
-				MagicBuffDatas.ApplyNow(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), CasterLevel(client), casterIsPlayer: true));
+			await _buffs.SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
+				MagicBuffDatas.ApplyNow(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), BuffService.CasterLevel(client), casterIsPlayer: true));
 			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id,

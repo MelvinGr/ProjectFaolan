@@ -92,10 +92,6 @@ namespace Faolan.GameServer
 		// centiseconds retail puts in the rest behaviour record.
 		private const int RestingChannelMs = 20_500;
 
-		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
-		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
-		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
-
 		// (The spellweave activate/deactivate selector used to live here as a single 0xFC constant. It is PER CLASS -
 		// necromancer 0xFC, demonologist 0x10C - so it moved to StartingData.SpellweaveToggleAction, which carries the
 		// corpus evidence for each row.)
@@ -223,6 +219,11 @@ namespace Faolan.GameServer
 		// See Progression/LevelUpService.cs.
 		private readonly LevelUpService _levelUp;
 
+		// Composed collaborator: the BUFF ENGINE (#274/#367/#784) - apply, track, expire, remove, restore, and the stat
+		// deltas a live buff carries. The three outbound ports whose buff members used to BE the implementation
+		// (IWorldOutbound, ISpellEffectOutbound, ISpellweaveOutbound) now forward here. See Combat/BuffService.cs.
+		private readonly BuffService _buffs;
+
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
@@ -320,6 +321,7 @@ namespace Faolan.GameServer
 			_factions = new FactionService(database, logger, SendFactionStanding);
 			_levelUp = new LevelUpService(database, _simulation, this, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, configuration.ContentKillStreaks);
+			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);

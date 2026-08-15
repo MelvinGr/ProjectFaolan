@@ -6,6 +6,7 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
@@ -66,7 +67,7 @@ namespace Faolan.GameServer.World
 				// the row set always mirrors what's currently active.
 				var now = DateTimeOffset.UtcNow;
 				var buffs = entity
-					.ActiveBuffs.Values.Where(b => GameServerListener.ShouldPersistBuff(entity, b) && !b.Expired(now))
+					.ActiveBuffs.Values.Where(b => BuffService.ShouldPersistBuff(entity, b) && !b.Expired(now))
 					.Select(b => new CharacterBuff
 					{
 						BuffId = b.BuffId,

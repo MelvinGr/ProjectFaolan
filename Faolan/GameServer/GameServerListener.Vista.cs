@@ -5,6 +5,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -83,7 +84,7 @@ namespace Faolan.GameServer
 
 			await WorldIir.Send(client,
 				MagicBuffCodec.Build(new MagicBuffIIR(self, 0x00, vista.BuffSpellBaseId, MagicBuffIds.FormApply, null,
-					MagicBuffDataCodec.Build(MagicBuffDatas.ApplyNowNoCaster(vista.BuffSpellBaseId, vista.BuffDurationCentiseconds, CasterLevel(client))))));
+					MagicBuffDataCodec.Build(MagicBuffDatas.ApplyNowNoCaster(vista.BuffSpellBaseId, vista.BuffDurationCentiseconds, BuffService.CasterLevel(client))))));
 
 			var start = VistaScryActions.Start(vista.ScryScriptId, vista.CameraPath, vista.PathDurationSeconds, scene.ObjectClass, scene.ObjectHandle);
 			await SendVistaAction(client, start);
