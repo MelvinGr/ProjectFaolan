@@ -254,6 +254,28 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
+		///     What a <c>RegenIIR</c> has to carry to bring these three pools up to their max: each pool's SHORTFALL in
+		///     the wire's ×100 vitals scale, and 0 for a pool that is already full.
+		///     <para>
+		///         A RegenIIR is a DELTA the client ADDS to its own current vitals, so the only correct value is this
+		///         entity's own shortfall. The create-world burst used to replay the captured <c>0 / 0x8F2 / 0</c>
+		///         verbatim and hand every new character +22.90 mana on top of a pool the same world entry had just
+		///         announced as full - a level-1 Necromancer stood up reading 269 against a 246 max.
+		///     </para>
+		/// </summary>
+		public (int Health, int Mana, int Stamina) ToRefillDeltas()
+		{
+			return (Shortfall(MaxHealth, Health), Shortfall(MaxMana, Mana), Shortfall(MaxStamina, Stamina));
+
+			static int Shortfall(uint max, uint current)
+			{
+				return current >= max
+					? 0
+					: (int)((max - current) * 100);
+			}
+		}
+
+		/// <summary>
 		///     The three CURRENTS only - what retail sends when a pool MOVES, as opposed to when it is seeded (#586).
 		///     <para>
 		///         Measured over the whole corpus (<c>--report vitals-shape</c>): of the 4,900 <c>0x96B8DC59</c>

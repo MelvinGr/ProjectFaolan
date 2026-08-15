@@ -162,6 +162,35 @@ namespace Faolan.Tests
 			Assert.Equal(expected, stat.GetScale());
 		}
 
+		// The create-world burst's RegenIIR is a DELTA the client ADDS to its own current vitals, so it may only ever
+		// carry this character's own shortfall. It used to replay the captured `0 / 0x8F2 / 0` verbatim, which handed
+		// every freshly created character +22.90 mana on top of a pool the same world entry had just announced as
+		// full: the level-1 Necromancer below stood up reading 269 against a 246 max, and only a relog (which
+		// recomputes from the class curve) cleared it.
+		[Fact]
+		public void AFreshlyCreatedCharacter_HasNothingToRefill()
+		{
+			var vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.Necromancer, Level = 1 }, null, ClassBase());
+
+			Assert.Equal(246u, vitals.MaxMana); // the captured retail level-1 mage anchor
+			Assert.Equal((0, 0, 0), vitals.ToRefillDeltas());
+		}
+
+		// ...and a pool that IS short states exactly how short, in the wire's ×100 scale.
+		[Fact]
+		public void RefillDeltas_CarryTheShortfallInWireUnits()
+		{
+			var vitals = EntityVitals.FromCharacter(Guardian(), null, ClassBase());
+			var missing = vitals.MaxHealth - 100;
+			vitals.Health = 100;
+
+			var (health, mana, stamina) = vitals.ToRefillDeltas();
+
+			Assert.Equal((int)missing * 100, health);
+			Assert.Equal(0, mana); // a Guardian has no mana pool, so there is nothing to refill into one
+			Assert.Equal(0, stamina);
+		}
+
 		// The base is DERIVED from (Class, Level) (#578), so a fixture picks a level rather than injecting numbers.
 		// Level 4 keeps the old shape of these cases - a few hundred HP, a stamina pool, no mana.
 		private static Character Guardian()

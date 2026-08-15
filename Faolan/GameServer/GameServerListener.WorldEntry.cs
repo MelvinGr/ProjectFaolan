@@ -119,13 +119,23 @@ namespace Faolan.GameServer
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 
-			// RegenIIR (retail fr325 carries 0 / 0x8F2 / 0 - the middle pool is the only seeded one).
+			// RegenIIR - retail's fr325 sits here, and a RegenIIR is a DELTA the client ADDS to its own current
+			// vitals (RegenCodec). So the value is that character's deficit at that moment, not a constant: replaying
+			// the captured 0 / 0x8F2 / 0 verbatim handed EVERY new character +22.90 mana on top of a pool this same
+			// world entry had just announced as full, and a level-1 Necromancer stood up reading 269 / 246 until the
+			// first relog recomputed it. What belongs here is this character's own shortfall, which for a freshly
+			// created one is zero in all three pools - the record still rides, because it is retail's sequence and it
+			// is what starts the client's regen loop.
+			// A world entity with no live vitals has nothing to say here, and a fabricated delta is exactly what this
+			// record must not carry - so it rides at zero.
+			var (health, mana, stamina) = _simulation.PlayerWorldEntity(client)?.Vitals.ToRefillDeltas() ?? default;
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(RegenCodec.Build(new RegenIIR(instance, 0x00, 0, 0x8F2, 0)))));
+				s => s.WriteArrayUInt32Length(RegenCodec.Build(instance, health, mana, stamina))));
 
 			// SyncCanSprint (0x200C, one byte).
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
 				GameCharInterfaceProjectMethods.DispatchSyncCanSprint, b => b.WriteByte(0x01)));
+
 		}
 
 		// Everything the client needs to LEAVE the loading screen and stand in the world: the deferred stat prompt, the

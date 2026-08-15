@@ -85,6 +85,12 @@ different set of records — `0x2024`, the `0x2052` ability grants, the `CharInP
 `SyncCanSprint` (`Blablatest` create fr324/325). Sending the login burst instead added a combo book, a stat prompt,
 a quest marker and the post-`0x2024` record stream that retail does not send there, and omitted `RegenIIR`.
 
+That `RegenIIR` carries **this character's own shortfall**, from `EntityVitals.ToRefillDeltas()` — which is zero in
+all three pools for a freshly created one. A `RegenIIR` is a DELTA the client ADDS to its current vitals, so the
+captured `0 / 0x8F2 / 0` is one character's deficit at one moment and not a constant: replaying it verbatim added
++22.90 mana on top of a pool this same entry announces as full (`BuildVitals` sends current == max), and a level-1
+Necromancer stood up reading 269 against a 246 max until the first relog recomputed the pool.
+
 ## Leaving the editor: the create→world handoff is on a TIMER, not on the client's bar (Gitea #433)
 
 Once the name is committed, the editor connection must hand the client to the world server with a `0x2002`
