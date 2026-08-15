@@ -254,7 +254,7 @@ recast element in the RDB (3,279 spells' worth, direct + line inheritance), exac
 those carries `cs = 0`. Life Leech holds 3000 cs = the 30 s its in-client tooltip renders.
 
 **The problem was that the number never left the server.** `RecastCentiseconds` occurred in four non-comment
-places, all in `HandleBccCastSpell`, all writing `Session.SpellReadyAt` — a server-side dictionary. Nothing wrote
+places, all in the cast pipeline (`CastService.HandleCast`), all writing `Session.SpellReadyAt` — a server-side dictionary. Nothing wrote
 it to a packet.
 
 ### ⭐ THE COOLDOWN IS `DispatchLockTemplate` — SOLVED, in-client verified
@@ -283,7 +283,7 @@ the wire form of `SetSpellLineRecastTime` and why all ranks grey together.
 The 251 bodies whose id is absent from `Spells` are **abilities and combos**: "template" is the client's word for
 the thing on the bar, not specifically a spell.
 
-Built by `LockTemplateCodec`, sent by `SendSpellCooldown` from the site in `Resolve()` that already arms the
+Built by `LockTemplateCodec`, sent by `CastService.SendSpellCooldown` from the site in `Resolve()` that already arms the
 server's own timer, carrying what REMAINS after the cast time. **In-client PASS 2026-08-09.**
 
 ### The two bugs found on the way, both real and both fixed

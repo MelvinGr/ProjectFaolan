@@ -159,38 +159,6 @@ namespace Faolan.GameServer
 			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
 		}
 
-		// Greys the spell's action-bar button and starts its cooldown sweep (#767) - `DispatchLockTemplate`, which is
-		// how retail states a recast and the reason ours never appeared: we sent none of the 992 the corpus carries.
-		//
-		// There is no recast GameAction on the wire (0 across all 132 dumps); the cooldown IS this message. Body is
-		// [u32 spellId][f32 seconds], and of the 741 captured bodies whose id resolves, 580 carry exactly the spell's
-		// own `RecastCentiseconds / 100` (the rest are partials - time LEFT, on a refresh).
-		//
-		// ⚠️ ONE PER SPELL IN THE LINE, not one for the cast. A `Contract of Protection` cast emits five bodies in a
-		// row - every rank on line 12 - each with the same 20.0. That is the wire form of `SetSpellLineRecastTime`,
-		// and it is why all five ranks of a spell grey together. So this resolves the line's membership rather than
-		// sending the cast id alone; a spell with no line locks only itself, matching `recastGroup`.
-		//
-		// WHETHER to send one and WHAT value it carries are SpellCooldownPolicy's (#768), measured over all 687
-		// captured casts. This used to send what was LEFT of the recast measured from the cast begin, which retail
-		// does not do - and the two spells that exposed it are the two the policy now names.
-		private async Task SendSpellCooldown(INetworkClient client, Spell spell)
-		{
-			if (!SpellCooldownPolicy.Locks(spell))
-				return;
-
-			var seconds = SpellCooldownPolicy.LockSeconds(spell);
-			var locked = spell.GuiStackingLine != 0
-				? await Database.SpellIdsOnLine(spell.GuiStackingLine)
-				: new[] { spell.Id };
-
-			foreach (var templateId in locked)
-				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-					GameCharInterfaceMethods.DispatchLockTemplate, s => s.WriteArray(LockTemplateCodec.Build(templateId, seconds))));
-
-			Logger.LogDebug("Locked {Count} template(s) for {Seconds:F2}s after casting {Spell} ('{Name}').", locked.Length, seconds, spell.Id, spell.Name);
-		}
-
 		// Delivers a completed melee combo (#139). Every step of a combo is an ordinary damaging swing - the corpus
 		// is explicit about that, both steps of the captured `Slave_1_AOE_2hb_Sweep_2` carry an 81-byte hit-result
 		// block - so the steps need nothing special here. What the FINISHER adds is the combo's payload, and that

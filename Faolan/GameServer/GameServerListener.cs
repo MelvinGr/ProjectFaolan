@@ -123,7 +123,9 @@ namespace Faolan.GameServer
 		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
+		// Internal (not private) because the composed collaborators frame their own GameCharInterface sends
+		// against it, the same reason WorldSenderEndpoint above is reachable - see Combat/CastService.cs.
+		internal static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x58);
 
 		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
@@ -224,6 +226,10 @@ namespace Faolan.GameServer
 		// (IWorldOutbound, ISpellEffectOutbound, ISpellweaveOutbound) now forward here. See Combat/BuffService.cs.
 		private readonly BuffService _buffs;
 
+		// Composed collaborator: the CAST PIPELINE (#236/#271/#767) - begin-ack, cast time, then resolve (server-side
+		// effects, ground AoE, the landing buff, mana, instant areas, offensive damage). See Combat/CastService.cs.
+		private readonly CastService _cast;
+
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
@@ -322,6 +328,7 @@ namespace Faolan.GameServer
 			_levelUp = new LevelUpService(database, _simulation, this, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, configuration.ContentKillStreaks);
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
+			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);
