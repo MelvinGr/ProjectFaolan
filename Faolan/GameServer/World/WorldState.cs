@@ -63,6 +63,20 @@ namespace Faolan.GameServer.World
 		// a real per-route number that means something - it is just not u/s over the ground. Open on #714.
 		public const float RouteWalkSpeed = 2.2f;
 
+		// A COMPANION's follow speed, measured off retail rather than reused from the chase constant (#827/#829).
+		//
+		// Casilda's 52 follow MoveTasks in Hoxxling_mage-heraldofxotli_login_gameplay chain exactly - each segment
+		// starts where the last ended - so the emitted path IS her ground track and seg/dt IS her speed. Over the 29
+		// consecutive pairs where the player was actually moving (dt under 5s; the longer gaps are the player standing
+		// still) the median is 4.94 u/s, mean 4.69, and the segments are 7.06u median.
+		//
+		// ⚠️ It matters because the client renders the walk at ITS OWN per-mode speed and only ever REACTS to where we
+		// put her (#714, and the executor confirmed in Ghidra: advance = speed * dt from a per-entity field). Stepping
+		// her at `NpcMoveSpeed` - 7 u/s, the CHASE constant - outran the client by ~42%, so she walked the first
+		// segment and was then snapped forward by each new one. That is exactly what "walks a few steps, then slides
+		// or teleports" was.
+		public const float FollowStepSpeed = 4.94f;
+
 		// #703: how close a route walker must get to a waypoint to count as having reached it and take the next one.
 		// Small relative to the 5.8u median gap between waypoints, so the walk stays ON the harvested polyline rather
 		// than cutting each corner - the corners are what keep it in the street.
@@ -452,7 +466,7 @@ namespace Faolan.GameServer.World
 						var fdz = leader.Position.Z + oz - entity.Position.Z;
 						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
 						if (fdist > stop)
-							StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader);
+							StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader, speed: FollowStepSpeed);
 						else
 							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
 							// points straight at her) and close the move with a single StopIIR (#262/#272).
@@ -719,7 +733,8 @@ namespace Faolan.GameServer.World
 			// segment since the last one (#272), so the client interpolates ~6u segments instead of a per-tick snap. The
 			// model position advances every call regardless; `moveType` is NpcMove (chase/return) or NpcFollow (companion)
 			// so the loop gates/handles it correctly. `target` rides the effect (the aggro/leader the broadcaster wants).
-			void StepAndStream(WorldEntity e, float dx, float dz, float dist, float stopShort, WorldTickEffectType moveType, WorldEntity target, float? targetY = null)
+			void StepAndStream(WorldEntity e, float dx, float dz, float dist, float stopShort, WorldTickEffectType moveType, WorldEntity target, float? targetY = null,
+				float speed = NpcMoveSpeed)
 			{
 				if (!e.Moving) // a fresh move: anchor the first segment at the start point
 				{
@@ -727,7 +742,7 @@ namespace Faolan.GameServer.World
 					e.Moving = true;
 				}
 
-				StepToward(e, dx, dz, dist, deltaSeconds, stopShort, targetY);
+				StepToward(e, dx, dz, dist, deltaSeconds, stopShort, targetY, speed);
 				if (Vector3.DistanceSquared(e.MoveOrigin, e.Position) < MoveBroadcastSegment * MoveBroadcastSegment)
 					return; // segment too short to broadcast yet - keep accumulating
 
