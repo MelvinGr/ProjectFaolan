@@ -3,8 +3,10 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -27,6 +29,9 @@ namespace Faolan.GameServer.Scripting
 		// sends them is gated to this id - the follow + beach-wall generalised (Escort goal / WorldObject.EffectQuestId),
 		// but the POSE stays Casilda-specific until per-NPC pose data exists.
 		public const uint CasildaTemplateId = 9411;
+
+		// The ordinary BCC (behaviour-control) state, against her captive 80 - see SendCasildaPose.
+		public const uint OrdinaryBccState = 1;
 
 		// ---- Kalanthes intro cutscene (create flow) --------------------------------------------------------------
 		// #234/#193 Kalanthes walk-up, CONSTRUCTED from typed MoveTask data (no replayed hex blob). Decoded from the
@@ -108,6 +113,13 @@ namespace Faolan.GameServer.Scripting
 			// ⛔ 2104 is deliberately NOT replayed: its field4 is a large absolute value that reads as a timestamp, and
 			// replaying one capture's clock is the kind of thing that looks right until it is not. She frees correctly
 			// without it; if a residual artefact ever shows up at the rescue, that record is the first suspect.
+			// ⭐ FIRST the BCC STATE, which is what actually lets her walk (#827). `CharacterStatId.CombatMode` (0x14) is
+			// "BCC State" to the client and selects the behaviour tree; her type ships 80 (the captive tree, where 1,186
+			// templates carry the ordinary 1), so until this lands her locomotion never runs - she was moved by the
+			// server while playing a standing animation, which is what "sliding" was. Retail sends exactly this one-stat
+			// update at the rescue, immediately before the three BCC records (capture idx 2103, 29 bytes).
+			await WorldIir.Send(client, StatUpdateCodec.Build(casildaHandle, new CharacterStatBlock().SetRaw(CharacterStatId.CombatMode, OrdinaryBccState)));
+
 			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0)));
 			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 5, 142007, 8, 24, 0, field12: 260)));
 			_logger.LogInformation("#267: sent Casilda freed pose (handle 0x{Handle:X8}) to {Player} - locomotion 42010 (slot 9) + slot-5 behaviour 142007 replacing the struggle.",

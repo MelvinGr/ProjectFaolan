@@ -3,6 +3,8 @@ using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
 namespace Faolan.Tests
@@ -194,5 +196,21 @@ namespace Faolan.Tests
 			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveTrance(0x0802E5D4));
 			Assert.Equal("642cd3d60000c3500802e5d40004000000010000000d08b9c80218042808300058af090000002700000001000000000000000000000000", Convert.ToHexStringLower(bytes));
 		}
+		// #827: the one-stat update retail sends at Casilda's rescue, immediately before the three BCC records
+		// (Hoxxling_mage-heraldofxotli_login_gameplay frame 1834, 25 bytes past the carrier length).
+		//
+		// ⭐ This is the record that actually lets her WALK. `CharacterStatId.CombatMode` (0x14) is "BCC State" to the
+		// client and selects the behaviour tree; her type ships 80 - her captive tree - where 1,186 templates carry the
+		// ordinary 1. Until it flips, her locomotion tree never runs, so the server moved her while she played a
+		// standing animation. That is what "she slides / teleports" was, and no amount of getting the MoveTask right
+		// fixed it: the movement was always arriving, the behaviour to animate it was not.
+		[Fact]
+		public void CasildasRescueBccState_MatchesCapture()
+		{
+			var bytes = StatUpdateCodec.Build(0x00017ED0, new CharacterStatBlock().SetRaw(CharacterStatId.CombatMode, 1));
+
+			Assert.Equal("96b8dc590000c35000017ed000000000010000001400000001", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
 	}
 }

@@ -129,7 +129,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the story holds different ones at different times - Casilda's 156196 is HER chained struggle (unique across
 		// all 1,208 templates, where the generic idle 42024 is shared by 1,008 of them), and once freed she holds the
 		// generic one. Retail's own captures show both spellings of her spawn body (#827).
-		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null, uint? animIdleId = null)
+		//
+		// `bccState` overrides the type's BEHAVIOUR-CONTROL state - `NpcStatCore.BccState`, which the client calls
+		// "BCC State" (CharacterStatId 0x14). It decides which behaviour tree runs, so it is state in the same way the
+		// pose is: 1,186 templates carry the ordinary 1, and Casilda's 80 is her CAPTIVE tree. Retail flips it to 1 by
+		// StatUpdate at the moment of her rescue (#827).
+		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null, uint? animIdleId = null, uint? bccState = null)
 		{
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
@@ -151,6 +156,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				message.MovementMode = mode;
 			if (animIdleId is { } idle)
 				(message.Bcc ??= new ProtoCoreCharacterIIR.CharacterBcc()).AnimIdleId = idle;
+			if (bccState is { } bcc)
+				(message.Stats ??= new ProtoCoreCharacterIIR.CharacterStats()).BccState = bcc;
 
 			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 		}

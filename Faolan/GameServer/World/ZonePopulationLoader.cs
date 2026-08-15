@@ -63,6 +63,11 @@ namespace Faolan.GameServer.World
 		// chained 156196 which exactly one template carries. Used as the freed escortee's held pose (#827).
 		private const uint GenericIdleAnimationId = 42024;
 
+		// The ordinary BEHAVIOUR-CONTROL state - 1,186 of the templates that declare one carry it, against Casilda's
+		// captive 80. The client calls it "BCC State" (CharacterStatId 0x14) and it selects the behaviour tree, so a
+		// creature left in a story state never runs its locomotion: she slid instead of walking (#827).
+		private const uint OrdinaryBccState = 1;
+
 		private const float FormationBindRange = WorldState.NpcLeashRange;
 
 		private readonly AmbientPoolService _ambient;
@@ -310,7 +315,7 @@ namespace Faolan.GameServer.World
 				// walk mode widened the gap the 6-unit segment broadcast then closes by snapping her forward. The
 				// remaining slide is that same server-step vs client-speed mismatch and is NOT fixed here - see #829.
 				if (entity.IsQuestEscortee)
-					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId);
+					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId, OrdinaryBccState);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
