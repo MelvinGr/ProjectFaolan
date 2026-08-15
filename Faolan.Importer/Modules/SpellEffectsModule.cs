@@ -135,14 +135,49 @@ namespace Faolan.Importer.Modules
 				$"{summons.Count} of {summonSpells.Count} catalogued summons resolved to a creature we hold ({unresolved} unresolved, #640).");
 		}
 
-		// The summonable pet creature TYPE names, lower-cased for matching. Two importers need them: the pets module
-		// lifts exactly these creatures onto their types, and the npcs module excludes them from the world PLACEMENTS
-		// (a captured session's summoned pets are not scenery). Both read them from the seeded rows - the one place
-		// that knows which creatures are pets.
+		// Every summonable creature TYPE name, lower-cased for matching - what the PETS module lifts onto its types.
+		// Read from the seeded rows, the one place that knows which creatures a spell can put in play.
 		public static async Task<IReadOnlySet<string>> PetTemplateNames(IDatabaseContext db)
 		{
 			var names = await db.SpellEffects.Where(e => e.Kind == SpellEffectKind.SummonPet && e.Template != null).Select(e => e.Template!).ToListAsync();
 			return names.Select(n => n.ToLowerInvariant()).ToHashSet();
+		}
+
+		// The narrower roster the NPCS module excludes from world PLACEMENTS: creatures that exist ONLY because a
+		// player summoned them. It is deliberately NOT `PetTemplateNames` (#827).
+		//
+		// ⚠️ A creature can be BOTH placed in the world and summonable, and retail says which by how it names the
+		// spell. `PetNameOf` already leans on that convention to read the name at all - these are its prefixes:
+		//
+		//   Pet: · Undead Minion: · Summon Horde: · Deathless Acolyte: · Dread Archmage: · (bare `Demon *`)
+		//        combat pets - they exist only while summoned, and must never become scenery
+		//   Companion:
+		//        a VANITY follower modelled on an NPC that stands in the world - `Companion: Courtesan`,
+		//        `Companion: Drunk Pirate`, `Companion: Snake Charmer`, `Companion: Wolf Pict Warrior`
+		//
+		// `Companion: Casilda` is the one that cost us: the beach's chained Casilda is the NPC the whole Tortage
+		// rescue chain (#261/#262/#267) hangs off, and the flat roster deleted her placement for 10 days because a
+		// vanity spell shares her name. She is not a pet - freeing her makes her follow.
+		//
+		// A name is exempted only when EVERY summon spell naming it is a `Companion:`. `Chicken` is both
+		// `Companion: Chicken` and `Pet: Chicken`, so it stays excluded - one vanity spell cannot vouch for a
+		// creature a hunter also summons.
+		//
+		// ⚠️ Residual gap, stated rather than hidden: this still excludes the placed `Pet:` animals (Chicken, Sheep,
+		// Panther, Cobra, Rocknose stand in the world too). Separating those needs PER-SPAWN evidence - the
+		// `SummonedHandles` owner-binding - not a type-level roster, and the corpus has no PetIIR for them.
+		public static async Task<IReadOnlySet<string>> SummonOnlyCreatureNames(IDatabaseContext db)
+		{
+			var summons = await db.SpellEffects
+				.Where(e => e.Kind == SpellEffectKind.SummonPet && e.Template != null)
+				.Join(db.Spells, e => e.SpellId, s => s.Id, (e, s) => new { e.Template, SpellName = s.Name })
+				.ToListAsync();
+
+			return summons
+				.GroupBy(x => x.Template!.ToLowerInvariant())
+				.Where(g => g.Any(x => !(x.SpellName ?? string.Empty).StartsWith("Companion: ", StringComparison.Ordinal)))
+				.Select(g => g.Key)
+				.ToHashSet();
 		}
 
 		// The pet a summon spell is NAMED after: the part of the spell name after the first ": ", or the whole name

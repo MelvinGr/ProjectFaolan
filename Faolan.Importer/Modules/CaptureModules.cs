@@ -523,7 +523,10 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var petNames = await SpellEffectsModule.PetTemplateNames(ctx.Db);
+			// Creatures that exist ONLY as a summon - NOT every summonable creature (#827). A `Companion:` vanity
+			// follower is modelled on an NPC that genuinely stands in the world, and excluding those by name deleted
+			// the beach's chained Casilda along with the Courtesans, Drunk Pirates and Wolf Pict Warriors.
+			var petNames = await SpellEffectsModule.SummonOnlyCreatureNames(ctx.Db);
 			// The maps whose population is per class (the city armories). Read from the DB, not hardcoded, so flagging
 			// another map is a data change - and so a run against an empty DB simply harvests everything class-agnostic.
 			var classSpecificMaps = await ctx.Db.Maps.Where(m => m.ClassSpecific).Select(m => m.Id).ToHashSetAsync();

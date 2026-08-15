@@ -302,7 +302,7 @@ namespace Faolan.Tests
 
 			var kills = await db
 				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill)
-				.Select(g => new { g.GoalId, g.QuestDefinitionId, g.Separator, g.TargetName, g.Name })
+				.Select(g => new { g.GoalId, g.QuestDefinitionId, g.Separator, g.TargetName, g.TargetTemplateId, g.Name })
 				.ToListAsync(ct);
 
 			// The evidence is the client's own kill VERB - as the wire's kind tag, or as the objective sentence
@@ -321,11 +321,19 @@ namespace Faolan.Tests
 			// creature we hold. A name we do not hold would be stored and never match anything - inert dressed up as
 			// wired - and a name SEVERAL templates share does not say which creature the quest meant (three distinct
 			// "Scavenger Lackey" templates is the known case).
+			//
+			// ⚠️ …unless the goal already carries a `TargetTemplateId`, which is the ID HALF of that pair (#521) and
+			// says outright which creature the quest meant - the name is only its fallback. A resolved goal is not
+			// ambiguous however many templates share its name, so requiring name-uniqueness of it tests the wrong
+			// thing. Surfaced by #827: restoring the world placements a pet-name collision had deleted brought a
+			// second, level-30 `Dog` template with it (a real patrolling NPC on map 2020 - it stands exactly where the
+			// importer had been reporting an orphaned patrol route), and goal 8591 "Slay Dogs" failed despite having
+			// pointed at template 11798 all along.
 			var names = await db.NpcTemplates.Where(t => t.Name != null).Select(t => t.Name!).ToListAsync(ct);
 			var owners = names.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
 			var unresolvable = kills
-				.Where(g => g.Separator == null && g.TargetName != null)
+				.Where(g => g.Separator == null && g.TargetName != null && g.TargetTemplateId == null)
 				.Where(g => !owners.TryGetValue(g.TargetName!, out var n) || n != 1)
 				.Select(g => $"goal {g.GoalId} targets '{g.TargetName}'")
 				.ToList();
