@@ -11,6 +11,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -1601,11 +1602,15 @@ namespace Faolan.Importer.Captures
 				.Select(g => new { Line = g.Key, Flags = g.Max(q => q.QuestLineFlags) })
 				.ToDictionaryAsync(x => x.Line, x => x.Flags);
 
+			// Verified against a capture, OR buildable from the goal rows (#827) - the same widening
+			// `IsSnapshotEligible` makes, and it has to be the same or the two disagree about which quests ship: the
+			// gate would admit a quest this never gave a record to, and it would fall out of the snapshot anyway.
+			// Buildability is evaluated below (it needs the goals loaded), so the query only narrows on what SQL can.
 			var candidates = await db
 				.QuestDefinitions.Include(q => q.Goals)
 				.Include(q => q.TextRefs)
 				.Include(q => q.Line)
-				.Where(q => !q.HasSnapshotRecord && q.ObjectiveRegionVerified && q.Level != 0)
+				.Where(q => !q.HasSnapshotRecord && q.Level != 0)
 				.ToListAsync();
 
 			var seeded = 0;
@@ -1613,6 +1618,9 @@ namespace Faolan.Importer.Captures
 			{
 				// Exactly the other arms of IsSnapshotEligible, so this can never flag a quest the gate would reject.
 				if (def.Goals.Count == 0 || def.Line is not { Magic: not 0 })
+					continue;
+
+				if (!def.ObjectiveRegionVerified && !SnapshotTails.IsObjectiveRegionBuildable(def))
 					continue;
 
 				var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();

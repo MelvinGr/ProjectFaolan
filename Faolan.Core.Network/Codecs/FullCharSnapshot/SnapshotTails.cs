@@ -152,7 +152,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// Only quests whose objective region provably reproduces the wire (see
 			// QuestDefinition.ObjectiveRegionVerified). The region has undecoded fields left, and an unreproducible
 			// one takes the whole login down with it.
-			if (def.Goals.Count == 0 || !def.ObjectiveRegionVerified || area is not { Magic: not 0 })
+			if (def.Goals.Count == 0 || area is not { Magic: not 0 })
+				return false;
+
+			// VERIFIED against a capture, or BUILDABLE from the goal rows (#827). The two are not the same claim and
+			// the flag keeps meaning only the first: "verified" is `reproduces a captured region byte-exact`, and only
+			// 103 of 5,049 quests were ever captured in a snapshot, so verification can never speak for the rest.
+			//
+			// A quest failing this used to be covered - `RestorePlayerQuests` delivered it live instead. That path was
+			// DELETED (#389/#390), so the quest is now delivered nowhere: active in CharacterQuests and never mentioned
+			// to the client, which reads its line as finished. `The Scavenger's Key` was reported that way in-client.
+			if (!def.ObjectiveRegionVerified && !IsObjectiveRegionBuildable(def))
 				return false;
 
 			// The blanket "objectiveGateGreen = false" that used to end this method is GONE (#389). It was added when
@@ -171,6 +181,31 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// never by flipping a quest's flag by hand.
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);
+		}
+
+		// Whether a quest's @609 objective region can be BUILT from its goal rows - as distinct from having been
+		// verified against a capture (#827).
+		//
+		// The discriminating field is the goal's KIND tag. `QuestObjectiveRegions.ForGoal` writes it as the record's
+		// `K` and falls back to 0 when the row has none, and its own comment says what that means: "a goal with no
+		// captured kind cannot be built into a region the client will accept". Everything else the record needs is
+		// either structural (the [1] lead, the goal-id echo), echoed from the definition, or legitimately zero on an
+		// unstarted goal. So the kind is the whole test, and it is a WIRE-harvested field - a row carrying one was
+		// observed, not inferred.
+		//
+		// PARTIAL goals are excluded here for the same reason ForQuest leaves them out of the region.
+		//
+		// ⚠️ This admits ~10 quests today (113 carry a kind on every goal; 103 of those are already verified), all of
+		// them early Tortage chain content. It is deliberately NOT a licence to ship any quest with goals: a region
+		// the client cannot parse takes the WHOLE login down (statlist.cpp:134), so the bar stays "every goal states
+		// its kind on the wire" rather than "the builder produced some bytes".
+		public static bool IsObjectiveRegionBuildable(QuestDefinition? def)
+		{
+			if (def == null)
+				return false;
+
+			var live = def.Goals.Where(g => !g.Partial).ToList();
+			return live.Count > 0 && live.TrueForAll(g => g.Separator != null);
 		}
 
 		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from

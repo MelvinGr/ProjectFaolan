@@ -134,6 +134,47 @@ namespace Faolan.Tests
 			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), portion);
 		}
 
+		// The same failure, one quest further along the same chain (#827): `The Scavenger's Key` was Active in
+		// CharacterQuests and absent from the client, so the Casilda line read as finished after a relog. It has no
+		// CAPTURED objective region - only 103 of 5,049 quests do - so `ObjectiveRegionVerified` can never speak for
+		// it, and the live restore path that used to cover the difference was deleted (#389/#390).
+		[Fact]
+		public async Task AQuestWithNoCapturedRegion_StillRidesTheSnapshot_WhenItsGoalsStateTheirKind()
+		{
+			await using var db = new DatabaseContext(TestDb.Options(DbPath));
+			var def = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs)
+				.FirstAsync(q => q.QuestId == 13563, TestContext.Current.CancellationToken);
+			var area = await db.QuestLines.FirstAsync(a => a.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
+
+			Assert.False(def.ObjectiveRegionVerified, "13563 has no captured region - if this flips, the test is no longer covering the buildable path");
+			Assert.True(SnapshotTails.IsObjectiveRegionBuildable(def), "every non-partial goal of 13563 states its wire kind, so its region is buildable");
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area), "13563 must ride the login snapshot or its line reads as finished");
+			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), SnapshotTails.QuestPortion([def], def, CaptureInstance));
+		}
+
+		// ⚠️ The bar for that widening, and the reason it is not "the builder produced some bytes": a goal with no
+		// captured KIND builds `K = 0`, which the client rejects - and a region it cannot parse takes the WHOLE login
+		// down (statlist.cpp:134), so this must stay strict. PARTIAL goals are excluded, matching what
+		// QuestObjectiveRegions.ForQuest leaves out of the region.
+		[Fact]
+		public void ObjectiveRegionBuildable_NeedsEveryLiveGoalToStateItsKind()
+		{
+			var withKind = new QuestGoalDefinition { GoalId = 1, Separator = 23 };
+			var kindless = new QuestGoalDefinition { GoalId = 2, Separator = null };
+			var kindlessButPartial = new QuestGoalDefinition { GoalId = 3, Separator = null, Partial = true };
+
+			Assert.True(SnapshotTails.IsObjectiveRegionBuildable(new QuestDefinition { Goals = [withKind] }));
+			Assert.True(SnapshotTails.IsObjectiveRegionBuildable(new QuestDefinition { Goals = [withKind, kindlessButPartial] }),
+				"a partial goal is not in the region, so it cannot disqualify the quest");
+
+			Assert.False(SnapshotTails.IsObjectiveRegionBuildable(new QuestDefinition { Goals = [withKind, kindless] }),
+				"one kindless live goal builds K=0 and the client rejects the region");
+			Assert.False(SnapshotTails.IsObjectiveRegionBuildable(new QuestDefinition { Goals = [kindlessButPartial] }),
+				"a quest whose only goal is partial has an empty region");
+			Assert.False(SnapshotTails.IsObjectiveRegionBuildable(new QuestDefinition()));
+			Assert.False(SnapshotTails.IsObjectiveRegionBuildable(null));
+		}
+
 		// @+0x2c carries the SERIES HEAD, not the quest's own id (#566). A standalone quest is its own head, so the
 		// two agree for 84 of the 99 captured records and the distinction only shows on a chain member - which is why
 		// emitting `def.QuestId` unconditionally looked right for years. 12407 (escort Casilda) is the clearest case:
