@@ -598,7 +598,7 @@ namespace Faolan.Tests
 
 		// Every goal whose trailing reference is an npc_template (LDB category 51000) names its target, and where we
 		// hold that template the name is the CATALOG's - i.e. the exact string the runtime compares against
-		// (QuestProgress.MatchingKillGoal's name fallback, ComputeGiverMarkerState).
+		// (QuestProgress.MatchingKillGoal's name fallback, QuestMarkerResolver.MarkerStateFor).
 		//
 		// The distinction is the whole point of #521's work item 1. LDB[51000] is keyed by template id and carries the
 		// client's own name, but 27 of our 1,018 templates were captured under the shared placeholder `Halen van

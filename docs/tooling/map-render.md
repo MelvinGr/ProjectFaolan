@@ -88,9 +88,9 @@ is transitional. `NpcSpawn.NpcSpawnAreaId` is a temporary MEMBERSHIP marker on t
 | resolve the area's creature | `.setnpcgroup` → `DatabaseRepository.SetNpcSpawnAreaCreature` (`ResolvedBy = Manual`) |
 | link its captured spawns | `SpawnAreaResolver.LinkCapturedSpawns` (creature match + bounds ±5u) or `.setnpcgroup`; reversible via `UnlinkNpcSpawnsFromArea` |
 | graduate | `.graduatenpcgroup` → `GraduateSpawnArea` **deletes** the linked `NpcSpawn` rows |
-| spawn from then on | a resolved area becomes an `AmbientPool` (`WorldBroadcaster.LoadAmbientSpawns`) holding ~`MaxCount` on the group's points, wandering (#266), fading on death, refilled by `MaintainAmbientPools` |
+| spawn from then on | a resolved area becomes an `AmbientPool` (`AmbientPoolService.LoadAsync`) holding ~`MaxCount` on the group's points, wandering (#266), fading on death, refilled by `AmbientPoolService.Replenish` |
 
-Linking is already non-duplicating **at runtime** — `WorldBroadcaster` treats a linked captured spawn as a member
+Linking is already non-duplicating **at runtime** — `AmbientPoolService` treats a linked captured spawn as a member
 of that area's pool rather than a separate entity, so there is no captured/ambient overlap in the live world.
 Graduation makes that permanent in the data and drops the frozen captured position in favour of the pool's wander.
 

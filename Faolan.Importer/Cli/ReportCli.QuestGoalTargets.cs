@@ -17,7 +17,7 @@ namespace Faolan.Importer.Cli
 	//
 	// ⚠️ This report exists because resolving the string is NOT the same as being able to store it. `TargetName` is a
 	// MATCH key, compared against a live entity's `NpcTemplate.Name` (QuestProgress.MatchingKillGoal's name fallback,
-	// ComputeGiverMarkerState). `NpcTemplate.Name` is the INTERNAL name; LDB 51000 is the DISPLAY name. Where the two
+	// QuestMarkerResolver.MarkerStateFor). `NpcTemplate.Name` is the INTERNAL name; LDB 51000 is the DISPLAY name. Where the two
 	// coincide the fill works; where they do not it silently stops matching while LOOKING resolved - strictly worse
 	// than the empty column it replaced. So the useful output here is not the strings, it is the per-category
 	// AGREEMENT RATE between the resolved string and the catalog the runtime actually matches against.

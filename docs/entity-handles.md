@@ -34,7 +34,7 @@ client not binding the two, and diverges from the captures we mirror.
 ## NPCs / loot / dynels: session-allocated handles in the low tracked range
 
 These get runtime handles unrelated to any persistent id, and the **range matters**. Observed (from captures
-and `WorldBroadcaster.cs:80-88`):
+and `RuntimeHandleAllocator`):
 
 | entity | handle range |
 |---|---|

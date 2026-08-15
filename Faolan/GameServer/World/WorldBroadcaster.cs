@@ -37,19 +37,6 @@ namespace Faolan.GameServer.World
 	// VERIFICATION with two connected players. Single-player is a no-op (no interest events).
 	public sealed class WorldBroadcaster : IQuestOutbound
 	{
-		// DispatchSetQuestMarker (0x2008) state byte (decoded #241): 0x02 = '!' (quest available), 0x04 = '?' (ready
-		// to turn in), 0x00 = none. 0x01 = the SILVER '!' - a quest NPC with nothing for you right now (#559).
-		//
-		// The silver state was missed by #241, which only saw three values. It is the second most common on the wire:
-		// of the 301 replies in xxx_mage-necromancer_login_play2, 181 are 0x00, 74 are 0x01, 30 are 0x02, 16 are 0x04.
-		// Turach and Laranga mirror each other across that capture and pin what it means - Turach is 0x01 at login
-		// (his quest needs Laranga first), 0x04 once she points at him, 0x01 again while his own quest is in progress,
-		// 0x04 when the bricks are collected, 0x01 after the hand-in. So 0x01 covers BOTH "prerequisite not met" and
-		// "held, or already turned in - nothing more here".
-		//
-		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
-		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
-		private const byte QuestMarkerNone = 0x00, QuestMarkerUnavailable = 0x01, QuestMarkerAvailable = 0x02, QuestMarkerTurnIn = 0x04;
 
 		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
 		private const double LootBagExpirySeconds = 120.0;
@@ -116,9 +103,6 @@ namespace Faolan.GameServer.World
 
 		private readonly WorldSimulation _sim;
 
-		// Quest-giver NPC name -> granted quest id, cached once (small set).
-		private Dictionary<uint, uint> _questGivers = null!;
-
 		// Quest-gated NPC TEMPLATE id -> the quest ids that reveal it (#261, re-keyed off the name in #521). Cached once;
 		// an NPC in this map is streamed only to players holding one of its quests active (see WorldEntity.GateQuestIds
 		// / IsVisibleTo).
@@ -137,6 +121,10 @@ namespace Faolan.GameServer.World
 		// MaintainAmbientPools) - that split is the state-vs-wire seam of #826.
 		private readonly AmbientPoolService _ambient;
 
+		// Decides the quest-marker byte, the forced quest-item drop and a player's held-quest sets. The wire side of
+		// the marker path (which entity, which viewers) stays here and calls in - the other half of the #826 seam.
+		private readonly QuestMarkerResolver _questMarkers;
+
 		// The listener's ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) -
 		// one shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
 		// knockback uses it (retail applies "Knockback immunity" in the same batch as the displacement).
@@ -153,6 +141,7 @@ namespace Faolan.GameServer.World
 			_combos = combos;
 			_applySelfBuff = applySelfBuff;
 			_ambient = new AmbientPoolService(sim, database, _handles, logger);
+			_questMarkers = new QuestMarkerResolver(database, logger);
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
@@ -217,7 +206,7 @@ namespace Faolan.GameServer.World
 				: _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && string.Equals(e.Name, npcName, StringComparison.OrdinalIgnoreCase));
 
 			if (npc != null)
-				await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc));
+				await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc));
 		}
 
 		// #261: re-evaluate quest-gated NPC visibility for one player after their quest state changed (accept / advance /
@@ -229,7 +218,7 @@ namespace Faolan.GameServer.World
 			if (entity == null)
 				return;
 
-			await LoadActiveQuestIds(entity);
+			await _questMarkers.LoadActiveQuestIds(entity);
 			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, true);
 			await DispatchInterest(events, null, client, entity);
 		}
@@ -970,7 +959,7 @@ namespace Faolan.GameServer.World
 
 			// Seed the player's active/completed quest set first so quest-gated NPCs (#261 Scavenger Tuut, #262 hide-
 			// once-done) are correctly included/excluded in the burst from the very start.
-			await LoadActiveQuestIds(entity);
+			await _questMarkers.LoadActiveQuestIds(entity);
 
 			var zone = _sim.World.ZoneForEntity(entity);
 			var token = zone.PlayfieldToken;
@@ -1042,7 +1031,7 @@ namespace Faolan.GameServer.World
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
 			// bag holding the goal's QUEST ITEM - it must be lootable, not a 50/50 roll.
 			var lootGoalItem = deadNpc.LastAttackerHandle is { } looterHandle
-				? await ActiveLootGoalItemFor(looterHandle, deadNpc.Name, deadNpc.NpcTemplateId)
+				? await _questMarkers.ActiveLootGoalItemFor(looterHandle, deadNpc.Name, deadNpc.NpcTemplateId)
 				: null;
 			var questDrop = lootGoalItem.HasValue;
 
@@ -1587,9 +1576,9 @@ namespace Faolan.GameServer.World
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(handle, out var npc) && !npc.IsPlayer)
-				return await ComputeGiverMarkerState(client, npc);
+				return await _questMarkers.MarkerStateFor(client, npc);
 
-			return QuestMarkerNone;
+			return QuestMarkerResolver.None;
 		}
 
 		// #241: re-send a quest-giver's marker to one viewer after their quest state changed (accept/complete) while
@@ -2039,150 +2028,6 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// The QUEST ITEM the killer needs off `npcName`'s corpse - the item id of their active LootFromNpc goal targeting
-		// it (#261), or null when they have no such goal. A non-null result forces the bag drop (the item must be
-		// lootable, not a 50/50 roll) and names what to put in it. Both goals in the game data want an actual key:
-		// Saddur -> 193186 "Acheronian Gate Key", Scavenger Tuut -> 319224 "Scavenger's Key", each item type 113 (Quest).
-		private async Task<uint?> ActiveLootGoalItemFor(uint characterId, string npcName, uint npcTemplateId = 0)
-		{
-			if (string.IsNullOrEmpty(npcName) && npcTemplateId == 0)
-				return null;
-
-			// One batched read rather than a query per active quest - this sits on the LOOT path, so it ran per kill
-			// that could drop a bag.
-			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
-			{
-				// #521: template first, name second - the same test MatchingLootGoal applies when the item is actually
-				// taken. The two must agree, or the drop is forced for a goal the take then refuses to advance.
-				var goal = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
-				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !QuestProgress.TargetsNpc(goal, npcTemplateId, npcName))
-					continue;
-
-				// A goal that names no item cannot be satisfied: the objective is RECEIVING the item, and there is none
-				// to receive or to match a take against (QuestProgress.MatchingLootGoal). Forcing a bag drop for it just
-				// produced an empty bag that looked lootable and advanced nothing. Every LootFromNpc goal in the data
-				// names its item, so this is a gap in the imported quest rather than a shape to support.
-				if (goal.QuestItemId is not { } questItemId || questItemId == 0)
-				{
-					_logger.LogError("Quest {Quest} goal {Goal} loots '{Npc}' but names no QuestItemId, so it can never complete - the goal needs its item harvested.", quest.QuestId, goal.GoalId,
-						npcName);
-					return null;
-				}
-
-				return questItemId;
-			}
-
-			return null;
-		}
-
-		// The quest-marker state byte (#241) for a viewer + a giver NPC in view, from the player's CharacterQuests:
-		// no quest held -> '!' (0x02); goals complete -> '?' (0x04); active/in-progress -> cleared (0x00). Returns
-		// 0x00 for a non-giver. Shared by the interest-spawn push AND the 0x2020-poll reply so they never disagree.
-		//
-		// It takes the ENTITY rather than a name because its two questions want different keys (#646): "is this the NPC
-		// my next talk goal names" is name-vs-name, since a talk goal's target is a string in the client's own RDB data
-		// (#521), while "does this NPC give a quest" is answered by the TEMPLATE, which is what the dialogue graph the
-		// giver map is derived from is keyed by.
-		private async Task<byte> ComputeGiverMarkerState(INetworkClient client, WorldEntity npc)
-		{
-			var character = client.Session.Character;
-			var npcName = npc?.Name;
-			if (npc == null || npcName == null || character == null)
-				return QuestMarkerNone;
-
-			// '?' (0x04) when the player has an ACTIVE quest whose current goal is to TALK to this NPC - she's the
-			// next step (e.g. the Casilda chain's talk-to-free stage 13480, active after looting Tuut's key). This is a
-			// SEPARATE source from the giver logic below: the giver quest (13479) is already Completed/superseded by
-			// then, so without this Casilda showed no '?'. Decoded from the captive-quest capture: retail sends 0x2008
-			// state 0x04 to her handle at the loot->talk transition (Blablatest fr1455).
-			// ⚠️ This runs once per 0x2020 spawn poll, and the client polls once per NPC it is loading - ~77 of them on
-			// the Tortage beach. A query per ACTIVE quest here made each poll ~12 DB round trips / ~257ms, so the
-			// client's serialized poll queue took ~20s to drain and every request behind it - including its 5s latency
-			// check - measured that backlog. One batched read instead; order is preserved, so the FIRST match wins.
-			// The giver logic below needs the raw rows in EVERY state (held / completed), so that stays a plain read.
-			var quests = await _database.GetCharacterQuests(character.Id);
-			foreach (var (_, qDef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
-			{
-				// #521: template first, name second - the same test the talk TRIGGER uses, so the marker and what
-				// actually fires on the greeting cannot disagree.
-				var qGoal = QuestProgress.InPlayOrder(qDef.Goals).FirstOrDefault();
-				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && QuestProgress.TargetsNpc(qGoal, npc.NpcTemplateId, npcName))
-					return QuestMarkerTurnIn;
-			}
-
-			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questId))
-				return QuestMarkerNone;
-
-			// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. Gate on the grant quest's MapId
-			// (its QuestDefinition, #244): only the giver's own map shows it. This used to also be what stopped a
-			// same-NAMED NPC world-wide from wearing the marker - "Halen van Dummy" is the internal name of 27
-			// unrelated templates - but the lookup above is keyed by TEMPLATE since #646, so the map gate is back to
-			// meaning only what it says.
-			var giverQuest = await _database.GetQuestDefinition(questId);
-			if (giverQuest != null && giverQuest.MapId != npc.MapId)
-				return QuestMarkerNone;
-
-			var held = Array.Find(quests, q => q.QuestId == questId);
-			// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest is
-			// only marked Completed on turn-in, not on the kill, #47/#241). Otherwise, held or not, the choice is
-			// between the GOLD '!' and the SILVER one, and it is the same question both times: does this NPC have
-			// something for you RIGHT NOW (#559)?
-			//   * not held, and every earlier step of its line is done -> GOLD, it is yours to take;
-			//   * not held, but the line has not reached it -> SILVER. This is Turach at login in
-			//     `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: his "The Quarry" is step 5 of line 241
-			//     and the player has done none of steps 1-4, so retail greys him rather than drawing no marker;
-			//   * held and in progress -> SILVER, he is still part of the chain with nothing to give;
-			//   * COMPLETED -> no marker at all, which retail states outright (see the branch below).
-			if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
-				return QuestMarkerTurnIn;
-
-			// ⛔ A COMPLETED quest draws NO marker. Retail is explicit about it: in
-			// xxx_mage-necromancer_login_play3 Tina carries '?' (0x04) at t=59.3 and 69.6, quest 10287 completes at
-			// t=101.7, and at t=102.0 she is set to 0x00 - three packets, the instant it finishes. This branch used to
-			// return SILVER for `held != null`, which is true of a completed quest too, so every giver a character had
-			// ever finished wore a permanent "available soon" marker. Found on a level-80 with the whole Destiny line
-			// done: every Tortage giver was silver.
-			if (held is { State: QuestState.Completed })
-				return QuestMarkerNone;
-
-			// Held and still in progress: silver, he is part of the chain with nothing to give right now.
-			if (held != null)
-				return QuestMarkerUnavailable;
-
-			return giverQuest != null && !await IsLineReady(giverQuest, quests)
-				? QuestMarkerUnavailable
-				: QuestMarkerAvailable;
-		}
-
-		// #559: whether `quest`'s line has actually reached it - every EARLIER step of the same quest line completed.
-		// This is what separates the gold '!' from the silver one for a quest the player does not hold: retail greys a
-		// giver whose quest exists but is not yet reachable, rather than drawing no marker.
-		//
-		// ⚠️ JournalSequence 0 is a legitimate captured value, not "unordered" - 74 captured quests carry it and 182
-		// lines have it on every step (see GetQuestDefinitionsByLine). A line ordered entirely by 0s cannot say what
-		// comes first, so a 0 on either side is skipped rather than guessed at: an unorderable line stays GOLD, which is
-		// the behaviour before this gate existed. Only a genuine lower sequence gates.
-		private async Task<bool> IsLineReady(QuestDefinition quest, CharacterQuest[] quests)
-		{
-			return quest.JournalSequence == 0 || LineReached(quest, await _database.GetQuestDefinitionsByLine(quest.QuestLineId), quests);
-		}
-
-		// The rule itself, split from the fetch so it can be tested against the real quest lines without a broadcaster.
-		internal static bool LineReached(QuestDefinition quest, IEnumerable<QuestDefinition> line, CharacterQuest[] quests)
-		{
-			foreach (var step in line)
-			{
-				if (step.JournalSequence == 0 || step.JournalSequence >= quest.JournalSequence)
-					continue;
-
-				if (Array.Find(quests, q => q.QuestId == step.QuestId) is not { State: QuestState.Completed })
-					return false;
-			}
-
-			return true;
-		}
-
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is
 		// null on entry (entry produces only Spawn/Despawn).
 		// Dispatches an entity interest pass AND, for the moving/refreshing player, the static world-object pass. The two
@@ -2277,25 +2122,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// #261: reload the player entity's ActiveQuestIds from the DB (the set interest gating tests gated NPCs against).
-		private async Task LoadActiveQuestIds(WorldEntity entity)
-		{
-			var characterId = entity.Client.Session.Character?.Id;
-			if (characterId == null)
-				return;
-
-			var quests = await _database.GetCharacterQuests(characterId.Value);
-			entity!.ActiveQuestIds.Clear();
-			entity.CompletedQuestIds.Clear();
-			foreach (var quest in quests)
-			{
-				if (quest.State == QuestState.Active)
-					entity.ActiveQuestIds.Add(quest.QuestId);
-				else if (quest.State == QuestState.Completed)
-					entity.CompletedQuestIds.Add(quest.QuestId); // #262: drives "hide once done" NPC gating
-			}
-		}
-
 		// #363 live ambient spawner: the capture-INDEPENDENT open-world
 		// population, managed as spawn-group POOLS. Each RESOLVED NpcSpawnArea becomes an AmbientPool that keeps ~MaxCount
 		// of its creature alive within the group's area: the initial fill spawns one per RDB point, each member roams the
@@ -2379,11 +2205,10 @@ namespace Faolan.GameServer.World
 			if (npc.Name == null || client.Session.Character == null)
 				return;
 
-			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.ContainsKey(npc.NpcTemplateId))
+			if (!await _questMarkers.IsGiver(npc.NpcTemplateId))
 				return; // not a quest-giver -> no marker
 
-			await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc));
+			await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc));
 		}
 
 		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (N3ToClientQuitCodec). Stamped with the

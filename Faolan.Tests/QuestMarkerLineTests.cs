@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -41,13 +42,13 @@ namespace Faolan.Tests
 			var quarry = line.Single(q => q.QuestId == TheQuarry);
 
 			// t=9.3s, a fresh character: nothing done, so the line has not reached step 5 -> silver, not gold.
-			Assert.False(WorldBroadcaster.LineReached(quarry, line, []));
+			Assert.False(QuestMarkerResolver.LineReached(quarry, line, []));
 
 			// Steps 1-4 done (the capture's state by t=123.3s, when Turach actually grants it) -> gold.
 			var doneThroughFour = line.Where(q => q.JournalSequence is > 0 and < 5)
 				.Select(q => new CharacterQuest { QuestId = q.QuestId, State = QuestState.Completed })
 				.ToArray();
-			Assert.True(WorldBroadcaster.LineReached(quarry, line, doneThroughFour));
+			Assert.True(QuestMarkerResolver.LineReached(quarry, line, doneThroughFour));
 
 			// An earlier step merely ACTIVE is not done - the chain has not passed it, so he stays silver.
 			var stillOnStepFour = doneThroughFour
@@ -55,7 +56,7 @@ namespace Faolan.Tests
 					? new CharacterQuest { QuestId = q.QuestId, State = QuestState.Active }
 					: q)
 				.ToArray();
-			Assert.False(WorldBroadcaster.LineReached(quarry, line, stillOnStepFour));
+			Assert.False(QuestMarkerResolver.LineReached(quarry, line, stillOnStepFour));
 		}
 
 		[Fact]
@@ -66,7 +67,7 @@ namespace Faolan.Tests
 			var line = await TortageSteps();
 			var first = line.Single(q => q.JournalSequence == 1);
 
-			Assert.True(WorldBroadcaster.LineReached(first, line, []));
+			Assert.True(QuestMarkerResolver.LineReached(first, line, []));
 		}
 
 		[Fact]
@@ -80,7 +81,7 @@ namespace Faolan.Tests
 				new QuestDefinition { QuestId = 2, JournalSequence = 0 }
 			};
 
-			Assert.True(WorldBroadcaster.LineReached(flat[1], flat, []));
+			Assert.True(QuestMarkerResolver.LineReached(flat[1], flat, []));
 		}
 
 		private static async Task<QuestDefinition[]> TortageSteps()

@@ -221,7 +221,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// A goal with no QuestItemId therefore matches NOTHING, deliberately. Every LootFromNpc goal in the game data
 		// names its item (3492 Saddur -> 193186, 5867 Scavenger Tuut -> 319224), so one without is a data gap, not a
 		// shape to support with a wildcard - and the loot path says so out loud when it meets one
-		// (WorldBroadcaster.ActiveLootGoalItemFor) rather than quietly accepting any item in its place.
+		// (QuestMarkerResolver.ActiveLootGoalItemFor) rather than quietly accepting any item in its place.
 		public static QuestGoalDefinition? MatchingLootGoal(IEnumerable<QuestGoalDefinition> goals, string sourceNpcName, uint grantedItemId,
 			uint? sourceTemplateId = null)
 		{
