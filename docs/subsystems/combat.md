@@ -668,8 +668,10 @@ then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There i
 banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
 the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/subsystems/on-screen-feedback.md`
 and `AttributeChangedCodec` (golden `AttributeChangedCodecTests`).
-Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
-how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
+Both paths are the same code: `LevelUpService` owns the burst, and combat only decides how much XP a kill is worth
+(`CombatResolver.ResolveKillXp`) before handing it to `LevelUpService.ApplyXp`; the GM `.level` set enters at
+`LevelUpService.SetLevel`. Which attributes rise / by how much is provisional (`Progression.AttributeGrowth`, flat
++1/primary) — no per-class growth tables exist in captures.
 
 ## Live spell / ability grants (#73, #74)
 Two distinct mid-session grant packets, both on the GameCharInterface conversation (same class pair), each

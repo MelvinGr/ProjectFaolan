@@ -32,6 +32,7 @@ using Faolan.GameServer.Apprentice;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Inventory;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -1128,6 +1129,28 @@ namespace Faolan.GameServer
 			var rating = CombatRatingCurve.For(character.Level);
 			foreach (var stat in CombatRatingCurve.Stats)
 				await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(character.Id, (uint)stat, rating)));
+		}
+
+		// --- ILevelUpOutbound: the wire side of a ding. Explicit forwards to the ops that already existed here, which
+		// is what keeps LevelUpService off the listener itself - see Progression/ILevelUpOutbound.cs.
+		Task<EntityVitals> ILevelUpOutbound.ReseedVitals(INetworkClient client)
+		{
+			return _combat.ReseedFromMaxStats(client);
+		}
+
+		Task ILevelUpOutbound.SendCombatRatings(INetworkClient client)
+		{
+			return SendCombatRatings(client);
+		}
+
+		Task ILevelUpOutbound.AnnounceAbility(INetworkClient client, Ability ability)
+		{
+			return SendAddSpecialAbility(client, ability);
+		}
+
+		Task ILevelUpOutbound.LearnSpell(INetworkClient client, uint spellId)
+		{
+			return SendLearnSpell(client, spellId);
 		}
 
 		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed

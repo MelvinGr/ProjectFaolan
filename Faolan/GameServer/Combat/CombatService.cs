@@ -9,11 +9,9 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network;
-using Faolan.Core.Progression;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -21,8 +19,9 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer.Combat
 {
 	// Combat domain logic: resolves melee swings and spell casts into damage, drives the NPC kill lifecycle
-	// (despawn + scheduled respawn via the world model), awards XP / levels, tracks kill-objective quest progress, and
-	// builds the combat wire packets (the BehaviorControlCenter ack, DamageResult, Energy, and 0x96B8DC59 vitals).
+	// (despawn + scheduled respawn via the world model), tracks kill-objective quest progress, and builds the combat
+	// wire packets (the BehaviorControlCenter ack, DamageResult, Energy, and 0x96B8DC59 vitals). A kill decides how
+	// much XP it is worth and hands it to the LevelUpService; the level curve and the ding burst live there, not here.
 	// Extracted out of the GameServer listener as a composed collaborator (like WorldBroadcaster): it reads/writes the
 	// world model via the WorldSimulation, broadcasts world effects via the WorldBroadcaster, and frames its own
 	// packets on the world conversation (WorldSenderEndpoint). Vitals resolve from the world model, which is their ONLY
@@ -54,14 +53,6 @@ namespace Faolan.GameServer.Combat
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
 
-		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
-		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
-		// composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, Ability, Task> _announceAddSpecialAbility;
-
-		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
-		// narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, uint, Task> _learnSpell;
 		private readonly FatalityService _fatality; // #140: the fatality burst on a killing blow
 		private readonly FactionService _factions; // #310: Khitai reputation, awarded on a kill
 		private readonly IDatabaseRepository _database;
@@ -69,6 +60,11 @@ namespace Faolan.GameServer.Combat
 		// Content:KillStreaks - whether a kill CHAIN is tracked and announced at all (#446). Read once at construction
 		// like the terrain dir, not per kill: it is a content switch for the server, not per-session state.
 		private readonly bool _killStreaks;
+
+		// Advancement (#209): a kill hands its XP here and the service owns everything downstream - the level curve,
+		// the ding burst, the level-gated ability/spell unlocks and the persistence. One-directional: combat drives
+		// progression, never the reverse.
+		private readonly LevelUpService _levelUp;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 
@@ -77,8 +73,7 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			Func<INetworkClient, Ability, Task> announceAddSpecialAbility, Func<INetworkClient, uint, Task> learnSpell, FatalityService fatality,
-			FactionService factions, bool killStreaks)
+			LevelUpService levelUp, FatalityService fatality, FactionService factions, bool killStreaks)
 		{
 			_killStreaks = killStreaks;
 			_factions = factions;
@@ -87,8 +82,7 @@ namespace Faolan.GameServer.Combat
 			_database = database;
 			_questProgression = questProgression;
 			_logger = logger;
-			_announceAddSpecialAbility = announceAddSpecialAbility;
-			_learnSpell = learnSpell;
+			_levelUp = levelUp;
 		}
 
 		// Channeled ground AoE (#349): ticks damage over the cast/channel duration so the client sees a floating number
@@ -703,54 +697,25 @@ namespace Faolan.GameServer.Combat
 				await OnNpcKilled(client, targetHandle, npcEntity!, cause);
 		}
 
-		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
-		// 0x96B8DC59 stat update so the XP bar (and, on a ding, level + new vitals) move. Experience is within-level
-		// progress. The new XP/level are PERSISTED immediately (SetCharacterProgress) so they survive relog instead of
-		// waiting on the full-graph disconnect/autosave save (which the player can lose by crashing or which can roll
-		// back on a navigation conflict).
+		// A kill's share of the killer's advancement: the XP the creature is worth, handed to the progression service
+		// (which owns the level curve, the ding burst and the persistence), plus the PvE kill counter, which is this
+		// path's alone.
+		//
+		// What a kill decides is the AMOUNT - `CombatResolver.ResolveKillXp(npcLevel)`. What that amount then does to
+		// the character is not combat's business, and used to be 40 lines of level curve + ding burst right here.
 		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
 		{
 			var character = killer.Session.Character;
 
-			var xp = CombatResolver.ResolveKillXp(npcLevel);
-			character.Experience += xp;
-
-			// The sheet's kill counter (#447). Persisted here rather than at autosave for the same reason the XP is:
-			// a kill is earned once, and a crash between the kill and the save loses it.
+			// The sheet's kill counter (#447). Persisted here rather than at autosave because a kill is earned once,
+			// and a crash between the kill and the save loses it - the same reason the XP is.
 			// This is the NPC counter, not the PvP one (#808): the slot the snapshot sends as `PvPTotalKills` (0x290)
 			// is a PvP CAREER total, and a mob kill used to land on it. `AwardKillXp` is reached only for a creature
 			// kill - it takes the NPC's level - so every increment here is PvE by construction.
 			character.NpcKills++;
 			await _database.SetCharacterNpcKillCounts(character.Id, character.NpcKills, character.NpcDeaths);
 
-			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
-			character.Experience = remaining;
-
-			if (levelsGained > 0)
-			{
-				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
-
-				// The LIVE entity's level too: it is what ramped buff deltas and the attribute rebase read, so leaving it
-				// behind would keep resolving them at the level the player entered the world with.
-				if (_sim.PlayerWorldEntity(killer!) is { } leveled)
-					leveled.Level = character.Level;
-
-				// No ceiling to store: the vitals max is DERIVED from (Class, Level), so writing the level IS writing
-				// the new max (#578). It used to be a persisted CharacterMaxStats row that only the `.level` GM command
-				// ever updated - a combat level-up wrote the level and left the row at its creation value, so the next
-				// login re-seeded current health from the old ceiling and the player came back at a fraction of their
-				// bar (a level-2 necromancer reading 89/955).
-				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
-				await PushLevelUp(killer!, character, levelsGained);
-				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
-				return;
-			}
-
-			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
-
-			var block = new CharacterStatBlock().SetExperience(character.Level, character.Experience);
-			await SendStatUpdate(killer!, block, killer!.Session.Character.Id);
-			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
+			await _levelUp.ApplyXp(killer, CombatResolver.ResolveKillXp(npcLevel));
 		}
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
@@ -810,120 +775,6 @@ namespace Faolan.GameServer.Combat
 
 			_logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
 			_combat.Remove(targetHandle);
-		}
-
-		// On level-up: emit the retail attribute-increase feedback (one AttributeChanged on-screen line per primary
-		// that rose - the VISIBLE half of a ding, #209), then raise the player's live vitals to the new max and refill
-		// them (a ding heals) and push the new Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
-		private async Task PushLevelUp(INetworkClient killer, Character character, uint levelsGained)
-		{
-			var instance = killer.Session.Character.Id;
-
-			// The level-up EVENT first (0x6D314743) - fires the client's "reached level N" banner + effect (#209);
-			// retail sends a SEPARATE event PER level ahead of the AttributeChanged lines (combat-levelup frame 9937,
-			// and Hoxxling's L2/L3/L4 as three), each carrying [level, currentXP, xpThisLevel, xpNextLevel, 1, 8, 0].
-			var fromLevel = character.Level - levelsGained;
-			for (var lvl = fromLevel + 1; lvl <= character.Level; lvl++)
-			{
-				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
-				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
-				var currentXp = lvl == character.Level
-					? thisXp + character.Experience
-					: thisXp;
-				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
-				await SendWorldPacket(killer, NewLevelCodec.Build(instance, lvl, deltas));
-
-				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
-				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
-				// class-independent level-keyed catalog (casters have no rows); it ships empty until populated from dumps,
-				// so this is a no-op today.
-				foreach (var combo in await _database.GetClassCombosUnlockedBetween(character.Class, lvl - 1, lvl))
-					await SendWorldPacket(killer, ComboBookCodec.Build(instance, combo.Id));
-			}
-
-			// The rating QUAD is LEVEL-DERIVED (`400 x level - 300`, #685), so the ding invalidates the copy the login
-			// snapshot carried - and retail restates it right here: 15 of the 18 captured `NewLevelIIR` events are
-			// followed by a quad burst, 11 of them within 0.1 s, i.e. inside this same burst. Without it a character's
-			// four combat ratings read the level they logged in at until the next relog.
-			var rating = CombatRatingCurve.For(character.Level);
-			foreach (var stat in CombatRatingCurve.Stats)
-				await SendWorldPacket(killer, StatCodec.Build(StatIirs.ForCharacter(instance, (uint)stat, rating)));
-
-			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
-				await SendWorldPacket(killer,
-					FormatFeedbackCodec.Build(instance, new AttributeChanged(attributeId, amount)));
-
-			var vitals = await ReseedFromMaxStats(killer);
-
-			var block = vitals
-				.ToVitalsBlock()
-				.SetLevel(character.Level)
-				.SetExperience(character.Level, character.Experience);
-			await SendStatUpdate(killer, block, killer.Session.Character.Id);
-
-			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
-			// ANNOUNCED 0x2052s at the ding (Rest at the L1->L2 ding - Blablabla frame 9937, Blablatest 1357,
-			// Stihetfv 685 - and in every L2+ char's login re-grant). The class<->ability map gives the per-class
-			// unlock level, so the ding grants are the band newly crossed.
-			var previousLevel = character.Level - levelsGained;
-			if (_announceAddSpecialAbility != null)
-			{
-				foreach (var ability in await _database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, character.Level))
-					await _announceAddSpecialAbility(killer, ability);
-			}
-
-			// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed
-			// range - learned (DispatchLearnSpell) and persisted to CharacterSpells so they ride every relog, exactly
-			// like .learnspell / a create-flow starter. Combos are NOT in that set (#298) - they went out above, on the
-			// combo book, which is the only place retail puts them.
-			if (_learnSpell != null)
-			{
-				var learned = await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level);
-				foreach (var spellId in learned)
-				{
-					await _learnSpell(killer, spellId);
-					await _database.AddCharacterSpell(character.Id, spellId);
-				}
-
-				await GrantCastabilityFor(character, learned);
-			}
-		}
-
-		// What makes a just-learned spell CASTABLE (#298). Learning a spell puts it in the book, which is enough for
-		// it to render and for the level to read right, but the client refuses the cast until the character carries
-		// the FEAT that teaches it (its criteria evaluator's feat case, `YouCanNotUseYet`). Two grants, and they are
-		// different things:
-		//
-		//   1. the TEACHING FEATS, read backwards out of FeatSpellGrants - exact, per spell, and available for all
-		//      twelve classes because it comes from the client RDB rather than from a capture. It deliberately stops
-		//      short of the class PROGRESSION tracks, which retail never puts in a feat list (see
-		//      GetFeatsTeachingSpells);
-		//   2. the class SKILL scaffold, which is the older stand-in and is kept because it is a different table
-		//      (skills, not feats) and still covers whatever the feat grants do not.
-		//
-		// The scaffold alone only ever worked for the four classes with a high-level capture (Necromancer,
-		// Demonologist, Assassin, Herald of Xotli) - `FullSkillIdsFor` returns null for the other eight, so their
-		// level-up spells stayed gated. The feat grant is what closes that.
-		//
-		// Both take effect on the next world entry: feats ride the spawn scaffold's pre-IIR frame, so there is no
-		// mid-session feat packet to send and none is invented here.
-		//
-		// The five classes that came out of the feat grant with ZERO coverage - Barbarian, Guardian, Conqueror,
-		// Assassin, Ranger - were not a gap: 227 of their 259 level-gated catalog entries are COMBOS, which no feat
-		// teaches and which never reach this method any more (see GetClassSpellsUnlockedBetween). What is left is an
-		// ordinary catalog gap of the same kind the caster classes have, Conqueror's ~36 real spells being most of it.
-		private async Task GrantCastabilityFor(Character character, IReadOnlyCollection<uint> learnedSpellIds)
-		{
-			var teachingFeats = await _database.GetFeatsTeachingSpells(learnedSpellIds);
-			if (teachingFeats.Length > 0)
-			{
-				await _database.AddCharacterFeats(character.Id, teachingFeats);
-				_logger.LogInformation("Level-up: trained {Count} feat(s) that teach {Spells} newly learned spell(s) for {Name}.", teachingFeats.Length, learnedSpellIds.Count, character.Name);
-			}
-
-			var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
-			if (fullScaffold != null)
-				await _database.EnsureCharacterSkills(character.Id, fullScaffold);
 		}
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
 
-namespace Faolan.GameServer.Combat
+namespace Faolan.GameServer.Progression
 {
 	// Provisional per-level primary-attribute growth, the values fed to the AttributeChanged level-up feedback (#209).
 	// Captures show every class raises all five primary attributes on a level-up (the same 5 category-615 ids appear

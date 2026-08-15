@@ -808,16 +808,6 @@ namespace Faolan.GameServer
 				AddSpecialAbilityCodec.Build(ability, announce)));
 		}
 
-		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute
-		// that rose (#209). This is the VISIBLE half of a level-up; the caller still pushes the new vitals maxima.
-		// `levelsGained` covers a multi-level jump (e.g. a `.level 40` set). The growth amounts are provisional
-		// (Combat.AttributeGrowth) until real per-class tables exist.
-		private static async Task SendLevelUpFeedback(INetworkClient client, uint newLevel, uint levelsGained = 1)
-		{
-			var character = client.Session.Character;
-			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
-				await SendFeedback(client, new AttributeChanged(attributeId, amount));
-		}
 		// --- ISpellweaveOutbound: the spellweaving FSM's wire + world-state surface. Explicit forwards to the
 		// methods that already existed, which is all the seven Func<> seams ever were - see ISpellweaveOutbound.
 		bool ISpellweaveOutbound.IsMounted(INetworkClient client)

@@ -32,8 +32,8 @@ banner in any capture — when a character dings (or a quest awards attribute po
 a `0x96B8DC59` vitals push with the new maxima. Built by `AttributeChangedCodec` (`Faolan.Core.Network`, a string codec whose text
 `FormatFeedbackCodec` carries), byte-exact in `AttributeChangedCodecTests`. typeFlags = `0x40000006`, footer = `0` (invariant across all 33 captured
 messages). The three `key="..."` are per-burst nonces the client does not validate (reuse is in-client proven).
-Wired into both ding paths: GM `.level` and the XP-driven `CombatService.PushLevelUp`. The growth amounts are
-provisional (`Combat.AttributeGrowth`) pending real per-class tables.
+Emitted by `LevelUpService`, which owns the whole ding burst — both the XP-driven ding and the GM `.level` set run
+the same code. The growth amounts are provisional (`Progression.AttributeGrowth`) pending real per-class tables.
 
 This is the same `FormatFeedback` retail sends as the (textual) reply to `CancelBuff` — it is the general
 "show feedback text" channel, distinct from the ChatServer chat/system-message path.

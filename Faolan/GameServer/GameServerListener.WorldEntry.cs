@@ -728,35 +728,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Emits the retail level-up dings: ONE NewLevelIIR_t (0x6D314743) per level gained - the event that fires the
-		// client's "Congratulations, you have reached level N!" banner + the level-up visual/audio effect (#209). The
-		// banner text is client-side and gated on this packet; the raw Level stat + AttributeChanged lines alone show
-		// nothing. Retail sends a SEPARATE event per level (Hoxxling dinged L2/L3/L4 as three, frames 9937->), each
-		// carrying [newLevel, currentXP, xpThisLevel, xpNextLevel, 1, 8, 0] (fields 5/6/7 constant across every
-		// capture). Sent before the AttributeChanged burst (combat-levelup capture ordering).
-		private async Task SendLevelUpDings(INetworkClient client, uint fromLevel, uint toLevel, uint finalRemainingXp)
-		{
-			var instance = client.Session.Character.Id;
-			var @class = client.Session.Character.Class;
-			for (var lvl = fromLevel + 1; lvl <= toLevel; lvl++)
-			{
-				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
-				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
-				var currentXp = lvl == toLevel
-					? thisXp + finalRemainingXp
-					: thisXp; // only the final level carries partial XP
-				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
-
-				await WorldIir.Send(client, NewLevelCodec.Build(instance, lvl, deltas));
-
-				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
-				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
-				// class-independent level-keyed catalog (casters have no rows); empty until populated from dumps.
-				foreach (var combo in await Database.GetClassCombosUnlockedBetween(@class, lvl - 1, lvl))
-					await WorldIir.Send(client, ComboBookCodec.Build(instance, combo.Id));
-			}
-		}
-
 		private async Task SendReadyForPlayScreen(INetworkClient client)
 		{
 			var sender = client.Session.IsUnnamedCreatePhase

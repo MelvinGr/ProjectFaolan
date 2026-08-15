@@ -37,7 +37,8 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
-		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, IGameServerProvider
+		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, ILevelUpOutbound,
+		IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -217,6 +218,11 @@ namespace Faolan.GameServer
 		// See Progression/SkillPointService.cs.
 		private readonly SkillPointService _skillPoints;
 
+		// Composed collaborator: character advancement - XP in, levels out, and the whole level-up burst (#209). Every
+		// path that moves a level goes through it (a kill's XP via CombatService, a GM `.level` set).
+		// See Progression/LevelUpService.cs.
+		private readonly LevelUpService _levelUp;
+
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
@@ -312,8 +318,8 @@ namespace Faolan.GameServer
 			_buffStats = new BuffStatEffects(database, logger);
 			_poolEffects = new SpellPoolEffects(database, logger);
 			_factions = new FactionService(database, logger, SendFactionStanding);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality, _factions,
-				configuration.ContentKillStreaks);
+			_levelUp = new LevelUpService(database, _simulation, this, logger);
+			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, configuration.ContentKillStreaks);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);

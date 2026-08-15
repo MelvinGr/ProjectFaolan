@@ -808,77 +808,11 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var previousLevel = character.Level;
-			character.Level = level;
-			// The live entity's level follows, same as the XP path - it drives ramped buff deltas and the attribute
-			// rebase, so a `.level` that left it stale would keep resolving them at the old level.
-			if (_simulation.PlayerWorldEntity(client) is { } leveled)
-				leveled.Level = level;
-			// A GM `.level` set jumps to the START of the target level, so zero the within-level XP: otherwise stale
-			// progress from a higher level shows against the (smaller) new MaxExp and the XP bar renders NEGATIVE on a
-			// level-DOWN (the bar's fill = Exp/MaxExp with Exp > MaxExp, or Exp for a level whose threshold is now below
-			// the carried total). Fresh level = empty bar.
-			character.Experience = 0;
-			// No vitals row to refresh: the ceiling is DERIVED from (Class, Level), so setting the level above is
-			// already the new max (#578).
-			await Database.SaveCharacter(character);
-
-			// Push Level AND a refreshed XP bar (Exp/MaxExp) so a GM `.level` ding shows exactly like an XP-driven ding
-			// (#209): the kill path (CombatService.PushLevelUp) now builds the same block off the same
-			// ReseedFromMaxStats, so both level-up paths emit an identical Level + vitals push.
-			//
-			// The vitals ride that block WHOLE - current and max. This was a `SendVitals(client)` that emitted the
-			// three CURRENT ids only, on the belief that "max rides the snapshot": true at world entry, wrong for
-			// every later change. Measured in-client (#450): `.level 80` left the client rendering `4285 / 1270` -
-			// the new current against the max it had been seeded with 57 levels earlier.
-			await SendStatUpdate(client,
-				(await _combat.ReseedFromMaxStats(client))
-					.ToVitalsBlock()
-					// Level AND ApprenticeLevel: the nameplate renders max() of the two, so pushing Level alone left
-					// a level-DOWN showing the old level over the health bar while the sheet showed the new one
-					// (#472). See CharacterStatBlock.SetLevel.
-					.SetLevel(level)
-					.SetExperience(level, character.Experience),
-				client.Session.Character.Id);
-
-			// The rating quad is level-derived (#685), so `.level` invalidates it in BOTH directions - which is why
-			// this sits here rather than inside the increase-only branch below. The XP-driven ding restates it too
-			// (CombatService.PushLevelUp).
-			await SendCombatRatings(client);
-
-			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
-			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
-			if (level > previousLevel)
-			{
-				// One NewLevelIIR ding per level gained first (fires the client's "reached level N" banner + effect), 				// THEN the per-attribute AttributeChanged lines - retail's order (combat-levelup capture 9937->9939).
-				await SendLevelUpDings(client, previousLevel, level, character.Experience);
-				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
-
-				// Level-gated ability unlocks, announced - same as the XP-driven ding (CombatService.PushLevelUp):
-				// retail grants e.g. Rest as an announced 0x2052 at the L1->L2 ding (#209/#73).
-				foreach (var ability in await Database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, level))
-					await SendAddSpecialAbility(client, ability);
-
-				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range, 				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.
-				var learned = await Database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, level);
-				foreach (var spellId in learned)
-				{
-					await SendLearnSpell(client, spellId);
-					await Database.AddCharacterSpell(character.Id, spellId);
-				}
-
-				// Castability (#298): the TEACHING FEATS for what was just learned (exact, per spell, all twelve
-				// classes - read backwards out of FeatSpellGrants), plus the older class SKILL scaffold, which is a
-				// different table and only ever covered the four captured classes. Both ride the next spawn (relog).
-				// Kept identical to CombatService.GrantCastabilityFor - the two level-up paths must not diverge.
-				var teachingFeats = await Database.GetFeatsTeachingSpells(learned);
-				if (teachingFeats.Length > 0)
-					await Database.AddCharacterFeats(character.Id, teachingFeats);
-
-				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
-				if (fullScaffold != null)
-					await Database.EnsureCharacterSkills(character.Id, fullScaffold);
-			}
+			// Everything a level change entails - persist, ding burst, attribute lines, vitals, rating quad, the
+			// level-gated ability/spell unlocks and their castability grants - belongs to the progression service, so a
+			// GM set and an XP-driven ding are LITERALLY the same code rather than two copies held in step by comment.
+			// They were two copies, and the comments said so ("must not diverge").
+			await _levelUp.SetLevel(client, level);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
