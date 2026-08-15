@@ -379,7 +379,12 @@ namespace Faolan.GameServer.World
 					// right: 24,432 of the 25,750 attributable captured Emote records land on an actor with no MoveTask in
 					// the preceding 10s (`--report ambient-animation`). Playing an idle over a walk would fight the walk
 					// animation anyway.
-					if (entity.TickAmbientAnimation(deltaSeconds))
+					// ⛔ …and never for a quest ESCORTEE (#827). It is held in a scripted pose until its rescue - playing
+					// an idle over Casilda's captive pose (#267) just replaces it, and a woman chained to a post does
+					// not scratch and look around - and it is walking behind the player afterwards, which the standing
+					// gate below already covers. Retail does animate her, but on combat EVENTS near the player rather
+					// than on this self-timed rotation.
+					if (!entity.IsQuestEscortee && entity.TickAmbientAnimation(deltaSeconds))
 					{
 						if (!IsStanding(zone, entity))
 						{

@@ -119,6 +119,21 @@ namespace Faolan.GameServer.World
 		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.
 		public uint? HideWhenQuestCompletedId { get; set; }
 
+		// Whether this NPC is the ESCORTEE of a quest - the same Escort goal that fills HideWhenQuestCompletedId is what
+		// says so, so the flag is data-driven and needs no per-NPC list.
+		//
+		// An escortee is never idle in the ambient sense (#827). Before its rescue it is held in a SCRIPTED POSE -
+		// Casilda's captive pose is a BehaviorControlCenterIIR (#267) and an idle emote played over it simply replaces
+		// the pose, which is what put a chained woman through a scratch-and-look-around routine. After the rescue it is
+		// walking behind the player, and the standing gate already suppresses idles there.
+		//
+		// ⚠️ This is not the same thing as "has no ambient animations". Retail DOES animate her - reacting when an
+		// enemy attacks the player and when that enemy dies - but those are REACTIONS to combat events, a different
+		// system from the self-timed idle rotation. Our harvest cannot tell the two apart and filed hers as idles
+		// (three rows on template 9411), which is tracked separately; suppressing the rotation is correct either way,
+		// because none of those three is an idle.
+		public bool IsQuestEscortee => HideWhenQuestCompletedId != null;
+
 		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
 		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
 		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
