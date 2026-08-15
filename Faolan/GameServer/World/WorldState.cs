@@ -469,8 +469,20 @@ namespace Faolan.GameServer.World
 							StepAndStream(entity, fdx, fdz, fdist, stop, WorldTickEffectType.NpcFollow, leader, speed: FollowStepSpeed);
 						else
 							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
-							// points straight at her) and close the move with a single StopIIR (#262/#272).
-							EndMove(entity, true, WorldTickEffectType.NpcFollow);
+							// points straight at her) but send NO StopIIR (#827).
+							//
+							// ⚠️ A follower oscillates around FollowStopRange for as long as the player is walking - out
+							// of range, step, back in range - so stopping here fired a Stop on every oscillation. Our
+							// stream read `Move STOP Move STOP Move Move STOP` where retail's is bursts of Moves with no
+							// Stop between them (52 moves to 7 stops across the whole capture, and none inside a burst).
+							// Each Stop halts the client's walk, and the next Move restarts it, so she played the halt
+							// animation over and over while the server kept repositioning her: "walks a few steps, then
+							// slides or teleports".
+							//
+							// The Stop belongs to the follow ENDING - the leader-gone branch above still sends one - not
+							// to her briefly catching up. With the task bound to the leader (mode-08) the client holds
+							// its own position near them anyway.
+							EndMove(entity, false, WorldTickEffectType.NpcFollow);
 						continue;
 					}
 
