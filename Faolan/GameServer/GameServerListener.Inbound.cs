@@ -2320,7 +2320,7 @@ namespace Faolan.GameServer
 					// Handled here, beside the quest-pickup above, because the item grant lives on the listener.
 					if (_broadcaster.HarvestNodeAt(client, target) is { } node)
 					{
-						await HarvestResourceNode(client, node);
+						await _tradeskill.Harvest(client, node);
 						break;
 					}
 

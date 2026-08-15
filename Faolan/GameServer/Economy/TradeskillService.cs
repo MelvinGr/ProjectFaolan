@@ -5,9 +5,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Constants;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
@@ -76,6 +82,13 @@ namespace Faolan.GameServer.Economy
 		// is 0 there - instant - which is the only reason there is no constant for it: we do not implement removal.
 		public const uint GemSocketCentiseconds = 500;
 
+		// GATHERING's wire side: a swung node restates its health to everyone looking at it, and an exhausted one
+		// despawns. Both are ordinary world-object broadcasts.
+		private readonly WorldBroadcaster _broadcaster;
+
+		// The refusal lines a harvest can produce ("already harvested", "bag full", "not yet harvestable") - said by
+		// the NODE, which is how retail words them, rather than as a system message.
+		private readonly IChatServerDispatcher _chat;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
@@ -84,10 +97,12 @@ namespace Faolan.GameServer.Economy
 		// own command QUEUE can hold more than one, and dropping a second craft on the floor would silently eat it.
 		private readonly List<StagedTradeskill> _staged = [];
 
-		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, ILogger logger)
+		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, WorldBroadcaster broadcaster, IChatServerDispatcher chat, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
+			_broadcaster = broadcaster;
+			_chat = chat;
 			_logger = logger;
 		}
 
@@ -413,6 +428,133 @@ namespace Faolan.GameServer.Economy
 			_logger.LogInformation("Craft: {Character} made {Count}x {Product} ({ProductId}) from recipe {Recipe}, into bag slot {Slot}.", character.Name, count, productItem?.Name ?? "?",
 				product.ItemId, recipeId, slot);
 			return recipeId;
+		}
+
+		// ── GATHERING ────────────────────────────────────────────────────────────────────────────────────────────
+		// The front half of the tradeskill loop: where a recipe's ingredients come FROM. It lives here rather than in
+		// a listener partial because it is the same loop as the craft below - and because the rank gate it opens with
+		// is `HasReachedFeat`, this service's own.
+
+		// Harvest a resource node (#494): grant the matching resource stack and retire the node.
+		//
+		// The captured payoff is the ORDINARY item path - DispatchAddItem into the backpack plus a
+		// DispatchDisplayItemLootChatMessage carrying (itemId, itemId, 0, count) - so nothing new goes on the wire, and
+		// the resource items already ship in faolan.db.
+		//
+		// ONE INTERACTION IS ONE SWING, and a swing takes 100 of the node's 1000 health and grants exactly 1 unit - so
+		// a full node is ten swings, not one. This used to empty the node in a single use and hand out 40, both of
+		// which were misreadings the annotated mining session settles:
+		//
+		//   - "one harvest empties it" came from reading the ENDS of the earlier captures and explaining the partial
+		//     values (901, 701, 382, ...) away as OTHER players on a shared node. They are the per-swing decrement.
+		//     The maintainer's own gold vein runs 298 -> 198 -> 98 while they narrate "-10% each time".
+		//   - the 40 came from the 4th u32 of the DispatchDisplayItemLootChatMessage that follows. That word is the
+		//     item's LEVEL (see HarvestCatalog.Yields); the count rides the ADD's stat_list 26, and it is 1 every time.
+		//
+		// The client renders health/max as the PERCENTAGE in the node's health bar - which is where the "12% silver
+		// vein" / "30% gold vein" annotations come from - so the swing has to put the new health on the wire or the
+		// node keeps reading full. That is the same StatIIR the respawn sequence already sends for CarsGroup.
+		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 18:22-18:45, dynels 0x2688/0x26d6/0x269a/0x2666/0x26c0]
+		//
+		// Retail also REGROWS a node in place (+33/+26/+16 per 60s, per node) rather than despawning it at the floor.
+		// We still despawn-and-respawn on exhaustion, which is the existing DynelVisualSequence; regrowth-in-place is
+		// tracked in Gitea #732.
+		public async Task Harvest(INetworkClient client, LiveWorldObject node)
+		{
+			var character = client.Session.Character;
+
+			// ⚠️ The node is identified by its DISPLAY id, not by Row.Name (#734). The record's name STRING is an
+			// internal name retail itself gets wrong - the silver vein ships as "Martial Ring", a copper node as
+			// "Vitalic Bronze-studded Armbands" - so keying on it left those rows silently inert. `Name` here is the
+			// LDB name the player actually sees, which is also what the messages below should say.
+			if (HarvestCatalog.NodeFor(node.Row.DisplayCategory, node.Row.DisplayId) is not { } harvest)
+				return; // not a harvest node at all - some other destructible the player clicked
+
+			var name = harvest.Name;
+
+			// #779: the GATHERING gate, and it goes FIRST because it is the only refusal here that is retail's own -
+			// retail turns a player away who has not trained the rank and says WHICH feat is missing rather than "you
+			// cannot do that", as one FormatFeedbackIIR carrying the `FeatRequired` remoteformat with the feat's
+			// template id in it. It also has to precede the #746 branch below, because the one node whose requirement
+			// the corpus states (Marble) is also one of the nine with no resource item - checking that first would
+			// answer a rank refusal with our own placeholder and the gate would never run at all.
+			//
+			// ⚠️ Only ONE node type carries a requirement (see HarvestCatalog.HarvestNode.RequiredFeatId): the corpus
+			// states exactly one, and deriving the other 24 from the tier ordering is the invention that catalog exists
+			// to avoid. Every other node stays ungated, which is the behaviour that shipped before this gate.
+			if (harvest.RequiredFeatId is { } requiredFeat && !await HasReachedFeat(character.Id, requiredFeat))
+			{
+				_logger.LogInformation("Harvest: {Player} has not trained feat {Feat}, so '{Node}' 0x{Handle:X8} was refused.", character.Name, requiredFeat, name, node.Handle);
+				await WorldIir.Send(client, FormatFeedbackCodec.Build(character.Id, new FeatRequired(requiredFeat)));
+
+				return;
+			}
+
+			// #746: a node type whose resource has no item row. Nine of the 25 shipped types are in this state, and it
+			// is not something a player can be expected to infer from a click that does nothing - so say it, the same
+			// way the exhausted and bag-full refusals do. Never silent: the alternative reads as a broken node.
+			if (harvest.ResourceItemId is not { } resourceId)
+			{
+				_logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} has no resource item in the catalog, so {Player} was granted nothing (Gitea #746/#203).",
+					name, node.Handle, character.Name);
+				await _chat.CharacterSay(node.Handle, $"({name}: not yet harvestable)", [character.Id]);
+				return;
+			}
+
+			if (!node.IsHarvestable)
+			{
+				// Never silent: a clickable but exhausted node means a despawn we failed to deliver.
+				_logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} is already exhausted; nothing granted to {Player}.", name, node.Handle, character.Name);
+				await _chat.CharacterSay(node.Handle, $"({name}: already harvested)", [character.Id]);
+				return;
+			}
+
+			var count = HarvestCatalog.YieldFor(node.Row.DisplayId);
+			if (await _outbound.GrantItemToBackpack(client, resourceId, count) == null)
+			{
+				// Bag full: refuse the harvest ENTIRELY rather than consuming the node for nothing. The node keeps its
+				// health, so the player can come back - the same grant-before-consume order the shop's buy path uses.
+				_logger.LogInformation("Harvest: {Player}'s bag is full, so '{Node}' was not harvested (it keeps its health).", character.Name, name);
+				await _chat.CharacterSay(node.Handle, "(bag full)", [character.Id]);
+				return;
+			}
+
+			var before = node.Health ?? HarvestCatalog.NodeMaxHealth;
+			var after = before - HarvestCatalog.SwingCost;
+			node.Health = after;
+			await SendItemLootChatMessage(client, resourceId, (uint)((await _database.GetItem(resourceId))?.Level ?? 0));
+			await _broadcaster.BroadcastNodeHealth(client, node, after);
+
+			// Exhausted only when it can no longer pay for a swing. Until then the node stays in the world with its
+			// health bar down, which is what the player sees in retail.
+			if (after >= HarvestCatalog.SwingCost)
+			{
+				_logger.LogInformation("Harvest: {Player} took {Count}x item {Item} from '{Node}' 0x{Handle:X8}; health {Before} -> {After} ({Percent}%).",
+					character.Name, count, resourceId, name, node.Handle, before, after, after * 100 / HarvestCatalog.NodeMaxHealth);
+				return;
+			}
+
+			node.Health = HarvestCatalog.ExhaustedHealth;
+			await _broadcaster.DespawnHarvestedNode(client, node);
+
+			_logger.LogInformation("Harvest: {Player} took the last {Count}x item {Item} from '{Node}' 0x{Handle:X8}; node exhausted and despawned.",
+				character.Name, count, resourceId, name, node.Handle);
+		}
+
+		// Decoded from the harvesting span of the chat-annotated capture (#494), where the loot line lands beside its
+		// annotation each time - Granite 161206 x40 (`just mined`), Oak 161213 x60 (`gethering wood`), Iron 161196 x40
+		// (`mining iron`). The item id is repeated in the first two words in every observed record.
+		// ⚠️ The 4th word is the item's LEVEL, not a count. The body is the same ProtoAcgItem-shaped layout the
+		// client's `itemref://` chat link carries - [template][template][0][level][hash][key1][key2][key3] - and
+		// reading it as a count is what put the bogus 40 / 60 / 40 yields into HarvestCatalog (#732): Items.Level for
+		// Granite, Oak and Iron is 40, 60 and 40 exactly. The line renders an item LINK, so the level is what its
+		// tooltip reads; how many arrived is the ADD's business, not this message's.
+		// The 48-byte tail is the hash + the three key quads, which we do not fill - the link still renders.
+		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint level)
+		{
+			return client.SendAsync(new Rpc(GameServerListener.LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchDisplayItemLootChatMessage,
+				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(level).WriteArray(new byte[48])));
 		}
 	}
 }

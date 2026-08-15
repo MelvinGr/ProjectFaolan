@@ -348,7 +348,7 @@ namespace Faolan.GameServer
 			_bank = new BankService(database, logger, this);
 			_tradepost = new TradepostService(database, logger, this);
 			_guildBank = new GuildBankService(database, this, logger);
-			_tradeskill = new TradeskillService(database, this, logger);
+			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 			_skillPoints = new SkillPointService(database, logger);
