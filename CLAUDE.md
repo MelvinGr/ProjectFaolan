@@ -144,7 +144,7 @@ shared op can be a `Func<…>` delegate seam (e.g. `ClientForCharacter` into `Gu
 services share the same cluster of ops, collapse them into one named interface the listener implements
 (`IEconomyOutbound` = wallet + item-grant for Shop/Bank/Tradepost; `IWorldOutbound` = the simulation tick's
 wire side). Do NOT pass the listener itself — that re-introduces the circular dependency the extraction
-removed. (See Gitea #200 for the remaining extraction backlog.)
+removed. (#200 closed with the listener extraction done; the remaining one is Gitea #826, `WorldBroadcaster`.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IChatServerDispatcher` for
