@@ -119,6 +119,15 @@ namespace Faolan.GameServer.World
 		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.
 		public uint? HideWhenQuestCompletedId { get; set; }
 
+		// The spawn record to send once this escortee is FREED - its own body with the story pose swapped for the
+		// creature's ordinary idle, and in WALK mode (#827). Null for everything that is not a posed escortee.
+		//
+		// Two bodies rather than a patch because the pose is a protobuf varint inside the CoreCharacter message, and
+		// `SpawnTransformPatch` only stamps fixed-width fields into a built record. Chosen by `Following`, which is
+		// what "freed" physically means - she is either chained to her post or walking behind someone - so the choice
+		// costs no per-stream-in quest lookup.
+		public byte[]? FreedSpawnBody { get; set; }
+
 		// Whether this NPC is the ESCORTEE of a quest - the same Escort goal that fills HideWhenQuestCompletedId is what
 		// says so, so the flag is data-driven and needs no per-NPC list.
 		//

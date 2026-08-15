@@ -59,6 +59,10 @@ namespace Faolan.GameServer.World
 		// How far a formation follower will look for its leader at zone load. OURS, not retail's - the corpus states
 		// which creature walks with which and never a maximum distance - so it is the leash territory a patroller
 		// already works in rather than a smaller invented number.
+		// The ordinary standing idle - shared by 1,008 of the 1,208 templates, against a story pose like Casilda's
+		// chained 156196 which exactly one template carries. Used as the freed escortee's held pose (#827).
+		private const uint GenericIdleAnimationId = 42024;
+
 		private const float FormationBindRange = WorldState.NpcLeashRange;
 
 		private readonly AmbientPoolService _ambient;
@@ -288,7 +292,23 @@ namespace Faolan.GameServer.World
 				// creature. Ours were locked to whatever value the type happened to be lifted with, which for the
 				// Old Tarantia patrollers is 2, so they ran their beats.
 				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeWalk : (uint?)null;
-				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, spawnMovementMode);
+				var token = _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken;
+				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, spawnMovementMode);
+
+				// #827: a quest ESCORTEE gets a second body for after its rescue. Two things differ, and both were
+				// reported in-client against Casilda:
+				//
+				//   * the POSE. `AnimIdleId` is the pose the creature HOLDS, and hers is 156196 - her chained struggle,
+				//     unique across all 1,208 templates where the generic idle 42024 is shared by 1,008. It ships in
+				//     the spawn record, so every stream-in re-asserted the chains no matter what BCC pose followed;
+				//     she stood up the moment the record carried the ordinary idle.
+				//   * the MODE. She has no patrol route, so she fell through to her type's stored mode 2 = RUN while
+				//     the server steps a follower at walk pace - the client ran the gap and got corrected, which is
+				//     what "sliding / teleporting over the floor" was. An escort walks (#714, mode 1).
+				//
+				// Built here rather than at the rescue because this is where the row is in hand.
+				if (entity.IsQuestEscortee)
+					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, SpawnPostIirs.MovementModeWalk, GenericIdleAnimationId);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.

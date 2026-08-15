@@ -123,7 +123,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Nobleman alone 2x213 and 1x79, and the overall split is 9,334 / 8,016 / 50 over 17,400 spawns. It is
 		// per-spawn-event STATE (how the creature is moving right now), which #244 lifted into the TYPE core, so every
 		// spawn of a type went out locked to one value. See #714.
-		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null)
+		//
+		// `animIdleId` overrides the type's held POSE, and is overridable for exactly the same reason: it is state, not
+		// identity. `NpcStatCore.AnimIdleId` is documented as "the pose it holds", and a creature whose pose depends on
+		// the story holds different ones at different times - Casilda's 156196 is HER chained struggle (unique across
+		// all 1,208 templates, where the generic idle 42024 is shared by 1,008 of them), and once freed she holds the
+		// generic one. Retail's own captures show both spellings of her spawn body (#827).
+		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null, uint? animIdleId = null)
 		{
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
@@ -143,6 +149,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var message = BuildMessageFromColumns(row);
 			if (movementMode is { } mode)
 				message.MovementMode = mode;
+			if (animIdleId is { } idle)
+				(message.Bcc ??= new ProtoCoreCharacterIIR.CharacterBcc()).AnimIdleId = idle;
 
 			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 		}

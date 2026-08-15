@@ -2155,9 +2155,16 @@ namespace Faolan.GameServer.World
 			// ⭐ #803: a RESPAWN delivery carries the entrance-animation trigger; every other delivery of the same
 			// entity does not. Stamped before the transform patch because the re-encode rebuilds the record, which
 			// would discard a patch applied to the old bytes.
+			// A freed escortee is described by her FREED body - the ordinary idle instead of the story pose, and walk
+			// mode (#827). `Following` is the physical form of "freed": chained to the post, or walking behind someone.
+			// Without this she kept the chained struggle after her rescue, because the pose the client holds comes from
+			// the spawn record and no later BCC registration replaces it.
+			var source = subject is { Following: true, FreedSpawnBody: not null }
+				? subject.FreedSpawnBody
+				: subject.SpawnBody;
 			var body = spawnAnimation
-				? NpcSpawnBuilder.WithSpawnAnimation(subject.SpawnBody)
-				: (byte[])subject.SpawnBody.Clone();
+				? NpcSpawnBuilder.WithSpawnAnimation(source)
+				: (byte[])source.Clone();
 
 			SpawnTransformPatch.WritePosition(body, subject.Position);
 
