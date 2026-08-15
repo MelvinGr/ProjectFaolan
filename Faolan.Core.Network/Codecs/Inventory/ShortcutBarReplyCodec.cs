@@ -5,7 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Network.Codecs.Inventory
 {
 	// The DispatchShortcutBarReply (0x2076) body - the player's saved action bar, sent at login in reply to
 	// RequestShortcutBar (0x206D). Decoded 2026-06-19 (#71) from every login dump (47/47; confirmed byte-exact

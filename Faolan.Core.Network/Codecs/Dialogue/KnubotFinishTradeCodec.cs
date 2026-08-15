@@ -3,7 +3,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs.Combat
+namespace Faolan.Core.Network.Codecs.Dialogue
 {
 	// KnubotFinishTradeIIR (0x7446F3FA) - the vendor/NPC trade-close. ReadSubClass (FUN_009a7c20) runs the Knubot
 	// base prefix (FUN_009a7e00, a u16 streaming version) then a target entity ref + trailer. Body observed as

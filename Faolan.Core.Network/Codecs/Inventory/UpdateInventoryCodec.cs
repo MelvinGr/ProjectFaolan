@@ -3,7 +3,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs.Combat
+namespace Faolan.Core.Network.Codecs.Inventory
 {
 	// UpdateInventoryIIR (0xA74D2814) - a live inventory delta. The slot-8 subclass reader is a stub because the
 	// client parses the body as PROTOBUF, not fixed fields (docs/re/v1-iir-readers.md). Frame:

@@ -3,7 +3,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
-namespace Faolan.Core.Network.Codecs.Combat
+namespace Faolan.Core.Network.Codecs.Dialogue
 {
 	// KnubotStartTradeIIR (0x4B2A47BF) - opens a vendor/NPC trade window. ReadSubClass (FUN_009a63a0) runs the
 	// Knubot base prefix then a list of TradeItem_c entries, each named by an XML `<remoteformat>` string (the same

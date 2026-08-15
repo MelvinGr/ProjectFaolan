@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;

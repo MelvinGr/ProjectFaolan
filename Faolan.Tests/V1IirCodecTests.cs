@@ -1,5 +1,7 @@
 using System;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Inventory;
 using Xunit;
 
 namespace Faolan.Tests
