@@ -230,6 +230,11 @@ namespace Faolan.GameServer
 		// effects, ground AoE, the landing buff, mana, instant areas, offensive damage). See Combat/CastService.cs.
 		private readonly CastService _cast;
 
+		// Composed collaborator: what a completed melee COMBO does when it lands (#139) - stamina, the finisher's
+		// spell, its damage, its knockback. A layer ABOVE the combo catalog (_combos), which is why it is a separate
+		// class - see Combat/ComboFinisher.cs. Built last: it needs the knockback service.
+		private readonly ComboFinisher _comboFinisher;
+
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
@@ -349,6 +354,7 @@ namespace Faolan.GameServer
 			_skillPoints = new SkillPointService(database, logger);
 			_environment = new EnvironmentService(database, this, logger);
 			_knockback = new KnockbackService(_simulation, _broadcaster, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id), logger);
+			_comboFinisher = new ComboFinisher(_simulation, _combat, _buffs, _combos, _spellModifiers, _knockback, logger);
 
 			InitGmCommands();
 		}

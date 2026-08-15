@@ -386,7 +386,7 @@ session (`ActiveComboId` / `ActiveComboStep` / `ActiveComboCentiseconds`):
 **The finisher's payload is a SPELL.** `Combo.GameActionId` resolves into the `Spells` catalog for **726 of the
 744** shipped combos, under the combo's own display name (`Assassin_20b_…_Grim_Corruption_II` → 149094 *Grim
 Corruption II*) [V3: ComboWireTests.ComboGameActionIds_ResolveIntoTheSpellCatalog]. So a combo's damage, its DoT
-and its debuff are that spell's, and `GameServerListener.ResolveComboFinisher` runs the same two ops a cast does
+and its debuff are that spell's, and `ComboFinisher.Deliver` runs the same two ops a cast does
 (`ApplySpell` + `CombatService.ResolveOffensiveCast`) instead of a bespoke combo-damage model — which is also what
 the per-combo spread in the measured numbers above says it should be. The steps themselves need nothing special:
 they are ordinary damaging swings already.
@@ -460,7 +460,7 @@ a query.
 | kind | what it modifies | where it lands |
 | --- | --- | --- |
 | 53250 `ChangeInheritedWeaponAttack` | one WEAPON ATTACK of the combo — its opener or its finisher | that step's swing damage and its critical roll, in `CombatService.SendNormalAttackResponse` |
-| 53209 `UpgradeCombo` | the combo as a WHOLE | the finisher's SPELL damage, in `ResolveComboFinisher` — which is where this model puts a combo's damage |
+| 53209 `UpgradeCombo` | the combo as a WHOLE | the finisher's SPELL damage, in `ComboFinisher.Deliver` — which is where this model puts a combo's damage |
 
 So `Fierce Opening` (+30% on every combo's opening attack) makes the first swing of a chain hit harder, and
 `Brutal Blows` (+400 crit rating on Overreach's finisher) makes its last swing crit more often, while `Hexer`
