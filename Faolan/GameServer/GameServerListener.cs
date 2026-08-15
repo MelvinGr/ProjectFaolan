@@ -173,13 +173,6 @@ namespace Faolan.GameServer
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
 
-		// #523: how close the player must come to an NPC for its APPROACH-triggered conversation to open. MEASURED at
-		// 12.9 / 13.8 / 10.9 units across three independent captures of Saddur's beach confrontation.
-		private const float ApproachConversationRadius = 15f;
-
-		// The NPC names that HAVE an approach-triggered conversation, cached on first use - a small static set, so the
-		// per-move check costs one hash lookup for the overwhelming majority of players who are near nobody special.
-		private HashSet<uint>? _approachConversationNpcs;
 		private readonly FatalityService _fatality;
 
 		// #310: Khitai reputation - awards standing on a kill and restores it at world entry.
@@ -336,7 +329,7 @@ namespace Faolan.GameServer
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel, agentServerDispatcher);
+			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);

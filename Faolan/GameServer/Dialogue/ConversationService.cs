@@ -1,3 +1,4 @@
+using System.Numerics;
 using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
@@ -59,17 +60,66 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
+
+		// The live world model - the approach trigger asks it who is standing near the player.
+		private readonly WorldSimulation _sim;
 		private readonly TravelService _travel;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, TravelService travel,
-			IChatServerDispatcher agents)
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, WorldSimulation sim,
+			QuestProgressionService questProgression, TravelService travel, IChatServerDispatcher agents)
 		{
 			_database = database;
 			_agents = agents;
 			_logger = logger;
 			_broadcaster = broadcaster;
+			_sim = sim;
 			_questProgression = questProgression;
 			_travel = travel;
+		}
+
+		// #523: how close the player must come to an NPC for its APPROACH-triggered conversation to open. MEASURED at
+		// 12.9 / 13.8 / 10.9 units across three independent captures of Saddur's beach confrontation.
+		private const float ApproachRadius = 15f;
+
+		// The NPC TEMPLATES that HAVE an approach-triggered conversation, cached on first use - a small static set, so
+		// the per-move check costs one hash lookup for the overwhelming majority of players who are near nobody special.
+		private HashSet<uint>? _approachNpcs;
+
+		// #523: open a conversation the player has just walked up to an NPC for - the APPROACH trigger. Saddur's beach
+		// confrontation is the worked example: "{hidegoodbye}Who stands before Saddur?" fires on approach, with no
+		// click and no object.
+		//
+		// The radius is MEASURED, not chosen: across three independent captures the window opens at 12.9, 13.8 and 10.9
+		// units from Saddur's spawn, so 15 covers all three with a little slack and stays far short of the next NPC
+		// (Casilda at 153+). It is deliberately small - a generous radius would open the conversation across a room.
+		//
+		// ⚠️ This is proximity to the NPC, NOT a bounded-area volume. Only volume-entry is in RDB 1000053 and the two
+		// are different mechanisms (#513), so nothing here needs region geometry.
+		//
+		// Fires ONCE per NPC per session (`ApproachedConversationNpcs`): Saddur's nodes carry no quest gate, so without
+		// a latch the window would re-open on every step taken near him. The TEMPLATES that have one at all are cached
+		// here (#646 - a display name would open Saddur's confrontation on any NPC that happened to share his name),
+		// so a player walking past ordinary NPCs pays one hash lookup and no DB hit.
+		public async Task CheckApproach(INetworkClient client, WorldEntity player, Vector3 position)
+		{
+			var templates = _approachNpcs ??= [.. await _database.GetApproachConversationNpcs()];
+			if (templates.Count == 0 || client.Session.ConversationNodeId != null)
+				return; // nothing to open, or a conversation is already up
+
+			var zone = _sim.World.ZoneForEntity(player);
+			foreach (var npc in zone.EntitiesInRange(position, ApproachRadius, player.Handle))
+			{
+				if (npc.IsPlayer || !templates.Contains(npc.NpcTemplateId))
+					continue;
+				if (!client.Session.ApproachedConversationNpcs.Add(npc.Handle))
+					continue; // already opened for this NPC this session
+
+				if (await TryOpenApproachConversation(client, npc.NpcTemplateId, npc.Handle))
+				{
+					_logger.LogInformation("#523: player {Char} approached {Npc} - opening its server-initiated conversation.", client.Session.Character.Name, npc.Name);
+					return; // one conversation at a time
+				}
+			}
 		}
 
 		// The player picked option `answerIndex` in the active conversation: resolve it to the option's own LDB id on the

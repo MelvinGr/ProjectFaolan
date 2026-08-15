@@ -737,7 +737,7 @@ region geometry at all** — the NPC is the target, and the only unknown was the
 
 The radius is **measured, not chosen**: across three independent captures Saddur's window opens at **12.9, 13.8
 and 10.9** units from his spawn, so `ApproachConversationRadius` is 15 — covering all three with slack while
-staying far short of the next NPC (Casilda at 153+). `CheckPlayerApproachConversations` runs beside the
+staying far short of the next NPC (Casilda at 153+). `ConversationService.CheckApproach` runs beside the
 `ReachArea` check on each accepted move, and latches per NPC per session
 (`ApproachedConversationNpcs`): Saddur's nodes carry no quest gate, so without it the window would re-open on
 every step taken near him.

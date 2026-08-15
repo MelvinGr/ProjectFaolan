@@ -10,6 +10,7 @@ using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
+using System.Numerics;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Quest
@@ -637,6 +638,42 @@ namespace Faolan.GameServer.Quest
 		{
 			var primary = QuestProgress.InPlayOrder(def.Goals).FirstOrDefault();
 			return primary != null && primary.GoalId == goal.GoalId;
+		}
+
+		// #262: solve any ReachArea quest goal the player has just walked into range of. Called from the move handler
+		// on every accepted player move; the goal targets are cached on the player WorldEntity (lazily loaded once, so
+		// this stays a pure in-memory distance test with no DB hit until a goal actually fires). A solved target is
+		// removed so it fires exactly once; SolveGoal handles the tick / completion / chain supersession.
+		//
+		// It lives here rather than in the listener's move handler because deciding WHETHER a goal is reached is quest
+		// logic, and both halves it needs - LoadReachGoals and SolveGoal - are this service's own.
+		public async Task CheckReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
+		{
+			var pending = player.PendingReachGoals ??= await LoadReachGoals(client.Session.Character.Id);
+			if (pending.Count == 0)
+				return;
+
+			// Snapshot the in-range targets BEFORE solving: SolveGoal can complete a stage whose supersession calls
+			// InvalidateReachGoals (PendingReachGoals -> null, reloaded next move), so we must not index the live list
+			// across a solve. Removes are null-safe; a target solved after an invalidation is simply excluded from the
+			// reload (LoadReachGoals skips completed goals), so no double-fire.
+			var reached = pending.Where(t => t.MapId == player.MapId && ReachedTarget(t, position)).ToList();
+			foreach (var target in reached)
+			{
+				player.PendingReachGoals?.Remove(target);
+				_logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
+				await SolveGoal(client, target.GoalId);
+			}
+		}
+
+		// Inside the goal's CLIENT trigger volume where it has one (#521) - the full prism test, so a goal region
+		// stacked over another does not fire from the wrong floor - else within the marker radius (the #262
+		// fallback, a horizontal circle around the goal's map pin).
+		private static bool ReachedTarget(ReachGoalTarget t, Vector3 position)
+		{
+			return t.Region != null
+				? EnvironmentService.Contains(t.Region, position)
+				: (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq;
 		}
 	}
 }

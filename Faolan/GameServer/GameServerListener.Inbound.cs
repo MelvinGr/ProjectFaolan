@@ -164,10 +164,10 @@ namespace Faolan.GameServer
 					// #262: a move can satisfy a ReachArea quest goal (e.g. Shipwrecked's "Enter the jungle") - solve
 					// any whose area this position falls in. In-memory distance test (targets cached on the entity).
 					if (moveEntity != null)
-						await CheckPlayerReachGoals(client, moveEntity, livePosition);
+						await _questProgression.CheckReachGoals(client, moveEntity, livePosition);
 
 					if (moveEntity != null)
-						await CheckPlayerApproachConversations(client, moveEntity, livePosition); // #523
+						await _conversation.CheckApproach(client, moveEntity, livePosition); // #523
 
 					// #495/#504: the world's own damage sources. Fall damage lands HERE rather than on the world tick
 					// because a fall's size is only known on the record that reports the landing, and a hazard's client-
