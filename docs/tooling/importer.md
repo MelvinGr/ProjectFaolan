@@ -19,7 +19,7 @@ the folders are organisational):
 |---|---|
 | `Cli/` | `ImportCli` (parse + load + migrate), `ImportRunner` (transactional run + delta), `ModuleRegistry`, `ImportModule`/`ImportContext` abstractions, `ReportCli`, `TableSnapshot`. |
 | `Modules/` | The `IImportModule` definitions (one class per `--only`/`--skip` token). |
-| `Captures/` | Capture reading (`TsharkCaptureReader`, `NamedCapture`), the shared `ImportOps` orchestration, and the per-subsystem `CaptureX` importers. |
+| `Captures/` | Capture reading (`TsharkCaptureReader`, `NamedCapture`), the shared `ImportOps` orchestration, `QuestGoalWiring` (the post-import pass that decides each quest goal's trigger/count/target), and the per-subsystem `CaptureX` importers. |
 | `Extractors/` | Packet-grammar extractors (conversations, NPC spawns/spells, patrol paths, quests, world objects, per-map loot pools, item-hash harvesting). |
 | `Rdb/` | Client-RDB readers/importers (opt-in, require `--rdb`). |
 

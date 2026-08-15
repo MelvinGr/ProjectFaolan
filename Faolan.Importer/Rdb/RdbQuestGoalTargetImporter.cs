@@ -59,7 +59,7 @@ namespace Faolan.Importer.Rdb
 				// than a kill is not this rule's business.
 				//
 				// ⚠️ It cannot be the usual "is it still at the default" test any more (#522). A 51000 goal carrying
-				// the client's kill verb is typed `Kill` before this runs (ImportOps.TypeKillGoalsFromKind), so a
+				// the client's kill verb is typed `Kill` before this runs (QuestGoalWiring.TypeKillGoalsFromKind), so a
 				// not-yet-typed test would skip all 24 and the column would never be filled: `Kill` is a decision now
 				// rather than the default. The TargetName test is what protects the two hand-seeded story kills, whose
 				// GatesTargetVisibility this would otherwise clear.

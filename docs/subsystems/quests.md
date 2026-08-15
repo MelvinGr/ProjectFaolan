@@ -100,7 +100,7 @@ template id and only fall back to the name.
 ### …and every goal type now matches on a template first
 
 `QuestGoalDefinition.TargetTemplateId` is the id half of the target, resolved at import
-(`ImportOps.ResolveGoalTargetTemplates`) so that the talk and loot paths match the way the kill path always has.
+(`QuestGoalWiring.ResolveGoalTargetTemplates`) so that the talk and loot paths match the way the kill path always has.
 A display name is **ambiguous in the world** — `Saddur` is two templates and `Halen van Dummy` is 38 — and that
 was a live defect, not a theoretical one: the quest-gate map keyed on the string, so flagging the Tortage Island
 Saddur (9500) also stamped `GateQuestIds` + `NoRespawn` onto the **Stygian Galley** Saddur (2993), hiding an NPC
@@ -254,7 +254,7 @@ what makes it safe. `SeedContentTests.GoalsThatStateAnAmount_CarryIt` checks bot
 ### Wiring rules run in order of EVIDENCE STRENGTH
 
 Every wiring step is bootstrap-only, so **whoever types a goal first wins and the rest skip it**. That makes the
-order in `ImportOps.WireQuests` load-bearing rather than cosmetic — it has produced wrong triggers twice:
+order in `QuestGoalWiring.WireQuests` load-bearing rather than cosmetic — it has produced wrong triggers twice:
 
 1. **a human decided** — the `Seed*` steps: editorial calls (`GatesTargetVisibility`, the Nadini stand-in) and
    everything no source states (`QuestItemId`, chain successors)
@@ -382,7 +382,7 @@ re-typing: `0` always meant "nobody has typed this". `Kill` moved to `6`, which 
 instead of rewriting 7,148 that were never kills.
 
 A goal is a kill goal because the **client's verb** says so (`Separator` = `QuestGoalKind.Kill`), which
-`ImportOps.TypeKillGoalsFromKind` is what applies. All 30 are typed, and they split two ways — the verb decides,
+`QuestGoalWiring.TypeKillGoalsFromKind` is what applies. All 30 are typed, and they split two ways — the verb decides,
 not whether the target resolves:
 
 | target reference | goals | matched by |

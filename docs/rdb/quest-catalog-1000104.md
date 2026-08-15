@@ -122,7 +122,7 @@ narrative order, which is what says the pointer is a prerequisite rather than an
 **Step order WITHIN a line is not in this table** — no field carries it, and neither does the row order.
 `Quest.tier` and `start_new_tier`, the two fields shaped for exactly that, are empty. A line gives you its
 first and last step and its membership; the order of the ones between is still hand-authored
-(`ImportOps.Chain`).
+(`QuestGoalWiring.Chain`).
 
 The row order deserved a test of its own, because a protobuf's repeated field preserves the order it was
 written in and no *field* being present does not mean no *order* is. It fails. `--report rdb-quest-catalog`

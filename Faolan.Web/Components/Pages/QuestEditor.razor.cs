@@ -10,7 +10,7 @@ namespace Faolan.Web.Components.Pages
 {
 	// A purpose-built editor for the quest chain (QuestDefinition + its QuestGoalDefinition goals): the SERVER-trigger
 	// fields (GoalType/TargetName/TrailingRefId/RequiredCount + NextQuestId) that make a quest playable, the same ones
-	// ImportOps.SeedGoal/Chain set. Sits next to the generic DbEditor but shows a quest and ALL its goals on one screen
+	// QuestGoalWiring.SeedGoal/Chain set. Sits next to the generic DbEditor but shows a quest and ALL its goals on one screen
 	// with GoalType as a dropdown, so wiring a stage doesn't need raw SQL. Admin-gated. Edits the live DB (restart to
 	// apply). The wire/@609 display fields (markers/keys) are shown but editing them can break byte-exact quests, so
 	// they carry a warning.

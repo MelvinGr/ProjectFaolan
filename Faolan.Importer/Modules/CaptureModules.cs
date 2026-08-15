@@ -1344,7 +1344,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			await ImportOps.WireQuests(ctx.Db);
+			await QuestGoalWiring.WireQuests(ctx.Db);
 
 			// Only quests whose objective region provably rebuilds may ride the login snapshot. Verified HERE, as the
 			// last thing that touches these rows: `quests` refreshes the goal fields from the captures and this overlay
