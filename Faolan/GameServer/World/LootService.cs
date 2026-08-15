@@ -17,9 +17,10 @@ namespace Faolan.GameServer.World
 	//   UL 0x2044 CloseLootBag [typetag][bag handle]                          -> drop the window without taking
 	//   UL 0x2045 TryLootCash  [typetag][bag handle]                          -> credit the bag's coins to the wallet
 	//   UL 0x2046 TryLootItem  [typetag][bag handle][display index]           -> grant the one dragged item
-	// The bag STATE + the take/fade/close wire side live on WorldBroadcaster (loot bags are world entities); this
-	// service is the orchestration the dispatch switch used to carry inline - it pulls items off the bag via the
-	// broadcaster and grants them through the IEconomyOutbound port (the listener implements both). Extracted out of
+	// Three collaborators, one per question (#826): the bag's CONTENTS are `LootBagContents`, the fade/close/window
+	// WIRE side is `WorldBroadcaster` (loot bags are world entities), and this service is the orchestration the
+	// dispatch switch used to carry inline - it pulls items off the bag via `LootBagContents` and grants them through
+	// the IEconomyOutbound port (the listener implements the latter). Extracted out of
 	// GameServerListener as a composed collaborator, mirroring ShopService (#200): the switch cases are now thin
 	// one-liners delegating here, like the shop cases. Our client does NOT local-add from the bag (verified -
 	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
@@ -31,11 +32,13 @@ namespace Faolan.GameServer.World
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly LootBagContents _bags;
 
-		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression, IChatServerDispatcher chat,
-			ILogger logger)
+		public LootService(WorldBroadcaster broadcaster, LootBagContents bags, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression,
+			IChatServerDispatcher chat, ILogger logger)
 		{
 			_broadcaster = broadcaster;
+			_bags = bags;
 			_outbound = outbound;
 			_database = database;
 			_questProgression = questProgression;
@@ -51,7 +54,7 @@ namespace Faolan.GameServer.World
 			if (await _outbound.GrantItemToBackpack(client, itemTemplateId, preferredSlot: preferredSlot) != null)
 				return true;
 
-			_broadcaster.ReturnBagItem(client, bagHandle, itemTemplateId, position);
+			_bags.ReturnBagItem(client, bagHandle, itemTemplateId, position);
 			if (client.Session.Character is { } character)
 				await _chat.SendSystemMessage(character.Id, "You have no room for that - free a slot and loot it again.");
 
@@ -74,9 +77,9 @@ namespace Faolan.GameServer.World
 			var bagHandle = body.ReadUInt32();
 
 			// Capture the bag's source NPC BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
-			var source = _broadcaster.BagSource(client, bagHandle);
+			var source = _bags.BagSource(client, bagHandle);
 
-			var items = _broadcaster.TakeBagItems(client, bagHandle);
+			var items = _bags.TakeBagItems(client, bagHandle);
 			var granted = 0;
 			foreach (var itemTemplateId in items)
 			{
@@ -117,7 +120,7 @@ namespace Faolan.GameServer.World
 			var bagHandle = body.ReadUInt32();
 
 			var character = client.Session.Character;
-			var cash = _broadcaster.TakeLootCash(client, bagHandle);
+			var cash = _bags.TakeLootCash(client, bagHandle);
 			if (cash > 0 && character != null)
 			{
 				character.Money += cash;
@@ -151,8 +154,8 @@ namespace Faolan.GameServer.World
 
 			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} desired slot {Slot}.", bagHandle, itemIndex, looterHandle, desiredPosition);
 
-			var source = _broadcaster.BagSource(client, bagHandle);
-			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
+			var source = _bags.BagSource(client, bagHandle);
+			var item = _bags.TakeBagItem(client, bagHandle, (int)itemIndex);
 			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex, (int)desiredPosition))
 				await _questProgression.AdvanceLootGoals(client, source.Name!, item.Value, source.TemplateId); // #261: the goal wants THIS item
 

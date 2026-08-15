@@ -108,6 +108,14 @@ namespace Faolan.GameServer.World
 		// ours. Forwarded to below so the listener's call sites are unchanged.
 		private readonly ZonePopulationLoader _zones;
 
+		// What is IN a loot bag. Public because LootService asks it directly rather than through us - taking an item
+		// out of a bag is not a broadcast, and routing it through here is what made the two look like one job.
+		public LootBagContents Bags { get; }
+
+		// Encounter lure/boss swaps and quest ambushes. Forwarded to below: all three are PORT methods
+		// (IWorldOutbound / IQuestOutbound), so the signature has to stay on us even though the work does not.
+		private readonly EncounterService _encounters;
+
 		// The listener's ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) -
 		// one shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
 		// knockback uses it (retail applies "Knockback immunity" in the same batch as the displacement).
@@ -126,6 +134,8 @@ namespace Faolan.GameServer.World
 			_ambient = new AmbientPoolService(sim, database, _handles, logger);
 			_questMarkers = new QuestMarkerResolver(database, logger);
 			_zones = new ZonePopulationLoader(sim, database, combos, _ambient, logger);
+			Bags = new LootBagContents(sim, database, logger);
+			_encounters = new EncounterService(sim, database, _handles, BroadcastEntityDespawn, logger);
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
@@ -393,20 +403,6 @@ namespace Faolan.GameServer.World
 
 			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
-		}
-
-		// The SOURCE NPC of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
-		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
-		// is RDB content we don't materialise. Both halves travel together (#521): the TEMPLATE is what a resolved goal
-		// matches on and the NAME is the fallback for one whose target has no template row yet. (null, 0) for a non-bag
-		// handle or a bag with no source.
-		public (string? Name, uint TemplateId) BagSource(INetworkClient client, uint bagHandle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) && bag.IsLootable)
-				return (bag.LootSourceName, bag.LootSourceTemplateId); // the dead NPC's identity, NOT the bag's "Bag of loot"
-
-			return (null, 0);
 		}
 
 		// Relays a player's BEHAVIOR (the BehaviorControlCenterIIR swing/cast animation) to every other player who can
@@ -1007,7 +1003,7 @@ namespace Faolan.GameServer.World
 			else
 			{
 				var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
-				items = await RollLootItems(dropsContents
+				items = await Bags.RollLootItems(dropsContents
 					? Random.Shared.Next(0, 3)
 					: 0, deadNpc.MapId); // 0-2 items, or none
 				cash = dropsContents
@@ -1525,75 +1521,6 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
 		}
 
-		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client does
-		// NOT compact its loot window after a removal: it removes the looted slot, leaves a GAP, and keeps every survivor
-		// at its ORIGINAL Pos - proven live (a 3-item bag dragged srcPos 1, then 2, then 0: the 2 could only arrive if
-		// the survivors kept their original positions). So the take must be position-STABLE: null the slot (template 0 =
-		// looted) in place rather than RemoveAt - shifting desynced the next drag's Pos and dropped the take. Returns the
-		// template id removed, or null if the bag/Pos is invalid or already looted. (Loot-all uses TakeBagItems.)
-		public uint? TakeBagItem(INetworkClient client, uint bagHandle, int index)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable)
-				return null;
-			if (index < 0 || index >= bag.LootItems.Count || bag.LootItems[index] == 0)
-				return null;
-
-			var item = bag.LootItems[index];
-			bag.LootItems[index] = 0; // looted-slot sentinel: survivors keep their stable Pos for the client's next drag
-			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count(i => i != 0));
-			return item;
-		}
-
-		// A player clicked "loot all" (top-level 0x2043): hand the caller the bag's item templates to grant (via
-		// DispatchAddItem) and clear them from the bag so each is granted exactly once. Empty when the bag is
-		// unknown / not a loot bag / already emptied. Coins are a separate path (TryLootCash -> TakeLootCash).
-		public IReadOnlyList<uint> TakeBagItems(INetworkClient client, uint bagHandle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable || !bag.LootItems.Any(i => i != 0))
-				return [];
-
-			// Grant the still-present items (skip already-drag-looted slots, now 0); loot-all empties + closes the bag.
-			var taken = bag.LootItems.Where(i => i != 0).ToArray();
-			bag.LootItems.Clear();
-			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
-			return taken;
-		}
-
-		// Puts an item BACK on the bag after a take whose grant failed (a full backpack, or an item the snapshot cannot
-		// build). Without it the take is destructive: the bag hands each item over exactly once, so a dropped grant
-		// deletes the loot - and the bag is emptied BEFORE the grant is attempted, so this cannot be prevented by
-		// checking first without duplicating the capacity rules the grant already owns. `position` restores a
-		// single-drag take to its original slot (the client keeps survivors at their original Pos - see TakeBagItem);
-		// loot-all appends, having cleared the list.
-		public void ReturnBagItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag))
-				return;
-
-			if (position is { } pos and >= 0 && pos < bag.LootItems.Count)
-				bag.LootItems[pos] = itemTemplateId;
-			else
-				bag.LootItems.Add(itemTemplateId);
-
-			_logger.LogWarning("Loot: item 0x{Item:X} could not be granted to {Player}; returned to bag 0x{Handle:X8}.", itemTemplateId, player.Name, bagHandle);
-		}
-
-		// TryLootCash (0x2045): takes the bag's coins exactly once - returns the amount and zeroes it on the bag
-		// (the caller credits the wallet + pushes the 0x2005 balance update). 0 = no bag / no coins / already taken.
-		public uint TakeLootCash(INetworkClient client, uint bagHandle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable)
-				return 0;
-
-			var cash = bag.CashTin;
-			bag.CashTin = 0;
-			return cash;
-		}
-
 		// The bag-window side of a cash take (#809): retail answers every TryLootCash with a LootRemoveItems carrying
 		// the amount and an EMPTY position list - the money row leaving the open window, the exact counterpart of the
 		// item take's slot list. Measured on the eight cash loots in
@@ -1795,21 +1722,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// A few random snapshot-buildable item templates for a loot bag. Drops from the MAP's loot pool
-		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
-		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
-		private async Task<List<uint>> RollLootItems(int count, uint mapId)
-		{
-			if (count <= 0)
-				return [];
-
-			var items = await _database.GetMapLootSample(mapId, count);
-			if (items.Length == 0)
-				items = await _database.GetRandomBuildableItems(count); // map has no captured loot pool - fall back
-
-			return items.Select(i => i.Id).ToList();
-		}
-
 		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each
 		// time the NPC is streamed in, so the '!' transitions to '?' (and clears) as the player accepts/completes the
 		// quest - e.g. Casilda shows '!' before, nothing while held, '?' once the kill goal is done (return to turn in).
@@ -1961,151 +1873,6 @@ namespace Faolan.GameServer.World
 				? "now follows"
 				: "stopped following", playerHandle);
 			return true;
-		}
-
-		// #502 scripted encounter: replace a LURE with its BOSS, on the lure's exact spot. An entity SWAP, not a
-		// re-template - which is what the capture shows (Damsel handle 0x0002db79 out, Eerika 0x0002ddd1 in, same
-		// second). The boss carries the lure's type so its corpse can restore it (EncounterReset).
-		//
-		// The boss is spawned FROM ITS TYPE: she has no NpcSpawn row and must not have one, existing only inside a
-		// triggered encounter (#501).
-		public async Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)
-		{
-			ArgumentNullException.ThrowIfNull(lure);
-			if (lure.EncounterBossTemplateId is not { } bossTemplateId)
-				return null;
-
-			var boss = await _database.GetNpcByTemplateId(bossTemplateId);
-			if (boss?.StatCore?.Health is not { } bossHealth || boss.StatCore.Level is not { } bossLevel)
-			{
-				// Loudly, not silently: an encounter whose boss type never got harvested would otherwise delete its
-				// lure and put nothing in its place, leaving an empty encounter no player could ever trigger again.
-				_logger.LogWarning("Encounter: lure {Lure} on map {Map} has no usable boss type {Boss} - leaving the lure in place.", lure.Name, lure.MapId, bossTemplateId);
-				return null;
-			}
-
-			var zone = _sim.World.ZoneForEntity(lure);
-			var position = lure.Position;
-			var rotation = lure.Rotation;
-
-			// Remove the lure for every viewer that has it, then drop it from the model - the same pair
-			// DespawnEntityForPlayer does, but driven from the entity rather than a caller's client.
-			await BroadcastEntityDespawn(lure);
-			_sim.World.Remove(lure);
-
-			var handle = _handles.Next();
-			var body = NpcSpawnBuilder.BuildFromType(boss, handle, position, rotation, zone.PlayfieldToken);
-			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, boss.Name, EntityVitals.FromMax(bossHealth, 0, bossHealth), boss.TemplateId);
-			entity.InstanceId = zone.InstanceId;
-			entity.Level = bossLevel;
-			entity.Disposition = WorldEntity.DispositionHostile; // the trap sprung - she attacks
-			entity.Hostile = true;
-			entity.LootContainer = boss.LootContainerTemplateId;
-			entity.SpawnBody = body;
-			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
-			entity.EncounterLureTemplateId = lure.NpcTemplateId;
-			foreach (var sp in boss.Spells)
-				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
-
-			// Added to the zone only: the interest manager streams a new entity to nearby players on its next pass,
-			// which is how the ambient pools spawn members mid-session too. No explicit broadcast to get wrong.
-			zone.Add(entity);
-			_logger.LogInformation("Encounter: {Lure} on map {Map} sprang into {Boss} (level {Level}) at ({X:F1}, {Z:F1}).", lure.Name, lure.MapId, boss.Name, entity.Level, position.X, position.Z);
-			return entity;
-		}
-
-		// #528 quest ambush: a goal just advanced for the first time and it springs an NPC on the player. Spawned FROM
-		// ITS TYPE beside them, hostile, with no placement anywhere - the same shape as an encounter boss, triggered by
-		// quest progress instead of proximity.
-		//
-		// The delay is real, not cosmetic: in the capture the trigger EFFECTS (item grant, goal progress, feedback) all
-		// land at t=315.6 and the body arrives at t=318.6 - two distinct steps. It is scheduled rather than awaited so
-		// the pickup's own reply chain is not held up behind it.
-		//
-		// Retail anchors the spawn on the interacted OBJECT (3.6 u from the brick); this anchors on the PLAYER standing
-		// at it, which is the same spot to within the interaction range and needs no object identity to reach the
-		// progression engine. The offset direction is the player's own facing, so it lands in front of them.
-		public void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush)
-		{
-			ArgumentNullException.ThrowIfNull(client);
-			ArgumentNullException.ThrowIfNull(ambush);
-
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return;
-
-			var zone = _sim.World.ZoneForEntity(player);
-			var facing = player.Rotation;
-			var forward = Vector3.Transform(new Vector3(0, 0, 1), facing);
-			var position = player.Position + forward * ambush.AnchorDistance;
-
-			var delayMs = (int)MathF.Max(0, ambush.DelaySeconds * 1000);
-			Task.RunAfter(delayMs, async () =>
-			{
-				// The player may have logged out, zoned or died in the delay - an ambush with nobody to ambush is
-				// dropped rather than left standing in an empty quarry.
-				if (client.Session.Account == null || _sim.PlayerWorldEntity(client) is not { } stillHere || stillHere.MapId != zone.MapId)
-					return;
-
-				await SpawnAmbusher(zone, ambush, position, facing);
-			}, _logger);
-		}
-
-		private async Task SpawnAmbusher(Zone zone, NpcAmbush ambush, Vector3 position, Quaternion rotation)
-		{
-			var type = await _database.GetNpcByTemplateId(ambush.NpcTemplateId);
-			if (type?.StatCore?.Health is not { } health || type.StatCore.Level is not { } level)
-			{
-				// Loudly, not silently: an ambush whose type never got harvested would spring nothing at all, and the
-				// quest would look exactly the same as one with no ambush wired.
-				_logger.LogWarning("Ambush: goal {Goal} on map {Map} names type {Type}, which has no usable stat core - nothing sprung.", ambush.GoalId, zone.MapId, ambush.NpcTemplateId);
-				return;
-			}
-
-			var handle = _handles.Next();
-			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, type.Name, EntityVitals.FromMax(health, 0, health), type.TemplateId);
-			entity.InstanceId = zone.InstanceId;
-			entity.Level = level;
-			entity.Disposition = WorldEntity.DispositionHostile; // it is an ambush - it attacks on arrival
-			entity.Hostile = true;
-			entity.LootContainer = type.LootContainerTemplateId;
-			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken);
-			entity.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
-			foreach (var sp in type.Spells)
-				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));
-
-			// Zone-only, as the encounter swap and the ambient pools are: the interest pass streams it to everyone in
-			// range on its next tick, and the sim's own aggro pass puts the player on its hate list - which is what the
-			// capture shows arriving with it, rather than a hate list we would have to author.
-			zone.Add(entity);
-			_logger.LogInformation("Ambush: goal {Goal} sprang {Name} (level {Level}) on map {Map} at ({X:F1}, {Z:F1}).", ambush.GoalId, type.Name, level, zone.MapId, position.X, position.Z);
-		}
-
-		// #502: the boss is gone - put her lure back where she stood, so the encounter can fire again. Spawned from the
-		// lure's TYPE at the boss's position: the boss took the lure's exact spot, so that position IS the lure's home.
-		public async Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss)
-		{
-			ArgumentNullException.ThrowIfNull(boss);
-			if (boss.EncounterLureTemplateId is not { } lureTemplateId)
-				return null;
-
-			var lure = await _database.GetNpcByTemplateId(lureTemplateId);
-			if (lure?.StatCore?.Health is not { } lureHealth || lure.StatCore.Level is not { } lureLevel)
-				return null;
-
-			var zone = _sim.World.ZoneForEntity(boss);
-			var encounter = await _database.GetNpcEncounter(zone.MapId, lureTemplateId);
-			var handle = _handles.Next();
-			var entity = WorldEntity.ForNpc(handle, zone.MapId, boss.Position, boss.Rotation, lure.Name, EntityVitals.FromMax(lureHealth, 0, lureHealth), lure.TemplateId);
-			entity.InstanceId = zone.InstanceId;
-			entity.Level = lureLevel;
-			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken);
-			entity.NoRespawn = true;
-			entity.ArmEncounter(encounter);
-
-			zone.Add(entity);
-			_logger.LogInformation("Encounter: {Lure} restored on map {Map} at ({X:F1}, {Z:F1}).", lure.Name, zone.MapId, boss.Position.X, boss.Position.Z);
-			return entity;
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
@@ -2501,6 +2268,22 @@ namespace Faolan.GameServer.World
 		public Task<string?> DescribeMissingClassImport(uint mapId, ConanClass forClass)
 		{
 			return _zones.DescribeMissingClassImport(mapId, forClass);
+		}
+
+		// Encounters and ambushes - the work is EncounterService's; these keep the port signatures.
+		public Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)
+		{
+			return _encounters.SwapEncounterLureForBoss(lure);
+		}
+
+		public Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss)
+		{
+			return _encounters.RestoreEncounterLure(boss);
+		}
+
+		public void ScheduleQuestAmbush(INetworkClient client, NpcAmbush ambush)
+		{
+			_encounters.ScheduleQuestAmbush(client, ambush);
 		}
 
 		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place

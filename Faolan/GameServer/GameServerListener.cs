@@ -332,7 +332,7 @@ namespace Faolan.GameServer
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
-			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);
+			_loot = new LootService(_broadcaster, _broadcaster.Bags, this, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);
