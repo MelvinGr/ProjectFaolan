@@ -649,6 +649,23 @@ namespace Faolan.GameServer
 
 			toSend.Add(snapshot);
 
+			// #262: if the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the
+			// live grant-trigger only fires on the talk itself, so without this a relog leaves her at the cage. Data-
+			// driven off the Escort goal + its escortee template id (no hard-coded quest id / name).
+			//
+			// ⚠️ BEFORE the entry burst, and that ordering is load-bearing (#827): the burst is where the escortee's
+			// spawn RECORD is built, and a freed escortee is described by a different body (ordinary idle, walk mode)
+			// chosen on `Following`. Resuming the follow after the burst - where this used to sit - meant her record
+			// was built as still-captive, so she came back chained on every relog no matter what was sent afterwards.
+			foreach (var (_, qdef) in await Database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
+			{
+				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+				{
+					_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
+					break;
+				}
+			}
+
 			// #398: the in-range NPCs ride the ENTRY BURST (before the client's first move), matching retail's shape
 			// (fr64-75 in the Hoxxling beach login capture) instead of a post-load interest volley. BuildEntryNpcBurst
 			// seeds them into the player's Known set, so the interest layer (BroadcastPlayerMove) then streams only the
@@ -696,18 +713,6 @@ namespace Faolan.GameServer
 				await _broadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
-			}
-
-			// #262: if the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the
-			// live grant-trigger only fires on the talk itself, so without this a relog leaves her at the cage. Data-
-			// driven off the Escort goal + its escortee template id (no hard-coded quest id / name).
-			foreach (var (_, qdef) in await Database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
-			{
-				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
-				{
-					_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
-					break;
-				}
 			}
 		}
 
