@@ -5,7 +5,7 @@ using Faolan.Core.Enums;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.Helpers
+namespace Faolan
 {
 	// #324: keeps the hosting realm's Realm.OnlineStatus in sync with the process lifecycle - Online when the realm
 	// game host starts, Offline on graceful shutdown - so the login tier's realm list (SendRealmList) shows which

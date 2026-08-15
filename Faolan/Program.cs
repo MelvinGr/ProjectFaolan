@@ -17,7 +17,6 @@ using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.CSPlayerAgent;
 using Faolan.GameServer;
-using Faolan.Helpers;
 using Faolan.Mcp;
 using Faolan.PlayerAgent;
 using Faolan.UniverseAgent;

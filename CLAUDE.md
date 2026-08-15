@@ -121,12 +121,14 @@ the compressed GameServer downloads; the Wireshark plugin + `tools/capture/tshar
 behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
 `SendVitals`/`SendAddItem` — never opcode-named), plus
-`.WorldEntry`/`.PostReadyBurst`/`.World`/`.Combat`/`.Buffs`/`.Tradepost`/`.ItemUse`; GM commands are the
-`.GmCommands` partial. Domain logic proper lives in composed service folders beside it (`Apprentice/`,
+`.WorldEntry`/`.World`/`.Combat`/`.Buffs`/`.ItemUse`/`.Factions`/`.Travel`/`.Vista`; GM commands are the
+`.GmCommands` partial. `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
+Domain logic proper lives in composed service folders beside it (`Apprentice/`,
 `Combat/`, `CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Inventory/`, `Progression/`, `Quest/`, `Scripting/`,
 `Session/`, `World/`). NB a partial-class file keeps
 `namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder
-is organizational only.
+is organizational only. That suppression is for **partials only** — a non-partial type takes its folder's
+namespace like anything else, and there is currently no exception to that in the tree.
 
 **Prefer composed collaborators over growing the partial.** Domain logic is pulled OUT of the listener into
 folder-namespaced service classes that take their deps by ctor and the client per call:

@@ -10,8 +10,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.CreateFlow
 {
 	// A character's starting kit: the class spells it knows, the abilities its bar is laid out from, and that default
 	// bar itself (#74/#71).
