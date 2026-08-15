@@ -130,6 +130,40 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(handle, form, slot, message.ToProtobuf(), tail);
 		}
 
+		// The COMPANION-LOCOMOTION registration retail installs on a freed escortee (#827) - the slot-9 behaviour that
+		// lets her WALK, with the full 88-byte behaviour-state tail rather than the short bound form.
+		//
+		// ⚠️ Sending the SHORT form is what left Casilda sliding through a standing animation for three rounds of
+		// fixes: the movement packets were retail-exact and arriving, and the behaviour that animates them was being
+		// registered with a truncated tail. Retail's record (Hoxxling_..._login_gameplay idx 2106, 124 bytes) carries:
+		//
+		//   [u32 0x12][u32 0] + five more zero words   28 bytes - the short bound tail is only its first 20
+		//   6 x NullIdentity.Pair                      48 bytes - the doubled unset-identity sentinel
+		//   [u32 1][u32 1][u32 1]                      12 bytes - the state triple the create-world companion form
+		//                                                         also carries (the comment on ItemRegistration notes
+		//                                                         it as "a small state pair (e.g. 0,1,1)")
+		//
+		// NOT built through `ItemRegistration`: that form binds a behaviour to an EQUIPPED ITEM and wants a handle, a
+		// 4-char tag and two transforms, none of which this record has. Same length family, different record.
+		public static BehaviorControlCenterIIR CompanionLocomotion(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6)
+		{
+			var message = new CommandMessage
+			{
+				BccActionId = behaviorId,
+				CommandqueueServerId = phase,
+				Flags = field5,
+				ExecutionStatus = field6
+			};
+
+			using var tail = new FaolanStream();
+			tail.WriteUInt32(0x12).WriteArray(new byte[24]);
+			for (var i = 0; i < 6; i++)
+				tail.WriteUInt32(NullIdentity.High).WriteUInt32(NullIdentity.Low);
+
+			tail.WriteUInt32(1).WriteUInt32(1).WriteUInt32(1);
+			return new BehaviorControlCenterIIR(handle, SeqBegin, slot, message.ToProtobuf(), tail.ToArray());
+		}
+
 		// The LONG (116-byte) registration: the same head as `Registration` plus an 88-byte behaviour-state tail that
 		// binds the behaviour to an EQUIPPED ITEM (the three records in the WorldPrep stream each pair with one of that
 		// burst's DispatchAddItem equipment pieces - the item's handle, its 4-char entity tag and its transform all

@@ -120,7 +120,7 @@ namespace Faolan.GameServer.Scripting
 			// update at the rescue, immediately before the three BCC records (capture idx 2103, 29 bytes).
 			await WorldIir.Send(client, StatUpdateCodec.Build(casildaHandle, new CharacterStatBlock().SetRaw(CharacterStatId.CombatMode, OrdinaryBccState)));
 
-			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0)));
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.CompanionLocomotion(casildaHandle, 9, 42010, 7, 24, 0)));
 			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(casildaHandle, 5, 142007, 8, 24, 0, field12: 260)));
 			_logger.LogInformation("#267: sent Casilda freed pose (handle 0x{Handle:X8}) to {Player} - locomotion 42010 (slot 9) + slot-5 behaviour 142007 replacing the struggle.",
 				casildaHandle, client.Session.Character.Name);

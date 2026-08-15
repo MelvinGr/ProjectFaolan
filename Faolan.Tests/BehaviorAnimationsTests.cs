@@ -212,5 +212,23 @@ namespace Faolan.Tests
 			Assert.Equal("96b8dc590000c35000017ed000000000010000001400000001", Convert.ToHexString(bytes).ToLowerInvariant());
 		}
 
+		// #827: the slot-9 LOCOMOTION registration retail installs at the rescue - byte-exact against
+		// Hoxxling_mage-heraldofxotli_login_gameplay idx 2106 (frame 1840), past the carrier's u32 length.
+		//
+		// ⚠️ We sent the SHORT bound form here for three rounds of fixes while she slid through a standing animation.
+		// The movement packets were retail-exact and arriving the whole time; this is the behaviour that animates
+		// them, and it was being registered with a tail truncated to its first 20 of 88 bytes.
+		[Fact]
+		public void CasildasFreedLocomotion_MatchesCapture()
+		{
+			var bytes = BehaviorControlCenterCodec.Build(BehaviorAnimations.CompanionLocomotion(0x00017ED0, 9, 42010, 7, 24, 0));
+
+			Assert.Equal(
+				"642cd3d60000c35000017ed00004000000090000000a089ac8021807281830000000001200000000000000000000000000000000" +
+				"0000000000000000b290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627ca" +
+				"000000010000000100000001",
+				Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
 	}
 }
