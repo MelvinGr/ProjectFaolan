@@ -100,10 +100,6 @@ namespace Faolan.GameServer.World
 		// GM's debug nameplates following the other realm's players around. Nothing outside this class touches it.
 		private bool _debugAreaLabels;
 
-		// #363 ambient spawn-group pools per loaded zone (built in LoadAmbientSpawns on the entry thread, iterated by
-		// MaintainAmbientPools on the tick thread - concurrent so the tick doesn't throw mid-load).
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>> _ambientPools = new ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>>();
-
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
@@ -132,16 +128,14 @@ namespace Faolan.GameServer.World
 		private HashSet<uint> _storyKillTargets = null!;
 		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
 
-		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs,
-		// and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
-		// value must be in the SAME LOW range retail assigns mid-session entity handles - the client only tracks/polls
-		// handles in that range, and the render of a mid-session spawn is completed by the client polling 0x2020 for the
-		// entity's handle (-> server SpawnCheck 0x2008). Captured retail mid-session spawns (the mount + interest NPCs)
-		// use 0x000286xx; the burst NPCs use 0x000818xx; the player/char-id is ~0x0802xxxx. A high value (the old
-		// 0x40000000, or even 0x0F000000) is FAR above any real handle, so the client never polls it and the entity
-		// silently never renders. 0x00090000 sits just above the burst NPCs (0x000818xx) and well below the char-id
-		// range (0x02000000+) - small, valid, collision-free. (Matches the RetailLoginReplay built-NPC test handle.)
-		private int _nextRuntimeHandle = 0x00090000;
+		// Handles for every runtime-spawned entity (loot bags, pets, summons, ambient members). The range and why it
+		// matters are documented on the allocator itself; it is composed here because nothing outside this class
+		// spawns runtime entities, and a SECOND counter would hand out colliding handles.
+		private readonly RuntimeHandleAllocator _handles = new RuntimeHandleAllocator();
+
+		// #363 ambient spawn-group pools. Owns the pool state and the spawning; the streaming stays here (see
+		// MaintainAmbientPools) - that split is the state-vs-wire seam of #826.
+		private readonly AmbientPoolService _ambient;
 
 		// The listener's ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) -
 		// one shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
@@ -158,6 +152,7 @@ namespace Faolan.GameServer.World
 			_tortageIntro = tortageIntro;
 			_combos = combos;
 			_applySelfBuff = applySelfBuff;
+			_ambient = new AmbientPoolService(sim, database, _handles, logger);
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
@@ -1364,7 +1359,7 @@ namespace Faolan.GameServer.World
 				// SetNameIIR after the spawn (SendWorldSpawn), gated on the .togglenpcgroup toggle. The client hard-caps a
 				// SetNameIIR name at 31 bytes, so we show the label alone (group | tier xN, ~24 chars) - the group name is
 				// what a labeling pass needs. Stashed here unconditionally so the toggle is instant.
-				if (AreaLabelFor(spawnAreas, npc) is { } areaLabel)
+				if (SpawnAreaLabels.AreaLabelFor(spawnAreas, npc) is { } areaLabel)
 				{
 					entity.OverheadNameOverride = areaLabel;
 					labelledCount++;
@@ -1441,7 +1436,7 @@ namespace Faolan.GameServer.World
 
 			BindFormationFollowers(zone, followers);
 
-			await LoadAmbientSpawns(mapId, instanceId, zone);
+			await _ambient.LoadAsync(mapId, instanceId, zone);
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
 			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).", labelledCount, npcs.Length, mapId,
@@ -1467,25 +1462,15 @@ namespace Faolan.GameServer.World
 		// point, streamed to nearby players.
 		public async Task MaintainAmbientPools()
 		{
-			foreach (var ((mapId, instanceId), pools) in _ambientPools)
+			// The service spawns the deficit and yields each member as it goes; the streaming is ours. Because
+			// Replenish is a lazy iterator, this keeps the original spawn-then-send order rather than spawning every
+			// pool's deficit up front.
+			foreach (var (entity, zone, pos) in _ambient.Replenish())
 			{
-				var zone = _sim.World.ZoneFor(mapId, instanceId);
-				foreach (var pool in pools)
+				foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
 				{
-					var live = zone.Entities.Where(e => e.SpawnAreaId == pool.AreaId && !e.IsDead).ToList();
-					if (live.Count >= pool.MaxCount)
-						continue;
-
-					var pos = FreeAmbientPoint(pool, live);
-					var entity = SpawnAmbientMember(pool, pos, zone);
-					if (entity == null)
-						continue;
-
-					foreach (var viewer in zone.PlayersInRange(pos, WorldSimulation.PlayerInterestRange))
-					{
-						if (viewer.Client != null && viewer.Known.Add(entity.Handle))
-							await SendWorldSpawn(viewer.Client, entity);
-					}
+					if (viewer.Client != null && viewer.Known.Add(entity.Handle))
+						await SendWorldSpawn(viewer.Client, entity);
 				}
 			}
 		}
@@ -1729,7 +1714,7 @@ namespace Faolan.GameServer.World
 				return null;
 			}
 
-			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
+			var handle = _handles.Next(); // a fresh summoned-entity handle (high range, no player/NPC collision)
 			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
 			// baked ones are just placeholders (the player's zone token here).
 			var body = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken);
@@ -1792,7 +1777,7 @@ namespace Faolan.GameServer.World
 
 			// BuildFromType throws for a type with no lifted StatCore.IirHeader - the fail-fast signal for un-lifted /
 			// partially-imported data; it never happens for a shipped pet/mount type.
-			var handle = NextRuntimeHandle();
+			var handle = _handles.Next();
 			// Bake the summoner's zone token (4-byte) - see SpawnAmbientMember; a 0 token desyncs the client version read.
 			var body = NpcSpawnBuilder.BuildFromType(npcType, handle, player.Position, player.Rotation, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
@@ -2371,52 +2356,6 @@ namespace Faolan.GameServer.World
 			_logger.LogDebug("World: #741 bound {Bound} of {Total} formation follower(s) to a leader within {Range}u.", bound, followers.Count, FormationBindRange);
 		}
 
-		private async Task LoadAmbientSpawns(uint mapId, uint instanceId, Zone zone)
-		{
-			var areas = await _database.GetResolvedSpawnAreas(mapId);
-			var pools = new List<AmbientPool>();
-			var spawned = 0;
-			foreach (var area in areas)
-			{
-				var type = area.NpcTemplate;
-				if (type?.StatCore?.IirHeader == null)
-					continue; // the resolved creature has no buildable stat core - skip (can't construct its body)
-
-				var points = area.Points.Select(p => p.Position).ToArray();
-				if (points.Length == 0)
-					continue;
-
-				var level = type.StatCore.Level ?? 0;
-				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level, level > 0
-					? CombatResolver.NpcMaxHealthForLevel(level)
-					: 1u, type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, FormatAreaLabel(area));
-				pools.Add(pool);
-
-				// The captured spawns LINKED to this area (tagged in the load loop above) are already in the zone as pool
-				// members - the "obsolete npcspawns" that fill the pool first; only spawn the DEFICIT up to MaxCount, at
-				// points not already occupied. So a resolved area with captured members doesn't double-populate.
-				var members = zone.Entities.Where(e => e.SpawnAreaId == area.Id).ToList();
-				for (var i = members.Count; i < pool.MaxCount; i++)
-				{
-					var member = SpawnAmbientMember(pool, FreeAmbientPoint(pool, members), zone);
-					if (member == null)
-						break;
-
-					members.Add(member);
-					spawned++;
-				}
-			}
-
-			_ambientPools[(mapId, instanceId)] = pools;
-			if (spawned > 0)
-				_logger.LogInformation("World: +{Count} ambient NPC(s) across {Pools} spawn-area pool(s) on map {Map}.", spawned, pools.Count, mapId);
-		}
-
-		private uint NextRuntimeHandle()
-		{
-			return (uint)Interlocked.Increment(ref _nextRuntimeHandle);
-		}
-
 		// A few random snapshot-buildable item templates for a loot bag. Drops from the MAP's loot pool
 		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
 		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
@@ -2586,36 +2525,6 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
-		// the maintenance caller, does that). The member roams the pool's points and fades-not-revives on death so the
-		// POOL owns its respawn. BuildFromType throws if the pool's type has no lifted stat core (a misconfigured pool).
-		private WorldEntity SpawnAmbientMember(AmbientPool pool, Vector3 pos, Zone zone)
-		{
-			var handle = NextRuntimeHandle();
-			// Bake THIS zone's live token (4-byte) so the body is wire-correct and SendWorldSpawn can re-stamp it per
-			// recipient. Passing 0 shipped a 1-byte token that the client read as a version-byte desync (crash on 4010's
-			// ambient pools) and that SpawnTransformPatch could not fix (it only overwrites a 4-byte token in place).
-			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken);
-
-			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
-			entity.InstanceId = zone.InstanceId;
-			entity.Level = pool.Level;
-			entity.Disposition = pool.Disposition;
-			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
-			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
-			entity.SpawnBody = body;
-			entity.SpawnAreaId = pool.AreaId;
-			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
-			entity.NoRespawn = true; // corpse fades on death; the POOL respawns a replacement (below)
-			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
-			entity.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
-			foreach (var s in pool.Type.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
-
-			zone.Add(entity);
-			return entity;
-		}
-
 		// #502 scripted encounter: replace a LURE with its BOSS, on the lure's exact spot. An entity SWAP, not a
 		// re-template - which is what the capture shows (Damsel handle 0x0002db79 out, Eerika 0x0002ddd1 in, same
 		// second). The boss carries the lure's type so its corpse can restore it (EncounterReset).
@@ -2646,7 +2555,7 @@ namespace Faolan.GameServer.World
 			await BroadcastEntityDespawn(lure);
 			_sim.World.Remove(lure);
 
-			var handle = NextRuntimeHandle();
+			var handle = _handles.Next();
 			var body = NpcSpawnBuilder.BuildFromType(boss, handle, position, rotation, zone.PlayfieldToken);
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, boss.Name, EntityVitals.FromMax(bossHealth, 0, bossHealth), boss.TemplateId);
 			entity.InstanceId = zone.InstanceId;
@@ -2715,7 +2624,7 @@ namespace Faolan.GameServer.World
 				return;
 			}
 
-			var handle = NextRuntimeHandle();
+			var handle = _handles.Next();
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, type.Name, EntityVitals.FromMax(health, 0, health), type.TemplateId);
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = level;
@@ -2748,7 +2657,7 @@ namespace Faolan.GameServer.World
 
 			var zone = _sim.World.ZoneForEntity(boss);
 			var encounter = await _database.GetNpcEncounter(zone.MapId, lureTemplateId);
-			var handle = NextRuntimeHandle();
+			var handle = _handles.Next();
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, boss.Position, boss.Rotation, lure.Name, EntityVitals.FromMax(lureHealth, 0, lureHealth), lure.TemplateId);
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = lureLevel;
@@ -2788,7 +2697,7 @@ namespace Faolan.GameServer.World
 			if (template == null)
 				return null;
 
-			var handle = NextRuntimeHandle();
+			var handle = _handles.Next();
 
 			// Resolve the rolled templates to the items the loot window can actually DISPLAY (present in the item
 			// table - a harvested hash stopped being a requirement in #723) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
@@ -3010,45 +2919,6 @@ namespace Faolan.GameServer.World
 				s => s.WriteArrayUInt32Length(body)));
 		}
 
-		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
-		private static NpcSpawnArea? AreaContaining(IReadOnlyList<NpcSpawnArea> areas, Vector3 pos)
-		{
-			const float pad = 5f;
-			NpcSpawnArea? best = null;
-			var bestDistSq = float.MaxValue;
-			foreach (var a in areas)
-			{
-				if (pos.X < a.BoundsMinX - pad || pos.X > a.BoundsMaxX + pad || pos.Z < a.BoundsMinZ - pad || pos.Z > a.BoundsMaxZ + pad)
-					continue;
-
-				var cx = (a.BoundsMinX + a.BoundsMaxX) * 0.5f;
-				var cz = (a.BoundsMinZ + a.BoundsMaxZ) * 0.5f;
-				var distSq = (pos.X - cx) * (pos.X - cx) + (pos.Z - cz) * (pos.Z - cz);
-				if (distSq < bestDistSq)
-				{
-					bestDistSq = distSq;
-					best = a;
-				}
-			}
-
-			return best;
-		}
-
-		// #363 dev label for a captured spawn's nameplate: LINK-first - the area it's a confirmed MEMBER of
-		// (NpcSpawnAreaId), even if it sits outside the bounds (a hand-linked stray); else the area its POSITION lands in
-		// (so an unlinked NPC still previews which area it's in). Null when neither. See FormatAreaLabel.
-		private static string? AreaLabelFor(IReadOnlyList<NpcSpawnArea> areas, NpcSpawn npc)
-		{
-			NpcSpawnArea? area = null;
-			if (npc.NpcSpawnAreaId is { } id)
-				area = areas.FirstOrDefault(a => a.Id == id);
-
-			area ??= AreaContaining(areas, npc.Position);
-			return area == null
-				? null
-				: FormatAreaLabel(area);
-		}
-
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
 		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
 		// Builds one entity's FA015807 spawn record, framed for `recipient`: the stored SpawnBody with the LIVE position
@@ -3111,52 +2981,6 @@ namespace Faolan.GameServer.World
 			// The u32 carrier length belongs to the SENDER (#530 rule 2) - SpawnBody is the bare record.
 			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body));
-		}
-
-		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
-		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own SpawnBodyReader
-		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
-		private static string FormatAreaLabel(NpcSpawnArea a)
-		{
-			return $"{a.GroupName} | {ResolvedTag(a.ResolvedBy)} x{a.MaxCount}";
-		}
-
-		// A pool point with no live member sitting on it (so a refill lands on an empty spot, not on top of a survivor);
-		// falls back to a random point when they're all occupied.
-		private static Vector3 FreeAmbientPoint(AmbientPool pool, IReadOnlyList<WorldEntity> live)
-		{
-			foreach (var pt in pool.Points)
-			{
-				var occupied = false;
-				foreach (var e in live)
-				{
-					var dx = e.Position.X - pt.X;
-					var dz = e.Position.Z - pt.Z;
-					if (dx * dx + dz * dz < 4f)
-					{
-						occupied = true;
-						break;
-					}
-				}
-
-				if (!occupied)
-					return pt;
-			}
-
-			return pool.Points[Random.Shared.Next(pool.Points.Length)];
-		}
-
-		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
-		private static string ResolvedTag(SpawnResolutionSource resolvedBy)
-		{
-			return resolvedBy switch
-			{
-				SpawnResolutionSource.Name          => "name",
-				SpawnResolutionSource.Containment   => "contain",
-				SpawnResolutionSource.IdPropagation => "id-prop",
-				SpawnResolutionSource.Manual        => "manual",
-				_                                   => "unresolved"
-			};
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
@@ -3237,10 +3061,6 @@ namespace Faolan.GameServer.World
 			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(moveBody)));
 		}
-
-		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
-		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when _debugAreaLabels is on.
-		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
 
 		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place
 		// them on it. DestMapId == 0 means the object IS a teleporter but its destination hasn't been captured yet -
