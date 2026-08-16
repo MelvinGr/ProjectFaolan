@@ -94,6 +94,8 @@ namespace Faolan.Importer.Cli
 			Census("MainQuest.prev_template_id", catalog.MainQuests.Count(m => m.PrevTemplateId != 0), chapters.Count);
 			Census("MainQuest.next_template_id", catalog.MainQuests.Count(m => m.NextTemplateId != 0), chapters.Count);
 			Census("MainQuest.condition_script_id", catalog.MainQuests.Count(m => m.ConditionScriptId != 0), chapters.Count);
+			Census("MainQuest.first_main_quest_template_id", catalog.MainQuests.Count(m => m.FirstMainQuestTemplateId != 0), chapters.Count);
+			Census("MainQuest.last_main_quest_template_id", catalog.MainQuests.Count(m => m.LastMainQuestTemplateId != 0), chapters.Count);
 			Census("MainQuest.type", catalog.MainQuests.Count(m => m.Type != 0), chapters.Count);
 			Census("MainQuest.tier", catalog.MainQuests.Count(m => m.Tier != 0), chapters.Count);
 			Census("MainQuest.xp_reward", catalog.MainQuests.Count(m => m.XpReward != 0), chapters.Count);
@@ -124,6 +126,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  lines holding more than one quest: {questsByChapter.Count(g => g.Count() > 1)}");
 			Console.WriteLine("  ⚠️  no FIELD orders the steps within a chapter - Quest.tier and Quest.start_new_tier, the");
 			Console.WriteLine("      fields shaped for exactly that, are empty (census above). The ROW ORDER is scored below.");
+
+			ChapterGroupCheck(catalog, chapters);
 
 			await StepOrderCheck(catalog);
 			await LineRewardCheck(catalog);
@@ -217,6 +221,55 @@ namespace Faolan.Importer.Cli
 		// ⚠️ Part 2 needs a sibling that was actually CAPTURED. A step with `HasSnapshotRecord = 0` carries 0 because
 		// no snapshot ever held it, which says nothing - counting those as disagreement would falsify the reading with
 		// missing data.
+		// `MainQuest.first_main_quest_template_id` / `last_main_quest_template_id` (fields 11 and 12) - populated on
+		// 1791 of 2181 chapters and, until this block, read by NOTHING: not the census above, not the importer, not
+		// the model. They went unnoticed because the census listed every OTHER field, which is exactly the shape a
+		// missing row hides in.
+		//
+		// They LOOK like the chapter-level twin of `first_quest_template_id`/`last_quest_template_id`: those bound a
+		// chapter's STEPS, so these should bound a GROUP OF CHAPTERS.
+		//
+		// ⛔ MEASURED, and the reading does not survive: the pair is DEGENERATE. Both ends resolve to a real chapter
+		// on all 1791 rows, but 1788 have `first` == the row's own id and 1786 have `first` == `last`, i.e. a group of
+		// exactly one. Only THREE genuine multi-chapter groups exist in the whole table - {2495, 2496} -> 2549,
+		// {1741, 2908}, and 3279 (which is one of the two duplicated ids). So the field carries a self-echo on 99.7%
+		// of rows and there is nothing here worth a column; `tier` does separate members where a group is real, but
+		// three groups is not a feature. Kept as a REPORT line rather than an import so the next reader sees the
+		// measurement instead of re-deriving it.
+		private static void ChapterGroupCheck(QuestGiverList catalog, Dictionary<uint, QuestGiverList.MainQuest> chapters)
+		{
+			var withGroup = catalog.MainQuests.Where(m => m.FirstMainQuestTemplateId != 0 || m.LastMainQuestTemplateId != 0).ToList();
+			Console.WriteLine();
+			Console.WriteLine("--- chapter GROUP pointers (first/last_main_quest_template_id, fields 11/12) ---");
+			if (withGroup.Count == 0)
+			{
+				Console.WriteLine("  empty in the shipped data");
+				return;
+			}
+
+			var resolvableFirst = withGroup.Count(m => chapters.ContainsKey(m.FirstMainQuestTemplateId));
+			var resolvableLast = withGroup.Count(m => chapters.ContainsKey(m.LastMainQuestTemplateId));
+			var selfFirst = withGroup.Count(m => m.FirstMainQuestTemplateId == m.TemplateId);
+			var same = withGroup.Count(m => m.FirstMainQuestTemplateId == m.LastMainQuestTemplateId);
+			Console.WriteLine($"  rows carrying the pair {withGroup.Count} / {chapters.Count}");
+			Console.WriteLine($"  first resolves to a chapter in this table: {resolvableFirst}/{withGroup.Count}   last: {resolvableLast}/{withGroup.Count}");
+			Console.WriteLine($"  rows whose first == their own id: {selfFirst}   rows where first == last (group of one): {same}");
+
+			// If this really is a grouping, the members sharing a (first,last) pair form a set, and `tier` should be
+			// the member's position in it. Printing the group SIZES says whether the pair partitions the table or is
+			// just a per-row echo.
+			var groups = withGroup.GroupBy(m => (m.FirstMainQuestTemplateId, m.LastMainQuestTemplateId)).ToList();
+			Console.WriteLine($"  distinct (first,last) pairs: {groups.Count}  -> mean members {(double)withGroup.Count / groups.Count:F1}, largest {groups.Max(g => g.Count())}");
+			var tierIsPosition = groups.Count(g => g.Select(m => m.Tier).Distinct().Count() == g.Count());
+			Console.WriteLine($"  groups whose members carry DISTINCT tiers (tier = position in the group?): {tierIsPosition}/{groups.Count}");
+
+			foreach (var g in groups.OrderByDescending(g => g.Count()).Take(3))
+			{
+				var members = g.OrderBy(m => m.Tier).Select(m => $"{m.TemplateId}(t{m.Tier})");
+				Console.WriteLine($"    group first={g.Key.Item1} last={g.Key.Item2}: {string.Join(" ", members)}");
+			}
+		}
+
 		private static async Task LineRewardCheck(QuestGiverList catalog)
 		{
 			await using var db = OpenDb();

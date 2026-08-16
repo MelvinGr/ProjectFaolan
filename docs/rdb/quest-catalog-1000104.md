@@ -56,6 +56,7 @@ precisely so nobody plans a decode around a column of zeroes.
 |---|---:|---|
 | `MainQuest.first_quest_template_id` / `last_quest_template_id` | 2183 / 2183 | the line's endpoints |
 | `MainQuest.tier` | 1791 | |
+| `MainQuest.first_main_quest_template_id` / `last_main_quest_template_id` | 1791 / 1791 | populated but **degenerate** — see below |
 | `MainQuest.reward` / `optional_reward` | 1098 / 619 | item template ids, as `templateId:type` |
 | `MainQuest.prev_template_id` | **394** | see ordering below |
 | `MainQuest.next_template_id` | **3** | effectively dead |
@@ -66,6 +67,25 @@ precisely so nobody plans a decode around a column of zeroes.
 | `Quest.tier` / `start_new_tier` | **0 / 0** | dead |
 | `Quest.start_scry_script_id` | **0** | dead |
 | `QuestGoal.phase` | 7327 | |
+
+### The chapter-GROUP pointers are a self-echo, not a grouping
+
+`first_main_quest_template_id` / `last_main_quest_template_id` (fields 11 and 12) sit on 1791 chapters and read
+like the chapter-level twin of `first_quest_template_id`/`last_quest_template_id` — those bound a chapter's
+*steps*, so these should bound a *group of chapters*. They were populated, and read by nothing: absent from the
+census, the importer and the model alike, which is exactly the shape a missing row hides in.
+
+Measured (`--report rdb-quest-catalog`, "chapter GROUP pointers"), the reading does **not** survive:
+
+| check | result |
+|---|---|
+| both ends resolve to a real chapter | 1791 / 1791 |
+| `first` == the row's **own** id | **1788** |
+| `first` == `last` (a group of one) | **1786** |
+| genuine multi-chapter groups in the whole table | **3** — `{2495, 2496} → 2549`, `{1741, 2908}`, and `3279` (one of the two duplicated ids) |
+
+So the pair is a self-reference on 99.7% of rows. `tier` does separate the members where a group is real, but
+three groups is not a feature worth a column. Left as a report line, deliberately **not** imported.
 
 ### "Dead" is two different things, and only one of them is an absent field
 
