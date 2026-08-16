@@ -415,6 +415,11 @@ namespace Faolan.Importer.Cli
 					return await BuffDurationCheck(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "spell-level-ladder":
+				{
+					return await SpellLevelLadder();
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

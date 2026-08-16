@@ -170,18 +170,31 @@ namespace Faolan.Core.Database.Repositories
 		// ⚠️ This does NOT close the over-grant, and is not claimed to: the same four characters show the level path
 		// offering 268/220/43 spells where retail gave them 91/100/4, so effects are one identified band of a much
 		// larger gap. Tracked in Gitea #847 - do not read a passing spellbook as a solved one.
+		//
+		// ⚠️ The GATE is `ClassSpell.GrantLevel` where a capture has caught the grant and `Spells.Level` everywhere
+		// else - the SAME expression `GetStartingSpells` gates on, and it has to be, because the two answer one
+		// question between them: this one decides what a DING teaches and that one what a RELOG restores. They used
+		// to disagree, this one reading `Spells.Level` alone, and every row where the two facts differ was a spell
+		// the login path said a character of that level knows and the ding path taught at a different level entirely
+		// (`Runed Flesh (Rank 1)` granted at 5, requirement 10; `Contract of Protection (Rank 1)` at 5 vs 10) - or
+		// never, for the two `Dance:` emotes whose requirement is 0 and whose captured grant is at 5.
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
-				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id))
-				.Where(s => !ctx.Spells.Any(applier => applier.EffectSpell == s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
-				.OrderBy(s => s.Level)
-				.ThenBy(s => s.Id)
-				.Select(s => s.Id)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
+				{
+					cs,
+					s,
+					Gate = (uint)(cs.GrantLevel ?? s.Level)
+				})
+				.Where(x => x.Gate > fromLevelExclusive && x.Gate <= toLevelInclusive)
+				.Where(x => !ctx.Combos.Any(c => c.GameActionId == x.s.Id))
+				.Where(x => !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
+				.OrderBy(x => x.Gate)
+				.ThenBy(x => x.s.Id)
+				.Select(x => x.s.Id)
 				.Distinct()
 				.ToArrayAsync();
 		}

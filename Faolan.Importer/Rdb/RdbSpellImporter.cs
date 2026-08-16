@@ -7,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Progression;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -168,6 +169,11 @@ namespace Faolan.Importer.Rdb
 		// Field 54 is a content BAND (pre- vs post-cap), not a requirement, and 45 named fields is exactly how many
 		// chances there are to import the wrong one - see the field-name warning in docs/rdb/spell-record-fields.md.
 		private const uint LevelField = 0x07D;
+
+		// The rank suffix the client puts on a ranked spell's name, and the level cap a re-read ladder has to stay
+		// inside (`Radiance`'s bands run to 91, which is what disqualifies them - see RankLadderFromEffectBands).
+		private const string RankSuffix = " (Rank ";
+		private const uint MaxCharacterLevel = LevelingResolver.MaxLevel;
 
 		// 123 - `GUI Stacking Order`, the spell's precedence within its stacking line. Read as the RANK until #634,
 		// which it only correlates with; the real rank is the "(Rank N)" suffix in the name.
@@ -634,6 +640,8 @@ namespace Faolan.Importer.Rdb
 				spell.SummonPointCost = summon?.PointCost;
 			}
 
+			var ladderLevelsSet = RankLadderFromEffectBands(byId, statEffects, logger);
+
 			// #271: apply the recast now that every row's GuiStackingLine is set. The spell's OWN record leads - it
 			// is that spell's own statement about itself, and it is what the retail tooltip shows - and a record
 			// naming the spell (or its line) from outside only fills in for a rank that carries no element, which is
@@ -822,11 +830,138 @@ namespace Faolan.Importer.Rdb
 			var criterionRows = pendingCriteria.Count;
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows, {ChainRows} CastNano chain rows, {CriterionRows} effect CRITERIA.",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, unparsedElements, recordsWithUnparsed,
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows, {EffectDurations} durations from the effect catalog, {EffectLinks} effect links from the area elements, {LadderLevels} rank levels re-read from the effect bands; {UnparsedElements} UNPARSED element head(s) across {RecordsWithUnparsed} record(s){UnparsedSamples}; element bytes {ElementBytes}/{TotalBytes}, {Kinds} distinct kinds ({Unreg} unregistered), {AreaRows} area-effect rows, {ChainRows} CastNano chain rows, {CriterionRows} effect CRITERIA.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded, effectDurations, effectLinksSet, ladderLevelsSet, unparsedElements, recordsWithUnparsed,
 				unparsedSamples.Count == 0 ? "" : " - " + string.Join(" | ", unparsedSamples), elementBytes, totalBodyBytes, kindsSeen.Count, kindsUnregistered.Count, areaRows, chainRows, criterionRows);
-			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
+			return (seen, inserted, namesSet, castTimesSet, levelsSet + ladderLevelsSet, mountsWritten, effectDurations, effectLinksSet, unparsedElements,
 				$"bytes {elementBytes}/{totalBodyBytes} ({100.0 * elementBytes / Math.Max(totalBodyBytes, 1):F1}% in elements), {kindsSeen.Count} kinds, {kindsUnregistered.Count} unregistered, {areaRows} area-effect rows, {chainRows} CastNano chain rows, {spellModRows} spell-scoped stat modifier rows, {criterionRows} effect criteria");
+		}
+
+		/// <summary>
+		///     The per-rank LEVEL LADDER, re-read from the effect ramp bands for the families where
+		///     <see cref="LevelField" /> provably is not one.
+		/// </summary>
+		/// <remarks>
+		///     A spell family's ranks unlock at SPACED levels - <c>Ice Strike</c> 7/20/35/50/65/80 - and field 125
+		///     states that ladder for 97 of the catalog's 124 class-spell rank families. For three of them it states
+		///     no ladder at all: every rank of <c>Chill</c> reads 7, every rank of <c>Infestation</c> reads 2, and
+		///     <c>Lifestrike</c>'s five ranks read 2/3/4/4/4. A character dinging to that one level was then taught
+		///     the WHOLE family in a single ding - ranks whose own numbers are written for level 75-80 included, which
+		///     <c>SpellEffectBands</c> then clamps onto a level-4 caster.
+		///     <para>
+		///         The record states the ladder a SECOND time, and correctly: an <c>InterpolatedHit</c> ramp is banded
+		///         by level (keys 172/173), and the band a rank's numbers open at IS that rank's unlock level.
+		///         Measured over the families whose field-125 ladder is intact the two agree EXACTLY - <c>Ice
+		///         Strike</c> 7/20/35/50/65/80, <c>Pestilential Blast</c> 1/20/35/50/65/80, <c>Flesh to Worms</c>
+		///         2/25/40/55/70, <c>Frost Blast</c> 16/30/45/60/75, <c>Blasphemous Ruin</c> 14/35/50/65/80. Where
+		///         they disagree an independent scrape backs the BAND: ellatha rates <c>Lifestrike</c> rank 1 and
+		///         <c>Chill</c> rank 1 at level 15, exactly where their rank-1 bands open and 8 levels above where
+		///         field 125 puts the whole of Chill.
+		///     </para>
+		///     <para>
+		///         ⚠️ The band is NOT a general level source and is deliberately not used as one - it agrees with
+		///         field 125 on only 46% of the rank spells carrying both, because a ramp may legitimately open at 1
+		///         (a buff that scales from the first level it is castable). It is consulted only where field 125 has
+		///         DISQUALIFIED itself by collapsing ranks, and only where the bands then answer completely,
+		///         monotonically, inside the level cap and with more distinct levels than the field managed. Over the
+		///         whole catalog that is those three families and nothing else; the other 20 collapsed families have
+		///         no second source and keep the field's answer - <c>--report spell-level-ladder</c> lists them.
+		///     </para>
+		/// </remarks>
+		private static int RankLadderFromEffectBands(Dictionary<uint, Spell> byId, Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>> statEffects, ILogger? logger)
+		{
+			var families = new Dictionary<string, List<(Spell Spell, int Rank)>>(StringComparer.Ordinal);
+			foreach (var spell in byId.Values)
+			{
+				if (RankOf(spell.Name) is not { } ranked)
+					continue;
+
+				(families.TryGetValue(ranked.Family, out var members)
+					? members
+					: families[ranked.Family] = []).Add((spell, ranked.Rank));
+			}
+
+			var changed = 0;
+			foreach (var (family, members) in families)
+			{
+				// Field 125 has to have spoken for the whole family before its silence on one rank can be read as a
+				// collapse, and it has to name FEWER levels than there are ranks - that is what disqualifies it.
+				if (members.Any(m => m.Spell.Level == 0))
+					continue;
+
+				var byRank = members.GroupBy(m => m.Rank).OrderBy(g => g.Key).ToList();
+				var fieldLevels = members.Select(m => (int)m.Spell.Level).Distinct().Count();
+				if (fieldLevels >= byRank.Count)
+					continue;
+
+				// ...and the bands have to answer for EVERY rank, with one answer per rank (two ids of the same rank
+				// disagreeing is not a ladder), inside the level cap.
+				var ladder = new List<uint>(byRank.Count);
+				foreach (var rank in byRank)
+				{
+					var lows = rank.Select(m => BandLow(statEffects, m.Spell.Id)).Distinct().ToList();
+					if (lows is [{ } low] && low > 0 && low <= MaxCharacterLevel)
+						ladder.Add(low);
+					else
+						break;
+				}
+
+				if (ladder.Count != byRank.Count)
+					continue;
+
+				// A ladder never steps DOWN with rank, and it is only worth taking if it separates more ranks than the
+				// field did - otherwise the two are the same statement and the field is the established one.
+				if (ladder.Zip(ladder.Skip(1)).Any(p => p.Second < p.First) || ladder.Distinct().Count() <= fieldLevels)
+					continue;
+
+				var before = string.Join("/", byRank.Select(r => r.First().Spell.Level));
+				foreach (var (rank, low) in byRank.Zip(ladder))
+					foreach (var (spell, _) in rank)
+					{
+						if (spell.Level == low)
+							continue;
+
+						spell.Level = (byte)low;
+						changed++;
+					}
+
+				logger?.LogInformation("RdbSpellImporter: '{Family}' ranks re-leveled {Before} -> {After} from the effect ramp bands (field {Field} states no ladder for it).",
+					family, before, string.Join("/", ladder), LevelField);
+			}
+
+			return changed;
+		}
+
+		// The band a spell's numbers OPEN at: the highest ramp low-level over its effects. Highest, not lowest,
+		// because a record may carry both a per-rank ramp and an unbanded companion effect whose ramp opens at 1 -
+		// `Blasphemous Ruin (Rank 2)` states 35 and 1 - and it is the banded one that dates the rank.
+		private static uint? BandLow(Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>> statEffects, uint spellId)
+		{
+			if (!statEffects.TryGetValue(spellId, out var mods))
+				return null;
+
+			uint? low = null;
+			foreach (var mod in mods)
+				if (mod.Ramp is { } ramp && (low is null || ramp.LowLevel > low))
+					low = ramp.LowLevel;
+
+			return low;
+		}
+
+		// The "(Rank N)" suffix the client puts on a ranked spell, split off its family name. Trailing spaces are
+		// trimmed because a few catalog names carry a double space before it ("Freeze  (Rank 2)").
+		private static (string Family, int Rank)? RankOf(string? name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return null;
+
+			var at = name.IndexOf(RankSuffix, StringComparison.Ordinal);
+			if (at < 0 || !name.EndsWith(')'))
+				return null;
+
+			return int.TryParse(name.AsSpan((at + RankSuffix.Length)..^1), out var rank)
+				? (name[..at].TrimEnd(), rank)
+				: null;
 		}
 
 		/// <summary>

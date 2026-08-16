@@ -191,6 +191,51 @@ namespace Faolan.Tests
 			Assert.Empty(dinged.Intersect(infestationRanks));
 		}
 
+		// The same shape of in-client report, one rung further along: a level-4 Necromancer's ding taught `Lifestrike`
+		// ranks 3, 4 AND 5 at once, the last of which states its damage for levels 75-80. The cause was the level data
+		// rather than the query - RDB field 125 rated the five ranks 2/3/4/4/4 - and `RdbSpellImporter`'s
+		// `RankLadderFromEffectBands` re-reads such a family's ladder off the effect ramp bands (15/30/45/60/75, which
+		// is where ellatha puts rank 1 too).
+		//
+		// Kept as an id-level gate for the same reason its `Flesh to Worms` neighbour is: a family that teaches SEVERAL
+		// of its own ranks in one ding passes every population test above, so only naming the family catches it.
+		[Fact]
+		public async Task TheNecromancerDing_TeachesOneLifestrikeRankPerBand_NotThreeAtLevelFour()
+		{
+			const uint LifestrikeRank1 = 3666302;
+			uint[] lifestrikeRanks = [3666302, 3666335, 3666337, 3666338, 3666339];
+
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+
+			var atFour = await repo.GetClassSpellsUnlockedBetween(ConanClass.Necromancer, 3, 4);
+			Assert.Empty(atFour.Intersect(lifestrikeRanks));
+
+			var atFifteen = await repo.GetClassSpellsUnlockedBetween(ConanClass.Necromancer, 14, 15);
+			Assert.Equal([LifestrikeRank1], atFifteen.Intersect(lifestrikeRanks));
+		}
+
+		// ⭐ The two grant paths answer ONE question between them - what a character of a given level knows - so
+		// everything the dings taught on the way up has to come back on the relog that re-derives the book. They gate
+		// on the same expression (`ClassSpell.GrantLevel` where a capture caught the grant, `Spells.Level` elsewhere),
+		// and this is what holds them there: the ding path read `Spells.Level` ALONE until the two were reconciled, so
+		// every row where the two facts differ was a spell one path placed at a level the other did not.
+		//
+		// From 1, not 0: level 1 is the create KIT's exclusive domain on the relog side (a captured list, not a level
+		// query), which is a difference of intent rather than a drift - see GetStartingSpells.
+		[Fact]
+		public async Task EverythingTheDingsTeach_ComesBackOnTheRelog()
+		{
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			foreach (var @class in ClassSpellClasses)
+			{
+				var dinged = await repo.GetClassSpellsUnlockedBetween(@class, 1, 80);
+				var relog = (await repo.GetStartingSpells(80, @class)).ToHashSet();
+
+				var lost = dinged.Where(id => !relog.Contains(id)).ToList();
+				Assert.True(lost.Count == 0, $"{@class}: dinged spell(s) the level-80 re-grant does not restore: {string.Join(", ", lost)}");
+			}
+		}
+
 		// A spell some OTHER spell applies, where that other spell is itself a real leveled `ClassSpells` entry (i.e.
 		// something a character can actually be taught). The referrer test is the whole point - see the trap gate
 		// above.

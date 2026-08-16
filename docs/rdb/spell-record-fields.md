@@ -584,6 +584,39 @@ Field 54 takes 23 values over the whole catalog and **19,957 of them are `1` or 
 other source agrees with: `Gate of Hell` 70, every rank-6 spell 80, and `Ice Strike`'s six ranks
 7 / 20 / 35 / 50 / 65 / 80. `RdbSpellImporter` reads 125, and that is correct.
 
+### ...but for a few families 125 states no LADDER, and the effect ramp band does
+
+A family's ranks unlock at spaced levels, and 125 says so for 103 of the 122 learnable rank families. For a
+handful it says one level for several ranks — every rank of `Chill` read **7**, every rank of `Infestation`
+read **2**, and `Lifestrike`'s five ranks read **2 / 3 / 4 / 4 / 4**. A single ding then taught the whole
+family at once: a level-4 Necromancer dinging from 3 was handed Lifestrike ranks 3, 4 *and* 5, the last of
+which states its damage for levels 75-80.
+
+**The record answers a second time, and correctly.** An `InterpolatedHit` element's ramp is banded by level
+(keys 172 `low` / 173 `high`), and the band a rank's numbers open at IS that rank's unlock level. Over the
+families whose 125 ladder is intact the two agree **exactly**:
+
+| family | field 125 | ramp band lows |
+|---|---|---|
+| `Ice Strike` | 7 / 20 / 35 / 50 / 65 / 80 | 7 / 20 / 35 / 50 / 65 / 80 |
+| `Pestilential Blast` | 1 / 20 / 35 / 50 / 65 / 80 | 1 / 20 / 35 / 50 / 65 / 80 |
+| `Flesh to Worms` | 2 / 25 / 40 / 55 / 70 | 2 / 25 / 40 / 55 / 70 |
+| `Frost Blast` | 16 / 30 / 45 / 60 / 75 | 16 / 30 / 45 / 60 / 75 |
+| `Blasphemous Ruin` | 14 / 35 / 50 / 65 / 80 | 14 / 35 / 50 / 65 / 80 |
+
+and where they disagree an independent scrape backs the **band**: ellatha rates `Lifestrike` rank 1 and
+`Chill` rank 1 at level 15, exactly where their rank-1 bands open and eight levels above where 125 puts the
+whole of Chill.
+
+⚠️ **The band is not a general level source.** It agrees with 125 on only 46% of the rank spells carrying
+both, because a ramp may legitimately open at 1 (a buff scaling from the first level it is castable) or be
+banded against a different family member's ranks. `RdbSpellImporter.RankLadderFromEffectBands` consults it
+only where 125 has disqualified itself by collapsing ranks, and only where the bands then answer for every
+rank with one value, monotonically, inside the level cap, and with more distinct levels than 125 managed —
+over the whole catalog, `Chill`, `Infestation` and `Lifestrike` and nothing else. The 19 families still
+collapsing have no second source and keep 125's answer; `--report spell-level-ladder` lists them and returns
+non-zero only if a family the rule *would* separate is still shipped collapsed.
+
 ## Field 132 `ManaCost` is usually a PERCENTAGE of the caster's mana pool
 
 Read straight, 132's values look too small to be a cost: `Ice Strike (Rank 6)` carries **9**. They are
