@@ -597,6 +597,41 @@ Dummy and named story NPCs — the population the friendly default is actually r
 warns per zone with the count and the names, because a world quietly missing its monsters looks exactly like a
 world that has none.
 
+### Turning a PEACEFUL NPC hostile mid-session — the collision-group restate (#839)
+
+Everything above decides what a creature is when the world loads. A creature that turns on the player *during*
+play — Saddur, whose dialogue fires the `Fight` scry event — needs one record more, and it is the one that makes
+the flip real to the client:
+
+```
+StatIIR (0xF98E10B3)  [class 0xC350][npc handle][env 0x00][stat 0x41A CarsGroup][3]
+```
+
+⚠️ Without it the flip reaches the server model and **nothing tells the client**. Every other part already
+worked: the NPC swung (8 damage landed), the hate list arrived addressed to the player, and the client's own
+`RequestAggroStatus` re-poll was answered `cCategory 1` — and the player still saw a peaceful nameplate and could
+not hit back. The reason is that Saddur spawned in `CarsGroup` **1**, the townsfolk group; an ordinary mob is
+already in group 3, which is why no other aggro path needs this.
+
+⭐ The corpus dates it exactly. Over all 134 captures **every character `CarsGroup` record carrying 3 is one of
+the three captured Saddur fights** — three captures, three handles, no fourth occurrence — and in all three the
+order is identical:
+
+```
+SendScryEvent "Fight"  →  CarsGroup := 3  →  HateListUpdate  →  the client re-polls  →  CombatMode 4, MoveTask, swings
+```
+
+So the restate is the FIRST thing retail sends on the flip, ahead of everything the ordinary aggro burst carries.
+`WorldBroadcaster.BroadcastNpcTurnedHostile` sends it, byte-exact against all three fights
+(`NpcTurnsHostileTests`). Two details are copied from the capture rather than reasoned out and are marked as such
+in the code: it is a **character** record carrying the **world-object `env` byte** (0x00 — the same "restate the
+dynel-layer copy first" shape `SkillPointTests` pins on Runspeed), and retail sends it **twice**, as two packets
+in one segment, in all three captures. `[V0: why the second copy.]`
+
+That retail treats the group as *live* state is also independent evidence for the tier-4 reading above: the value
+it moves a creature to when it starts fighting is the value the rule keys on. `NpcStatCore.MobCarsGroup` is the
+single constant both use.
+
 ⚠️ It was faction-first for everything until #715, on the reasoning that per-NPC `cCategory` is "noisy". It is
 not — the noise was the name collision of #731 (38 templates share `Halen van Dummy`, spanning four factions, and
 votes were routed faction-ward *through the name*). A faction roll-up also cannot express the guard/citizen split,

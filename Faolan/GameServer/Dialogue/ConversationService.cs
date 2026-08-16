@@ -549,13 +549,21 @@ namespace Faolan.GameServer.Dialogue
 			{
 				if (string.Equals(name, HostileScriptEvent, StringComparison.OrdinalIgnoreCase))
 				{
-					// The flags only: the simulation's own aggro pass then hate-lists the player, draws combat mode and
-					// swings - the same burst it produces for any other aggro, and the one retail sends here. Authoring
-					// it a second time from this path would be a second copy of the combat opening.
+					// The flags, plus the one record only this path can send: the simulation's own aggro pass then
+					// hate-lists the player, draws combat mode and swings - the same burst it produces for any other
+					// aggro, and the one retail sends here. Authoring that a second time from this path would be a
+					// second copy of the combat opening.
+					//
+					// The collision-group restate is NOT part of that burst and has to go out here, because it is the
+					// only thing that distinguishes this flip from an ordinary mob's aggro: an ordinary mob spawned in
+					// the mob group already, and this one spawned as a townsperson. Without it Saddur swung at the
+					// player while still drawing peaceful and refusing to be hit (#839) - see BroadcastNpcTurnedHostile
+					// for the corpus measurement that dates it to exactly here, ahead of the hate list.
 					if (_sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var npc) == true && npc != null)
 					{
 						npc.Disposition = WorldEntity.DispositionHostile;
 						npc.Hostile = true;
+						await _broadcaster.BroadcastNpcTurnedHostile(npc);
 						_logger.LogInformation("Script: {Name} fired \"{Event}\" - it turns on {Player}.", node.NpcName, name, client.Session.Character?.Name);
 					}
 					else

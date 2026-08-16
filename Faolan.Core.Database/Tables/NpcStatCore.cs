@@ -30,6 +30,15 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(NpcTemplateId)), NoReorder]
 	public class NpcStatCore
 	{
+		// The `CarsGroup` of a creature that FIGHTS. Retail treats it as a live property, not just a spawn field: when
+		// Saddur's dialogue turns him on the player it restates his group to this value with a `StatIIR`, and only then
+		// does the client draw him hostile and let him be hit (#839). Measured over the whole corpus - EVERY character
+		// `CarsGroup` record carrying 3 is one of the three captured Saddur fights, and there are no others.
+		//
+		// It is also the collision group the last-resort disposition tier keys on (`NpcDispositionTiers`, #841): groups
+		// 0/1 are the named townsfolk, 3 the mobs.
+		public const uint MobCarsGroup = 3;
+
 		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
@@ -66,6 +75,8 @@ namespace Faolan.Core.Database.Tables
 		public int? Radius { get; set; }
 		public uint? ChatId { get; set; }
 		public uint? GuildId { get; set; }
+		// The collision/response group (`cars_group`, spawn proto field 5). Not an aggression field, but it separates
+		// the populations: groups 0/1 hold the named townsfolk, 3 the mobs (see MobCarsGroup).
 		public uint? CarsGroup { get; set; }
 		public uint? OrientationMode { get; set; }
 		public uint? SoundScryScript { get; set; }

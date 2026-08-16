@@ -517,6 +517,38 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// An NPC that was standing in the world PEACEFUL has just turned on the player: restate its collision group to
+		// the mob one, for every viewer that already knows it.
+		//
+		// ⭐ This is what makes the flip real to the CLIENT, and without it the creature is hostile on the server only:
+		// it swings, the hate list arrives, the re-poll answers cCategory 1 - and the player still sees a peaceful
+		// nameplate and cannot hit back. Saddur was the reported case (#839): he attacked for 8 damage while refusing
+		// to be attacked, because his `CarsGroup` was still 1, the townsfolk group he spawned in.
+		//
+		// Measured rather than guessed. Over all 134 captures EVERY character `CarsGroup` record carrying the mob group
+		// is one of the three captured Saddur fights - three captures, three handles, no other occurrence - and in all
+		// three the order is identical: `SendScryEvent "Fight"`, then this record, then the hate list, then the client's
+		// own re-poll. So it is the first thing retail sends on the flip, ahead of everything we already send.
+		//
+		// ⚠️ Two things here are copied from the capture rather than reasoned out, and both are marked as such:
+		// the record is a CHARACTER one carrying the world-object `env` byte (0x00, not the 0x01 characters normally
+		// take - the same "restate the dynel layer first" shape `SkillPointService` documents), and retail sends it
+		// TWICE, as two packets in one segment, in all three captures. [V0: why the second copy.]
+		public async Task BroadcastNpcTurnedHostile(WorldEntity npc)
+		{
+			ArgumentNullException.ThrowIfNull(npc);
+			var body = StatCodec.Build(StatIirs.ForCharacter(npc.Handle, (uint)CharacterStatId.CarsGroup, NpcStatCore.MobCarsGroup, StatIirs.WorldObjectEnv));
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client == null || !viewer.Known.Contains(npc.Handle))
+					continue;
+
+				await WorldIir.Send(viewer.Client, body);
+				await WorldIir.Send(viewer.Client, body);
+			}
+		}
+
 		// An NPC engaged or disengaged combat: push the combat-mode stat (stat 20) to every viewer in range that sees it,
 		// so the client DRAWS (enter) or SHEATHES (exit) the NPC's weapon. Without it the NPC swings empty-handed (#218) -
 		// the swing animation plays but no weapon is in hand because the client never put the NPC into combat stance.

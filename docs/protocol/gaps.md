@@ -30,6 +30,19 @@ for n in sorted({int(m) for m in re.findall(r'Tracked: Gitea #(\d+)', open('docs
 EOF
 ```
 
+### The hostile-flip `CarsGroup` restate's second copy
+When a conversation turns its NPC on the player, retail restates the creature's collision group to the mob one
+before anything else — `StatIIR [class 0xC350][handle][env 0x00][stat 0x41A][3]` — and that record is what makes
+the flip real to the client (see [combat.md](../subsystems/combat.md)). It is sent **twice**: two separate packets
+in one TCP segment, byte-identical, with no second value and no `env` 0x00/0x01 pair. 3 of 3 in the corpus, and
+those three are the only character `CarsGroup == 3` records in all 134 captures. We replay both because the
+capture says so; **why there is a second copy** is not known. The likeliest reading is two emitters firing on one
+event (the collision layer and the gamecode layer, the shape `SkillPointService` documents for Runspeed) — but
+under that reading the copies should differ in some field, and they do not. Close it by finding the client's
+consumer of stat 0x41A on a character and identifying both writers, or by capturing a DIFFERENT dialogue-driven
+hostile flip (the corpus has only Saddur's). Tracked in Gitea #842.
+`[V0: why the second copy.]`
+
 ---
 
 ## Transport

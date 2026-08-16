@@ -44,7 +44,10 @@ namespace Faolan.Importer.Extractors
 		// townsfolk (Villager, Serving Wench, Armorsmith, Tanner Chael), group 3 the mobs (Wolf, Bear, Warg, Vanir
 		// Berserker, Mercenary Archer, Pict Ripper Jaw). It is a CORRELATE and is only ever consulted when the corpus
 		// has said nothing - never over an observation.
-		public const uint MobCarsGroup = 3;
+		//
+		// ⚠️ Retail treats the same value as LIVE state, which is separate evidence that it is the combat group and
+		// not a coincidence: turning Saddur hostile restates his group to it (`NpcStatCore.MobCarsGroup`, #839).
+		public const uint MobCarsGroup = NpcStatCore.MobCarsGroup;
 
 		public enum Tier
 		{
