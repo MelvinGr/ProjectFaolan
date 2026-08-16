@@ -28,13 +28,13 @@ namespace Faolan.GameServer.Quest
 		//
 		// The silver state was missed by #241, which only saw three values. It is the second most common on the wire:
 		// of the 301 replies in xxx_mage-necromancer_login_play2, 181 are 0x00, 74 are 0x01, 30 are 0x02, 16 are 0x04.
-		// Turach and Laranga mirror each other across that capture and pin what it means - Turach is 0x01 at login
-		// (his quest needs Laranga first), 0x04 once she points at him, 0x01 again while his own quest is in progress,
-		// 0x04 when the bricks are collected, 0x01 after the hand-in. So 0x01 covers BOTH "prerequisite not met" and
-		// "held, or already turned in - nothing more here".
+		// Turach is 0x01 at login there - his quest needs Laranga first - and 0x04 once she points at him, which is what
+		// pins silver as "prerequisite not met": the line exists and runs through this NPC, but it has not reached him.
 		//
 		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
 		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
+		//
+		// ⛔ Silver does NOT mean "you are carrying my quest" - see the `held != null` branch in MarkerStateFor.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
 
 		private readonly IDatabaseRepository _database;
@@ -107,30 +107,34 @@ namespace Faolan.GameServer.Quest
 
 			var held = Array.Find(quests, q => q.QuestId == questId);
 			// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest is
-			// only marked Completed on turn-in, not on the kill, #47/#241). Otherwise, held or not, the choice is
-			// between the GOLD '!' and the SILVER one, and it is the same question both times: does this NPC have
-			// something for you RIGHT NOW (#559)?
-			//   * not held, and every earlier step of its line is done -> GOLD, it is yours to take;
-			//   * not held, but the line has not reached it -> SILVER. This is Turach at login in
-			//     `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: his "The Quarry" is step 5 of line 241
-			//     and the player has done none of steps 1-4, so retail greys him rather than drawing no marker;
-			//   * held and in progress -> SILVER, he is still part of the chain with nothing to give;
-			//   * COMPLETED -> no marker at all, which retail states outright (see the branch below).
+			// only marked Completed on turn-in, not on the kill, #47/#241).
 			if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
 				return TurnIn;
 
-			// ⛔ A COMPLETED quest draws NO marker. Retail is explicit about it: in
-			// xxx_mage-necromancer_login_play3 Tina carries '?' (0x04) at t=59.3 and 69.6, quest 10287 completes at
-			// t=101.7, and at t=102.0 she is set to 0x00 - three packets, the instant it finishes. This branch used to
-			// return SILVER for `held != null`, which is true of a completed quest too, so every giver a character had
-			// ever finished wore a permanent "available soon" marker. Found on a level-80 with the whole Destiny line
-			// done: every Tortage giver was silver.
-			if (held is { State: QuestState.Completed })
-				return None;
-
-			// Held and still in progress: silver, he is part of the chain with nothing to give right now.
+			// ⛔ A quest you are ALREADY CARRYING draws no marker at all - not the silver '!', which says "there is
+			// something here you cannot take yet", and a quest in your journal is not that. The giver goes quiet the
+			// moment you accept, and speaks again only when the objective is done ('?' above) or when a later step
+			// names them as its talk target (the '?' at the top of this method).
+			//
+			// `Blablatest_mage-necromancer-create_casilda_quest_first_stage` is the whole rule in one capture, on
+			// Casilda's own chain: '!' (0x02) while 13479 is unclaimed, 0x00 the instant it is granted at t=191.7,
+			// 0x00 straight through the Tuut kill and the key loot, '?' (0x04) at t=223.3 when 13480 makes talking to
+			// her the goal, and 0x00 again at t=230.1 once that is handed in. Across all 275 captures Casilda is
+			// 0x00 x178 / 0x02 x170 / 0x04 x21 and NEVER 0x01.
+			//
+			// This branch used to return SILVER while the quest was in progress (#559) and NONE once it completed. The
+			// completed half was right and is kept - retail states it outright in xxx_mage-necromancer_login_play3,
+			// where Tina carries '?' at t=59.3 and 69.6, quest 10287 completes at t=101.7, and she is set to 0x00 at
+			// t=102.0. The in-progress half was wrong: accepting a quest lit a silver '!' over the giver that stayed
+			// there for the whole quest.
+			//
+			// ⚠️ ONE observation still resists this: Turach in `xxx_..._play2_tortage_city_first-quests` is 0x01 from
+			// t=392 while holding 10286, which he grants. He is 0x01 in all 88 of his marker replies corpus-wide and
+			// never 0x00, so whatever separates him from Casilda is not the held/not-held question this branch asks
+			// (Gitea #848). It does not reach us either way: he spawns on map 4020 while 10286 is MapId 4010, so
+			// the map gate above already answers None for him.
 			if (held != null)
-				return Unavailable;
+				return None;
 
 			return giverQuest != null && !await IsLineReady(giverQuest, quests)
 				? Unavailable

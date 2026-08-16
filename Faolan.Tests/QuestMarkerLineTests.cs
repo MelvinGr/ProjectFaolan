@@ -9,10 +9,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #559: retail draws FOUR quest-marker states, and the fourth is the greyed/silver '!' - "this NPC is part of a
-	// chain but has nothing for you right now". One half of it (the quest is held, or already turned in) was already
-	// sent; the other is a quest the player does NOT hold whose line has not reached it yet. Without that half a giver
-	// deep in a chain drew the GOLD '!' from the moment you logged in, offering a quest you could not take.
+	// #559: retail draws FOUR quest-marker states, and the fourth is the greyed/silver '!' - "there is something here
+	// you cannot take yet". That is a quest the player does NOT hold whose line has not reached its giver; without it a
+	// giver deep in a chain drew the GOLD '!' from the moment you logged in, offering a quest you could not take.
+	//
+	// ⚠️ Silver is ONLY the not-held case. A quest already in the journal clears the marker instead - see
+	// QuestMarkerStateTests, which reads that off Casilda's own chain.
 	//
 	// The oracle is `xxx_mage-necromancer_login_play2_tortage_city_first-quests`, where Turach (0x27929) and Laranga
 	// (0x27917) mirror each other across the whole session. Turach reads 0x01 at login: his "The Quarry" is step 5 of

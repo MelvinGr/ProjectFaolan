@@ -507,6 +507,34 @@ Scavenger's Key*) complete on the **kill** and the **loot** with no dialogue at 
 2 → 4, and the next stage granted in the same burst. A chain stage supersedes where its goal is met; only the
 talk-goal stage (13480) completes in a conversation.
 
+## The marker over a giver's head: silver is "not yet", never "in progress"
+
+`DispatchSetQuestMarker` carries one state byte, and `QuestMarkerResolver` decides it: `0x00` none, `0x01`
+silver `!`, `0x02` gold `!`, `0x04` gold `?`.
+
+`Blablatest_mage-necromancer-create_casilda_quest_first_stage` walks Casilda's whole chain on a fresh
+character and pins four of the five states on one NPC (handle `0x315cc`):
+
+| t | what just happened | marker |
+|---|---|---|
+| — | 13479 *The Scavenger* unclaimed | `0x02` gold `!` |
+| 191.7 → 191.9 | `QuestFullUpdate` grants 13479 | `0x00` **none** |
+| 213.8 | Scavenger Tuut killed; 13479 completes, 13563 granted | `0x00` |
+| 223.3 | key looted; 13480 makes *talk to Casilda* the goal | `0x04` gold `?` |
+| 230.1 | 13480 handed in, 12407 granted | `0x00` |
+
+⭐ **Accepting a quest CLEARS the marker.** It does not grey it. Silver means *"there is something here you
+cannot take yet"* — a giver whose line has not reached them — and a quest already in the journal is not that.
+Across all 275 captures Casilda is `0x00` ×178 / `0x02` ×170 / `0x04` ×21 and **never** `0x01`. The giver goes
+quiet on accept and speaks again only when the objective is done, or when a later step names them as its talk
+target. Gated by `QuestMarkerStateTests`; the not-held silver half by `QuestMarkerLineTests`.
+
+⚠️ One observation resists this and is not yet explained: Turach in
+`xxx_mage-necromancer_login_play2_tortage_city_first-quests` is `0x01` from t=392 while carrying 10286, which
+he grants. He is `0x01` in all 88 of his marker replies corpus-wide and never `0x00`, so whatever separates him
+from Casilda is not the held/not-held question. It does not reach our wire either way — he spawns on map 4020
+while 10286 is `MapId` 4010, so the giver map-gate already answers none for him. Tracked in Gitea #848.
+
 ## The Completed tab's body text is LDB slot 50303, and retail left half of it unwritten
 
 The Completed tab renders a *Region → Area → quest* tree, and each completed quest carries exactly **two**
