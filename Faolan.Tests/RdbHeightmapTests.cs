@@ -111,6 +111,76 @@ namespace Faolan.Tests
 			Assert.Null(hm.HeightNear(-1, 0, 5f, 2f, 5f));
 		}
 
+		// #832: 1066611 is per-PLAYFIELD and bakes that playfield's own props into the surface, so playfields sharing a
+		// tilemap (Tortage Island 4010 + City of Tortage 4020/4022 + End Battle 4030, all `tilemap ID="4040"`) each read
+		// their one shared terrain differently. Props only ADD height, so the lower envelope is the ground under all of
+		// them.
+		[Fact]
+		public void LowerEnvelope_TakesTheGroundUnderEveryPlayfieldsProps()
+		{
+			var terrain = Build(4, 4, (gx, gz) => 145f + gx + gz);
+			var withTrees = Build(4, 4, (gx, gz) => gz == 1 && gx != 3
+				? 199f // this playfield has a canopy along one row...
+				: 145f + gx + gz);
+			var withTower = Build(4, 4, (gx, gz) => gx == 3 && gz != 1
+				? 260f // ...and this one a building along a column
+				: 145f + gx + gz);
+
+			Assert.True(RdbHeightmap.TryLowerEnvelope([withTrees, withTower], out var merged));
+			Assert.True(RdbHeightmap.TryParse(merged, out var hm));
+			Assert.True(RdbHeightmap.TryParse(terrain, out var bare));
+
+			for (var gx = 0; gx < 4; gx++)
+			for (var gz = 0; gz < 4; gz++)
+				Assert.Equal(bare.HeightAt(gx, gz), hm.HeightAt(gx, gz));
+		}
+
+		// ⚠️ The honest limit of the envelope, pinned so it is a known property and not a surprise: a cell that carries
+		// a prop in EVERY sibling keeps the lowest prop, because no grid in the group ever saw the ground there. On
+		// Tortage that is the case for cells under permanent geometry, and it is why the loot drop's own sampling
+		// (HeightNear) still has to tolerate an implausible cell rather than trusting the bake.
+		[Fact]
+		public void LowerEnvelope_CannotRecoverGroundNoSiblingEverSaw()
+		{
+			var a = Build(2, 2, (gx, _) => gx == 0
+				? 199f
+				: 145f);
+			var b = Build(2, 2, (gx, _) => gx == 0
+				? 260f
+				: 145f);
+
+			Assert.True(RdbHeightmap.TryLowerEnvelope([a, b], out var merged));
+			Assert.True(RdbHeightmap.TryParse(merged, out var hm));
+			Assert.Equal(199f, hm.HeightAt(0, 0)); // the lower of the two props, not the ground under them
+			Assert.Equal(145f, hm.HeightAt(1, 0));
+		}
+
+		// A sibling at another resolution is SKIPPED, not fatal - and this is the case that made the first cut of the
+		// merge a no-op in practice: Tortage's tilemap group is 4010/4015/4020/4022/4030/4040 and 4022 alone is a 768²
+		// grid, so vetoing the group on it left the island exactly as it was.
+		[Fact]
+		public void LowerEnvelope_SkipsASiblingSampledAtAnotherResolution_AndStillMergesTheRest()
+		{
+			var own = Build(4, 4, (_, _) => 199f);
+			var otherSize = Build(8, 8, (_, _) => 1f);
+			var sibling = Build(4, 4, (_, _) => 145f);
+
+			Assert.True(RdbHeightmap.TryLowerEnvelope([own, otherSize, sibling], out var merged));
+			Assert.True(RdbHeightmap.TryParse(merged, out var hm));
+			Assert.Equal(145f, hm.HeightAt(2, 2)); // the same-size sibling still won
+			Assert.Equal(4, hm.Width); // ...and the odd one out did not decide the shape
+		}
+
+		[Fact]
+		public void LowerEnvelope_WithNothingToMergeInto_IsRefused()
+		{
+			// One usable grid is not an envelope. False means "keep the body you already have" - the caller must not
+			// rewrite an identical file and report a merge that never happened.
+			var only = Build(4, 4, (gx, gz) => 145f + gx + gz);
+			Assert.False(RdbHeightmap.TryLowerEnvelope([only], out _));
+			Assert.False(RdbHeightmap.TryLowerEnvelope([only, Build(8, 8, (_, _) => 1f)], out _));
+		}
+
 		private static byte[] Build(int w, int h, Func<int, int, float> height, uint levels = 1)
 		{
 			var bytes = new List<byte>();

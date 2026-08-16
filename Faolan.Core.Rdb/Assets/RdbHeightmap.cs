@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Extensions;
 
@@ -107,6 +108,82 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			return best;
+		}
+
+		/// <summary>
+		///     The LOWER ENVELOPE of several 1066611 bodies that describe the SAME terrain - cell by cell, the lowest
+		///     height any of them reports - returned as a body in the same format. The FIRST body fixes the grid, and a
+		///     later one sampled differently is skipped rather than fatal; false when nothing merged into the first, in
+		///     which case the caller keeps that body as it stands.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         1066611 is emitted PER PLAYFIELD and bakes that playfield's own static objects into the surface, so
+		///         it is not the bare terrain. Playfields that share a tilemap (Tortage Island 4010, City of Tortage
+		///         4020/4022 and the End Battle 4030 all name <c>tilemap ID="4040"</c>) are one physical terrain, and
+		///         each one's grid is that terrain plus ITS props. Props only ever ADD height, so the lowest reading
+		///         across the siblings is the ground under all of them.
+		///     </para>
+		///     <para>
+		///         Measured against positions entities are known to stand on - a player's logged walk path and the
+		///         imported NPC spawns - taking the envelope moves the island from 53%/79% of samples within 1 m to
+		///         95%/99%, and the city-night set from 44% to 70%, while never scoring below the best single grid on
+		///         any of the four sets. Each playfield's own grid is the WORST one in its neighbours' areas and the
+		///         best in its own, which is the fingerprint of per-playfield props rather than of a bad bake.
+		///     </para>
+		///     <para>
+		///         ⚠️ The one thing it cannot preserve is a variant that genuinely DIGS: where a sibling lowers the
+		///         terrain, the envelope keeps the dug version for every playfield. That is a real trade, taken because
+		///         it is measurable and the alternative is not - 4.9% of Tortage's cells read lower in 4010 than 4020.
+		///     </para>
+		/// </remarks>
+		public static bool TryLowerEnvelope(IReadOnlyList<byte[]> bodies, [NotNullWhen(true)] out byte[]? merged)
+		{
+			merged = null;
+			ArgumentNullException.ThrowIfNull(bodies);
+
+			float[]? lowest = null;
+			byte[]? shape = null;
+			var contributors = 0;
+			foreach (var body in bodies)
+			{
+				if (!TryParse(body, out var hm))
+					continue;
+
+				if (lowest == null)
+				{
+					shape = body;
+					lowest = (float[])hm._heights.Clone();
+					contributors = 1;
+					continue;
+				}
+
+				// A sibling sampled at a different resolution is a different grid, not a variant of this one - there is
+				// no cell-to-cell correspondence to take a minimum over, so it is skipped. It must not veto the merge:
+				// Tortage's tilemap group is 4010/4015/4020/4022/4030/4040, and 4022 alone is a 768² grid against the
+				// others' 1536², so refusing the whole group for it left the island exactly as unmerged as before.
+				if (hm._heights.Length != lowest.Length)
+					continue;
+
+				contributors++;
+				for (var i = 0; i < lowest.Length; i++)
+					if (hm._heights[i] < lowest[i])
+						lowest[i] = hm._heights[i];
+			}
+
+			// Nothing to merge WITH: hand back false so the caller keeps the original body rather than rewriting it
+			// into an identical one and reporting a merge that did not happen.
+			if (lowest == null || shape == null || contributors < 2)
+				return false;
+
+			// Same layout back out: the 12-byte header of whichever body defined the shape, then the merged grid.
+			var body2 = new byte[12 + lowest.Length * 4];
+			shape.AsSpan(0, 12).CopyTo(body2);
+			for (var i = 0; i < lowest.Length; i++)
+				body2.WriteF32Le(12 + i * 4, lowest[i]);
+
+			merged = body2;
+			return true;
 		}
 
 		// Parse a decompressed 1066611 resource. `tilemapExtent` is the playfield's world-unit width (from the 1070003
