@@ -963,6 +963,104 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #835: an ambient spawn-area pool builds its creature from the TYPE, so the type's APPEARANCE navigations have
+		// to come back populated. Lazy loading is off by design, so a missing Include is not an error - the collection
+		// simply arrives EMPTY and the spawn body goes out with no morph table and no worn equipment. That is exactly
+		// how every ambient NPC in the world ended up naked, and how it STAYED naked after the type rows were filled
+		// in: the rows existed, the query never loaded them. Asserting the navigations are non-empty is the only thing
+		// that catches it - a row count would have passed throughout.
+		[Fact]
+		public async Task GetResolvedSpawnAreas_LoadsTheTypesAppearance_NotJustItsStatCore()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-areas-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint templateId = 8848; // Poacher, the reported creature
+				const uint itemId = 189907; // the pirate sailor chest it wears
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
+					ctx.Items.Add(new Item
+					{
+						Id = itemId,
+						Name = "NPC_Pirate_sailor_chest",
+						Hash = 1497905484,
+						Key = new ProtoDecryptionKey
+						{
+							Key1 = 1,
+							Key2 = 2,
+							Key3 = 3,
+							Key4 = 4
+						}
+					});
+					ctx.NpcTemplates.Add(new NpcTemplate
+					{
+						TemplateId = templateId,
+						Name = "Poacher",
+						StatCore = new NpcStatCore
+						{
+							NpcTemplateId = templateId,
+							Level = 5,
+							IirHeader = 0xFA015807
+						},
+						Morphs =
+						[
+							new NpcMorph
+							{
+								NpcTemplateId = templateId, Ordinal = 0, MorphId = 324, Value = 0.918f
+							}
+						],
+						Equipment =
+						[
+							new NpcEquipment
+							{
+								NpcTemplateId = templateId, Pos = 5, Template = itemId, Level = 1
+							}
+						]
+					});
+
+					var area = new NpcSpawnArea
+					{
+						MapId = Map.TortageBeachId,
+						NpcTemplateId = templateId,
+						GroupOrdinal = 0,
+						MaxCount = 8,
+						Category = "Name",
+						GroupKey = "Poacher1",
+						GroupName = "Poacher1"
+					};
+					area.Points.Add(new NpcSpawnAreaPoint
+					{
+						PointIndex = 0, PositionX = 1, PositionY = 2, PositionZ = 3
+					});
+					ctx.NpcSpawnAreas.Add(area);
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				var areas = await repo.GetResolvedSpawnAreas(Map.TortageBeachId);
+
+				var loaded = Assert.Single(areas);
+				Assert.NotEmpty(loaded.Points); // the pool's spawn points, and the reason this query is a split one
+				var type = loaded.NpcTemplate;
+				Assert.NotNull(type);
+				Assert.NotNull(type!.StatCore);
+				Assert.NotEmpty(type.Morphs); // the hair/face table - empty here means a naked, featureless spawn body
+				var worn = Assert.Single(type.Equipment);
+				Assert.NotNull(worn.Item); // the builder reads the worn item's identity THROUGH this navigation
+				Assert.Equal("NPC_Pirate_sailor_chest", worn.Item.Name);
+			}
+			finally
+			{
+				TestDb.Delete(dbPath);
+			}
+		}
+
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
 			var options = TestDb.Options(path);

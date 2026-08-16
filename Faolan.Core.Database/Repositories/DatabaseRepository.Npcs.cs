@@ -399,6 +399,12 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
+		// The ambient spawn-area pools (#363) and the creature TYPE each one spawns. The include set has to match what
+		// the type-built spawn body needs, because lazy loading is off: an APPEARANCE navigation that is not Included
+		// arrives EMPTY and the builder cheerfully emits a creature with no morph table and no worn equipment. That is
+		// #835 - every ambient NPC in the world rendered naked, and it stayed naked after the type rows were filled in,
+		// because the rows were never loaded. `GetNpcByTemplateId` / `GetNpcByName` (the pet and encounter paths) have
+		// always Included both; this one had not.
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -407,7 +413,15 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(t => t!.StatCore)
 				.Include(a => a.NpcTemplate)
 				.ThenInclude(t => t!.Spells)
+				.Include(a => a.NpcTemplate)
+				.ThenInclude(t => t!.Equipment)
+				.ThenInclude(e => e.Item) // the builder reads the worn item's identity through this navigation
+				.Include(a => a.NpcTemplate)
+				.ThenInclude(t => t!.Morphs)
 				.Include(a => a.Points)
+				// Five collection navigations off one root would be returned as their PRODUCT and deduped client-side
+				// (#582). Nothing here depends on the un-ordered read order.
+				.AsSplitQuery()
 				.Where(a => a.MapId == mapId && a.NpcTemplateId != null)
 				.ToArrayAsync();
 		}
