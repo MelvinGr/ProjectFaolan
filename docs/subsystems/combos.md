@@ -148,7 +148,8 @@ Conqueror, Assassin and Ranger** nothing at all — 227 of their 259 level-gated
 the combo book — so for them its silence is missing data, not a statement, and gating on it would ship an empty
 spellbook with no capture to notice. The population is bimodal with nothing between: those five sit at **exactly
 0** feat-taught rows and the next class up at **29**, so "does the map grant this class anything" is a real
-separation and not a threshold chosen to fit. Held by `NoClass_ReachesLevel80WithAnEmptySpellbook`.
+separation and not a threshold chosen to fit. Held by `AClassTheFeatMapCoversStillHasASpellbookAt80`, which
+asserts the converse — a class the map *does* speak for must still have a book.
 
 ### The membership map's own blind spot, and the third source that closes it
 
@@ -159,15 +160,25 @@ the level path. Of the 18 spells the captured level-80 Necromancer knew and the 
 carry `GuiStackingLine = 0`**.
 
 The third source is the captures themselves: every `CharacterSpell` row is a statement that a character of that
-class held that spell. The `class-spells-known` importer module derives membership from it — 246 capture-proven
-`(class, spell)` pairs, 45 of them new — and it cannot produce a false positive, because a character really did
+class held that spell. The `class-spells-known` importer module derives membership from it — 211 capture-proven
+`(class, spell)` pairs, 15 of them new — and it cannot produce a false positive, because a character really did
 have the spell.
+
+⚠️ **LEVELED spells only.** A book also holds what the character OWNS or EARNED, and those carry `Level 0`;
+claiming class membership for them is a category error that
+`NoClassSpellRow_ContradictsItsSpellsStackingLine` catches — the captured Necromancer's `Blue Snow Mammoth`
+sits on line 44224, i.e. filed under Demonologist, because **a mount belongs to no class** and its line is not a
+class statement. The check is byte-identical with 15 rows as with 45, so the `Level 0` half was doing nothing.
 
 ⚠️ What is left is **not** the level path's business at all. Every remaining miss carries `Level 0`: mounts,
 pets and companions, `Dance:` / `Social Ability:` emotes, `Path:` travel unlocks and veteran rewards — earned or
 bought, never leveled into, and replayed on login from the character's own rows (`GrantCharacterSpells`) rather
-than re-derived from the class. The five uncovered classes still keep today's answer, wrong as it is (the
-Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs) — Gitea #852.
+than re-derived from the class.
+
+The five uncovered classes are handled by the combo-CHAIN exclusion above rather than by the feat gate, which
+takes 29 of the 68 they were offered. What survives it is the Conqueror's `Colossus of War (1..20)` — twenty
+stacking increments of a `Colossus of War` that carries no class row, so no exclusion reaches them — plus four
+strays: Gitea #854.
 
 ### 4. The GATING FEAT (#581) — the source that LEADS
 
