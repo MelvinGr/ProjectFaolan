@@ -74,17 +74,44 @@ namespace Faolan.Importer.Modules
 				added++;
 			}
 
+			// ⭐ The ACTION overlay - the one thing about a scry event that is NOT harvested. Retail states the event
+			// STRING and nothing else, so what the server does about it is authored here, and this table IS the
+			// plug-in point: a future quest whose dialogue fires `RunToKhemi` or `SpawnBandits` is wired by adding a
+			// line below, with no change to the dialogue runtime.
+			//
+			// BOOTSTRAP-ONLY, like `Chain` in QuestGoalWiring: only an event still sitting at `None` is stamped, so a
+			// hand edit (or a re-run after someone mapped one) is never clobbered. An event that is not listed stays
+			// `None` and LOGS when it fires - which is the honest state for `SpawnSheep`, `AriasMageLeave`,
+			// `ProtectiveSpell` and `knubotconarchdrunk`, none of which we can act on yet.
+			var actions = new Dictionary<string, NpcScriptAction>(System.StringComparer.OrdinalIgnoreCase)
+			{
+				["Fight"] = NpcScriptAction.TurnHostile,          // Saddur turns on the player
+				["RunToTortage"] = NpcScriptAction.LeaveWorld,    // Casilda's escort is over - she heads for the gate
+				["SpawnScavenger"] = NpcScriptAction.RevealQuestTargets // ...and Scavenger Tuut enters the world
+			};
+
+			var mapped = 0;
+			foreach (var row in await ctx.Db.NpcScriptEvents.ToListAsync())
+			{
+				if (row.Action != NpcScriptAction.None || !actions.TryGetValue(row.Event, out var action))
+					continue;
+
+				row.Action = action;
+				mapped++;
+			}
+
 			await ctx.Db.SaveChangesAsync();
 
 			// Print the roster: seven distinct strings over the whole corpus, so the whole harvest fits on screen and
 			// an unimplemented one is visible rather than buried in a count.
+			var actionOf = await ctx.Db.NpcScriptEvents.ToDictionaryAsync(e => (e.NpcTemplateId, e.Event), e => e.Action);
 			foreach (var (template, name, npcName, sightings) in seen)
-				System.Console.WriteLine($"  {npcName} ({template}) fires \"{name}\" x{sightings}");
+				System.Console.WriteLine($"  {npcName} ({template}) fires \"{name}\" x{sightings} -> {actionOf.GetValueOrDefault((template, name))}");
 
 			var skipped = unknownType > 0
 				? $", {unknownType} on a creature type we do not hold"
 				: "";
-			return new ImportResult($"{added} script event(s) harvested across {seen.Select(e => e.TemplateId).Distinct().Count()} creature(s){skipped}.");
+			return new ImportResult($"{added} script event(s) harvested across {seen.Select(e => e.TemplateId).Distinct().Count()} creature(s), {mapped} newly mapped to an action{skipped}.");
 		}
 	}
 }

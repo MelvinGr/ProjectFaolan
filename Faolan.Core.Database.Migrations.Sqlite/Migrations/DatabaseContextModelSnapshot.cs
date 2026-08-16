@@ -2323,6 +2323,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Action")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("NpcTemplateId", "Event");
 
                     b.ToTable("NpcScriptEvents");

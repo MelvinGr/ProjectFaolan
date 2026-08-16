@@ -730,6 +730,44 @@ NPC     We'll meet again.
 `{gameactiononnpc SendScryEvent EventString RunToTortage}` is what sends her off. `{resolvegoal <TOKEN>}` is the
 same inline directive that resolves her earlier stage (`BJGY` for 13480) — see Gitea #356.
 
+### Scry events: the string is retail's, the ACTION is ours (#839)
+
+`SendScryEvent` (GameAction **53241**) carries a bare length-prefixed string that the playfield's script listens
+for — `000E "SpawnScavenger"`, addressed to the NPC firing it, not to the player. We harvest the string into
+`NpcScriptEvents(NpcTemplateId, Event)` and hang a server-side **`Action`** on it, exactly the way a quest goal's
+`GoalType` sits beside its harvested row:
+
+| action | what it does | shipped on |
+|---|---|---|
+| `None` | harvested, stored, logged when it fires — nothing happens | `SpawnSheep`, `AriasMageLeave`, `ProtectiveSpell`, `knubotconarchdrunk` |
+| `TurnHostile` | the NPC turns on the player | Saddur `Fight` |
+| `LeaveWorld` | walks to the object that opened the window, then despawns | Casilda `RunToTortage` |
+| `RevealQuestTargets` | the creatures this player's quests are waiting on enter the world | Casilda `SpawnScavenger` |
+
+⭐ **The runtime dispatches on the action, never on the string** — which is what makes a future quest's script a
+seed line rather than a code change. `RunToTortage` names one quest's fiction and fits nobody else; a
+`RunToKhemi` gets the same behaviour by stamping the same action. `None` is load-bearing for the same reason
+`QuestGoalType.None` is: an unmapped event is *visibly* unmapped instead of being bent into the nearest
+behaviour. `SpawnSheep` is the case that proves it — it looks like `SpawnScavenger` and is not, because
+Ulfheoinn grants no quest we hold and no goal gates a Sheep, so a reveal there would reveal nothing and read as
+wired. Gated by `NpcScriptEventTests`.
+
+### `SpawnScavenger` — and why the quest gate stays
+
+`RevealQuestTargets` says **when**; the quest says **who**. That is not a simplification, it is what retail does,
+measured over 13 captures:
+
+- **7 captures fire the event**, and Scavenger Tuut's spawn follows within the same instant — usually the same
+  TCP segment, and in `Strie_rogue-assassin_login_randomActions` the *same frame* (3263). Order is always quest
+  full-update → `SpawnScavenger` → spawn.
+- **6 captures have no event at all** and spawn him in the world-entry burst (frames 22–126). In
+  `Stihetfv_…_compeltefirstquest` he arrives at frame 105 while the quest full-update is at 684 — he predates it.
+  All six players held quest 13479 in their login snapshot (frames 68/61/23…).
+
+So retail has **two** paths: the scry event for the live "he appears now", and the ordinary gated world-entry
+stream for every session after. The second is our `GatesTargetVisibility` → `WorldEntity.GateQuestIds`, and it is
+why the gate stays: deleting it in favour of a live spawn would strand the quest for any player who logs out.
+
 **The trigger is `BehaviorId.UseDynel` (0x12) on the city door**, and it reproduces across both beach-to-city
 captures — necro `fr11357 → fr11395`, demo `fr10180 → fr10213`, same action, same 60-byte body, ~35 frames ahead
 of the window opening. The door is a `WorldObject`, so the trigger is stable rather than session-volatile:

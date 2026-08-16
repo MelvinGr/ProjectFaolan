@@ -540,19 +540,22 @@ namespace Faolan.GameServer.Dialogue
 		// retail runs them. In the capture Saddur's `Fight` action rides the second-to-last screen, and the fight
 		// itself starts ~3s after `KnubotCloseChatWindow`: hate list, threat, CombatMode 4, then the first swing.
 		//
-		// Only turning hostile is acted on. Everything else in the harvested alphabet is a world script we do not run
-		// (Casilda's `SpawnScavenger` puts Scavenger Tuut in the world, `RunToTortage` sends her to the city), and each
-		// one LOGS rather than passing silently - an unimplemented script that says nothing is indistinguishable from
-		// one that does not exist.
+		// ⭐ Dispatched on the row's ACTION, never on the event STRING. The string is retail's and names one quest's
+		// fiction - `RunToTortage` fits nobody but Casilda - so matching it in C# would mean a new `const string` and a
+		// new branch for every dialogue that wants the same behaviour. The action is what the strings have in common,
+		// so a future `RunToKhemi` or `SpawnBandits` is wired by stamping `NpcScriptEvent.Action` and nothing here
+		// changes. An UNMAPPED event (four of the seven shipped) logs rather than passing silently - an unimplemented
+		// script that says nothing is indistinguishable from one that does not exist.
 		private async Task FireScriptEvents(INetworkClient client, ConversationNode node, uint npcHandle)
 		{
 			var events = await _database.GetNpcScriptEvents(node.NpcTemplateId);
 			if (events.Length == 0)
 				return;
 
-			foreach (var name in events)
+			foreach (var script in events)
 			{
-				if (string.Equals(name, HostileScriptEvent, StringComparison.OrdinalIgnoreCase))
+				var name = script.Event;
+				if (script.Action == NpcScriptAction.TurnHostile)
 				{
 					// The flags, plus the one record only this path can send: the simulation's own aggro pass then
 					// hate-lists the player, draws combat mode and swings - the same burst it produces for any other
@@ -580,7 +583,7 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 				}
 
-				if (string.Equals(name, LeaveScriptEvent, StringComparison.OrdinalIgnoreCase))
+				if (script.Action == NpcScriptAction.LeaveWorld)
 				{
 					// The escort is over, so the escortee heads for the gate the player opened her window with and is
 					// gone. Retail plays it out - MoveTask then n3ToClientQuit - rather than blinking her away, which
@@ -600,16 +603,22 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 				}
 
-				_logger.LogInformation("Script: {Name} fired \"{Event}\", which the server does not act on yet (#839).", node.NpcName, name);
+				if (script.Action == NpcScriptAction.RevealQuestTargets)
+				{
+					// The creatures the player's quests are waiting on enter the world. Expressed as "re-evaluate what
+					// the quests ask for" rather than "spawn creature N", because the event names no creature and
+					// retail's own second path agrees: on a relog Scavenger Tuut arrives in the ordinary world-entry
+					// stream with NO scry event, gated on the quest being held. So the quest says WHO and this says
+					// WHEN - which is also why a future spawn script needs no code here, only a gated goal and this
+					// action stamped on its event.
+					await _broadcaster.RefreshQuestVisibility(client);
+					_logger.LogInformation("Script: {Name} fired \"{Event}\" - its quests' creatures are now in the world.", node.NpcName, name);
+					continue;
+				}
+
+				_logger.LogInformation("Script: {Name} fired \"{Event}\", which is harvested but carries no mapped action yet (#839).", node.NpcName, name);
 			}
 		}
-
-		// The one harvested script event the server acts on: retail's string for "this NPC now fights you".
-		private const string HostileScriptEvent = "Fight";
-
-		// ...and retail's string for "this NPC's business with you is done - it leaves". Casilda's, once the escort has
-		// delivered her to the city gate.
-		private const string LeaveScriptEvent = "RunToTortage";
 
 		// Where a leaving NPC walks to: the world object that opened this conversation. Null when the player opened it
 		// themselves, which is the honest answer - a farewell with no door behind it has no gate to head for.

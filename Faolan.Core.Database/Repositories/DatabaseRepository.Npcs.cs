@@ -50,7 +50,7 @@ namespace Faolan.Core.Database.Repositories
 
 		Task<Dictionary<uint, NpcSpawn[]>> GetAppearanceVariants(IReadOnlyCollection<uint> templateIds);
 
-		Task<string[]> GetNpcScriptEvents(uint npcTemplateId);
+		Task<NpcScriptEvent[]> GetNpcScriptEvents(uint npcTemplateId);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<int> GraduateSpawnArea(uint areaId);
 		Task<int> LinkNpcSpawnsToArea(uint areaId, uint templateId, float selectedX, float selectedZ);
@@ -450,10 +450,12 @@ namespace Faolan.Core.Database.Repositories
 
 		// The scripted events this creature's dialogue fires (#839) - retail's `SendScryEvent` strings, e.g. Saddur's
 		// `Fight`. Empty for the overwhelming majority of NPCs, which script nothing.
-		public async Task<string[]> GetNpcScriptEvents(uint npcTemplateId)
+		// The whole ROW, not just the string: what the server does about an event is its `Action` column, so a caller
+		// that only got the text would be back to matching names in C# (#839).
+		public async Task<NpcScriptEvent[]> GetNpcScriptEvents(uint npcTemplateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.NpcScriptEvents.Where(e => e.NpcTemplateId == npcTemplateId).Select(e => e.Event).ToArrayAsync();
+			return await ctx.NpcScriptEvents.AsNoTracking().Where(e => e.NpcTemplateId == npcTemplateId).ToArrayAsync();
 		}
 
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
