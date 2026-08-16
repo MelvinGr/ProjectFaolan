@@ -29,7 +29,10 @@ namespace Faolan.Importer.Cli
 		{
 			var samples = new List<(string Capture, string Name, bool Ranged, float Distance)>();
 			var noPosition = 0;
-			int dbgAttacks = 0, dbgNpcActor = 0, dbgTargets = 0, dbgSpawns = 0, dbgMoves = 0;
+			// The counts that make the NEGATIVE result legible: a mob's attack record names no target, so there is
+			// nothing to measure a distance TO. Printed rather than dropped, because "0 samples" on its own reads as a
+			// broken report instead of as the finding it is.
+			int npcAttacks = 0, withTargets = 0;
 
 			foreach (var c in captures)
 			{
@@ -50,7 +53,6 @@ namespace Faolan.Importer.Cli
 							if (!p.TryParse(SimpleCharFullUpdateCodec.Parse, out var spawn))
 								continue;
 
-							dbgSpawns++;
 							position[spawn.Handle] = spawn.Position;
 							if (spawn.Character?.player_stats == null)
 								npcNames[spawn.Handle] = spawn.Character?.Name ?? "?";
@@ -62,10 +64,7 @@ namespace Faolan.Importer.Cli
 						case CharDCMoveCodec.Opcode:
 						{
 							if (p.TryParse(CharDCMoveCodec.Parse, out var move))
-							{
-								dbgMoves++;
 								position[move.Handle] = move.Position;
-							}
 							continue;
 						}
 
@@ -77,15 +76,14 @@ namespace Faolan.Importer.Cli
 							var ranged = bcc.BehaviorId == (uint)BehaviorId.CombatRanged;
 							if (!ranged && bcc.BehaviorId != (uint)BehaviorId.CombatMelee)
 								continue;
-							dbgAttacks++;
 							if (!npcNames.TryGetValue(bcc.Actor, out var name)) // players swing too; this is about mobs
 								continue;
-							dbgNpcActor++;
-							if (dbgNpcActor <= 5)
-								Console.WriteLine($"  DBG tailLen={bcc.Tail.Length} argsLen={bcc.Args.Length} first={(bcc.Tail.Length >= 4 ? bcc.Tail.ReadU32Be(0).ToString() : "-")} args0={(bcc.Args.Length >= 4 ? bcc.Args.ReadU32Be(0).ToString() : "-")}");
+
+							npcAttacks++;
 							if (!TryReadAttackTargets(bcc, out var targets) || targets.Count == 0)
 								continue;
-							dbgTargets++;
+
+							withTargets++;
 							if (!position.TryGetValue(bcc.Actor, out var from))
 							{
 								noPosition++;
@@ -112,7 +110,9 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine("ranged-standoff: the distance a retail mob is at when it attacks (#838)");
 			Console.WriteLine("Melee is the CONTROL - the same pipeline must put melee mobs at contact range for the archer figure to mean anything.\n");
-			Console.WriteLine($"DEBUG spawns={dbgSpawns} moves={dbgMoves} attacks={dbgAttacks} npcActor={dbgNpcActor} withTargets={dbgTargets}");
+			Console.WriteLine($"{npcAttacks} attacks by an NPC; {withTargets} of them name a target at all.");
+			if (withTargets == 0)
+				Console.WriteLine("=> a mob's attack record carries an EMPTY target list, so retail's own stand-off distance cannot be measured from the corpus (#838).\n");
 			Console.WriteLine($"{samples.Count} attack/target pairs with both positions known; {noPosition} skipped (a party never seen moving).\n");
 
 			Report("RANGED (bow/crossbow/thrown)", samples.Where(s => s.Ranged).ToList());
