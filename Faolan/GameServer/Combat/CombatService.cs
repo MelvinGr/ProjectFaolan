@@ -749,6 +749,18 @@ namespace Faolan.GameServer.Combat
 				// The dying mob drops its target first (retail sends this LookAtIIR on 95% of captured kills, Stickienecro
 				// idx 545, between the killing damage and the pose); then the pose freezes the corpse.
 				await SendWorldPacket(killer, LookAtCodec.Build(LookAts.DropTarget(targetHandle)));
+
+				// ⚠️ FLUSH what it walked but never had broadcast, BEFORE freezing it (#272). The tick only emits a
+				// move once the creature has covered 6u since the last one, so a mob killed MID-CHASE - which is what
+				// killing one at range means - is carrying up to 6u the client has not seen. The pose below states the
+				// true death position, so without this the corpse jumps that distance onto its killer and only then
+				// plays the death animation. A melee kill never showed it: the chase had already stopped and flushed.
+				//
+				// Retail keeps them in agreement rather than posing somewhere else - 250 of 267 captured death poses
+				// sit at distance 0.00 from the end of that handle's preceding MoveTask - so the client is brought up
+				// to date and the pose stays where the creature actually died.
+				await _sim.FlushPendingMove(npcEntity);
+
 				await SendWorldPacket(killer, MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)));
 				// #742: the record's field3 is the dying NPC's own BEHAVIOUR COUNTER, not a "death variant" - so its
 				// death takes the next index after its last swing, which is exactly the 5 -> 6 -> 6(abort) -> 7

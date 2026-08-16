@@ -115,6 +115,20 @@ namespace Faolan.GameServer.World
 
 		private readonly IWorldOutbound _output;
 
+		// #272: send what `entity` has walked but not yet had broadcast, and end its move.
+		//
+		// The tick throttles a chase into ~6u segments (`MoveBroadcastSegment`) and flushes the remainder in its own
+		// `EndMove` when the entity arrives. DEATH is the one way a move ends without going through that, so a creature
+		// killed mid-chase leaves up to 6u the client never saw - and the death POSE states the true position, so the
+		// corpse jumps that far onto its killer before playing its death animation. Lives here because the tick owns
+		// the segment bookkeeping this is finishing.
+		public async Task FlushPendingMove(WorldEntity entity)
+		{
+			ArgumentNullException.ThrowIfNull(entity);
+			if (entity.TakePendingMoveSegment())
+				await _output.BroadcastNpcMove(entity);
+		}
+
 		// Last aura application per (holder, buff, area) - see TickAuras for why it is not WorldEntity.LastDotTick, and
 		// #776 for why the HOLDER is in the key: since a mob can carry an area-emitting debuff, two entities holding
 		// the same buff would otherwise share one stamp and each suppress the other's cadence.

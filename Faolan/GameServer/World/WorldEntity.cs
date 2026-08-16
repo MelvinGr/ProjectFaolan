@@ -631,6 +631,32 @@ namespace Faolan.GameServer.World
 		// Cleared on arrival, death and respawn.
 		public bool Moving { get; set; }
 
+		// #272: take the movement this entity has walked but NOT yet had broadcast, ending the move. Returns false when
+		// there is nothing pending, so the caller sends no packet.
+		//
+		// ⚠️ It exists for DEATH, which is the one way a move ends without going through the tick's own `EndMove`.
+		// The tick only emits a segment once `MoveOrigin -> Position` reaches `MoveBroadcastSegment` (6u), so a
+		// creature killed MID-CHASE carries up to 6u the client was never told about - and the death POSE states the
+		// true position, which makes the corpse jump that distance toward its killer right before the death animation.
+		// Killing it in melee never showed it: the chase had already ended and flushed.
+		//
+		// Retail keeps the two in agreement instead: over the whole corpus, 250 of 267 death poses sit at distance
+		// **0.00** from the end of that handle's preceding MoveTask (median 0.00). So the fix is to flush, not to move
+		// the pose - the pose is right, the client was simply behind.
+		public bool TakePendingMoveSegment()
+		{
+			if (!Moving || Vector3.DistanceSquared(MoveOrigin, Position) <= 1e-4f)
+			{
+				Moving = false;
+				return false;
+			}
+
+			MoveFrom = MoveOrigin;
+			MoveOrigin = Position;
+			Moving = false;
+			return true;
+		}
+
 		// A summoned/test NPC that should NOT revive when killed: once dead it lingers as a lootable
 		// corpse for RespawnDelaySeconds, then the tick fades + removes it instead of respawning it.
 		public bool NoRespawn { get; set; }

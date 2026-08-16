@@ -642,6 +642,22 @@ populations: community 346 polls four templates unanimously neutral and two unan
 replays `handle -> template` as it walks the packets and attributes each poll to the most recent spawn *before*
 it. Collapsing that into one map first silently gave four `Crocodile Pict` templates another mob's votes.
 
+### The death pose flushes what the chase never sent (#272)
+
+⚠️ A creature killed **mid-chase** used to jump onto its killer and only then play its death animation, and only
+when killed *from a distance* — a melee kill never showed it.
+
+The tick throttles a chase into ~6u segments (`MoveBroadcastSegment`) and flushes the remainder in its own
+`EndMove` when the NPC arrives. **Death is the one way a move ends without going through that**, so a mob still
+running at you carries up to 6u the client was never told about — and the death pose states the *true* position.
+Kill it in melee and the chase had already stopped and flushed, which is why the bug looked range-dependent.
+
+⭐ Retail keeps the two in agreement rather than posing somewhere else: over the whole corpus **250 of 267 death
+poses sit at distance 0.00** from the end of that handle's preceding MoveTask (median 0.00). So the pose is right
+and the client was simply behind — `WorldSimulation.FlushPendingMove` sends the missing segment before
+`DeathSequence.Pose`, and `WorldEntity.TakePendingMoveSegment` re-anchors so a second call cannot re-send the same
+ground. Gated by `PendingMoveFlushTests`.
+
 ## NPC chase / aggro movement (#190, 2026-06-15)
 
 A hostile NPC aggros a player two ways: proximity — a player inside `NpcAggroRange` (20u) — or **being hit**,
