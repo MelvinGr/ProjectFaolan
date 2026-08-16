@@ -97,9 +97,34 @@ exists to teach. The referrer must itself be a real **book** spell — `Plague S
 nothing. Both exclusions apply to all three grant paths (the ding, the relog re-grant, the default bar seed),
 never to the captured `IsStarter` kit, which is retail's own list.
 
-⚠️ Neither exclusion closes the over-grant, and a passing spellbook should not be read as a solved one: the same
-four characters show the level path offering **268 / 220 / 43 / 1** spells where retail gave them
-**91 / 100 / 4 / 0**. Open work tracked in Gitea #847.
+#### ⭐ The third band, and the one that closes most of it: a spell no FEAT teaches
+
+The client grants a spell rank through a **feat** — a `<Class> Class Feat NNN` for rank 1 and a
+`Spell Unlocking <lo>-<hi>` for ranks 2 and up, whose name carries the level band it covers (`FeatSpellGrants`).
+Anything in a class's stacking line that no feat teaches was never on a level path, and the client would refuse
+the cast anyway: its criteria evaluator gates on carrying the teaching feat (`YouCanNotUseYet`).
+
+Read as a gate, measured against the two captured level-80s:
+
+| | offered before | offered, feat-gated | actually known | of the offered-and-known, feat-taught |
+|---|---:|---:|---:|---:|
+| Necromancer | 230 | **111** | 109 | **91 / 91** |
+| Demonologist | 201 | **109** | 127 | **101 / 101** |
+
+It costs no recall: every spell those two know that the path offers at all is feat-taught, and everything it
+appears to "miss" was already off the catalog (pets, mounts, emotes, the `Undead Minion:` / `Deathless Acolyte:`
+lines). `--report spell-grant-check` is the standing measurement, and its one assertion is that direction.
+
+⚠️ **Applied PER CLASS** (`DatabaseRepository.FeatMapCovers`). The feat map grants **Barbarian, Guardian,
+Conqueror, Assassin and Ranger** nothing at all — 227 of their 259 level-gated entries are combos, which travel
+the combo book — so for them its silence is missing data, not a statement, and gating on it would ship an empty
+spellbook with no capture to notice. The population is bimodal with nothing between: those five sit at **exactly
+0** feat-taught rows and the next class up at **29**, so "does the map grant this class anything" is a real
+separation and not a threshold chosen to fit. Held by `NoClass_ReachesLevel80WithAnEmptySpellbook`.
+
+⚠️ Even so this does not close the over-grant: the same characters show **111 / 109 / 10 / 1** offered where
+retail gave them **109 / 127 / 8 / 2**, and the five uncovered classes keep today's answer, wrong as it is (the
+Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs). Open work tracked in Gitea #847.
 
 ### 4. The GATING FEAT (#581) — the source that LEADS
 

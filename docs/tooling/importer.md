@@ -309,6 +309,17 @@ residual collapse against the TEACHING FEATS, which split the 19 into two struct
 ≥ 4487431, and the captured level-80s know the rank below but never it) and a *rank 1 from a class feat* (rank 1's
 only grant is a `<Class> Class Feat`, which states no band, so field 125 copied band-granted rank 2's level onto it).
 See the field-125 section of [spell-record-fields.md](../rdb/spell-record-fields.md)) ·
+`spell-grant-check` (does the level path offer a captured character the spellbook retail gave them? Runs the
+SHIPPING queries — `GetStartingSpells` and `GetStartingBarSpells` — for every character in the DB against its own
+captured known-spell list, and splits the errors: EXTRA (offered, not known) is printed because the population moves
+with the corpus; MISSING is split into *never on offer* (absent from `ClassSpells`, or `Level 0` — a catalog gap)
+and DROPPED (in the class catalog, carries a level, and still not offered), which is the only direction that can
+only be a defect. It is the standing measurement behind the per-class feat gate in
+[combos.md](../subsystems/combos.md). ⚠️ It CANNOT be a test even in principle: `faolan.sql` excludes every
+`Character*` table as per-developer play state, so the suite's fixture holds zero `CharacterSpells` rows and any
+such gate there passes vacuously. It caught a real one on its first run — the default bar seeded
+`Pestilential Blast (Rank 1)` for a level-4 Necromancer whose book did not hold it, because the bar re-derived its
+own candidate set instead of seeding from the book) ·
 `broadcast-check` (#272: which server records does retail send to EVERY player who can see the subject, and which
 only to the one client concerned? The oracle is `login_2-clients_group-trade-friend`, the ONLY capture with two game
 connections — with one client a broadcast and a private reply look identical, with two a record reaching both streams

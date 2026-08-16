@@ -214,6 +214,43 @@ namespace Faolan.Tests
 			Assert.Equal([LifestrikeRank1], atFifteen.Intersect(lifestrikeRanks));
 		}
 
+		// ⭐ The default action bar may only point at spells the character actually HAS. It is seeded once, on first
+		// world entry, from `GetStartingBarSpells`, and the book comes from `GetStartingSpells`; a slot outside that
+		// book is a dead button. The bar used to re-derive its own candidate set - its own copy of the combo and
+		// effect exclusions plus a plain `Level <= level` - and the copy drifted: level 1 is the create KIT's
+		// exclusive domain on the book side and an ordinary level on the bar side, so a level-4 Necromancer's bar was
+		// seeded with `Pestilential Blast (Rank 1)`, which the character had never been taught.
+		[Fact]
+		public async Task TheDefaultBar_OnlySeedsSpellsTheBookHolds()
+		{
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			foreach (var @class in ClassSpellClasses)
+				foreach (var level in (uint[])[1, 2, 4, 20, 80])
+				{
+					var book = (await repo.GetStartingSpells(level, @class)).ToHashSet();
+					var bar = await repo.GetStartingBarSpells(level, @class);
+
+					var outside = bar.Where(id => !book.Contains(id)).ToList();
+					Assert.True(outside.Count == 0, $"{@class} at level {level}: bar seeds {string.Join(", ", outside)}, which the book does not hold");
+				}
+		}
+
+		// ⚠️ The guard on `DatabaseRepository.FeatMapCovers`. Gating the level path on "a feat teaches it" is applied
+		// PER CLASS, because the feat map grants five classes (Barbarian, Guardian, Conqueror, Assassin, Ranger)
+		// nothing at all - their level-gated entries are overwhelmingly combos, which travel the combo book. For those
+		// the map's silence is missing data, not a statement, and gating on it would hand out an EMPTY spellbook with
+		// no capture to notice. This is what would fail if the gate were ever made global.
+		[Fact]
+		public async Task NoClass_ReachesLevel80WithAnEmptySpellbook()
+		{
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			foreach (var @class in ClassSpellClasses)
+			{
+				var book = await repo.GetStartingSpells(80, @class);
+				Assert.True(book.Length > 0, $"{@class} would reach level 80 knowing nothing");
+			}
+		}
+
 		// ⭐ The two grant paths answer ONE question between them - what a character of a given level knows - so
 		// everything the dings taught on the way up has to come back on the relog that re-derives the book. They gate
 		// on the same expression (`ClassSpell.GrantLevel` where a capture caught the grant, `Spells.Level` elsewhere),

@@ -178,9 +178,12 @@ namespace Faolan.Core.Database.Repositories
 		// the login path said a character of that level knows and the ding path taught at a different level entirely
 		// (`Runed Flesh (Rank 1)` granted at 5, requirement 10; `Contract of Protection (Rank 1)` at 5 vs 10) - or
 		// never, for the two `Dance:` emotes whose requirement is 0 and whose captured grant is at 5.
+		//
+		// ⭐ AND THE SPELL HAS TO BE ONE A FEAT TEACHES, for a class the feat map speaks for - see FeatMapCovers.
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var featGated = await FeatMapCovers(ctx, @class);
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
@@ -192,11 +195,56 @@ namespace Faolan.Core.Database.Repositories
 				.Where(x => x.Gate > fromLevelExclusive && x.Gate <= toLevelInclusive)
 				.Where(x => !ctx.Combos.Any(c => c.GameActionId == x.s.Id))
 				.Where(x => !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
+				.Where(x => !featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id))
 				.OrderBy(x => x.Gate)
 				.ThenBy(x => x.s.Id)
 				.Select(x => x.s.Id)
 				.Distinct()
 				.ToArrayAsync();
+		}
+
+		/// <summary>
+		///     Whether the client's feat→spell grant map is a STATEMENT about this class, and so may be used as the
+		///     gate on what its level path teaches. True for the seven classes it grants anything to; false for the
+		///     five it grants nothing to, where its silence is missing data rather than "this class learns nothing".
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The client grants a spell rank through a FEAT: a <c>&lt;Class&gt; Class Feat NNN</c> for rank 1 and a
+		///     <c>Spell Unlocking &lt;lo&gt;-&lt;hi&gt;</c> for ranks 2 and up, whose name carries the level band it
+		///     covers. Read as a gate on the level path it is what closes most of the over-grant (#847), measured
+		///     against the two captured level-80s:
+		///     <list type="table">
+		///         <item>Necromancer: 230 offered → <b>110</b>, against the 109 the captured L80 actually knows.</item>
+		///         <item>Demonologist: 201 offered → <b>108</b> (the L80 knows 127).</item>
+		///     </list>
+		///     and it costs NOTHING: of the spells those two know that the path offers at all, <b>91 of 91</b> and
+		///     <b>100 of 100</b> are feat-taught. What the gate appears to "miss" (18 and 27) is already not offered
+		///     today - pets, mounts, emotes and the <c>Undead Minion:</c> / <c>Deathless Acolyte:</c> lines, none of
+		///     which are in <c>ClassSpells</c> for the class.
+		///     <para>
+		///         It also makes every granted spell CASTABLE. The client refuses a cast until the character carries
+		///         the feat that teaches the spell (<c>YouCanNotUseYet</c>), which is what
+		///         <c>LevelUpService.GrantCastabilityFor</c> exists to satisfy; with this gate there is by construction
+		///         always such a feat to train.
+		///     </para>
+		///     <para>
+		///         ⚠️ <b>Per class, and NOT a tuned threshold.</b> The population is bimodal with nothing in between:
+		///         Barbarian, Guardian, Conqueror, Assassin and Ranger have <b>exactly 0</b> feat-taught rows, and the
+		///         next class up has <b>29</b>. So "does the map grant this class anything at all" is a genuine
+		///         separation rather than a cut-off chosen to fit. The five are not a data gap of their own making -
+		///         227 of their 259 level-gated entries are COMBOS, which travel the combo book and are already
+		///         excluded here, so there was never much for a feat to teach.
+		///     </para>
+		///     <para>
+		///         ⚠️ For those five the gate is <b>off</b> and nothing changes: they keep today's answer, wrong as it
+		///         is (the Conqueror's 38 are mostly <c>Colossus of War (1..20)</c> and combo debuffs). Silence is not
+		///         a statement - gating on it would ship an empty spellbook, and no capture exists to notice. Their
+		///         residue stays on #847.
+		///     </para>
+		/// </remarks>
+		private static Task<bool> FeatMapCovers(DatabaseContext ctx, ConanClass @class)
+		{
+			return ctx.ClassSpells.Where(cs => cs.Class == @class).AnyAsync(cs => ctx.FeatSpellGrants.Any(g => g.SpellId == cs.SpellId));
 		}
 
 		public async Task<Item?> GetItem(uint id)
@@ -399,19 +447,20 @@ namespace Faolan.Core.Database.Repositories
 			return rows.ToLookup(c => (c.SpellId, c.Sequence));
 		}
 
+		// ⭐ The bar seeds from the BOOK - `GetStartingSpells` verbatim - rather than re-deriving a candidate set of its
+		// own. It used to carry its own copy of the combo and effect exclusions plus a plain `Level > 0 && <= level`,
+		// and the copy had drifted: level 1 is the create kit's exclusive domain on the book side (a captured LIST,
+		// not a level query) and was an ordinary level on this one, so a level-4 Necromancer's bar was seeded with
+		// `Pestilential Blast (Rank 1)` - Level 1, in the class catalog, and not a spell the character had been
+		// taught. A slot pointing outside the book is a dead button, and the only way a third copy of the rules
+		// cannot drift from the other two is not to exist. Caught by `--report spell-grant-check`.
 		public async Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class)
 		{
+			var book = await GetStartingSpells(level, @class);
+
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var candidates = await ctx
-				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
-				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
-				.Where(s => s.Level > 0 && s.Level <= level)
-				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id)) // a combo is not a spellbook spell - see GetClassSpellsUnlockedBetween (#298)
-				// ...and neither is an EFFECT: the DoT a book spell applies carries its caster's class-encoded
-				// stacking line, so `ClassSpells` attributes it to the class exactly like a combo. Same rule and same
-				// reason as the ding path - see GetClassSpellsUnlockedBetween, including why the referrer must itself
-				// be a book spell. Without it the relog re-grant put back what the ding no longer teaches.
-				.Where(s => !ctx.Spells.Any(applier => applier.EffectSpell == s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
+			var candidates = await ctx.Spells
+				.Where(s => book.Contains(s.Id))
 				.Select(s => new
 				{
 					s.Id,
@@ -470,6 +519,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<uint[]> GetStartingSpells(uint level, ConanClass @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var featGated = await FeatMapCovers(ctx, @class);
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
@@ -477,11 +527,14 @@ namespace Faolan.Core.Database.Repositories
 					cs,
 					s
 				})
-				// The LEVEL branch excludes combos AND effects - neither is a spellbook spell, see
-				// GetClassSpellsUnlockedBetween (#298 / #847). The starter kit is left alone in both cases: it is a
-				// captured LIST, so whatever it holds is what retail granted (and in fact holds no combo GameAction).
+				// The LEVEL branch excludes combos AND effects, and (for a class the feat map speaks for) keeps only
+				// what a feat teaches - none of the three is a spellbook spell the level path may grant, see
+				// GetClassSpellsUnlockedBetween and FeatMapCovers (#298 / #847). The starter kit is left alone by all
+				// three: it is a captured LIST, so whatever it holds is what retail granted (and in fact holds no
+				// combo GameAction, and every one of its members is feat-taught anyway).
 				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id)
 					&& !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id))
+					&& (!featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id))
 					&& (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level
 					: x.s.Level > 1 && x.s.Level <= level)))

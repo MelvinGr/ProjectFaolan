@@ -420,6 +420,11 @@ namespace Faolan.Importer.Cli
 					return await SpellLevelLadder(arg);
 				}
 
+				case "spell-grant-check":
+				{
+					return await SpellGrantCheck();
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));
