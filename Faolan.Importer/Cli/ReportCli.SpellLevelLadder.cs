@@ -169,7 +169,7 @@ namespace Faolan.Importer.Cli
 			if (stale.Count == 0)
 			{
 				Console.WriteLine("  ✅ every remaining collapse has no second source - the effect bands answer partially, "
-				                  + "step down with rank or run past the level cap. Those keep field 125's answer (Gitea #847).");
+				                  + "step down with rank or run past the level cap. Those keep field 125's answer (Gitea #853).");
 				return 0;
 			}
 

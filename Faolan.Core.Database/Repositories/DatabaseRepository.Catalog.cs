@@ -167,9 +167,16 @@ namespace Faolan.Core.Database.Repositories
 		// L80 Necromancer, 19 from the L80 Demonologist, 10 from the Herald) at **zero** false positives - it never
 		// drops a spell a captured character actually knows.
 		//
-		// ⚠️ This does NOT close the over-grant, and is not claimed to: the same four characters show the level path
-		// offering 268/220/43 spells where retail gave them 91/100/4, so effects are one identified band of a much
-		// larger gap. Tracked in Gitea #847 - do not read a passing spellbook as a solved one.
+		// ⚠️ Effects were ONE band of four, and on their own they left the level path offering 268/220/43 spells where
+		// retail gave those characters 91/100/4. The other three are combos (above), the per-rank level LADDER
+		// (`RdbSpellImporter.RankLadderFromEffectBands`, where field 125 states none and one ding taught a whole
+		// family) and the feat TREE (FeatMapCovers below). With all four the offer is 88/95/5 against a known
+		// 109/127/8 and ZERO false positives - `--report spell-grant-check` is the standing measurement.
+		//
+		// ⚠️ What remains is the opposite error and a different problem: the class<->spell HARVEST does not know
+		// about whole bands the captured level-80s hold - the `Undead Minion:` / `Deathless Acolyte:` pet lines,
+		// mounts, companions, and the `Dance:` emotes, which are race-gated rather than class-gated. Gitea #851;
+		// #852 for the five classes the feat map cannot speak for. Do not read a passing spellbook as a solved one.
 		//
 		// ⚠️ The GATE is `ClassSpell.GrantLevel` where a capture has caught the grant and `Spells.Level` everywhere
 		// else - the SAME expression `GetStartingSpells` gates on, and it has to be, because the two answer one
@@ -239,7 +246,7 @@ namespace Faolan.Core.Database.Repositories
 		///         ⚠️ For those five the gate is <b>off</b> and nothing changes: they keep today's answer, wrong as it
 		///         is (the Conqueror's 38 are mostly <c>Colossus of War (1..20)</c> and combo debuffs). Silence is not
 		///         a statement - gating on it would ship an empty spellbook, and no capture exists to notice. Their
-		///         residue stays on #847.
+		///         residue stays on Gitea #852.
 		///     </para>
 		/// </remarks>
 		private static Task<bool> FeatMapCovers(DatabaseContext ctx, ConanClass @class)

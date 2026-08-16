@@ -635,7 +635,7 @@ Read against the feats, the 19 residual collapses are two shapes, not one:
 
 ⚠️ The second shape is **not** recoverable from the client: the feat record carries no level field (five teaching
 feats diffed — the fixed header is byte-identical up to the name), and a class feat is not a single-level unlock
-(`Necromancer Class Feat 001` grants spells rated 1, 5, 7, 10 and 25). Open under Gitea #847.
+(`Necromancer Class Feat 001` grants spells rated 1, 5, 7, 10 and 25). Open work tracked in Gitea #853.
 
 Two families are worse than a copy. `Radiance`'s effect bands are shifted one rank — band(*n*) equals level(*n+1*),
 ending at 91, past the level cap — and its `Spell Unlocking` feats are scrambled (ranks 2-4 all under 60-80, rank 5

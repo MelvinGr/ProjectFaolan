@@ -139,7 +139,7 @@ separation and not a threshold chosen to fit. Held by `NoClass_ReachesLevel80Wit
 against **109 / 127 / 8** known, and the shortfall is spells absent from `ClassSpells` for the class entirely —
 pets, mounts, emotes, the `Undead Minion:` / `Deathless Acolyte:` lines. The five uncovered classes also keep
 today's answer, wrong as it is (the Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs). Open
-work tracked in Gitea #847.
+work tracked in Gitea #851 (the harvest gap) and #852 (the five uncovered classes).
 
 ### 4. The GATING FEAT (#581) — the source that LEADS
 
