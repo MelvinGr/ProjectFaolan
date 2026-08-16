@@ -6,7 +6,10 @@ namespace Faolan.GameServer.World
 	public enum WorldTickEffectType
 	{
 		NpcRespawned, // a dead NPC's respawn timer elapsed; it is alive again at its spawn point (re-render it)
-		NpcCorpseLootable, // a dead NPC's death-animation linger elapsed; convert its corpse to a lootable bag in place
+		NpcCorpseLootDropped, // an NPC just died; drop its loot bag as a SEPARATE dynel beside the body (retail does this in the death's own burst)
+		NpcCorpseFaded, // the body has lain there for CorpseFadeSeconds; fade it out for viewers (n3ToClientFade)
+		NpcCorpseQuit, // ...and CorpseQuitDelaySeconds later, drop the corpse handle for viewers (n3ToClientQuit)
+		NpcCorpseRemoved, // a NoRespawn corpse finished the sequence above; take the entity out of the zone entirely
 		LootExpired, // a loot bag's lifetime elapsed (despawn it for nearby players, then remove it from the zone)
 		NpcAttack, // an aggroed NPC (Entity) swings at a player (Target); the listener applies damage + pushes vitals
 		NpcMove, // an aggroed NPC (Entity) stepped toward its target player (Target); broadcast its MoveTask transform

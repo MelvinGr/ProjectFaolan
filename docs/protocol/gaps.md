@@ -82,6 +82,21 @@ avoided the coefficients. They really do need a live dump.
 
 `[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
 
+### NPC respawn interval
+The three other post-death numbers are measured (`--report corpse-timing`: the bag drops in the death's own burst
+0.8 u from the body, the corpse fades at 30.72 s and quits at 33.18 s, an unlooted bag expires at 300 s). The
+interval before the creature comes BACK is not, because **no capture contains a respawn**: across all 134
+captures, 275 NPC kills produced no dead handle returning to its spawn point and no killed spawn point refilled by
+another entity. The scan is not blind — it attributes 8,894 spawns to interest churn, and the six candidates it
+surfaces all sit 52–984 u from the dead creature's anchor (the handle being reused), where a real respawn is *at*
+the spawn point. The bound is how long the client demonstrably kept watching the spot: strongest **733.9 s** with
+nothing returning. `WorldEntity.DefaultRespawnDelaySeconds` is therefore a chosen floor (750 s, just past that
+observation), not retail's number. Closing it needs a deliberate capture that clears a camp and then *stays put*
+for 15+ minutes — or the confirmation that creatures on a **Solo** playfield (4010 Tortage Island, where nearly
+every capture was taken) simply never respawn for the life of the instance, which would make the right model a
+per-spawn flag rather than a timer. Tracked in Gitea #855.
+`[V0: NPC respawn interval]`
+
 ---
 
 ## Minigames / Massive PvP

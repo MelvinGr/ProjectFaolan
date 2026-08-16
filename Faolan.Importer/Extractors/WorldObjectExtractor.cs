@@ -71,7 +71,7 @@ namespace Faolan.Importer.Extractors
 
 				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
 				// world-builder-PLACED containers. A drop - a plain "Bag of loot" OR a boss/raid CHEST ("Large Chest",
-				// "Chest") - spawns dynamically on a kill and fades after ~120s (WorldBroadcaster.LootBagExpirySeconds);
+				// "Chest") - spawns dynamically on a kill and fades after 300s (WorldBroadcaster.LootBagExpirySeconds);
 				// it must NOT be baked as a permanent WorldObject (that was how a stray "Large Chest" ended up standing
 				// on the Tortage beach - #363). Placed containers are constructed the SAME way (bigger container is just
 				// a bigger LootBagTemplate.Variant), so the NAME can't tell a drop from a placement; the signal is the

@@ -38,27 +38,58 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
 The `B2 90 80 5C 29 E6 27 CA` 8-byte sequence is the standard null-identity filler wherever an item
 identity quad would go (behavior acks, the 0xF result block, 0x2052 grants).
 
-## NPC death lifecycle (corpse linger -> loot bag -> respawn)
+## NPC death lifecycle (loot bag -> corpse fade -> respawn)
 
 A killed NPC no longer instant-pops. The killing blow pushes the `health=0` vitals (`ApplyNpcDamage`), then
 `CombatService.OnNpcKilled` `MarkDead`s the world entity (+ XP + kill quests) and plays the death anim via the
 retail NPC-death pair — a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06, freezes the corpse in
 place) + a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6, behaviorId 41877) on the dying handle
 (`DeathSequence.Pose`/`DeathSequence.Bcc`, #204/#349, see below). The
-world tick (`WorldState.Tick`) drives two independent timers off the death:
-1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
-   client plays its death animation. When it elapses the tick emits `NpcCorpseLootable` ->
-   `WorldBroadcaster.ConvertCorpseToLoot`, which (decoupled, #246) rolls the drop, spawns a **SEPARATE** loot bag
-   (its own handle, via `SpawnLootBagAt` - the standalone-bag path) at the death spot, then
-   despawns the corpse. The bag lives/loots/expires independently (a `ForLoot` entity, tick-expired) and SURVIVES
-   the NPC's respawn. (Old `MakeCorpseLootable` reused the NPC handle in place - removed; it pinned the respawn to
-   the death spot, #246.) Empty drops just despawn the corpse.
-2. **respawn** (`RespawnDelaySeconds`, ~15s): revives the NPC at its spawn point and re-renders it
-   (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245). **EXCEPT** summoned NPCs
-   (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer` — the pet-summon / test-spawn path): once dead they don't
-   revive — the post-death timer runs
-   as a despawn (`TickPostDeathDespawn` → `LootExpired` fade+remove) so a test mob fades out instead of coming
-   back (commit `df8f90d`, a GM QoL).
+world tick (`WorldState.Tick`) then drives the corpse sequence (`WorldEntity.TickCorpse` → `CorpseStage`) and,
+independently, the respawn timer.
+
+⭐ **The bag is not the corpse, and the body does not pop.** Measured over 275 NPC deaths in 134 captures
+(`--report corpse-timing`): the loot bag is a **separate dynel spawned in the SAME packet burst as the death**,
+and the body lies **beside** it for another half-minute.
+[V1: Faolan.Importer/Cli/ReportCli.CorpseTiming.cs]
+
+| stage | when | what goes out |
+|---|---|---|
+| `CorpseStage.Drop` | **0.00 s** median (n=100 matched kills) | `LootBagFullUpdateIIR` for a **new** handle, at the corpse **+0.8 u on Z** (91 of 100 exactly `(dx,dz)=(0.0,+0.8)`) |
+| `CorpseStage.Fade` | **30.72 s** median (n=229) | `n3ToClientFade` on the CORPSE handle, `fadeSeconds` **2.0** — invariant for `EntityClass.Character` across all 229; a loot bag's is 3.0 |
+| `CorpseStage.Quit` | **33.18 s** median (n=228) | `n3ToClientQuit` on the corpse handle |
+| bag expiry | **300 s** unlooted (4 bags, 299.8–300.2) | the bag's own `n3ToClientFade` + consumed-visual (`BroadcastEntityFade`) |
+
+⚠️ The quit is measured **from the fade**, not as "the first quit after the death". A dead entity is still
+interest-managed — walk away from a body and it quits, walk back and it re-spawns — so the first quit is often
+that one. Reading it that way leaves the median at 33.18 s but drops the minimum to 6.96 s, which is the tell.
+
+1. **loot drop** (`NpcCorpseLootDropped` → `WorldBroadcaster.DropCorpseLoot`) rolls the drop and spawns a
+   **SEPARATE** loot bag (its own handle, via `SpawnLootBagAt` — the standalone-bag path, decoupled in #246). The
+   bag lives/loots/expires independently (a `ForLoot` entity, tick-expired) and SURVIVES the NPC's respawn. (Old
+   `MakeCorpseLootable` reused the NPC handle in place — removed; it pinned the respawn to the death spot, #246.)
+   A kill with nothing to give leaves no bag at all.
+2. **corpse teardown** (`NpcCorpseFaded` → `BroadcastCorpseFade`, then `NpcCorpseQuit` →
+   `BroadcastEntityDespawn`) fades and then drops the BODY, long after the bag landed.
+3. **respawn** (`RespawnDelaySeconds`, `WorldEntity.DefaultRespawnDelaySeconds`): revives the NPC at its spawn
+   point and re-renders it (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245).
+   **EXCEPT** `WorldEntity.NoRespawn` creatures (summons, ambient pool members): they leave the world
+   (`NpcCorpseRemoved`) when the corpse sequence ends instead of waiting out a timer they never use.
+
+⚠️ **The respawn interval is the one number here the corpus cannot supply**, and the default is a floor we chose,
+not a measurement. Across all 134 captures, **275 NPC kills produced no respawn at all** — no dead handle ever
+came back to its spawn point, and no killed spawn point was refilled by another entity. That is not a blind
+detector: the same scan attributes **8,894** spawns to interest churn, so it sees a re-spawn readily when there is
+one, and the six candidates it does surface all sit **52–984 u** from the dead creature's own anchor (the handle
+being reused for something else, where a genuine respawn is *at* the spawn point).
+
+The bound comes from how long the client demonstrably kept watching the spot afterwards, measured off a neighbour
+anchored within 10 u of the dead creature's anchor: the strongest is **733.9 s** — over twelve minutes parked on a
+Barachan Panther's corpse with nothing returning — and the top ten all exceed 310 s. So the default sits just past
+that at **750 s** (`WorldEntity.DefaultRespawnDelaySeconds`), where no captured session contradicts it. Note
+Tortage Island (4010) is one of four Solo maps, so "clear it and it stays clear for your session" may be the real
+retail rule rather than any timer. Tracked in Gitea #855.
+`[V0: NPC respawn interval]`
 
 `.delete [<handle>]` (GM, `DeleteCommand`): the DURABLE removal — despawns the selected entity live AND deletes its
 `NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike a plain live despawn

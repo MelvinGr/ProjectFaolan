@@ -18,6 +18,11 @@ namespace Faolan.Core.Network.Codecs.World
 		// the whole family (the corpus extract's world-object slice, the burst's column lift).
 		public const uint SimpleDynel = (uint)IirTypes.SimpleDynelFullUpdateIIR;
 
+		// The dropped-loot dynel. Named for the same reason as SimpleDynel: a caller that wants BAGS specifically -
+		// `--report corpse-timing` telling a kill's bag apart from the corpse beside it - would otherwise spell the
+		// IIR itself, outside Codecs/.
+		public const uint LootBag = (uint)IirTypes.LootBagFullUpdateIIR;
+
 		public static readonly IReadOnlySet<uint> Placed = new HashSet<uint>
 		{
 			(uint)IirTypes.SimpleDynelFullUpdateIIR, (uint)IirTypes.LootBagFullUpdateIIR,

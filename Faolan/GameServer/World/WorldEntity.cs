@@ -19,13 +19,51 @@ namespace Faolan.GameServer.World
 	// scattered per-session maps into this shared model. Vitals/AI/buffs will hang off this as those systems land.
 	public sealed class WorldEntity
 	{
-		// How long a fresh corpse stays as the dying creature (so the client plays its death animation off the
-		// health=0 vitals it just received) before the corpse is converted to a lootable bag in place. Must be well
-		// under RespawnDelaySeconds so the lootable window opens before the NPC revives.
-		public const double CorpseLingerSeconds = 3.0;
+		// ⭐ The corpse is NOT the loot bag, and it does not pop after the death animation. Measured over the whole
+		// retail corpus (`--report corpse-timing`, 275 NPC deaths across 134 captures): the bag is a SEPARATE dynel
+		// spawned in the SAME packet burst as the death, and the body then lies BESIDE it for another half-minute:
+		//
+		//   death -> loot bag spawns (delay 0.00 s median over 100 matched kills, its own handle, 0.8 u away)
+		//         -> n3ToClientFade on the corpse handle at 30.72 s (median, n=229)
+		//         -> n3ToClientQuit on the corpse handle at 33.18 s (median, n=228)
+		//
+		// We used to do the opposite of all three: hold the bag back 3 s, then despawn the corpse to make room for it.
+		// So the drop is now immediate (TickCorpse -> Drop) and these two govern only the BODY.
+		public const double CorpseFadeSeconds = 30.7;
+
+		// The gap between the corpse's fade and its quit (33.18 - 30.72). The fade itself plays a 2.0 s dissolve - see
+		// CorpseFadeAnimationSeconds - so the handle is dropped just after the client has finished dissolving it.
+		//
+		// ⚠️ Measuring this needs the fade as the anchor, not "the first quit after the death". A dead entity is still
+		// interest-managed - walk away from a body and it quits, walk back and it re-spawns - so the first quit is
+		// often that one, tens of seconds early. Reading it that way put the median at 33.18 s but the MINIMUM at
+		// 6.96 s, which is the tell.
+		public const double CorpseQuitDelaySeconds = 2.5;
+
+		// The `fadeSeconds` float the corpse's n3ToClientFade carries. INVARIANT by entity class across the corpus: a
+		// Character (0xC350) fades in 2.0 s in all 229 captured corpse fades, a loot bag (0xC87A) in 3.0 s - which is
+		// why this is here and not left on N3ToClientFadeCodec.DefaultFadeSeconds (that default IS the bag's 3.0).
+		public const float CorpseFadeAnimationSeconds = 2.0f;
 
 		// Default time a killed NPC stays dead before the tick respawns it.
-		public const double DefaultRespawnDelaySeconds = 15.0;
+		//
+		// ⚠️ This number is a FLOOR we chose, not a measurement - the corpus cannot supply one. Across all 134
+		// captures, **275 NPC kills produced no respawn at all**: no dead handle ever came back to its spawn point, and
+		// no killed spawn point was refilled by another entity. That is not a blind detector - the same scan attributes
+		// 8,894 spawns to interest churn, so it sees a re-spawn readily when there is one. The six candidates it does
+		// surface are all 52-984 u from the dead creature's own anchor, i.e. the handle being REUSED for something
+		// else, where a genuine respawn is AT the spawn point.
+		//
+		// The bound comes from how long the client demonstrably kept watching the spot afterwards (measured off a
+		// neighbour anchored within 10 u of the dead creature's anchor): the strongest is **733.9 s** - over twelve
+		// minutes parked on the corpse of a Barachan Panther with nothing returning - and the top ten all exceed 310 s.
+		//
+		// So retail's interval is longer than anything the corpus can see, and the old 15 s was invented (a mob was
+		// back before its own corpse had finished fading). 750 s sits just past the strongest observation, so no
+		// captured session contradicts it. Note Tortage Island (4010) is one of four SOLO maps - a per-player copy - so
+		// "clear it and it stays clear for your session" may well be the real retail rule rather than any timer.
+		// [V0: NPC respawn interval]
+		public const double DefaultRespawnDelaySeconds = 750.0;
 
 		public const uint DispositionFriendly = 0;
 		public const uint DispositionHostile = 1;
@@ -36,15 +74,14 @@ namespace Faolan.GameServer.World
 		// as retail's stream does.
 		public uint HeartbeatTick;
 
-		// Set once the corpse has been turned into a lootable bag this death, so the conversion fires exactly once.
-		private bool _corpseConverted;
+		// How far this death's corpse timeline has already been driven, so each stage fires exactly once (see TickCorpse).
+		private CorpseStage _corpseStage;
 
 		// Time (seconds) until this NPC may swing again; counts down while it has a target in range.
 		private double _attackCooldownRemaining;
 
-		// Remaining time (seconds) the dying corpse is still the creature model (death animation) before it becomes a
-		// loot bag; counts down while dead-and-not-yet-converted.
-		private double _corpseLingerRemaining;
+		// Seconds since this entity died, advanced by TickCorpse only. Drives the drop -> fade -> quit sequence above.
+		private double _corpseAge;
 
 		// Time (seconds) until this defender moves a shield to another arc (#20); counts down while engaged.
 		private double _shieldShiftRemaining;
@@ -926,14 +963,14 @@ namespace Faolan.GameServer.World
 			return false;
 		}
 
-		// Marks the entity dead (call once its vitals reach 0) and starts the corpse-linger + respawn countdowns. The
-		// corpse stays as the dying creature for CorpseLingerSeconds (death animation), then the tick converts it to a
-		// lootable bag; the respawn timer revives it later. Idempotent per death.
+		// Marks the entity dead (call once its vitals reach 0) and starts the corpse + respawn countdowns. The tick then
+		// drops the loot bag beside the body, fades the body out at CorpseFadeSeconds and quits its handle; the respawn
+		// timer revives it much later. Idempotent per death.
 		public void MarkDead()
 		{
 			_respawnRemaining = RespawnDelaySeconds;
-			_corpseLingerRemaining = CorpseLingerSeconds;
-			_corpseConverted = false;
+			_corpseAge = 0;
+			_corpseStage = CorpseStage.None;
 			InCombat = false; // combat ends on death; a respawn re-engages from a clean (sheathed) state
 			ShieldDistribution = 0; // the shield rose belongs to the fight; the next engage rolls a fresh one (#20)
 			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
@@ -1068,20 +1105,37 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// Counts down a fresh corpse's death-animation linger by dt; returns true the single tick it elapses, so the
-		// caller converts the corpse to a lootable bag in place. Fires exactly once per death and only while dead.
-		public bool TickCorpseLinger(double dt)
+		// Drives the corpse timeline (drop -> fade -> quit, see CorpseFadeSeconds) and returns the ONE stage that came
+		// due on this tick, or null. Each stage fires exactly once per death and only while dead, so a revive mid-way
+		// (TickRespawn / a resurrect) simply stops the sequence where it stands.
+		//
+		// One stage per tick even if a long dt crossed two: the next tick fires the follower. At 10 Hz against a 2.5 s
+		// gap that cannot happen in practice, and letting a stalled tick emit a fade and a quit in the same breath
+		// would put both on the wire with no dissolve in between.
+		public CorpseStage? TickCorpse(double dt)
 		{
-			if (_corpseConverted || !IsDead)
-				return false;
+			if (!IsDead || _corpseStage >= CorpseStage.Quit)
+				return null;
 
-			_corpseLingerRemaining -= dt;
-			if (_corpseLingerRemaining > 0)
-				return false;
+			_corpseAge += dt;
 
-			_corpseConverted = true;
-			return true;
+			// The bag is dropped on the FIRST tick after death rather than waiting out any delay - retail spawns it in
+			// the death's own packet burst, and a 10 Hz tick is the closest this side can get to that.
+			if (_corpseStage < CorpseStage.Drop)
+				return _corpseStage = CorpseStage.Drop;
+
+			if (_corpseStage < CorpseStage.Fade && _corpseAge >= CorpseFadeSeconds)
+				return _corpseStage = CorpseStage.Fade;
+
+			if (_corpseStage == CorpseStage.Fade && _corpseAge >= CorpseFadeSeconds + CorpseQuitDelaySeconds)
+				return _corpseStage = CorpseStage.Quit;
+
+			return null;
 		}
+
+		// True once this death's corpse has been quit (the handle is no longer rendered for anyone). A NoRespawn
+		// entity is removed from the world here rather than at its respawn timer - it has no respawn to wait for.
+		public bool CorpseCleared => _corpseStage >= CorpseStage.Quit;
 
 		// Counts down a loot bag's lifetime by dt; returns true the tick it expires (caller despawns + removes it).
 		// No-op (false) for anything that isn't a loot bag.
@@ -1141,16 +1195,9 @@ namespace Faolan.GameServer.World
 			return _routeDwellRemaining <= 0;
 		}
 
-		// A summoned NoRespawn NPC: once dead, run its respawn timer DOWN as a despawn timer instead of reviving -
-		// returns true the tick it elapses so the caller fades + removes the corpse. Never revives the entity.
-		public bool TickPostDeathDespawn(double dt)
-		{
-			if (!IsDead)
-				return false;
-
-			_respawnRemaining -= dt;
-			return _respawnRemaining <= 0;
-		}
+		// (A NoRespawn NPC used to run its respawn timer down as a DESPAWN timer here. It leaves the world at the end of
+		// its corpse sequence instead - `CorpseStage.Quit` -> `NpcCorpseRemoved` - because the respawn delay is now
+		// twelve minutes, which would have parked a dead summon in the zone long after the client stopped drawing it.)
 
 		// Advances the respawn countdown for a DEAD entity by dt; when it elapses, revives the entity (vitals back to
 		// full, transform back to its spawn point) and returns true so the caller can re-spawn it for nearby players.
@@ -1176,7 +1223,8 @@ namespace Faolan.GameServer.World
 			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();
-			_corpseConverted = false;
+			_corpseAge = 0;
+			_corpseStage = CorpseStage.None;
 			InCombat = false; // the fresh NPC starts idle (sheathed); re-aggro re-draws via the combat-mode broadcast
 			ShieldDistribution = 0; // ...and unrolls its shield rose until it engages again (#20)
 			Returning = false;

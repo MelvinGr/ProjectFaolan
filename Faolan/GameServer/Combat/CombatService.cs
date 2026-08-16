@@ -731,10 +731,11 @@ namespace Faolan.GameServer.Combat
 		{
 			if (npcEntity != null)
 			{
-				// MarkDead starts the corpse-linger + respawn timers. The killing blow already pushed health=0 vitals
+				// MarkDead starts the corpse + respawn timers. The killing blow already pushed health=0 vitals
 				// (ApplyNpcDamage), so the client plays the death animation on the still-rendered creature; the world
-				// tick then converts the lingering corpse to a lootable bag (NpcCorpseLootable) and respawns it later.
-				// Don't despawn/convert here - that instant-popped the corpse before the death animation could play.
+				// tick then drops its loot bag beside it (NpcCorpseLootDropped), fades the body out half a minute later
+				// and respawns the creature much later still.
+				// Don't despawn here - that instant-popped the corpse before the death animation could play.
 				npcEntity.MarkDead();
 				// Record the killer so the corpse's loot bag is owned by them (the allowed looter), not whoever is in
 				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
@@ -785,9 +786,9 @@ namespace Faolan.GameServer.Combat
 				await _factions.AwardForKill(killer, npcEntity.FactionId);
 				await AnnounceKillChain(killer);
 
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
-					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn
-						? "then fades (no respawn)"
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); loot drops now, corpse fades in {Fade}s, {Fate}.", npcEntity.Name, targetHandle, cause,
+					WorldEntity.CorpseFadeSeconds, npcEntity.NoRespawn
+						? "then it leaves the world (no respawn)"
 						: $"respawns in {npcEntity.RespawnDelaySeconds}s");
 				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
 				// 13479) completes + supersedes to the next stage; a chainless kill quest keeps the legacy turn-in path.

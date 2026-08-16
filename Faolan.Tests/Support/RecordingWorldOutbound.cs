@@ -20,6 +20,7 @@ namespace Faolan.Tests.Support
 		public List<(uint NpcHandle, uint CasterHandle, int Delta, uint SpellId)> DotTicks { get; } = [];
 		public List<(uint SourceHandle, uint EffectSpellId, float Radius, uint MaxTargets)> Areas { get; } = [];
 		public List<uint> InterestResolves { get; } = [];
+		public List<(uint Handle, CorpseStage Stage)> CorpseEvents { get; } = [];
 
 		// What ApplySpellArea answers with, and what a spell's aura areas / #784 chain edges are - set by the test that
 		// needs them.
@@ -140,8 +141,23 @@ namespace Faolan.Tests.Support
 			return Task.CompletedTask;
 		}
 
-		public Task ConvertCorpseToLoot(WorldEntity npc)
+		// The corpse sequence, recorded in order so a lifecycle gate can assert that the bag lands on the kill and the
+		// body is torn down half a minute later, rather than the other way round.
+		public Task DropCorpseLoot(WorldEntity npc)
 		{
+			CorpseEvents.Add((npc.Handle, CorpseStage.Drop));
+			return Task.CompletedTask;
+		}
+
+		public Task BroadcastCorpseFade(WorldEntity npc)
+		{
+			CorpseEvents.Add((npc.Handle, CorpseStage.Fade));
+			return Task.CompletedTask;
+		}
+
+		public Task BroadcastEntityDespawn(WorldEntity entity)
+		{
+			CorpseEvents.Add((entity.Handle, CorpseStage.Quit));
 			return Task.CompletedTask;
 		}
 

@@ -36,8 +36,15 @@ namespace Faolan.GameServer.World
 	public sealed class WorldBroadcaster : IQuestOutbound
 	{
 
-		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
-		private const double LootBagExpirySeconds = 120.0;
+		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry). Capture-measured:
+		// every bag in the corpus that nobody emptied faded at 300 s (four of them, 299.9-300.2 - a spread of 0.3 s
+		// over five minutes is a fixed timer, not a coincidence). Looted-empty bags are torn down within seconds of the
+		// window closing instead, which is the AfterLootTake path, not this one. Was 120 s, which was invented.
+		private const double LootBagExpirySeconds = 300.0;
+
+		// Retail drops the bag BESIDE the body rather than inside it: a flat +0.8 u on the world Z axis, unrotated by
+		// the corpse's facing (60 of 65 measured kills are exactly (dx, dz) = (0.0, +0.8)). See DropCorpseLoot.
+		private const float LootBagCorpseOffsetZ = 0.8f;
 
 		// How far a loot bag may be ground-snapped from the NPC's death Y. The snap fixes death-moment Y drift (tall /
 		// flying creatures, MoveTask Z-drift #190) - a few metres. Beyond that the heightmap is describing the OUTDOOR
@@ -788,7 +795,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				// Re-add to Known: the corpse despawn (ConvertCorpseToLoot, #246) removed the handle, so the player
+				// Re-add to Known: the corpse's quit (#246) removed the handle, so the player
 				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
 				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
@@ -1093,7 +1100,7 @@ namespace Faolan.GameServer.World
 		//   drag 1 of 2        -> contents remain -> kept, and it expires on its own (TickExpiry -> LootExpired)
 		//
 		// Nothing is consumed HERE, not even a bag that reads as empty. A no-drop kill leaves no bag at all
-		// (ConvertCorpseToLoot only spawns one for questDrop || items || cash), so the only bag that can be open and
+		// (DropCorpseLoot only spawns one for questDrop || items || cash), so the only bag that can be open and
 		// empty is the QUEST one: a LootFromNpc mob whose goal names no quest item drops an empty bag deliberately,
 		// because looting it is what completes the goal (the goal matches on the bag's SOURCE NPC, not its contents).
 		// Consuming that on close would make the quest uncompletable - the player closes the window once and the goal
@@ -1114,14 +1121,18 @@ namespace Faolan.GameServer.World
 			return Task.CompletedTask;
 		}
 
-		// A dead NPC's death-animation linger elapsed (driven by the world tick): turn its corpse into a lootable bag
-		// IN PLACE. Every kill leaves a lootable corpse - the drop ROLL decides only whether it carries items/cash, not
-		// whether it's lootable (retail leaves a lootable corpse on every kill; empty corpses are fine). Falls back to a
-		// plain despawn only when no loot-bag world object can be built for the map.
-		public async Task ConvertCorpseToLoot(WorldEntity deadNpc)
+		// An NPC just died (driven by the world tick, on the first tick after the kill): roll its drop and spawn the
+		// loot bag. The bag is its OWN dynel next to the body, and the BODY IS LEFT ALONE - it lies there until
+		// BroadcastCorpseFade tears it down ~30.8 s later.
+		//
+		// ⚠️ This used to be `ConvertCorpseToLoot`, and the name was the bug: it waited out a 3 s "death-animation
+		// linger", spawned the bag and then despawned the corpse, so a kill left a bag where the body had been. Retail
+		// does neither half of that (`--report corpse-timing`, 65 matched kills): the bag is in the death's own packet
+		// burst - delay 0.00 s median - and the corpse is still standing 30 s later. See WorldEntity.CorpseFadeSeconds.
+		public async Task DropCorpseLoot(WorldEntity deadNpc)
 		{
 			if (!deadNpc.IsDead)
-				return; // revived (or never died) before the linger fired - nothing to convert
+				return; // revived (or never died) before the drop fired - nothing to drop
 
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
 			// bag holding the goal's QUEST ITEM - it must be lootable, not a 50/50 roll.
@@ -1153,12 +1164,11 @@ namespace Faolan.GameServer.World
 
 			// DECOUPLED loot (#246): the bag is a SEPARATE IsLoot entity (its OWN handle) at the death spot, NOT the
 			// NPC's handle reused. Reusing it pinned the NPC's respawn to where it died (the client can't move a bag
-			// handle via the respawn's CharFullUpdate) and made the loot vanish when the NPC respawned. Spawn the bag,
-			// then despawn the corpse so the NPC handle respawns clean at its spawn point (BroadcastNpcRespawn re-adds
-			// it to Known); the bag lives/loots/expires on its own (tick-managed via TickExpiry). Empty corpses just
-			// despawn (matching retail - not every kill leaves a bag).
+			// handle via the respawn's CharFullUpdate) and made the loot vanish when the NPC respawned. The bag
+			// lives/loots/expires on its own (tick-managed via TickExpiry) while the corpse runs its own teardown.
 			// Spawn a bag when there's loot, OR unconditionally for a quest mob (the bag may be empty - looting it still
-			// completes the LootFromNpc goal, which matches on the bag's source NPC, not its contents).
+			// completes the LootFromNpc goal, which matches on the bag's source NPC, not its contents). A kill with
+			// nothing to give leaves no bag, which is retail's behaviour too - not every corpse there is lootable.
 			if (questDrop || items.Count > 0 || cash > 0)
 			{
 				// Bag at the NPC's death spot HORIZONTALLY (X/Z - where the player expects it, not at the killer's feet
@@ -1179,10 +1189,15 @@ namespace Faolan.GameServer.World
 				// cell read 199.63 against a death Y of 145.19, the 54 m delta failed the tolerance below, and his bag
 				// kept the death Y - 0.6 m UNDER the sand, invisible and unclickable, which broke the quest that needed
 				// it looted. The beach cells a metre away read 146.1. See RdbHeightmap.HeightNear.
-				var dropPos = deadNpc.Position;
-				var groundY = _sim.Terrain?.GroundHeightNear(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z, deadNpc.Position.Y, MaxLootGroundSnap);
+				//
+				// ⭐ BESIDE the body, not under it: retail offsets the bag by a flat +0.8 u on Z, and it is a
+				// world-AXIS offset rather than one rotated by the corpse's facing - 60 of the 65 measured kills land on
+				// (dx, dz) == (0.0, +0.8) exactly, whatever direction the creature was facing. The body is still lying
+				// there for another half-minute (CorpseFadeSeconds), so a bag placed dead-centre sits inside the mesh.
+				var dropPos = deadNpc.Position with { Z = deadNpc.Position.Z + LootBagCorpseOffsetZ };
+				var groundY = _sim.Terrain?.GroundHeightNear(deadNpc.MapId, dropPos.X, dropPos.Z, dropPos.Y, MaxLootGroundSnap);
 				if (groundY is { } ground && MathF.Abs(ground - deadNpc.Position.Y) <= MaxLootGroundSnap)
-					dropPos = deadNpc.Position with { Y = ground };
+					dropPos = dropPos with { Y = ground };
 				else if (groundY is { } refused)
 					// Not silent: past the tolerance the death Y is kept deliberately (an indoor/cave kill), but a bag
 					// that ends up out of reach looks identical to one that never dropped, so say which case this was.
@@ -1195,8 +1210,25 @@ namespace Faolan.GameServer.World
 					"Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).", deadNpc.Name,
 					deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
 			}
+		}
 
-			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
+		// The corpse's own teardown, ~30.8 s after the kill: fade the BODY out for everyone who can see it. The
+		// n3ToClientQuit that drops the handle follows CorpseQuitDelaySeconds later (BroadcastEntityDespawn), and the
+		// loot bag it dropped on death is untouched by both - it outlives the body and expires on its own clock.
+		//
+		// Sent as a Character-class fade with a 2.0 s dissolve, which is what every captured creature fade carries
+		// (56 of 56); the loot-bag fade's 3.0 s default on the codec is the OTHER class's number.
+		public async Task BroadcastCorpseFade(WorldEntity npc)
+		{
+			var fade = N3ToClientFadeCodec.Build(EntityClass.Character, npc.Handle, WorldEntity.CorpseFadeAnimationSeconds);
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client == null || !viewer.Known.Contains(npc.Handle))
+					continue;
+
+				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(fade)));
+			}
 		}
 
 		// GM .delete of a static WORLD OBJECT (chest/door/dynel): these aren't in the live entity model (they stream
@@ -1268,7 +1300,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
-		// MaxCount. A killed member fades + is removed (LootExpired), dropping the pool's live count; here we respawn ONE
+		// MaxCount. A killed member fades + is removed at the end of its corpse sequence (NpcCorpseRemoved), dropping
+		// the pool's live count; here we respawn ONE
 		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
 		// point, streamed to nearby players.
 		public async Task MaintainAmbientPools()

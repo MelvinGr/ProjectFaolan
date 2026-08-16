@@ -93,9 +93,12 @@ namespace Faolan.Tests
 			boss.Vitals!.Health = 0;
 			zone.Add(boss);
 
-			// Run well past the corpse/post-death timers, then keep ticking: exactly one reset, ever.
-			var resets = world.Tick(60.0).Count(e => e.Type == WorldTickEffectType.EncounterReset);
-			resets += world.Tick(60.0).Count(e => e.Type == WorldTickEffectType.EncounterReset);
+			// Run well past the corpse timers - the sequence emits one stage per tick, so this takes several - and then
+			// keep ticking long after it has finished: exactly one reset, ever.
+			var resets = 0;
+			for (var i = 0; i < 10; i++)
+				resets += world.Tick(60.0).Count(e => e.Type == WorldTickEffectType.EncounterReset);
+
 			Assert.Equal(1, resets);
 			Assert.True(boss.EncounterResetDone);
 		}

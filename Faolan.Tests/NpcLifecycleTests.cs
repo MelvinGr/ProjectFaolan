@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
@@ -17,14 +18,50 @@ namespace Faolan.Tests
 			Assert.False(npc.TickRespawn(100.0));
 		}
 
+		// The retail corpse sequence (WorldEntity.CorpseFadeSeconds): the loot bag drops on the KILL, and the body is
+		// torn down half a minute later. The ordering is the point - we used to do it backwards, holding the bag for 3s
+		// and despawning the corpse to make room for it.
 		[Fact]
-		public void TickCorpseLinger_FiresOnceAfterLingerThenStops()
+		public void TickCorpse_DropsLootAtOnceThenFadesTheBodyMuchLater()
 		{
-			var npc = DeadNpc(20.0); // long respawn so only the linger is in play
-			Assert.False(npc.TickCorpseLinger(1.0)); // 1s, still the dying creature
-			Assert.False(npc.TickCorpseLinger(1.0)); // 2s
-			Assert.True(npc.TickCorpseLinger(1.0)); // 3s -> corpse becomes lootable (CorpseLingerSeconds)
-			Assert.False(npc.TickCorpseLinger(1.0)); // already converted -> never fires again this death
+			var npc = DeadNpc(600.0); // long respawn so only the corpse sequence is in play
+
+			Assert.Equal(CorpseStage.Drop, npc.TickCorpse(0.1)); // the first tick after the kill drops the bag
+			Assert.Null(npc.TickCorpse(0.1)); // ...exactly once
+			Assert.Null(npc.TickCorpse(WorldEntity.CorpseFadeSeconds - 1.0)); // the body is still lying there at ~30s
+
+			Assert.Equal(CorpseStage.Fade, npc.TickCorpse(1.0)); // 30.8s -> fade the body out
+			Assert.Null(npc.TickCorpse(1.0)); // the quit waits out its own 2.5s gap, it does not follow immediately
+			Assert.Equal(CorpseStage.Quit, npc.TickCorpse(WorldEntity.CorpseQuitDelaySeconds)); // 33.3s -> drop the handle
+
+			Assert.Null(npc.TickCorpse(100.0)); // and the sequence is spent for this death
+			Assert.True(npc.CorpseCleared);
+		}
+
+		// A long stalled tick may cross two stages at once; it must still put them on the wire one at a time, or a fade
+		// and the quit that ends it go out in the same breath with no dissolve in between.
+		[Fact]
+		public void TickCorpse_EmitsOneStagePerTickEvenWhenDtOverruns()
+		{
+			var npc = DeadNpc(600.0);
+			Assert.Equal(CorpseStage.Drop, npc.TickCorpse(1000.0));
+			Assert.Equal(CorpseStage.Fade, npc.TickCorpse(0.1));
+			Assert.Equal(CorpseStage.Quit, npc.TickCorpse(0.1));
+		}
+
+		// A revive part-way through abandons the sequence, and the next death starts it over from the top.
+		[Fact]
+		public void TickCorpse_RestartsFromTheTopAfterARespawn()
+		{
+			var npc = DeadNpc(1.0);
+			Assert.Equal(CorpseStage.Drop, npc.TickCorpse(0.1));
+			Assert.True(npc.TickRespawn(1.0));
+			Assert.False(npc.CorpseCleared);
+			Assert.Null(npc.TickCorpse(100.0)); // alive - no corpse to run
+
+			npc.Vitals.ApplyHealthDelta(-80);
+			npc.MarkDead();
+			Assert.Equal(CorpseStage.Drop, npc.TickCorpse(0.1)); // the new death drops its own bag
 		}
 
 		[Fact]
@@ -53,27 +90,51 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void WorldStateTick_CorpseBecomesLootableThenRespawns()
+		public void WorldStateTick_DropsLootOnDeathFadesTheCorpseThenRespawns()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(2040);
+			var npc = DeadNpc(60.0);
+			zone.Add(npc);
+
+			// The kill itself: the bag drops immediately, and the body stays put.
+			var dropped = world.Tick(0.1);
+			Assert.Single(dropped);
+			Assert.Same(npc, dropped[0].Entity);
+			Assert.Equal(WorldTickEffectType.NpcCorpseLootDropped, dropped[0].Type);
+			Assert.True(npc.IsDead);
+
+			// ~30.8s: the body fades, then its handle is quit 2.5s later. The bag is not involved in either.
+			Assert.Empty(world.Tick(WorldEntity.CorpseFadeSeconds - 1.0));
+			Assert.Equal(WorldTickEffectType.NpcCorpseFaded, Assert.Single(world.Tick(1.0)).Type);
+			Assert.Equal(WorldTickEffectType.NpcCorpseQuit, Assert.Single(world.Tick(WorldEntity.CorpseQuitDelaySeconds)).Type);
+			Assert.True(npc.IsDead); // a placed NPC is still in the zone, waiting out its respawn
+
+			// Respawn timer (60s): revive at the spawn point, long after the corpse has gone.
+			Assert.Empty(world.Tick(60.0 - WorldEntity.CorpseFadeSeconds - WorldEntity.CorpseQuitDelaySeconds - 0.2));
+			var revived = world.Tick(0.2);
+			Assert.Equal(WorldTickEffectType.NpcRespawned, Assert.Single(revived).Type);
+			Assert.False(npc.IsDead);
+		}
+
+		// A NoRespawn creature (a summon, an ambient pool member) leaves the world when its corpse sequence ends rather
+		// than sitting out a respawn timer it will never use - which at the 420s default would have parked it in the
+		// zone for seven minutes after the client had already stopped rendering it.
+		[Fact]
+		public void WorldStateTick_NoRespawnCorpseLeavesTheWorldWhenTheSequenceEnds()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(2040);
 			var npc = DeadNpc();
+			npc.NoRespawn = true;
 			zone.Add(npc);
 
-			// Death-animation linger (~3s): the corpse converts to a lootable bag, still dead.
-			Assert.Empty(world.Tick(2.0)); // 2s
-			var lootable = world.Tick(1.0); // 3s
-			Assert.Single(lootable);
-			Assert.Same(npc, lootable[0].Entity);
-			Assert.Equal(WorldTickEffectType.NpcCorpseLootable, lootable[0].Type);
-			Assert.True(npc.IsDead);
+			Assert.Equal(WorldTickEffectType.NpcCorpseLootDropped, Assert.Single(world.Tick(0.1)).Type);
+			Assert.Equal(WorldTickEffectType.NpcCorpseFaded, Assert.Single(world.Tick(WorldEntity.CorpseFadeSeconds)).Type);
 
-			// Respawn timer (10s): revive at the spawn point.
-			Assert.Empty(world.Tick(6.0)); // 9s
-			var revived = world.Tick(1.0); // 10s
-			Assert.Single(revived);
-			Assert.Equal(WorldTickEffectType.NpcRespawned, revived[0].Type);
-			Assert.False(npc.IsDead);
+			var end = world.Tick(WorldEntity.CorpseQuitDelaySeconds);
+			Assert.Equal([WorldTickEffectType.NpcCorpseQuit, WorldTickEffectType.NpcCorpseRemoved], end.Select(e => e.Type));
+			Assert.All(end, e => Assert.Same(npc, e.Entity));
 		}
 
 		[Fact]
@@ -101,7 +162,9 @@ namespace Faolan.Tests
 			var npc = DeadNpc(2.0);
 			zone.Add(npc);
 
-			Assert.Empty(world.Tick(1.0)); // 1s, still dead
+			// The first tick drops the corpse's loot bag; the respawn is the only thing after it at this delay (2s is
+			// far short of the corpse fade, so the body is still standing when the creature revives under it).
+			Assert.Equal(WorldTickEffectType.NpcCorpseLootDropped, Assert.Single(world.Tick(1.0)).Type);
 			var effects = world.Tick(1.0); // 2s -> respawns
 			Assert.Single(effects);
 			Assert.Same(npc, effects[0].Entity);

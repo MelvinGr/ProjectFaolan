@@ -224,7 +224,7 @@ namespace Faolan.GameServer.World
 				if (_questGatedNpcs.TryGetValue(npc.NpcTemplateId, out var gateQuests))
 					entity.GateQuestIds = gateQuests;
 
-				// …and, SEPARATELY, whether it stays dead (#708). A story kill target must not respawn ~15s later -
+				// …and, SEPARATELY, whether it stays dead (#708). A story kill target must not respawn at all -
 				// killing Scavenger Tuut for Casilda's quest completes the goal and he should stay dead (retail
 				// solo-instances him), so he despawns after death instead of reviving; his loot bag (the quest key) is
 				// a separate entity and still drops. ⚠️ Not implied by the gate: a quest-only target on a REPEATABLE

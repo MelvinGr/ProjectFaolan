@@ -56,9 +56,17 @@ namespace Faolan.GameServer.World
 		// it was streaming (#190).
 		Task BroadcastNpcStop(WorldEntity npc);
 
-		// Convert a dead NPC's corpse to a lootable bag in place (after its death-animation linger), or despawn it if
-		// no loot bag can be built for the map.
-		Task ConvertCorpseToLoot(WorldEntity npc);
+		// Roll a freshly killed NPC's drop and spawn its loot bag as a SEPARATE dynel beside the body. The corpse is
+		// left standing - retail's bag and body coexist, and the body is torn down by the two calls below.
+		Task DropCorpseLoot(WorldEntity npc);
+
+		// Fade a dead NPC's BODY out for the players in range (n3ToClientFade, the 2.0 s Character dissolve), ~30.8 s
+		// after the kill. Its handle is dropped a couple of seconds later via BroadcastEntityDespawn.
+		Task BroadcastCorpseFade(WorldEntity npc);
+
+		// Drop an entity's handle for the players in range (n3ToClientQuit) - the second half of the corpse teardown,
+		// and the plain despawn used wherever an entity should simply stop existing for a viewer.
+		Task BroadcastEntityDespawn(WorldEntity entity);
 
 		// #778: re-run one player's interest pass with nothing having changed on their side, so entities that moved
 		// THEMSELVES are streamed in and out for a player standing still. See WorldBroadcaster.ResolveInterest.

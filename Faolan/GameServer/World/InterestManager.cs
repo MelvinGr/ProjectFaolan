@@ -93,8 +93,8 @@ namespace Faolan.GameServer.World
 						// keep it in range so the move-prune below does NOT despawn it early - before it has hit the floor -
 						// which happens whenever the player moves during the ~3s linger. Do NOT add a dead NPC the mover does
 						// NOT know: interest would spawn it ALIVE at its death spot and that re-add to Known would gate out the
-						// real respawn's relocate-to-spawn (#246). ConvertCorpseToLoot removes the corpse from Known, so an
-						// awaiting-respawn NPC (post-linger, t=3..15s) is no longer in Known and is correctly skipped here.
+						// real respawn's relocate-to-spawn (#246). The corpse's quit removes the handle from Known, so an
+						// awaiting-respawn NPC (past its corpse sequence) is no longer in Known and is correctly skipped here.
 						if (mover.Known.Contains(other.Handle))
 							inRange.Add(other.Handle);
 						continue;

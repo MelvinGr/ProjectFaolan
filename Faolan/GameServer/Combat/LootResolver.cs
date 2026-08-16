@@ -9,8 +9,9 @@ namespace Faolan.GameServer.Combat
 		// Chance a kill drops a loot bag.
 		public const double DefaultDropChance = 0.5;
 
-		// How long a dropped loot bag stays in the world before it expires and despawns.
-		public const double LootExpirySeconds = 120.0;
+		// How long a dropped loot bag stays in the world before it expires and despawns. Capture-measured at 300 s -
+		// see WorldBroadcaster.LootBagExpirySeconds, which is the copy the live drop path actually reads.
+		public const double LootExpirySeconds = 300.0;
 
 		// Coins a dropped bag carries (tin, the wallet wire unit), scaled by the NPC's level. The retail beach
 		// bags consistently granted 2 tin per loot (the +2 steps in the 0x2005 wallet captures - level ~2-5

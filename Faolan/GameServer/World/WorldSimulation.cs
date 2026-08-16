@@ -45,8 +45,10 @@ namespace Faolan.GameServer.World
 		private const bool NpcAmbientAnimationEnabled = true;
 
 		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
-		// is replaced on the next pass, so ~15s matches the DefaultRespawnDelaySeconds mobs use.
-		private const double AmbientMaintainIntervalSeconds = 15.0;
+		// is replaced on the next pass - so it tracks the DefaultRespawnDelaySeconds placed mobs use rather than being
+		// a number of its own. It was 15 s alongside the old 15 s respawn; leaving it there while placed spawns moved to
+		// 420 s would have made the ambient population the fast-respawning one, which is the complaint that started this.
+		private const double AmbientMaintainIntervalSeconds = WorldEntity.DefaultRespawnDelaySeconds;
 
 		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and
 		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 150 u range, so a second's granularity is two
@@ -880,7 +882,8 @@ namespace Faolan.GameServer.World
 							// death-pose and walk / re-animate the corpse, so a patrolling NPC appears to walk off and vanish
 							// instead of dying in place. Only the corpse-lifecycle effects (linger->loot, respawn, fade) apply
 							// once dead.
-							if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootable or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
+							if (effect.Entity.IsDead && effect.Type is not (WorldTickEffectType.NpcCorpseLootDropped or WorldTickEffectType.NpcCorpseFaded or WorldTickEffectType.NpcCorpseQuit
+								    or WorldTickEffectType.NpcCorpseRemoved or WorldTickEffectType.NpcRespawned or WorldTickEffectType.LootExpired))
 								continue;
 
 							switch (effect.Type)
@@ -891,9 +894,29 @@ namespace Faolan.GameServer.World
 									break;
 								}
 
-								case WorldTickEffectType.NpcCorpseLootable:
+								case WorldTickEffectType.NpcCorpseLootDropped:
 								{
-									await _output.ConvertCorpseToLoot(effect.Entity);
+									await _output.DropCorpseLoot(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcCorpseFaded:
+								{
+									await _output.BroadcastCorpseFade(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcCorpseQuit:
+								{
+									await _output.BroadcastEntityDespawn(effect.Entity);
+									break;
+								}
+
+								case WorldTickEffectType.NpcCorpseRemoved:
+								{
+									// The fade + quit have already gone out (the two stages before this one), so the
+									// entity is off every client's screen; this only drops it from the model.
+									World.Remove(effect.Entity);
 									break;
 								}
 

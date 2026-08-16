@@ -17,9 +17,19 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		Task IWorldOutbound.ConvertCorpseToLoot(WorldEntity npc)
+		Task IWorldOutbound.DropCorpseLoot(WorldEntity npc)
 		{
-			return _broadcaster.ConvertCorpseToLoot(npc);
+			return _broadcaster.DropCorpseLoot(npc);
+		}
+
+		Task IWorldOutbound.BroadcastCorpseFade(WorldEntity npc)
+		{
+			return _broadcaster.BroadcastCorpseFade(npc);
+		}
+
+		Task IWorldOutbound.BroadcastEntityDespawn(WorldEntity entity)
+		{
+			return _broadcaster.BroadcastEntityDespawn(entity);
 		}
 
 		Task IWorldOutbound.SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)

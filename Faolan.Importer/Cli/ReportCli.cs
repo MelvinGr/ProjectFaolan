@@ -375,6 +375,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// What happens AFTER the death record: when the loot bag lands and where, how long the body lies there,
+				// how long an unlooted bag lasts, and whether the creature is ever seen to respawn.
+				case "corpse-timing":
+				{
+					CorpseTiming(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #588/#400: does a captured spawn's worn list state which weapon SET is drawn?
 				case "weapon-set-drawn":
 				{

@@ -358,32 +358,42 @@ namespace Faolan.GameServer.World
 						continue;
 					}
 
-					// A dead NPC first lingers as the dying creature (death animation), then its corpse becomes a
-					// lootable bag, then it respawns. The corpse-linger and respawn timers run independently off the
-					// same death; the linger (~3s) elapses well before the respawn (~15s) so the bag is lootable in
-					// between.
+					// A dead NPC drops its loot bag at once, then lies there as a corpse for CorpseFadeSeconds before the
+					// body fades and its handle is quit - retail's sequence, and the bag outlives the body rather than
+					// replacing it. The corpse and respawn timers run independently off the same death; the corpse is
+					// long gone (~33s) before the respawn (~420s) puts the creature back.
 					if (entity.IsDead)
 					{
-						if (entity.TickCorpseLinger(deltaSeconds))
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootable));
-						// Summoned (test) NPCs don't revive: once the post-death timer elapses, fade + remove the
-						// corpse (LootExpired) instead of respawning it.
-						if (entity.NoRespawn)
+						switch (entity.TickCorpse(deltaSeconds))
 						{
-							if (entity.TickPostDeathDespawn(deltaSeconds))
-							{
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
-								// #502: an encounter BOSS carries the lure it replaced. Once its corpse clears, put the
-								// lure back where it stood so the encounter can fire again. Guarded so a corpse cannot
-								// restore twice.
-								if (entity is { EncounterLureTemplateId: not null, EncounterResetDone: false })
+							case CorpseStage.Drop:
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootDropped));
+								break;
+							case CorpseStage.Fade:
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseFaded));
+								break;
+							case CorpseStage.Quit:
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseQuit));
+								// Summoned (test) NPCs and ambient pool members don't revive: their corpse sequence IS
+								// their whole afterlife, so once it has run they leave the world instead of waiting out
+								// a respawn timer they will never use.
+								if (entity.NoRespawn)
 								{
-									entity.EncounterResetDone = true;
-									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
+									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseRemoved));
+									// #502: an encounter BOSS carries the lure it replaced. Once its corpse clears, put
+									// the lure back where it stood so the encounter can fire again. Guarded so a corpse
+									// cannot restore twice.
+									if (entity is { EncounterLureTemplateId: not null, EncounterResetDone: false })
+									{
+										entity.EncounterResetDone = true;
+										effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
+									}
 								}
-							}
+
+								break;
 						}
-						else if (entity.TickRespawn(deltaSeconds))
+
+						if (!entity.NoRespawn && entity.TickRespawn(deltaSeconds))
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
 
 						continue;
