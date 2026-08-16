@@ -54,6 +54,10 @@ namespace Faolan.GameServer.World
 		public async Task LoadAsync(uint mapId, uint instanceId, Zone zone)
 		{
 			var areas = await _database.GetResolvedSpawnAreas(mapId);
+
+			// The harvested OUTFITS of each creature this map pools (#836). Retail dresses the individuals of a type
+			// differently, so a pool draws from the set rather than putting all eight members in the type's default.
+			var variants = await _database.GetAppearanceVariants(areas.Where(a => a.NpcTemplateId != null).Select(a => a.NpcTemplateId!.Value).Distinct().ToList());
 			var pools = new List<AmbientPool>();
 			var spawned = 0;
 			foreach (var area in areas)
@@ -67,7 +71,7 @@ namespace Faolan.GameServer.World
 					continue;
 
 				var level = type.StatCore.Level ?? 0;
-				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, level, level > 0
+				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, variants.GetValueOrDefault(type.TemplateId, []), level, level > 0
 					? CombatResolver.NpcMaxHealthForLevel(level)
 					: 1u, type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, SpawnAreaLabels.FormatAreaLabel(area));
 				pools.Add(pool);
@@ -120,7 +124,12 @@ namespace Faolan.GameServer.World
 			// Bake THIS zone's live token (4-byte) so the body is wire-correct and SendWorldSpawn can re-stamp it per
 			// recipient. Passing 0 shipped a 1-byte token that the client read as a version-byte desync (crash on 4010's
 			// ambient pools) and that SpawnTransformPatch could not fix (it only overwrites a 4-byte token in place).
-			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken);
+			// Round-robin the harvested outfits by how many of this pool are already standing, so eight Poachers are
+			// eight individuals and the assignment is stable rather than random (a respawn re-draws in the same order).
+			var wearing = pool.Outfits.Length > 0
+				? pool.Outfits[zone.Entities.Count(e => e.SpawnAreaId == pool.AreaId) % pool.Outfits.Length]
+				: null;
+			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken, wearing);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
 			entity.InstanceId = zone.InstanceId;
@@ -169,6 +178,9 @@ namespace Faolan.GameServer.World
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
 		// Label is the dev nameplate tag (SpawnAreaLabels.FormatAreaLabel), applied to members when the GM's
 		// `.togglenpcgroup` debug labelling is on.
-		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
+		// Outfits: the distinct harvested appearances of this creature, drawn from in spawn order so a pool is a crowd
+		// of individuals rather than a uniform (#836). Empty for a type we have no placement of - the type's own
+		// appearance is then the fallback, which is what a summoned pet has always used.
+		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, NpcSpawn[] Outfits, uint Level, uint MaxHealth, uint Disposition, string Label);
 	}
 }

@@ -88,14 +88,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// bytes shorter, desyncing the client's version read into a crash. Zone tokens are always 4-byte (WorldState
 		// mints them from 0x00A00000), so passing the zone token keeps the record wire-correct. Throws if the type
 		// has no lifted stat core.
-		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, uint playfieldToken)
+		// `wearing` overrides the type's own appearance with ONE HARVESTED PLACEMENT's (#836). Retail dresses the
+		// individuals of a type differently - the three captured beach Poachers wear three different kits, sharing only
+		// their leather legs - so a pool of eight built from the single type default is a uniform that retail never
+		// fields. The type's appearance stays the fallback for a creature we have no placement of (a summoned pet).
+		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, uint playfieldToken, NpcSpawn? wearing = null)
 		{
 			if (npc?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
 					$"NpcTemplate '{npc?.Name ?? "?"}' (id {npc?.TemplateId}) has no lifted StatCore.IirHeader - the type is not imported/lifted (or StatCore was not Included).");
 
-			var morphs = npc
-				.Morphs.OrderBy(m => m.Ordinal)
+			var morphSource = wearing?.Morphs is { Count: > 0 }
+				? wearing.Morphs.OrderBy(m => m.Ordinal).Select(m => (m.MorphId, m.Value, m.Word2, m.Text))
+				: npc.Morphs.OrderBy(m => m.Ordinal).Select(m => (m.MorphId, m.Value, m.Word2, m.Text));
+			var morphs = morphSource
 				.Select(m => new NpcAppearanceMorph
 				{
 					MorphId = m.MorphId,
@@ -104,7 +110,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Text = m.Text ?? ""
 				})
 				.ToList();
-			var message = BuildMessageFromType(npc);
+			var message = BuildMessageFromType(npc, wearing);
 			return BuildBody(handle, x, position, rotation, playfieldToken, message, morphs);
 		}
 
@@ -184,7 +190,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Constructs the WHOLE ProtoCoreCharacterIIR for a creature TYPE (#307): Name + the stat core straight from
 		// NpcTemplate.StatCore (no per-placement overrides - a type has no placement) + worn equipment from
 		// NpcTemplate.Equipment.
-		public static ProtoCoreCharacterIIR BuildMessageFromType(NpcTemplate npc)
+		public static ProtoCoreCharacterIIR BuildMessageFromType(NpcTemplate npc, NpcSpawn? wearing = null)
 		{
 			var core = npc.StatCore!;
 			var msg = new ProtoCoreCharacterIIR
@@ -198,7 +204,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				msg.CanFall = core.CanFall.Value;
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
-			if (npc.Equipment is { Count: > 0 })
+			// This individual's kit when one was handed in, the type's otherwise. Not merged: a kit is a whole outfit,
+			// and mixing one NPC's chest with another's would dress a creature retail never dressed.
+			if (wearing?.Equipment is { Count: > 0 } worn)
+			{
+				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(worn))
+					msg.InventoryEntries.Add(entry);
+			}
+			else if (npc.Equipment is { Count: > 0 })
 			{
 				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(npc.Equipment))
 					msg.InventoryEntries.Add(entry);

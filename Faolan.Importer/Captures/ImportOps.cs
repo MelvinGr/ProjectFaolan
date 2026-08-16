@@ -143,6 +143,20 @@ namespace Faolan.Importer.Captures
 					equipByTemplate[e.TemplateId] = e.Equipment;
 			}
 
+			// ⚠️ ...and how many DISTINCT NPCs each template stands for, because the merge above is only identity-
+			// preserving when the answer is one (#836). Casilda is a unique creature, so "the richest kit seen on
+			// template 9411" IS her own richest kit. A Poacher is not: template 8848 stands for many individuals, and
+			// retail dresses them INDIVIDUALLY - the three captured beach Poachers wear three different kits (7, 6 and
+			// 6 pieces, differing in chest, weapon, boots and whether they carry a slot-2 piece at all), sharing only
+			// their leather legs. Applying the richest kit to all of them handed every Poacher in the world the same
+			// loadout and erased that, which is what "they all look the same" turned out to be.
+			//
+			// A placement is (map, position): a handle is session-volatile, and the same NPC seen in two captures is
+			// the one standing in the same spot.
+			var placementsPerTemplate = perCap.SelectMany(p => p.All)
+				.GroupBy(e => e.TemplateId)
+				.ToDictionary(g => g.Key, g => g.Select(e => (e.MapId, X: MathF.Round(e.X), Z: MathF.Round(e.Z))).Distinct().Count());
+
 			// Richest PATROL ROUTE per (map, template) - the third backfill of the same shape as the two above, and the
 			// one that was missing (#425).
 			//
@@ -360,7 +374,13 @@ namespace Faolan.Importer.Captures
 						};
 					}
 
-					if (equipByTemplate.TryGetValue(e.TemplateId, out var fullEquip) && fullEquip.Count > e.Equipment.Count)
+					// The richest-kit merge only where the template IS one NPC (#836); everywhere else a placement keeps
+					// what IT was seen wearing, and the template set is a fallback for an observation that carried no
+					// equipment at all - the same rule the morph backfill above uses, and for the same reason.
+					var oneNpcOfThisType = placementsPerTemplate.GetValueOrDefault(e.TemplateId) <= 1;
+					if (equipByTemplate.TryGetValue(e.TemplateId, out var fullEquip) && (oneNpcOfThisType
+						    ? fullEquip.Count > e.Equipment.Count
+						    : e.Equipment.Count == 0))
 					{
 						e = e with
 						{

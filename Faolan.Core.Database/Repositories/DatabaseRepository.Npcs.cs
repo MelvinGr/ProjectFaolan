@@ -47,6 +47,8 @@ namespace Faolan.Core.Database.Repositories
 		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
+
+		Task<Dictionary<uint, NpcSpawn[]>> GetAppearanceVariants(IReadOnlyCollection<uint> templateIds);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<int> GraduateSpawnArea(uint areaId);
 		Task<int> LinkNpcSpawnsToArea(uint areaId, uint templateId, float selectedX, float selectedZ);
@@ -405,6 +407,41 @@ namespace Faolan.Core.Database.Repositories
 		// #835 - every ambient NPC in the world rendered naked, and it stayed naked after the type rows were filled in,
 		// because the rows were never loaded. `GetNpcByTemplateId` / `GetNpcByName` (the pet and encounter paths) have
 		// always Included both; this one had not.
+		/// <summary>
+		///     The DISTINCT harvested appearances of each given creature type - one placement per outfit, world-wide -
+		///     for a spawner that has to dress an individual it has no placement for (the ambient pools, #836).
+		/// </summary>
+		/// <remarks>
+		///     Retail dresses the individuals of a type differently: the three captured beach Poachers wear three
+		///     different kits and share only their leather legs. So the type's single default outfit is a uniform retail
+		///     never fields, and a pool of eight needs the SET of outfits to draw from.
+		///     <para>
+		///         Deduped by the kit itself (slot=template pairs), so twenty placements wearing the same thing offer
+		///         one variant rather than twenty, and ordered by spawn id so the draw is stable across restarts.
+		///     </para>
+		/// </remarks>
+		public async Task<Dictionary<uint, NpcSpawn[]>> GetAppearanceVariants(IReadOnlyCollection<uint> templateIds)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx
+				.NpcSpawns.Include(s => s.Equipment)
+				.ThenInclude(e => e.Item)
+				.Include(s => s.Morphs)
+				.AsSplitQuery()
+				.Where(s => templateIds.Contains(s.NpcTemplateId) && (s.Equipment.Count > 0 || s.Morphs.Count > 0))
+				.OrderBy(s => s.Id)
+				.ToListAsync();
+
+			return rows
+				.GroupBy(s => s.NpcTemplateId)
+				.ToDictionary(g => g.Key, g => g.GroupBy(Outfit).Select(v => v.First()).ToArray());
+
+			static string Outfit(NpcSpawn s)
+			{
+				return string.Join(",", s.Equipment.OrderBy(e => e.Pos).Select(e => $"{e.Pos}={e.Template}"));
+			}
+		}
+
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
