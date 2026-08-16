@@ -68,6 +68,31 @@ precisely so nobody plans a decode around a column of zeroes.
 | `Quest.start_scry_script_id` | **0** | dead |
 | `QuestGoal.phase` | 7327 | |
 
+### 1000104 is the ONLY RDB type that carries quest names — swept, with a control
+
+Asked directly: is there quest data in some *other* RDB type? Swept with
+`--report rdb-text-scan --report-arg "<names>:local"` over **all 411,233 local records, 0 unreadable**:
+
+| needle | records | types |
+|---|---:|---|
+| `Freeing the Captured` (quest 13480) | 1 | **1000104 only** |
+| `The Scavenger's Key` (quest 13563) | 1 | **1000104 only** |
+| `Threat of the Vanir` *(control — a region label, not a quest name)* | 10 | 1030002 ×7, 1000053, 1000055, 1000104 |
+
+Two real quest names occur in the catalog and **nowhere else in the client**. The control is what makes that
+a finding rather than a failed search: a string that *is* present in several tables is found in all of them, so
+the two single-hit results are the tables' silence, not the scan's.
+
+The control also sharpens the [bounded-area](bounded-areas-1000053.md) question. It appears as the
+`<name>` `QUEST Threat of the Vanir` (1000053, and its `Spawn-area / camp names` twin 1000055 at the same
+record id 1020, plus the localized-string table 1030002), while the catalog's line is named
+`[Field_of_the_Dead] The Threat of the Vanir`. **The two strings differ** — the region label is a designer's
+shorthand for the line, so the link is real to a human reader and cannot be made by exact match. That is why the
+51 `quest-goal` bounded areas are not a harvest source: wiring them to goals would be editorial, not a rule.
+
+⚠️ `:local` skips CDN-only records, so this is "not in the local packs". The types that could carry quest text
+at all are local, so the conclusion holds; a CDN-inclusive sweep is simply much slower.
+
 ### The chapter-GROUP pointers are a self-echo, not a grouping
 
 `first_main_quest_template_id` / `last_main_quest_template_id` (fields 11 and 12) sit on 1791 chapters and read
