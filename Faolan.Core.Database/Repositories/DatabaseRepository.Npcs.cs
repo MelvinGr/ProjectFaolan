@@ -434,11 +434,15 @@ namespace Faolan.Core.Database.Repositories
 
 			return rows
 				.GroupBy(s => s.NpcTemplateId)
-				.ToDictionary(g => g.Key, g => g.GroupBy(Outfit).Select(v => v.First()).ToArray());
+				.ToDictionary(g => g.Key, g => g.GroupBy(Individual).Select(v => v.First()).ToArray());
 
-			static string Outfit(NpcSpawn s)
+			// What makes two placements the same PERSON to look at and listen to: the worn kit and the voice. Voice is
+			// part of the key rather than a detail, because retail rolls it per spawn independently of the gear - two
+			// placements in identical armour with different voices are two variants, and keying on the kit alone would
+			// throw one of them away.
+			static string Individual(NpcSpawn s)
 			{
-				return string.Join(",", s.Equipment.OrderBy(e => e.Pos).Select(e => $"{e.Pos}={e.Template}"));
+				return string.Join(",", s.Equipment.OrderBy(e => e.Pos).Select(e => $"{e.Pos}={e.Template}")) + $"|v{s.VoiceSet}";
 			}
 		}
 

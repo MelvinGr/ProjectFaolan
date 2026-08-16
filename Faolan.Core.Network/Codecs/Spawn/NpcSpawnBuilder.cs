@@ -204,6 +204,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				msg.CanFall = core.CanFall.Value;
 			if (core.MovementMode.HasValue)
 				msg.MovementMode = core.MovementMode.Value;
+			// ...and this individual's VOICE with the outfit. Retail rolls VoiceSet per spawn, not per type: it scores
+			// 0% stable at BOTH type and placement scope over the corpus (`--report field-stability`), five enumerated
+			// values with 2 the modal one, and a Poacher Marksman alone was captured with four of them. A pool that
+			// speaks with one voice is as wrong as one that wears one outfit, and it costs nothing to carry it on the
+			// placement we are already drawing from.
+			if (wearing != null && msg.Stats != null)
+				msg.Stats.VoiceSet = wearing.VoiceSet;
+
 			// This individual's kit when one was handed in, the type's otherwise. Not merged: a kit is a whole outfit,
 			// and mixing one NPC's chest with another's would dress a creature retail never dressed.
 			if (wearing?.Equipment is { Count: > 0 } worn)
