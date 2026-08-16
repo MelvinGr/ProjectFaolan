@@ -1052,9 +1052,22 @@ namespace Faolan.GameServer.World
 				// Y=153 under a surface of Y=181 and his bag spawned 28m overhead, unreachable. Outdoors the delta is
 				// ~1m, which is why this only ever showed up on interior kills. Past the tolerance the death Y is the
 				// better answer: the creature was demonstrably standing there.
+				//
+				// ⚠️ The sample is GroundHeightNear, not GroundHeight, and that is the difference between a bag you can
+				// see and one you cannot. The heightmap holds one height per cell, so a rock/wall/trunk owns its
+				// footprint at its own height: Scavenger Tuut died on the edge of a sea stack's footprint, his nearest
+				// cell read 199.63 against a death Y of 145.19, the 54 m delta failed the tolerance below, and his bag
+				// kept the death Y - 0.6 m UNDER the sand, invisible and unclickable, which broke the quest that needed
+				// it looted. The beach cells a metre away read 146.1. See RdbHeightmap.HeightNear.
 				var dropPos = deadNpc.Position;
-				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY && MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
-					dropPos = deadNpc.Position with { Y = groundY };
+				var groundY = _sim.Terrain?.GroundHeightNear(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z, deadNpc.Position.Y, MaxLootGroundSnap);
+				if (groundY is { } ground && MathF.Abs(ground - deadNpc.Position.Y) <= MaxLootGroundSnap)
+					dropPos = deadNpc.Position with { Y = ground };
+				else if (groundY is { } refused)
+					// Not silent: past the tolerance the death Y is kept deliberately (an indoor/cave kill), but a bag
+					// that ends up out of reach looks identical to one that never dropped, so say which case this was.
+					_logger.LogInformation("Loot: no ground snap for {Name}'s bag - died at Y={DeathY:F2} with the terrain at Y={Ground:F2} ({Delta:F1} m apart, tolerance {Tolerance} m), so the bag keeps the death height.",
+						deadNpc.Name, deadNpc.Position.Y, refused, MathF.Abs(refused - deadNpc.Position.Y), MaxLootGroundSnap);
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer,
 					deadNpc.NpcTemplateId);

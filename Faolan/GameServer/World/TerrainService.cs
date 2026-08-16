@@ -27,6 +27,12 @@ namespace Faolan.GameServer.World
 	public sealed class TerrainService
 	{
 		private const float EyeHeight = 1.5f; // lift both endpoints off the ground so you can see over small bumps
+
+		// How far around a point GroundHeightNear may look for the surface the entity was standing on. 2 m is the width
+		// of the thing that steals the sample (a rock/wall/trunk footprint is a cell or two) and stays well inside the
+		// distance over which the beach itself moves - the Tortage sand runs ~0.1 m per metre, so a 2 m reach costs at
+		// most ~0.2 m of slope error, against the 50 m it recovers.
+		private const float GroundSampleRadius = 2f;
 		private const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
 
 		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
@@ -65,6 +71,17 @@ namespace Faolan.GameServer.World
 			EnsureLoaded(mapId);
 			return _heightmaps.TryGetValue(mapId, out var hm)
 				? hm.HeightAt(x, z)
+				: null;
+		}
+
+		// The ground height under something that was STANDING at `nearY` - the nearest cell unless a taller neighbour
+		// explains it better (RdbHeightmap.HeightNear). For a drop/placement beside a rock, a wall or a tree, whose
+		// footprint owns the nearest cell at its own height; see that method for the measured Tortage case.
+		public float? GroundHeightNear(uint mapId, float x, float z, float nearY, float tolerance, float radius = GroundSampleRadius)
+		{
+			EnsureLoaded(mapId);
+			return _heightmaps.TryGetValue(mapId, out var hm)
+				? hm.HeightNear(x, z, nearY, radius, tolerance)
 				: null;
 		}
 

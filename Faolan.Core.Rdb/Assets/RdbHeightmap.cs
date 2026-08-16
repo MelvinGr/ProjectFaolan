@@ -50,6 +50,65 @@ namespace Faolan.Core.Rdb.Assets
 			return _heights[gz * Width + gx];
 		}
 
+		/// <summary>
+		///     The ground height at (x, z) for something KNOWN to be standing on the ground at <paramref name="nearY" />.
+		///     The nearest cell, unless it is further than <paramref name="tolerance" /> from that Y - in which case the
+		///     cells within <paramref name="radius" /> are searched and the one closest to it wins. Null off the grid.
+		/// </summary>
+		/// <remarks>
+		///     <para>
+		///         <see cref="HeightAt" /> takes the single NEAREST cell, and that is the wrong sample next to anything
+		///         tall. The heightmap is one height per cell, so a rock formation, a wall or a tree trunk occupies its
+		///         footprint at its OWN height: a creature standing at the foot of it can round to a cell that is the
+		///         rock's top, 50 m up, while the ground it is actually on sits in the cell one metre away.
+		///     </para>
+		///     <para>
+		///         Measured on Tortage beach (4010): Scavenger Tuut died at Y=145.19 against a nearest cell of
+		///         <b>199.63</b> - the sea stack he was standing beside - while the beach cells 1-3 m away read
+		///         145.6-146.3. The 54 m delta put the sample past the caller's snap tolerance, so his loot bag kept the
+		///         death Y and spawned ~0.6 m UNDER the sand, where it cannot be seen or clicked.
+		///     </para>
+		///     <para>
+		///         The neighbourhood search is a FALLBACK, not the normal path: a nearest cell that is already within
+		///         <paramref name="tolerance" /> of the entity is returned untouched, so ordinary ground - flat or
+		///         sloped - samples exactly as it always did. Searching unconditionally would be worse than the bug: on
+		///         a slope the closest-to-Y candidate is simply whichever cell matches the entity's own height, so the
+		///         snap would stop correcting anything.
+		///     </para>
+		///     <para>
+		///         It also does NOT defeat the caller's own tolerance check - a creature genuinely below the surface
+		///         (indoors, in a cave, under a bridge) has no nearby cell at its height either, so the best candidate
+		///         is still far away and the caller still declines.
+		///     </para>
+		/// </remarks>
+		public float? HeightNear(float worldX, float worldZ, float nearY, float radius, float tolerance)
+		{
+			if (HeightAt(worldX, worldZ) is not { } nearest)
+				return null;
+
+			var cells = (int)MathF.Ceiling(radius / CellSize);
+			if (cells <= 0 || MathF.Abs(nearest - nearY) <= tolerance)
+				return nearest;
+
+			var gx = (int)MathF.Round((worldX - OriginX) / CellSize);
+			var gz = (int)MathF.Round((worldZ - OriginZ) / CellSize);
+			var best = nearest;
+			for (var dz = -cells; dz <= cells; dz++)
+			for (var dx = -cells; dx <= cells; dx++)
+			{
+				var x = gx + dx;
+				var z = gz + dz;
+				if (x < 0 || x >= Width || z < 0 || z >= Height)
+					continue;
+
+				var candidate = _heights[z * Width + x];
+				if (MathF.Abs(candidate - nearY) < MathF.Abs(best - nearY))
+					best = candidate;
+			}
+
+			return best;
+		}
+
 		// Parse a decompressed 1066611 resource. `tilemapExtent` is the playfield's world-unit width (from the 1070003
 		// <tilemap Width>) used only to derive the cell size; pass 0 (or == W) to assume 1 unit/cell.
 		public static bool TryParse(ReadOnlySpan<byte> body, [NotNullWhen(true)] out RdbHeightmap? heightmap, float tilemapExtent = 0f, float originX = 0f, float originZ = 0f)

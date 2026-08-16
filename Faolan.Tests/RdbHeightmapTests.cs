@@ -61,6 +61,56 @@ namespace Faolan.Tests
 			Assert.False(RdbHeightmap.TryParse(bogus.ToArray(), out _));
 		}
 
+		// The measured Tortage-beach case (#830-adjacent, the invisible loot bag). Scavenger Tuut died at Y=145.19 on
+		// the edge of a sea stack's footprint: his NEAREST heightmap cell is the rock's top at 199.63, while the beach
+		// cells a metre away read 146.1. The nearest-cell sample therefore put the ground 54 m away, the loot drop's 5 m
+		// snap tolerance refused it, and the bag kept the death Y - 0.6 m under the sand, where it can be neither seen
+		// nor clicked.
+		[Fact]
+		public void HeightNear_TakesTheSurfaceTheEntityStoodOn_NotTheRockItStoodBeside()
+		{
+			// A 5x5 beach at 146.1 with a rock occupying the centre cell.
+			var body = Build(5, 5, (gx, gz) => gx == 2 && gz == 2
+				? 199.63f
+				: 146.1f);
+			Assert.True(RdbHeightmap.TryParse(body, out var hm));
+
+			Assert.Equal(199.63f, hm.HeightAt(2, 2)); // what the drop used to sample
+			Assert.Equal(146.1f, hm.HeightNear(2, 2, 145.19f, 2f, 5f)); // ...and the sand it was standing on
+		}
+
+		[Fact]
+		public void HeightNear_OnOpenGround_IsTheNearestCell()
+		{
+			// No competing surface: every candidate is the same, so this must not move a normal drop at all.
+			var body = Build(5, 5, (gx, gz) => 145f + gx * 0.1f + gz * 0.1f);
+			Assert.True(RdbHeightmap.TryParse(body, out var hm));
+
+			Assert.Equal(hm.HeightAt(2, 2), hm.HeightNear(2, 2, 145.2f, 2f, 5f));
+		}
+
+		[Fact]
+		public void HeightNear_KeepsAnIndoorKillOutOfReachOfTheSurface()
+		{
+			// Kier-Dheed's case: killed at Y=153 in a cave under a surface of ~181. NOTHING nearby is at his height, so
+			// the closest candidate is still ~28 m away and the caller's tolerance still refuses to snap - which is what
+			// stops a bag being flung into the open air above the cave.
+			var body = Build(5, 5, (gx, gz) => 181f + gx * 0.2f + gz * 0.2f);
+			Assert.True(RdbHeightmap.TryParse(body, out var hm));
+
+			var ground = hm.HeightNear(2, 2, 153f, 2f, 5f);
+			Assert.NotNull(ground);
+			Assert.True(MathF.Abs(ground!.Value - 153f) > 5f, "an indoor kill must stay past the snap tolerance");
+		}
+
+		[Fact]
+		public void HeightNear_OffGrid_IsStillNull()
+		{
+			var body = Build(4, 3, (_, _) => 5f);
+			Assert.True(RdbHeightmap.TryParse(body, out var hm));
+			Assert.Null(hm.HeightNear(-1, 0, 5f, 2f, 5f));
+		}
+
 		private static byte[] Build(int w, int h, Func<int, int, float> height, uint levels = 1)
 		{
 			var bytes = new List<byte>();
