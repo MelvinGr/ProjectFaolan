@@ -78,6 +78,29 @@ that line's spells (per line, not per spell: a line's spells are one combo famil
 have a catalogued combo). Lines 20000 and 20001 carry no combo at all, so they are left **unattributed** rather
 than handed to Guardian.
 
+⚠️ **`ClassSpells` membership is a DISPLAY grouping, not a spellbook** — the stacking line is what the client
+groups icons by, so anything carrying a class's line is attributed to that class whether or not a player can ever
+cast it. Two kinds of non-castable record do:
+
+| band | how it gets in | proof it is not learned |
+|---|---|---|
+| **combos** (#298) | `Combos.GameActionId` IS a `Spells.Id`, and a combo's GameAction carries a stacking line | across the four captured characters' known-spell lists (246 entries) not one is a combo GameAction |
+| **effects** (#847) | the DoT a spell APPLIES carries its **caster's** line | the captured L80 Necromancer knows all five ranks of `Flesh to Worms` (2/25/40/55/70) and **zero** ranks of the `Infestation` it inflicts |
+
+An effect's ranks pair with the **caster's** ranks rather than with a level ladder of their own, so all five
+`Infestation` ranks sit at `Level 2` and a single 1 → 2 ding taught the whole ladder. A flat rank ladder is the
+tell: only 7 of 172 ranked lines have every rank at one level.
+
+⛔ **"Exclude anything named as some spell's `EffectSpell`" is the wrong rule.** `Flesh to Worms (Rank 1)` is
+itself named as the effect of `Plague Swarm`, so the naive predicate deletes the very spell the level-2 ding
+exists to teach. The referrer must itself be a real **book** spell — `Plague Swarm` is `Level 0` and grants
+nothing. Both exclusions apply to all three grant paths (the ding, the relog re-grant, the default bar seed),
+never to the captured `IsStarter` kit, which is retail's own list.
+
+⚠️ Neither exclusion closes the over-grant, and a passing spellbook should not be read as a solved one: the same
+four characters show the level path offering **268 / 220 / 43 / 1** spells where retail gave them
+**91 / 100 / 4 / 0**. Open work tracked in Gitea #847.
+
 ### 4. The GATING FEAT (#581) — the source that LEADS
 
 `Combos.FeatId` is not a `Feats.Id`; it is the **wire** feat id, so it resolves through
