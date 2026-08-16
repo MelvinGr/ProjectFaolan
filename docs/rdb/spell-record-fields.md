@@ -617,6 +617,30 @@ over the whole catalog, `Chill`, `Infestation` and `Lifestrike` and nothing else
 collapsing have no second source and keep 125's answer; `--report spell-level-ladder` lists them and returns
 non-zero only if a family the rule *would* separate is still shipped collapsed.
 
+### The TEACHING FEAT is a third statement, and it splits the residue in two
+
+Every rank of a normal family is granted by a feat (`FeatSpellGrants`): a `<Class> Class Feat NNN` for rank 1 and
+a **`Spell Unlocking <lo>-<hi>`** for ranks 2 and up — whose *name* carries the level band it covers. That band
+independently confirms the effect-band repair: `Lifestrike` ranks 2/3/4/5 are granted by the 20-40, 40-60, 60-80
+and 60-80 feats, which fits the repaired 30/45/60/75 exactly and the old 3/4/4/4 not at all. And
+`Necromancer Class Feat 011` grants rank 1 of **both** `Chill` and `Lifestrike`, so those two cannot unlock at
+different levels — after the repair they do not (15 and 15, against 7 and 2 before).
+
+Read against the feats, the 19 residual collapses are two shapes, not one:
+
+| shape | evidence | count |
+|---|---|---:|
+| **untaught top rank** — not level-granted at all | no feat grants it while every rank below has one; it repeats the level below; all nine sit in one late id block (`>= 4487431`) nothing else occupies; the captured level-80s know the rank below and never it (`Chill` 1-5 not 6, `Pestilential Blast` 1-6 not 7, `Hellfire Stream` 1-5 not 6, `Shock` 1-4 not 5) | 8 |
+| **rank 1 from a class feat** — level copied from rank 2 | rank 1's only grant is a `<Class> Class Feat`, which states no band, so field 125 had nothing of rank 1's own | 9 |
+
+⚠️ The second shape is **not** recoverable from the client: the feat record carries no level field (five teaching
+feats diffed — the fixed header is byte-identical up to the name), and a class feat is not a single-level unlock
+(`Necromancer Class Feat 001` grants spells rated 1, 5, 7, 10 and 25). Open under Gitea #847.
+
+Two families are worse than a copy. `Radiance`'s effect bands are shifted one rank — band(*n*) equals level(*n+1*),
+ending at 91, past the level cap — and its `Spell Unlocking` feats are scrambled (ranks 2-4 all under 60-80, rank 5
+under 20-40). `Quell the Ether` rank 1 is rated **45** while rank 2 is rated 30, which no ladder allows.
+
 ## Field 132 `ManaCost` is usually a PERCENTAGE of the caster's mana pool
 
 Read straight, 132's values look too small to be a cost: `Ice Strike (Rank 6)` carries **9**. They are

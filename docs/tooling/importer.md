@@ -295,7 +295,7 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
-`spell-level-ladder` (which spell FAMILIES ship a per-rank level ladder and which ship one level for several ranks,
+`spell-level-ladder` (`--report-arg <family substring>` for the per-rank detail: which spell FAMILIES ship a per-rank level ladder and which ship one level for several ranks,
 so that a single ding teaches two, three or six ranks of the same spell at once. `Spells.Level` comes from RDB field
 125, which states the ladder for 103 of the 122 learnable rank families and states none at all for a few — every
 rank of `Chill` read 7, `Lifestrike`'s five read 2/3/4/4/4, and a level-4 Necromancer was handed Lifestrike ranks 3,
@@ -303,8 +303,12 @@ rank of `Chill` read 7, `Lifestrike`'s five read 2/3/4/4/4, and a level-4 Necrom
 second time (the `InterpolatedHit` ramp's level band) completely and monotonically; this counts the residue it
 cannot, rather than leaving it invisible. ⭐ A report and not a test for the #729 reason — both sides are shipped
 DATA — so the populations PRINT and the one assertion is the direction that can only be a defect: a family the rule
-WOULD separate whose shipped rows are still collapsed, i.e. `faolan.db` predates the rule. See the field-125 section
-of [spell-record-fields.md](../rdb/spell-record-fields.md)) ·
+WOULD separate whose shipped rows are still collapsed, i.e. `faolan.db` predates the rule. ⭐ It also DIAGNOSES each
+residual collapse against the TEACHING FEATS, which split the 19 into two structural shapes — an *untaught top rank*
+(no feat grants it while every rank below has one, and it repeats the level below; all nine sit in one late id block
+≥ 4487431, and the captured level-80s know the rank below but never it) and a *rank 1 from a class feat* (rank 1's
+only grant is a `<Class> Class Feat`, which states no band, so field 125 copied band-granted rank 2's level onto it).
+See the field-125 section of [spell-record-fields.md](../rdb/spell-record-fields.md)) ·
 `broadcast-check` (#272: which server records does retail send to EVERY player who can see the subject, and which
 only to the one client concerned? The oracle is `login_2-clients_group-trade-friend`, the ONLY capture with two game
 connections — with one client a broadcast and a private reply look identical, with two a record reaching both streams

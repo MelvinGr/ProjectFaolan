@@ -417,7 +417,7 @@ namespace Faolan.Importer.Cli
 
 				case "spell-level-ladder":
 				{
-					return await SpellLevelLadder();
+					return await SpellLevelLadder(arg);
 				}
 
 				case "broadcast-check":
