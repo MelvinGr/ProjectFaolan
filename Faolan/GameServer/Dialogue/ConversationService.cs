@@ -512,6 +512,7 @@ namespace Faolan.GameServer.Dialogue
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
 				EndConversation(client);
 				_logger.LogInformation("Conversation ended (npc={Name}, screen 0x{Node:X8}) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.Id, clickedNpcHandle);
+				await FireScriptEvents(client, node, clickedNpcHandle);
 				return;
 			}
 
@@ -529,6 +530,49 @@ namespace Faolan.GameServer.Dialogue
 			_logger.LogInformation("Conversation screen (npc={Name}, screen 0x{Node:X8}) -> {Packets} packet(s), {Options} option(s) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.Id,
 				node.Packets.Count, client.Session.ConversationOptions.Count, clickedNpcHandle);
 		}
+
+		// #839: the SCRIPTED EVENTS this creature's dialogue fires, run once the window has CLOSED - which is where
+		// retail runs them. In the capture Saddur's `Fight` action rides the second-to-last screen, and the fight
+		// itself starts ~3s after `KnubotCloseChatWindow`: hate list, threat, CombatMode 4, then the first swing.
+		//
+		// Only turning hostile is acted on. Everything else in the harvested alphabet is a world script we do not run
+		// (Casilda's `SpawnScavenger` puts Scavenger Tuut in the world, `RunToTortage` sends her to the city), and each
+		// one LOGS rather than passing silently - an unimplemented script that says nothing is indistinguishable from
+		// one that does not exist.
+		private async Task FireScriptEvents(INetworkClient client, ConversationNode node, uint npcHandle)
+		{
+			var events = await _database.GetNpcScriptEvents(node.NpcTemplateId);
+			if (events.Length == 0)
+				return;
+
+			foreach (var name in events)
+			{
+				if (string.Equals(name, HostileScriptEvent, StringComparison.OrdinalIgnoreCase))
+				{
+					// The flags only: the simulation's own aggro pass then hate-lists the player, draws combat mode and
+					// swings - the same burst it produces for any other aggro, and the one retail sends here. Authoring
+					// it a second time from this path would be a second copy of the combat opening.
+					if (_sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var npc) == true && npc != null)
+					{
+						npc.Disposition = WorldEntity.DispositionHostile;
+						npc.Hostile = true;
+						_logger.LogInformation("Script: {Name} fired \"{Event}\" - it turns on {Player}.", node.NpcName, name, client.Session.Character?.Name);
+					}
+					else
+					{
+						_logger.LogWarning("Script: {Name} fired \"{Event}\" but handle 0x{Handle:X8} is not a live entity in the player's zone - it stays friendly.", node.NpcName, name,
+							npcHandle);
+					}
+
+					continue;
+				}
+
+				_logger.LogInformation("Script: {Name} fired \"{Event}\", which the server does not act on yet (#839).", node.NpcName, name);
+			}
+		}
+
+		// The one harvested script event the server acts on: retail's string for "this NPC now fights you".
+		private const string HostileScriptEvent = "Fight";
 
 		// Completes any quest GIVEN by the NPC TEMPLATE whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The

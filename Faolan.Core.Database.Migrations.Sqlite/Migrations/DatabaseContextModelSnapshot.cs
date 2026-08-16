@@ -2314,6 +2314,20 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("NpcMorphs");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcScriptEvent", b =>
+                {
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Event")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NpcTemplateId", "Event");
+
+                    b.ToTable("NpcScriptEvents");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawn", b =>
                 {
                     b.Property<uint>("Id")
@@ -5226,6 +5240,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
                         .WithMany("Morphs")
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NpcTemplate");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcScriptEvent", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany()
                         .HasForeignKey("NpcTemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

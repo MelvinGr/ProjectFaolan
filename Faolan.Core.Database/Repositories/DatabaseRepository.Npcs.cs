@@ -49,6 +49,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 
 		Task<Dictionary<uint, NpcSpawn[]>> GetAppearanceVariants(IReadOnlyCollection<uint> templateIds);
+
+		Task<string[]> GetNpcScriptEvents(uint npcTemplateId);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<int> GraduateSpawnArea(uint areaId);
 		Task<int> LinkNpcSpawnsToArea(uint areaId, uint templateId, float selectedX, float selectedZ);
@@ -444,6 +446,14 @@ namespace Faolan.Core.Database.Repositories
 			{
 				return string.Join(",", s.Equipment.OrderBy(e => e.Pos).Select(e => $"{e.Pos}={e.Template}")) + $"|v{s.VoiceSet}";
 			}
+		}
+
+		// The scripted events this creature's dialogue fires (#839) - retail's `SendScryEvent` strings, e.g. Saddur's
+		// `Fight`. Empty for the overwhelming majority of NPCs, which script nothing.
+		public async Task<string[]> GetNpcScriptEvents(uint npcTemplateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcScriptEvents.Where(e => e.NpcTemplateId == npcTemplateId).Select(e => e.Event).ToArrayAsync();
 		}
 
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
