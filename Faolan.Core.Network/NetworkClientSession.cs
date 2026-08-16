@@ -235,6 +235,12 @@ namespace Faolan.Core.Network
 		// The NPC of the ACTIVE dialogue, or null when no conversation is open.
 		uint? ConversationNpcHandle { get; set; }
 
+		// The world OBJECT that opened the active dialogue - a door or gate whose use triggered it - or null when the
+		// player opened it themselves. Kept because a script event fired at the END of the conversation may need the
+		// place it was opened at: Casilda's `RunToTortage` sends her to the city gate the player just used, and by
+		// then the door handler that knew which one is long gone (#839).
+		uint? ConversationTriggerObjectId { get; set; }
+
 		// Handles whose APPROACH-triggered conversation has already opened this session (#523) - the latch that stops
 		// it re-firing on every step taken near the NPC. Per session, like the rest of the conversation state.
 		HashSet<uint> ApproachedConversationNpcs { get; }
@@ -378,6 +384,7 @@ namespace Faolan.Core.Network
 		public uint? ConversationAgentInstance { get; set; }
 		public uint? ConversationEndedNpcHandle { get; set; }
 		public uint? ConversationNpcHandle { get; set; }
+		public uint? ConversationTriggerObjectId { get; set; }
 		public HashSet<uint> ApproachedConversationNpcs { get; } = [];
 		public HashSet<uint> GreetedConversationNpcs { get; } = [];
 		public uint Energy { get; set; }

@@ -129,9 +129,39 @@ namespace Faolan.Importer.Modules
 				updated++;
 			}
 
+			// ⚠️ CORRECTIVE (#839): an ESCORTEE never sells rides, so a captured travel row pointing at one is a
+			// misattribution an earlier harvest wrote - and upsert never deletes, so it would outlive the fix.
+			//
+			// Casilda is the case. Her farewell is opened BY the city gate, and retail's order is: the escort completes,
+			// she runs off and DESPAWNS, and the gate's own zone-line then carries the player in. So a teleport followed
+			// her conversation, and the extractor's changemap branch wrote it up as "travel with Casilda to Tortage" -
+			// shipping the gate's exact arrival (754/176/673), because it WAS the gate's. In play that teleported the
+			// player the instant the farewell closed, with a trip announcement and a Racer buff retail never sends here.
+			//
+			// The extractor now stops at the NPC's despawn so she is no longer harvested; this clears what she left.
+			// STRUCTURAL, not a name match: the row's NPC is the target of an `Escort` goal. An escort ends AT a door,
+			// which is exactly the shape that gets mistaken for a ride, and it selects one row in the shipped data.
+			// Directive rows are exempt - those are authored from the client's own dialogue text, not from a correlation.
+			var escortees = await ctx.Db.QuestGoalDefinitions
+				.Where(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId != 0)
+				.Select(g => g.TrailingRefId)
+				.ToListAsync();
+			var escorteeNames = await ctx.Db.NpcTemplates
+				.Where(t => escortees.Contains(t.TemplateId))
+				.Select(t => t.Name)
+				.ToListAsync();
+
+			var stale = await ctx.Db.TravelDestinations
+				.Where(d => !d.FromDialogueDirective && escorteeNames.Contains(d.NpcName))
+				.ToListAsync();
+			foreach (var row in stale)
+				Console.WriteLine($"  travel-wiring: dropping \"{row.NpcName}\" -> map {row.DestinationMapId} - an escortee does not sell rides; that teleport is the door's (#839).");
+
+			ctx.Db.TravelDestinations.RemoveRange(stale);
+
 			await ctx.Db.SaveChangesAsync();
 
-			return new ImportResult($"{trips.Count} trip(s) harvested: {added} added, {updated} refreshed" +
+			return new ImportResult($"{trips.Count} trip(s) harvested: {added} added, {updated} refreshed, {stale.Count} stale dropped" +
 			                        (cleared > 0 ? $", {cleared} cleared" : "") + (skipped > 0 ? $", {skipped} skipped (map or screen not imported)" : "") + ".");
 		}
 	}

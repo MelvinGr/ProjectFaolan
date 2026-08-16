@@ -71,6 +71,10 @@ namespace Faolan.GameServer.World
 		// value every actual melee swinger sends.)
 		private const uint NpcCombatModeValue = 4;
 
+		// A scripted exit's two beats, from the farewell window closing - see ScheduleScriptedExit for the frames.
+		private const int ScriptedExitMoveDelayMs = 4000;
+		private const int ScriptedExitDespawnDelayMs = 1200;
+
 		// Dev visualization (#363): when true, an NPC that resolves to an RDB spawn AREA has that area's label pushed as
 		// its overhead nameplate (via SetNameIIR after spawn) so a manual creature-labeling pass sees which area it's in.
 		// Off by default; toggled live by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
@@ -515,6 +519,48 @@ namespace Faolan.GameServer.World
 					await WorldIir.Send(viewer.Client, lockedTo);
 				}
 			}
+		}
+
+		// A scripted EXIT: the NPC walks to a point and then leaves the world (#839). Casilda's `RunToTortage` is the
+		// case it exists for - her escort is over, so she heads for the city gate and is gone.
+		//
+		// The shape is retail's, measured over BOTH beach-to-city captures, and they agree to within 0.3 s. Timed from
+		// the farewell window closing (`KnubotCloseChatWindow`):
+		//
+		//   +4.0 s   a MoveTask carries her the last few units to the gate
+		//   +5.2 s   n3ToClientQuit - she is gone
+		//
+		// (`xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` fr11419 close, fr11438 move, fr11446 quit;
+		// `xxx_mage-demo_login_play_beach-to-enter-tortage_city` fr10239, fr10254, fr10264.)
+		//
+		// ⚠️ Scheduled rather than awaited: the caller is finishing a conversation, and holding its reply chain for
+		// five seconds would stall the window's own close.
+		public void ScheduleScriptedExit(WorldEntity npc, Vector3 exit)
+		{
+			ArgumentNullException.ThrowIfNull(npc);
+			var zone = _sim.World.ZoneForEntity(npc);
+
+			Task.RunAfter(ScriptedExitMoveDelayMs, async () =>
+			{
+				// She may already be gone - the player zoned, the zone reloaded, or a second trigger fired. An exit
+				// for an entity that has left is dropped rather than broadcast against a stale handle.
+				if (!zone.TryGet(npc.Handle, out _))
+					return;
+
+				npc.MoveFrom = npc.Position;
+				npc.Position = exit;
+				await BroadcastNpcMove(npc);
+
+				Task.RunAfter(ScriptedExitDespawnDelayMs, async () =>
+				{
+					if (!zone.TryGet(npc.Handle, out _))
+						return;
+
+					await BroadcastEntityDespawn(npc);
+					zone.Remove(npc.Handle);
+					_logger.LogInformation("Script: {Npc} reached its exit and left the world.", npc.Name);
+				}, _logger);
+			}, _logger);
 		}
 
 		// An NPC that was standing in the world PEACEFUL has just turned on the player: restate its collision group to

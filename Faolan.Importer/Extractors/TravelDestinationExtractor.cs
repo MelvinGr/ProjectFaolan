@@ -73,6 +73,24 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
+				// ⚠️ The conversation NPC LEFT THE WORLD. An NPC that despawns is not giving anybody a ride, so the
+				// walk stops treating anything after it as this dialogue's trip (#839).
+				//
+				// This is what told Casilda's farewell apart from a wagoneer's. Her window is opened by the city gate,
+				// the escort ends, she runs off and despawns, and the DOOR's own zone-line then carries the player in -
+				// so a teleport followed her conversation and the changemap branch below wrote it up as "travel with
+				// Casilda to Tortage". It even shipped the gate's exact arrival (754/176/673), because it WAS the
+				// gate's. The #821 guard assumed a zone-line door has "no conversation anywhere near it"; a door that
+				// opens one is precisely the case it did not cover. Both beach-to-city captures show her
+				// n3ToClientQuit landing BEFORE the teleport, which is what makes this checkable rather than a
+				// special case.
+				if (p is { IsDownload: true, SubOpcode: N3ToClientQuitCodec.Opcode } && active && npc != 0
+				    && p.TryParse(N3ToClientQuitCodec.Parse, out var quit) && quit.Handle == npc)
+				{
+					active = false;
+					continue;
+				}
+
 				// A greeting (server opens the window) restarts the walk; the player's picks deepen it. Same two
 				// signals ConversationExtractor keys its own tree on, so the paths agree by construction.
 				if (p.IsDownload && p.TryParse(KnubotCodec.Parse, out var opened) && opened is KnubotOpenChatWindowIIR open)

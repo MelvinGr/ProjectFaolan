@@ -221,6 +221,11 @@ namespace Faolan.GameServer.Dialogue
 			if (roots.Length == 0)
 				return null;
 
+			// Remember the door/gate that opened this window, for a script event fired when it CLOSES: Casilda's
+			// `RunToTortage` sends her to the object the player just used, and the handler that knew which one has
+			// already returned by then (#839).
+			client.Session.ConversationTriggerObjectId = worldObjectId;
+
 			var character = client.Session.Character;
 			var quests = character == null
 				? []
@@ -575,12 +580,56 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 				}
 
+				if (string.Equals(name, LeaveScriptEvent, StringComparison.OrdinalIgnoreCase))
+				{
+					// The escort is over, so the escortee heads for the gate the player opened her window with and is
+					// gone. Retail plays it out - MoveTask then n3ToClientQuit - rather than blinking her away, which
+					// is why the exit point is the TRIGGER OBJECT and not a hard-coded pair of coordinates: the object
+					// that opened this conversation IS the place the escort was leading to (the same reasoning
+					// `TryOpenTriggeredConversation` already uses to find the escortee at all).
+					if (ExitPointFor(client, npcHandle) is { } exit && _sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var leaving) == true && leaving != null)
+					{
+						_broadcaster.ScheduleScriptedExit(leaving, exit);
+						_logger.LogInformation("Script: {Name} fired \"{Event}\" - she heads for the gate and leaves.", node.NpcName, name);
+					}
+					else
+					{
+						_logger.LogWarning("Script: {Name} fired \"{Event}\" but there is no trigger object to walk to - she stays put.", node.NpcName, name);
+					}
+
+					continue;
+				}
+
 				_logger.LogInformation("Script: {Name} fired \"{Event}\", which the server does not act on yet (#839).", node.NpcName, name);
 			}
 		}
 
 		// The one harvested script event the server acts on: retail's string for "this NPC now fights you".
 		private const string HostileScriptEvent = "Fight";
+
+		// ...and retail's string for "this NPC's business with you is done - it leaves". Casilda's, once the escort has
+		// delivered her to the city gate.
+		private const string LeaveScriptEvent = "RunToTortage";
+
+		// Where a leaving NPC walks to: the world object that opened this conversation. Null when the player opened it
+		// themselves, which is the honest answer - a farewell with no door behind it has no gate to head for.
+		private Vector3? ExitPointFor(INetworkClient client, uint npcHandle)
+		{
+			if (client.Session.ConversationTriggerObjectId is not { } objectId)
+				return null;
+
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return null;
+
+			foreach (var candidate in _sim.World.ZoneForEntity(player).WorldObjects)
+			{
+				if (candidate.Row.Id == objectId)
+					return candidate.Position;
+			}
+
+			return null;
+		}
 
 		// Completes any quest GIVEN by the NPC TEMPLATE whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
