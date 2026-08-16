@@ -6,8 +6,12 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Combat
 {
 	// HateListUpdateIIR (0x8A01E5A1) - a hate/aggro entry: a flag byte then three u32s (FUN_007a93a0); in the capture
-	// the trio is [0xC350 marker][target handle][count]. The carrier handle is the hater (the NPC); `Target` is who it
-	// hates.
+	// the trio is [0xC350 marker][target handle][count].
+	//
+	// ⚠️ The carrier handle is the entity whose THREAT LIST this updates - the PLAYER - and `Target` is the creature
+	// that now threatens them. Not the other way round: this comment used to say the carrier was "the hater (the NPC)"
+	// and the aggro broadcast followed it, which addressed every record to a handle the client keeps no threat list
+	// for. Measured over the corpus, 270 of 270 captured records carry the session player as the carrier.
 	//
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class HateListUpdateCodec

@@ -489,8 +489,20 @@ namespace Faolan.GameServer.World
 			if (target == null)
 				return;
 
-			var hate = HateListUpdateCodec.Build(npc.Handle, target.Handle);
-			var threat = ThreatLevelCodec.Build(npc.Handle, 1, 1);
+			// ⚠️ The hate/threat records are addressed to the TARGET, not to the NPC - it is the PLAYER's threat list
+			// that gains an entry, not the creature's. Measured over the whole corpus: 270 of 270 HateListUpdates carry
+			// the session player as the subject and name the other party as the target, and ThreatLevel is the player's
+			// on 681 of 712. Built the other way round they are addressed to a handle the client has no threat list
+			// for, so it drops them - and with them the re-poll that follows: retail's client answers this pair by
+			// asking RequestAggroStatus for the NPC again (frame 8482 in the Saddur fight) and only then learns the
+			// creature turned hostile. That is why a mob could attack a player while still drawing GREEN and refusing
+			// to be attacked back (#839): the flip reached the server model and nothing told the client.
+			var hate = HateListUpdateCodec.Build(target.Handle, npc.Handle);
+			// Retail opens with threat 0 and then 1 - an initialise followed by the first real level, both on the
+			// player - and climbs from there as damage accrues (3 by the second swing in that fight).
+			var threatOpen = ThreatLevelCodec.Build(target.Handle, 0, 1);
+			var threat = ThreatLevelCodec.Build(target.Handle, 1, 1);
+			// LockedToChanged is the one that IS the NPC's: [npc] -> [target], exactly as captured (#405).
 			var lockedTo = LockedToChangedCodec.Build(npc.Handle, target.Handle);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
@@ -498,6 +510,7 @@ namespace Faolan.GameServer.World
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 				{
 					await WorldIir.Send(viewer.Client, hate);
+					await WorldIir.Send(viewer.Client, threatOpen);
 					await WorldIir.Send(viewer.Client, threat);
 					await WorldIir.Send(viewer.Client, lockedTo);
 				}
