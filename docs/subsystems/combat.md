@@ -531,7 +531,7 @@ Decode: `CombatDamageCodecTests` (98/98 frames of the strickenbla capture). Buil
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
 semantically decoded - capture-typical defaults for the live send.
 
-## Where an NPC's hostility comes from (#256/#715/#731)
+## Where an NPC's hostility comes from (#256/#715/#731/#840/#841)
 
 `NpcStatCore.Disposition` is retail's own `cCategory` — the third word of the `DispatchUpdateAggroStatus` reply,
 `0` friendly (green) / `1` hostile (red) / `2` neutral (yellow). It drives both the overhead name colour and, in
@@ -544,15 +544,58 @@ see [factions.md](factions.md); and retail's own spawns omit
 `NpcStats.faction_id` entirely.) So the only way to learn a template's disposition is to capture retail
 answering for it, and **targeting the NPC is enough** — no combat, no kill, no quest state.
 
-The importer harvests it in `NpcDispositionModule`, and how it aggregates matters:
+The importer harvests it in `NpcDispositionModule`, and how it aggregates matters. `NpcDispositionTiers` owns the
+order — **three observations and one inference**, strongest evidence first:
 
 1. **A template that was polled gets its own answer.** 406 of the 414 polled templates vote **unanimously**, and
    the answers line up with the client's colour table exactly — traders/villagers/citizens green, mobs red,
    **guards yellow**.
-2. **A template never polled falls back to its FACTION's majority** (`NpcStats.community`), which is what gives
-   the harvest reach beyond the NPCs actually targeted.
-3. **Neither polled → NULL**, which the sim treats as friendly, the client's own default for an NPC it was never
-   told about.
+2. **A template caught SWINGING at something is hostile** (#840). Same corpus, a different record — an
+   observation, not an inference — and it is ranked above the faction roll-up for the same reason its own poll is:
+   its own behaviour beats an average over its faction-mates.
+3. **A template still unanswered falls back to its FACTION's majority** (`NpcStats.community`), which is what
+   gives the harvest reach beyond the NPCs actually targeted.
+4. **The mob rule** (#841): `CarsGroup == 3` **and** a real, non-civilian community → hostile. The only inference
+   in the chain, and it fires only when the corpus has said nothing about the creature *or* its whole faction.
+5. **Nothing → NULL**, which the sim treats as friendly, the client's own default for an NPC it was never told
+   about.
+
+### Why tier 4 exists, and why it is scoped the way it is
+
+The captured tiers reach as far as the corpus does and no further: 154 types over **645 placements** came out of
+them with no answer, and a NULL is served friendly — so the Tortage beach crocodiles stood in the world green and
+passive (#840). Both new captures and a hand-maintained override were ruled out, so what was left had to be a
+rule. ⚠️ And a rule here is exactly what went wrong before: `Hostile = Community > 0` was replaced on 2026-07-11
+*because* it aggroed every Citizen, vendor and Gate Guard — community 1 is the CIVILIAN/default faction.
+
+So it was measured rather than argued. `--report disposition-rule` scores every candidate against the 430
+templates retail was captured answering for directly — ground truth no tier of the chain contributed to:
+
+| rule | hostile found | NEUTRAL→hostile | FRIENDLY→hostile | accuracy |
+|---|---:|---:|---:|---:|
+| always friendly (the default it replaces) | 0 / 102 | 0 | 0 | 76.3% |
+| `Community > 0` (the pre-2026-07-11 rule) | 86 / 102 | 84 | **159** | 39.8% |
+| `Community` not in {null, 1} | 84 / 102 | 58 | 91 | 61.2% |
+| `CarsGroup == 3` alone | 96 / 102 | 5 | 0 | 97.4% |
+| **shipped:** both | 84 / 102 | 2 | **0** | 95.3% |
+
+The old rule lands **below the friendly default** it was traded for, and its 159 friendly-side errors are the
+2026-07-11 regression quantified. ⭐ The collision group alone scores a point higher than what ships and is
+deliberately not what ships: on the population that actually reaches the tier the two answer the **same 118
+templates**, so the community half costs nothing today while halving the neutral-side error. The slice they
+disagree on — the mob collision group in the civilian faction or in none — is where the passive wildlife sits, the
+rabbits, hens, deer and badgers retail answers NEUTRAL for. A rule that makes a rabbit bite is a visible defect;
+leaving a creature friendly is the status quo the tier improves on, so the tie breaks conservative.
+
+`CarsGroup` (spawn proto field 5) is **not** decoded as an aggression field — it is the collision/response group —
+and it is used as a CORRELATE, consulted only where there is no observation. It separates the two populations
+cleanly all the same: groups 0/1 hold the named townsfolk (Villager, Serving Wench, Armorsmith, Tanner Chael),
+group 3 the mobs (Wolf, Bear, Warg, Vanir Berserker, Mercenary Archer, Pict Ripper Jaw).
+
+Result: **645 placements over 154 types down to 102 over 61**, and the residue is Refugees, Commoners, a Target
+Dummy and named story NPCs — the population the friendly default is actually right for. `ZonePopulationLoader`
+warns per zone with the count and the names, because a world quietly missing its monsters looks exactly like a
+world that has none.
 
 ⚠️ It was faction-first for everything until #715, on the reasoning that per-NPC `cCategory` is "noisy". It is
 not — the noise was the name collision of #731 (38 templates share `Halen van Dummy`, spanning four factions, and

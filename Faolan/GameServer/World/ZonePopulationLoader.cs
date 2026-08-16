@@ -267,8 +267,13 @@ namespace Faolan.GameServer.World
 				//
 				// ⚠️ That default is a real gap, not a neutral choice, and it is COUNTED rather than passed over (#840):
 				// a creature nobody ever polled and that no capture caught fighting stands in the world green and
-				// passive. The beach crocodiles are the reported case. The count is reported per zone below, because a
+				// passive. The beach crocodiles were the reported case. The count is reported per zone below, because a
 				// world that is quietly missing its monsters looks exactly like a world with no monsters in it.
+				//
+				// The gap is now the RESIDUE of four tiers rather than of one (#841, `NpcDispositionTiers`): own poll,
+				// caught attacking, faction roll-up, then the static mob rule. 645 placements over 154 types came down
+				// to 102 over 61 - and what is left is Refugees, Commoners, a Target Dummy and named story NPCs, which
+				// is the population the friendly default is actually right for.
 				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
 				if (npc.NpcTemplate.StatCore?.Disposition == null)

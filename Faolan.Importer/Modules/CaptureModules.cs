@@ -623,9 +623,13 @@ namespace Faolan.Importer.Modules
 	// every townsperson hostile. Writes NpcStatCore.Disposition (0 friendly / 1 hostile / 2 neutral); the sim gates
 	// aggro (only 1 aggros) and the overhead name colour on it (#256/aggro). Depends on `npcs` (the stat cores to
 	// attach to must exist).
+	//
+	// Four tiers, strongest evidence first - own poll, seen attacking, faction roll-up, then the static mob rule that
+	// fills what the corpus never saw. `NpcDispositionTiers` owns the order and `--report disposition-rule` scores the
+	// last one; see both before changing the ranking.
 	public sealed class NpcDispositionModule : IImportModule
 	{
-		private const long NullCommunity = -1; // sentinel for NPCs with no NpcStats.community
+		private const long NullCommunity = NpcDispositionTiers.NullCommunity; // sentinel for NPCs with no NpcStats.community
 
 		// No hard DependsOn: it attaches to whatever NpcStatCores exist, and registration order already sequences it
 		// after `npcs` in a full default run. (A hard dep would force `npcs` -> `characters` -> ... into a targeted
@@ -704,33 +708,21 @@ namespace Faolan.Importer.Modules
 			foreach (var cap in ctx.Captures)
 				seenAttacking.UnionWith(NpcDispositionExtractor.ExtractAttackers(cap.Packets));
 
+			// The fourth and LAST tier (#841): a creature the corpus never polled, never caught fighting, and whose
+			// whole faction was never polled either, decided from the static columns - a real non-civilian community
+			// plus the mob collision group. It is the only INFERENCE in the chain, which is why it sits below every
+			// observation and why the module reports how it scores instead of just how often it fired: the shape it
+			// has to avoid is the 2026-07-11 regression, a rule that was right for wildlife and wrong for townsfolk.
+			// `--report disposition-rule` is the measurement, against the directly-polled templates.
 			var updated = 0;
 			var hostile = 0;
-			var fromOwnVotes = 0;
-			var fromAttacking = 0;
+			var byTier = new Dictionary<NpcDispositionTiers.Tier, int>();
 			foreach (var core in cores)
 			{
-				var comm = core.Community.HasValue
-					? core.Community.Value
-					: NullCommunity;
-
-				uint disposition;
-				if (templateDisposition.TryGetValue(core.NpcTemplateId, out var own))
-				{
-					disposition = own;
-					fromOwnVotes++;
-				}
-				else if (seenAttacking.Contains(core.NpcTemplateId))
-				{
-					// Ranked ABOVE the faction roll-up deliberately: this creature's own behaviour beats an average
-					// taken over its faction-mates, the same reason its own poll does.
-					disposition = 1;
-					fromAttacking++;
-				}
-				else if (!commDisposition.TryGetValue(comm, out disposition))
-				{
-					continue; // never polled, never seen fighting, faction never polled -> leave NULL, and say so below
-				}
+				var (resolved, tier) = NpcDispositionTiers.Resolve(core, templateDisposition, seenAttacking, commDisposition);
+				byTier[tier] = byTier.GetValueOrDefault(tier) + 1;
+				if (resolved is not { } disposition)
+					continue; // nothing said anything -> leave NULL, and say so below
 
 				if (core.Disposition != disposition)
 				{
@@ -738,7 +730,7 @@ namespace Faolan.Importer.Modules
 					updated++;
 				}
 
-				if (disposition == 1)
+				if (disposition == NpcDispositionTiers.Hostile)
 					hostile++;
 			}
 
@@ -749,7 +741,10 @@ namespace Faolan.Importer.Modules
 			var stillNull = cores.Count(c => c.Disposition == null);
 			return new ImportResult(
 				$"{templateDisposition.Count} templates polled directly, {commDisposition.Count} factions dispositioned; " +
-				$"{updated} stat cores set ({fromOwnVotes} from their own votes, {fromAttacking} from being seen attacking, {hostile} hostile); " +
+				$"{updated} stat cores set ({byTier.GetValueOrDefault(NpcDispositionTiers.Tier.OwnVotes)} from their own votes, " +
+				$"{byTier.GetValueOrDefault(NpcDispositionTiers.Tier.SeenAttacking)} from being seen attacking, " +
+				$"{byTier.GetValueOrDefault(NpcDispositionTiers.Tier.FactionRollUp)} from their faction, " +
+				$"{byTier.GetValueOrDefault(NpcDispositionTiers.Tier.MobRule)} from the mob rule, {hostile} hostile); " +
 				$"{stillNull} still unknown (served friendly).");
 		}
 

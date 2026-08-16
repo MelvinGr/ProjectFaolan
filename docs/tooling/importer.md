@@ -295,6 +295,17 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
+`disposition-rule` (#841: is the LAST-RESORT hostility rule better than the default it replaced, and does it leave
+the townsfolk alone? `NpcDispositionTiers` decides an NPC's overhead disposition from three observations and one
+inference; this scores the inference, and its ablations, against the 430 templates retail was captured answering a
+`RequestAggroStatus` for — ground truth no tier of the chain contributed to. The friendly default gets 0 of 102
+hostiles (76.3% overall); `Community > 0`, the rule the 2026-07-11 regression removed, calls **159 polled-FRIENDLY
+templates hostile** and lands BELOW the default at 39.8%; the shipped `CarsGroup == 3 AND a real non-civilian
+community` gets 84 of 102 at 95.3% with **zero** friendly-side errors. ⭐ The collision group ALONE scores higher
+(97.4%) and is deliberately not what ships: the `fills` column shows the two answer the SAME 118 templates on the
+population that actually reaches the tier, so the community half costs nothing today while halving the neutral-side
+error — the slice they disagree on is where the rabbits, hens and deer sit. ⚠️ The assertion is not a percentage but
+the regression signature: exit code 1 on any directly-polled FRIENDLY template the rule would make hostile) ·
 `spawn-animation` (#607: what IS `npc_stats.spawn_animation`? Two tests. The first partitions every captured NPC
 spawn into the login BURST and MID-SESSION — the class of predictor a field census cannot see — and ⛔ FALSIFIED the
 ticket's hypothesis: 7.3% of burst spawns carry the flag against 5.8% mid-session, so it does not mean "this entity

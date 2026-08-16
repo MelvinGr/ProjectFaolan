@@ -415,6 +415,11 @@ namespace Faolan.Importer.Cli
 					return await BuffDurationCheck(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "disposition-rule":
+				{
+					return await DispositionRule(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "spawn-animation":
 				{
 					SpawnAnimation(NamedCapture.LoadAll(capturesDir), _options.Configuration[Keys.ContentRdbDir]);
