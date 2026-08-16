@@ -90,5 +90,53 @@ namespace Faolan.Importer.Extractors
 
 			return votes;
 		}
+
+		/// <summary>
+		///     The NPC TEMPLATES this capture saw ATTACK something - an independent hostility signal for a creature the
+		///     client never happened to poll.
+		/// </summary>
+		/// <remarks>
+		///     The poll harvest above can only speak for creatures a player's client asked about, and its faction
+		///     fallback only for factions some member of which was asked about. 154 templates - 645 placements - came
+		///     out of it with NO disposition at all, and a null disposition is read as FRIENDLY by the world model, so
+		///     every one of them stood around green and passive. The beach crocodiles (14049) are the reported case:
+		///     they never aggro because nothing ever told us they were hostile.
+		///     <para>
+		///         A creature that SWINGS at somebody is hostile, and that is an observation rather than an inference -
+		///         the same corpus, a different record. Handles are recycled (91 within a single capture), so the
+		///         handle -> template map is rolled forward packet by packet exactly as the poll pass does; taking the
+		///         first or last spawn per handle would credit one creature's attacks to another.
+		///     </para>
+		/// </remarks>
+		public static IEnumerable<uint> ExtractAttackers(IReadOnlyList<CapturedPacket> packets)
+		{
+			ArgumentNullException.ThrowIfNull(packets);
+			var spawns = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).ToArray();
+			var templates = new Dictionary<uint, uint>();
+			var nextSpawn = 0;
+			var attackers = new HashSet<uint>();
+
+			for (var i = 0; i < packets.Count; i++)
+			{
+				while (nextSpawn < spawns.Length && spawns[nextSpawn].SourceIndex <= i)
+				{
+					templates[spawns[nextSpawn].Handle] = spawns[nextSpawn].TemplateId;
+					nextSpawn++;
+				}
+
+				var p = packets[i];
+				if (p is not { IsDownload: true, IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
+					continue;
+				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var bcc))
+					continue;
+				if (bcc.BehaviorId is not ((uint)BehaviorId.CombatMelee or (uint)BehaviorId.CombatRanged or (uint)BehaviorId.CombatUnarmed))
+					continue;
+
+				if (templates.TryGetValue(bcc.Actor, out var templateId))
+					attackers.Add(templateId);
+			}
+
+			return attackers;
+		}
 	}
 }

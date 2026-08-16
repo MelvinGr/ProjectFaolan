@@ -178,6 +178,10 @@ namespace Faolan.GameServer.World
 				.ToList();
 
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
+			// #840: creatures with NO harvested disposition, which are served FRIENDLY and never aggro. Counted so the
+			// gap is stated at load instead of being discovered in play as "the crocodiles ignore me".
+			var undisposed = 0;
+			var undisposedNames = new HashSet<string>();
 			string? labelSample = null;
 			var followers = new Dictionary<WorldEntity, HashSet<uint>>(); // #741: follower -> the leader TYPES it may bind to
 			foreach (var npc in spawnRows)
@@ -260,8 +264,18 @@ namespace Faolan.GameServer.World
 				// is faction MEMBERSHIP, NOT hostility: community 1 is the civilian/default faction shared by Citizens,
 				// vendors and guards, so the old `community > 0` test wrongly aggroed every townsperson. NULL disposition
 				// -> friendly (the client's green default for an un-told-about NPC). Only cCategory 1 (hostile) aggros.
+				//
+				// ⚠️ That default is a real gap, not a neutral choice, and it is COUNTED rather than passed over (#840):
+				// a creature nobody ever polled and that no capture caught fighting stands in the world green and
+				// passive. The beach crocodiles are the reported case. The count is reported per zone below, because a
+				// world that is quietly missing its monsters looks exactly like a world with no monsters in it.
 				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
+				if (npc.NpcTemplate.StatCore?.Disposition == null)
+				{
+					undisposed++;
+					undisposedNames.Add(npc.NpcTemplate.Name ?? $"#{npc.NpcTemplateId}");
+				}
 
 				// The creature's death animation (#362): use the type's harvested death behaviorId, else the humanoid
 				// default. Sent in the death BccIIR by CombatService.OnNpcKilled so demons/beasts play their own death.
@@ -383,6 +397,15 @@ namespace Faolan.GameServer.World
 			await _ambient.LoadAsync(mapId, instanceId, zone);
 
 			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} DB rows, no runtime dedup).", zone.Count, mapId, instanceId, npcs.Length);
+			if (undisposed > 0)
+			{
+				// WARNING, not information: these creatures are being served green and passive because nothing in the
+				// corpus ever said otherwise, which in play reads as "the monsters are broken" (#840).
+				_logger.LogWarning("World: {Count} NPC(s) on map {Map} have NO harvested disposition and are served FRIENDLY - they will not aggro: {Names}.", undisposed, mapId,
+					string.Join(", ", undisposedNames.Order().Take(8)) + (undisposedNames.Count > 8
+						? $", +{undisposedNames.Count - 8} more"
+						: ""));
+			}
 			_logger.LogDebug("World: #363 {Labelled}/{Total} captured spawns have a spawn-area label on map {Map} (.togglenpcgroup to show; sample: {Sample}).", labelledCount, npcs.Length, mapId,
 				labelSample ?? "<none>");
 		}

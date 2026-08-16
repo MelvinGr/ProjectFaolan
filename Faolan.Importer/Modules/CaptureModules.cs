@@ -696,9 +696,18 @@ namespace Faolan.Importer.Modules
 			var commDisposition = commVotes.ToDictionary(kv => kv.Key, kv => Majority(kv.Value));
 			var templateDisposition = templateVotes.ToDictionary(kv => kv.Key, kv => Majority(kv.Value));
 
+			// The third tier (#840): a creature the corpus saw ATTACK is hostile, whether or not anyone polled it.
+			// Without it a template no client ever asked about - and whose faction-mates were never asked about
+			// either - keeps a NULL disposition, which the world model reads as FRIENDLY: 154 templates over 645
+			// placements stood around green and passive, the beach crocodiles among them.
+			var seenAttacking = new HashSet<uint>();
+			foreach (var cap in ctx.Captures)
+				seenAttacking.UnionWith(NpcDispositionExtractor.ExtractAttackers(cap.Packets));
+
 			var updated = 0;
 			var hostile = 0;
 			var fromOwnVotes = 0;
+			var fromAttacking = 0;
 			foreach (var core in cores)
 			{
 				var comm = core.Community.HasValue
@@ -711,9 +720,16 @@ namespace Faolan.Importer.Modules
 					disposition = own;
 					fromOwnVotes++;
 				}
+				else if (seenAttacking.Contains(core.NpcTemplateId))
+				{
+					// Ranked ABOVE the faction roll-up deliberately: this creature's own behaviour beats an average
+					// taken over its faction-mates, the same reason its own poll does.
+					disposition = 1;
+					fromAttacking++;
+				}
 				else if (!commDisposition.TryGetValue(comm, out disposition))
 				{
-					continue; // neither this template nor its faction was ever polled -> leave NULL (non-hostile in the sim)
+					continue; // never polled, never seen fighting, faction never polled -> leave NULL, and say so below
 				}
 
 				if (core.Disposition != disposition)
@@ -727,9 +743,14 @@ namespace Faolan.Importer.Modules
 			}
 
 			await ctx.Db.SaveChangesAsync();
+
+			// A creature with NO disposition is served as friendly and passive, so the count is worth stating rather
+			// than leaving as the difference between two other numbers.
+			var stillNull = cores.Count(c => c.Disposition == null);
 			return new ImportResult(
 				$"{templateDisposition.Count} templates polled directly, {commDisposition.Count} factions dispositioned; " +
-				$"{updated} stat cores set ({fromOwnVotes} from their own votes, {hostile} hostile).");
+				$"{updated} stat cores set ({fromOwnVotes} from their own votes, {fromAttacking} from being seen attacking, {hostile} hostile); " +
+				$"{stillNull} still unknown (served friendly).");
 		}
 
 		// The winning category of a vote tally. Ties break to the LOWEST category, so a 50/50 lands on the more
