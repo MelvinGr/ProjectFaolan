@@ -397,6 +397,26 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
   learned spells become castable (#298). **This is skills, not feats** — it just happens to share the `0x3F1`-list shape.
+- ⚠️ **What a transcribed scaffold may carry is the class's CONTENT, never the captured player's own state.** A
+  captured id list mixes the two, and granting it wholesale stated one player's facts about everybody else. Two bands
+  are therefore held out of `FullSkillIdsFor`:
+  - **The class-PROGRESSION entry**, which is the character's **level**. Every class has exactly one 80-long
+    progression run in `FeatIdMaps` (`MaxRank >= 79`), and a character carries **exactly one** id from its own run, at
+    `base + (level - 1)` — measured across five captured spawns at four levels: two fresh at rank 0, Hoxxling at
+    `114804` (L5), and the Necro/Demo at `85279`/`104579` (L80). It resolves to that level's
+    `<Class> Class Feat NNN` template, i.e. the class/level **attribute base**, which is where the client gets the
+    five attributes and the MaxHealth it draws. So it is **derived per character** at spawn time
+    (`PlayerSpawnScaffoldRows.ClassProgressionIdFor`) and never replayed from a row — a stored copy goes stale on
+    every ding. This is the same exclusion the feat grant below already applies, arrived at from the other side.
+  - **The tradeskill PROFESSION rungs**, which are what that player had **trained** (`.tradeskill` →
+    `AddCharacterFeats`, [#735](tradeskill-recipes.md)). The captured Necromancer's were `Weaponsmith`/`Armorsmith
+    Grandmaster` and four Masters; the Demonologist's eight more at its own ranks; the Assassin's a lone
+    `Mining Apprentice`.
+
+  Both reached the client together: a level-2 Necromancer's first relog after a ding rendered a level-80 attribute
+  sheet (Str 71 / Int 231 / Con 61, health max 984) **and** a Grandmaster smith's crafting tab. Gated by
+  `PlayerSpawnScaffoldRowsTests.ClassProgressionEntry_IsTheCharactersLevel` and
+  `FullSkillScaffold_CarriesNoCapturedCharactersOwnState`.
 - **The teaching feat is granted with the spell (2026-08-04, #298).** `FeatSpellGrants` (1,510 rows, 915 feats,
   667 spells — GameAction element kind `53019 Spell` on a feat template) is read *backwards* by
   `IDatabaseRepository.GetFeatsTeachingSpells`, so both level-up paths train exactly the feats that teach the

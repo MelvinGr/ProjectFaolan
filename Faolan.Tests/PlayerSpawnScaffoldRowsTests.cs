@@ -73,6 +73,91 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(captured)), Convert.ToHexString(SimpleCharFullUpdateCodec.Build(rebuilt)));
 		}
 
+		// ⭐ The scaffold's class-progression entry IS the character's LEVEL, and this is the measurement that says so:
+		// five captured player spawns across five classes and four levels (two fresh, Hoxxling mid-Tortage at 5, the
+		// Necro and Demo at 80), each carrying exactly ONE id from its class's 80-long progression run, at exactly the
+		// rank its character's level implies. `FeatIdMaps` resolves that entry to the
+		// level's `<Class> Class Feat NNN` template - the class/level ATTRIBUTE BASE (#444) - which is where the
+		// client gets the five attributes and the MaxHealth it draws.
+		//
+		// So it is a per-CHARACTER fact and cannot be shipped as class content. It used to be: the level-up scaffold
+		// grant handed every dinged character the captured L80's entry, and a level-2 Necromancer holding 85279 came
+		// back from its first relog rendering a level-80 one - Str 71 / Int 231 / Con 61, health max 984. It is
+		// derived per character now (ClassProgressionIdFor), and this pins the read side that proves the derivation.
+		[Theory, InlineData("SpawnDikketestLogin", 1, 124400u), InlineData("SpawnStrieTemplate", 1, 160000u), InlineData("SpawnHoxxlingBuffed", 5, 114804u),
+		 InlineData("SpawnNecroKingsCastle", 80, 85279u), InlineData("SpawnDemoRandomActions", 80, 104579u)]
+		public void ClassProgressionEntry_IsTheCharactersLevel(string name, int level, uint expectedId)
+		{
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(Golden(name)));
+			var ids = PlayerSlot(scaffold).IdList.Select(e => e.Id).ToArray();
+
+			// Exactly one progression id in the whole list - a character is at one level, and a second entry would
+			// mean the run boundaries are wrong.
+			Assert.Equal([expectedId], ids.Where(PlayerSpawnScaffoldRows.IsClassProgressionId).ToArray());
+			Assert.Equal((ushort)level, PlayerSpawnScaffoldRows.ClassProgressionLevelOf(ids));
+		}
+
+		// Derive and read back are exact inverses over every class at every level - the whole 12 x 80 grid, so no
+		// class's run can be transposed onto another's without this failing. Level 0 and 81 clamp INTO the run rather
+		// than walking off either end of it into a neighbouring class's band.
+		[Theory, InlineData(ConanClass.Guardian), InlineData(ConanClass.Conqueror), InlineData(ConanClass.DarkTemplar), InlineData(ConanClass.Barbarian), InlineData(ConanClass.Assassin), InlineData(ConanClass.Ranger),
+		 InlineData(ConanClass.BearShaman), InlineData(ConanClass.PriestOfMitra), InlineData(ConanClass.TempestOfSet), InlineData(ConanClass.Necromancer), InlineData(ConanClass.Demonologist), InlineData(ConanClass.HeraldOfXotli)]
+		public void ClassProgressionId_RoundTripsAtEveryLevel(ConanClass @class)
+		{
+			for (ushort level = 1; level <= 80; level++)
+			{
+				var id = PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, level);
+				Assert.NotNull(id);
+				Assert.True(PlayerSpawnScaffoldRows.IsClassProgressionId(id.Value));
+				Assert.Equal(level, PlayerSpawnScaffoldRows.ClassProgressionLevelOf([id.Value]));
+			}
+
+			Assert.Equal(PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, 1), PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, 0));
+			Assert.Equal(PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, 80), PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, 81));
+
+			// And the class's FRESH rows carry its own level-1 entry and no other - the anchor this table was written
+			// down from, so the table cannot drift away from the seeded rows without this failing.
+			var character = new Character
+			{
+				Id = 0x0200000C,
+				Class = @class
+			};
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
+
+			var seeded = character.Skills.Select(s => s.SkillId).ToArray();
+			Assert.Equal([PlayerSpawnScaffoldRows.ClassProgressionIdFor(@class, 1)], seeded.Where(PlayerSpawnScaffoldRows.IsClassProgressionId).Cast<uint?>().ToArray());
+		}
+
+		// ⭐ The captured scaffolds carry the captured player's own TRADESKILL professions, and those are TRAINED
+		// (`.tradeskill` -> AddCharacterFeats, #735), not granted by a class. The level-up grant used to hand them
+		// over wholesale, which is why a level-2 Necromancer relogged as a Grandmaster weapon- and armoursmith with
+		// six Master gathering skills. `FullSkillIdsFor` is the class's CONTENT, so no profession rung may appear in
+		// it - and neither may a progression entry, for the same reason.
+		//
+		// The ids are the profession ladders' own, spelled out rather than resolved through FeatPrereqs: this is a
+		// list that must not GROW, so it states what was removed (Necromancer: Weaponsmith/Armorsmith Grandmaster,
+		// Woodcutting/Mining/Prospecting/Stonecutting Master, Weaver Grandmaster, Skinner Master; Demonologist:
+		// Alchemy Artisan, Gemcutter Novice and six more at its own ranks; Assassin: Mining Apprentice).
+		[Theory, InlineData(ConanClass.Necromancer), InlineData(ConanClass.Demonologist), InlineData(ConanClass.Assassin), InlineData(ConanClass.HeraldOfXotli)]
+		public void FullSkillScaffold_CarriesNoCapturedCharactersOwnState(ConanClass @class)
+		{
+			uint[] professionRungs =
+			[
+				321202, 321502, 321701, 322402, 323201, 323205, 323301, 323300, 323305, 323402, 323405, 323501, 323505, 327200, 327402, 327500, 327505
+			];
+
+			var full = PlayerSpawnScaffoldRows.FullSkillIdsFor(@class);
+			Assert.NotNull(full);
+
+			Assert.DoesNotContain(full, PlayerSpawnScaffoldRows.IsClassProgressionId);
+			Assert.Empty(full.Intersect(professionRungs));
+
+			// It is still the class's scaffold, not an empty list - the castability stand-in it exists for (#298) is
+			// untouched, and the ids stay ascending because the wire requires it.
+			Assert.NotEmpty(full);
+			Assert.Equal(full.OrderBy(id => id), full);
+		}
+
 		// The unlocked FEAT list (spawn pre-IIR) extracts to CharacterFeat rows in wire/train order - a DIFFERENT
 		// region + id-space than the post-IIR skill scaffold (CharacterSkill). NecroL80 (L80 Necro) carries 25 feats;
 		// the ids + order are locked to the capture (tools/capture/decode_unlocked_feats.py). Feats and skills
@@ -345,6 +430,14 @@ namespace Faolan.Tests
 				Class = @class
 			};
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
+
+			// The captured character's LEVEL, read back off the scaffold's own class-progression entry. That entry is
+			// DERIVED on the way out (TryApplyFrom) rather than replayed from the rows, because the client reads it as
+			// the character's level and draws its attributes and health from the matching class/level template - so a
+			// level has to come in for one to go back out, and these round-trips are what prove the two directions are
+			// exact inverses on real captured bytes. See ClassProgressionEntry_IsTheCharactersLevel for the levels
+			// each capture states.
+			character.Level = PlayerSpawnScaffoldRows.ClassProgressionLevelOf(character.Skills.Select(s => s.SkillId)) ?? 0;
 
 			var rebuilt = SimpleCharFullUpdateCodec.Parse(Record(body)); // fresh instance, then the character overwrites
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt, MorphRegistry.ByName));

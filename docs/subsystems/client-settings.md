@@ -83,7 +83,7 @@ could ever match it.
   `AuthenticateLoggedInCodec`, `UpdateSubscriptionSettingsCodec`, `UpdateCharacterSettingsCodec`,
   `UpdateCharacterPreviewCodec`, `SendCharacterSettingsCodec`, `SendCharacterPreviewCodec`,
   `SendCharacterSettingsCheckSumMapCodec`.
-- Handlers and senders: `Faolan/PlayerAgent/PlayerAgentListener.cs` and `Faolan/PlayerAgent/Packets.cs`.
+- Handlers and senders: `Faolan/PlayerAgent/PlayerAgentListener.cs` and `Faolan/PlayerAgent/PlayerAgentListener.Outbound.cs`.
 - Storage: `CharacterClientSettings` (one row per character, `Settings` and `Preview`, either half nullable
   because they arrive as separate messages) and `Account.SubscriptionSettings`.
 - Byte-exact gates: `ClientSettingsCodecTests` against the captured bodies, `ClientSettingsPersistenceTests`

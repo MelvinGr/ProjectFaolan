@@ -48,6 +48,46 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			[ConanClass.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
 		};
 
+		// The CLASS PROGRESSION track: the rank-0 wire feat id of the 80-long run whose entries ARE the class's
+		// levels. `FeatIdMaps` holds exactly twelve runs with `MaxRank >= 79` - one per class - and each run's rank-0
+		// id is the anchor already listed in FreshSkillIdsByClass above, so this table is that query written down
+		// (`Stormcaller` is the RDB's name for the Tempest of Set - see [[class_attribute_base_444]]).
+		//
+		// ⭐ A character carries EXACTLY ONE entry from its own run, and it is `base + (level - 1)` - measured, not
+		// assumed: all four captured characters agree, at four different levels.
+		//
+		//   NecroL80  L80 Necromancer     85279 = 85200 + 79
+		//   DemoL80   L80 Demonologist   104579 = 104500 + 79
+		//   Hakotep   L24 Herald         114823 = 114800 + 23
+		//   AssassinL23 L23 Assassin     160022 = 160000 + 22
+		//
+		// It resolves through FeatIdMaps to that level's `<Class> Class Feat NNN` template - i.e. the class/level
+		// ATTRIBUTE BASE (#444), which is where the client gets the five attributes and MaxHealth it draws. So this
+		// entry is the character's LEVEL restated on the wire, and shipping somebody else's is shipping their
+		// attributes: a level-2 Necromancer holding 85279 renders as a level-80 one (Str 71 / Int 231, HP max 984).
+		//
+		// ⚠️ WIRE ids only. The RDB TEMPLATE ids are NOT contiguous and `template = base + (level - 1)` is wrong for
+		// 5 of the 12 classes ([[class_attribute_base_444]]) - the arithmetic holds on THIS side of FeatIdMaps.
+		private static readonly Dictionary<ConanClass, uint> ClassProgressionBaseByClass = new Dictionary<ConanClass, uint>
+		{
+			[ConanClass.Guardian] = 24700,
+			[ConanClass.Conqueror] = 54900,
+			[ConanClass.DarkTemplar] = 74600,
+			[ConanClass.Necromancer] = 85200,
+			[ConanClass.Demonologist] = 104500,
+			[ConanClass.HeraldOfXotli] = 114800,
+			[ConanClass.Barbarian] = 124400,
+			[ConanClass.Assassin] = 160000,
+			[ConanClass.Ranger] = 175000,
+			[ConanClass.PriestOfMitra] = 198000,
+			[ConanClass.TempestOfSet] = 234600,
+			[ConanClass.BearShaman] = 244300
+		};
+
+		// How long each of those runs is - one entry per level, and the reason a level is clamped into it rather than
+		// walking off the end of the class's band into the next one's.
+		private const uint ClassProgressionLevels = 80;
+
 		// The FULL ability/skill scaffold a high-level character of the class carries, harvested from the captured
 		// retail chars (NecroL80 L80 Necro, DemoL80 L80 Demo, AssassinL23 L23 Assassin, Hakotep L24 Herald). A spell's
 		// in-client usability is gated on the char carrying the matching ABILITY/SKILL scaffold entry - and that
@@ -57,27 +97,42 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the two). Over-grants (no per-level breakdown), and only covers classes we have a high-level capture for.
 		// See [[feat_trees_decode_251]] (feats-vs-skills correction) and Gitea #298/#251/#74. Ascending ids (the
 		// wire/codec require it).
+		//
+		// ⚠️ TWO bands that a capture DOES carry are deliberately absent here, because they are facts about the
+		// character that was captured rather than content of its class - and granting them stated those facts about
+		// somebody else:
+		//
+		//   1. the CLASS PROGRESSION entry (85279, 104579, 160022, 114823) - the captured character's LEVEL. See
+		//      ClassProgressionBaseByClass; it is DERIVED per character in TryApplyFrom and never stored.
+		//   2. the TRADESKILL PROFESSION rungs - what that player had TRAINED. The Necromancer's were `Weaponsmith
+		//      Grandmaster` / `Armorsmith Grandmaster` / `Woodcutting`+`Mining`+`Prospecting`+`Stonecutting Master` /
+		//      `Weaver Grandmaster` / `Skinner Master`, the Demonologist's eight more at its own ranks, the
+		//      Assassin's `Mining Apprentice`. A profession is bought by TRAINING it (`.tradeskill` ->
+		//      AddCharacterFeats, #735), so a level-2 character has none; handing over a captured player's made every
+		//      dinged character a Grandmaster smith on its next relog.
+		//
+		// A captured character legitimately keeps both in its OWN extracted rows (ExtractTo) - that is where
+		// TradeskillService reads the imported L80s' professions from. What is wrong is replaying them as the class's.
 		private static readonly Dictionary<ConanClass, uint[]> FullSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
 			[ConanClass.Necromancer] =
 			[
-				4100, 7002, 8909, 13603, 18502, 85279, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104,
-				321202, 321502, 323205, 323305, 323405, 323505, 326000, 326300, 326600, 327402, 327505, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000
+				4100, 7002, 8909, 13603, 18502, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104,
+				326000, 326300, 326600, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000
 			],
 			[ConanClass.Demonologist] =
 			[
-				4400, 7002, 8909, 13603, 18502, 104579, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704,
-				321701, 322402, 323201, 323300, 323402, 323501, 326000, 326300, 326600, 327200, 327500, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500,
-				1440700, 1441902, 1445000
+				4400, 7002, 8909, 13603, 18502, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704,
+				326000, 326300, 326600, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500, 1440700, 1441902, 1445000
 			],
 			[ConanClass.Assassin] =
 			[
-				3400, 13603, 14101, 14801, 15000, 16707, 160022, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 323301, 328703,
+				3400, 13603, 14101, 14801, 15000, 16707, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 328703,
 				328902, 329302, 330400, 331300
 			],
 			[ConanClass.HeraldOfXotli] =
 			[
-				4300, 7700, 13603, 14101, 18502, 114823, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703,
+				4300, 7700, 13603, 14101, 18502, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703,
 				328902, 330400, 331300
 			]
 		};
@@ -374,6 +429,58 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				: null;
 		}
 
+		// The class-progression scaffold entry for a character at `level` - the wire feat that IS its level, and
+		// through FeatIdMaps its class/level attribute base. Null for a class with no run in the table, which is no
+		// class today; it stays nullable so a future/unknown ConanClass drops the entry rather than fabricating an id
+		// in some other class's band.
+		//
+		// Level is 1-based and CLAMPED into the run: level 0 (an unset row) reads as level 1 rather than as the
+		// PREVIOUS class's last level, and anything past 80 stops at 80 instead of walking into the next band.
+		public static uint? ClassProgressionIdFor(ConanClass @class, ushort level)
+		{
+			if (!ClassProgressionBaseByClass.TryGetValue(@class, out var progressionBase))
+				return null;
+
+			var rank = (uint)Math.Clamp(level, 1, ClassProgressionLevels) - 1;
+			return progressionBase + rank;
+		}
+
+		// Whether `id` is ANY class's progression entry (any class, any level). Used to drop a stored or captured one
+		// before the derived entry goes back in - `@class`'s own run is not enough, because a character can be
+		// carrying another class's from a captured scaffold it was extracted from.
+		public static bool IsClassProgressionId(uint id)
+		{
+			foreach (var progressionBase in ClassProgressionBaseByClass.Values)
+			{
+				if (id >= progressionBase && id < progressionBase + ClassProgressionLevels)
+					return true;
+			}
+
+			return false;
+		}
+
+		// The LEVEL a scaffold's id list states, read off its class-progression entry - the exact inverse of
+		// ClassProgressionIdFor, and the reason that derivation can be checked rather than believed. Null when the
+		// list carries no progression entry at all, which no captured player spawn does.
+		//
+		// The runs do not overlap, so the class is not needed to read one: an id identifies both which class's run it
+		// is in and how far along. Ranks are 0-based and levels 1-based, hence the +1.
+		public static ushort? ClassProgressionLevelOf(IEnumerable<uint> scaffoldIds)
+		{
+			ArgumentNullException.ThrowIfNull(scaffoldIds);
+
+			foreach (var id in scaffoldIds)
+			{
+				foreach (var progressionBase in ClassProgressionBaseByClass.Values)
+				{
+					if (id >= progressionBase && id < progressionBase + ClassProgressionLevels)
+						return (ushort)(id - progressionBase + 1);
+				}
+			}
+
+			return null;
+		}
+
 		// The vanity shown-mask carried by a captured spawn's frame. The write side is FreshPreFrame; this is the
 		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
 		public static uint ReadVanityShownMask(SimpleCharFullUpdateIIR scaffold)
@@ -411,9 +518,23 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			slot.Entries.Clear();
 			slot.Entries.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
 
+			// The id list is the character's stored skill rows with ONE substitution: the class-progression entry is
+			// DERIVED from (Class, Level) here rather than read back, the same rule the entry table follows (#483).
+			// It is a restatement of the character's level, so a stored copy goes stale on every ding - and stale is
+			// not cosmetic here: the client reads that entry's `<Class> Class Feat NNN` template for the five
+			// attributes and MaxHealth it draws, so an entry left at the level the row was written renders those at
+			// that level for ever. It reached the client the same way twice over: the level-up grant handed every
+			// dinged character the CAPTURED L80's entry (#298's full scaffold), and any level change at all left the
+			// stored one behind. Deriving is the only version that cannot drift.
+			//
+			// Every OTHER row is passed through untouched, ranks included - a captured character's professions and
+			// abilities are its own and are not second-guessed here.
 			slot.IdList.Clear();
-			if (character.Skills != null)
-				slot.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
+			var storedSkills = character.Skills?.Where(s => !IsClassProgressionId(s.SkillId)).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)) ?? [];
+			if (ClassProgressionIdFor(character.Class, character.Level) is { } progressionId)
+				storedSkills = storedSkills.Append(new ScaffoldIdEntry(0, progressionId));
+
+			slot.IdList.AddRange(storedSkills.OrderBy(s => s.Id));
 
 			// The closer (last entry-table record) carries the COUNT MARKER the client uses to read the feat list:
 			// TAG = (IdList.Count + 2) * 0x3F1 (see FreshCloser). It was stored at the FRESH skill count, so once the

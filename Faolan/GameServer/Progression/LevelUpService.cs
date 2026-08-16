@@ -241,6 +241,14 @@ namespace Faolan.GameServer.Progression
 		// Assassin, Ranger - were not a gap: 227 of their 259 level-gated catalog entries are COMBOS, which no feat
 		// teaches and which never reach this method any more (see GetClassSpellsUnlockedBetween). What is left is an
 		// ordinary catalog gap of the same kind the caster classes have, Conqueror's ~36 real spells being most of it.
+		//
+		// ⚠️ The scaffold in (2) is a CAPTURED character's id list, so what it may grant is the class's CONTENT and
+		// never that character's own state. Two bands used to ride along and both showed up in-client on a level-2
+		// Necromancer's first relog: the captured L80's class-PROGRESSION entry, which the client reads as the
+		// character's level and drew level-80 attributes and health from (Str 71 / Int 231 / HP max 984), and that
+		// player's trained TRADESKILL rungs, which made it a Grandmaster weapon- and armoursmith. Both are out of
+		// FullSkillIdsByClass now - the progression entry is DERIVED per character at spawn time
+		// (PlayerSpawnScaffoldRows.ClassProgressionIdFor) and a profession is trained, not dinged into.
 		private async Task GrantCastabilityFor(Character character, IReadOnlyCollection<uint> learnedSpellIds)
 		{
 			var teachingFeats = await _database.GetFeatsTeachingSpells(learnedSpellIds);
