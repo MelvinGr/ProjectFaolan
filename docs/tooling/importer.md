@@ -295,6 +295,14 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
+`broadcast-check` (#272: which server records does retail send to EVERY player who can see the subject, and which
+only to the one client concerned? The oracle is `login_2-clients_group-trade-friend`, the ONLY capture with two game
+connections — with one client a broadcast and a private reply look identical, with two a record reaching both streams
+IS a broadcast. Prints each IIR as BROADCAST / per-client / MIXED. ⚠️ Do NOT automate off the type: a
+`BehaviorControlCenterIIR` carries both an entity animation and an ack of the client's own request, so the record's
+ROLE decides — the MIXED rows are the proof, and `N3ToClientQuit` at 2/44 is a despawn being per-viewer by interest,
+which is correct. The standing measurement behind the broadcast rule in
+[combat.md](../subsystems/combat.md)) ·
 `disposition-rule` (#841: is the LAST-RESORT hostility rule better than the default it replaced, and does it leave
 the townsfolk alone? `NpcDispositionTiers` decides an NPC's overhead disposition from three observations and one
 inference; this scores the inference, and its ablations, against the 430 templates retail was captured answering a

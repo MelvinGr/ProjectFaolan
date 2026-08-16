@@ -18,7 +18,7 @@ namespace Faolan.Importer.Captures
 	public readonly record struct CapturedPacket(
 		long Ticks, bool IsDownload, uint WireOpcode, uint SubOpcode, byte[] Bytes,
 		int Frame = 0, string Direction = "", int Port = 0, string Protocol = "Conan",
-		uint SenderClass = 0, uint ReceiverClass = 0, uint MethodId = 0)
+		uint SenderClass = 0, uint ReceiverClass = 0, uint MethodId = 0, int Stream = -1)
 	{
 		// ## The positional `WireOpcode`, and why it is not `Rpc.Method`
 		//

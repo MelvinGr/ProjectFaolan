@@ -1172,7 +1172,12 @@ namespace Faolan.GameServer
 			}
 
 			var entity = _simulation.PlayerWorldEntity(client);
-			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SearchStance(character.Id, animAction, entity?.NextBehaviorPhase() ?? 3)));
+			// #272: a stance is something the OTHER players watch you do, so the same record is relayed to everyone who
+			// can see the actor. `BehaviorControlCenterIIR` is 11/11 broadcast in the two-client capture
+			// (`--report broadcast-check`), and a search crouch nobody else sees is a player frozen upright to them.
+			var searchStance = BehaviorControlCenterCodec.Build(BehaviorAnimations.SearchStance(character.Id, animAction, entity?.NextBehaviorPhase() ?? 3));
+			await WorldIir.Send(client, searchStance);
+			await _broadcaster.BroadcastBehaviorToViewers(client, searchStance);
 		}
 
 		// The HIDE stance (#505) - a TOGGLE on one selector, so the server holds which way the next press goes.
@@ -1200,7 +1205,11 @@ namespace Faolan.GameServer
 				? BehaviorAnimations.SneakHideExit(character.Id, StartingData.SneakHideExitAction, phase)
 				: BehaviorAnimations.SneakHideEnter(character.Id, enterAction, phase, entity?.NextBehaviorCommandId() ?? 3, entity?.ShadowCoverage ?? 100);
 
-			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(record));
+			// #272: relayed like the search stance - entering or leaving hiding is visible on the actor, and a rogue
+			// who slips into the shadows only on their own screen is still standing there for everyone else.
+			var stance = BehaviorControlCenterCodec.Build(record);
+			await WorldIir.Send(client, stance);
+			await _broadcaster.BroadcastBehaviorToViewers(client, stance);
 			if (entity != null)
 				entity.IsHidden = !hidden;
 
@@ -1227,7 +1236,10 @@ namespace Faolan.GameServer
 			var entity = _simulation.PlayerWorldEntity(client);
 
 			var record = BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1);
-			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(record));
+			// #272: a 20-second rest cast is an animation on the actor - relayed, like every other player behaviour.
+			var restCast = BehaviorControlCenterCodec.Build(record);
+			await WorldIir.Send(client, restCast);
+			await _broadcaster.BroadcastBehaviorToViewers(client, restCast);
 
 			// ⚠️ Rest is a CAST, so it has to arm the cast path's cancel state or it can never be cancelled (#505).
 			// The client ends this channel the same way it ends any other: it sends the c2s cancel BCC (seq 0x0002)

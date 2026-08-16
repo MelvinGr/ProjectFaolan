@@ -705,6 +705,35 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// Send records that describe what an ENTITY is doing to every viewer that can see it - the general form of the
+		// Broadcast* methods below, for a sequence that has no single name.
+		//
+		// ⭐ The rule it exists to serve (#272): a record addressed to a SUBJECT, describing world-visible state, goes
+		// to everyone who can see that subject. Measured, not assumed - in the two-client capture
+		// (`login_2-clients_group-trade-friend`, the only one with two game connections) every subject of
+		// `MoveTaskIIR` (12/12), `BehaviorControlCenterIIR` (11/11), `LookAtIIR` (8/8), `StatUpdateIIR` (9/9) and
+		// `StopIIR` (4/4) appears on BOTH clients' streams. What is genuinely per-player is the player's OWN state -
+		// `FullPlayerCharacterIIR` 0/2, `FeedbackIIR` 0/2, `UpdateInventoryIIR` 0/2 - and a despawn, which is per
+		// viewer by interest (`N3ToClientQuitIIR` 2/44). `--report broadcast-check` re-measures it.
+		//
+		// ⚠️ Not every record of a broadcast TYPE is a broadcast: a `BehaviorControlCenterIIR` carrying an ACK is a
+		// reply to the actor's own request, and the two-client capture contains no combat, so it cannot speak for
+		// those. Reach for this when the record says what an entity DID, not when it answers what a client ASKED.
+		public async Task BroadcastEntityRecords(WorldEntity subject, params byte[][] records)
+		{
+			ArgumentNullException.ThrowIfNull(subject);
+			ArgumentNullException.ThrowIfNull(records);
+
+			foreach (var viewer in _sim.World.ZoneForEntity(subject).PlayersInRange(subject.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client == null || !viewer.Known.Contains(subject.Handle))
+					continue;
+
+				foreach (var record in records)
+					await WorldIir.Send(viewer.Client, record);
+			}
+		}
+
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
 			// #272: send the mode-1 PathMoveTask WALK form (the client interpolates the segment over time) rather than the

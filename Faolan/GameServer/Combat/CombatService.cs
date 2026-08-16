@@ -71,11 +71,16 @@ namespace Faolan.GameServer.Combat
 
 		private readonly WorldSimulation _sim;
 
+		// #272: world-VISIBLE records (a death, an animation) go to everyone who can see the subject, not just to the
+		// client whose action caused them. See WorldBroadcaster.BroadcastEntityRecords for the measurement behind that.
+		private readonly WorldBroadcaster _outbound;
+
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			LevelUpService levelUp, FatalityService fatality, FactionService factions, bool killStreaks)
+			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, bool killStreaks)
 		{
+			_outbound = outbound;
 			_killStreaks = killStreaks;
 			_factions = factions;
 			_fatality = fatality;
@@ -748,8 +753,6 @@ namespace Faolan.GameServer.Combat
 				// lingering corpse plays its death anim.
 				// The dying mob drops its target first (retail sends this LookAtIIR on 95% of captured kills, Stickienecro
 				// idx 545, between the killing damage and the pose); then the pose freezes the corpse.
-				await SendWorldPacket(killer, LookAtCodec.Build(LookAts.DropTarget(targetHandle)));
-
 				// ⚠️ FLUSH what it walked but never had broadcast, BEFORE freezing it (#272). The tick only emits a
 				// move once the creature has covered 6u since the last one, so a mob killed MID-CHASE - which is what
 				// killing one at range means - is carrying up to 6u the client has not seen. The pose below states the
@@ -761,12 +764,19 @@ namespace Faolan.GameServer.Combat
 				// to date and the pose stays where the creature actually died.
 				await _sim.FlushPendingMove(npcEntity);
 
-				await SendWorldPacket(killer, MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)));
-				// #742: the record's field3 is the dying NPC's own BEHAVIOUR COUNTER, not a "death variant" - so its
-				// death takes the next index after its last swing, which is exactly the 5 -> 6 -> 6(abort) -> 7
-				// progression one captured NPC's records walk. `AttackSwingCounter` is the same counter its swing acks
-				// already number themselves with, so death simply continues it.
-				await SendWorldPacket(killer,
+				// ⚠️ BROADCAST, not sent to the killer alone. A death is world-visible: everyone watching the creature
+				// must see it drop its target, freeze in its death pose and play its death animation, or it stands
+				// there alive-looking for every other player until it fades. Measured in the two-client capture - every
+				// subject of `LookAtIIR` (8/8), `MoveTaskIIR` (12/12, the mode-6 poses among them) and
+				// `BehaviorControlCenterIIR` (11/11) reaches BOTH clients. See BroadcastEntityRecords.
+				//
+				// #742: the BCC's field3 is the dying NPC's own BEHAVIOUR COUNTER, not a "death variant" - so its death
+				// takes the next index after its last swing, which is exactly the 5 -> 6 -> 6(abort) -> 7 progression
+				// one captured NPC's records walk. `AttackSwingCounter` is the same counter its swing acks already
+				// number themselves with, so death simply continues it.
+				await _outbound.BroadcastEntityRecords(npcEntity,
+					LookAtCodec.Build(LookAts.DropTarget(targetHandle)),
+					MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)),
 					BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, ++npcEntity.AttackSwingCounter, npcEntity.DeathActivationTime)));
 
 				await AwardKillXp(killer, npcEntity.Level);

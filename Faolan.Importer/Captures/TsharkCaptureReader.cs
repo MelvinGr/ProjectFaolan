@@ -99,7 +99,12 @@ namespace Faolan.Importer.Captures
 						: "";
 					list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full,
 						p.TryGetProperty("Frame", out var fr) && fr.TryGetInt32(out var frame) ? frame : 0,
-						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass"), ParseHex(p, "MethodId")));
+						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass"), ParseHex(p, "MethodId"),
+						// The TCP stream, i.e. WHICH CONNECTION carried this. Kept because it is the only thing that can
+						// tell a broadcast from a private reply: with two clients on the wire, a record reaching both
+						// streams IS a broadcast (#272, `--report broadcast-check`). `Port` cannot answer that - it is
+						// the SERVER port, identical for every client on a tier.
+						p.TryGetProperty("Stream", out var st) && st.TryGetInt32(out var stream) ? stream : -1));
 				}
 			}
 

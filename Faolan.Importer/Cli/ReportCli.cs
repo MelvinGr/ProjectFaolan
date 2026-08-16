@@ -415,6 +415,11 @@ namespace Faolan.Importer.Cli
 					return await BuffDurationCheck(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "broadcast-check":
+				{
+					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "disposition-rule":
 				{
 					return await DispositionRule(NamedCapture.LoadAll(capturesDir));

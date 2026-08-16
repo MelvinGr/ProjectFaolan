@@ -642,6 +642,38 @@ populations: community 346 polls four templates unanimously neutral and two unan
 replays `handle -> template` as it walks the packets and attributes each poll to the most recent spawn *before*
 it. Collapsing that into one map first silently gave four `Crocodile Pict` templates another mob's votes.
 
+### ⭐ The broadcast rule (#272)
+
+**A record addressed to a SUBJECT and describing world-visible state goes to every player who can see that
+subject — not only to the client whose action caused it.** A record about a player's own state, or a reply to
+their own request, does not.
+
+This class of bug is invisible in single-client testing *and* in a single-client capture, which is why it needs a
+standing measurement rather than a convention. The oracle is
+**`login_2-clients_group-trade-friend`** — the only capture with two game connections. With one client, a
+broadcast and a private reply look identical; with two, a record reaching both streams IS a broadcast.
+`--report broadcast-check` re-measures it:
+
+| verdict | records |
+|---|---|
+| **BROADCAST** (every subject reached both clients) | `SimpleCharFullUpdate` 35/35, `MoveTask` 12/12, `BehaviorControlCenter` 11/11, `StatUpdate` 9/9, `LookAt` 8/8, `CharDCMove` 6/6, `DoorFullUpdate` 5/5, `MagicBuff` 5/5, `Stop` 4/4, `StatDamage` 3/3, `ClimbingDynelFullUpdate` 3/3, `AddToGroup` 2/2, `RemoveFromGroup` 2/2, `LockedToChanged` 2/2 |
+| **per-client** (every subject reached one) | `FullPlayerCharacter` 0/2, `Feedback` 0/2, `FormatFeedback` 0/2, `UpdateInventory` 0/2, `CoreClaim` 0/1 |
+| **MIXED** | `SimpleDynelFullUpdate` 56/70, `N3ToClientQuit` 2/44, `GameActionList` 5/6, `CharInPlay` 3/5, `StatIIR` 3/4, `Regen` 1/2 |
+
+⚠️ **Do not automate off the type.** An IIR type is not one message: a `BehaviorControlCenterIIR` carries an
+entity's animation (broadcast) *and* the ack of a client's own request (not), and the two players in that capture
+never fought — so its 11/11 says only that these eleven were the first kind. The record's **role** decides. The
+MIXED rows are the proof: `N3ToClientQuit` is 2/44 because a despawn is per-viewer *by interest*, which is
+correct, not a bug.
+
+**How to apply.** Use `WorldBroadcaster.BroadcastEntityRecords` for records about an NPC/world entity, and
+`BroadcastBehaviorToViewers` to relay a player's own behaviour to everyone watching. Reach for them when the
+record says what an entity **did**; leave a per-client send when it answers what a client **asked**.
+
+Fixed under this rule so far: the NPC death sequence (drop-target, death pose, death BCC — previously sent to
+the killer alone, so a creature someone else killed stayed standing for you), and the search / hide / rest player
+stances (previously the actor only, so a rogue entering the shadows was still standing upright to everyone else).
+
 ### The death pose flushes what the chase never sent (#272)
 
 ⚠️ A creature killed **mid-chase** used to jump onto its killer and only then play its death animation, and only
