@@ -80,15 +80,20 @@ namespace Faolan.Importer.Cli
 				})
 				.ToListAsync();
 
-			var bands = await db.SpellStatEffects.AsNoTracking()
-				.Where(e => e.LowLevel != null)
+			// The level a record's numbers OPEN at, read exactly as `RdbSpellImporter.BandOpensAt` reads it: the
+			// LOWEST band above 1, falling back to the lowest of all. A stepped ramp states `{1, 30, 35, 40, 45}` for
+			// a rank rated 30, so the highest is its CEILING and only the lowest-above-floor is its own level - and
+			// this column has to agree with the importer or it promises repairs that will not happen.
+			var bands = (await db.SpellStatEffects.AsNoTracking()
+					.Where(e => e.LowLevel != null)
+					.Select(e => new
+					{
+						e.SpellId,
+						Low = e.LowLevel!.Value
+					})
+					.ToListAsync())
 				.GroupBy(e => e.SpellId)
-				.Select(g => new
-				{
-					SpellId = g.Key,
-					Low = g.Max(e => e.LowLevel)
-				})
-				.ToDictionaryAsync(x => x.SpellId, x => (uint?)x.Low);
+				.ToDictionary(g => g.Key, g => (uint?)(g.Where(e => e.Low > 1).Select(e => e.Low).DefaultIfEmpty(g.Min(e => e.Low)).Min()));
 
 			// (spell -> the names of the feats that teach it). The NAME is the payload here, not the id: it is what
 			// carries the level band and what separates a class feat from a band feat.

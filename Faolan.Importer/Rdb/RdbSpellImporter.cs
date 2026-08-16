@@ -894,13 +894,14 @@ namespace Faolan.Importer.Rdb
 				if (fieldLevels >= byRank.Count)
 					continue;
 
-				// ...and the bands have to answer for EVERY rank, with one answer per rank (two ids of the same rank
-				// disagreeing is not a ladder), inside the level cap.
+				// ...and the bands have to answer for EVERY rank, with one answer per rank, inside the level cap. A
+				// record carrying NO banded effect is silent rather than dissenting - several of these families ship
+				// two ids per rank where only one holds the ramp - so it is the ids that DO answer that have to agree.
 				var ladder = new List<uint>(byRank.Count);
 				foreach (var rank in byRank)
 				{
-					var lows = rank.Select(m => BandLow(statEffects, m.Spell.Id)).Distinct().ToList();
-					if (lows is [{ } low] && low > 0 && low <= MaxCharacterLevel)
+					var lows = rank.Select(m => BandOpensAt(statEffects, m.Spell.Id)).Where(l => l is > 0).Distinct().ToList();
+					if (lows is [{ } low] && low <= MaxCharacterLevel)
 						ladder.Add(low);
 					else
 						break;
@@ -932,20 +933,54 @@ namespace Faolan.Importer.Rdb
 			return changed;
 		}
 
-		// The band a spell's numbers OPEN at: the highest ramp low-level over its effects. Highest, not lowest,
-		// because a record may carry both a per-rank ramp and an unbanded companion effect whose ramp opens at 1 -
-		// `Blasphemous Ruin (Rank 2)` states 35 and 1 - and it is the banded one that dates the rank.
-		private static uint? BandLow(Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>> statEffects, uint spellId)
+		/// <summary>
+		///     The level a spell's numbers OPEN at: the LOWEST ramp low-level over its effects that is above 1,
+		///     falling back to the lowest of all when every one of them is 1.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Lowest, not highest, and the difference is the whole rule. A record carries one of two shapes, and
+		///     reading the highest is right for one and reads the CEILING on the other:
+		///     <list type="bullet">
+		///         <item>
+		///             one band - <c>Ice Strike (Rank 1)</c> states <c>{7}</c> and is rated 7. Highest and lowest
+		///             agree.
+		///         </item>
+		///         <item>
+		///             a STEPPED ramp of four or five - <c>Radiance (Rank 2)</c> states
+		///             <c>{1, 30, 35, 40, 45}</c> and is rated <b>30</b>. The <c>1</c> is a floor entry and the 45 is
+		///             where the rank is superseded, so the rank's own level is the second step.
+		///         </item>
+		///     </list>
+		///     Measured over the 406 rank spells that carry a band at all, this reproduces <c>Spells.Level</c> on
+		///     <b>263</b> against the highest reading's 202 - and the split is entirely by shape: on the 92 records
+		///     with four or five bands it is right 71 times and the highest reading twice.
+		///     <para>
+		///         ⭐ Which is what turns eleven collapsed families into a repair rather than a residue. Each of them
+		///         states ranks 2..N at exactly <c>Spells.Level</c> - four or five control points per family, 40-odd
+		///         in all - and then supplies the one rung field 125 lacks: <c>Radiance</c> reads 15/30/45/60/75
+		///         where the field reads 30/30/45/60/75, <c>Gelid Bones</c> 10/25/40/55/70 against 25/25/40/55/70.
+		///         Rank 1 lands below rank 2 every time.
+		///     </para>
+		/// </remarks>
+		private static uint? BandOpensAt(Dictionary<uint, List<ItemTemplateStatModifiers.Modifier>> statEffects, uint spellId)
 		{
 			if (!statEffects.TryGetValue(spellId, out var mods))
 				return null;
 
-			uint? low = null;
+			uint? lowest = null;
+			uint? aboveFloor = null;
 			foreach (var mod in mods)
-				if (mod.Ramp is { } ramp && (low is null || ramp.LowLevel > low))
-					low = ramp.LowLevel;
+			{
+				if (mod.Ramp is not { } ramp)
+					continue;
 
-			return low;
+				if (lowest is null || ramp.LowLevel < lowest)
+					lowest = ramp.LowLevel;
+				if (ramp.LowLevel > 1 && (aboveFloor is null || ramp.LowLevel < aboveFloor))
+					aboveFloor = ramp.LowLevel;
+			}
+
+			return aboveFloor ?? lowest;
 		}
 
 		// The "(Rank N)" suffix the client puts on a ranked spell, split off its family name. Trailing spaces are

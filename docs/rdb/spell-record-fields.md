@@ -608,14 +608,32 @@ and where they disagree an independent scrape backs the **band**: ellatha rates 
 `Chill` rank 1 at level 15, exactly where their rank-1 bands open and eight levels above where 125 puts the
 whole of Chill.
 
-⚠️ **The band is not a general level source.** It agrees with 125 on only 46% of the rank spells carrying
-both, because a ramp may legitimately open at 1 (a buff scaling from the first level it is castable) or be
-banded against a different family member's ranks. `RdbSpellImporter.RankLadderFromEffectBands` consults it
-only where 125 has disqualified itself by collapsing ranks, and only where the bands then answer for every
-rank with one value, monotonically, inside the level cap, and with more distinct levels than 125 managed —
-over the whole catalog, `Chill`, `Infestation` and `Lifestrike` and nothing else. The 19 families still
-collapsing have no second source and keep 125's answer; `--report spell-level-ladder` lists them and returns
-non-zero only if a family the rule *would* separate is still shipped collapsed.
+#### ⚠️ Which band — the LOWEST above 1, never the highest
+
+A record carries one of two shapes, and reading the wrong end of the second one reads its **ceiling**:
+
+| shape | example | what it means |
+|---|---|---|
+| one band | `Ice Strike (Rank 1)` states `{7}`, rated 7 | the band *is* the level |
+| a stepped ramp of four or five | `Radiance (Rank 2)` states `{1, 30, 35, 40, 45}`, rated **30** | the `1` is a floor entry, the 45 is where the rank is superseded, and the rank's own level is the second step |
+
+So the reading is **the lowest band above 1**, falling back to the lowest of all where every one is 1. Over the
+406 rank spells carrying a band it reproduces `Spells.Level` on **263**, against 202 for the highest — and the
+difference is entirely by shape: on the 92 records with four or five bands it is right 71 times and the highest
+reading **twice**.
+
+⚠️ **Even so the band is not a general level source** — 263 of 406 is 65%, because a ramp may legitimately open
+at 1 (a buff scaling from the first level it is castable) or be banded against a different family member's ranks.
+`RdbSpellImporter.RankLadderFromEffectBands` consults it only where 125 has disqualified itself by collapsing
+ranks, and only where the bands then answer for every rank with one value, monotonically, inside the level cap,
+and with more distinct levels than 125 managed. A record carrying no banded effect is **silent rather than
+dissenting**, so a rank is answered by whichever of its ids do carry a ramp.
+
+That is `Chill`, `Infestation`, `Lifestrike`, `Radiance` and `Gelid Bones`. The last two are what the corrected
+reading added: `Radiance` states ranks 2-5 at **exactly** 30/45/60/75, matching field 125 rung for rung, and then
+supplies the one it copied — rank 1 at **15** where 125 repeats rank 2's 30. Four control points, then the
+answer. `--report spell-level-ladder` lists the 17 still collapsing and returns non-zero only if a family the
+rule *would* separate is still shipped collapsed.
 
 ### The TEACHING FEAT is a third statement, and it splits the residue in two
 
@@ -631,7 +649,7 @@ Read against the feats, the 19 residual collapses are two shapes, not one:
 | shape | evidence | count |
 |---|---|---:|
 | **untaught top rank** — not level-granted at all | no feat grants it while every rank below has one; it repeats the level below; all nine sit in one late id block (`>= 4487431`) nothing else occupies; the captured level-80s know the rank below and never it (`Chill` 1-5 not 6, `Pestilential Blast` 1-6 not 7, `Hellfire Stream` 1-5 not 6, `Shock` 1-4 not 5) | 8 |
-| **rank 1 from a class feat** — level copied from rank 2 | rank 1's only grant is a `<Class> Class Feat`, which states no band, so field 125 had nothing of rank 1's own | 9 |
+| **rank 1 from a class feat** — level copied from rank 2 | rank 1's only grant is a `<Class> Class Feat`, which states no band, so field 125 had nothing of rank 1's own | 7 |
 
 ⚠️ The second shape is **not** recoverable from the client: the feat record carries no level field (five teaching
 feats diffed — the fixed header is byte-identical up to the name), and a class feat is not a single-level unlock
