@@ -29,6 +29,11 @@ namespace Faolan.Importer.Captures
 	// which is why it is worth its own file rather than another 1,250 lines in the grab-bag.
 	public static class QuestGoalWiring
 	{
+		// The "Acheronian Gate" world object on the beach (map 4010, 523.4/754.7) - what quest 12369's goal 3492
+		// "Unlock the Acheronian gate" is solved by USING (#527). `WorldObject.Id` is the importer's derived key, so
+		// this survives a re-harvest of the world objects.
+		private const uint AcheronianGateObjectId = 975369919;
+
 		// Overlay the hand-authored quest WIRING onto the harvested definitions - the fields captures don't carry: the
 		// server trigger (GoalType/TargetName/QuestItemId via SeedGoal), the chain successor (NextQuestId via Chain), and
 		// the byte-exact @609/snapshot detail the beach + Casilda quests need. Run as its OWN importer module
@@ -153,8 +158,17 @@ namespace Faolan.Importer.Captures
 			// (ResequenceGoalsByPhase): the client's phase says 7134 is played first, and the corpus agrees - 7134 is
 			// the goal that takes the `Advanced` hand-off, which only a NON-last goal gets.
 			//
-			// 3492 = ReachArea at the gate itself - the gate object sits on its marker, and arriving there with the key
-			// is what "unlock" amounts to for us until a use-the-object goal type exists. III is chain-final for now.
+			// 3492 = USE the Acheronian Gate itself, holding the key. III is chain-final for now.
+			//
+			// ⚠️ It was a ReachArea until #527, and that was wrong in play rather than merely approximate: the gate
+			// object STANDS ON the goal's marker, so the objective completed the moment the player walked up to it -
+			// before the key was looted, and without the gate ever being touched. Reported in-client 2026-08-16 as
+			// "auto-completes on proximity".
+			//
+			// Retail's order is unambiguous (`Hoxxling_mage-heraldofxotli_login_gameplay`): fr12193 the player selects
+			// the gate dynel, fr12196 sends the use, fr12204 goal 3492 ticks 1/1, fr12205 the quest completes. The key
+			// (193186) rides along as the goal's QuestItemId - `UseWorldObject` requires it to be HELD, and unlike a
+			// delivery does not take it.
 			//
 			// ⚠️ It STAYS a seed while its sibling 3498 "Enter the City of Tortage" went (#705): 3498 carries a
 			// TrailingCategory 100 location reference, so TypeLocationGoalsFromTrailingCategory types it from the
@@ -163,7 +177,7 @@ namespace Faolan.Importer.Captures
 			await Chain(db, 12369, 12373);
 			await CorrectAcheronianGateGoals(db);
 			await SeedGoal(db, 12369, 7134, QuestGoalType.LootFromNpc, "Saddur", 193186, 1);
-			await SeedGoal(db, 12369, 3492, QuestGoalType.ReachArea);
+			await SeedGoal(db, 12369, 3492, QuestGoalType.UseWorldObject, questItemId: 193186, worldObjectId: AcheronianGateObjectId);
 
 			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
 			// here. goal 3495 "get 3 stone bricks" = CollectItem of item 193400 (its TrailingRefId), picked up from the 12
@@ -208,6 +222,18 @@ namespace Faolan.Importer.Captures
 				unlock.TargetName = null;
 				unlock.QuestItemId = null;
 				Console.WriteLine("Corrected quest 12369: goal 3492 'Unlock the Acheronian gate' was carrying goal 7134's key loot (#527).");
+			}
+
+			// The SECOND mistyping of the same goal, and it needs a corrective for the same reason: 3492 was seeded
+			// `ReachArea` while no use-the-object type existed, and `IsWired` would keep that forever. It is not a
+			// close-enough approximation - the gate object stands ON the goal's marker, so the objective auto-completed
+			// on PROXIMITY, before the key was looted and without the gate being touched (reported in-client
+			// 2026-08-16). Narrow on purpose, exactly like the block above: only the row the old seed could have
+			// produced - a bare ReachArea with no target of any kind - so a hand edit is left alone.
+			if (unlock is { GoalType: QuestGoalType.ReachArea, TargetName: null, QuestItemId: null, TargetWorldObjectId: null })
+			{
+				unlock.GoalType = QuestGoalType.None; // hand it back to the seed below, which types it properly
+				Console.WriteLine("Corrected quest 12369: goal 3492 'Unlock the Acheronian gate' was a ReachArea that completed on proximity (#527).");
 			}
 
 			var findKey = goals.Find(g => g.GoalId == 7134);
@@ -1100,7 +1126,7 @@ namespace Faolan.Importer.Captures
 		// re-import never clobbers trigger fields set by hand (the Quest editor) or a prior run. A newly-created goal is
 		// un-wired, so a fresh import still bootstraps.
 		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null,
-			uint? required = null, bool gatesVisibility = false, bool staysDead = false)
+			uint? required = null, bool gatesVisibility = false, bool staysDead = false, uint? worldObjectId = null)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)
@@ -1123,6 +1149,9 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = type;
 			goal.TargetName = target;
 			goal.QuestItemId = questItemId;
+			// The door/gate/lever a UseWorldObject goal is solved by USING (#527). Server-side, like TargetName beside
+			// it - the goal record names its object nowhere on the wire.
+			goal.TargetWorldObjectId = worldObjectId;
 			// Editorial, and off by default: a one-time story target hides until its quest is active, and stays dead.
 			// See QuestGoalDefinition.GatesTargetVisibility for why neither is ever derived from having a TargetName -
 			// and #708 for why they are two calls: a quest-only target on a REPEATABLE quest is the first case that

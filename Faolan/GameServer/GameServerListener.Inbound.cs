@@ -2219,6 +2219,12 @@ namespace Faolan.GameServer
 			var playedFarewell = false;
 			if (interaction.WorldObjectId is { } usedObjectId && behaviorType == 0x0003)
 			{
+				// #527: using this object may BE an objective - "Unlock the Acheronian gate" is solved by using the
+				// gate, not by walking up to it. Same begin-phase gate as the escort hand-off below, so a door-use's
+				// release phase cannot tick it twice, and ahead of the escort/teleport work for the same reason retail
+				// puts it there: in the capture the goal ticks before anything else the use causes.
+				await _questProgression.AdvanceUseObjectGoals(client, usedObjectId);
+
 				foreach (var escortee in await Database.GetServerInitiatedConversationNpcs(usedObjectId))
 				{
 					// Gate on the escort actually being IN PROGRESS. That is what separates the one door use

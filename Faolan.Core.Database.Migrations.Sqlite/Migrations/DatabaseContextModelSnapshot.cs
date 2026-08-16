@@ -3204,6 +3204,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("TargetTemplateId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("TargetWorldObjectId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("TrailingCategory")
                         .HasColumnType("INTEGER");
 
@@ -3238,6 +3241,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("RegionId");
 
                     b.HasIndex("TargetTemplateId");
+
+                    b.HasIndex("TargetWorldObjectId");
 
                     b.ToTable("QuestGoalDefinitions");
                 });
@@ -5446,6 +5451,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("TargetTemplateId");
 
+                    b.HasOne("Faolan.Core.Database.Tables.WorldObject", "TargetWorldObject")
+                        .WithMany()
+                        .HasForeignKey("TargetWorldObjectId");
+
                     b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "ObjectiveKey", b1 =>
                         {
                             b1.Property<uint>("QuestGoalDefinitionGoalId")
@@ -5516,6 +5525,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Region");
 
                     b.Navigation("TargetTemplate");
+
+                    b.Navigation("TargetWorldObject");
 
                     b.Navigation("TrailingKey")
                         .IsRequired();

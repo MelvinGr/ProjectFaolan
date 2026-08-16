@@ -85,6 +85,21 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(QuestItemId))]
 		public virtual Item? QuestItem { get; set; }
 
+		// The WORLD OBJECT this goal is about - the door, gate or lever a `UseWorldObject` goal is solved by USING
+		// (#527). SERVER-SIDE ONLY, like `TargetName` and `TargetTemplateId` beside it, and for the same reason: the
+		// goal record names its target nowhere on the wire.
+		//
+		// ⚠️ It could NOT reuse `TrailingRefId`, which is where an Escort goal keeps its escortee and a UseItem goal
+		// its item. That field is part of the byte-exact @609 record, and goal 3492's is 0 in the capture - writing a
+		// world-object id into it would put bytes on the wire retail never sent, to carry a fact retail never puts
+		// there. A server-side column is the honest home for a server-side resolution.
+		//
+		// Points at `WorldObject.Id`, the importer's own derived key, so it survives a re-harvest (see DerivedKey).
+		public uint? TargetWorldObjectId { get; set; }
+
+		[ForeignKey(nameof(TargetWorldObjectId))]
+		public virtual WorldObject? TargetWorldObject { get; set; }
+
 		public uint SubId { get; set; } // the trailing record's id echoed in the header (= TrailingRefId)
 
 		// The trailing text record: a <remoteformat category=51200> or a <localized category=51000 flags=..>.

@@ -29,6 +29,7 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 | `ReachArea` | the move handler, per accepted move | the goal's **region** if it has one, else a 40-unit radius around its map marker |
 | `CollectItem` | **any item reaching the inventory** | `TrailingRefId == item template id` |
 | `UseItem` | `UseInventoryItem`, on the right-click that applies the item's own effect | `TrailingRefId == item template id` |
+| `UseWorldObject` | the `UseDynel` handler, on the **begin** phase of a world-object use | `TargetWorldObjectId == the used object`, plus `QuestItemId` **held** if it names one |
 
 ⚠️ **`UseItem` is not `CollectItem` with a different name, and the difference is load-bearing.** A collect is
 satisfied by *holding* the item; a use, by *consuming* it. The one shipped `Use` goal — *"Use the Vial to Capture
@@ -447,8 +448,25 @@ One is now typed:
 
   - **g7134** = `LootFromNpc` **Saddur** → 193186, count 1 — the objective the capture actually records
     (Saddur dies fr11942 → corpse bag fr11947 → key added fr12023).
-  - **g3492** = `ReachArea` at its own marker, where the gate object stands — the same pattern as stage III's
-    g3498, and the closest trigger we have until a use-the-object goal type exists.
+  - **g3492** = `UseWorldObject` on the **Acheronian Gate** (975369919), with the key (193186) required in hand.
+
+  ⚠️ **g3492 was `ReachArea` at its own marker until #527, and that was wrong in play, not merely approximate.**
+  The gate object *stands on* the marker — which is what made the reach look right — so the objective completed
+  the moment the player walked up to it: before the key was looted, and without the gate ever being touched.
+  Reported in-client 2026-08-16 as "auto-completes on proximity". Retail's order settles it, and there is no
+  ambiguity in it (`Hoxxling_mage-heraldofxotli_login_gameplay`): fr12193 the player *selects* the gate dynel,
+  fr12196 sends the **use**, fr12204 g3492 ticks 1/1, fr12205 the quest completes.
+
+  ⭐ The general lesson, since the same marker reasoning is available for every goal: **"the marker is where the
+  target is" makes a reach look right for any objective whose target is a thing you must interact with.** A reach
+  is the correct type only when *arriving* is the objective — stage III's g3498 "Enter the City of Tortage"
+  genuinely is one. Where the target is a door, a gate or a lever, the trigger is the use.
+
+  The key is required but **not consumed**: `QuestProgress.RequiredHeldItemId` is deliberately separate from
+  `DeliveryItemId`, because a hand-in gives its item away and an unlock does not. Retail does remove the key one
+  frame after the quest completes (fr12206, quest container `0x71` slot 0) — but that lands *after* the quest's
+  own completion, so it reads as the quest clearing its container rather than the gate eating the key. Which of
+  the two it is is open, tracked in Gitea #843.
 
   No goal is `Partial` any more, which `SeedContentTests.NoQuestGoal_IsStillPartial` now keeps true.
 

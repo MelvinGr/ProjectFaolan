@@ -275,6 +275,63 @@ namespace Faolan.Tests
 			Assert.True(await db.Items.AnyAsync(i => i.Id == goal.TrailingRefId, ct),
 				"the Use goal's item left the catalog - the objective is now uncompletable rather than inert");
 		}
+		// #527: "Unlock the Acheronian gate" is solved by USING the gate, not by standing next to it. The matcher must
+		// be blind to every other goal type, and in particular a reach goal at the same spot must not answer for it.
+		[Fact]
+		public void MatchingUseObjectGoal_ByWorldObjectId_UseWorldObjectTypeOnly()
+		{
+			var goals = new[]
+			{
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 3492,
+					GoalType = QuestGoalType.UseWorldObject,
+					TargetWorldObjectId = 975369919, // the Acheronian Gate
+					QuestItemId = 193186 // ...and the key that opens it
+				},
+				new QuestGoalDefinition
+				{
+					Sequence = 2,
+					GoalId = 3498,
+					GoalType = QuestGoalType.ReachArea
+				}
+			};
+
+			Assert.Equal(3492u, QuestProgress.MatchingUseObjectGoal(goals, 975369919)?.GoalId);
+			Assert.Null(QuestProgress.MatchingUseObjectGoal(goals, 244779243)); // a different object - the Grotto
+			Assert.Null(QuestProgress.MatchingUseObjectGoal(goals, 0)); // no object -> no match, never the reach goal
+
+			// The KEY half. It is a prerequisite, not a hand-over: nothing takes it, which is what separates this from
+			// DeliveryItemId beside it.
+			Assert.Equal(193186u, QuestProgress.RequiredHeldItemId(goals[0]));
+			Assert.Equal(0u, QuestProgress.RequiredHeldItemId(goals[1]));
+			Assert.False(QuestProgress.IsDelivery(goals[0]), "an unlock is not a hand-in - the key must not be consumed");
+		}
+
+		// The shipped row, so the proximity bug cannot come back by a re-seed: goal 3492 must stay a USE of the gate
+		// object, holding the key. It was a ReachArea until #527 - and the gate object stands ON the goal's marker, so
+		// that completed the objective on arrival, before the key was looted and without the gate being touched.
+		[Fact]
+		public async Task ShippedAcheronianGateGoal_IsAUseOfTheGate_NotAReach()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var goal = await db.QuestGoalDefinitions.FirstOrDefaultAsync(g => g.QuestDefinitionId == 12369 && g.GoalId == 3492, ct);
+			Assert.NotNull(goal);
+			Assert.Equal(QuestGoalType.UseWorldObject, goal!.GoalType);
+			Assert.Equal(193186u, goal.QuestItemId);
+
+			// The same guard the Use-item gate applies: a goal pointing at an object or an item we do not hold is a
+			// silently uncompletable objective rather than an inert one.
+			Assert.NotNull(goal.TargetWorldObjectId);
+			Assert.True(await db.WorldObjects.AnyAsync(o => o.Id == goal.TargetWorldObjectId, ct),
+				"the unlock goal's world object left the world - the objective is now uncompletable");
+			Assert.True(await db.Items.AnyAsync(i => i.Id == goal.QuestItemId, ct),
+				"the gate key left the catalog - the unlock can never be satisfied");
+		}
+
 		[Fact]
 		public void CanHandIn_DeliveryNeedsTheItemInHand_OthersUnaffected()
 		{

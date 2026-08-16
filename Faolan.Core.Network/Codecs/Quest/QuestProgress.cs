@@ -140,6 +140,33 @@ namespace Faolan.Core.Network.Codecs.Quest
 				: InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.UseItem && g.TrailingRefId == itemId)).FirstOrDefault();
 		}
 
+		// The UseWorldObject goal for `worldObjectId` (#527): the first (in PLAY order) such goal pointing at the door,
+		// gate or lever just used. Its own column rather than `TrailingRefId` - see `TargetWorldObjectId`.
+		public static QuestGoalDefinition? MatchingUseObjectGoal(IEnumerable<QuestGoalDefinition> goals, uint worldObjectId)
+		{
+			return worldObjectId == 0
+				? null
+				: InPlayOrder(goals.Where(g => g.GoalType == QuestGoalType.UseWorldObject && g.TargetWorldObjectId == worldObjectId)).FirstOrDefault();
+		}
+
+		// The item a goal requires the player to be CARRYING, without taking it - 0 when it requires none.
+		//
+		// Distinct from `DeliveryItemId` beside it, and the difference is what happens to the item: a delivery HANDS
+		// ITS ITEM OVER and the hand-in takes it, while "unlock the gate with the key" wants the key in hand and
+		// leaves it there. Only `UseWorldObject` reads this today - the key half of an unlock (#527).
+		//
+		// ⚠️ Retail DOES remove the Acheronian Gate Key one frame after quest 12369 completes
+		// (`Hoxxling_mage-heraldofxotli_login_gameplay` fr12206, quest container 0x71 slot 0). That is not evidence
+		// the GATE consumed it: the removal lands AFTER the quest's own completion, so it reads as the quest clearing
+		// its quest-container items - a general behaviour, not this goal's. Taking the key here would bake one reading
+		// of an ambiguous frame into a trigger. Which of the two it is is open, tracked as Gitea #843.
+		public static uint RequiredHeldItemId(QuestGoalDefinition goal)
+		{
+			return goal is { GoalType: QuestGoalType.UseWorldObject, QuestItemId: > 0 }
+				? goal.QuestItemId.Value
+				: 0;
+		}
+
 		// The NPC TEMPLATE a goal targets, or null when it has not been resolved to one (#521). Two sources, and they
 		// never disagree - the second is where the first came from wherever both exist:
 		//

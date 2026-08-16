@@ -1246,11 +1246,19 @@ namespace Faolan.Tests
 			Assert.Equal("Saddur", goals[0].TargetName);
 			Assert.Equal(193186u, goals[0].QuestItemId); // "Acheronian Gate Key"
 
-			// Then unlock the gate. ReachArea at its own marker, which is where the gate object stands.
+			// Then unlock the gate - by USING the gate object, holding the key.
+			//
+			// ⚠️ This gate used to assert `ReachArea` at the goal's own marker, on the reasoning that the gate object
+			// stands there. It does - and that is exactly why the reach was wrong (#527): the objective completed the
+			// moment the player walked up to the gate, before the key was looted and without the gate ever being
+			// touched. "The marker is where the target is" makes a reach LOOK right for any goal whose target is a
+			// thing you must interact with, which is the trap - a reach is the right type only when ARRIVING is the
+			// objective. Retail sends the use and ticks the goal after it.
 			Assert.Equal(3492u, goals[1].GoalId);
-			Assert.Equal(QuestGoalType.ReachArea, goals[1].GoalType);
+			Assert.Equal(QuestGoalType.UseWorldObject, goals[1].GoalType);
 			Assert.Null(goals[1].TargetName);
-			Assert.True(goals[1].MarkerX > 0 && goals[1].MarkerY > 0, "a ReachArea goal with no marker can never be completed");
+			Assert.Equal(975369919u, goals[1].TargetWorldObjectId); // the "Acheronian Gate" world object
+			Assert.Equal(193186u, goals[1].QuestItemId); // ...which needs the key in hand to open
 		}
 	}
 }

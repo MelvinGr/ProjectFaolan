@@ -155,6 +155,19 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Escort, null!, npcTemplateId);
 		}
 
+		// The player USED a world object - a door, a gate, a lever: complete any active goal that is about USING that
+		// object (#527). Called from the same `UseDynel` choke point the escort hand-off uses, on the BEGIN phase only.
+		//
+		// The Acheronian Gate is the case it exists for. "Unlock the Acheronian gate" (12369/3492) was wired as a
+		// ReachArea because no use-the-object type existed, and the gate stands ON its own marker - so walking up to it
+		// completed the objective, before the key had been looted and without the gate ever being touched. Retail's
+		// order is the opposite and unambiguous: target the gate, send the use, and only THEN does the goal tick
+		// (`Hoxxling_mage-heraldofxotli_login_gameplay` fr12193 select -> fr12196 use -> fr12204 goal 3492 1/1).
+		public Task AdvanceUseObjectGoals(INetworkClient client, uint worldObjectId)
+		{
+			return Advance(client, QuestGoalType.UseWorldObject, null!, worldObjectId);
+		}
+
 		// The player's rank in the named faction, or NULL when that cannot be answered - which is the case today,
 		// because the faction/reputation system does not exist yet (Gitea #310).
 		//
@@ -349,6 +362,7 @@ namespace Faolan.GameServer.Quest
 					QuestGoalType.UseItem     => QuestProgress.MatchingUseGoal(def.Goals, targetTemplateId ?? 0),
 					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0, npcTemplateId),
 					QuestGoalType.Escort      => QuestProgress.MatchingEscortGoal(def.Goals, targetTemplateId ?? 0),
+					QuestGoalType.UseWorldObject => QuestProgress.MatchingUseObjectGoal(def.Goals, targetTemplateId ?? 0),
 					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName, npcTemplateId)
 				};
 				if (goal == null)
@@ -373,6 +387,16 @@ namespace Faolan.GameServer.Quest
 					// Say so rather than no-op: the player IS on the right quest talking to the right NPC, so silence
 					// reads as a broken quest. This only fires once the goal has already matched.
 					await _agents.SendSystemMessage(character.Id, "You are not carrying what this delivery needs.");
+					continue;
+				}
+
+				// #527: an "unlock X" goal wants the KEY in hand. Same shape as the delivery check above and a separate
+				// rule for one reason - this one does NOT take the item; the key stays in the bag (see
+				// QuestProgress.RequiredHeldItemId). Without it "Unlock the Acheronian gate" is solved by shoving the
+				// gate empty-handed, which is the proximity bug wearing a different trigger.
+				if (!await HoldsRequiredItem(character.Id, goal))
+				{
+					await _agents.SendSystemMessage(character.Id, "It is locked. You need the key.");
 					continue;
 				}
 
@@ -460,8 +484,25 @@ namespace Faolan.GameServer.Quest
 
 			// Summed across slots: a stack can be split over several cells, and a split stack is still the items.
 			var itemId = QuestProgress.DeliveryItemId(goal);
-			var held = (await _database.GetCharacterItems(characterId)).Where(i => i.TemplateId == itemId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
-			return QuestProgress.CanHandIn(goal, held);
+			return QuestProgress.CanHandIn(goal, await HeldCount(characterId, itemId));
+		}
+
+		// #527: whether the player is CARRYING what an "unlock" needs - the gate key. True when the goal names no such
+		// item, so this is a no-op on every other goal type.
+		//
+		// Separate from HoldsDeliveryItem above, and the difference is what happens NEXT: a delivery's item is taken
+		// when the hand-in goes through, and a key is not. One is a hand-over, the other a prerequisite.
+		private async Task<bool> HoldsRequiredItem(uint characterId, QuestGoalDefinition goal)
+		{
+			var itemId = QuestProgress.RequiredHeldItemId(goal);
+			return itemId == 0 || await HeldCount(characterId, itemId) > 0;
+		}
+
+		// How many of `itemId` the character holds. Summed across slots: a stack can be split over several cells, and a
+		// split stack is still the items.
+		private async Task<uint> HeldCount(uint characterId, uint itemId)
+		{
+			return (await _database.GetCharacterItems(characterId)).Where(i => i.TemplateId == itemId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
 		}
 
 		// Whether every goal of the quest has now reached its required count. `justTicked`/`justProgress` is the goal we

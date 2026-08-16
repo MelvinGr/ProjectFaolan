@@ -484,7 +484,26 @@ namespace Faolan.Core.Database.Tables
 		///         quest objective does both.
 		///     </para>
 		/// </remarks>
-		UseItem = 7
+		UseItem = 7,
+
+		/// <summary>
+		///     USE the world object in <see cref="QuestGoalDefinition.TargetWorldObjectId" /> - the door, gate or
+		///     lever the objective is about. Solved by the same `UseDynel` BCC a zone-line door takes, not by
+		///     standing near it (#262/#527).
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Deliberately NOT a <see cref="ReachArea" />, which is what "Unlock the Acheronian gate" (12369/3492)
+		///     was wired as while this type did not exist. The gate object stands ON the goal's marker, so a reach
+		///     completed the objective the moment the player walked up to it - before looting the key, and without
+		///     ever touching the gate. Retail's own order settles it: the player targets the gate, sends the use, and
+		///     only THEN does the goal tick.
+		///     <para>
+		///         A goal of this type may also name a <see cref="QuestGoalDefinition.QuestItemId" />, which the
+		///         player must be CARRYING for the use to count - the key half of "unlock". The item is not consumed;
+		///         see <c>QuestProgress.RequiredHeldItemId</c>.
+		///     </para>
+		/// </remarks>
+		UseWorldObject = 8
 	}
 
 	public enum QuestTextSlot
