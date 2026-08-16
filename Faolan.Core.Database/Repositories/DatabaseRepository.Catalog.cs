@@ -147,6 +147,21 @@ namespace Faolan.Core.Database.Repositories
 		// 227 of 259 combos, so there was nothing for a feat to teach. What is left is a real, ordinary gap of the
 		// same kind the caster classes have.
 		//
+		// ⚠️ AND NEITHER IS A SPELL A COMBO CHAINS (#852). `SpellAreaEffects` with kind `CastNano` is a spell->spell
+		// APPLY link, and a combo's GameAction uses it to inflict its debuff - which then carries the caster's
+		// class-encoded stacking line and lands in `ClassSpells` exactly like the DoT below. It is the SAME mistake
+		// one link over, and it is what the melee classes' whole "spellbook" was: `Staggering Blow I-IV` (Barbarian),
+		// `Lethargy I-III` (Assassin), `Bleeding Puncture I-IV` (Ranger), `Disable I-III` (Guardian). The rule takes
+		// 29 of the 68 the five of them were offered, all four of the Barbarian's and all three of the Assassin's.
+		//
+		// Same oracle, same standard: across the 249 spells the five imported characters know, NOT ONE is chained by
+		// a combo. ⚠️ And the broad form - "chained by ANY spell" - is NOT safe and was measured and rejected: it
+		// takes six of the level-80 Necromancer's own 109. Only the combo chainer is a statement about the target.
+		//
+		// ⚠️ It legitimately empties the Barbarian's and the Assassin's spell list, and that is not a class losing
+		// its kit: they hold 103 and 75 COMBOS, which travel the combo book. A pure-combo class having no spellbook
+		// spells is the shape of the class, not a gap - see `EveryClass_ReachesLevel80WithSomethingToCast`.
+		//
 		// ⚠️ AN EFFECT IS NOT A SPELLBOOK SPELL EITHER, and it reaches `ClassSpells` by the same route a combo does:
 		// the DoT a spell APPLIES carries its caster's class-encoded `GuiStackingLine`, so the map attributes it to
 		// the class exactly like the spell that applies it. `Infestation` is what `Flesh to Worms` inflicts - the
@@ -202,6 +217,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(x => x.Gate > fromLevelExclusive && x.Gate <= toLevelInclusive)
 				.Where(x => !ctx.Combos.Any(c => c.GameActionId == x.s.Id))
 				.Where(x => !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
+				.Where(x => !ctx.SpellAreaEffects.Any(chain => chain.EffectSpellId == x.s.Id && ctx.Combos.Any(c => c.GameActionId == chain.SpellId)))
 				.Where(x => !featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 				.OrderBy(x => x.Gate)
 				.ThenBy(x => x.s.Id)
@@ -542,6 +558,7 @@ namespace Faolan.Core.Database.Repositories
 				// combo GameAction, and every one of its members is feat-taught anyway).
 				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id)
 					&& !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id))
+					&& !ctx.SpellAreaEffects.Any(chain => chain.EffectSpellId == x.s.Id && ctx.Combos.Any(c => c.GameActionId == chain.SpellId))
 					&& (!featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 					&& (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level

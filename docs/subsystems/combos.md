@@ -86,6 +86,21 @@ cast it. Two kinds of non-castable record do:
 |---|---|---|
 | **combos** (#298) | `Combos.GameActionId` IS a `Spells.Id`, and a combo's GameAction carries a stacking line | across the four captured characters' known-spell lists (246 entries) not one is a combo GameAction |
 | **effects** (#847) | the DoT a spell APPLIES carries its **caster's** line | the captured L80 Necromancer knows all five ranks of `Flesh to Worms` (2/25/40/55/70) and **zero** ranks of the `Infestation` it inflicts |
+| **what a combo CHAINS** (#852) | `SpellAreaEffects` kind `CastNano` is a spell→spell apply link, and a combo's GameAction inflicts its debuff through it — which then carries the caster's line | of the 249 spells the five imported characters know, **not one** is chained by a combo |
+
+⭐ The third band is the melee classes' entire "spellbook": `Staggering Blow I-IV` (Barbarian), `Lethargy I-III`
+(Assassin), `Bleeding Puncture I-IV` (Ranger), `Disable I-III` (Guardian). The rule takes **29 of the 68** those
+five were offered — all four of the Barbarian's and all three of the Assassin's — and leaves the Conqueror with a
+list that finally reads like a Conqueror's (`Rally`, `Battle Cry: Inspire the Ranks`, `Aura: Hoarfrost`,
+`Guard of Dancing Steel`).
+
+⛔ **The broad form — "chained by ANY spell" — is not safe, and was measured and rejected**: it takes six of the
+level-80 Necromancer's own 109. Only a COMBO chainer is a statement about its target.
+
+⚠️ It leaves the Barbarian and the Assassin with **zero** level-granted spells, and that is the shape of the class
+rather than a gap: they hold 103 and 75 **combos**, which travel their own path.
+`EveryClass_ReachesLevel80WithSomethingToCast` asserts on the whole kit for exactly that reason, and
+`AClassTheFeatMapCoversStillHasASpellbookAt80` holds the line for the classes that really are casters.
 
 An effect's ranks pair with the **caster's** ranks rather than with a level ladder of their own, so all five
 `Infestation` ranks sit at `Level 2` and a single 1 → 2 ding taught the whole ladder. A flat rank ladder is the

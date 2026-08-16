@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -237,17 +238,46 @@ namespace Faolan.Tests
 
 		// ⚠️ The guard on `DatabaseRepository.FeatMapCovers`. Gating the level path on "a feat teaches it" is applied
 		// PER CLASS, because the feat map grants five classes (Barbarian, Guardian, Conqueror, Assassin, Ranger)
-		// nothing at all - their level-gated entries are overwhelmingly combos, which travel the combo book. For those
-		// the map's silence is missing data, not a statement, and gating on it would hand out an EMPTY spellbook with
-		// no capture to notice. This is what would fail if the gate were ever made global.
+		// nothing at all. For those the map's silence is missing data, not a statement, and gating on it would hand
+		// out an empty kit with no capture to notice. This is what would fail if the gate were ever made global.
+		//
+		// ⚠️ It asserts on the whole KIT - spells PLUS combos - and not on the spellbook alone, because an empty
+		// spellbook is the correct answer for a pure-combo class. Once the combo-CHAIN exclusion (#852) removed the
+		// debuffs their combos inflict, the Barbarian and the Assassin were left with zero level-granted spells, and
+		// that is the shape of the class rather than a gap: they hold 103 and 75 combos, which travel their own path
+		// (`GetClassCombosUnlockedBetween` -> ComboBookIIR). Asserting on the book alone would have made a correct
+		// exclusion look like a regression and invited a rule that put the debuffs back.
 		[Fact]
-		public async Task NoClass_ReachesLevel80WithAnEmptySpellbook()
+		public async Task EveryClass_ReachesLevel80WithSomethingToCast()
 		{
 			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
 			foreach (var @class in ClassSpellClasses)
 			{
 				var book = await repo.GetStartingSpells(80, @class);
-				Assert.True(book.Length > 0, $"{@class} would reach level 80 knowing nothing");
+				var combos = await repo.GetClassCombosUnlockedBetween(@class, 0, 80);
+
+				Assert.True(book.Length + combos.Length > 0, $"{@class} would reach level 80 with nothing to cast at all");
+			}
+		}
+
+		// ...and the two are not interchangeable: a class the feat map DOES speak for is a caster, and a caster with
+		// an empty spellbook is a defect however many combos it holds.
+		[Fact]
+		public async Task AClassTheFeatMapCoversStillHasASpellbookAt80()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+
+			foreach (var @class in ClassSpellClasses)
+			{
+				var covered = await db.ClassSpells.AsNoTracking().Where(cs => cs.Class == @class)
+					.AnyAsync(cs => db.FeatSpellGrants.Any(g => g.SpellId == cs.SpellId && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory), ct);
+				if (!covered)
+					continue;
+
+				var book = await repo.GetStartingSpells(80, @class);
+				Assert.True(book.Length > 0, $"{@class} has automatic-unlock feats and would still reach level 80 knowing no spells");
 			}
 		}
 
