@@ -507,6 +507,46 @@ Scavenger's Key*) complete on the **kill** and the **loot** with no dialogue at 
 2 → 4, and the next stage granted in the same burst. A chain stage supersedes where its goal is met; only the
 talk-goal stage (13480) completes in a conversation.
 
+## The Completed tab's body text is LDB slot 50303, and retail left half of it unwritten
+
+The Completed tab renders a *Region → Area → quest* tree, and each completed quest carries exactly **two**
+strings — the pair the completed-quest journal region ships (`CompletedQuestJournalRegionCodec`):
+
+| record | category | slot | what it is |
+|---|---|---|---|
+| `rec[0]` | 50301 | `Title` | the quest name — *"The Scavenger"* |
+| `rec[1]` | 50303 | `ListSubLine` | the **past-tense retrospective** shown under it |
+
+The 50303 text is written specifically as completed-tab prose and reads nothing like the active-quest
+description: 50302 `Summary` is present tense (*"I must take the key from the scavenger I fought…"*) while 50303
+is past tense (*"As my journey started on the beach of Tortage, I met the enslaved woman Casilda. I freed her
+from her chains and captor, and escorted her to the city of Tortage."*).
+
+⚠️ **A completed quest showing only its title is very often correct, not a bug.** Of the **1,974** quests
+carrying a 50303 slot, **1,064 (54%) are unfilled developer placeholders** in the client's own LDB:
+
+| value | quests |
+|---|---|
+| `<write the task solved text here>` | 1,021 |
+| `<write the mission solved text here>` | 35 |
+| `<write the task description here>` | 5 |
+| real prose | 910 |
+
+The Casilda destiny chain is a clean illustration, and the reason this reads as a server bug when it is not:
+its three intermediate steps — 13479 *The Scavenger*, 13563 *The Scavenger's Key*, 13480 *Freeing the Captured*
+— are **all placeholders**, while the stage that concludes the chain, 12407 *Casilda*, has the real paragraph
+quoted above. So the tab looks empty for exactly as long as the player is inside the chain.
+
+**Our bytes are retail's.** Dumped from `Hakotep_hox_login_gameplay0` frame 76 and rebuilt from the database,
+both records match key-for-key on all three quests, and `CompletedQuestJournalGenerationTests
+.CapturedRegions_RebuildFromTheDatabase_ByteExact` holds that over the whole corpus. The remoteformat `key` is
+**not** a request token either: it appears only in the four s2c snapshot packets of that session and is never
+sent back, so the client resolves 50301/50303 locally out of its own LDB. There is no reply for the server to
+owe.
+
+`--report ldb-quest-text <questId>` prints every slot for a quest, which is how to settle "should there be text
+here" before treating a blank as a defect.
+
 ## ReachArea: the marker is a pin, the region is the trigger
 
 A `ReachArea` goal carries a map marker, and the marker is what the client draws — not what retail triggers on.
