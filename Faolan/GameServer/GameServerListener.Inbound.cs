@@ -2216,7 +2216,7 @@ namespace Faolan.GameServer
 			// conversation for (ConversationNode.TriggerWorldObjectId), because the object that plays the
 			// escortee's farewell is by definition the place the escort was leading to. Costs one indexed
 			// lookup on a door use and yields nothing for every ordinary door.
-			var playedFarewell = false;
+			var playedFarewell = false; // TODO: verify in retail how the farewall works
 			if (interaction.WorldObjectId is { } usedObjectId && behaviorType == 0x0003)
 			{
 				// #527: using this object may BE an objective - "Unlock the Acheronian gate" is solved by using the
@@ -2243,6 +2243,14 @@ namespace Faolan.GameServer
 			// conversation opening, and then 1,200+ further packets with no playfield handoff at all. The
 			// farewell also opens with {hidegoodbye}, which pins the player until it is done - teleporting
 			// them mid-dialogue would strand the window on a map the NPC is not on. The next use goes through.
+			//
+			// ⚠️ So the player enters Tortage on a SECOND use of the gate, which is the maintainer's recollection of
+			// retail - and it is the one point where the captures disagree with it (#844, needs-testing). Both show
+			// the teleport arriving ~0.5 s after Casilda's despawn with no second interaction between: I dumped every
+			// c2s packet in that window and it is movement and pings only. Two sessions are not the rulebook - a
+			// trigger volume the moving player stepped into would look identical on the wire - so this stays as
+			// reported until an in-client check settles it. If the captures win, the fix is here: schedule the
+			// zone-line teleport after the escortee's exit instead of returning.
 			if (playedFarewell)
 				return;
 
