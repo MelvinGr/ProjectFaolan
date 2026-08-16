@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,6 +126,85 @@ namespace Faolan.Tests
 				Assert.True(bar.All(id => !comboActions.Contains(id)),
 					$"{@class}: the default bar seeds combo GameAction(s) {string.Join(", ", bar.Where(comboActions.Contains))}");
 			}
+		}
+
+		// #847: an EFFECT is not a spellbook spell either, and it reaches `ClassSpells` by the same route a combo
+		// does - the DoT a spell applies carries its caster's class-encoded stacking line. `Infestation` is what
+		// `Flesh to Worms` inflicts, and all five of its ranks sit at Level 2 because an effect's ranks pair with the
+		// CASTER's ranks rather than with a level ladder of their own, so one 1 -> 2 ding taught all five.
+		//
+		// Same oracle as the combo rule: no captured character's spellbook holds one.
+		[Fact]
+		public async Task NoCapturedSpellbook_ContainsAnEffectOfABookSpell()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var effects = await EffectsOfBookSpells(db, ct);
+			var known = await db.CharacterSpells.AsNoTracking().Select(s => s.SpellId).Distinct().ToListAsync(ct);
+
+			var leaked = known.Where(effects.Contains).ToList();
+			Assert.True(leaked.Count == 0, "captured spellbook entries that are a book spell's effect: " + string.Join(", ", leaked));
+		}
+
+		// So no grant path may teach one - the ding, the relog re-grant, or the default bar seed. The re-grant matters
+		// as much as the ding: it re-derives the whole book on every world entry, so leaving it out would put back
+		// what the ding no longer teaches.
+		[Fact]
+		public async Task NoSpellGrantQuery_ReturnsAnEffectOfABookSpell()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var effects = await EffectsOfBookSpells(db, ct);
+
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			foreach (var @class in ClassSpellClasses)
+			{
+				var dinged = await repo.GetClassSpellsUnlockedBetween(@class, 0, 80);
+				Assert.True(dinged.All(id => !effects.Contains(id)), $"{@class}: level-up learns effect spell(s) {string.Join(", ", dinged.Where(effects.Contains))}");
+
+				var relog = await repo.GetStartingSpells(80, @class);
+				Assert.True(relog.All(id => !effects.Contains(id)), $"{@class}: the level-80 re-grant learns effect spell(s) {string.Join(", ", relog.Where(effects.Contains))}");
+
+				var bar = await repo.GetStartingBarSpells(80, @class);
+				Assert.True(bar.All(id => !effects.Contains(id)), $"{@class}: the default bar seeds effect spell(s) {string.Join(", ", bar.Where(effects.Contains))}");
+			}
+		}
+
+		// ⚠️ The trap the rule is shaped around, kept as its own gate because the obvious predicate passes every test
+		// above and is still wrong. `Flesh to Worms (Rank 1)` is ITSELF named as the effect of `Plague Swarm`, so
+		// "anything some spell points at" deletes the very spell the level-2 ding exists to teach. `Plague Swarm` is
+		// Level 0 and therefore grants nothing, which is what makes it not a book spell and its target not an effect.
+		//
+		// So the Necromancer's 1 -> 2 ding must teach `Flesh to Worms (Rank 1)` and NOT the five `Infestation` ranks
+		// it applies - the exact in-client report this came from.
+		[Fact]
+		public async Task TheNecromancerDing_TeachesFleshToWorms_AndNotTheInfestationItApplies()
+		{
+			const uint FleshToWormsRank1 = 1206011;
+			uint[] infestationRanks = [1378899, 1378901, 1378902, 1378903, 1378904];
+
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			var dinged = await repo.GetClassSpellsUnlockedBetween(ConanClass.Necromancer, 1, 2);
+
+			Assert.Contains(FleshToWormsRank1, dinged);
+			Assert.Empty(dinged.Intersect(infestationRanks));
+		}
+
+		// A spell some OTHER spell applies, where that other spell is itself a real leveled `ClassSpells` entry (i.e.
+		// something a character can actually be taught). The referrer test is the whole point - see the trap gate
+		// above.
+		private static async Task<HashSet<uint>> EffectsOfBookSpells(DatabaseContext db, CancellationToken ct)
+		{
+			var book = await db.ClassSpells.AsNoTracking().Select(cs => cs.SpellId).Distinct().ToListAsync(ct);
+			var appliers = await db.Spells.AsNoTracking().Where(s => s.EffectSpell != 0 && s.Level > 0).Select(s => new
+			{
+				s.Id,
+				s.EffectSpell
+			}).ToListAsync(ct);
+
+			var bookSet = book.ToHashSet();
+			return appliers.Where(a => bookSet.Contains(a.Id)).Select(a => a.EffectSpell).ToHashSet();
 		}
 
 		// ...and the five classes that carried NO teaching feat at all (#298) were combos, not a gap: Barbarian,

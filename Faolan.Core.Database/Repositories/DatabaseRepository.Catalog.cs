@@ -146,6 +146,30 @@ namespace Faolan.Core.Database.Repositories
 		// like a total gap (Barbarian, Guardian, Conqueror, Assassin, Ranger - zero teaching feats between them) are
 		// 227 of 259 combos, so there was nothing for a feat to teach. What is left is a real, ordinary gap of the
 		// same kind the caster classes have.
+		//
+		// ⚠️ AN EFFECT IS NOT A SPELLBOOK SPELL EITHER, and it reaches `ClassSpells` by the same route a combo does:
+		// the DoT a spell APPLIES carries its caster's class-encoded `GuiStackingLine`, so the map attributes it to
+		// the class exactly like the spell that applies it. `Infestation` is what `Flesh to Worms` inflicts - the
+		// client's own description says so - and all five of its ranks sit at Level 2 because an effect's ranks pair
+		// with the CASTER's ranks rather than with a level ladder of their own. So a single level 1 -> 2 ding put
+		// `Infestation (Rank 1..5)` in a Necromancer's book, five spells retail never grants at all.
+		//
+		// The oracle is the same one the combo rule used: the captured L80 Necromancer knows all five ranks of
+		// `Flesh to Worms` (2/25/40/55/70) and ZERO ranks of `Infestation`.
+		//
+		// ⚠️ The rule is NOT "anything named as some spell's EffectSpell" - that is the obvious form and it is wrong.
+		// `Flesh to Worms (Rank 1)` is itself named as the effect of `Plague Swarm`, so the naive predicate deletes
+		// the very spell the level-2 ding is supposed to teach. The referrer has to be a real BOOK spell for its
+		// target to be an effect: `Plague Swarm` is Level 0 and so grants nothing, while `Flesh to Worms` is a
+		// leveled `ClassSpells` entry and so its target genuinely is one.
+		//
+		// Measured over all four captured characters' known-spell lists: the rule removes 67 over-grants (38 from the
+		// L80 Necromancer, 19 from the L80 Demonologist, 10 from the Herald) at **zero** false positives - it never
+		// drops a spell a captured character actually knows.
+		//
+		// ⚠️ This does NOT close the over-grant, and is not claimed to: the same four characters show the level path
+		// offering 268/220/43 spells where retail gave them 91/100/4, so effects are one identified band of a much
+		// larger gap. Tracked in Gitea #847 - do not read a passing spellbook as a solved one.
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -154,6 +178,7 @@ namespace Faolan.Core.Database.Repositories
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
 				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
 				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id))
+				.Where(s => !ctx.Spells.Any(applier => applier.EffectSpell == s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
 				.OrderBy(s => s.Level)
 				.ThenBy(s => s.Id)
 				.Select(s => s.Id)
@@ -369,6 +394,11 @@ namespace Faolan.Core.Database.Repositories
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
 				.Where(s => s.Level > 0 && s.Level <= level)
 				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id)) // a combo is not a spellbook spell - see GetClassSpellsUnlockedBetween (#298)
+				// ...and neither is an EFFECT: the DoT a book spell applies carries its caster's class-encoded
+				// stacking line, so `ClassSpells` attributes it to the class exactly like a combo. Same rule and same
+				// reason as the ding path - see GetClassSpellsUnlockedBetween, including why the referrer must itself
+				// be a book spell. Without it the relog re-grant put back what the ding no longer teaches.
+				.Where(s => !ctx.Spells.Any(applier => applier.EffectSpell == s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
 				.Select(s => new
 				{
 					s.Id,
@@ -434,10 +464,12 @@ namespace Faolan.Core.Database.Repositories
 					cs,
 					s
 				})
-				// The LEVEL branch excludes combos - a combo is not a spellbook spell, see GetClassSpellsUnlockedBetween
-				// (#298). The starter kit is left alone: it is a captured LIST, so whatever it holds is what retail
-				// granted (and in fact holds no combo GameAction).
-				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id) && (x.cs.GrantLevel != null
+				// The LEVEL branch excludes combos AND effects - neither is a spellbook spell, see
+				// GetClassSpellsUnlockedBetween (#298 / #847). The starter kit is left alone in both cases: it is a
+				// captured LIST, so whatever it holds is what retail granted (and in fact holds no combo GameAction).
+				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id)
+					&& !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id))
+					&& (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level
 					: x.s.Level > 1 && x.s.Level <= level)))
 				.OrderBy(x => x.s.Level)
