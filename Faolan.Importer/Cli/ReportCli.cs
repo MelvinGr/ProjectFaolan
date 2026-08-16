@@ -422,7 +422,7 @@ namespace Faolan.Importer.Cli
 
 				case "spell-grant-check":
 				{
-					return await SpellGrantCheck();
+					return await SpellGrantCheck(arg);
 				}
 
 				case "broadcast-check":

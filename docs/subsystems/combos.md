@@ -104,16 +104,29 @@ The client grants a spell rank through a **feat** — a `<Class> Class Feat NNN`
 Anything in a class's stacking line that no feat teaches was never on a level path, and the client would refuse
 the cast anyway: its criteria evaluator gates on carrying the teaching feat (`YouCanNotUseYet`).
 
-Read as a gate, measured against the two captured level-80s:
+⭐ **And only the AUTOMATIC feats count** — `Feat.AutomaticUnlockCategory` (7063). Measured over the 946 feats
+that grant a spell the split is exact: the 271 in that category resolve to 24 names and no others
+(`Spell Unlocking <lo>-<hi>`, `<Class> Class Feat NNN`, `Pet Mastery`), while the 675 in category 8072 carry 238
+names, every one of the form `Spell - <the spell's own name>` — a per-spell **purchase** in the feat tree.
 
-| | offered before | offered, feat-gated | actually known | of the offered-and-known, feat-taught |
-|---|---:|---:|---:|---:|
-| Necromancer | 230 | **111** | 109 | **91 / 91** |
-| Demonologist | 201 | **109** | 127 | **101 / 101** |
+| | offered before | any feat | AUTOMATIC feat | actually known | EXTRA |
+|---|---:|---:|---:|---:|---:|
+| Necromancer | 230 | 111 | **88** | 109 | **0** |
+| Demonologist | 201 | 109 | **95** | 127 | **0** |
+| Herald of Xotli (L24) | — | 10 | **5** | 8 | **0** |
 
-It costs no recall: every spell those two know that the path offers at all is feat-taught, and everything it
-appears to "miss" was already off the catalog (pets, mounts, emotes, the `Undead Minion:` / `Deathless Acolyte:`
-lines). `--report spell-grant-check` is the standing measurement, and its one assertion is that direction.
+The automatic gate reproduces the captured spellbooks with **zero** false positives on every character in the
+corpus. Gating on "any feat" instead leaves 20 extra on the Necromancer, and they are exactly 8072 rows —
+`Ritual of the Lich`, `Despoil the Soul`, `One with Death` — tree spells that player did not spec into. The three
+the same player *did* spec into are 8072 too, so what separates the two populations is a point spend, not a
+property of the spell. `FeatService` hands a tree spell over when its feat is **trained**
+(`GetSpellsTaughtByFeats`), which is the mechanism retail uses and the only path those spells now arrive by.
+`--report spell-grant-check` is the standing measurement.
+
+⚠️ The category is used rather than the 24 names because it is a client field and because it is strictly better:
+`Pet Mastery` carries it, matches no name pattern, and is what teaches the captured Necromancer its `Ice Shackle`.
+⛔ It does **not** establish what 7063 means in general — 16,051 feats carry it, most of them armour and equip
+feats. The claim is scoped to the feats that grant a spell.
 
 ⚠️ **Applied PER CLASS** (`DatabaseRepository.FeatMapCovers`). The feat map grants **Barbarian, Guardian,
 Conqueror, Assassin and Ranger** nothing at all — 227 of their 259 level-gated entries are combos, which travel
@@ -122,9 +135,11 @@ spellbook with no capture to notice. The population is bimodal with nothing betw
 0** feat-taught rows and the next class up at **29**, so "does the map grant this class anything" is a real
 separation and not a threshold chosen to fit. Held by `NoClass_ReachesLevel80WithAnEmptySpellbook`.
 
-⚠️ Even so this does not close the over-grant: the same characters show **111 / 109 / 10 / 1** offered where
-retail gave them **109 / 127 / 8 / 2**, and the five uncovered classes keep today's answer, wrong as it is (the
-Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs). Open work tracked in Gitea #847.
+⚠️ What is left is not an over-grant but a **catalog gap**: the same characters show **88 / 95 / 5** offered
+against **109 / 127 / 8** known, and the shortfall is spells absent from `ClassSpells` for the class entirely —
+pets, mounts, emotes, the `Undead Minion:` / `Deathless Acolyte:` lines. The five uncovered classes also keep
+today's answer, wrong as it is (the Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs). Open
+work tracked in Gitea #847.
 
 ### 4. The GATING FEAT (#581) — the source that LEADS
 

@@ -37,12 +37,19 @@ namespace Faolan.GameServer.Feats
 		private readonly IChatServerDispatcher _chat;
 		private readonly ILogger _logger;
 
-		public FeatService(ICharacterRepository database, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport)
+		// Teaching a spell live (DispatchLearnSpell 0x200A) is the listener's op - the same one `ILevelUpOutbound`
+		// exposes for the ding. It arrives as a delegate rather than that port because this service needs exactly the
+		// one operation off it, which is the seam CLAUDE.md prescribes until a second op joins it.
+		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+
+		public FeatService(ICharacterRepository database, ILogger logger, IChatServerDispatcher chat, Func<uint, uint, Vector3?, Task> teleport,
+			Func<INetworkClient, uint, Task> learnSpell)
 		{
 			_database = database;
 			_logger = logger;
 			_chat = chat;
 			_teleport = teleport;
+			_learnSpell = learnSpell;
 		}
 
 		// .feat list | .feat train <id> [<id>...] | .feat reset  - the test bootstrap for the feat subsystem (the retail
@@ -83,7 +90,7 @@ namespace Faolan.GameServer.Feats
 						return;
 					}
 
-					var added = await TrainWithinBudget(character.Id, character.Level, ids);
+					var added = await TrainWithinBudget(client, character.Level, ids);
 					if (added < 0)
 					{
 						await _chat.SendSystemMessage(character.Id, $"Not enough feat points (budget {FeatRules.PointBudget(character.Level)} at level {character.Level}).");
@@ -139,7 +146,7 @@ namespace Faolan.GameServer.Feats
 
 			var character = client.Session.Character;
 
-			var added = await TrainWithinBudget(character.Id, character.Level, featIds);
+			var added = await TrainWithinBudget(client, character.Level, featIds);
 			if (added < 0)
 			{
 				// Over the feat-point budget (safety net; the client normally pre-validates). Don't add or ack.
@@ -216,8 +223,9 @@ namespace Faolan.GameServer.Feats
 		// Trains `requested` onto the character iff the resulting feat set is legal: within the feat-point budget AND
 		// with every PREREQUISITE satisfied (FeatPrereq, the client's own feat-tree edges - #251). Returns the number
 		// of feats added, or -1 when the train is rejected.
-		private async Task<int> TrainWithinBudget(uint characterId, ushort level, IReadOnlyList<uint> requested)
+		private async Task<int> TrainWithinBudget(INetworkClient client, ushort level, IReadOnlyList<uint> requested)
 		{
+			var characterId = client.Session.Character.Id;
 			var existing = await _database.GetCharacterFeats(characterId);
 			var after = existing.Concat(requested.Where(id => !existing.Contains(id))).ToList();
 			if (!FeatRules.WithinBudget(level, after))
@@ -238,7 +246,31 @@ namespace Faolan.GameServer.Feats
 				return -1;
 			}
 
-			return await _database.AddCharacterFeats(characterId, requested);
+			var added = await _database.AddCharacterFeats(characterId, requested);
+			await GrantSpellsTaughtBy(client, requested);
+			return added;
+		}
+
+		// ⭐ A feat that TEACHES a spell hands it over when it is trained (#847). The catalog carries two grant
+		// mechanisms and the level path only owns one of them: `Feat.AutomaticUnlockCategory` feats teach what a ding
+		// gives, and the feat TREE teaches the rest - one named `Spell - <name>` feat per spell, bought with a point.
+		// Both captured level-80s hold SOME of their class's tree spells and not others, which is what says the tree
+		// half is a purchase rather than a handout; before this it was the only half nothing granted, because the
+		// level path had (correctly) stopped offering it.
+		//
+		// Idempotent by construction: `AddCharacterSpell` reports whether the row was new, and only a new one is
+		// announced, so re-training a feat the character already holds re-toasts nothing.
+		private async Task GrantSpellsTaughtBy(INetworkClient client, IReadOnlyList<uint> featIds)
+		{
+			var characterId = client.Session.Character.Id;
+			foreach (var spellId in await _database.GetSpellsTaughtByFeats(featIds))
+			{
+				if (!await _database.AddCharacterSpell(characterId, spellId))
+					continue;
+
+				await _learnSpell(client, spellId);
+				_logger.LogInformation("Character {CharacterId} learned spell {SpellId} from a trained feat.", characterId, spellId);
+			}
 		}
 	}
 }

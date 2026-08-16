@@ -195,7 +195,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(x => x.Gate > fromLevelExclusive && x.Gate <= toLevelInclusive)
 				.Where(x => !ctx.Combos.Any(c => c.GameActionId == x.s.Id))
 				.Where(x => !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
-				.Where(x => !featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id))
+				.Where(x => !featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 				.OrderBy(x => x.Gate)
 				.ThenBy(x => x.s.Id)
 				.Select(x => x.s.Id)
@@ -244,7 +244,8 @@ namespace Faolan.Core.Database.Repositories
 		/// </remarks>
 		private static Task<bool> FeatMapCovers(DatabaseContext ctx, ConanClass @class)
 		{
-			return ctx.ClassSpells.Where(cs => cs.Class == @class).AnyAsync(cs => ctx.FeatSpellGrants.Any(g => g.SpellId == cs.SpellId));
+			return ctx.ClassSpells.Where(cs => cs.Class == @class)
+				.AnyAsync(cs => ctx.FeatSpellGrants.Any(g => g.SpellId == cs.SpellId && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory));
 		}
 
 		public async Task<Item?> GetItem(uint id)
@@ -534,7 +535,7 @@ namespace Faolan.Core.Database.Repositories
 				// combo GameAction, and every one of its members is feat-taught anyway).
 				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id)
 					&& !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id))
-					&& (!featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id))
+					&& (!featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 					&& (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level
 					: x.s.Level > 1 && x.s.Level <= level)))

@@ -43,6 +43,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<FeatSpellStatModifier[]> GetCharacterFeatSpellStatModifiers(uint characterId);
 
 		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
+
+		// The inverse: the TREE spells a set of just-trained feats teaches. See the implementation's remarks.
+		Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 
 		// The whole feat graph's single-prerequisite edges - what the tradeskill ladders are walked out of (#735).
@@ -624,6 +627,42 @@ namespace Faolan.Core.Database.Repositories
 				join map in ctx.FeatIdMaps on grant.FeatId equals map.TemplateId
 				where !progressionTracks.Contains(map.BaseIndex)
 				select map.WireFeatId).Distinct().ToArrayAsync();
+		}
+
+		/// <summary>
+		///     The spells a set of just-TRAINED feats teaches - the inverse of
+		///     <see cref="GetFeatsTeachingSpells" />, and the other half of the spell-grant story (#847).
+		/// </summary>
+		/// <remarks>
+		///     The catalog carries two grant mechanisms and the level path only owns one of them
+		///     (<see cref="Feat.AutomaticUnlockCategory" />): the feats a character gets automatically teach the spells
+		///     a ding hands out, and the feat TREE teaches the rest - one named feat per spell, bought with a feat
+		///     point. This is that second path, so it deliberately EXCLUDES the automatic category: those spells are
+		///     the level path's to grant and re-granting them here would re-toast a spell the character already has.
+		///     <para>
+		///         The oracle is the captured level-80s. Both hold tree spells - the Necromancer <c>Cannibalism</c>,
+		///         <c>No Rest For the Dead</c> and <c>Mark of the Devourer</c>, the Demonologist <c>Thunderclap</c>,
+		///         <c>Possession</c>, <c>Lore of Skelos</c> and two more - and hold only SOME of the tree, which is
+		///         what says they were bought rather than handed out: the same class catalog offers 19 more of exactly
+		///         the same kind that neither character has.
+		///     </para>
+		///     <para>
+		///         ⚠️ Takes WIRE feat ids, like <c>CharacterFeat.FeatId</c>, and hops through
+		///         <see cref="FeatIdMap" /> to the RDB TEMPLATE id the grant is keyed by - the same two id spaces
+		///         <see cref="GetFeatsTeachingSpells" /> bridges in the other direction (#467).
+		///     </para>
+		/// </remarks>
+		public async Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds)
+		{
+			var wanted = wireFeatIds as IReadOnlyCollection<uint> ?? [.. wireFeatIds];
+			if (wanted.Count == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await (from map in ctx.FeatIdMaps.Where(m => wanted.Contains(m.WireFeatId))
+				join grant in ctx.FeatSpellGrants on map.TemplateId equals grant.FeatId
+				where grant.Feat.TemplateCategory != Feat.AutomaticUnlockCategory
+				select grant.SpellId).Distinct().ToArrayAsync();
 		}
 
 		// The stat modifiers a character's trained feats grant. Two hops, because the wire and the catalog use

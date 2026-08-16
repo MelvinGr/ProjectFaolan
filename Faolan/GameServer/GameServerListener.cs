@@ -342,7 +342,7 @@ namespace Faolan.GameServer
 			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
-			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
+			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport, SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
 			_environment = new EnvironmentService(database, this, logger);
 			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
