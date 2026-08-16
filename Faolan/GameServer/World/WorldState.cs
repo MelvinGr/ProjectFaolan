@@ -143,6 +143,11 @@ namespace Faolan.GameServer.World
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
 
+		// The client's own `TWK_RangeCheckSlack` (1.25, from the tuning table via `--report rdb-tweaks`): how far
+		// inside its weapon's range an archer stands, so a shot is not sitting exactly on the boundary where one step
+		// of player movement would break it and restart the approach. #838.
+		public const float RangeCheckSlack = 1.25f;
+
 		// How fast a chasing NPC closes on its target (world units per second). Capture-measured: retail renders NPC
 		// locomotion at ~6.9 u/s (median over 207 clear-locomotion samples, mode 7; Captures movement trajectories). This
 		// MUST equal the speed the CLIENT renders the NPC at, because the client paces a no-duration 2-point MoveTask
@@ -660,19 +665,32 @@ namespace Faolan.GameServer.World
 					var dz = target.Position.Z - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 
-					// Walk up to CONTACT range (well inside swing range) so the NPC visibly closes on the player instead of
-					// stopping a swing-range away. While still outside swing range it only winds up; once inside swing range
-					// it swings even while taking the last steps to contact (#272).
-					if (horizontal > NpcContactRange)
-						StepAndStream(entity, dx, dz, horizontal, NpcContactRange, WorldTickEffectType.NpcMove, target);
+					// How close this creature needs to be to attack, and how close it therefore walks (#838). A melee mob
+					// keeps the measured pair it always had: swing range 3u, walk into CONTACT at 1.5u so it visibly
+					// closes instead of stopping a swing away (#272). An ARCHER stops at its weapon's own `Attack Range`
+					// - 17.5u for every captured bow against a melee weapon's 2.0 - because walking a bow carrier into
+					// contact range is what made it fight like a melee mob.
+					//
+					// The stand-off is the weapon range less the client's own `TWK_RangeCheckSlack` (1.25), so the shot
+					// is inside range rather than exactly on the boundary, where a step of player movement would break
+					// it and restart the approach.
+					var attackRange = entity.RangedAttacker
+						? entity.AttackRange
+						: NpcMeleeRange;
+					var walkTo = entity.RangedAttacker
+						? MathF.Max(NpcContactRange, entity.AttackRange - RangeCheckSlack)
+						: NpcContactRange;
+
+					if (horizontal > walkTo)
+						StepAndStream(entity, dx, dz, horizontal, walkTo, WorldTickEffectType.NpcMove, target);
 					else
-						// At contact: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
+						// In position: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
 						// the swing/combat-mode draw plants it).
 						EndMove(entity, false, WorldTickEffectType.NpcMove);
 
-					if (horizontal > NpcMeleeRange)
+					if (horizontal > attackRange)
 					{
-						entity.ArmAttackCooldown(NpcAttackInterval); // still out of swing range: wind up for arrival
+						entity.ArmAttackCooldown(NpcAttackInterval); // still out of range: wind up for arrival
 						continue;
 					}
 

@@ -196,6 +196,12 @@ namespace Faolan.Core.Database.Tables
 		// bind-on-equip item goes on. One name for it, shared by the template's word and the instance's.
 		public const uint BoundOnTheWire = 1u << 26;
 
+		// The weapon's ATTACK RANGE in world units x100 - RDB item-template property field 287, which the client's own
+		// stat table names `Attack Range` (CharacterStatId.AttackRange = 0x011F). Measured across the NPC weapons: every
+		// melee one reads 200 (2.0 units) and every bow 1750 (17.5), so this is what separates a creature that walks up
+		// from one that shoots. NULL for a non-weapon. #838.
+		public int? AttackRange { get; set; }
+
 		public int? MaxDamage { get; set; }
 
 		// The weapon's inherent MIN/MAX damage - RDB item-template property fields 286 (0x11E) / 285 (0x11D), decoded

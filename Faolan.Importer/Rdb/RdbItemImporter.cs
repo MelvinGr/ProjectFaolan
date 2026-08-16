@@ -177,6 +177,7 @@ namespace Faolan.Importer.Rdb
 				bindFieldsAdded = 0,
 				gemSlotsAdded = 0,
 				weaponDamageAdded = 0,
+				attackRangeAdded = 0,
 				onUseAdded = 0,
 				lockLinesAdded = 0,
 				onUseUnknownSpell = 0;
@@ -411,6 +412,16 @@ namespace Faolan.Importer.Rdb
 					}
 				}
 
+				// ATTACK RANGE (#838): property field 287, the client's own `Attack Range` stat, in world units x100.
+				// It is what tells an NPC whether to close or to hold: every captured NPC melee weapon reads 200 and
+				// every bow 1750. The client tuning table has no AI stand-off constant and a mob's swing names no
+				// target to measure a distance from, so the weapon IS the source for it.
+				if (TryReadPropertyField(template.AsSpan(12), 287, out var attackRange) && attackRange > 0 && item.AttackRange != (int)attackRange)
+				{
+					item.AttackRange = (int)attackRange;
+					attackRangeAdded++;
+				}
+
 				// BAG capacity: property field 104 (= the Bag container kind 0x68) holds the extra backpack slots a bag
 				// adds when equipped (the "+N slots" tooltip) - Burlap 24 / Bag of Holding 20 / Veteran's Bag 35. It sits
 				// in the table's non-monotonic tail (after the strictly-decreasing run), so it needs the dedicated scan.
@@ -455,8 +466,11 @@ namespace Faolan.Importer.Rdb
 			// The *Bonus columns were set on tracked Item entities above, so they save with everything else. (The old
 			// ItemStat-row replace is gone: at most one primary attribute per item and SetAttributeBonus clears the
 			// other four, so a changed/moved modifier can't leave a stale value.)
-			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0 || qualitiesAdded > 0 || statsAdded > 0 || bagsAdded > 0 || weaponDamageAdded > 0 ||
-			    flagsAdded > 0 || bindFieldsAdded > 0 || gemSlotsAdded > 0 || onUseAdded > 0)
+			// ⚠️ Ask the CHANGE TRACKER, not a hand-maintained list of counters. This was an OR over every counter the
+			// importer happened to keep, so a field added later saved only when some OTHER field also changed on the
+			// same run: `AttackRange` (#838) set 632 items, reported 632, and wrote nothing, because on a re-run of an
+			// already-imported catalog every other counter is 0. The count is not the fact - the save is.
+			if (db.ChangeTracker.HasChanges())
 				await db.SaveChangesAsync();
 
 			if (bagsAdded > 0)
@@ -476,6 +490,8 @@ namespace Faolan.Importer.Rdb
 
 			if (weaponDamageAdded > 0)
 				Console.WriteLine($"  weapon min/max damage (fields 286/285) set on {weaponDamageAdded} item(s).");
+			if (attackRangeAdded > 0)
+				Console.WriteLine($"  weapon attack range (field 287) set on {attackRangeAdded} item(s).");
 
 			if (lockLinesAdded > 0)
 				Console.WriteLine($"  {lockLinesAdded} consumable(s) got their SHARED-cooldown line from CoreLockSpellLineTemplate (#764).");

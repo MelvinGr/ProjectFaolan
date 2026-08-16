@@ -531,6 +531,11 @@ namespace Faolan.GameServer.World
 		// unarmed.
 		public bool RangedAttacker { get; set; }
 
+		// How far this creature attacks from, in world units - its main-hand weapon's `Attack Range` (#838,
+		// NpcWeapon.AttackRange), defaulting to the melee constant. Stamped beside RangedAttacker, from the same
+		// equipment rows, and read by the chase: a bow carrier stops here instead of walking into contact range.
+		public float AttackRange { get; set; } = WorldState.NpcMeleeRange;
+
 		// #623: the `combo_npc_generic_*` catalog id this NPC's melee swings carry, 0 when it has no melee weapon
 		// (unarmed, an animal, an archer). Picked from the WEAPON (NpcWeapon.MeleeComboName) and stamped at load
 		// beside RangedAttacker, for the same reason: that is where the equipment rows are already Included.

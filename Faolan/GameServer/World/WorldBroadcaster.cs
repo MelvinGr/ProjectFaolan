@@ -1423,6 +1423,7 @@ namespace Faolan.GameServer.World
 			entity.InstanceId = player.InstanceId; // #268: spawn into the summoner's map instance (see SpawnPetForPlayer).
 			entity.Level = npc.Level;
 			entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment); // #671, as in the zone-load path
+			entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange); // #838
 			entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment); // #623, likewise
 			entity.ClassComboIds = await _combos.NpcClassComboIds(npc.Equipment, entity.Level, npc.NpcTemplate.StatCore?.ComboClass); // #675, likewise
 			entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
@@ -1479,6 +1480,7 @@ namespace Faolan.GameServer.World
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.RangedAttacker = NpcWeapon.IsRanged(npcType.Equipment); // #671 - from the TYPE's equipment; a pet has no NpcSpawn row
+			entity.AttackRange = NpcWeapon.AttackRange(npcType.Equipment, WorldState.NpcMeleeRange); // #838
 			entity.MeleeComboId = await _combos.NpcMeleeComboId(npcType.Equipment); // #623, likewise
 			entity.ClassComboIds = await _combos.NpcClassComboIds(npcType.Equipment, level, npcType.StatCore?.ComboClass); // #675, likewise
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default

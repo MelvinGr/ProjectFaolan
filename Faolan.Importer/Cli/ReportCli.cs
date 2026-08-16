@@ -451,6 +451,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "ranged-standoff":
+				{
+					RangedStandoff(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "spawn-diff":
 				{
 					SpawnDiff(NamedCapture.LoadAll(capturesDir), arg);

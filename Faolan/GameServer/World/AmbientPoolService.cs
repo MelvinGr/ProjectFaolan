@@ -137,6 +137,10 @@ namespace Faolan.GameServer.World
 			entity.Disposition = pool.Disposition;
 			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
 			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
+			// #837/#838: the pool used to stamp neither of these, so a pooled archer fought as an unarmed melee mob.
+			// They come from the OUTFIT this member was dressed in, which is a real harvested placement's kit.
+			entity.RangedAttacker = NpcWeapon.IsRanged(wearing?.Equipment);
+			entity.AttackRange = NpcWeapon.AttackRange(wearing?.Equipment, WorldState.NpcMeleeRange);
 			entity.SpawnBody = body;
 			entity.SpawnAreaId = pool.AreaId;
 			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on

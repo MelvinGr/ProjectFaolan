@@ -204,6 +204,7 @@ namespace Faolan.GameServer.World
 				// #671: a mob that SHOOTS deals about a fifth of what one that swings does. Decided here, off the
 				// equipment rows this query already Includes, so the combat tick reads a flag rather than a join.
 				entity.RangedAttacker = NpcWeapon.IsRanged(npc.Equipment);
+				entity.AttackRange = NpcWeapon.AttackRange(npc.Equipment, WorldState.NpcMeleeRange); // #838: hold a bow's distance
 				// #623: and which `combo_npc_generic_*` its swings perform, off the same rows.
 				entity.MeleeComboId = await _combos.NpcMeleeComboId(npc.Equipment);
 				entity.Level = npc.Level;

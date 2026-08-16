@@ -1664,6 +1664,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Id")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AttackRange")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("BagExtraSlots")
                         .HasColumnType("INTEGER");
 

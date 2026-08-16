@@ -183,6 +183,33 @@ namespace Faolan.GameServer.Combat
 
 		// The item class worn in `slot`, or 0 when the slot is empty. `Item` is an FK navigation; a row whose Item is
 		// not Included would throw, so ask the ROW for the slot first and only touch the item on the one that matters.
+		/// <summary>
+		///     How far this NPC can attack from, in world units - its MAIN HAND weapon's `Attack Range` (#838), or
+		///     <paramref name="meleeDefault" /> when it holds nothing that states one.
+		/// </summary>
+		/// <remarks>
+		///     The client's own item stat, property field 287 (`CharacterStatId.AttackRange`), stored x100. Measured
+		///     across the NPC weapons in the corpus it is a clean split - every melee weapon reads 200 (2.0 units) and
+		///     every bow 1750 (17.5) - which is what lets an archer hold its distance instead of running up to swing.
+		///     <para>
+		///         It is the WEAPON's number rather than an AI constant because the client has no AI stand-off tuning
+		///         (`--report rdb-tweaks` names `AIDefaults_MaximumChaseRadius` and the deaggro delay, nothing about
+		///         range) and a mob's attack record names no target, so the distance cannot be measured off the corpus
+		///         either. The weapon is where retail keeps it.
+		///     </para>
+		/// </remarks>
+		public static float AttackRange(IEnumerable<INpcEquipment>? equipment, float meleeDefault)
+		{
+			if (equipment == null)
+				return meleeDefault;
+
+			foreach (var row in equipment)
+				if (row.Pos == MainHandPos && row.Item?.AttackRange is > 0 and var range)
+					return range / 100f;
+
+			return meleeDefault;
+		}
+
 		private static uint CategoryIn(IEnumerable<INpcEquipment>? equipment, uint slot)
 		{
 			if (equipment == null)
