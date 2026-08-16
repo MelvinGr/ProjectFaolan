@@ -429,6 +429,25 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   captured lists, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of them her
   class track. The feat list goes on the wire, so training one would be inventing content to satisfy a criterion
   that demonstrably does not need it.
+- **…and the spell is granted with the TRAINED feat (2026-08-16, #847)** — the same table read forwards,
+  `IDatabaseRepository.GetSpellsTaughtByFeats`, so `FeatService` hands over what a feat teaches at the moment it
+  is trained. The two directions are not redundant, because `FeatSpellGrants` carries **two grant mechanisms** and
+  they are separated by `Feat.AutomaticUnlockCategory` (7063):
+
+  | category | feats | names | how the spell arrives |
+  |---:|---:|---:|---|
+  | **7063** | 271 | 24 — `Spell Unlocking <lo>-<hi>`, `<Class> Class Feat NNN`, `Pet Mastery` | on a LEVEL, from the ding path |
+  | **8072** | 675 | 238, every one `Spell - <the spell's own name>` | on a TRAIN, from here |
+
+  Measured over the 946 feats that grant a spell, with zero overlap. The captures settle which is which: gating
+  the level path on the automatic category reproduces the captured spellbooks exactly (the level-80 Necromancer
+  88 offered / 88 known, the Demonologist 95 / 95), while including the tree leaves 20 extra on the Necromancer —
+  `Ritual of the Lich`, `Despoil the Soul`, `One with Death` — and the three of the same kind she DOES hold
+  (`Cannibalism`, `No Rest For the Dead`, `Mark of the Devourer`) are 8072 too. What separates the two
+  populations is a point spend, not a property of the spell. Standing measurement: `--report spell-grant-check`.
+
+  ⚠️ Idempotent by construction — `AddCharacterSpell` reports whether the row was new and only a new one is
+  announced — so re-training a feat re-toasts nothing.
 
 ## Why a learned spell may still refuse to cast — the feat criterion
 
