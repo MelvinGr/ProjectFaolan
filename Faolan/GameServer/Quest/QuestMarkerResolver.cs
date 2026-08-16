@@ -122,14 +122,17 @@ namespace Faolan.GameServer.Quest
 			var offerable = false;
 			foreach (var questId in questIds)
 			{
-				// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. Gate on the grant quest's
-				// MapId (its QuestDefinition, #244). This used to also be what stopped a same-NAMED NPC world-wide from
-				// wearing the marker - "Halen van Dummy" is the internal name of 27 unrelated templates - but the
-				// lookup above is keyed by TEMPLATE since #646, so the map gate is back to meaning only what it says.
+				// ⛔ There is deliberately NO map gate here. `QuestDefinition.MapId` is the objective's MARKER PIN -
+				// where the quest sends you - not where its giver stands, and gating on it suppressed markers retail
+				// demonstrably sends: it blocks 15 of the 28 giver quests in the shipped data, among them Turach and
+				// Laranga (quests on 4010, they stand on 4020), Alyssa (10800 vs 4020), Caor, Oracle Vateesa and
+				// Hadrathus - and the captures show retail marking every one of those.
+				//
+				// The gate came from #244, where it did double duty as the thing stopping a same-NAMED NPC world-wide
+				// from wearing the marker ("Halen van Dummy" is the internal name of 27 unrelated templates). That job
+				// belongs to the TEMPLATE-keyed lookup above since #646, so removing the gate does not give it back.
+				// docs/subsystems/quests.md already said MapId "cannot be a general match key - it is a marker pin".
 				var giverQuest = await _database.GetQuestDefinition(questId);
-				if (giverQuest != null && giverQuest.MapId != npc.MapId)
-					continue;
-
 				var held = Array.Find(quests, q => q.QuestId == questId);
 				// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest
 				// is only marked Completed on turn-in, not on the kill, #47/#241). It outranks the rest: a giver you can

@@ -117,17 +117,34 @@ namespace Faolan.Tests
 			Assert.Equal(QuestMarkerResolver.Available, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
 		}
 
-		private async Task<Harnessed> Harness(uint giverSequence = 1, (uint QuestId, uint Sequence)? earlierStep = null, (uint QuestId, uint Sequence)? alsoGrants = null)
+		[Fact]
+		public async Task AGiverStandingOffTheQuestSOwnMap_StillWearsTheMarker()
+		{
+			// `QuestDefinition.MapId` is the objective's marker PIN, not where the giver stands, so it must not gate.
+			// It blocks 15 of the 28 giver quests in the shipped data - Turach and Laranga (quests on 4010, they stand
+			// on 4020), Alyssa (10800 vs 4020), Caor, Oracle Vateesa, Hadrathus - and the captures show retail marking
+			// every one of them.
+			// The NPC stands on Tortage Island (4010) while the quest pins White Sands (10800) - Alyssa's real shape.
+			var h = await Harness(questMapId: 10800);
+
+			Assert.Equal(QuestMarkerResolver.Available, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
+		}
+
+		private async Task<Harnessed> Harness(uint giverSequence = 1, (uint QuestId, uint Sequence)? earlierStep = null, (uint QuestId, uint Sequence)? alsoGrants = null,
+			uint? questMapId = null)
 		{
 			var (options, path) = TestDb.NewSeededDatabase(Player);
 			_databases.Add(path);
 			await using (var ctx = new DatabaseContext(options))
 			{
 				ctx.NpcTemplates.Add(new NpcTemplate { TemplateId = GiverTemplate, Name = "Casilda" });
+				// The seeded DB only carries Tortage Beach; a quest pinned elsewhere needs that map to exist for the FK.
+				if (questMapId is { } pin && pin != Map.TortageBeachId)
+					ctx.Maps.Add(new Map { Id = pin, Name = "Somewhere else" });
 				ctx.QuestLines.Add(new QuestLine { QuestLineId = GiverLine });
 				// A step only counts as part of its line once it has journal TEXT - that is the filter
 				// GetQuestDefinitionsByLine applies to keep the client's catalog-only quests out of a line (see there).
-				ctx.QuestDefinitions.Add(Step(GiverQuest, "The Scavenger", giverSequence));
+				ctx.QuestDefinitions.Add(Step(GiverQuest, "The Scavenger", giverSequence, questMapId));
 				if (earlierStep is { } earlier)
 					ctx.QuestDefinitions.Add(Step(earlier.QuestId, "An earlier step", earlier.Sequence));
 				if (alsoGrants is { } second)
@@ -160,11 +177,11 @@ namespace Faolan.Tests
 			return new Harnessed(new QuestMarkerResolver(database, NullLogger.Instance), database, client, npc);
 		}
 
-		private static QuestDefinition Step(uint questId, string name, uint sequence) =>
+		private static QuestDefinition Step(uint questId, string name, uint sequence, uint? mapId = null) =>
 			new()
 			{
 				QuestId = questId, QuestLineId = GiverLine, Name = name,
-				MapId = Map.TortageBeachId, JournalSequence = sequence,
+				MapId = mapId ?? Map.TortageBeachId, JournalSequence = sequence,
 				TextRefs = [new QuestTextRef { QuestId = questId, RefId = questId, Slot = QuestTextSlot.Title, Category = 50301 }]
 			};
 

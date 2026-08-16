@@ -547,6 +547,15 @@ captures do not separate the two reasons — Alyssa goes gold → silver within 
 drop. What is still unexplained: Turach and Laranga stay silver even past their last harvested grant, which
 fits an unharvested further quest but is not proven. Tracked in Gitea #848.
 
+⛔ **The quest's `MapId` does not gate the marker.** It is the objective's marker *pin* — where the quest sends
+you — not where its giver stands, and the two differ for **15 of the 28 giver quests** in the shipped data:
+Turach and Laranga stand on 4020 while their quests pin 4010, Alyssa on 4020 against 10800, and likewise Caor,
+Oracle Vateesa, Hadrathus, Kaen, Cadarn, Borcha, Tanner Chael, Serving Wench, Arias and Valkyrie Hylda. The
+captures show retail marking those NPCs, so gating on it suppressed markers that should be sent. The gate came
+from #244, where it doubled as the thing stopping a same-*named* NPC world-wide from wearing the marker
+(`Halen van Dummy` is the internal name of 27 unrelated templates); that job belongs to the template-keyed
+lookup since #646.
+
 Gated by `QuestMarkerStateTests`; the line-not-reached half by `QuestMarkerLineTests`.
 
 ## The Completed tab's body text is LDB slot 50303, and retail left half of it unwritten
