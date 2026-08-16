@@ -652,19 +652,26 @@ namespace Faolan.GameServer.Dialogue
 			if (character == null)
 				return;
 
-			var givers = await _database.GetQuestGiverMap(); // NpcTemplateId -> the quest id it grants
-			if (!givers.TryGetValue(npcTemplateId, out var givenQuestId))
+			var givers = await _database.GetQuestGiverMap(); // NpcTemplateId -> EVERY quest id it grants
+			if (!givers.TryGetValue(npcTemplateId, out var givenQuestIds))
 				return;
 
-			var held = (await _database.GetCharacterQuests(character.Id)).FirstOrDefault(q => q.QuestId == givenQuestId);
-			if (held == null || held.State != QuestState.Active || held.GoalRequired == 0 || held.GoalProgress < held.GoalRequired)
-				return;
+			// ⚠️ Every quest the NPC grants, not just one: the map used to collapse to Min(GrantQuestId), so a giver who
+			// hands out two - Turach's "The Quarry" and "The Guard", Laranga's "The Blacksmith" and "The Barmaid" - could
+			// only ever turn the lower-numbered one in, and the other stayed Active forever with its objective done.
+			var quests = await _database.GetCharacterQuests(character.Id);
+			foreach (var givenQuestId in givenQuestIds)
+			{
+				var held = Array.Find(quests, q => q.QuestId == givenQuestId);
+				if (held == null || held.State != QuestState.Active || held.GoalRequired == 0 || held.GoalProgress < held.GoalRequired)
+					continue;
 
-			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
-			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
-			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
-			_logger.LogInformation("Quest {Quest} turned in to template {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcTemplateId, character.Name,
-				held.GoalProgress, held.GoalRequired);
+				await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
+				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
+				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
+				_logger.LogInformation("Quest {Quest} turned in to template {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcTemplateId, character.Name,
+					held.GoalProgress, held.GoalRequired);
+			}
 		}
 
 		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the

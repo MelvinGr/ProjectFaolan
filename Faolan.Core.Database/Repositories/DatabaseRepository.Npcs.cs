@@ -43,7 +43,12 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<uint, uint[]>> GetQuestGatedNpcMap();
 		Task<HashSet<uint>> GetStoryKillTargets();
-		Task<Dictionary<uint, uint>> GetQuestGiverMap();
+		// NPC TEMPLATE -> EVERY quest that template's dialogue grants, ascending. A giver is not one quest: Turach hands
+		// out both "The Quarry" and "The Guard", Laranga both "The Blacksmith" and "The Barmaid", Cramaleico two more.
+		// This used to return `Min(GrantQuestId)` - one quest per NPC - which silently made the other grants invisible:
+		// a two-quest giver could only ever turn ONE of them in, and the marker over their head could only ever describe
+		// one of them.
+		Task<Dictionary<uint, uint[]>> GetQuestGiverMap();
 		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
@@ -375,7 +380,7 @@ namespace Faolan.Core.Database.Repositories
 
 		// Which quest each NPC TEMPLATE gives, derived from the dialogue graph's own grants (#646: keyed by template,
 		// like everything else that routes off a click - the display name it used to key on is ambiguous in the world).
-		public async Task<Dictionary<uint, uint>> GetQuestGiverMap()
+		public async Task<Dictionary<uint, uint[]>> GetQuestGiverMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var grants = await ctx
@@ -387,7 +392,7 @@ namespace Faolan.Core.Database.Repositories
 				})
 				.Distinct()
 				.ToListAsync();
-			return grants.GroupBy(g => g.NpcTemplateId).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
+			return grants.GroupBy(g => g.NpcTemplateId).ToDictionary(g => g.Key, g => g.Select(x => x.GrantQuestId!.Value).OrderBy(q => q).ToArray());
 		}
 
 		// #647: which templates carry a ROLE, straight off the client's own `NpcStats.profession_type`. This is what

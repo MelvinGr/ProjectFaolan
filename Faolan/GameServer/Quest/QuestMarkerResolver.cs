@@ -34,14 +34,14 @@ namespace Faolan.GameServer.Quest
 		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
 		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
 		//
-		// ⛔ Silver does NOT mean "you are carrying my quest" - see the `held != null` branch in MarkerStateFor.
+		// ⛔ Silver is about what the giver has LEFT TO GRANT, not about what you are carrying - see MarkerStateFor.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
 
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
-		// Quest-giver NPC template id -> granted quest id, cached once (small set).
-		private Dictionary<uint, uint> _questGivers = null!;
+		// Quest-giver NPC template id -> EVERY quest it grants, cached once (small set).
+		private Dictionary<uint, uint[]> _questGivers = null!;
 
 		public QuestMarkerResolver(IDatabaseRepository database, ILogger logger)
 		{
@@ -93,52 +93,61 @@ namespace Faolan.GameServer.Quest
 			}
 
 			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questId))
+			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questIds))
 				return None;
 
-			// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. Gate on the grant quest's MapId
-			// (its QuestDefinition, #244): only the giver's own map shows it. This used to also be what stopped a
-			// same-NAMED NPC world-wide from wearing the marker - "Halen van Dummy" is the internal name of 27
-			// unrelated templates - but the lookup above is keyed by TEMPLATE since #646, so the map gate is back to
-			// meaning only what it says.
-			var giverQuest = await _database.GetQuestDefinition(questId);
-			if (giverQuest != null && giverQuest.MapId != npc.MapId)
-				return None;
-
-			var held = Array.Find(quests, q => q.QuestId == questId);
-			// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest is
-			// only marked Completed on turn-in, not on the kill, #47/#241).
-			if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
-				return TurnIn;
-
-			// ⛔ A quest you are ALREADY CARRYING draws no marker at all - not the silver '!', which says "there is
-			// something here you cannot take yet", and a quest in your journal is not that. The giver goes quiet the
-			// moment you accept, and speaks again only when the objective is done ('?' above) or when a later step
-			// names them as its talk target (the '?' at the top of this method).
+			// ⭐ The marker describes the NEXT quest this NPC can GRANT you, and a giver is not one quest - Turach hands
+			// out two, Laranga two, Cramaleico two. So the answer is a fold over all of them:
 			//
-			// `Blablatest_mage-necromancer-create_casilda_quest_first_stage` is the whole rule in one capture, on
-			// Casilda's own chain: '!' (0x02) while 13479 is unclaimed, 0x00 the instant it is granted at t=191.7,
-			// 0x00 straight through the Tuut kill and the key loot, '?' (0x04) at t=223.3 when 13480 makes talking to
-			// her the goal, and 0x00 again at t=230.1 once that is handed in. Across all 275 captures Casilda is
-			// 0x00 x178 / 0x02 x170 / 0x04 x21 and NEVER 0x01.
+			//   * one of theirs is held with its objective done   -> '?' (0x04), turn it in here;
+			//   * some grant is still OUTSTANDING (neither held nor completed):
+			//       - its line has reached it -> GOLD '!' (0x02), it is yours to take;
+			//       - it has not             -> SILVER '!' (0x01), "there is something here you cannot take yet";
+			//   * nothing outstanding at all                      -> NO marker. The giver is spent.
 			//
-			// This branch used to return SILVER while the quest was in progress (#559) and NONE once it completed. The
-			// completed half was right and is kept - retail states it outright in xxx_mage-necromancer_login_play3,
-			// where Tina carries '?' at t=59.3 and 69.6, quest 10287 completes at t=101.7, and she is set to 0x00 at
-			// t=102.0. The in-progress half was wrong: accepting a quest lit a silver '!' over the giver that stayed
-			// there for the whole quest.
+			// That last clause is what a carried quest hits, and it is the whole difference between Casilda and Alyssa.
+			// Casilda grants exactly ONE quest, so the instant you accept it she has nothing left to offer and goes
+			// blank - `Blablatest_mage-necromancer-create_casilda_quest_first_stage` and SIX other captures record the
+			// same 0x02 -> 0x00 -> 0x04 -> 0x00 walk on her, and across all 275 captures she is 0x00 x178 / 0x02 x170 /
+			// 0x04 x21 and NEVER 0x01. Alyssa sits on a four-step line ending in "Report back to Alyssa" and goes
+			// SILVER eight frames after granting hers (Hoxxling_..._login_gameplay2, grant frame 9603 -> 0x01 frame
+			// 9611). Both are "carrying the giver's quest"; the marker differs because what is left to grant differs.
 			//
-			// ⚠️ ONE observation still resists this: Turach in `xxx_..._play2_tortage_city_first-quests` is 0x01 from
-			// t=392 while holding 10286, which he grants. He is 0x01 in all 88 of his marker replies corpus-wide and
-			// never 0x00, so whatever separates him from Casilda is not the held/not-held question this branch asks
-			// (Gitea #848). It does not reach us either way: he spawns on map 4020 while 10286 is MapId 4010, so
-			// the map gate above already answers None for him.
-			if (held != null)
-				return None;
+			// ⚠️ Silver is therefore NOT simply "your level is too low", which is how the community documents the grey
+			// '!', NOR simply "the chain has not reached them". It is "they have one you cannot take yet" and the
+			// captures do not separate the two reasons - Gitea #848 holds what is still unexplained (Turach and Laranga
+			// stay silver even past their last harvested grant, which fits an unharvested further quest but is not
+			// proven).
+			var outstanding = false;
+			var offerable = false;
+			foreach (var questId in questIds)
+			{
+				// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. Gate on the grant quest's
+				// MapId (its QuestDefinition, #244). This used to also be what stopped a same-NAMED NPC world-wide from
+				// wearing the marker - "Halen van Dummy" is the internal name of 27 unrelated templates - but the
+				// lookup above is keyed by TEMPLATE since #646, so the map gate is back to meaning only what it says.
+				var giverQuest = await _database.GetQuestDefinition(questId);
+				if (giverQuest != null && giverQuest.MapId != npc.MapId)
+					continue;
 
-			return giverQuest != null && !await IsLineReady(giverQuest, quests)
-				? Unavailable
-				: Available;
+				var held = Array.Find(quests, q => q.QuestId == questId);
+				// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest
+				// is only marked Completed on turn-in, not on the kill, #47/#241). It outranks the rest: a giver you can
+				// hand something to says so before it advertises what it has left.
+				if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
+					return TurnIn;
+
+				// Carried, or already finished: this one is not on offer. Retail is explicit about the finished half in
+				// xxx_mage-necromancer_login_play3 - Tina carries '?' at t=59.3 and 69.6, quest 10287 completes at
+				// t=101.7, and she is set to 0x00 at t=102.0, three packets, the instant it finishes.
+				if (held != null)
+					continue;
+
+				outstanding = true;
+				offerable |= giverQuest == null || await IsLineReady(giverQuest, quests);
+			}
+
+			return !outstanding ? None : offerable ? Available : Unavailable;
 		}
 
 		// The QUEST ITEM the killer needs off `npcName`'s corpse - the item id of their active LootFromNpc goal targeting

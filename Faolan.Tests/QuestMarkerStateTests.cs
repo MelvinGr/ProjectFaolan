@@ -32,6 +32,7 @@ namespace Faolan.Tests
 		private const uint Player = 0x01000001;
 		private const uint GiverTemplate = 9411; // Casilda
 		private const uint GiverQuest = 13479; // "The Scavenger", step 1 of line 1054
+		private const uint SecondQuest = 13563; // a second grant from the same NPC, for the Alyssa-shaped case
 		private const uint GiverLine = 1054;
 		private const uint GiverHandle = 0x000315cc; // her handle in the capture, for provenance only
 
@@ -92,7 +93,31 @@ namespace Faolan.Tests
 			Assert.Equal(QuestMarkerResolver.Unavailable, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
 		}
 
-		private async Task<Harnessed> Harness(uint giverSequence = 1, (uint QuestId, uint Sequence)? earlierStep = null)
+		[Fact]
+		public async Task ATwoQuestGiver_STAYSSilverWhileYouCarryTheFirst()
+		{
+			// Casilda and Alyssa are both "carrying the giver's quest" and get DIFFERENT markers, because what is left
+			// to grant differs. Casilda grants one quest and goes blank; Alyssa sits on a four-step line ending in
+			// "Report back to Alyssa" and goes silver eight frames after granting hers
+			// (Hoxxling_..._login_gameplay2: grant at frame 9603, 0x01 at frame 9611).
+			var h = await Harness(alsoGrants: (SecondQuest, 2));
+			await h.Database.SetCharacterQuest(Player, GiverQuest, QuestState.Active, goalProgress: 0, goalRequired: 1);
+
+			Assert.Equal(QuestMarkerResolver.Unavailable, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
+		}
+
+		[Fact]
+		public async Task ATwoQuestGiver_GoesGoldAgainOnceTheFirstIsDone()
+		{
+			// …and the second grant becoming reachable is what turns them gold again, rather than the NPC being
+			// permanently spent after one quest.
+			var h = await Harness(alsoGrants: (SecondQuest, 2));
+			await h.Database.SetCharacterQuest(Player, GiverQuest, QuestState.Completed);
+
+			Assert.Equal(QuestMarkerResolver.Available, await h.Resolver.MarkerStateFor(h.Client, h.Npc));
+		}
+
+		private async Task<Harnessed> Harness(uint giverSequence = 1, (uint QuestId, uint Sequence)? earlierStep = null, (uint QuestId, uint Sequence)? alsoGrants = null)
 		{
 			var (options, path) = TestDb.NewSeededDatabase(Player);
 			_databases.Add(path);
@@ -105,6 +130,8 @@ namespace Faolan.Tests
 				ctx.QuestDefinitions.Add(Step(GiverQuest, "The Scavenger", giverSequence));
 				if (earlierStep is { } earlier)
 					ctx.QuestDefinitions.Add(Step(earlier.QuestId, "An earlier step", earlier.Sequence));
+				if (alsoGrants is { } second)
+					ctx.QuestDefinitions.Add(Step(second.QuestId, "A second quest from the same giver", second.Sequence));
 
 				// The giver map is derived from the dialogue graph, so the NPC only counts as a giver once some branch
 				// of theirs grants the quest. One self-looping edge is the smallest shape that says so.
@@ -112,8 +139,15 @@ namespace Faolan.Tests
 				ctx.ConversationNodes.Add(node);
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
+				// One SaveChanges per edge: the derived key is stamped ON INSERT, so two unsaved edges both sit at
+				// Id 0 in the change tracker and collide before either is written.
 				ctx.ConversationEdges.Add(new ConversationEdge { FromNodeId = node.Id, ToNodeId = node.Id, OptionId = 0, GrantQuestId = GiverQuest });
 				await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				if (alsoGrants is { } secondGrant)
+				{
+					ctx.ConversationEdges.Add(new ConversationEdge { FromNodeId = node.Id, ToNodeId = node.Id, OptionId = 1, GrantQuestId = secondGrant.QuestId });
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
 			}
 
 			var database = new DatabaseRepository(new Factory(options));

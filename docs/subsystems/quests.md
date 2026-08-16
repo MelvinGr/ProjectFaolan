@@ -523,17 +523,31 @@ character and pins four of the five states on one NPC (handle `0x315cc`):
 | 223.3 | key looted; 13480 makes *talk to Casilda* the goal | `0x04` gold `?` |
 | 230.1 | 13480 handed in, 12407 granted | `0x00` |
 
-⭐ **Accepting a quest CLEARS the marker.** It does not grey it. Silver means *"there is something here you
-cannot take yet"* — a giver whose line has not reached them — and a quest already in the journal is not that.
-Across all 275 captures Casilda is `0x00` ×178 / `0x02` ×170 / `0x04` ×21 and **never** `0x01`. The giver goes
-quiet on accept and speaks again only when the objective is done, or when a later step names them as its talk
-target. Gated by `QuestMarkerStateTests`; the not-held silver half by `QuestMarkerLineTests`.
+That walk reproduces on six other characters (`Blablabla_soldier-guardian_…`, `Hoxxling_…_login_gameplay`,
+`Strie_rogue-assassin_login_randomActions`, `xxx_mage-demo_login_play_beach…`, `xxx_…_play1_beach…`,
+`Ranochar_…_get-casilda-quest`), and across all 275 captures Casilda is `0x00` ×178 / `0x02` ×170 / `0x04` ×21
+and **never** `0x01`.
 
-⚠️ One observation resists this and is not yet explained: Turach in
-`xxx_mage-necromancer_login_play2_tortage_city_first-quests` is `0x01` from t=392 while carrying 10286, which
-he grants. He is `0x01` in all 88 of his marker replies corpus-wide and never `0x00`, so whatever separates him
-from Casilda is not the held/not-held question. It does not reach our wire either way — he spawns on map 4020
-while 10286 is `MapId` 4010, so the giver map-gate already answers none for him. Tracked in Gitea #848.
+⭐ **The marker describes the NEXT quest this NPC can GRANT you — and a giver is not one quest.** Turach hands
+out two, Laranga two, Cramaleico two. So the state is a fold over all of a giver's grants:
+
+- one of theirs is held with its objective done → `0x04`, turn it in here;
+- some grant is still outstanding (neither held nor completed) → `0x02` if its line has reached it, `0x01` if not;
+- nothing outstanding at all → **no marker**. The giver is spent.
+
+That last clause is what a carried quest hits, and it is the whole difference between Casilda and Alyssa.
+Casilda grants exactly **one** quest, so accepting it leaves her with nothing to offer and she goes blank.
+Alyssa sits on a four-step line ending in *"Report back to Alyssa"* and goes **silver eight frames after
+granting hers** (`Hoxxling_…_login_gameplay2`: grant at frame 9603, `0x01` at frame 9611). Both are "carrying
+the giver's quest"; the marker differs because what is *left to grant* differs.
+
+⚠️ **Silver is therefore not simply "your level is too low"**, which is how the community documents the grey
+`!`, **nor simply "the chain has not reached them"**. It is *"they have one you cannot take yet"*, and the
+captures do not separate the two reasons — Alyssa goes gold → silver within 58 seconds, and a level cannot
+drop. What is still unexplained: Turach and Laranga stay silver even past their last harvested grant, which
+fits an unharvested further quest but is not proven. Tracked in Gitea #848.
+
+Gated by `QuestMarkerStateTests`; the line-not-reached half by `QuestMarkerLineTests`.
 
 ## The Completed tab's body text is LDB slot 50303, and retail left half of it unwritten
 
