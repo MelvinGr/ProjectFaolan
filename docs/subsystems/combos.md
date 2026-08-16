@@ -111,8 +111,8 @@ names, every one of the form `Spell - <the spell's own name>` — a per-spell **
 
 | | offered before | any feat | AUTOMATIC feat | actually known | EXTRA |
 |---|---:|---:|---:|---:|---:|
-| Necromancer | 230 | 111 | **88** | 109 | **0** |
-| Demonologist | 201 | 109 | **95** | 127 | **0** |
+| Necromancer | 230 | 111 | **97** | 109 | **0** |
+| Demonologist | 201 | 109 | **96** | 127 | **0** |
 | Herald of Xotli (L24) | — | 10 | **5** | 8 | **0** |
 
 The automatic gate reproduces the captured spellbooks with **zero** false positives on every character in the
@@ -135,11 +135,24 @@ spellbook with no capture to notice. The population is bimodal with nothing betw
 0** feat-taught rows and the next class up at **29**, so "does the map grant this class anything" is a real
 separation and not a threshold chosen to fit. Held by `NoClass_ReachesLevel80WithAnEmptySpellbook`.
 
-⚠️ What is left is not an over-grant but a **catalog gap**: the same characters show **88 / 95 / 5** offered
-against **109 / 127 / 8** known, and the shortfall is spells absent from `ClassSpells` for the class entirely —
-pets, mounts, emotes, the `Undead Minion:` / `Deathless Acolyte:` lines. The five uncovered classes also keep
-today's answer, wrong as it is (the Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs). Open
-work tracked in Gitea #851 (the harvest gap) and #852 (the five uncovered classes).
+### The membership map's own blind spot, and the third source that closes it
+
+`GuiStackingLine` is only present on **3,158 of 21,502** spell records, so the class map is structurally blind to
+the rest — including the whole `Undead Minion:` / `Deathless Acolyte:` / `Dread Archmage:` pet ladder
+(35/35/40/55/65/65/70/80), every rank of which a `Spell Unlocking` feat teaches and which therefore belongs on
+the level path. Of the 18 spells the captured level-80 Necromancer knew and the map had never heard of, **16
+carry `GuiStackingLine = 0`**.
+
+The third source is the captures themselves: every `CharacterSpell` row is a statement that a character of that
+class held that spell. The `class-spells-known` importer module derives membership from it — 246 capture-proven
+`(class, spell)` pairs, 45 of them new — and it cannot produce a false positive, because a character really did
+have the spell.
+
+⚠️ What is left is **not** the level path's business at all. Every remaining miss carries `Level 0`: mounts,
+pets and companions, `Dance:` / `Social Ability:` emotes, `Path:` travel unlocks and veteran rewards — earned or
+bought, never leveled into, and replayed on login from the character's own rows (`GrantCharacterSpells`) rather
+than re-derived from the class. The five uncovered classes still keep today's answer, wrong as it is (the
+Conqueror's 38 are mostly `Colossus of War (1..20)` and combo debuffs) — Gitea #852.
 
 ### 4. The GATING FEAT (#581) — the source that LEADS
 

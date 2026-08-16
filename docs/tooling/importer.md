@@ -76,6 +76,7 @@ Capture-sourced (default group, run in dependency order):
 | `conversations` (clean rebuild, overwrite-only) | — |
 | `character-state` (wallets, hotbar) | `characters` |
 | `learned-spells` | `characters`, `spells` |
+| `class-spells-known` (class↔spell MEMBERSHIP derived from the captured spellbooks — the third source, for the ~85% of spell records carrying no stacking line, #851) | — (registry position orders it; naming `characters` would drag its destructive rebuild into an `--only` run) |
 | `character-abilities` (+ combo books) | `characters`, `abilities` |
 | `character-quests` | `characters`, `quests` |
 | `character-bank` | `characters`, `items` |
@@ -313,8 +314,9 @@ See the field-125 section of [spell-record-fields.md](../rdb/spell-record-fields
 SHIPPING queries — `GetStartingSpells` and `GetStartingBarSpells` — for every character in the DB against its own
 captured known-spell list, and splits the errors: EXTRA (offered, not known) is printed because the population moves
 with the corpus; MISSING is split into *never on offer* (absent from `ClassSpells`, or `Level 0` — a catalog gap)
-and DROPPED (in the class catalog, carries a level, and still not offered), which is the only direction that can
-only be a defect. It is the standing measurement behind the per-class feat gate in
+*held below their stated level* (retail granted it earlier than the client's record says), *no teaching feat* (a
+feat-harvest gap) and *bought in the feat TREE* (a different mechanism) — leaving DROPPED, which is the only
+direction that can only be a defect. It is the standing measurement behind the per-class feat gate in
 [combos.md](../subsystems/combos.md). ⚠️ It CANNOT be a test even in principle: `faolan.sql` excludes every
 `Character*` table as per-developer play state, so the suite's fixture holds zero `CharacterSpells` rows and any
 such gate there passes vacuously. It caught a real one on its first run — the default bar seeded

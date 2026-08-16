@@ -18,24 +18,32 @@ namespace Faolan.Importer.Cli
 	//
 	//   EXTRA   - a spell the path offers that the character does not know. Retail is the leading source, so an extra
 	//             is wrong; but the population moves whenever captures or the catalog grow, so it is PRINTED.
-	//   MISSING - a spell the character demonstrably knows that the path would not restore. Split THREE ways, and
-	//             only the last is a defect:
-	//               * never on offer      - not in `ClassSpells` for the class, or `Level 0`, or a combo. A catalog
-	//                                       gap; the level path was never going to reach it.
+	//   MISSING - a spell the character demonstrably knows that the path would not restore. Split FIVE ways, because
+	//             four of them are another mechanism and only the last is a defect:
+	//               * never on offer      - not in `ClassSpells` for the class, or `Level 0`, or a combo. Today this
+	//                                       is entirely `Level 0`: mounts, pets, `Dance:`/`Social Ability:` emotes,
+	//                                       `Path:` travel unlocks and veteran rewards - earned or bought, never
+	//                                       leveled into, and replayed on login from the character's OWN rows
+	//                                       (`GrantCharacterSpells`) rather than re-derived from the class.
+	//               * held below level    - the catalog gates it above the character's own level, so retail granted
+	//                                       it earlier than the client's record says. `ClassSpell.GrantLevel` is
+	//                                       where that gets written, but only a capture of the GRANT states it; a
+	//                                       known-spell list merely bounds it, so this is reported, not written.
+	//               * no teaching feat    - zero `FeatSpellGrants` rows, so the feat gate cannot pass it. A gap in
+	//                                       the feat harvest rather than in the gate.
 	//               * bought in the TREE  - taught only by a non-`Feat.AutomaticUnlockCategory` feat, i.e. a
-	//                                       `Spell - <name>` the player spent a point on. A DIFFERENT mechanism, and
-	//                                       `FeatService` hands these over when the feat is trained.
-	//               * DROPPED             - in the class catalog, carries a level, taught by an automatic feat, and
-	//                                       still not offered. Nothing explains that but a bug.
+	//                                       `Spell - <name>` the player spent a point on. `FeatService` hands these
+	//                                       over when the feat is trained.
+	//               * DROPPED             - none of the above. Nothing explains it but a bug.
 	//
 	// ⭐ **Why a report and not a test** (Gitea #729): both sides are shipped DATA - importer OUTPUT (`ClassSpells` +
 	// `Spells.Level` + `FeatSpellGrants`) against importer INPUT (the captured known-spell lists). It also physically
 	// cannot be a test: `faolan.sql` excludes every `Character*` table as per-developer play state, so the suite's
 	// fixture holds ZERO `CharacterSpells` rows and any such gate there passes vacuously.
 	//
-	// What it exists to hold is the claim `DatabaseRepository.FeatMapCovers` and `Feat.AutomaticUnlockCategory` were
-	// introduced on. It is currently **EXTRA 0 / DROPPED 0** on every captured character - the level-80 Necromancer
-	// 88 offered / 88 known, the level-80 Demonologist 95 / 95 - with the tree half accounted for separately.
+	// It is currently **EXTRA 0 / DROPPED 0** on every captured character, at 97 of the level-80 Necromancer's 109
+	// and 96 of the level-80 Demonologist's 127, with every one of the rest attributed to one of the four
+	// mechanisms above.
 	public static partial class ReportCli
 	{
 		private static async Task<int> SpellGrantCheck(string? nameFilter)
@@ -73,30 +81,46 @@ namespace Faolan.Importer.Cli
 				if (known.Count == 0)
 					continue;
 
-				// The class's own catalog rows, so a MISSING spell can be attributed: absent from the catalog is a
-				// harvest gap, present in it but not offered is a gate failure.
-				var inCatalog = (await db.ClassSpells.AsNoTracking()
+				// The class's own catalog rows, with the GATE level the two grant paths read - `ClassSpell.GrantLevel`
+				// where a capture caught the grant and `Spells.Level` everywhere else. Absent from this map is a
+				// harvest gap; present in it but above the character's own level is a level-DATA disagreement, which
+				// is a different thing from the gate dropping it.
+				var catalogGate = await db.ClassSpells.AsNoTracking()
 					.Where(cs => cs.Class == 0 || cs.Class == (ConanClass)character.Class)
-					.Select(cs => cs.SpellId).ToListAsync()).ToHashSet();
+					.Join(db.Spells.AsNoTracking(), cs => cs.SpellId, sp => sp.Id, (cs, sp) => new
+					{
+						cs.SpellId,
+						Gate = (uint)(cs.GrantLevel ?? sp.Level)
+					})
+					.ToDictionaryAsync(x => x.SpellId, x => x.Gate);
+				var inCatalog = catalogGate.Keys.ToHashSet();
 
 				var offered = (await repo.GetStartingSpells(Math.Max(character.Level, (ushort)1), (ConanClass)character.Class)).ToHashSet();
 				var bar = await repo.GetStartingBarSpells(character.Level, (ConanClass)character.Class);
 
 				var missing = known.Where(id => !offered.Contains(id)).ToList();
 				var offCatalog = missing.Where(id => !inCatalog.Contains(id) || levels.GetValueOrDefault(id) == 0 || comboActions.Contains(id)).ToList();
-				var fromTree = missing.Except(offCatalog).Where(id => anyTaught.Contains(id) && !autoTaught.Contains(id)).ToList();
-				var dropped = missing.Except(offCatalog).Except(fromTree).ToList();
+				var rest = missing.Except(offCatalog).ToList();
+				// Held BELOW the level the catalog gates it at - retail granted it earlier than the client's own
+				// record says. That is what `ClassSpell.GrantLevel` records where a capture catches the grant itself;
+				// a known-spell list only bounds it, so it is reported rather than written.
+				var earlyHeld = rest.Where(id => catalogGate.GetValueOrDefault(id) > character.Level).ToList();
+				rest = rest.Except(earlyHeld).ToList();
+				var noFeat = rest.Where(id => !anyTaught.Contains(id)).ToList();
+				var fromTree = rest.Except(noFeat).Where(id => !autoTaught.Contains(id)).ToList();
+				var dropped = rest.Except(noFeat).Except(fromTree).ToList();
 				var extra = offered.Where(id => !known.Contains(id)).ToList();
 
 				Console.WriteLine($"{character.Name} (class {(ConanClass)character.Class}, level {character.Level}): knows {known.Count}, path offers {offered.Count}.");
-				Console.WriteLine($"  matched {known.Count - missing.Count}   EXTRA {extra.Count}   missing {missing.Count} = {offCatalog.Count} never on offer (catalog gap)"
+				Console.WriteLine($"  matched {known.Count - missing.Count}   EXTRA {extra.Count}   missing {missing.Count} = {offCatalog.Count} never on offer"
+				                  + $" + {earlyHeld.Count} held below their stated level + {noFeat.Count} no teaching feat"
 				                  + $" + {fromTree.Count} bought in the feat TREE + {dropped.Count} DROPPED");
 
 				// `--report-arg <character name>` names both populations instead of counting them - which is the only
 				// way an EXTRA becomes actionable, since what it means is decided one spell at a time.
 				if (!string.IsNullOrWhiteSpace(nameFilter) && character.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
 				{
-					foreach (var (label, ids) in new[] { ("EXTRA (offered, not known)", extra), ("MISSING, never on offer", offCatalog), ("MISSING, bought in the feat TREE", fromTree) })
+					foreach (var (label, ids) in new[] { ("EXTRA (offered, not known)", extra), ("MISSING, never on offer", offCatalog), ("MISSING, bought in the feat TREE", fromTree), ("MISSING, held below their stated level", earlyHeld), ("MISSING, no teaching feat", noFeat) })
 					{
 						Console.WriteLine($"  {label}:");
 						foreach (var id in ids.OrderBy(id => levels.GetValueOrDefault(id)).ThenBy(id => names.GetValueOrDefault(id, "")))

@@ -324,6 +324,88 @@ namespace Faolan.Importer.Captures
 		// learned set on every world entry, so a capture's grants ARE that character's spellbook. Attributed to the
 		// character via the grant's RpcHeader receiver instance (= character id). Only characters already in the DB
 		// are touched (CaptureCharacterImporter materializes them first); idempotent (skips spells already recorded).
+		/// <summary>
+		///     Class↔spell MEMBERSHIP derived from what captured characters demonstrably KNOW (#851): every
+		///     <c>CharacterSpell</c> row is a statement that a character of that class held that spell, which is a
+		///     membership fact the client catalog cannot always reach.
+		/// </summary>
+		/// <remarks>
+		///     The catalog source is <c>Spell.GuiStackingLine</c> encoded as <c>ConanClass * 1000 + lineIndex</c>
+		///     (#296), and it is structurally blind to a record that carries no line at all - which is most of the
+		///     catalog (3,158 of 21,502 templates carry one). That is the whole of the gap this closes: of the 18
+		///     spells the level-80 Necromancer knows and the class map had never heard of, <b>16 carry
+		///     <c>GuiStackingLine = 0</c></b>, including the entire <c>Undead Minion:</c> /
+		///     <c>Deathless Acolyte:</c> / <c>Dread Archmage:</c> pet ladder (35/35/40/55/65/65/70/80), every rank of
+		///     which is taught by a <c>Spell Unlocking</c> feat and so belongs on the level path.
+		///     <para>
+		///         ⭐ It cannot invent a false positive: the row says a character of this class HAD this spell, and
+		///         one did. What it may add that is not class CONTENT - a mount summon, a companion, a
+		///         <c>Dance:</c> emote - carries <c>Level 0</c> and is therefore never level-granted; those are owned
+		///         or earned, and the level gate already declines them.
+		///     </para>
+		///     <para>
+		///         ⚠️ ADDITIVE, like every other writer of this table. An existing row keeps its
+		///         <see cref="ClassSpell.IsStarter" /> and <see cref="ClassSpell.GrantLevel" />, which are facts only
+		///         a create/ding capture can state.
+		///     </para>
+		///     <para>
+		///         ⚠️ Sound only while a captured character is ONE class, which every imported character is. A
+		///         character that had changed class would attribute its whole book to whichever class the row records.
+		///     </para>
+		/// </remarks>
+		public static async Task<(int Pairs, int Inserted)> ImportClassSpellsFromKnownAsync(IDatabaseContext db, ILogger? logger = null)
+		{
+			// ⚠️ LEVELED spells only. A character's book also holds what it OWNS or EARNED - mounts, pets and
+			// companions, `Dance:` / `Social Ability:` emotes, `Path:` travel unlocks, veteran rewards - and those
+			// carry `Level 0`, are never level-granted, and come back on login from the character's own rows
+			// (`GrantCharacterSpells`) rather than from the class. Adding them would claim class MEMBERSHIP for
+			// something whose gate is ownership, and it contradicts the catalog where the two speak: the captured
+			// Necromancer's `Blue Snow Mammoth` and `Fading Black Horse` sit on stacking line 44224, i.e. filed under
+			// Demonologist, because a mount belongs to no class and its line is not a class statement at all
+			// (`NoClassSpellRow_ContradictsItsSpellsStackingLine` is what says so).
+			var proven = await (from known in db.CharacterSpells
+				join character in db.Characters on known.CharacterId equals character.Id
+				join spell in db.Spells on known.SpellId equals spell.Id
+				where spell.Level > 0
+				select new
+				{
+					character.Class,
+					known.SpellId
+				}).Distinct().ToListAsync();
+
+			if (proven.Count == 0)
+			{
+				logger?.LogInformation("CaptureSpellImporter: no captured character spellbooks - no class membership to derive.");
+				return (0, 0);
+			}
+
+			var existing = (await db.ClassSpells.Select(cs => new
+			{
+				cs.Class,
+				cs.SpellId
+			}).ToListAsync()).Select(x => ((uint)x.Class, x.SpellId)).ToHashSet();
+
+			var inserted = 0;
+			foreach (var pair in proven)
+			{
+				if (!existing.Add(((uint)pair.Class, pair.SpellId)))
+					continue;
+
+				db.ClassSpells.Add(new ClassSpell
+				{
+					Class = (ConanClass)pair.Class,
+					SpellId = pair.SpellId
+				});
+				inserted++;
+			}
+
+			if (inserted > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureSpellImporter: {Pairs} capture-proven (class, spell) pairs, {Inserted} new ClassSpell rows.", proven.Count, inserted);
+			return (proven.Count, inserted);
+		}
+
 		public static async Task<(int Characters, int Inserted)> ImportLearnedSpellsAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var byCharacter = new Dictionary<uint, HashSet<uint>>();
