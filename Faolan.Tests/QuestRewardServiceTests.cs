@@ -5,6 +5,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Quest;
@@ -113,7 +114,62 @@ namespace Faolan.Tests
 			Assert.Empty(outbound.Offers);
 		}
 
-		private async Task<(QuestRewardService Service, INetworkClient Client, RecordingRewardOutbound Outbound, RecordingEconomy Economy)> Harness(bool completed = true)
+		// The XP the completion paid, recorded through the delegate seam - the whole reason that seam is a Func and
+		// not a LevelUpService, which would need a WorldSimulation behind it to say the same thing.
+		private readonly List<uint> _xpAwards = [];
+
+		// #820: a quest pays the experience and money its OWN record states - which are the numbers the client's
+		// journal advertised on its `XP:` and `Money:` lines, established in-client (#759/#802). Anything else would
+		// be a divergence the player can see on the panel they took the quest from.
+		[Fact]
+		public async Task CompletingAQuestThatStatesRewards_PaysBoth()
+		{
+			var (service, client, _, economy) = await Harness(xpReward: 5553, moneyReward: 111200);
+			client.Session.Character.Money = 400;
+
+			await service.GrantCompletionRewards(client, QuestId);
+
+			Assert.Equal([5553u], _xpAwards);
+
+			// TIN in the column, TIN on the wire, and an ABSOLUTE balance rather than a delta - so 400 + 111200.
+			var cash = Assert.Single(economy.CashUpdates);
+			Assert.Equal((111600ul, UpdateCashReason.Gain), cash);
+			Assert.Equal(111600ul, client.Session.Character.Money);
+		}
+
+		// ⛔ And nothing is invented where the record is silent, which is almost every quest: 21 of 5049 carry a money
+		// reward. Retail pays experience on quests whose every reward slot is zero, but the magnitude is unmeasurable
+		// from what we hold (`CharacterStatId.Exp` is on no stat record in the whole corpus - see #820), so a formula
+		// here would be a guess shipped into five thousand quests. Paying nothing is the honest answer until a
+		// capture says otherwise, and this is what holds that line.
+		[Fact]
+		public async Task CompletingAQuestThatStatesNoReward_PaysNothing()
+		{
+			var (service, client, _, economy) = await Harness();
+			client.Session.Character.Money = 400;
+
+			await service.GrantCompletionRewards(client, QuestId);
+
+			Assert.Empty(_xpAwards);
+			Assert.Empty(economy.CashUpdates);
+			Assert.Equal(400ul, client.Session.Character.Money);
+		}
+
+		// The two halves are independent - a quest may pay experience only, which is the commoner shape of the pair
+		// (the money carriers are a SUBSET of the xp carriers).
+		[Fact]
+		public async Task AQuestThatPaysExperienceOnly_SendsNoWalletUpdate()
+		{
+			var (service, client, _, economy) = await Harness(xpReward: 715);
+
+			await service.GrantCompletionRewards(client, QuestId);
+
+			Assert.Equal([715u], _xpAwards);
+			Assert.Empty(economy.CashUpdates);
+		}
+
+		private async Task<(QuestRewardService Service, INetworkClient Client, RecordingRewardOutbound Outbound, RecordingEconomy Economy)> Harness(bool completed = true,
+			uint xpReward = 0, ulong moneyReward = 0)
 		{
 			var (options, path) = TestDb.NewSeededDatabase(CharacterId);
 			_databases.Add(path);
@@ -121,7 +177,11 @@ namespace Faolan.Tests
 			await using (var ctx = new DatabaseContext(options))
 			{
 				ctx.QuestLines.Add(new QuestLine { QuestLineId = 386 });
-				ctx.QuestDefinitions.Add(new QuestDefinition { QuestId = QuestId, QuestLineId = 386, Name = "The Trainer of Mages" });
+				ctx.QuestDefinitions.Add(new QuestDefinition
+				{
+					QuestId = QuestId, QuestLineId = 386, Name = "The Trainer of Mages",
+					XpReward = xpReward, MoneyReward = moneyReward
+				});
 				ctx.QuestDefinitions.Add(new QuestDefinition { QuestId = 12371, QuestLineId = 386, Name = "The Quarry" });
 
 				// The three captured options, with the real keys the shipped Items rows carry.
@@ -149,7 +209,11 @@ namespace Faolan.Tests
 			var database = new DatabaseRepository(new Factory(options));
 			var outbound = new RecordingRewardOutbound();
 			var economy = new RecordingEconomy();
-			return (new QuestRewardService(database, outbound, economy, NullLogger.Instance), new RecordingNetworkClient(CharacterId), outbound, economy);
+			return (new QuestRewardService(database, outbound, economy, (_, xp) =>
+			{
+				_xpAwards.Add(xp);
+				return Task.CompletedTask;
+			}, NullLogger.Instance), new RecordingNetworkClient(CharacterId), outbound, economy);
 		}
 
 		private static void AddItem(DatabaseContext ctx, uint id, string name, uint k1, uint k2, uint k3, uint k4)
@@ -180,15 +244,23 @@ namespace Faolan.Tests
 			}
 		}
 
-		// Records which templates actually reached the backpack - the difference between "confirmed" and "granted".
+		// Records which templates actually reached the backpack - the difference between "confirmed" and "granted" -
+		// and the wallet pushes, which is how #820's money award is observed.
 		private sealed class RecordingEconomy : NoOpEconomyOutbound
 		{
 			public List<uint> Granted { get; } = [];
+			public List<(ulong BalanceTin, UpdateCashReason Reason)> CashUpdates { get; } = [];
 
 			public override Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null)
 			{
 				Granted.Add(itemTemplateId);
 				return Task.FromResult<int?>(Granted.Count);
+			}
+
+			public override Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
+			{
+				CashUpdates.Add((balanceTin, reason));
+				return Task.CompletedTask;
 			}
 		}
 

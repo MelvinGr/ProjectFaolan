@@ -313,7 +313,10 @@ namespace Faolan.GameServer
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
-			_questRewards = new QuestRewardService(database, _broadcaster, this, logger);
+			// #820: built BEFORE the quest rewards, which now pay experience through it. A quest award is a second
+			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
+			_levelUp = new LevelUpService(database, _simulation, this, logger);
+			_questRewards = new QuestRewardService(database, _broadcaster, this, _levelUp.ApplyXp, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, logger);
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellAreas = new SpellAreaCatalog(database);
@@ -322,13 +325,12 @@ namespace Faolan.GameServer
 			_buffStats = new BuffStatEffects(database, logger);
 			_poolEffects = new SpellPoolEffects(database, logger);
 			_factions = new FactionService(database, logger, SendFactionStanding);
-			_levelUp = new LevelUpService(database, _simulation, this, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, _broadcaster, configuration.ContentKillStreaks);
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher);
+			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);

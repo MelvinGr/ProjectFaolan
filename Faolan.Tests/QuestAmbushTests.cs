@@ -111,7 +111,7 @@ namespace Faolan.Tests
 
 			var database = new DatabaseRepository(new Factory(options));
 			var outbound = new RecordingQuestOutbound();
-			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), new QuestRewardService(database, outbound, null!, NullLogger.Instance), NullLogger.Instance);
+			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), new QuestRewardService(database, outbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), NullLogger.Instance);
 
 			var client = new RecordingNetworkClient(CharacterId);
 			await service.Grant(client, QuestId, nameof(QuestAmbushTests));

@@ -65,8 +65,12 @@ namespace Faolan.GameServer.Dialogue
 		private readonly WorldSimulation _sim;
 		private readonly TravelService _travel;
 
+		// #820: a turn-in is a quest COMPLETION, so it pays the quest's stated reward the same way the objective path
+		// does. Reached directly rather than through the progression service, which would only be forwarding.
+		private readonly QuestRewardService _rewards;
+
 		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, WorldSimulation sim,
-			QuestProgressionService questProgression, TravelService travel, IChatServerDispatcher agents)
+			QuestProgressionService questProgression, TravelService travel, IChatServerDispatcher agents, QuestRewardService rewards)
 		{
 			_database = database;
 			_agents = agents;
@@ -75,6 +79,7 @@ namespace Faolan.GameServer.Dialogue
 			_sim = sim;
 			_questProgression = questProgression;
 			_travel = travel;
+			_rewards = rewards;
 		}
 
 		// #523: how close the player must come to an NPC for its APPROACH-triggered conversation to open. MEASURED at
@@ -669,6 +674,10 @@ namespace Faolan.GameServer.Dialogue
 				await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
 				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
 				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
+
+				// #820: THIS is where a turn-in quest completes, so this is where it pays. The guard above only lets a
+				// quest through while it is still Active, so the flip - and the payment - happen exactly once.
+				await _rewards.GrantCompletionRewards(client, held.QuestId);
 				_logger.LogInformation("Quest {Quest} turned in to template {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcTemplateId, character.Name,
 					held.GoalProgress, held.GoalRequired);
 			}

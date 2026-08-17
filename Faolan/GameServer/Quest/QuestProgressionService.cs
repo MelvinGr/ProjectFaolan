@@ -599,8 +599,15 @@ namespace Faolan.GameServer.Quest
 			// #815: a quest that offers a CHOICE of rewards presents it now. Deliberately NOT on the turn-in path above
 			// - that one leaves the quest Active awaiting a hand-in, and the reward belongs to completion. The capture
 			// puts the offer inside the completion burst, after the QuestIIR state flip, which is where this lands.
+			//
+			// #820: the XP and money the quest's own record states are paid on the same condition and for the same
+			// reason - the turn-in path has not completed anything yet, so it pays at its own flip
+			// (ConversationService.TryTurnInQuests) rather than here.
 			if (goal.GoalType != QuestGoalType.Kill || def.NextQuestId is not null)
+			{
+				await _rewards.GrantCompletionRewards(client, quest.QuestId);
 				await _rewards.OfferOnCompletion(client, quest.QuestId);
+			}
 		}
 
 		private async Task<uint> GoalProgressOf(uint characterId, CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)
