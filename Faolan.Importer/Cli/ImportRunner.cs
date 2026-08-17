@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,8 +21,9 @@ namespace Faolan.Importer.Cli
 
 			await using var tx = await ctx.Db.Database.BeginTransactionAsync();
 
-			foreach (var module in plan)
+			for (var i = 0; i < plan.Count; i++)
 			{
+				var module = plan[i];
 				var mode = ctx.ModeFor(module.Name);
 				if (!module.SupportedModes.Contains(mode))
 				{
@@ -36,7 +38,26 @@ namespace Faolan.Importer.Cli
 				// Record it so the module sees the mode it is actually running in - it branches on ModeFor.
 				ctx.SetEffectiveMode(module.Name, mode);
 
-				var result = await module.RunAsync(ctx);
+				ImportResult result;
+				try
+				{
+					result = await module.RunAsync(ctx);
+				}
+				catch (Exception e)
+				{
+					// The plan is ONE transaction, so a module throwing must still abort everything - a half-applied
+					// plan is not a state we want to commit, and swallowing the failure to carry on would be exactly
+					// the silent fallback this codebase refuses. What was missing is WHICH module died and what it
+					// took with it: #819's rdb-quest-catalog crash surfaced as a bare NullReferenceException, and the
+					// seven modules sequenced after it went missing with nothing saying so. Name both, then rethrow.
+					var skipped = plan.Skip(i + 1).Select(m => m.Name).ToList();
+					await ctx.Out.WriteLineAsync($"[{module.Name}] FAILED: {e.GetType().Name}: {e.Message}");
+					await ctx.Out.WriteLineAsync(skipped.Count == 0
+						? "Nothing was written - the transaction is rolled back. It was the last module in the plan."
+						: $"Nothing was written - the transaction is rolled back. {skipped.Count} module(s) never ran: {string.Join(", ", skipped)}");
+					throw;
+				}
+
 				await ctx.Out.WriteLineAsync($"[{module.Name}] {result.Summary}");
 			}
 
