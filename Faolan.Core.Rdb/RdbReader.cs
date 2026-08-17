@@ -45,6 +45,14 @@ namespace Faolan.Core.Rdb
 		private Dictionary<(uint, uint), Entry>? _byKey;
 		public IReadOnlyList<Entry> Entries => _entries;
 
+		// Every (type, id) the index states MORE THAN ONCE, with how many entries carry it - computed at parse, so
+		// the answer costs nothing to ask and is the same whether or not anything ever calls TryGet. Empty on this
+		// client; a non-empty list means an override layer is present and `TryGet`'s last-wins rule is live. Kept as
+		// data rather than a log line because this project has no logger - the caller that has one prints it
+		// (`--only rdb-inventory` does).
+		private readonly List<(uint Type, uint Id, int Count)> _duplicateKeys = [];
+		public IReadOnlyList<(uint Type, uint Id, int Count)> DuplicateKeys => _duplicateKeys;
+
 		public int Count => _entries.Count;
 
 		public RdbReader(string rdbDir, string? cdnBaseUrl = null)
@@ -115,9 +123,21 @@ namespace Faolan.Core.Rdb
 			return UnwrapIOz1(inner);
 		}
 
+		// ⚠️ LAST entry wins when a (type, id) appears more than once (#834). That is the patch semantic - a later
+		// index entry is an override of the earlier one - and it is a DECISION, not the incidental result of a
+		// `GroupBy(...).First()`, which is what this used to be. THIS client's `le.idx` has zero duplicate keys
+		// (measured: v5, 873,588 entries, 0 collisions), so the rule changes nothing today; it exists so that if a
+		// patch layer ever does add a second entry, the consumer gets the NEW copy rather than silently the old one.
+		// `DuplicateKeys` is how that stops being silent either way.
 		public bool TryGet(uint type, uint id, out Entry entry)
 		{
-			_byKey ??= _entries.GroupBy(e => (e.Type, e.Id)).ToDictionary(g => g.Key, g => g.First());
+			if (_byKey == null)
+			{
+				_byKey = new Dictionary<(uint, uint), Entry>(_entries.Count);
+				foreach (var e in _entries)
+					_byKey[(e.Type, e.Id)] = e;
+			}
+
 			return _byKey.TryGetValue((type, id), out entry);
 		}
 
@@ -197,6 +217,30 @@ namespace Faolan.Core.Rdb
 				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
 				_entries.Add(new Entry(type, id, file, offset, size, hash));
 			}
+
+			CensusDuplicateKeys();
+		}
+
+		// One pass over the parsed entries recording any (type, id) stated more than once. #834: the old key index
+		// resolved a collision with `First()` and said nothing, so a patch layer's entry would have been served
+		// STALE and the symptom would have read as wrong CONTENT rather than a wrong pick. Counting here means the
+		// question "does this client's index collide?" is answered by the reader itself instead of needing a
+		// hand-written index parser to rule it out, which is what #832's audit actually had to do.
+		private void CensusDuplicateKeys()
+		{
+			var counts = new Dictionary<(uint, uint), int>(_entries.Count);
+			foreach (var e in _entries)
+				counts[(e.Type, e.Id)] = counts.GetValueOrDefault((e.Type, e.Id)) + 1;
+
+			foreach (var (key, n) in counts)
+			{
+				if (n > 1)
+					_duplicateKeys.Add((key.Item1, key.Item2, n));
+			}
+
+			_duplicateKeys.Sort((x, y) => x.Type != y.Type
+				? x.Type.CompareTo(y.Type)
+				: x.Id.CompareTo(y.Id));
 		}
 
 		private byte[] ReadRaw(Entry e)

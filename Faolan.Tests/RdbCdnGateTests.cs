@@ -41,7 +41,16 @@ namespace Faolan.Tests
 
 		// A test that constructs one deliberately without a mirror (there is none to reach in the suite), plus this
 		// file, whose "offenders" are the literals the gate matches on.
-		private static readonly HashSet<string> BareReaderAllowed = ["RdbCollisionMeshTests.cs", "RdbCdnGateTests.cs"];
+		private static readonly HashSet<string> BareReaderAllowed =
+		[
+			"RdbCollisionMeshTests.cs",
+			"RdbCdnGateTests.cs",
+
+			// #834's last-wins rule is checked against a SYNTHETIC `le.idx` the test writes itself - three entries,
+			// all `file == 0`, no CDN record in it at all. A mirror base would have nothing to reach and would only
+			// make the construction look like it depended on one.
+			"RdbDuplicateKeyTests.cs"
+		];
 
 		[Fact]
 		public void NoRdbReader_GatesOnIsLocalOutsideTheReportersThatNameTheSplit()

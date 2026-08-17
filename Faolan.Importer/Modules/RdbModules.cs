@@ -57,7 +57,19 @@ namespace Faolan.Importer.Modules
 			ctx.Out.WriteLine("  type        count   name");
 			foreach (var (type, count) in rdb.TypeCounts())
 				ctx.Out.WriteLine($"  {type,-10}  {count,6}  {(TypeNames.TryGetValue(type, out var n) ? n : "")}");
-			return Task.FromResult(new ImportResult($"{rdb.Count} index entries inventoried (read-only)."));
+
+			// #834: a (type, id) the index states twice means an override layer is present, and TryGet's last-wins
+			// rule is deciding which copy every consumer gets. Say so where a human is looking, rather than leaving
+			// it to be discovered as wrong content. Zero on this client - printed anyway, because "0 duplicate keys"
+			// is the answer to the question and a silent absence is not.
+			ctx.Out.WriteLine($"  duplicate (type,id) keys: {rdb.DuplicateKeys.Count}"
+				+ (rdb.DuplicateKeys.Count == 0
+					? ""
+					: " - TryGet serves the LAST entry of each"));
+			foreach (var (type, id, count) in rdb.DuplicateKeys.Take(20))
+				ctx.Out.WriteLine($"    {type}:{id} x{count}");
+
+			return Task.FromResult(new ImportResult($"{rdb.Count} index entries inventoried, {rdb.DuplicateKeys.Count} duplicate keys (read-only)."));
 		}
 	}
 
