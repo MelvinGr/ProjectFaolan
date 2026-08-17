@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests
@@ -19,52 +20,41 @@ namespace Faolan.Tests
 	// assertion would fail the moment a claim or an AH purchase legitimately delivers one.
 	//
 	// So the invariant moved down a level: it is no longer about Items.Hash (a provenance record, 0 is a normal
-	// value there) but about what reaches the WIRE. Every held item must resolve to a well-formed token.
+	// value there) but about what reaches the WIRE. Every item must resolve to a well-formed token.
+	//
+	// ⚠️ And it is asked of the TEMPLATE population, not of held instances (#849). Both gates here used to read
+	// `db.ItemInstances` out of `TestDb.GameDatabase`, and the seed excludes that table with the rest of the player
+	// state: 404 rows in `faolan.db`, zero in `faolan.sql`. They were asserting "no offender among no rows". Asking
+	// `Items` instead is not a weaker question but a strictly stronger one - it covers every template that COULD be
+	// held rather than the handful some captured character happened to be carrying, and `Items` is seeded, so the
+	// gate can actually fail. The held-instance form, which needs the real database, is
+	// `--report inventory-token-check`.
 	public class InventoryItemHashTests
 	{
 		[Fact]
-		public async Task EveryHeldItem_ResolvesToAWellFormedWireToken()
+		public async Task EveryItemTemplate_ResolvesToAWellFormedWireToken()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
 
-			var held = (from ii in db.ItemInstances
-					join i in db.Items on ii.TemplateId equals i.Id
-					select new { ii.OwnerCharacterId, ii.Container, ii.Slot, i.Id, i.Name, i.Hash })
-				.ToList();
+			var items = await db.Items.AsNoTracking().Select(i => new
+			{
+				i.Id,
+				i.Name,
+				i.Hash
+			}).ToListAsync(ct);
 
-			var offenders = held
+			Assert.NotEmpty(items); // the population is real - otherwise this gate is the vacuous kind it replaced
+
+			var offenders = items
 				.Where(o => !AcgHash.IsWellFormed(AcgHash.ForWire(o.Id, o.Hash)))
 				.Take(20)
 				.ToList();
 
 			Assert.True(offenders.Count == 0,
-				"a character is holding an item whose wire token the client would refuse:\n  "
+				"an item template mints a wire token the client would refuse:\n  "
 				+ string.Join("\n  ", offenders.Select(o =>
-					$"character {o.OwnerCharacterId} {o.Container}[{o.Slot}] -> item {o.Id} '{o.Name}' (harvested 0x{o.Hash:X8}, wire 0x{AcgHash.ForWire(o.Id, o.Hash):X8})")));
-		}
-
-		// An item pointing at a template that is not in Items at all is still a real defect - that one has no
-		// identity to mint FROM, and the snapshot skips it, so the item is invisible with nothing to explain it.
-		//
-		// ⚠️ Since #750 the FK enforces this (ItemInstance.TemplateId -> Items, Restrict), so the gate can only fail on
-		// a database whose constraints were bypassed. It is kept for that: faolan.db is a committed artifact and a hand
-		// edit through the sqlite3 CLI has foreign keys OFF by default.
-		[Fact]
-		public async Task NoInventoryRow_PointsAtAMissingItemTemplate()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-
-			var itemIds = db.Items.Select(i => i.Id).ToHashSet();
-			var offenders = db.ItemInstances
-				.Select(ii => new { ii.OwnerCharacterId, ii.Container, ii.Slot, ItemId = (uint?)ii.TemplateId })
-				.ToList()
-				.Where(ii => !itemIds.Contains(ii.ItemId!.Value))
-				.Take(20)
-				.ToList();
-
-			Assert.True(offenders.Count == 0,
-				"a character is holding a template with no Items row:\n  "
-				+ string.Join("\n  ", offenders.Select(o => $"character {o.OwnerCharacterId} {o.Container}[{o.Slot}] -> item {o.ItemId}")));
+					$"item {o.Id} '{o.Name}' (harvested 0x{o.Hash:X8}, wire 0x{AcgHash.ForWire(o.Id, o.Hash):X8})")));
 		}
 	}
 }

@@ -19,23 +19,12 @@ namespace Faolan.Tests
 		// (FeatIdMap.MaxRank, from FUN_007850c0's `base*100 + 10`), so the digits index a family instead of naming a
 		// rank. The twelve `<Class> Class Feat 001` tracks carry one entry per character level; the others are
 		// `2HE 60-80`, `Bow 60-80` and `Class Specific HP 60-80`.
-		[Fact]
-		public async Task NoCapturedFeatList_ContainsAProgressionTrack()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var ct = TestContext.Current.CancellationToken;
-
-			var tracks = await TrackBases(db, ct);
-			Assert.NotEmpty(tracks); // the catalog really does hold them - otherwise this test is vacuous
-
-			var carried = await (from feat in db.CharacterFeats.AsNoTracking()
-				join map in db.FeatIdMaps.AsNoTracking() on feat.FeatId equals map.WireFeatId
-				where tracks.Contains(map.BaseIndex)
-				select feat.FeatId).ToListAsync(ct);
-
-			Assert.True(carried.Count == 0, "captured feat lists carrying a progression track: " + string.Join(", ", carried));
-		}
-
+		// ⚠️ The gate that used to prove this from the captured feat lists is in `--report spell-grant-check` now
+		// (#849). It read `db.CharacterFeats`, and `faolan.sql` excludes every `Character*` table as per-developer
+		// play state, so the suite's fixture holds none: it asserted an empty join against an empty left side and
+		// could not fail. Note the `Assert.NotEmpty(tracks)` it carried - the vacuity guard was on the RIGHT-hand
+		// population, which was never the empty one.
+		//
 		// So the level-up grant must not train one either. Asked over the whole grant table at once, because the
 		// per-class picture is what made this worth gating: a Dark Templar's level band resolves 32 of its spells
 		// through `Spell Unlocking 20-40` (a real feat) and 5 through its class track (not one).

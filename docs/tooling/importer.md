@@ -321,7 +321,16 @@ direction that can only be a defect. It is the standing measurement behind the p
 `Character*` table as per-developer play state, so the suite's fixture holds zero `CharacterSpells` rows and any
 such gate there passes vacuously. It caught a real one on its first run — the default bar seeded
 `Pestilential Blast (Rank 1)` for a level-4 Necromancer whose book did not hold it, because the bar re-derived its
-own candidate set instead of seeding from the book) ·
+own candidate set instead of seeding from the book. ⭐ It also carries the three **captured-record exclusions**
+(#849), each of which used to be a test that could not fail: no captured spellbook holds a combo's GameAction or a
+book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
+a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
+rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`inventory-token-check` (#719/#723: does every item a character is HOLDING reach the wire as something the client
+will render? Flags a held template with no `Items` row — invisible in the snapshot with nothing to explain it — and
+one whose minted wire token is malformed. ⚠️ A report for the #729/#849 reason: `ItemInstances` hangs off
+`Characters`, so the seed excludes it and the two gates that used to assert this in `InventoryItemHashTests` ran
+over an empty table. The TEMPLATE half stayed a test, where it covers a strictly larger population) ·
 `broadcast-check` (#272: which server records does retail send to EVERY player who can see the subject, and which
 only to the one client concerned? The oracle is `login_2-clients_group-trade-friend`, the ONLY capture with two game
 connections — with one client a broadcast and a private reply look identical, with two a record reaching both streams

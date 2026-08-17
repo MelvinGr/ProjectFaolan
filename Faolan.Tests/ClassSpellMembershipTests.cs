@@ -86,22 +86,14 @@ namespace Faolan.Tests
 
 		// #298: a COMBO is not a spellbook spell. `ClassSpells` is derived from the class-encoded stacking line and a
 		// melee combo's GameAction carries one, so combos are attributed to their class exactly like spells - which is
-		// correct as MEMBERSHIP and wrong as a spellbook. `Combos.GameActionId` IS a `Spells.Id`, and this is the
-		// oracle that says retail never learns one: every captured character's known-spell list, including a level-80
-		// Necromancer's 109 entries and a Herald's 127.
-		[Fact]
-		public async Task NoCapturedSpellbook_ContainsAComboGameAction()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var ct = TestContext.Current.CancellationToken;
-
-			var comboActions = await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync(ct);
-			var known = await db.CharacterSpells.AsNoTracking().Select(s => s.SpellId).Distinct().ToListAsync(ct);
-
-			var leaked = known.Where(comboActions.Contains).ToList();
-			Assert.True(leaked.Count == 0, "captured spellbook entries that are a combo's GameAction: " + string.Join(", ", leaked));
-		}
-
+		// correct as MEMBERSHIP and wrong as a spellbook.
+		//
+		// ⚠️ The ORACLE for that - every captured character's known-spell list - lives in `--report spell-grant-check`
+		// and not here (#849). `faolan.sql` excludes every `Character*` table as per-developer play state, so the
+		// suite's fixture holds zero `CharacterSpells` rows and the gate that used to sit here asserted an empty
+		// intersection against an empty left-hand side. What remains below is the CODE half, which needs no character
+		// rows and can genuinely fail.
+		//
 		// So neither level-up path may learn one. Both queries feed `DispatchLearnSpell` + `AddCharacterSpell`; the
 		// combos of the level band travel their own way, as ComboBookIIR right after the NewLevelIIR.
 		[Fact]
@@ -134,20 +126,8 @@ namespace Faolan.Tests
 		// `Flesh to Worms` inflicts, and all five of its ranks sit at Level 2 because an effect's ranks pair with the
 		// CASTER's ranks rather than with a level ladder of their own, so one 1 -> 2 ding taught all five.
 		//
-		// Same oracle as the combo rule: no captured character's spellbook holds one.
-		[Fact]
-		public async Task NoCapturedSpellbook_ContainsAnEffectOfABookSpell()
-		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var ct = TestContext.Current.CancellationToken;
-
-			var effects = await EffectsOfBookSpells(db, ct);
-			var known = await db.CharacterSpells.AsNoTracking().Select(s => s.SpellId).Distinct().ToListAsync(ct);
-
-			var leaked = known.Where(effects.Contains).ToList();
-			Assert.True(leaked.Count == 0, "captured spellbook entries that are a book spell's effect: " + string.Join(", ", leaked));
-		}
-
+		// Same oracle as the combo rule, and in the same place for the same reason - `--report spell-grant-check`.
+		//
 		// So no grant path may teach one - the ding, the relog re-grant, or the default bar seed. The re-grant matters
 		// as much as the ding: it re-derives the whole book on every world entry, so leaving it out would put back
 		// what the ding no longer teaches.

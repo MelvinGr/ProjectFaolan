@@ -457,6 +457,11 @@ namespace Faolan.Importer.Cli
 					return await SpellGrantCheck(arg);
 				}
 
+				case "inventory-token-check":
+				{
+					return await InventoryTokenCheck();
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));
