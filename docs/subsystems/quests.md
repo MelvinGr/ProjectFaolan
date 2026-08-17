@@ -584,10 +584,26 @@ lit grant nothing at all**, so we would send `0x00` for every one of them. That 
 wider than the Turach question it was found through: Ninus (silver ×134), Skeggi (×48), Junia (×48) and Donus
 (×17) all grant nothing and are each targeted by untouched quests.
 
-⚠️ It names silver's **population**, not its trigger. Casilda is the standing counterexample — 13480 targets
-her and is untouched while she is dark 178 times — so a further condition exists. And 15% of silver and 20%
-of gold `!` land on NPCs with no quest relation in the shipped data at all, which is a harvest gap rather
-than a rule. Tracked in Gitea #848.
+⭐⭐ **And the condition that separates them is the quest LINE, not the quest.** Casilda looked like a
+counterexample — 13480 targets her and is untouched while she is dark 178 times — until the relation is taken
+one level up: 13480 sits in line 1054, *the line the player is already on*. Measured over every marker packet:
+
+> **Silver requires an untouched line.** Of the 257 packets about an NPC whose every quest line the player had
+> already started, **0 carried silver** — 229 dark, 27 gold `?` (the actionable ones), 1 gold `!`. And 85% of
+> all silver sits on an NPC in a line the player has *not* begun.
+
+So the grey `!` means *"a chain you have not begun runs through here"*, and once you are **on** that chain the
+NPC goes dark until it is actually your turn to act on them (`0x04`). That is what reconciles the two NPCs this
+was opened over: Turach stays silver because lines 222 (*[NPE] The Legendary Turach*) and 1305 (*Cimmerian Blue
+Steel*) pass through him and the player never started either — not because of an unharvested grant — while
+Casilda's only line is one the player is on.
+
+⚠️ **Necessary, not sufficient.** Being in an untouched line only lights an NPC 20% of the time, so something
+further gates it (level is the community's claim, and the corpus cannot yet separate it — see #848). The
+journal is capture-derived, so "started" is a lower bound; that biases toward calling a line *unstarted*,
+which shrinks the zero-exception population rather than weakening it. And 15% of silver and 20% of gold `!`
+land on NPCs with no quest relation in the shipped data at all — a harvest gap, not a rule. Tracked in
+Gitea #848.
 
 ⛔ **The quest's `MapId` does not gate the marker.** It is the objective's marker *pin* — where the quest sends
 you — not where its giver stands, and the two differ for **15 of the 28 giver quests** in the shipped data:

@@ -56,9 +56,18 @@ namespace Faolan.GameServer.Quest
 		// player has neither taken nor finished, and *zero* are on a grant the player already holds.
 		//
 		// So `MarkerStateFor` returning None for any non-giver is a real gap: 38 of the 62 NPC templates retail ever
-		// lit grant nothing, and we would send 0x00 for every one of them. What is NOT pinned is the extra condition -
-		// Casilda is the standing counterexample (13480 targets her and is untouched while she is dark 178 times), so
-		// "targeted by an untouched quest" names silver's population without predicting when it fires.
+		// lit grant nothing, and we would send 0x00 for every one of them.
+		//
+		// ⭐⭐ The condition is the quest LINE, not the quest. Casilda looked like the counterexample - 13480 targets
+		// her and is untouched while she is dark 178 times - until the relation is read one level up: 13480 is in
+		// line 1054, the line the player is already ON. Of the 257 packets about an NPC whose every line the player
+		// had already started, **zero** carried silver (229 dark, 27 gold '?', 1 gold '!'). So silver means "a chain
+		// you have not begun runs through here", and once you are on that chain the NPC goes dark until it is your
+		// turn to act on them. Turach stays silver because lines 222 and 1305 pass through him untouched - not
+		// because of an unharvested grant.
+		//
+		// ⚠️ NECESSARY, not sufficient: an untouched line lights an NPC only 20% of the time, so a further gate
+		// exists (the community says level; the corpus cannot separate it yet). That is why nothing here acts on it.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
 
 		private readonly IDatabaseRepository _database;

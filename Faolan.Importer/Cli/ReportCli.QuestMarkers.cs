@@ -168,6 +168,12 @@ namespace Faolan.Importer.Cli
 				.GroupBy(g => g.Template)
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().OrderBy(q => q).ToArray());
 
+			// ⭐ The LINE each quest belongs to (#848). The relation that finally separates Casilda from Turach is not
+			// about a quest at all - it is about whether the player has touched the CHAIN that quest sits in.
+			var lineOf = db.QuestDefinitions.Where(q => q.QuestLineId > 0)
+				.Select(q => new { q.QuestId, q.QuestLineId })
+				.ToDictionary(q => q.QuestId, q => q.QuestLineId);
+
 			var perNpc = observations.GroupBy(o => o.Template)
 				.Select(g => new
 				{
@@ -241,7 +247,7 @@ namespace Faolan.Importer.Cli
 			foreach (var n in dark.OrderByDescending(n => n.Zero).Take(15))
 				Console.WriteLine($"    {Trim(n.Name, 25),-25}  {n.Template,-9}  0x00 x{n.Zero,-5}  grants {Trim(string.Join(",", n.Grants), 12),-12}  targeted-by {Trim(string.Join(",", n.Targeted), 30)}");
 
-			RulePredictorTest(observations, grants, targeted);
+			RulePredictorTest(observations, grants, targeted, lineOf);
 
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ Both lists are POPULATIONS, not verdicts. A never-lit giver may simply have been observed only by");
@@ -257,8 +263,21 @@ namespace Faolan.Importer.Cli
 		// ⚠️ Each row is a PACKET, and retail re-sends the same answer for every NPC on every poll, so a single
 		// long-parked session weights heavily. The per-NPC table above is the counterweight; read them together.
 		private static void RulePredictorTest(List<MarkerObservation> observations,
-			Dictionary<uint, uint[]> grants, Dictionary<uint, uint[]> targeted)
+			Dictionary<uint, uint[]> grants, Dictionary<uint, uint[]> targeted, Dictionary<uint, uint> lineOf)
 		{
+			// Each observation's LINE view: which chains this NPC appears in at all, and which chains the player has
+			// already touched (any quest of that line held or completed as of this packet).
+			foreach (var o in observations)
+			{
+				foreach (var q in grants.GetValueOrDefault(o.Template, []).Concat(targeted.GetValueOrDefault(o.Template, [])))
+					if (lineOf.TryGetValue(q, out var line))
+						o.NpcLines.Add(line);
+
+				foreach (var q in o.Held.Concat(o.Completed))
+					if (lineOf.TryGetValue(q, out var line))
+						o.TouchedLines.Add(line);
+			}
+
 			Console.WriteLine();
 			Console.WriteLine("=== ⭐ which quest RELATION do the states track? (#848) ===");
 			Console.WriteLine();
@@ -298,6 +317,29 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  {name,-42} {string.Join("  ", cells)}");
 			}
 
+			// ⭐⭐ The one relation that comes out ABSOLUTE, printed as a gate rather than a percentage - and printed
+			// with its exceptions named, because a claim of "zero" is only worth having if the next capture that
+			// breaks it says so out loud.
+			var allStarted = observations.Where(o => o.NpcLines.Count > 0 && o.NpcLines.All(o.TouchedLines.Contains)).ToList();
+			var silverExceptions = allStarted.Where(o => o.State == 0x01).ToList();
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ SILVER REQUIRES AN UNTOUCHED LINE. Of the {allStarted.Count} packet(s) about an NPC whose every quest line the");
+			Console.WriteLine($"     player had ALREADY started, {silverExceptions.Count} carried silver.");
+			foreach (var g in allStarted.GroupBy(o => o.State).OrderBy(g => g.Key))
+				Console.WriteLine($"       0x{g.Key:X2} x{g.Count(),-5}  {string.Join(", ", g.Select(o => o.Name).Distinct().Take(6))}");
+			foreach (var o in silverExceptions.Take(10))
+				Console.WriteLine($"       ⛔ EXCEPTION: {o.Name} in {Trim(o.Capture, 50)}");
+
+			var goldExceptions = allStarted.Where(o => o.State == 0x02).ToList();
+			foreach (var o in goldExceptions.Take(5))
+				Console.WriteLine($"       ⚠️ gold '!' here too: {o.Name} in {Trim(o.Capture, 50)} - held {o.Held.Count}, completed {o.Completed.Count}");
+
+			Console.WriteLine();
+			Console.WriteLine("     ⚠️ The journal is what the CAPTURE showed, so `touched` is a LOWER bound - a quest finished before");
+			Console.WriteLine("        the dump opened and never re-displayed is invisible. That biases toward calling a line UNstarted,");
+			Console.WriteLine("        which shrinks the population above rather than the exception count inside it: the zero is on the");
+			Console.WriteLine("        packets where the player is KNOWN to have started every line the NPC is in, and is safe that way.");
+
 			Console.WriteLine();
 			Console.WriteLine("  The baseline is the whole population: an NPC picked at random is lit "
 			                  + $"{observations.Count(o => o.State != 0) * 100.0 / observations.Count:0.0}% of the time.");
@@ -318,8 +360,23 @@ namespace Faolan.Importer.Cli
 			("a goal of an untouched quest targets it", (o, _, t) => t.Any(q => !o.Held.Contains(q) && !o.Completed.Contains(q))),
 			("a goal of a COMPLETED quest targets it", (o, _, t) => t.Any(o.Completed.Contains)),
 			("neither relation at all", (_, g, t) => g.Length == 0 && t.Length == 0),
+
+			// ⭐⭐ THE LINE RELATIONS (#848). "A quest line runs through this NPC that the player has not begun" is the
+			// reading that survives both awkward cases at once: Turach stays silver because lines 222 and 1305 pass
+			// through him and the player never started either, while Casilda goes DARK the moment her quest is taken
+			// because her only line (1054) is now one the player is ON - and a line in progress lights her only when
+			// she is actually actionable.
+			("in a line the player has NOT started", (o, _, _) => o.NpcLines.Any(l => !o.TouchedLines.Contains(l))),
+			("in a line the player HAS started", (o, _, _) => o.NpcLines.Any(o.TouchedLines.Contains)),
+			("ONLY in lines the player has started", (o, _, _) => o.NpcLines.Count > 0 && o.NpcLines.All(o.TouchedLines.Contains)),
 		];
 
-		private sealed record MarkerObservation(string Capture, uint Template, string Name, byte State, HashSet<uint> Held, HashSet<uint> Completed);
+		private sealed record MarkerObservation(string Capture, uint Template, string Name, byte State, HashSet<uint> Held, HashSet<uint> Completed)
+		{
+			// The quest LINES this NPC appears in (as granter or goal target), and the lines the player had already
+			// touched when this packet was sent. Filled by RulePredictorTest, which is where the line map is loaded.
+			public HashSet<uint> NpcLines { get; } = [];
+			public HashSet<uint> TouchedLines { get; } = [];
+		}
 	}
 }
