@@ -49,6 +49,10 @@ namespace Faolan.Core.Database.Repositories
 		// a two-quest giver could only ever turn ONE of them in, and the marker over their head could only ever describe
 		// one of them.
 		Task<Dictionary<uint, uint[]>> GetQuestGiverMap();
+		// NPC TEMPLATE -> every quest whose GOAL targets that template - the quests that send a player TO this NPC
+		// rather than the ones it hands out. The two maps together are "which chains run through this NPC", which is
+		// what the marker rule is actually about (#848/#857).
+		Task<Dictionary<uint, uint[]>> GetQuestGoalTargetMap();
 		// The NPC TEMPLATES that play `profession` - the client's own role tag (#647), not a display-name match.
 		Task<uint[]> GetNpcTemplatesByProfession(NpcProfession profession);
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
@@ -393,6 +397,43 @@ namespace Faolan.Core.Database.Repositories
 				.Distinct()
 				.ToListAsync();
 			return grants.GroupBy(g => g.NpcTemplateId).ToDictionary(g => g.Key, g => g.Select(x => x.GrantQuestId!.Value).OrderBy(q => q).ToArray());
+		}
+
+		/// <summary>
+		///     Which quests each NPC TEMPLATE is a GOAL TARGET of - the quests that will send a player to this NPC,
+		///     as opposed to the ones it hands out itself (<see cref="GetQuestGiverMap" />).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The two together are "which quest chains run through this NPC", which is the relation the marker rule
+		///     turns out to be about (#848/#857). The giver map alone is not it: measured over 34,837 marker packets,
+		///     only 31% of the silver retail sent is on an NPC that grants anything at all, while 85% is on one some
+		///     untouched quest's goal will send the player to. 38 of the 62 templates retail ever lit grant nothing.
+		///     <para />
+		///     ⚠️ Keyed by TEMPLATE and nothing else, deliberately. A goal also carries a `TargetName`, and matching on
+		///     that would attach the relation to every NPC sharing a display name - "Halen van Dummy" is the internal
+		///     name of 27 unrelated templates (#646). A goal that names only a string is skipped here rather than
+		///     resolved by name: an unattributable relation is better than a wrong one on 27 NPCs.
+		/// </remarks>
+		public async Task<Dictionary<uint, uint[]>> GetQuestGoalTargetMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			// ⛔ KILL and LOOT targets are excluded, and that is measured rather than tidy-minded. A marker says "there
+			// is something here for you"; a mob the quest sends you to kill is not that, and retail agrees without
+			// exception - Saddur is 0x00 in all 76 of his marker packets and Scavenger Tuut in all 13, while both are
+			// goal targets of the live Tortage chain. Including them put 14 spurious silvers on the two of them.
+			// The talk/deliver targets beside them (Bronwith "Report to Bronwith", Cavan "Give the Wolf Tails to
+			// Cavan") are the shape this relation is for.
+			var targets = await ctx
+				.QuestGoalDefinitions.Where(g => g.TargetTemplateId != null && g.TargetTemplateId > 0
+				                                 && g.GoalType != QuestGoalType.Kill && g.GoalType != QuestGoalType.LootFromNpc)
+				.Select(g => new
+				{
+					Template = g.TargetTemplateId!.Value,
+					g.QuestDefinitionId
+				})
+				.Distinct()
+				.ToListAsync();
+			return targets.GroupBy(t => t.Template).ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().OrderBy(q => q).ToArray());
 		}
 
 		// #647: which templates carry a ROLE, straight off the client's own `NpcStats.profession_type`. This is what

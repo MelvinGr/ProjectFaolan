@@ -1918,8 +1918,11 @@ namespace Faolan.GameServer.World
 			if (npc.Name == null || client.Session.Character == null)
 				return;
 
-			if (!await _questMarkers.IsGiver(npc.NpcTemplateId))
-				return; // not a quest-giver -> no marker
+			// #857: "quest-relevant", not "giver". An NPC that grants nothing can still wear a marker - retail lights
+			// 38 templates that grant nothing at all - so the gate has to admit the goal-target relation too, or the
+			// silver rule below it can never fire for the population it was written for.
+			if (!await _questMarkers.IsQuestRelevant(npc.NpcTemplateId))
+				return; // no quest touches this NPC -> no marker
 
 			await SendQuestMarker(client, npc.Handle, await _questMarkers.MarkerStateFor(client, npc));
 		}

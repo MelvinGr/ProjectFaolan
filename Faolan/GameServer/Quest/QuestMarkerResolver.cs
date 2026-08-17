@@ -53,8 +53,14 @@ namespace Faolan.GameServer.Quest
 		// relation this class does not read. Gold '!' is the opposite and matches what we do: 68% grant a quest the
 		// player has neither taken nor finished, and *zero* are on a grant the player already holds.
 		//
-		// So `MarkerStateFor` returning None for any non-giver is a real gap: 38 of the 62 NPC templates retail ever
-		// lit grant nothing, and we would send 0x00 for every one of them.
+		// So `MarkerStateFor` returning None for any non-giver was a real gap: 38 of the 62 NPC templates retail ever
+		// lit grant nothing, and we sent 0x00 for every one of them. `ChainRunsThrough` is what closes it (#857).
+		//
+		// ⚠️ Measured, and shipped knowing its error: `--report quest-markers` scores the rule against retail and it
+		// lights 6 packets across 2 NPCs that retail leaves dark (0.03% of the dark population) while demonstrating
+		// no positive hit at all - every one of the 50 silver packets whose viewer level the corpus captured sits on
+		// an NPC the quest harvest holds no relation for. The LINE clause alone, which needs no viewer level and so
+		// has nine times the evidence, recovers 80% of retail's silver (278 of 347). A third gate exists (#848).
 		//
 		// ⭐⭐ The condition is the quest LINE, not the quest. Casilda looked like the counterexample - 13480 targets
 		// her and is untouched while she is dark 178 times - until the relation is read one level up: 13480 is in
@@ -72,13 +78,27 @@ namespace Faolan.GameServer.Quest
 		//
 		// Both cutoffs are BRACKETED, not pinned - the corpus is sparse in delta and the gaps either side of the band
 		// hold no observation at all: a quest ABOVE the player is dark somewhere in `-7 < T <= -2`, one BELOW them
-		// somewhere in `1 < T <= 56`. Picking a number inside an unobserved gap would be inventing data, which is why
-		// nothing here acts on any of it yet (#848).
+		// somewhere in `1 < T <= 56`. Picking a number inside an unobserved gap would be inventing data, so what
+		// ships is the OBSERVED EDGE, which cannot be (see LitBandBelowPlayer).
 		//
 		// ⚠️ That measurement only exists because the completed-quest ARCHIVE is read out of the login snapshot: the
 		// live QuestIIR traffic is ONE packet in the level-80 captures, so without it every quest they ever finished
 		// reads as "never taken" and their darkness looks like a level rule when it is just completion.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
+
+		/// <summary>
+		///     The band of (player level − quest level) in which retail was OBSERVED to light a marker: -2 through +1.
+		///     Outside it every observation is dark - 0/243 for a quest far above the player, 0/164 far below.
+		/// </summary>
+		/// <remarks>
+		///     ⛔ These are the observed EDGES, not the real cutoffs, and the difference is the point. The corpus
+		///     brackets each cutoff without pinning it (`-7 &lt; T &lt;= -2` above, `1 &lt; T &lt;= 56` below) and the
+		///     gaps hold no observation at all. Widening to anywhere inside a gap would be inventing data; sitting on
+		///     the observed edge cannot be, because it IS the data. So this errs by going dark inside the gaps rather
+		///     than by lighting something retail would not. Pinning them needs the in-client run on #848 - park a
+		///     character beside one giver and `.setlevel` upward.
+		/// </remarks>
+		public const int LitBandBelowPlayer = -2, LitBandAbovePlayer = 1;
 
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -86,18 +106,31 @@ namespace Faolan.GameServer.Quest
 		// Quest-giver NPC template id -> EVERY quest it grants, cached once (small set).
 		private Dictionary<uint, uint[]> _questGivers = null!;
 
+		// NPC template id -> every quest whose GOAL targets it, cached the same way. The relation the marker rule is
+		// mostly about and the giver map does not carry (#857).
+		private Dictionary<uint, uint[]> _goalTargets = null!;
+
 		public QuestMarkerResolver(IDatabaseRepository database, ILogger logger)
 		{
 			_database = database;
 			_logger = logger;
 		}
 
-		// Whether this NPC template gives a quest at all - the cheap gate the spawn push applies before computing a
-		// state it would only throw away.
-		public async Task<bool> IsGiver(uint npcTemplateId)
+		/// <summary>
+		///     Whether any quest touches this NPC template at all - it GRANTS one, or a quest's goal SENDS a player to
+		///     it. The cheap gate the spawn push applies before computing a state it would only throw away.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ It used to ask only "is it a giver", which made it the thing that silently capped the marker
+		///     population (#857): the 38 of 62 templates retail lights that grant nothing never reached
+		///     <see cref="MarkerStateFor" /> at all, so widening that method alone would have changed nothing. A gate
+		///     narrower than the rule it guards is invisible - it looks like the rule simply never fires.
+		/// </remarks>
+		public async Task<bool> IsQuestRelevant(uint npcTemplateId)
 		{
 			_questGivers ??= await _database.GetQuestGiverMap();
-			return _questGivers.ContainsKey(npcTemplateId);
+			_goalTargets ??= await _database.GetQuestGoalTargetMap();
+			return _questGivers.ContainsKey(npcTemplateId) || _goalTargets.ContainsKey(npcTemplateId);
 		}
 
 		// The quest-marker state byte (#241) for a viewer + a giver NPC in view, from the player's CharacterQuests:
@@ -137,7 +170,9 @@ namespace Faolan.GameServer.Quest
 
 			_questGivers ??= await _database.GetQuestGiverMap();
 			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questIds))
-				return None;
+				return await ChainRunsThrough(character, npc, quests)
+					? Unavailable
+					: None;
 
 			// ⭐ The marker describes the NEXT quest this NPC can GRANT you, and a giver is not one quest - Turach hands
 			// out two, Laranga two, Cramaleico two. So the answer is a fold over all of them:
@@ -193,7 +228,105 @@ namespace Faolan.GameServer.Quest
 				offerable |= giverQuest == null || await IsLineReady(giverQuest, quests);
 			}
 
-			return !outstanding ? None : offerable ? Available : Unavailable;
+			// A giver with nothing left to offer can still be silver for a DIFFERENT chain that runs through it - which
+			// is exactly Turach, dark on line 241 (the one he is granting) and silver for 222 and 1305 (which pass
+			// through him and the player never began). So the non-giver rule below applies here too, rather than only
+			// to NPCs the giver map has never heard of.
+			if (!outstanding)
+				return await ChainRunsThrough(character, npc, quests) ? Unavailable : None;
+
+			return offerable ? Available : Unavailable;
+		}
+
+		/// <summary>
+		///     The SILVER rule for an NPC this player has nothing to take from: does a quest chain they have not begun
+		///     run through it, at a quest level retail would light for them?
+		/// </summary>
+		/// <remarks>
+		///     ⭐ Two measured conditions, both from #848 (`--report quest-markers`, 34,837 marker packets):
+		///     <list type="number">
+		///         <item>
+		///             The relation is the quest LINE, and it is NECESSARY: of the 1,559 packets about an NPC whose
+		///             every line the player had already started, ZERO carried silver. Silver means "a chain you have
+		///             not begun runs through here". Note "runs through", not "is granted by" - 38 of the 62 templates
+		///             retail ever lit grant nothing at all (#857), and 85% of silver is on an NPC some untouched
+		///             quest's goal will send the player to. That relation is `GetQuestGoalTargetMap`.
+		///         </item>
+		///         <item>
+		///             The second gate is LEVEL, and it is two-sided: every lit observation in the corpus sits at a
+		///             delta of -2..+1 (player level minus quest level), and every delta outside that band is
+		///             unanimously dark - 0/243 far above, 0/164 far below.
+		///         </item>
+		///     </list>
+		///     ⛔ **The band used here is the OBSERVED lit range and deliberately not one unit wider.** Both real
+		///     cutoffs are only BRACKETED - a quest above the player is dark somewhere in `-7 &lt; T &lt;= -2`, one
+		///     below them somewhere in `1 &lt; T &lt;= 56` - and the gaps hold no observation at all. Choosing a number
+		///     inside an unobserved gap would be inventing data; choosing the observed edge cannot be, because it is
+		///     the data. The cost of that choice is UNDER-lighting inside the gaps, which is the direction this code
+		///     already erred in, rather than sending a marker retail would not.
+		///     <para />
+		///     ⚠️ Still not SUFFICIENT, and knowingly so. Inside the band and on an untouched line, retail lights 299
+		///     of 382 - so a third gate exists and this over-lights about a fifth of the time. That is a large
+		///     improvement on what it replaces (0x00 for every one of these NPCs, i.e. wrong on the 78% that should be
+		///     lit) but it is not the rule, and #857 holds the remainder.
+		/// </remarks>
+		private async Task<bool> ChainRunsThrough(Character character, WorldEntity npc, CharacterQuest[] quests)
+		{
+			_goalTargets ??= await _database.GetQuestGoalTargetMap();
+			if (!_goalTargets.TryGetValue(npc.NpcTemplateId, out var targetingQuestIds))
+				return false;
+
+			// "Begun" is per LINE and counts BOTH states: a completed quest began its line just as much as a held one.
+			// Reading only the active set would call a finished line untouched and light a chain the player has been
+			// all the way through, which is the single biggest way this rule can go wrong.
+			var startedLines = new HashSet<uint>();
+			var lineOf = new Dictionary<uint, QuestDefinition>();
+			foreach (var questId in quests.Select(q => q.QuestId).Concat(targetingQuestIds).Distinct())
+			{
+				if (await _database.GetQuestDefinition(questId) is not { } def)
+					continue;
+
+				lineOf[questId] = def;
+				if (Array.Exists(quests, q => q.QuestId == questId))
+					startedLines.Add(def.QuestLineId);
+			}
+
+			return LightsSilver(targetingQuestIds.Select(id => lineOf.GetValueOrDefault(id)), startedLines, character.Level);
+		}
+
+		/// <summary>
+		///     The silver decision itself, pure over its inputs: do any of the quests running through this NPC belong
+		///     to a line the player has not begun, at a level inside the observed lit band?
+		/// </summary>
+		/// <remarks>
+		///     Split out of <see cref="ChainRunsThrough" /> so `--report quest-markers` can score the SHIPPING rule
+		///     against the corpus rather than a second copy of it - the same reason <see cref="LineReached" /> is
+		///     public. A rule measured in one implementation and shipped in another is a rule with no measurement.
+		/// </remarks>
+		public static bool LightsSilver(IEnumerable<QuestDefinition?> throughQuests, ISet<uint> startedLines, uint playerLevel, bool applyLevelBand = true)
+		{
+			foreach (var def in throughQuests)
+			{
+				if (def == null || startedLines.Contains(def.QuestLineId))
+					continue;
+
+				// `applyLevelBand: false` is the LINE clause on its own, for `--report quest-markers` to score the two
+				// gates apart. It is not a second model: only 50 of the corpus's 456 silver packets carry a viewer
+				// level, so scoring them together measures the line rule on 11% of its evidence.
+				if (!applyLevelBand)
+					return true;
+
+				// A quest of level 0 states no level, so the band cannot be applied to it and a guess would BE the
+				// rule. Left dark: an unstated level is not evidence of a lit one.
+				if (def.Level == 0)
+					continue;
+
+				var delta = (int)playerLevel - (int)def.Level;
+				if (delta >= LitBandBelowPlayer && delta <= LitBandAbovePlayer)
+					return true;
+			}
+
+			return false;
 		}
 
 		// The QUEST ITEM the killer needs off `npcName`'s corpse - the item id of their active LootFromNpc goal targeting

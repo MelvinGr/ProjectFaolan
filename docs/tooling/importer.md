@@ -326,6 +326,11 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`quest-markers` (#848/#857: what retail's quest-marker byte means, scored against every relation the shipped
+data holds — and, at the end, what the SHIPPING rule would send, by calling `QuestMarkerResolver.LightsSilver`
+directly rather than restating it, since a rule measured in one implementation and shipped in another has no
+measurement. Scoped to the packets that rule actually decides: the giver fold owns anything with a quest still
+on offer, and scoring those measures a branch the server never reaches) ·
 `world-object-items` (#824: which world objects point at an item template `Items` does not hold, split by whether
 the CLIENT ships that template — because only one half can ever be fixed by importing harder. *Shipped, keyless*
 needs a capture referencing the item, since an item's TEA key is server-assigned and only ever arrives on the wire

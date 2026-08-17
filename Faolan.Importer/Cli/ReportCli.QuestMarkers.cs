@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.GameServer.Quest;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -140,6 +142,170 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"({multiViewerCaptures} capture(s) hold more than one player and are excluded from the level test below - nothing names a marker's recipient.)");
 
 			MarkerCrossTab(observations);
+			ScoreShippingRule(observations);
+		}
+
+		// ⭐ What would WE send? The cross-tab above scores RELATIONS against retail; this scores the rule the server
+		// actually ships (#857), so a change to it is measurable rather than argued.
+		//
+		// It calls `QuestMarkerResolver.LightsSilver` directly rather than restating the rule. A rule measured in one
+		// implementation and shipped in another is a rule with no measurement - that is why the resolver exposes it,
+		// the same reason `LineReached` is public.
+		//
+		// ⚠️ Scoped to the packets the rule actually DECIDES: retail sent 0x00 or 0x01, and the viewer's level is
+		// known. The gold states come from the giver fold and the talk-goal check, neither of which this rule touches,
+		// and a marker whose viewer level we never captured cannot be scored at all (the level band needs it).
+		private static void ScoreShippingRule(List<MarkerObservation> observations)
+		{
+			using var db = OpenDb();
+			var defs = db.QuestDefinitions.ToDictionary(q => q.QuestId, q => q);
+
+			var grants = db.ConversationEdges.Where(e => e.GrantQuestId > 0)
+				.Select(e => new { e.From.NpcTemplateId, QuestId = e.GrantQuestId!.Value })
+				.Distinct()
+				.ToList()
+				.GroupBy(g => g.NpcTemplateId)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+
+			// The same exclusion the shipping map applies (`GetQuestGoalTargetMap`): a KILL or LOOT target is not a
+			// marker relation. Restated here rather than shared because this report also scores the UNrestricted
+			// relation in its cross-tab above, and the two questions want different sets.
+			var targeted = db.QuestGoalDefinitions.Where(g => g.TargetTemplateId != null && g.TargetTemplateId != 0
+			                                                  && g.GoalType != QuestGoalType.Kill && g.GoalType != QuestGoalType.LootFromNpc)
+				.Select(g => new { Template = g.TargetTemplateId!.Value, g.QuestDefinitionId })
+				.Distinct()
+				.ToList()
+				.GroupBy(g => g.Template)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestDefinitionId).Distinct().ToArray());
+
+			int hit = 0, miss = 0, over = 0, correctDark = 0;
+			// The LINE clause alone, scored over every 0x00/0x01 packet rather than only the ones whose viewer level
+			// we captured. The two clauses have to be scored apart: the level band needs a viewer level, and only 50
+			// of the 456 silver packets have one, so folding them together scores the line rule on 11% of its evidence
+			// and reads as the rule failing when it is the sample that is missing.
+			int lineHit = 0, lineMiss = 0, lineOver = 0;
+			var missReason = new Dictionary<string, int>();
+			var overNpc = new Dictionary<string, int>();
+			foreach (var o in observations)
+			{
+				if (o.State != 0x00 && o.State != 0x01)
+					continue;
+
+				// ⚠️ PRECEDENCE. The silver rule is the LAST thing `MarkerStateFor` consults - a giver with a quest
+				// still on offer is answered gold by the fold above it, and a talk goal is answered 0x04 before that.
+				// Scoring the silver rule over those packets measures a branch the server never reaches, and it is not
+				// a small effect: it puts Casilda at the top of the over-lit list, when retail's 0x00 there is her
+				// giver state and the resolver would have returned gold. Skip anything the fold owns.
+				var outstandingGrant = grants.GetValueOrDefault(o.Template, []).Any(q => !o.Held.Contains(q) && !o.Completed.Contains(q));
+				if (outstandingGrant)
+					continue;
+
+				var through = grants.GetValueOrDefault(o.Template, []).Concat(targeted.GetValueOrDefault(o.Template, []))
+					.Distinct()
+					.Select(q => defs.GetValueOrDefault(q))
+					.ToList();
+				var startedLines = o.Held.Concat(o.Completed)
+					.Select(q => defs.GetValueOrDefault(q)?.QuestLineId ?? 0)
+					.Where(l => l != 0)
+					.ToHashSet();
+
+				// Level 0 makes the band vacuously satisfiable for every quest that states a level, which is exactly
+				// "the line clause on its own" - the rule with its second gate removed rather than a separate model.
+				var lineOnly = QuestMarkerResolver.LightsSilver(through, startedLines, 0, applyLevelBand: false);
+				if (o.State == 0x01)
+				{
+					if (lineOnly)
+						lineHit++;
+					else
+						lineMiss++;
+				}
+				else if (lineOnly)
+				{
+					lineOver++;
+				}
+
+				if (o.PlayerLevel == 0)
+					continue;
+
+				var predicted = QuestMarkerResolver.LightsSilver(through, startedLines, o.PlayerLevel);
+				if (o.State == 0x01)
+				{
+					if (predicted)
+					{
+						hit++;
+					}
+					else
+					{
+						miss++;
+						// ⭐ WHY it was missed, in the order the rule tests. A bare recovery percentage says the rule
+						// is wrong; this says which of its clauses is doing the rejecting - and whether the answer is
+						// a rule change at all or a harvest gap wearing one.
+						var unstarted = through.Where(d => d != null && !startedLines.Contains(d.QuestLineId)).ToList();
+						missReason[through.Count == 0
+							? "no quest relation in the shipped data at all"
+							: unstarted.Count == 0
+								? "every line through this NPC was already started"
+								: unstarted.All(d => d!.Level == 0)
+									? "the untouched quests state no level (Level 0)"
+									: "level delta outside the observed band"] = missReason.GetValueOrDefault(
+							through.Count == 0
+								? "no quest relation in the shipped data at all"
+								: unstarted.Count == 0
+									? "every line through this NPC was already started"
+									: unstarted.All(d => d!.Level == 0)
+										? "the untouched quests state no level (Level 0)"
+										: "level delta outside the observed band") + 1;
+					}
+				}
+				else if (predicted)
+				{
+					over++;
+					overNpc[o.Name] = overNpc.GetValueOrDefault(o.Name) + 1;
+				}
+				else
+				{
+					correctDark++;
+				}
+			}
+
+			var silver = hit + miss;
+			var dark = over + correctDark;
+			Console.WriteLine();
+			Console.WriteLine("=== ⭐ what the SHIPPING rule would send (QuestMarkerResolver.LightsSilver, #857) ===");
+			Console.WriteLine();
+            Console.WriteLine($"  Scored over the {silver + dark:N0} packet(s) where retail sent 0x00 or 0x01 and the viewer's level is known.");
+			Console.WriteLine();
+			Console.WriteLine($"  retail SILVER (0x01), {silver,6:N0}:   {hit,6:N0} we light   {miss,6:N0} we leave dark   -> {(silver == 0 ? 0 : hit * 100.0 / silver),5:0}% recovered");
+			Console.WriteLine($"  retail DARK   (0x00), {dark,6:N0}:   {over,6:N0} we light   {correctDark,6:N0} we leave dark   -> {(dark == 0 ? 0 : over * 100.0 / dark),5:0}% over-lit");
+
+			var lineSilver = lineHit + lineMiss;
+			Console.WriteLine();
+			Console.WriteLine("  ...and the LINE clause ALONE, over every 0x00/0x01 packet (no viewer level needed, so 9x the evidence):");
+			Console.WriteLine($"  retail SILVER (0x01), {lineSilver,6:N0}:   {lineHit,6:N0} we light   {lineMiss,6:N0} we leave dark   -> {(lineSilver == 0 ? 0 : lineHit * 100.0 / lineSilver),5:0}% recovered");
+			Console.WriteLine($"  retail DARK   (0x00):                 {lineOver,6:N0} we light");
+			if (overNpc.Count > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  the NPCs we would light where retail sent 0x00 - and whether retail EVER lights them:");
+				foreach (var (name, n) in overNpc.OrderByDescending(r => r.Value).Take(15))
+				{
+					var everLit = observations.Where(x => x.Name == name).ToList();
+					var states = everLit.GroupBy(x => x.State).OrderBy(g => g.Key).Select(g => $"0x{g.Key:X2}x{g.Count()}");
+					Console.WriteLine($"    {n,5}  {name,-28}  retail over the whole corpus: {string.Join(" ", states)}");
+				}
+			}
+
+			if (missReason.Count > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  why each missed silver was left dark:");
+				foreach (var (reason, n) in missReason.OrderByDescending(r => r.Value))
+					Console.WriteLine($"    {n,6:N0}  {reason}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("  ⚠️ Reported, never asserted. Both numbers move with the corpus AND with the quest harvest -");
+			Console.WriteLine("     an NPC retail lights off a grant we never captured is a harvest gap scored as a miss.");
 		}
 
 		// One capture's quest-state transitions in packet order: (packet index, quest id, state).

@@ -694,6 +694,36 @@ which shrinks the zero-exception population rather than weakening it. And 15% of
 land on NPCs with no quest relation in the shipped data at all — a harvest gap, not a rule. Tracked in
 Gitea #848.
 
+### …and the server acts on it (#857)
+
+`QuestMarkerResolver.ChainRunsThrough` is the silver rule, consulted **last** — after the talk-goal `0x04` and
+after the giver fold, so an NPC with a quest still on offer is answered gold as before. It applies the two
+conditions above plus one exclusion:
+
+⛔ **A KILL or LOOT target is not a marker relation.** A marker says "there is something here for you", and a
+mob the quest sends you to kill is not that. Retail agrees without exception: Saddur is `0x00` in all **76** of
+his marker packets and Scavenger Tuut in all **13**, both while being goal targets of the live Tortage chain.
+Excluding them is a pure precision gain — over-lighting drops from 20 packets to 6 with recall unchanged.
+
+⚠️ **What ships is the OBSERVED band edge, −2…+1, and deliberately not one unit wider.** The real cutoffs are
+only bracketed; choosing a number inside an unobserved gap would be inventing data, while sitting on the edge
+cannot be, because it *is* the data. The cost is going dark inside the gaps — the direction the code already
+erred in — rather than sending a marker retail would not.
+
+⚠️ **Its error is measured, and it is shipped knowing it.** `--report quest-markers` scores the shipping rule
+against retail (calling `LightsSilver` directly, so there is no second copy to drift):
+
+| | retail silver | retail dark |
+|---|---|---|
+| full rule, viewer level known | 0 of 50 recovered | **6** lit of 22,670 (0.03%) |
+| LINE clause alone, all packets | **278 of 347 = 80%** recovered | 1,885 lit |
+
+The full rule cannot demonstrate a positive hit, and the reason is sampling rather than the rule: every one of
+the 50 silver packets whose viewer level the corpus captured sits on an NPC the quest harvest holds **no**
+relation for. The line clause needs no viewer level, has nine times the evidence, and recovers 80%. The 6
+over-lights are Battlemaster Bronwith (×4) and Cavan (×2) — both never lit by retail, and both the third gate's
+business (#848).
+
 ⛔ **The quest's `MapId` does not gate the marker.** It is the objective's marker *pin* — where the quest sends
 you — not where its giver stands, and the two differ for **15 of the 28 giver quests** in the shipped data:
 Turach and Laranga stand on 4020 while their quests pin 4010, Alyssa on 4020 against 10800, and likewise Caor,
