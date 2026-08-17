@@ -50,6 +50,7 @@ namespace Faolan.Importer.Cli
 		{
 			var observations = new List<MarkerObservation>();
 			var unresolved = 0;
+			var multiViewerCaptures = 0;
 
 			foreach (var c in captures)
 			{
@@ -63,6 +64,26 @@ namespace Faolan.Importer.Cli
 				// a capture that opens mid-life readable at all, since the login burst re-displays the journal the
 				// player already had. Both are folded into one "state as of packet i" walk.
 				var journal = QuestJournalWalk(c);
+
+				// The VIEWER's level, off their own spawn body (`player_stats` is what separates a player spawn from
+				// an NPC one). Needed for #848's other thread: the wiki claims a quest far BELOW the player draws no
+				// marker, and the corpus evidence for that has never been separated from the line rule.
+				// ⚠️ TWO clients can share one dump and NOTHING in a marker packet names its recipient, so a capture
+				// with more than one player in it cannot attribute a level to the viewer at all. Those are dropped
+				// from the level test rather than guessed at - the ticket's own history has one wrong attribution in
+				// it already (keyed on a capture FILENAME), and this is the same failure wearing a different hat.
+				var playerLevels = new HashSet<uint>();
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
+						continue;
+					if (p.TryParse(SimpleCharFullUpdateCodec.Parse, out var self) && self.Character?.player_stats != null && self.Character.Stats?.Level is > 0 and var lvl)
+						playerLevels.Add(lvl);
+				}
+
+				var playerLevel = playerLevels.Count == 1 ? playerLevels.Single() : 0;
+				if (playerLevels.Count > 1)
+					multiViewerCaptures++;
 
 				for (var i = 0; i < c.Packets.Count; i++)
 				{
@@ -97,7 +118,7 @@ namespace Faolan.Importer.Cli
 						(questState == QuestCodec.StateCompleted ? held : completed).Remove(questId);
 					}
 
-					observations.Add(new MarkerObservation(c.Name, spawn.TemplateId, spawn.Name, state, held, completed));
+					observations.Add(new MarkerObservation(c.Name, spawn.TemplateId, spawn.Name, state, held, completed) { PlayerLevel = playerLevel });
 				}
 			}
 
@@ -115,21 +136,44 @@ namespace Faolan.Importer.Cli
 				                  + (g == null ? "   ⭐ NEVER SENT in the whole corpus" : ""));
 			}
 
+			if (multiViewerCaptures > 0)
+				Console.WriteLine($"({multiViewerCaptures} capture(s) hold more than one player and are excluded from the level test below - nothing names a marker's recipient.)");
+
 			MarkerCrossTab(observations);
 		}
 
 		// One capture's quest-state transitions in packet order: (packet index, quest id, state).
+		//
+		// ⚠️⚠️ The live IIRs are NOT the whole journal, and believing they were made this report lie about exactly the
+		// population #848 cares about. `QuestIIR`/`QuestFullUpdateIIR` carry what happens DURING the session, and the
+		// level-80 captures hold **one** such packet each - so every quest that character ever finished read as
+		// "untouched", and a level-80 standing dark beside a Tortage NPC looked like evidence for a level rule when
+		// it is just a quest they completed years earlier.
+		//
+		// The archive arrives instead inside the login SNAPSHOT, as the area-grouped completed-quest region (#390),
+		// which is why it has to be read here too: the necromancer's snapshot alone carries ~1,540 of them.
 		private static List<(int At, uint QuestId, uint State)> QuestJournalWalk(NamedCapture c)
 		{
 			var walk = new List<(int At, uint QuestId, uint State)>();
 			for (var i = 0; i < c.Packets.Count; i++)
 			{
 				var p = c.Packets[i];
-				if (p is not { IsIirCarrier: true, IsDownload: true })
+				if (!p.IsDownload)
 					continue;
 
-				if (p.SubOpcode == QuestCodec.Opcode && p.TryParse(QuestCodec.Parse, out var q))
-					walk.Add((i, q.QuestId, q.State));
+				if (SnapshotJournalReader.TryReadCompleted(p.Bytes, out var archive) && archive != null)
+				{
+					foreach (var q in archive.Areas.SelectMany(a => a.Quests).Where(q => q.QuestId != 0))
+						walk.Add((i, q.QuestId, QuestCodec.StateCompleted));
+
+					continue;
+				}
+
+				if (!p.IsIirCarrier)
+					continue;
+
+				if (p.SubOpcode == QuestCodec.Opcode && p.TryParse(QuestCodec.Parse, out var q2))
+					walk.Add((i, q2.QuestId, q2.State));
 				else if (p.SubOpcode == QuestFullUpdateCodec.Opcode && p.TryParse(QuestFullUpdateCodec.Parse, out var full) && full.Record != null)
 					walk.Add((i, full.Record.QuestId, QuestCodec.StateActive));
 			}
@@ -173,6 +217,10 @@ namespace Faolan.Importer.Cli
 			var lineOf = db.QuestDefinitions.Where(q => q.QuestLineId > 0)
 				.Select(q => new { q.QuestId, q.QuestLineId })
 				.ToDictionary(q => q.QuestId, q => q.QuestLineId);
+
+			var levelOf = db.QuestDefinitions.Where(q => q.Level > 0)
+				.Select(q => new { q.QuestId, q.Level })
+				.ToDictionary(q => q.QuestId, q => q.Level);
 
 			var perNpc = observations.GroupBy(o => o.Template)
 				.Select(g => new
@@ -248,6 +296,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"    {Trim(n.Name, 25),-25}  {n.Template,-9}  0x00 x{n.Zero,-5}  grants {Trim(string.Join(",", n.Grants), 12),-12}  targeted-by {Trim(string.Join(",", n.Targeted), 30)}");
 
 			RulePredictorTest(observations, grants, targeted, lineOf);
+			LevelVersusLineTest(observations, grants, targeted, levelOf);
 
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ Both lists are POPULATIONS, not verdicts. A never-lit giver may simply have been observed only by");
@@ -346,6 +395,116 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  A relation only tells us something insofar as its lit% beats that.");
 		}
 
+		// ⭐⭐ #848 thread 2, re-examined. The claim on the ticket is that a quest far BELOW the player draws no marker
+		// ("significantly lower-level characters will not have the exclamation mark"), bracketed from the corpus at
+		// `1 < T <= 56` because a level-80 was seen dark beside 15 never-taken quests at delta 56-75.
+		//
+		// ⚠️ That evidence was never separated from the LINE rule, and the two predict the same darkness. This splits
+		// them: every observation on an NPC with an UNTOUCHED quest is bucketed by the level gap to that quest AND by
+		// whether the player had already started the NPC's lines. If the high-delta darkness lives entirely in the
+		// `all lines started` column, the level rule is unsupported and the bracket is an artifact of the confound.
+		private static void LevelVersusLineTest(List<MarkerObservation> observations,
+			Dictionary<uint, uint[]> grants, Dictionary<uint, uint[]> targeted, Dictionary<uint, uint> levelOf)
+		{
+			Console.WriteLine();
+			Console.WriteLine("=== ⭐ level gap vs the line rule - which explains a DARK marker? (#848 thread 2) ===");
+			Console.WriteLine();
+
+			var rows = new List<(int Delta, bool LineUntouched, byte State, string Capture)>();
+			foreach (var o in observations.Where(o => o.PlayerLevel > 0))
+			{
+				// The untouched quest this NPC is related to whose level is CLOSEST to the player - the one that would
+				// decide a "too low for you" rule, since any nearer quest is the one retail would advertise.
+				var candidates = grants.GetValueOrDefault(o.Template, []).Concat(targeted.GetValueOrDefault(o.Template, []))
+					.Where(q => !o.Held.Contains(q) && !o.Completed.Contains(q) && levelOf.ContainsKey(q))
+					.Select(q => (int)o.PlayerLevel - (int)levelOf[q])
+					.ToList();
+				if (candidates.Count == 0)
+					continue;
+
+				rows.Add((candidates.MinBy(Math.Abs), o.NpcLines.Any(l => !o.TouchedLines.Contains(l)), o.State, o.Capture));
+			}
+
+			if (rows.Count == 0)
+			{
+				Console.WriteLine("  (no observation has both a viewer level and an untouched quest of known level)");
+				return;
+			}
+
+			Console.WriteLine($"  {rows.Count:N0} observation(s) where the viewer's level is known AND the NPC has an untouched quest of known level.");
+			Console.WriteLine("  Delta = viewer level - quest level; positive means the quest is BELOW the player.");
+			Console.WriteLine();
+			Console.WriteLine("  delta        line UNstarted: lit / total        all lines started: lit / total");
+			foreach (var bucket in LevelBuckets)
+			{
+				var inBucket = rows.Where(r => bucket.Holds(r.Delta)).ToList();
+				if (inBucket.Count == 0)
+					continue;
+
+				var untouched = inBucket.Where(r => r.LineUntouched).ToList();
+				var started = inBucket.Where(r => !r.LineUntouched).ToList();
+				Console.WriteLine($"  {bucket.Name,-12} {Cell(untouched),-36} {Cell(started)}");
+			}
+
+			// ⭐ The boundary, at one-level resolution. A bracket is only worth stating if the corpus actually has
+			// observations either side of it, so this prints every delta that occurs rather than a chosen bucketing -
+			// and prints how many distinct CAPTURES back each one, because a flip that happens inside one session is
+			// a control and a flip between sessions is a confound waiting to be named.
+			Console.WriteLine();
+			Console.WriteLine("  per-level detail, line-UNstarted only (the column where a level rule could still live):");
+			Console.WriteLine();
+			Console.WriteLine("  delta   lit / total   captures");
+			foreach (var g in rows.Where(r => r.LineUntouched).GroupBy(r => r.Delta).OrderBy(g => g.Key))
+				Console.WriteLine($"  {g.Key,+5}   {g.Count(r => r.State != 0),4} / {g.Count(),-6}  {g.Select(r => r.Capture).Distinct().Count()}");
+
+			// ⭐ The brackets, computed rather than eyeballed - and deliberately expressed as brackets, because the
+			// corpus is SPARSE in delta (a handful of characters at a handful of levels) and the gap either side of
+			// the lit band is unobserved rather than dark. Picking a number inside an unobserved gap would be
+			// inventing data; naming the gap is the honest result.
+			var byDelta = rows.Where(r => r.LineUntouched).GroupBy(r => r.Delta)
+				.Select(g => (Delta: g.Key, Lit: g.Count(r => r.State != 0), Total: g.Count()))
+				.OrderBy(x => x.Delta)
+				.ToList();
+			var litDeltas = byDelta.Where(x => x.Lit > 0).Select(x => x.Delta).ToList();
+			if (litDeltas.Count > 0)
+			{
+				var lo = litDeltas.Min();
+				var hi = litDeltas.Max();
+				var darkBelow = byDelta.Where(x => x.Lit == 0 && x.Delta < lo).Select(x => x.Delta).DefaultIfEmpty(int.MinValue).Max();
+				var darkAbove = byDelta.Where(x => x.Lit == 0 && x.Delta > hi).Select(x => x.Delta).DefaultIfEmpty(int.MaxValue).Min();
+
+				Console.WriteLine();
+				Console.WriteLine($"  ⭐ MARKERS LIGHT ONLY IN A BAND around the player's level: every lit observation is at delta {lo}..{hi},");
+				Console.WriteLine("     and every delta outside it is unanimously dark.");
+				if (darkBelow != int.MinValue)
+					Console.WriteLine($"       quest ABOVE the player: lit at {lo}, dark at {darkBelow} -> the cutoff is bracketed {darkBelow} < T <= {lo}, gap unobserved");
+				if (darkAbove != int.MaxValue)
+					Console.WriteLine($"       quest BELOW the player: lit at {hi}, dark at {darkAbove} -> the cutoff is bracketed {hi} < T <= {darkAbove}, gap unobserved");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("  ⭐ Read the columns, not the rows: if the far-below-you darkness is confined to the RIGHT column,");
+			Console.WriteLine("     the line rule already explains it and the level cutoff has no evidence of its own.");
+			return;
+
+			static string Cell(List<(int Delta, bool LineUntouched, byte State, string Capture)> rows)
+			{
+				var lit = rows.Count(r => r.State != 0);
+				return rows.Count == 0 ? "-" : $"{lit,5} / {rows.Count,-6} = {lit * 100.0 / rows.Count,5:0}% lit";
+			}
+		}
+
+		private static readonly (string Name, Func<int, bool> Holds)[] LevelBuckets =
+		[
+			("<= -10", d => d <= -10),
+			("-9..-2", d => d is >= -9 and <= -2),
+			("-1..+1", d => d is >= -1 and <= 1),
+			("+2..+9", d => d is >= 2 and <= 9),
+			("+10..+29", d => d is >= 10 and <= 29),
+			("+30..+55", d => d is >= 30 and <= 55),
+			(">= +56", d => d >= 56),
+		];
+
 		// The relations the shipped quest data can express about an NPC, given a player's journal at one moment.
 		// `grants` is the dialogue graph's own grants (what QuestMarkerResolver reads); `targeted` is the quests whose
 		// GOALS send the player to this NPC - the relation it does not read.
@@ -377,6 +536,9 @@ namespace Faolan.Importer.Cli
 			// touched when this packet was sent. Filled by RulePredictorTest, which is where the line map is loaded.
 			public HashSet<uint> NpcLines { get; } = [];
 			public HashSet<uint> TouchedLines { get; } = [];
+
+			// The VIEWER's own level in this capture (0 = their spawn body was never captured).
+			public uint PlayerLevel { get; init; }
 		}
 	}
 }

@@ -598,8 +598,29 @@ was opened over: Turach stays silver because lines 222 (*[NPE] The Legendary Tur
 Steel*) pass through him and the player never started either — not because of an unharvested grant — while
 Casilda's only line is one the player is on.
 
-⚠️ **Necessary, not sufficient.** Being in an untouched line only lights an NPC 20% of the time, so something
-further gates it (level is the community's claim, and the corpus cannot yet separate it — see #848). The
+⭐ **The other gate is LEVEL, and it is two-sided.** With the completed-quest archive folded in (the login
+snapshot's own region — the live `QuestIIR` traffic is *one packet* in the level-80 captures, so without it
+every quest they ever finished reads as "never taken"), every marker packet whose viewer level is known and
+whose NPC has an untouched quest of known level falls in a narrow band:
+
+| delta (player − quest) | lit / total | captures |
+|---|---|---|
+| −76 / −75 / −57 | 0 / 243 | 40 / 4 / 1 |
+| **−7** | 0 / 10 | 2 |
+| **−2 … +1** | **299 / 382** | 40 / 3 / 18 / 3 |
+| **+56** | 0 / 127 | 8 |
+| +57 / +75 | 0 / 37 | 8 / 1 |
+
+So retail lights a marker only for a quest **at or near the player's own level**, and draws nothing both for
+one far above them and one far below. Both cutoffs are **bracketed, not pinned** — the corpus is sparse in
+delta and the gaps either side of the band hold no observation at all:
+
+* quest **above** the player: lit at −2, dark at −7 → `−7 < T ≤ −2`
+* quest **below** the player: lit at +1, dark at +56 → `1 < T ≤ 56`
+
+⚠️ **Necessary, not sufficient.** Being in an untouched line only lights an NPC 20% of the time, so level is
+the second gate rather than a replacement — and neither cutoff can be narrowed further here, since picking a
+number inside an unobserved gap would be inventing data (#848). The
 journal is capture-derived, so "started" is a lower bound; that biases toward calling a line *unstarted*,
 which shrinks the zero-exception population rather than weakening it. And 15% of silver and 20% of gold `!`
 land on NPCs with no quest relation in the shipped data at all — a harvest gap, not a rule. Tracked in

@@ -64,8 +64,20 @@ namespace Faolan.GameServer.Quest
 		// turn to act on them. Turach stays silver because lines 222 and 1305 pass through him untouched - not
 		// because of an unharvested grant.
 		//
-		// ⚠️ NECESSARY, not sufficient: an untouched line lights an NPC only 20% of the time, so a further gate
-		// exists (the community says level; the corpus cannot separate it yet). That is why nothing here acts on it.
+		// ⚠️ NECESSARY, not sufficient: an untouched line lights an NPC only 20% of the time. The second gate is
+		// LEVEL, and it is two-sided - retail lights a marker only for a quest at or near the player's own level:
+		//
+		//   delta (player - quest)   -76/-75/-57  |   -7   |  -2..+1  |  +56  |  +57/+75
+		//   lit / observations          0 / 243   | 0 / 10 | 299/382  | 0/127 |  0 / 37
+		//
+		// Both cutoffs are BRACKETED, not pinned - the corpus is sparse in delta and the gaps either side of the band
+		// hold no observation at all: a quest ABOVE the player is dark somewhere in `-7 < T <= -2`, one BELOW them
+		// somewhere in `1 < T <= 56`. Picking a number inside an unobserved gap would be inventing data, which is why
+		// nothing here acts on any of it yet (#848).
+		//
+		// ⚠️ That measurement only exists because the completed-quest ARCHIVE is read out of the login snapshot: the
+		// live QuestIIR traffic is ONE packet in the level-80 captures, so without it every quest they ever finished
+		// reads as "never taken" and their darkness looks like a level rule when it is just completion.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
 
 		private readonly IDatabaseRepository _database;
