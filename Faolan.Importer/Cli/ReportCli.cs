@@ -383,6 +383,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #855: WHICH property of a creature picks its respawn interval - 120 s or 150 s. corpse-timing
+				// established that retail respawns at all; this one carries the attributes and cross-tabs them.
+				case "respawn-interval":
+				{
+					RespawnInterval(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #588/#400: does a captured spawn's worn list state which weapon SET is drawn?
 				case "weapon-set-drawn":
 				{

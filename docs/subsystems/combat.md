@@ -81,22 +81,35 @@ as long as an entity *lives* — the same one re-spawns at identical coords acro
 test, `death(H)` then `spawn(H)`, looks right and finds nothing at all. The revived creature is a new entity with a
 new id. The signal is the same **creature** reappearing **at the dead one's spawn point**:
 
-| creature | observed intervals | |
-|---|---|---|
-| Brutal Pirate | 149.9, 149.9, 149.9, 150.0, 150.2, 150.2 | 6 kills across **2 unrelated captures** → **150 s** |
-| Wild Cow | 119.5, 120.0 | 2 kills, 2 captures → **120 s** |
-| Wild Pig | 119.9 (and one at 192.9 the client was out of range for) | → **120 s** |
+| creature | playfield | observed intervals | |
+|---|---|---|---|
+| Brutal Pirate | City of Tortage (4020) | 149.9, 149.9, 149.9, 150.0, 150.2, 150.2, 150.2 (+ one at 157.3) | 7 agreeing kills across **2 unrelated captures** → **150 s** |
+| Wild Cow | Poitain (2070) | 119.5, 120.0 | 2 kills, 2 captures → **120 s** |
+| Wild Pig | Poitain (2070) | 119.9 (and one at 192.9 the client was out of range for) | one clean reading, agrees with Wild Cow |
 
-Six observations spanning 0.3 s across two captures is a timer, not a coincidence. So the interval is **per
-creature**, in the 2–2.5 minute range. `NpcTemplate` has no column for it yet, so
-`WorldEntity.DefaultRespawnDelaySeconds` takes the best-attested cluster (**150 s**) for everything — per-creature
-respawn is Gitea #855.
+⭐ **These are timers, and the proof needs no assumption about streaming range** (`--report respawn-interval`).
+A spawn body arrives when the client is told, so a constant interval *could* in principle be one moment of the
+player returning — except that the kills behind the 150 s cluster are **62 s apart inside one capture**. No single
+delivery event can land at a fixed offset from each of several deaths spread over a minute, and the same cluster
+also spans two sessions, which share nothing. (A player-position "was the client watching" gate was built first and
+thrown away: judged against a fixed 100 u radius it rejected every clean 150.0 s pirate and accepted a wandering
+Panther.)
+[V1: Faolan.Importer/Cli/ReportCli.RespawnInterval.cs]
+
+⛔ **What SELECTS 120 vs 150 is not decidable from the corpus, and not for want of harvesting.** The two measured
+creatures are a beast in Poitain and a humanoid in Tortage, so creature identity and playfield are perfectly
+confounded; nine attributes survive the cross-tab (map, level, health, community, superfamily, npc_type, normalset,
+race, monster_data) and only `faction_id`/`profession_type` are eliminated, by being unset on both. Of the 251
+kills that matched nothing, 151 never see that creature again in the dump and 89 more only see a re-streamed
+handle. **One capture would decide it: kill a Panther in City of Tortage and stand there three minutes** — a beast
+on the humanoid's map. Until then `NpcTemplate` has no column and `WorldEntity.DefaultRespawnDelaySeconds` takes
+the best-attested cluster (**150 s**) for everything — Gitea #855.
 
 ⚠️ **Do not re-derive this from "the client watched for N seconds and nothing came back."** That bound cannot tell
 *no respawn* from *the client was out of range when it happened*, and it is wrong by a factor of five here: the
 same capture that shows `Brutal Pirate 0xaa88` respawning at 150.0 s also contains a 334 s window in which it
 "never returned". Only observed intervals count.
-`[V0: what governs a creature's respawn interval — 120 s vs 150 s is per-creature and NpcTemplate has no column]`
+`[V0: what governs a creature's respawn interval — creature vs playfield are confounded in the corpus]`
 
 `.delete [<handle>]` (GM, `DeleteCommand`): the DURABLE removal — despawns the selected entity live AND deletes its
 `NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike a plain live despawn

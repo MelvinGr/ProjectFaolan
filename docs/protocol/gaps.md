@@ -83,19 +83,38 @@ avoided the coefficients. They really do need a live dump.
 `[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
 
 ### What governs a creature's respawn interval
-The interval itself is measured (`--report corpse-timing`): a killed creature comes back **on a new entity handle**
-at its old spawn point, at **150 s** for Brutal Pirate (6 kills, 0.3 s spread, 2 unrelated captures) and **120 s**
-for Wild Cow / Wild Pig. What is NOT known is what SELECTS one number over the other — creature, family, level,
-playfield or spawn group — and only three creatures in the corpus are killed often enough, and observed long
-enough afterwards, to yield an interval at all. So `NpcTemplate` has no respawn column and
-`WorldEntity.DefaultRespawnDelaySeconds` gives every creature the best-attested 150 s. Close it by harvesting more
-intervals (kills in captures where the player stays put afterwards) and testing whether the split follows the
-creature family. Tracked in Gitea #855.
+The interval itself is measured (`--report respawn-interval`): a killed creature comes back **on a new entity
+handle** at its old spawn point, at **150 s** for Brutal Pirate (7 agreeing kills, 0.3 s spread, 2 unrelated
+captures) and **120 s** for Wild Cow (2 kills, 2 captures; Wild Pig's one clean reading of 119.9 s agrees).
 
-⚠️ The trap this cost a cycle to: the obvious `death(handle)` → `spawn(same handle)` test finds **nothing**, because
-a respawn is a new entity id. And "the client watched for N seconds and nothing came back" is not a usable bound —
-it cannot tell a missing respawn from a client that was out of range when it happened.
-`[V0: what governs a creature's respawn interval — 120 s vs 150 s is per-creature and NpcTemplate has no column]`
+**These are timers, not delivery artifacts**, and the argument needs no assumption about streaming range: the
+Brutal Pirate kills behind the 150 s cluster are **62 s apart within one capture**, so no single moment of the
+player returning can put every fill at a fixed offset from its own death — and the cluster spans two sessions,
+which share nothing at all.
+
+What is NOT known is what SELECTS one number over the other, and the corpus **cannot** decide it: the only two
+creatures with a measured timer are a beast in **Poitain** (2070) and a humanoid in **City of Tortage** (4020), so
+creature identity and playfield are perfectly confounded. Nine candidate attributes survive the cross-tab —
+map, level, health, community, superfamily, npc_type, normalset, race, monster_data — and only `faction_id` and
+`profession_type` are eliminated, by being unset on every measured creature. The client is no help either: the
+tuning sheet (1000516) carries only world-boss/festival schedule tweaks, and the RDB spawn layout (1010506) is
+consumed to EOF with no respawn field.
+
+**Nor is it a harvesting problem — the corpus is exhausted.** Of 251 kills that matched nothing, 151 never see
+that creature again in the dump at all and 89 more only ever see a *re-streamed* handle (an entity the client
+already knew, which is not a respawn); loosening the anchor radius would add ten candidates, all 50–300 u from the
+spawn point. So `NpcTemplate` has no respawn column and `WorldEntity.DefaultRespawnDelaySeconds` gives every
+creature the best-attested 150 s.
+
+⭐ **One capture decides it**: kill a **Panther in City of Tortage** — a beast on the humanoid's playfield — and
+stand there for three minutes. 120 s means the creature picks the number; 150 s means the playfield does. (A
+humanoid killed in Poitain is the same experiment from the other side.) Tracked in Gitea #855.
+
+⚠️ Two traps this cost a cycle each. The obvious `death(handle)` → `spawn(same handle)` test finds **nothing**,
+because a respawn is a new entity id. And "the client watched for N seconds and nothing came back" is not a usable
+bound — it cannot tell a missing respawn from a client that was out of range when it happened; the capture showing
+`Brutal Pirate 0xaa88` back at 150.0 s also holds a 334 s window in which it "never returned".
+`[V0: what governs a creature's respawn interval — creature vs playfield are confounded in the corpus]`
 
 ---
 

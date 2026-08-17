@@ -378,6 +378,13 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`respawn-interval` (#855: how long after a kill the creature comes back, and what picks the number. A respawn is a
+NEW entity id, so the signal is the same TEMPLATE back at the dead one's anchor on a handle the client has never
+seen. Whether the interval is a TIMER or just the moment the player walked back is decided from the timestamps
+alone — a cluster of agreeing intervals whose DEATHS are far apart, or which spans two captures, cannot be one
+delivery event. Then it cross-tabs every attribute the spawn body states against the measured intervals, and says
+which survive as selectors. Also prints why every unmatched kill matched nothing, which is what shows the corpus
+is exhausted rather than the filters being too tight),
 `death-timing` (every death BccIIR grouped by its ANIMATION, with each actor resolved to a creature name against
 its own capture's spawns. It is what settled that `field12` is the CREATURE's animation length and not the
 animation's: on 17036, 22 creatures, 22 carrying one value each and none carrying two — #781. Reports the
