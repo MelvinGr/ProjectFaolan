@@ -326,6 +326,14 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`quest-container` (#843: what takes an item out of the quest container `0x71` - the goal that SPENDS it, or the
+quest COMPLETING? The two readings make different predictions about the rest of the corpus and this measures
+them. Verdict: **7 of the 17 completions that happened while the container held something KEPT their items**, so
+"a completed quest clears its container" is refuted rather than merely unchosen. The decisive pair is one chain -
+13563 *"Get the Scavenger's Key"*, an ACQUIRE goal, completes holding the key and keeps it, while 13480 *"Free
+Casilda"*, the step that USES it, completes and loses it. ⚠️ Prints an ARRIVAL control beside every parse count,
+which is what caught the first run reading `.Record` where an RPC body wants `.Body` - 187 packets arrived, 0
+parsed, and the report printed a confident zero) ·
 `quest-markers` (#848/#857: what retail's quest-marker byte means, scored against every relation the shipped
 data holds — and, at the end, what the SHIPPING rule would send, by calling `QuestMarkerResolver.LightsSilver`
 directly rather than restating it, since a rule measured in one implementation and shipped in another has no

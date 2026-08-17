@@ -152,14 +152,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The item a goal requires the player to be CARRYING, without taking it - 0 when it requires none.
 		//
 		// Distinct from `DeliveryItemId` beside it, and the difference is what happens to the item: a delivery HANDS
-		// ITS ITEM OVER and the hand-in takes it, while "unlock the gate with the key" wants the key in hand and
-		// leaves it there. Only `UseWorldObject` reads this today - the key half of an unlock (#527).
+		// ITS ITEM OVER and the hand-in takes it, while "unlock the gate with the key" wants the key in hand to open
+		// it with. Only `UseWorldObject` reads this - the key half of an unlock (#527). Both are spent now (#843);
+		// what still differs is WHEN, and that is retail's ordering rather than ours - see below.
 		//
-		// ⚠️ Retail DOES remove the Acheronian Gate Key one frame after quest 12369 completes
-		// (`Hoxxling_mage-heraldofxotli_login_gameplay` fr12206, quest container 0x71 slot 0). That is not evidence
-		// the GATE consumed it: the removal lands AFTER the quest's own completion, so it reads as the quest clearing
-		// its quest-container items - a general behaviour, not this goal's. Taking the key here would bake one reading
-		// of an ambiguous frame into a trigger. Which of the two it is is open, tracked as Gitea #843.
+		// ⭐ Retail DOES remove the Acheronian Gate Key one frame after quest 12369 completes
+		// (`Hoxxling_mage-heraldofxotli_login_gameplay` fr12206, quest container 0x71 slot 0), and #843 asked whether
+		// that was the GATE spending it or the QUEST clearing its container. It is the gate: measured over the whole
+		// corpus (`--report quest-container`), 7 of the 17 completions that happened while the 0x71 container held
+		// something KEPT their items - so "a completed quest clears its container" is refuted, not merely unchosen.
+		// The decisive pair is one chain: 13563 "Get the Scavenger's Key" (an ACQUIRE goal) completes holding the key
+		// and the key stays, while 13480 "Free Casilda" - the step that USES it - completes and the key goes.
+		//
+		// So the rule is "the goal that SPENDS it takes it", and `QuestProgressionService.ConsumeRequiredItem` now
+		// does. This predicate is still only the HOLD check: what it returns is the item the goal demands, and the
+		// caller decides whether that demand is satisfied or spent.
 		public static uint RequiredHeldItemId(QuestGoalDefinition goal)
 		{
 			return goal is { GoalType: QuestGoalType.UseWorldObject, QuestItemId: > 0 }

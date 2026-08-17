@@ -467,6 +467,11 @@ namespace Faolan.Importer.Cli
 					return await WorldObjectItems(RdbDir());
 				}
 
+				case "quest-container":
+				{
+					return QuestContainer(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

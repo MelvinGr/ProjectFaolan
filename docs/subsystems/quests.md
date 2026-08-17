@@ -542,6 +542,41 @@ One is now typed:
 `Hoxxling_mage-heraldofxotli_login_gameplay2` fr4310/4367/4447/5102 and `…_login_gameplay` fr3633/3634/11942,
 `xxx_mage-{demo,necromancer}_login_play*`, `loot-drag-1538` fr2843. Gated by `QuestGoalHandoffTests`.
 
+## What takes an item out of the quest container: the goal that SPENDS it (#843)
+
+A quest item lands in the quest container (`0x71`) and something later removes it. In
+`Hoxxling_mage-heraldofxotli_login_gameplay` the Acheronian Gate Key is removed one packet *after* quest 12369
+completes, which reads two ways — the **gate** spent it, or the **quest** cleared its container as a general
+rule. One capture cannot separate them; the corpus can, because the two predict different things about every
+other completion (`--report quest-container`).
+
+> ⛔ **"A completed quest clears its container" is refuted.** Of the **17** completions that happened while the
+> `0x71` container held something, **7 kept their items**.
+
+The decisive pair sits in one chain in `xxx_mage-necromancer_login_play1`:
+
+| packet | event | container |
+|---|---|---|
+| 1427 | Scavenger's Key added | slot 0 |
+| 1431 | **13563 *"Get the Scavenger's Key"* completes** — an ACQUIRE goal (`LootFromNpc`) | **key stays** |
+| 1899 | **13480 *"Free Casilda"* completes** — the step that USES it | |
+| 1902 | key removed | slot 0 emptied |
+
+So the rule is **the goal that spends it takes it**. An acquire goal completing changes nothing; a use, an
+unlock or a hand-in does.
+
+⭐ The same scan settles a second thing that had been recorded as a judgement call: the **delivery** removal is
+in the corpus after all. In `..._play2` the slot empties at packet 5765 and quest 12371 — completing goal
+*"Deliver 3 stone bricks to Turach"* — completes at 5769. `ConsumeDeliveryItems` had been marked "the
+maintainer's call, no capture shows it"; it is a decoded fact now.
+
+⚠️ Note the two orderings are **retail's**, not ours: the unlock's removal lands *after* its completion packets
+and the delivery's *before*. `ConsumeRequiredItem` is called after `CompleteObjective` for exactly that reason.
+
+⚠️ Only the `UseWorldObject` half is wired, because it is the only one whose goal NAMES the item it spends
+(`QuestItemId` — 12369's gate goal names 193186). *"Free Casilda"* spends a key belonging to an **earlier**
+quest's goal and no column says so, so wiring it would mean inventing the link. That is the residual on #843.
+
 ## Turn-in: the text goes out first, the state follows it
 
 There is **no separate turn-in or reward node** to look for. Retail's turn-in screen *is* the in-progress

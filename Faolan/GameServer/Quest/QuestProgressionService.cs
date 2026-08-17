@@ -413,10 +413,15 @@ namespace Faolan.GameServer.Quest
 					: Math.Min(required, current + step);
 
 				// The hand-in TAKES the goods. Placed AFTER the `current >= required` re-fire guard above, so talking to
-				// the recipient a second time cannot take a second set. Nothing in the corpus shows the removal - retail
-				// completes the delivery and moves on without a captured DispatchRemoveItem - so this is the maintainer's call
-				// (2026-08-01) rather than a decoded fact: a delivery the player walks away from still holding is not a
-				// delivery. HoldsDeliveryItem has already verified the count is present.
+				// the recipient a second time cannot take a second set. HoldsDeliveryItem has already verified the
+				// count is present.
+				//
+				// ⭐ The corpus DOES show this removal, which makes it a measured fact rather than the design decision
+				// it was recorded as (#843, `--report quest-container`): in xxx_mage-necromancer_login_play2 the 0x71
+				// slot is emptied at packet 5765 and quest 12371 - whose completing goal is "Deliver 3 stone bricks to
+				// Turach" - completes four packets later at 5769. It had been written down as the maintainer's call
+				// (2026-08-01) on the grounds that no capture showed it; what had actually happened is that the scan
+				// looking for it was reading the wrong span.
 				if (QuestProgress.IsDelivery(goal))
 					await ConsumeDeliveryItems(client!, character.Id, goal, required);
 
@@ -434,6 +439,12 @@ namespace Faolan.GameServer.Quest
 				if (progress >= required && await AllGoalsComplete(character.Id, quest, def, goal, progress))
 				{
 					await CompleteObjective(client!, character, quest, def, goal, required);
+
+					// #843: the key an "unlock X" goal demanded is SPENT by the unlocking, and it goes AFTER the
+					// completion because that is where retail puts it - fr12205 QuestIIR completed, fr12206
+					// DispatchRemoveItem 0x71 slot 0. The delivery consume above lands BEFORE its completion for the
+					// same reason (fr5765 remove, fr5769 completed), so the two orderings are retail's, not ours.
+					await ConsumeRequiredItem(client!, character.Id, goal);
 					continue;
 				}
 
@@ -453,14 +464,52 @@ namespace Faolan.GameServer.Quest
 		// The other half of the hand-in (#521): HoldsDeliveryItem checks, this TAKES. `required` is the count the goal asks for,
 		// which is what the check demanded, so it is what gets handed over - extras the player is carrying stay theirs.
 		//
-		// ⚠️ Nothing in the corpus shows the removal (retail completes the delivery without a captured
-		// DispatchRemoveItem in the frames around it), so this is a design decision - the maintainer's, 2026-08-01 - and not a
-		// decoded fact: a delivery you walk away from still holding the goods is not a delivery. Recorded here because
-		// the day a capture shows otherwise, this is the one place to change.
+		// ⭐ A capture DOES show the removal, so this is a decoded fact now rather than the design decision it was
+		// recorded as (#843): in xxx_mage-necromancer_login_play2 the 0x71 slot empties at packet 5765 and quest
+		// 12371 - completing goal "Deliver 3 stone bricks to Turach" - completes at 5769, four packets later.
+		//
+		// ⚠️ Worth knowing HOW it stayed hidden, because the same trap is one report away: the scan that had looked
+		// for it parsed each packet's `.Record` (the IIR-carrier view) where an RPC method body wants `.Body`. Every
+		// parse failed and the sweep printed a confident zero. Only counting arrivals separately from parses made the
+		// difference visible - see `--report quest-container`'s control line.
 		//
 		// A short take is LOGGED rather than tolerated silently: the caller has already verified the player holds
 		// enough, so removing fewer means the inventory moved underneath us. The goal still advances - refusing to
 		// complete a quest the player has legitimately finished is the worse failure of the two.
+		/// <summary>
+		///     The key an "unlock X" goal demanded is SPENT by the unlocking (#843). No-op for every other goal.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ **The rule is "the goal that SPENDS it takes it", not "a completed quest clears its container"** -
+		///     and the second reading is refuted rather than merely unchosen. Measured by
+		///     <c>--report quest-container</c> over the whole corpus: of 17 quest completions that happened while the
+		///     0x71 container held something, **7 kept their items**. The decisive pair is one chain in one capture:
+		///     <list type="bullet">
+		///         <item>
+		///             13563 *"Get the Scavenger's Key"* (a `LootFromNpc` ACQUIRE goal) completes at packet 1431
+		///             holding the key - and the key STAYS. A completion did not clear the container.
+		///         </item>
+		///         <item>
+		///             13480 *"Free Casilda"* completes at 1899 and the key is removed at 1902 - because that is the
+		///             step that USES it.
+		///         </item>
+		///     </list>
+		///     ⚠️ Only the `UseWorldObject` half is wired, because it is the only one whose goal NAMES the item it
+		///     spends (<c>QuestItemId</c>, e.g. 12369's gate goal naming 193186). *"Free Casilda"* spends a key that
+		///     belongs to an EARLIER quest's goal, and no column says so - implementing that would mean inventing the
+		///     link. It is the residual on #843.
+		/// </remarks>
+		private async Task ConsumeRequiredItem(INetworkClient client, uint characterId, QuestGoalDefinition goal)
+		{
+			var itemId = QuestProgress.RequiredHeldItemId(goal);
+			if (itemId == 0)
+				return;
+
+			var taken = await _economy.TakeItemsFromInventory(client, itemId, 1);
+			if (taken < 1)
+				_logger.LogWarning("Goal {Goal} spent key {Item}, but character {Character} no longer held it - the hold check passed, so the inventory changed under it.", goal.GoalId, itemId, characterId);
+		}
+
 		private async Task ConsumeDeliveryItems(INetworkClient client, uint characterId, QuestGoalDefinition goal, uint required)
 		{
 			var wanted = Math.Max(1u, required);
