@@ -43,11 +43,9 @@ namespace Faolan.GameServer.Quest
 		//
 		// The silver state was missed by #241, which only saw three values. It is the second most common on the wire:
 		// of the 301 replies in xxx_mage-necromancer_login_play2, 181 are 0x00, 74 are 0x01, 30 are 0x02, 16 are 0x04.
-		// Turach is 0x01 at login there - his quest needs Laranga first - and 0x04 once she points at him, which is what
-		// pins silver as "prerequisite not met": the line exists and runs through this NPC, but it has not reached him.
 		//
 		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
-		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
+		// ones no quest touches at all. Silver says "a chain runs through this NPC"; none says "this NPC is scenery".
 		//
 		// ⚠️ **Silver is measured to be mostly NOT about what this NPC grants** (#848, `--report quest-markers` over
 		// 34,837 resolved marker packets). Of the 456 silver packets retail sent, only 31% are on an NPC that grants
