@@ -509,8 +509,29 @@ talk-goal stage (13480) completes in a conversation.
 
 ## The marker over a giver's head: silver is "not yet", never "in progress"
 
-`DispatchSetQuestMarker` carries one state byte, and `QuestMarkerResolver` decides it: `0x00` none, `0x01`
-silver `!`, `0x02` gold `!`, `0x04` gold `?`.
+`DispatchSetQuestMarker` carries one state byte, and `QuestMarkerResolver` decides it.
+
+⭐ **The enum is the CLIENT's, and it has five values.** `n3VisualDynel::SetQuestMarker` switches the byte
+straight onto a particle effect, and `GamecodeClient_t::SetQuestMarker` hands it over untouched, so the wire
+value *is* the effect selector:
+
+| value | client effect | what it draws |
+|---|---|---|
+| `0x00` | *(none — clears the effect)* | nothing |
+| `0x01` | `quest_new_inactive` | silver `!` |
+| `0x02` | `quest_new_active` | gold `!` |
+| `0x03` | `quest_progress_inactive` | silver `?` — **exists in the client, never sent by retail** |
+| `0x04` | `quest_progress_active` | gold `?` |
+
+So the axes are the client's own: `new` (`!`) vs `progress` (`?`), each `active` (bright) or `inactive` (the
+greyed form the community documents as the grey `!`). `0x03` is real and unused — **zero** of the 34,837
+resolved marker packets in the corpus carry it (`--report quest-markers`), so retail's server collapses
+whatever it was meant for onto another value.
+[V1: tools/ghidra/DecompileFns.java FNS=005affb0]
+
+⛔ **The client applies no level logic of its own** — it plays the effect it is told to play. The community's
+"grey means come back at a higher level", and the far-below-you quest that draws nothing, are therefore both
+**server** choices of which byte to send, and neither is recoverable by more RE of the client.
 
 `Blablatest_mage-necromancer-create_casilda_quest_first_stage` walks Casilda's whole chain on a fresh
 character and pins four of the five states on one NPC (handle `0x315cc`):
@@ -542,10 +563,31 @@ granting hers** (`Hoxxling_…_login_gameplay2`: grant at frame 9603, `0x01` at 
 the giver's quest"; the marker differs because what is *left to grant* differs.
 
 ⚠️ **Silver is therefore not simply "your level is too low"**, which is how the community documents the grey
-`!`, **nor simply "the chain has not reached them"**. It is *"they have one you cannot take yet"*, and the
-captures do not separate the two reasons — Alyssa goes gold → silver within 58 seconds, and a level cannot
-drop. What is still unexplained: Turach and Laranga stay silver even past their last harvested grant, which
-fits an unharvested further quest but is not proven. Tracked in Gitea #848.
+`!`, **nor simply "the chain has not reached them"**. Alyssa goes gold → silver within 58 seconds, and a
+level cannot drop.
+
+⭐⭐ **And measured over the whole corpus, silver is mostly not about what the NPC GRANTS at all**
+(`--report quest-markers`, 34,837 resolved marker packets, each scored against the player's journal *as of
+that packet* rather than at the end of the capture):
+
+| of the packets carrying… | grants a quest at all | grants one untouched | a goal of an **untouched** quest targets it | no quest relation |
+|---|---|---|---|---|
+| `0x01` silver `!` (456) | 31% | 26% | **85%** | 15% |
+| `0x02` gold `!` (582) | 68% | **68%** | 55% | 20% |
+| `0x04` gold `?` (189) | 97% | 85% | 96% | 1% |
+
+Gold `!` is what this code already models — 68% of it sits on a grant the player has neither taken nor
+finished, and **zero** of it on a grant they already hold. Silver's defining relation is the other one: *a
+goal of a quest the player has not touched will send them here*. `QuestMarkerResolver` never reads that
+relation — it answers `None` for any NPC outside the giver map — and **38 of the 62 NPC templates retail ever
+lit grant nothing at all**, so we would send `0x00` for every one of them. That is the model gap, and it is
+wider than the Turach question it was found through: Ninus (silver ×134), Skeggi (×48), Junia (×48) and Donus
+(×17) all grant nothing and are each targeted by untouched quests.
+
+⚠️ It names silver's **population**, not its trigger. Casilda is the standing counterexample — 13480 targets
+her and is untouched while she is dark 178 times — so a further condition exists. And 15% of silver and 20%
+of gold `!` land on NPCs with no quest relation in the shipped data at all, which is a harvest gap rather
+than a rule. Tracked in Gitea #848.
 
 ⛔ **The quest's `MapId` does not gate the marker.** It is the objective's marker *pin* — where the quest sends
 you — not where its giver stands, and the two differ for **15 of the 28 giver quests** in the shipped data:

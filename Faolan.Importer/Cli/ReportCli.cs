@@ -383,6 +383,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #848/#559: every DispatchSetQuestMarker retail sent, cross-tabbed against what the shipped quest
+				// data says the NPC is worth - and the client's own five-value enum for the state byte.
+				case "quest-markers":
+				{
+					QuestMarkers(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #855: WHICH property of a creature picks its respawn interval - 120 s or 150 s. corpse-timing
 				// established that retail respawns at all; this one carries the attributes and cross-tabs them.
 				case "respawn-interval":

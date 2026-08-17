@@ -23,8 +23,23 @@ namespace Faolan.GameServer.Quest
 	// path re-deriving it.
 	public sealed class QuestMarkerResolver
 	{
-		// DispatchSetQuestMarker (0x2008) state byte (decoded #241): 0x02 = '!' (quest available), 0x04 = '?' (ready
-		// to turn in), 0x00 = none. 0x01 = the SILVER '!' - a quest NPC with nothing for you right now (#559).
+		// DispatchSetQuestMarker (0x2008) state byte, and the enum is the CLIENT's own - recovered from
+		// `n3VisualDynel::SetQuestMarker` (`FUN_005affb0`), which switches the byte straight onto a particle effect
+		// (`GamecodeClient_t::SetQuestMarker` @01395460 resolves the ID32 and passes the byte through untouched):
+		//
+		//   0x00  (no effect - clears whatever was there)   0x02  quest_new_active        = GOLD '!'
+		//   0x01  quest_new_inactive       = SILVER '!'     0x04  quest_progress_active   = GOLD '?'
+		//   0x03  quest_progress_inactive  = SILVER '?'  <- exists in the client, NEVER sent by retail
+		//
+		// So the axes are `new`(!) vs `progress`(?), each `active` (bright) or `inactive` (the greyed form the
+		// community calls the grey '!'). ⭐ `0x03` is real and unused: zero packets carry it across the whole corpus
+		// (`--report quest-markers`), so retail's server collapses whatever it was for onto another value. We do not
+		// send it either, and a constant for a value nothing emits would be a claim we cannot support.
+		//
+		// ⛔ The client applies NO level logic here - it plays the effect it is told to. The community's "grey means
+		// come back at a higher level", and the far-below-you quest that draws nothing, are both SERVER choices of
+		// which byte to send, so neither is recoverable by more RE of the client (#848).
+		// [V1: tools/ghidra/DecompileFns.java FNS=005affb0]
 		//
 		// The silver state was missed by #241, which only saw three values. It is the second most common on the wire:
 		// of the 301 replies in xxx_mage-necromancer_login_play2, 181 are 0x00, 74 are 0x01, 30 are 0x02, 16 are 0x04.
@@ -34,7 +49,16 @@ namespace Faolan.GameServer.Quest
 		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
 		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
 		//
-		// ⛔ Silver is about what the giver has LEFT TO GRANT, not about what you are carrying - see MarkerStateFor.
+		// ⚠️ **Silver is measured to be mostly NOT about what this NPC grants** (#848, `--report quest-markers` over
+		// 34,837 resolved marker packets). Of the 456 silver packets retail sent, only 31% are on an NPC that grants
+		// anything at all, while **85% are on an NPC some UNTOUCHED quest's goal will send the player to** - a
+		// relation this class does not read. Gold '!' is the opposite and matches what we do: 68% grant a quest the
+		// player has neither taken nor finished, and *zero* are on a grant the player already holds.
+		//
+		// So `MarkerStateFor` returning None for any non-giver is a real gap: 38 of the 62 NPC templates retail ever
+		// lit grant nothing, and we would send 0x00 for every one of them. What is NOT pinned is the extra condition -
+		// Casilda is the standing counterexample (13480 targets her and is untouched while she is dark 178 times), so
+		// "targeted by an untouched quest" names silver's population without predicting when it fires.
 		public const byte None = 0x00, Unavailable = 0x01, Available = 0x02, TurnIn = 0x04;
 
 		private readonly IDatabaseRepository _database;

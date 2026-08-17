@@ -378,6 +378,13 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`quest-markers` (#848/#559: every `DispatchSetQuestMarker` retail sent, resolved to the NPC it was about — via the
+most recent spawn of that handle BEFORE the packet, since handles are recycled — and cross-tabbed against the two
+relations the shipped quest data holds for that NPC: what it GRANTS (the dialogue graph, all `QuestMarkerResolver`
+reads) and what a quest goal SENDS you to. Each packet is scored against the player's journal AS OF that packet,
+replayed from `QuestIIR` + `QuestFullUpdateIIR`, so "untouched / held / completed" is a fact about that moment.
+It is what measured silver as an 85%-goal-target population rather than a grant one, and what counts the marker
+states retail never sends),
 `respawn-interval` (#855: how long after a kill the creature comes back, and what picks the number. A respawn is a
 NEW entity id, so the signal is the same TEMPLATE back at the dead one's anchor on a handle the client has never
 seen. Whether the interval is a TIMER or just the moment the player walked back is decided from the timestamps
