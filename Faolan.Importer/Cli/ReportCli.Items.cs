@@ -29,7 +29,25 @@ namespace Faolan.Importer.Cli
 			var item = db.Items.FirstOrDefault(i => i.Id == itemId);
 			if (item == null)
 			{
+				// ⚠️ "not in DB" is not the answer - it is the question. There are two completely different reasons
+				// an item is missing, and only one of them can ever be fixed by importing harder (#824):
+				//
+				//   * the client does not ship the template either - the id is not an item at all, or belongs to
+				//     content this client build does not carry;
+				//   * the client DOES ship it and we hold no KEY. That is the common case and it is a dead end by
+				//     construction: an item's TEA key is server-assigned, cryptographically random per item, and
+				//     reaches us only by riding a `ProtoAcgItem` in some capture (#203, closed won't-fix). No
+				//     derivation, no key table, and `Items.Key1..4` are NOT NULL because the CLIENT needs the quad to
+				//     decrypt the template out of its own RDB - so a name-only row would be unusable anyway.
+				//
+				// Saying which costs one index lookup, so say it rather than making the next reader re-derive it.
 				Console.WriteLine($"item {itemId} not in DB");
+				using var probe = OpenRdb(rdbDir);
+				var shipped = new uint[] { 1000020, 1000620 }.Where(t => probe.TryGet(t, itemId, out var e) && e.Size > 0).ToList();
+				Console.WriteLine(shipped.Count == 0
+					? "  ...and the client ships no 1000020/1000620 template for it either - this id is not an item template in this build."
+					: $"  ...but the client DOES ship it (RDB type {string.Join("/", shipped)}). The blocker is the KEY, not the catalog:"
+					  + " an item's TEA key only ever arrives on the wire, so this item needs a capture that references it (#203).");
 				return;
 			}
 

@@ -362,6 +362,22 @@ those objectives still cannot complete — **51 of the 74** referenced items are
 but their templates are `RDBH`-encrypted with a per-item key only a capture yields, so this is a catalog-coverage
 gap, not a quest bug.
 
+⭐ **The gap is entirely capture-blocked, and that is now measured rather than assumed** (`--report
+world-object-items`, Gitea #824). Of the 227 distinct item templates that world objects point at and `Items` does
+not hold — 1,616 objects between them — **227 are shipped by the client** in RDB 1000020/1000620 and **none** are
+absent from it. So every single one is the same story: the template is right there and we hold no key, which is a
+dead end by construction (#203 — the key is server-assigned, random per item, and only ever arrives on the wire).
+`--report item-template <id>` says which of the two cases an id is in rather than leaving "not in DB" to be
+interpreted.
+
+⛔ **And a pickup that cannot pay out no longer pretends to.** The node path used to ignore the grant's answer, so
+harvesting a `Spool of Thread` (quest 14014, item 778593) played the entire animation — fade out, *"it grows back
+in 14s"*, regrow — and put nothing in the bag, with the reason appearing in no log anywhere. The node is marked
+harvested only if something actually arrived, and `GrantItemToBackpack`'s three refusals each say which they are:
+a template not in `Items` (a data gap, warned), no free slot (a player condition, informational), and a delivery
+that failed with a slot in hand (which should never happen). The player is told *"You cannot carry that."* rather
+than watching a node dissolve for nothing.
+
 ## A goal update has three shapes, and the QUEST picks which one
 
 What a goal move puts on the wire is decided by the state of the **quest**, not by the goal or by what triggered

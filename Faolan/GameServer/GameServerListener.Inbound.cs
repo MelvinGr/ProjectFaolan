@@ -2314,8 +2314,16 @@ namespace Faolan.GameServer
 					{
 						if (await _questProgression.ResolveCollectPickupItem(client) is { } pickedItem)
 						{
-							await GrantItemToBackpack(client, pickedItem);
-							await _broadcaster.MarkPickupHarvested(client, target);
+							// ⚠️ The node is marked harvested only if something ACTUALLY arrived (#824). This used to
+							// ignore the grant's answer, so a pickup whose item could not be delivered played the whole
+							// animation - fade out, "it grows back in 14s", regrow - and put nothing in the bag, which
+							// is precisely how #824 presented. Both reasons a grant can fail want the node LEFT
+							// STANDING: a full backpack means try again after making room, and a template we do not
+							// hold means this node can never pay out and should not pretend to.
+							if (await GrantItemToBackpack(client, pickedItem) != null)
+								await _broadcaster.MarkPickupHarvested(client, target);
+							else
+								await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "You cannot carry that.");
 						}
 
 						break; // inert (no active collect quest) still swallows the use - don't open a window on a brick

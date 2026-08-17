@@ -326,6 +326,12 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`world-object-items` (#824: which world objects point at an item template `Items` does not hold, split by whether
+the CLIENT ships that template — because only one half can ever be fixed by importing harder. *Shipped, keyless*
+needs a capture referencing the item, since an item's TEA key is server-assigned and only ever arrives on the wire
+(#203, closed won't-fix); *not shipped* can never be produced at all. Currently **227 of 227 distinct missing
+templates are shipped-but-keyless**, across 1,616 objects — so the whole gap is capture-blocked and none of it is
+an import defect. Reported, never asserted: both counts move as captures are added) ·
 `inventory-token-check` (#719/#723: does every item a character is HOLDING reach the wire as something the client
 will render? Flags a held template with no `Items` row — invisible in the snapshot with nothing to explain it — and
 one whose minted wire token is malformed. ⚠️ A report for the #729/#849 reason: `ItemInstances` hangs off

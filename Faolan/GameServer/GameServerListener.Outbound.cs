@@ -416,9 +416,22 @@ namespace Faolan.GameServer
 		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null,
 			ItemInstance? transferring = null)
 		{
+			// ⚠️ Every refusal below says WHY. This method used to return a bare `null` from three different places -
+			// no template, no free slot, the delivery itself failing - and the caller could not tell them apart, so a
+			// grant that silently did nothing looked identical to a grant that had never been asked for. #824 is what
+			// that costs: harvesting a `Spool of Thread` played the whole node animation and put nothing in the bag,
+			// and the reason (its template is not in `Items`) appeared in no log anywhere.
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
+			{
+				// A DATA gap rather than a player condition, so it is a warning: something in the world - a quest
+				// goal, a loot table, a harvest node - is pointing at a template we do not hold. Almost always an
+				// item no capture ever showed, whose TEA key is therefore unrecoverable (#203), which is why the row
+				// cannot simply be added.
+				Logger.LogWarning("Grant refused for {Char}: item template {Template} is not in Items, so there is nothing to hand over.",
+					client.Session.Character.Name, itemTemplateId);
 				return null;
+			}
 
 			var characterId = client.Session.Character.Id;
 
@@ -443,7 +456,14 @@ namespace Faolan.GameServer
 				? null
 				: preferredSlot);
 			if (slot == null)
+			{
+				// An ordinary PLAYER condition, not a defect - a full bag is a thing that happens - so it is
+				// informational. It is still stated, because "nothing arrived" reads the same to the player either
+				// way and the two need different answers from whoever reads the log.
+				Logger.LogInformation("Grant refused for {Char}: no free {Kind} slot for item {Template} ({Name}).",
+					client.Session.Character.Name, kind, itemTemplateId, item.Name);
 				return null;
+			}
 
 			// The instance the client is about to be told about, and the id the live add and the next login's snapshot
 			// both name it by (#750). The two used to agree via a formula over (instance, kind, slot); they agree by
@@ -452,7 +472,13 @@ namespace Faolan.GameServer
 				? await Database.TransferCharacterItem(transferring.Id, characterId, kind, slot.Value)
 				: await Database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
 			if (delivered == null)
+			{
+				// A free slot was found and the write still did not produce a row - so this one is neither a data gap
+				// nor a full bag, and it is the only one of the three that should never happen.
+				Logger.LogWarning("Grant failed for {Char}: {Kind}[{Slot}] was free and item {Template} ({Name}) still did not persist.",
+					client.Session.Character.Name, kind, slot.Value, itemTemplateId, item.Name);
 				return null;
+			}
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem

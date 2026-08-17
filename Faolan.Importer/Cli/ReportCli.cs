@@ -462,6 +462,11 @@ namespace Faolan.Importer.Cli
 					return await InventoryTokenCheck();
 				}
 
+				case "world-object-items":
+				{
+					return await WorldObjectItems(RdbDir());
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));
