@@ -47,7 +47,8 @@ namespace Faolan.GameServer.World
 		// #363 ambient spawn-pool maintenance cadence. This interval doubles as the respawn delay - a killed pool member
 		// is replaced on the next pass - so it tracks the DefaultRespawnDelaySeconds placed mobs use rather than being
 		// a number of its own. It was 15 s alongside the old 15 s respawn; leaving it there while placed spawns moved to
-		// 420 s would have made the ambient population the fast-respawning one, which is the complaint that started this.
+		// the measured 150 s would have made the ambient population the fast-respawning one, which is the complaint that
+		// started this.
 		private const double AmbientMaintainIntervalSeconds = WorldEntity.DefaultRespawnDelaySeconds;
 
 		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and

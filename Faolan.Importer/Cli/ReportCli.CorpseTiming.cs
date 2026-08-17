@@ -22,31 +22,41 @@ namespace Faolan.Importer.Cli
 	// death's own packet burst as a separate dynel and leaves the body lying beside it for another half-minute. And we
 	// respawned the creature 15 s after it died - before its own corpse would have finished fading.
 	//
-	// ## Why the respawn half is a NON-observation, and why that is still a result
+	// ## Reading the respawn: the creature comes back on a NEW handle
 	//
-	// A handle is a stable server entity id for the life of a session (the same handle re-spawns at identical coords
-	// across interest churn), so `death(H)` followed by `spawn(H)` is that creature respawning - PROVIDED the spawn is
-	// neither the corpse being re-streamed nor the handle being reused (see the two filters below). Nothing in the
-	// corpus survives both. That is only worth anything with a control, so the report prints three:
-	//   * how many spawns the same scan attributes to interest churn (it finds those readily - it is not blind);
-	//   * whether any OTHER entity ever refilled the dead creature's spawn point (a respawn on a fresh handle);
-	//   * how long the client demonstrably stayed parked at the spot afterwards, measured as the last event it
-	//     received for a NEIGHBOUR anchored within 10 u of the dead creature's own anchor.
-	// The last of those is the number that bounds the interval: a kill the client watched the aftermath of for N
-	// seconds with nothing returning says the respawn is longer than N. See WorldEntity.DefaultRespawnDelaySeconds.
+	// The obvious test - `death(H)` followed by `spawn(H)` - finds NOTHING, and believing it cost a whole cycle.
+	// A handle is stable for as long as an entity LIVES (the same handle re-spawns at identical coords across
+	// interest churn), but a respawn is a new entity: retail allocates a fresh id for the revived creature. So the
+	// question is never what happened to the handle. It is whether the SAME CREATURE reappears AT the dead one's
+	// spawn point, and that is what `refills` measures.
+	//
+	// Three things produce a spawn of a DEAD handle and none of them is a respawn, which is why the same-handle
+	// scan is kept as a control rather than deleted:
+	//   * the CORPSE being re-streamed as the player walks in and out of range of it - it is still an entity, so it
+	//     quits and re-spawns like anything else, and does so while the body is still there (one Cavecrawler three
+	//     times before its own fade). Hence `> corpseGone`, anchored on the FADE rather than the first quit.
+	//   * the handle being REUSED for a different creature once the corpse is gone - it lands wherever that creature
+	//     is, which is what `Moved` exposes.
+	//   * a player's own resurrect, which is why player handles are excluded outright.
+	//
+	// ⚠️ There is no usable "the client watched and nothing came back" bound, and an earlier version of this report
+	// printed one. It cannot distinguish "no respawn happened" from "the client was not in range at the moment it
+	// did" - `Brutal Pirate 0xaa88` respawned at 150.0 s in the very capture whose witness window claimed 334 s of
+	// nothing. A non-observation of a respawn is worth nothing here; only the observed intervals are.
 	//
 	// Exit code is 0 always - this is a measurement, not a gate. The populations move whenever captures are added
-	// (memory: a shipped-data check PRINTS rather than pins), and the one direction that could only be a defect - a
-	// respawn shorter than our configured delay - cannot be asserted here because the corpus contains no respawns.
+	// (memory: a shipped-data check PRINTS rather than pins).
 	public static partial class ReportCli
 	{
 		// The death record: BehaviorId 0x1F at phase 0x0004 (the same pair `--report death-timing` filters on).
 		private const uint CorpseDeathBehaviorId = 0x0000001F;
 		private const ushort CorpseDeathSeq = 0x0004;
 
-		// How close two anchors must be for one creature to witness the other's spawn point - "the client was standing
-		// on the spot", not merely "somewhere in the camp".
-		private const float WitnessRadius = 10.0f;
+		// How close a returning creature must be to the dead one's anchor to count as the same spawn point. Retail's
+		// revive is exact - the measured clusters all land at 0.0 u - so this is slack for a mob that took a step
+		// before its first captured transform, not a search radius.
+		private const float RespawnAnchorRadius = 3.0f;
+
 
 		// The corpse teardown's own length, used only as the fallback marker for "the body is gone" on a death whose
 		// fade the dump did not catch. The measured value, which is where WorldEntity.CorpseFadeSeconds comes from.
@@ -67,8 +77,7 @@ namespace Faolan.Importer.Cli
 			var deaths = 0;
 			var respawns = new List<(string Capture, string Name, uint Handle, double Seconds, float Moved)>();
 			var churnSpawns = 0;
-			var refilled = 0;
-			var witnessed = new List<(string Capture, string Name, uint Handle, double Seconds)>();
+			var refills = new List<(string Capture, string Dead, uint DeadHandle, string Fill, uint FillHandle, double Seconds, float Dist)>();
 
 			foreach (var c in captures)
 			{
@@ -122,20 +131,17 @@ namespace Faolan.Importer.Cli
 					if (back != null)
 						respawns.Add((c.Name, names.GetValueOrDefault(death.Handle, "?"), death.Handle, back.Seconds - death.Seconds,
 							anchors.TryGetValue(death.Handle, out var home0) ? Ground(back.Position - home0) : float.NaN));
-					else if (anchors.TryGetValue(death.Handle, out var anchor)
-					         && events.Any(e => e.Kind == CorpseEventKind.Spawn && e.Handle != death.Handle && e.Seconds > death.Seconds && Ground(e.Position - anchor) <= 3.0f))
-						refilled++;
-
-					// How long the client demonstrably kept watching that spot with nothing coming back.
-					if (anchors.TryGetValue(death.Handle, out var home))
+					// ⭐ THE respawn signal, and the one the same-handle test above cannot see. A revived creature comes
+					// back on a NEW entity id, so the question is not what happened to the handle - it is whether the
+					// SAME CREATURE reappears AT the dead one's spawn point. Same name, within a few units of its
+					// anchor; the distance rides along and is printed, so a coincidental neighbour (two mobs of one camp
+					// standing close) can be told apart from a genuine refill by eye rather than by trusting the radius.
+					if (anchors.TryGetValue(death.Handle, out var anchor) && names.TryGetValue(death.Handle, out var deadName))
 					{
-						var last = lastSeen
-							.Where(kv => kv.Key != death.Handle && anchors.TryGetValue(kv.Key, out var a) && Ground(a - home) <= WitnessRadius && kv.Value > death.Seconds)
-							.Select(kv => kv.Value)
-							.DefaultIfEmpty(double.NaN)
-							.Max();
-						if (!double.IsNaN(last))
-							witnessed.Add((c.Name, names.GetValueOrDefault(death.Handle, "?"), death.Handle, last - death.Seconds));
+						var fill = events.FirstOrDefault(e => e.Kind == CorpseEventKind.Spawn && e.Handle != death.Handle && e.Seconds > death.Seconds
+						                                     && names.GetValueOrDefault(e.Handle) == deadName && Ground(e.Position - anchor) <= RespawnAnchorRadius);
+						if (fill != null)
+							refills.Add((c.Name, deadName, death.Handle, deadName, fill.Handle, fill.Seconds - death.Seconds, Ground(fill.Position - anchor)));
 					}
 
 					// The bag this kill dropped: the nearest un-taken one inside the match window.
@@ -187,18 +193,19 @@ namespace Faolan.Importer.Cli
 			foreach (var r in respawns.OrderBy(r => r.Seconds))
 				Console.WriteLine($"    +{r.Seconds,7:0.0}s  {r.Moved,6:0.0}u from home  {r.Name} 0x{r.Handle:x}  {r.Capture}");
 
-			Console.WriteLine($"deaths whose spawn point was refilled by ANY entity: {refilled} of {deaths}");
-			Console.WriteLine($"(control) spawns the same scan calls interest churn: {churnSpawns}");
-			if (witnessed.Count > 0)
-			{
-				Console.WriteLine();
-				Console.WriteLine($"how long the client kept watching the spot afterwards - a lower bound on the interval, per kill,");
-				Console.WriteLine($"measured off a neighbour anchored within {WitnessRadius:0} u of the dead creature's own anchor:");
-				foreach (var w in witnessed.OrderByDescending(w => w.Seconds).Take(10))
-					Console.WriteLine($"  {w.Seconds,7:0.0}s  {w.Name} 0x{w.Handle:x}  {w.Capture}");
+			Console.WriteLine($"RESPAWNS - the same creature back at the dead one's spawn point, on a NEW handle: {refills.Count} of {deaths}");
+			foreach (var r in refills.OrderBy(r => r.Seconds))
+				Console.WriteLine($"    +{r.Seconds,7:0.1}s  {r.Dist,4:0.0}u  {r.Dead} 0x{r.DeadHandle:x} -> 0x{r.FillHandle:x}  {r.Capture[..System.Math.Min(46, r.Capture.Length)]}");
 
-				Console.WriteLine($"  n={witnessed.Count}, strongest bound {witnessed.Max(w => w.Seconds):0.0}s with nothing returning.");
+			Console.WriteLine();
+			Console.WriteLine("per creature (one whose observations agree ACROSS captures is a real timer, not a coincidence):");
+			foreach (var g in refills.GroupBy(r => r.Dead).OrderByDescending(g => g.Count()).ThenBy(g => g.Key))
+			{
+				var v = g.Select(r => r.Seconds).OrderBy(x => x).ToList();
+				var caps = g.Select(r => r.Capture).Distinct().Count();
+				Console.WriteLine($"  {g.Key,-24} n={v.Count,2} in {caps} capture(s): {string.Join(", ", v.Select(x => x.ToString("0.0")))}");
 			}
+			Console.WriteLine($"(control) spawns the same scan calls interest churn: {churnSpawns}");
 		}
 
 		private static float Ground(Vector3 delta)

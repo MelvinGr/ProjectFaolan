@@ -361,7 +361,7 @@ namespace Faolan.GameServer.World
 					// A dead NPC drops its loot bag at once, then lies there as a corpse for CorpseFadeSeconds before the
 					// body fades and its handle is quit - retail's sequence, and the bag outlives the body rather than
 					// replacing it. The corpse and respawn timers run independently off the same death; the corpse is
-					// long gone (~33s) before the respawn (~420s) puts the creature back.
+					// long gone (~33s) before the respawn (~150s) puts the creature back.
 					if (entity.IsDead)
 					{
 						switch (entity.TickCorpse(deltaSeconds))

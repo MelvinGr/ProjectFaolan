@@ -82,20 +82,20 @@ avoided the coefficients. They really do need a live dump.
 
 `[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
 
-### NPC respawn interval
-The three other post-death numbers are measured (`--report corpse-timing`: the bag drops in the death's own burst
-0.8 u from the body, the corpse fades at 30.72 s and quits at 33.18 s, an unlooted bag expires at 300 s). The
-interval before the creature comes BACK is not, because **no capture contains a respawn**: across all 134
-captures, 275 NPC kills produced no dead handle returning to its spawn point and no killed spawn point refilled by
-another entity. The scan is not blind — it attributes 8,894 spawns to interest churn, and the six candidates it
-surfaces all sit 52–984 u from the dead creature's anchor (the handle being reused), where a real respawn is *at*
-the spawn point. The bound is how long the client demonstrably kept watching the spot: strongest **733.9 s** with
-nothing returning. `WorldEntity.DefaultRespawnDelaySeconds` is therefore a chosen floor (750 s, just past that
-observation), not retail's number. Closing it needs a deliberate capture that clears a camp and then *stays put*
-for 15+ minutes — or the confirmation that creatures on a **Solo** playfield (4010 Tortage Island, where nearly
-every capture was taken) simply never respawn for the life of the instance, which would make the right model a
-per-spawn flag rather than a timer. Tracked in Gitea #855.
-`[V0: NPC respawn interval]`
+### What governs a creature's respawn interval
+The interval itself is measured (`--report corpse-timing`): a killed creature comes back **on a new entity handle**
+at its old spawn point, at **150 s** for Brutal Pirate (6 kills, 0.3 s spread, 2 unrelated captures) and **120 s**
+for Wild Cow / Wild Pig. What is NOT known is what SELECTS one number over the other — creature, family, level,
+playfield or spawn group — and only three creatures in the corpus are killed often enough, and observed long
+enough afterwards, to yield an interval at all. So `NpcTemplate` has no respawn column and
+`WorldEntity.DefaultRespawnDelaySeconds` gives every creature the best-attested 150 s. Close it by harvesting more
+intervals (kills in captures where the player stays put afterwards) and testing whether the split follows the
+creature family. Tracked in Gitea #855.
+
+⚠️ The trap this cost a cycle to: the obvious `death(handle)` → `spawn(same handle)` test finds **nothing**, because
+a respawn is a new entity id. And "the client watched for N seconds and nothing came back" is not a usable bound —
+it cannot tell a missing respawn from a client that was out of range when it happened.
+`[V0: what governs a creature's respawn interval — 120 s vs 150 s is per-creature and NpcTemplate has no column]`
 
 ---
 

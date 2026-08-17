@@ -118,8 +118,8 @@ namespace Faolan.Tests
 		}
 
 		// A NoRespawn creature (a summon, an ambient pool member) leaves the world when its corpse sequence ends rather
-		// than sitting out a respawn timer it will never use - which at the 420s default would have parked it in the
-		// zone for seven minutes after the client had already stopped rendering it.
+		// than sitting out a respawn timer it will never use, which would park it in the zone for minutes after the
+		// client had already stopped rendering it.
 		[Fact]
 		public void WorldStateTick_NoRespawnCorpseLeavesTheWorldWhenTheSequenceEnds()
 		{

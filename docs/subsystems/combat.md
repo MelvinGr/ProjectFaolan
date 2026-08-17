@@ -76,20 +76,27 @@ that one. Reading it that way leaves the median at 33.18 s but drops the minimum
    **EXCEPT** `WorldEntity.NoRespawn` creatures (summons, ambient pool members): they leave the world
    (`NpcCorpseRemoved`) when the corpse sequence ends instead of waiting out a timer they never use.
 
-⚠️ **The respawn interval is the one number here the corpus cannot supply**, and the default is a floor we chose,
-not a measurement. Across all 134 captures, **275 NPC kills produced no respawn at all** — no dead handle ever
-came back to its spawn point, and no killed spawn point was refilled by another entity. That is not a blind
-detector: the same scan attributes **8,894** spawns to interest churn, so it sees a re-spawn readily when there is
-one, and the six candidates it does surface all sit **52–984 u** from the dead creature's own anchor (the handle
-being reused for something else, where a genuine respawn is *at* the spawn point).
+⭐ **A respawn comes back on a NEW entity handle**, which is why it takes a moment to see. A handle is stable for
+as long as an entity *lives* — the same one re-spawns at identical coords across interest churn — so the natural
+test, `death(H)` then `spawn(H)`, looks right and finds nothing at all. The revived creature is a new entity with a
+new id. The signal is the same **creature** reappearing **at the dead one's spawn point**:
 
-The bound comes from how long the client demonstrably kept watching the spot afterwards, measured off a neighbour
-anchored within 10 u of the dead creature's anchor: the strongest is **733.9 s** — over twelve minutes parked on a
-Barachan Panther's corpse with nothing returning — and the top ten all exceed 310 s. So the default sits just past
-that at **750 s** (`WorldEntity.DefaultRespawnDelaySeconds`), where no captured session contradicts it. Note
-Tortage Island (4010) is one of four Solo maps, so "clear it and it stays clear for your session" may be the real
-retail rule rather than any timer. Tracked in Gitea #855.
-`[V0: NPC respawn interval]`
+| creature | observed intervals | |
+|---|---|---|
+| Brutal Pirate | 149.9, 149.9, 149.9, 150.0, 150.2, 150.2 | 6 kills across **2 unrelated captures** → **150 s** |
+| Wild Cow | 119.5, 120.0 | 2 kills, 2 captures → **120 s** |
+| Wild Pig | 119.9 (and one at 192.9 the client was out of range for) | → **120 s** |
+
+Six observations spanning 0.3 s across two captures is a timer, not a coincidence. So the interval is **per
+creature**, in the 2–2.5 minute range. `NpcTemplate` has no column for it yet, so
+`WorldEntity.DefaultRespawnDelaySeconds` takes the best-attested cluster (**150 s**) for everything — per-creature
+respawn is Gitea #855.
+
+⚠️ **Do not re-derive this from "the client watched for N seconds and nothing came back."** That bound cannot tell
+*no respawn* from *the client was out of range when it happened*, and it is wrong by a factor of five here: the
+same capture that shows `Brutal Pirate 0xaa88` respawning at 150.0 s also contains a 334 s window in which it
+"never returned". Only observed intervals count.
+`[V0: what governs a creature's respawn interval — 120 s vs 150 s is per-creature and NpcTemplate has no column]`
 
 `.delete [<handle>]` (GM, `DeleteCommand`): the DURABLE removal — despawns the selected entity live AND deletes its
 `NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike a plain live despawn

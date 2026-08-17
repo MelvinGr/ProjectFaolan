@@ -45,25 +45,26 @@ namespace Faolan.GameServer.World
 		// why this is here and not left on N3ToClientFadeCodec.DefaultFadeSeconds (that default IS the bag's 3.0).
 		public const float CorpseFadeAnimationSeconds = 2.0f;
 
-		// Default time a killed NPC stays dead before the tick respawns it.
+		// Default time a killed NPC stays dead before the tick respawns it. Capture-measured (`--report corpse-timing`).
 		//
-		// ⚠️ This number is a FLOOR we chose, not a measurement - the corpus cannot supply one. Across all 134
-		// captures, **275 NPC kills produced no respawn at all**: no dead handle ever came back to its spawn point, and
-		// no killed spawn point was refilled by another entity. That is not a blind detector - the same scan attributes
-		// 8,894 spawns to interest churn, so it sees a re-spawn readily when there is one. The six candidates it does
-		// surface are all 52-984 u from the dead creature's own anchor, i.e. the handle being REUSED for something
-		// else, where a genuine respawn is AT the spawn point.
+		// ⭐ **A respawn comes back on a NEW entity handle**, and that is the whole reason this was hard to see. A
+		// handle is stable for as long as an entity LIVES - the same one re-spawns at identical coords across interest
+		// churn - so the natural test, `death(H)` then `spawn(H)`, looks right and finds NOTHING. The revived creature
+		// is a new entity with a new id. The signal is the same CREATURE reappearing AT the dead one's spawn point:
 		//
-		// The bound comes from how long the client demonstrably kept watching the spot afterwards (measured off a
-		// neighbour anchored within 10 u of the dead creature's anchor): the strongest is **733.9 s** - over twelve
-		// minutes parked on the corpse of a Barachan Panther with nothing returning - and the top ten all exceed 310 s.
+		//   Brutal Pirate   149.9  149.9  149.9  150.0  150.2  150.2   (6 kills, 2 captures)  -> 150 s
+		//   Wild Cow        119.5  120.0                               (2 kills, 2 captures)  -> 120 s
+		//   Wild Pig        119.9  (192.9, a respawn the client was out of range for)          -> 120 s
 		//
-		// So retail's interval is longer than anything the corpus can see, and the old 15 s was invented (a mob was
-		// back before its own corpse had finished fading). 750 s sits just past the strongest observation, so no
-		// captured session contradicts it. Note Tortage Island (4010) is one of four SOLO maps - a per-player copy - so
-		// "clear it and it stays clear for your session" may well be the real retail rule rather than any timer.
-		// [V0: NPC respawn interval]
-		public const double DefaultRespawnDelaySeconds = 750.0;
+		// Six Brutal Pirate observations spanning 0.3 s across two unrelated captures is a timer, not a coincidence.
+		// So the interval is **per creature**, in the 2-2.5 minute range, and this default takes the best-attested
+		// cluster. `NpcTemplate` has no column for it yet - Gitea #855 - so every creature currently gets 150 s.
+		//
+		// ⚠️ Do NOT re-derive this from "the client watched for N seconds and nothing came back". That bound cannot
+		// tell "no respawn" from "the client was out of range when it happened", and it is wrong by a factor of five
+		// here: the same capture that shows Brutal Pirate 0xaa88 respawning at 150.0 s also has a 334 s window in
+		// which it "never returned". Only observed intervals count.
+		public const double DefaultRespawnDelaySeconds = 150.0;
 
 		public const uint DispositionFriendly = 0;
 		public const uint DispositionHostile = 1;
@@ -1196,8 +1197,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// (A NoRespawn NPC used to run its respawn timer down as a DESPAWN timer here. It leaves the world at the end of
-		// its corpse sequence instead - `CorpseStage.Quit` -> `NpcCorpseRemoved` - because the respawn delay is now
-		// twelve minutes, which would have parked a dead summon in the zone long after the client stopped drawing it.)
+		// its corpse sequence instead - `CorpseStage.Quit` -> `NpcCorpseRemoved` - so a dead summon's exit is tied to its
+		// own corpse rather than to a respawn delay it never uses and which has since grown tenfold.)
 
 		// Advances the respawn countdown for a DEAD entity by dt; when it elapses, revives the entity (vitals back to
 		// full, transform back to its spawn point) and returns true so the caller can re-spawn it for nearby players.
