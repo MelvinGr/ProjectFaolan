@@ -113,6 +113,82 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(NpcHandle, player.Known);
 		}
 
+		// ⚠️ The other half of #778: BOUNDARY CHURN. A flat radius has no memory, so a walker whose beat happens to
+		// run along the interest edge crosses it twice per lap and is spawned and despawned every time - a whole
+		// FA015807 spawn record each way, for an NPC that never actually goes anywhere.
+		//
+		// This paces one NPC back and forth across the line and counts the RESOLVE, not the packets: the despawn half
+		// is gated on `Confirmed`, which only a client poll sets, so counting sends would score a churning pass as
+		// quiet for the wrong reason (the second despawn is suppressed, the spawns are not). The events are the
+		// churn; what reaches the wire depends on what the client has confirmed.
+		[Fact]
+		public void AWalkerPacingTheBoundary_IsNotRespawnedEveryLap()
+		{
+			var (_, _, player, npc) = Harness();
+			player.Known.Add(NpcHandle);
+			player.Confirmed.Add(NpcHandle);
+
+			var events = 0;
+			// Six laps of a small dither straddling the range - the shape of a beat that runs along the edge.
+			for (var lap = 0; lap < 6; lap++)
+			{
+				foreach (var offset in (float[])[-1f, 1f, 2f, 1f])
+				{
+					npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + offset, 0, 0);
+					events += InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true).Count;
+				}
+			}
+
+			// The NPC is never more than 3 units from the line, so it should be resolved at most once. Without
+			// hysteresis this is one despawn and one spawn per lap.
+			Assert.True(events <= 1, $"a walker dithering across the interest edge resolved {events} interest events; it never moved more than 3 units");
+		}
+
+		// ⛔ ...and the band is a DESPAWN-side rule only. An entity inside it that the player does NOT already hold
+		// must not be introduced - otherwise the effective interest range is simply 165 u and the churn has moved
+		// outward rather than gone away.
+		[Fact]
+		public void AnUnknownNpcInsideTheHysteresisBand_IsNotSpawned()
+		{
+			var (_, _, player, npc) = Harness();
+			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + 5f, 0, 0); // in the band, never seen
+
+			var events = InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true);
+
+			Assert.Empty(events);
+			Assert.DoesNotContain(NpcHandle, player.Known);
+		}
+
+		// ...while one the player DOES hold is kept there, which is the whole point of the band.
+		[Fact]
+		public void AKnownNpcInsideTheHysteresisBand_IsKept()
+		{
+			var (_, _, player, npc) = Harness();
+			player.Known.Add(NpcHandle);
+			player.Confirmed.Add(NpcHandle);
+			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + 5f, 0, 0);
+
+			var events = InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true);
+
+			Assert.Empty(events);
+			Assert.Contains(NpcHandle, player.Known);
+		}
+
+		// ...and past the band it goes, so a genuine departure is not held for ever.
+		[Fact]
+		public void AKnownNpcBeyondTheHysteresisBand_IsDespawned()
+		{
+			var (_, _, player, npc) = Harness();
+			player.Known.Add(NpcHandle);
+			player.Confirmed.Add(NpcHandle);
+			npc.Position = new Vector3(WorldSimulation.PlayerInterestRange + InterestManager.DespawnHysteresis + 1f, 0, 0);
+
+			var despawn = Assert.Single(InterestManager.ResolveMove(_zone!, player, WorldSimulation.PlayerInterestRange, true));
+
+			Assert.Equal(InterestEventType.Despawn, despawn.Type);
+			Assert.DoesNotContain(NpcHandle, player.Known);
+		}
+
 		private (WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc) Harness()
 		{
 			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);

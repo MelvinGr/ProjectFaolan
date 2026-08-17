@@ -20,6 +20,28 @@ namespace Faolan.GameServer.World
 	// scaling step.
 	public static class InterestManager
 	{
+		/// <summary>
+		///     How far past the interest range an entity must go before it is DESPAWNED, having been spawned at the
+		///     range itself. A plain radius has no memory, so an entity sitting on the line is streamed in and out
+		///     every pass.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ **This is OURS, not retail's.** The interest range it widens is itself unmeasured (Gitea #856), and
+		///     retail's own answer to this family of problem is a GRID with hysteresis rather than a radius with a
+		///     band (#529, for world objects). So this is not a decoded constant and must not be documented as one -
+		///     it is the minimum honest fix for a churn that a flat radius creates by construction.
+		///     <para />
+		///     Sized against the thing that churns: a route walker moves at about 2.2 u/s and the standing-player
+		///     sweep runs at 1 Hz (#778), so 15 u is a walker spending some seven seconds in the band before the
+		///     despawn lands. Small enough that a genuine departure still despawns promptly, wide enough that a beat
+		///     running along the edge crosses once instead of once per lap.
+		///     <para />
+		///     It is a DESPAWN-side band only. Nothing is ever spawned beyond the range because of it: an entity in
+		///     the band is kept if the viewer already holds it and ignored if it does not. Otherwise the effective
+		///     range would simply be 165 u with the same churn moved outward.
+		/// </remarks>
+		public const float DespawnHysteresis = 15f;
+
 		// Resolves which of the zone's static world objects the player should have rendered right now, updating the
 		// player's non-sticky known set: returns the ones to SPAWN (newly in range) and the handles to DESPAWN (walked
 		// out of range). Shared by the entry pass and the per-move pass so both obey one rule.
@@ -73,17 +95,29 @@ namespace Faolan.GameServer.World
 		{
 			var events = new List<InterestEvent>();
 
+			// The despawn band (see DespawnHysteresis). Both halves below query at the WIDER radius so an entity in
+			// the band is visible to the pass at all - it is then KEPT if already known and ignored if not, which is
+			// what makes the band a despawn-side rule rather than a bigger range.
+			var keepRange = range + DespawnHysteresis;
+
 			// (1) The mover's own view (only a player receives packets): entities it came into range of are spawned,
 			//     ones it left are despawned. (Others moving is handled by their own ResolveMove call.) With
 			//     includeNonPlayers, "entities" is players + NPCs; otherwise just players.
 			if (mover.IsPlayer)
 			{
 				var candidates = includeNonPlayers
-					? zone.EntitiesInRange(mover.Position, range, mover.Handle)
-					: zone.PlayersInRange(mover.Position, range, mover.Handle);
+					? zone.EntitiesInRange(mover.Position, keepRange, mover.Handle)
+					: zone.PlayersInRange(mover.Position, keepRange, mover.Handle);
 				var inRange = new HashSet<uint>();
 				foreach (var other in candidates)
 				{
+					// In the hysteresis band: hold on to it if the mover already has it, and do not introduce it
+					// otherwise. `inRange` drives the prune below, so adding the handle without adding it to Known is
+					// exactly "keep what is rendered, spawn nothing new".
+					var beyondRange = Vector3.Distance(mover.Position, other.Position) > range;
+					if (beyondRange && !mover.Known.Contains(other.Handle))
+						continue;
+
 					if (other.IsLoot)
 						continue; // loot bags have their own open/fade lifecycle, not interest streaming
 
@@ -138,7 +172,15 @@ namespace Faolan.GameServer.World
 				if (!viewer.IsPlayer || viewer.Handle == mover.Handle)
 					continue;
 
-				if (mover.IsVisibleTo(viewer) && Vector3.Distance(viewer.Position, mover.Position) <= range)
+				// The same band, from the other side: a mover that has drifted past the range is kept for a viewer
+				// that already holds it (and merely forwarded a Move, since Known.Add then returns false), and is not
+				// introduced to one that does not. Reading `Known` BEFORE the isEntry block below matters - that block
+				// clears the handle to force a fresh spawn, which would otherwise make every entering mover look
+				// unknown here and lose its band.
+				var distance = Vector3.Distance(viewer.Position, mover.Position);
+				var withinBand = distance <= range || (distance <= keepRange && viewer.Known.Contains(mover.Handle));
+
+				if (mover.IsVisibleTo(viewer) && withinBand)
 				{
 					// #323: on entry, forget any stale build of the mover on this viewer so the mover is SPAWNED (not
 					// forwarded as a Move the null-move entry dispatch would drop); the viewer re-polls the fresh spawn.

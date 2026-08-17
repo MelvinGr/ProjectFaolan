@@ -566,6 +566,22 @@ A subject walking at ~2.2 u/s covers two units per sweep, so the granularity is 
 is testing, and the cost is one distance check per entity in the player's zone.
 [V3: StandingPlayerInterestTests.AnNpcThatWalkedOutOfRange_IsDespawnedForAStandingPlayer]
 
+⛔ **And a radius has no memory, which the sweep turned from a curiosity into churn.** A walker whose beat runs
+along the interest edge crosses it twice a lap, and each crossing is a whole `FA015807` spawn record one way and
+a despawn the other — for an NPC that never actually goes anywhere. Measured rather than argued: an NPC dithering
+three units either side of the line resolved **6 interest events** over six laps.
+
+`InterestManager.DespawnHysteresis` is the band that stops it — spawned at the range, despawned only 15 u past
+it. ⚠️ It is **ours, not retail's**: the range it widens is itself unmeasured (#856), and retail's own answer to
+this family is a grid with hysteresis rather than a radius with a band (#529). It is sized against the thing that
+churns — a 2.2 u/s walker spends about seven seconds in the band before a despawn lands.
+
+⚠️ It is a **despawn-side rule only**, and that is the invariant to preserve: an entity in the band is kept if the
+viewer already holds it and ignored if it does not. Spawning into the band would simply make the effective range
+165 u and move the churn outward.
+[V3: StandingPlayerInterestTests.AWalkerPacingTheBoundary_IsNotRespawnedEveryLap]
+[V3: StandingPlayerInterestTests.AnUnknownNpcInsideTheHysteresisBand_IsNotSpawned]
+
 ## NPC counter-attack animation ack (decoded 2026-06-15)
 
 When an NPC swings at the player, retail sends a second `BehaviorControlCenterIIR` (0x642CD3D6) whose
