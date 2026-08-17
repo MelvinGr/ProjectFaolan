@@ -378,6 +378,11 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`quest-xp` (#820: what retail PAYS for a quest. Every completion in the corpus with the experience readings either
+side of it, with the kill-completed ones held apart — their delta is the kill's. Its real finding is a CONTROL: Exp
+never appears in a stat block at all (0 of 20,213 records over 33 stat ids, from 10,016 parsed blocks), so its only
+live carrier is the level-up ding and no delta isolates a quest. What it can state is a lower bound, from a
+completion that dings: the overshoot past the threshold just crossed),
 `quest-markers` (#848/#559: every `DispatchSetQuestMarker` retail sent, resolved to the NPC it was about — via the
 most recent spawn of that handle BEFORE the packet, since handles are recycled — and cross-tabbed against the two
 relations the shipped quest data holds for that NPC: what it GRANTS (the dialogue graph, all `QuestMarkerResolver`

@@ -383,6 +383,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #820: what retail actually PAYS for a quest - every completion in the corpus with its Exp/cash delta,
+				// with the kill-completed ones held apart, since their delta is the kill's.
+				case "quest-xp":
+				{
+					QuestXp(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #848/#559: every DispatchSetQuestMarker retail sent, cross-tabbed against what the shipped quest
 				// data says the NPC is worth - and the client's own five-value enum for the state byte.
 				case "quest-markers":

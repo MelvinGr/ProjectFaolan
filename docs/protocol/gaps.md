@@ -82,6 +82,28 @@ avoided the coefficients. They really do need a live dump.
 
 `[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
 
+### What a quest pays in XP and cash
+Completing a quest awards nothing on our server, and the payout cannot be measured here (Gitea #820).
+
+⭐ **Retail never sends the player's experience in a stat update.** `--report quest-xp` over the whole corpus:
+**10,016** `StatUpdateIIR` stat blocks parse cleanly, carrying **20,213** records across **33** distinct stat
+ids, and `CharacterStatId.Exp` appears in **none** of them. Its only live carrier is the level-up ding
+(`NewLevelIIR`), which fires ~20 times in 134 captures — so no experience delta in the corpus isolates a single
+quest. `xxx_…_play4` holds exactly one live Exp reading, the ding at *Rescue Arias*' completion, so any delta
+ending there spans the entire 334-second session before it; the tightest completion-spanning interval anywhere
+is 128 s.
+
+What the corpus *can* state is a lower bound, for a quest whose completion levels the character: the ding
+carries the running total and the threshold just crossed, and the award that fired it took the player from
+below that threshold to that total. Quest 10830 paid **≥ 532** at level 7, quest 10915 **≥ 13** at level 6.
+
+⚠️ Mining is exhausted — the limit is the wire, not the sample size, so more talk-completed quest completions
+would add nothing. The stored candidates are all eliminated already: `XpReward`/`MoneyReward` are populated on
+21 of 5,049 quests and zero on every quest of the captured chain, the RDB catalog's per-line reward disagrees
+with both the value and the cadence, and the client's tuning table holds no reward curve (its level curve is
+server-side here too).
+`[V0: what a quest pays in XP and cash]`
+
 ### What governs a creature's respawn interval
 The interval itself is measured (`--report respawn-interval`): a killed creature comes back **on a new entity
 handle** at its old spawn point, at **150 s** for Brutal Pirate (7 agreeing kills, 0.3 s spread, 2 unrelated

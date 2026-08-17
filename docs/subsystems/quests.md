@@ -287,6 +287,35 @@ placeholder never types a reach again, and `QuestProgressionService.LoadReachGoa
 is not tracked. A goal carrying the client's real trigger REGION (#521) is exempt — the volume is the target then,
 and the marker is only a map pin.
 
+## Quest XP is not observable on the wire, and the corpus cannot state a payout
+
+Completing a quest awards no experience and no money on our server (Gitea #820). The columns are imported and
+nothing reads them, and the reason the wiring is still open is not that the code is missing but that **there is
+nothing to check it against**.
+
+⭐ **Retail never sends the player's experience in a stat update.** Measured over the whole corpus with
+`--report quest-xp`: **10,016** `StatUpdateIIR` stat blocks parse cleanly, carrying **20,213** records across
+**33** distinct stat ids, and `CharacterStatId.Exp` is in **none** of them. Its only live carrier is the
+level-up ding (`NewLevelIIR`, whose `[Exp, ExpCurrentLevelBase, MaxExp, …]` summary is decoded), which fires
+about twenty times in 134 captures.
+
+So no experience delta in the corpus isolates one quest. `xxx_…_play4` holds exactly **one** live Exp reading —
+the ding at the completion of *Rescue Arias* — so any delta ending there spans the whole 334-second session
+before it, kills and other quests included. The tightest completion-spanning interval anywhere in the corpus is
+128 s.
+
+⭐ **What the corpus can state is a lower bound**, and only for a quest whose completion levels the character.
+The ding carries the running total *and* the threshold just crossed, so the overshoot is how far the award that
+fired it carried the player past the threshold — and they were below it immediately before:
+
+| quest | at level | award |
+|---|---|---|
+| 10830 *Rescue Arias* | 7 | **≥ 532** |
+| 10915 *Nadini* | 6 | **≥ 13** |
+
+⚠️ **Mining is therefore exhausted** — the limit is the wire, not the sample. More talk-completed quests would
+add nothing, because the payout is never stated. `[V0: what a quest pays in XP and cash]`
+
 ## Collect goals do not care how the item arrives
 
 A gather objective is satisfied by **holding** the item. The client's data says which item and how many, and
