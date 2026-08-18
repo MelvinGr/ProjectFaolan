@@ -35,9 +35,11 @@ namespace Faolan.Importer.Cli
 	//     Demonologist `Hellfire Stream` 1-5 and `Shock` 1-4 but neither - four controlled misses, i.e. a miss with
 	//     the rank BELOW present as the control. These are not level-granted at all.
 	//   * **RANK 1 FROM A CLASS FEAT** - rank 1 shares rank 2's level, and rank 1's only grant is a `<Class> Class
-	//     Feat`, never a `Spell Unlocking` band. Field 125 copied the band-granted rank 2's level onto it. The real
-	//     level is NOT recoverable: the feat record carries no level field (five teaching feats diffed - the fixed
-	//     header is byte-identical up to the name), so the band is all the client states and rank 1 has none.
+	//     Feat`, never a `Spell Unlocking` band. Field 125 copied the band-granted rank 2's level onto it.
+	//     ⭐⭐ **This IS recoverable, and #853 is answered** - the band was never the only thing the client states.
+	//     A `<Class> Class Feat NNN` is a family of ten wire ids, and the client's featclass table (RDB 1000043)
+	//     gives each one its own LEVEL. `RdbFeatImporter.DeriveClassSpellGrantLevels` writes it to
+	//     `ClassSpell.GrantLevel`; this report prints it beside the extrapolation it replaced.
 	//
 	// The `Spell Unlocking` band is also a CHECK on the level itself, and it is what independently confirmed the
 	// effect-band repair: `Lifestrike` ranks 2/3/4/5 are granted by the 20-40, 40-60, 60-80 and 60-80 feats, which
@@ -166,7 +168,12 @@ namespace Faolan.Importer.Cli
 				foreach (var kind in new[] { UntaughtTopRank, RankOneFromAClassFeat })
 					Console.WriteLine($"  {collapsed.Count(c => c.Diagnosis.Contains(kind, StringComparison.Ordinal)),3} x {kind}");
 
-				RankOneCandidates(collapsed, learnable);
+				var grantLevels = await db.ClassSpells.AsNoTracking().Where(c => c.GrantLevel != null)
+					.Select(c => new { c.SpellId, Level = c.GrantLevel!.Value })
+					.ToListAsync();
+				var bySpell = grantLevels.GroupBy(g => g.SpellId).ToDictionary(g => g.Key, g => g.Min(x => x.Level));
+				RankOneCandidates(collapsed, learnable, bySpell);
+				LadderMonotonicity(learnable, bySpell);
 			}
 
 			if (!string.IsNullOrWhiteSpace(familyFilter))
@@ -175,8 +182,8 @@ namespace Faolan.Importer.Cli
 			var stale = collapsed.Where(c => c.Repairable).ToList();
 			if (stale.Count == 0)
 			{
-				Console.WriteLine("  ✅ every remaining collapse has no second source - the effect bands answer partially, "
-				                  + "step down with rank or run past the level cap. Those keep field 125's answer (Gitea #853).");
+				Console.WriteLine("  ✅ every remaining collapse has no second source in the effect bands - they answer partially, "
+				                  + "step down with rank or run past the level cap. `ClassSpell.GrantLevel` answers them instead (Gitea #853).");
 				return 0;
 			}
 
@@ -187,37 +194,36 @@ namespace Faolan.Importer.Cli
 		}
 
 		/// <summary>
-		///     What rank 1's level WOULD be if the family's own ladder step were continued one rung down - printed as
-		///     a CANDIDATE, never applied.
+		///     Rank 1's real level, from the client's featclass SCHEDULE - printed beside what the old ladder
+		///     extrapolation would have guessed, so the two can be compared per family.
 		/// </summary>
 		/// <remarks>
-		///     ⛔ #853 established that rank 1's true level is not recoverable from the client: rank 1 is granted by a
-		///     <c>&lt;Class&gt; Class Feat NNN</c>, which states no level band, so field 125 has nothing of rank 1's
-		///     own to carry and repeats its neighbour's. Two sources were checked and rejected - the feat record has
-		///     no level field, and a class feat is not a single-level unlock.
+		///     ⭐⭐ <b>#853 is answered, and this block is what shows it.</b> The ticket's premise was that rank 1's
+		///     level "is not recoverable from the client", because rank 1 is granted by a
+		///     <c>&lt;Class&gt; Class Feat NNN</c> whose NAME carries no level band. That reasoning treated the class
+		///     feat as ONE feat. It is a family of ten wire ids, and the client's featclass table (RDB 1000043,
+		///     <c>FeatClassEntry</c>) gives each of them its own LEVEL - so the teaching feat states rank 1's level
+		///     after all, just not in its name. <c>RdbFeatImporter.DeriveClassSpellGrantLevels</c> writes it to
+		///     <see cref="Faolan.Core.Database.Tables.ClassSpell.GrantLevel" />, which is where the report reads it.
 		///     <para />
-		///     ⭐ What CAN be said is that where a family has a second source, rank 1 lands exactly one ladder step
-		///     below rank 2. `Chill` is the control: repaired from its effect bands it reads 15/30/45/60/75, and 15 is
-		///     30 minus the family's own 15-level step. This prints how many of the repaired families agree, so the
-		///     extrapolation is quoted with its own control rather than on its own.
-		///     <para />
-		///     ⚠️ It stays a CANDIDATE. A regular ladder is not a promise that the designers used one - `Spark of
-		///     Life` steps by 25 and would extrapolate to level 0, which is not a level a spell is granted at, and
-		///     that alone shows the rule is not universal. Writing these into `Spells.Level` would be shipping a
-		///     fitted curve into content the ticket deliberately left alone; the thing that settles it is a capture
-		///     of one of these grants, which lands in `ClassSpell.GrantLevel` and already wins where it exists.
+		///     ⚠️ The extrapolation column stays, and stays REFUTED - it is the rival explanation, and printing it
+		///     next to the answer is what shows the answer was needed. It was right on only ~60% of the families
+		///     where the ladder was already known, and on `Spark of Life` it produces level 0, which is not a level a
+		///     spell is granted at. The schedule gives that family 15.
 		/// </remarks>
 		private static void RankOneCandidates(
 			List<(string Family, string Field, string Band, string Diagnosis, bool Repairable)> collapsed,
-			IReadOnlyCollection<KeyValuePair<string, List<(uint Id, string Name, byte Level, int Rank)>>> learnable)
+			IReadOnlyCollection<KeyValuePair<string, List<(uint Id, string Name, byte Level, int Rank)>>> learnable,
+			IReadOnlyDictionary<uint, byte> grantLevels)
 		{
 			var affected = collapsed.Where(c => c.Diagnosis.Contains(RankOneFromAClassFeat, StringComparison.Ordinal)).ToList();
 			if (affected.Count == 0)
 				return;
 
 			Console.WriteLine();
-			Console.WriteLine("  ⭐ where the ladder's OWN step is continued one rung down (a CANDIDATE - nothing is written):");
-			Console.WriteLine($"     {"family",-28}  {"shipped",-22}  step  rank 1 would be");
+			Console.WriteLine("  ⭐ rank 1's level from the client's featclass SCHEDULE (ClassSpell.GrantLevel), against the ladder extrapolation it replaced:");
+			Console.WriteLine($"     {"family",-28}  {"shipped",-22}  step  extrapolated  from the schedule");
+			var byFamily = learnable.ToDictionary(f => f.Key, f => f.Value);
 			foreach (var c in affected)
 			{
 				var levels = c.Field.Split('/').Select(v => int.TryParse(v, out var n) ? n : -1).ToList();
@@ -228,7 +234,19 @@ namespace Faolan.Importer.Cli
 				// value is what it was copied FROM, so a step measured across 1->2 would be zero by construction.
 				var step = levels[2] - levels[1];
 				var candidate = levels[1] - step;
-				Console.WriteLine($"     {c.Family,-28}  {c.Field,-22}  {step,4}  {(candidate > 0 ? candidate.ToString() : $"{candidate} ⛔ not a grantable level")}");
+				// ⚠️ Over EVERY rank-1 row, not the first. Several of these families ship the same rank twice on two
+				// different `GuiStackingLine`s (two classes offering it), and only the row an auto-trained feat
+				// actually teaches carries a grant level - so taking the first row reported "-" for three families
+				// whose answer was sitting on the sibling id.
+				var rankOne = "-";
+				if (byFamily.TryGetValue(c.Family, out var ranks))
+				{
+					var lowest = ranks.Min(x => x.Rank);
+					var found = ranks.Where(r => r.Rank == lowest && grantLevels.ContainsKey(r.Id)).Select(r => (int)grantLevels[r.Id]).ToList();
+					if (found.Count > 0)
+						rankOne = found.Min() == found.Max() ? found[0].ToString() : $"{found.Min()}..{found.Max()}";
+				}
+				Console.WriteLine($"     {c.Family,-28}  {c.Field,-22}  {step,4}  {(candidate > 0 ? candidate.ToString() : $"{candidate} ⛔"),12}  {rankOne}");
 			}
 
 			// The CONTROL, and the reason the block above is quotable at all: the families whose ladder a second
@@ -261,9 +279,78 @@ namespace Faolan.Importer.Cli
 			// carries a merely-duplicated one. The candidate column stays because a HUMAN reading one family at a
 			// time can weigh it; a sweep cannot.
 			Console.WriteLine(rate >= 95
-				? "     ⭐ The control is strong enough that the candidates above are worth taking seriously per family."
-				: $"     ⛔ REFUTED as a rule: right on only {rate:F0}% of the families where the answer is known, so applying it would"
-				  + " fabricate a level for roughly two in five. It stays a per-family reading for a human, never a sweep.");
+				? "     ⭐ The control is strong enough that the extrapolation would have been worth taking seriously per family."
+				: $"     ⛔ REFUTED as a rule: right on only {rate:F0}% of the families where the answer is known - which is why the"
+				  + " schedule column, not this one, is what got written (#853).");
+		}
+
+		/// <summary>
+		///     How many rank ladders are MONOTONIC under each of the two level sources - the headline measurement
+		///     behind #853, and the reason the featclass schedule was taken over field 125.
+		/// </summary>
+		/// <remarks>
+		///     A rank ladder that steps DOWN is incoherent whichever source states it, so this is a property the two
+		///     can be scored against without a capture. Measured at the time of writing: field 125 breaks exactly one
+		///     family - <c>Quell the Ether</c>, 45/30/45/60/75, the contradiction the ticket filed as unrecoverable -
+		///     and the schedule breaks none, reading 15/30/45/60/75 for it.
+		///     <para />
+		///     ⚠️ PRINTED, not asserted. A ladder is the client's statement and a future build could legitimately
+		///     ship an odd one; what would be a defect is our derivation inventing the disorder, and that shows up
+		///     here as a count moving off zero rather than as a threshold to pin.
+		/// </remarks>
+		private static void LadderMonotonicity(
+			IReadOnlyCollection<KeyValuePair<string, List<(uint Id, string Name, byte Level, int Rank)>>> learnable,
+			IReadOnlyDictionary<uint, byte> grantLevels)
+		{
+			var scored = 0;
+			var statedBroken = new List<string>();
+			var derivedBroken = new List<string>();
+
+			foreach (var (family, ranks) in learnable)
+			{
+				// One row per rank, and only families every rank of which the schedule answers - a partial ladder
+				// would score the gap rather than the source.
+				var byRank = ranks.GroupBy(r => r.Rank).OrderBy(g => g.Key).ToList();
+				if (byRank.Count < 2)
+					continue;
+
+				// ⚠️ The SAME rows on both sides. Several families ship a rank twice (two `GuiStackingLine`s) and only
+				// one of the pair is the row an auto-trained feat teaches - so scoring `Spells.Level` over min-of-all
+				// rows while scoring the schedule over the taught row lets field 125 off: `Quell the Ether`'s taught
+				// rank 1 reads 45, its sibling 30, and taking the min silently reported a clean ladder.
+				var taught = byRank.Select(g => g.Where(r => grantLevels.ContainsKey(r.Id)).ToList()).ToList();
+				if (taught.Any(g => g.Count == 0))
+					continue;
+
+				scored++;
+				var derived = taught.Select(g => g.Min(r => (int)grantLevels[r.Id])).ToList();
+				var stated = taught.Select(g => g.Max(r => (int)r.Level)).ToList();
+				if (Descends(stated))
+					statedBroken.Add($"{family} ({string.Join("/", stated)})");
+				if (Descends(derived))
+					derivedBroken.Add($"{family} ({string.Join("/", derived)})");
+			}
+
+			if (scored == 0)
+				return;
+
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ ladder monotonicity over the {scored} families the featclass schedule answers in full:");
+			Console.WriteLine($"     Spells.Level (RDB field 125)   : {statedBroken.Count} non-monotonic" + (statedBroken.Count > 0 ? "  - " + string.Join(", ", statedBroken) : ""));
+			Console.WriteLine($"     ClassSpell.GrantLevel (1000043): {derivedBroken.Count} non-monotonic" + (derivedBroken.Count > 0 ? "  - " + string.Join(", ", derivedBroken) : ""));
+
+			return;
+
+			static bool Descends(List<int> ladder)
+			{
+				for (var i = 1; i < ladder.Count; i++)
+				{
+					if (ladder[i] < ladder[i - 1])
+						return true;
+				}
+
+				return false;
+			}
 		}
 
 		private const string UntaughtTopRank = "untaught top rank (not level-granted)";

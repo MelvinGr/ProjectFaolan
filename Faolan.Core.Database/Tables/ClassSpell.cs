@@ -43,14 +43,25 @@ namespace Faolan.Core.Database.Tables
 		// and the grant is stated outright. The RDB leads on level data, including over captures.
 		public bool IsStarter { get; set; }
 
-		// The level at which a capture SHOWS this class actually being granted this spell: a NewLevelIIR (0x6D314743)
-		// ding followed by the 0x200A grant (#376). Null = no capture has caught this spell being granted.
+		// The level at which this class is actually granted this spell. TWO sources, and they agree:
+		//
+		//   1. a capture SHOWING the grant - a NewLevelIIR (0x6D314743) ding followed by the 0x200A grant (#376);
+		//   2. ⭐ the client's own featclass SCHEDULE - the level of the auto-trained feat that teaches the spell
+		//      (`FeatClassEntry`, RDB 1000043), derived offline by `RdbFeatImporter.DeriveClassSpellGrantLevels`
+		//      (#853). It reproduces all 14 capture-proven levels EXACTLY, including the ten where `Spells.Level`
+		//      disagrees with the capture, and covers the whole catalog instead of the handful a capture caught.
+		//
+		// A capture still wins where both speak - it never has to, but the rule that retail leads should not be
+		// inverted by a derivation that merely happens to match it. Null = neither source answers.
 		//
 		// This is the real unlock gate and it is NOT `Spells.Level`. Retail grants at or BELOW that field, never above
 		// - Desecrating Essence R1 is granted at 3 but Spells.Level says 5; Contract of Protection R1 at 5 vs 10; Ice
 		// Strike R1 in the create kit at 1 vs 7. So the RDB field is a trainer /
-		// full-power level, a DIFFERENT fact, not a worse measurement of this one. Where a capture has spoken, this
-		// wins; everywhere else `Spells.Level` is still the only gate we have.
+		// full-power level, a DIFFERENT fact, not a worse measurement of this one.
+		//
+		// ⚠️ `Spells.Level` is the fallback only where NEITHER source above answers - which is now the minority. It
+		// is also the source that is wrong where they differ: it breaks one rank ladder (`Quell the Ether`
+		// 45/30/45/60/75) and gates two spells above the level a captured character demonstrably holds them at.
 		public byte? GrantLevel { get; set; }
 	}
 }

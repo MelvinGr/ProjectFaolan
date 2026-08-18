@@ -651,13 +651,46 @@ Read against the feats, the 19 residual collapses are two shapes, not one:
 | **untaught top rank** — not level-granted at all | no feat grants it while every rank below has one; it repeats the level below; all nine sit in one late id block (`>= 4487431`) nothing else occupies; the captured level-80s know the rank below and never it (`Chill` 1-5 not 6, `Pestilential Blast` 1-6 not 7, `Hellfire Stream` 1-5 not 6, `Shock` 1-4 not 5) | 8 |
 | **rank 1 from a class feat** — level copied from rank 2 | rank 1's only grant is a `<Class> Class Feat`, which states no band, so field 125 had nothing of rank 1's own | 7 |
 
-⚠️ The second shape is **not** recoverable from the client: the feat record carries no level field (five teaching
-feats diffed — the fixed header is byte-identical up to the name), and a class feat is not a single-level unlock
-(`Necromancer Class Feat 001` grants spells rated 1, 5, 7, 10 and 25). Open work tracked in Gitea #853.
+### ⭐⭐ …and the feat's LEVEL is a fourth, which answers the residue outright (#853)
 
-Two families are worse than a copy. `Radiance`'s effect bands are shifted one rank — band(*n*) equals level(*n+1*),
-ending at 91, past the level cap — and its `Spell Unlocking` feats are scrambled (ranks 2-4 all under 60-80, rank 5
-under 20-40). `Quell the Ether` rank 1 is rated **45** while rank 2 is rated 30, which no ladder allows.
+The second shape was filed as **not recoverable from the client**, because a `<Class> Class Feat NNN` states no
+level band in its name and "is not a single-level unlock" — `Necromancer Class Feat 001` grants spells rated 1, 5,
+7, 10 and 25.
+
+⭐ That reasoning treated the class feat as ONE feat. It is a **family of ten wire ids**, and the client's
+featclass table (**RDB 1000043**, `FeatClassEntry`, #862) gives each of them its own LEVEL:
+`Necromancer Class Feat 001` is ranks 0..9 at levels 1..10. So the teaching feat states the level after all — not
+in its name, in the table that schedules it. `RdbFeatImporter.DeriveClassSpellGrantLevels` writes it to
+`ClassSpell.GrantLevel`, which is per class, as this fact has to be.
+
+Three controls, and it wins all three:
+
+| control | `Spells.Level` (field 125) | the featclass schedule |
+|---|---|---|
+| the **14 capture-proven grant levels** in the database | **4** of 14 | **14** of 14 |
+| ladder **monotonicity** over the 76 families it answers in full | 1 broken — `Quell the Ether` 45/30/45/60/75 | **0** |
+| the **captured spellbooks** (a spell known at level *L* must be gated at ≤ *L*) | 2 violations | **0** over 196 resolved spells |
+
+The capture column is the strongest: it reproduces every one of the ten rows where field 125 *disagrees* with a
+capture — `Frenzy` 5 not 25, `Ice Shackle` 5 not 20, `Contract of Protection` 5 not 10, `Desecrating Essence` 3 not
+5. And the spellbook violations are the level-24 Herald of Xotli holding `Hellfire Breath (Rank 1)` and
+`Arcane Abatement (Rank 1)`, which field 125 rates 25 and 30 — two spells retail demonstrably gave him that the
+stated level says he cannot have.
+
+⛔ **The obvious rival is refuted, and the report still prints it.** "Continue the family's own ladder step one
+rung down" is right on only 62% of the families where the answer is already known, and on `Spark of Life` (step 25)
+it produces level **0**. The schedule gives that family 15. `--report spell-level-ladder` prints both columns side
+by side.
+
+The two families that were *worse* than a copy both resolve too. `Quell the Ether` rank 1 was rated **45** against
+rank 2's 30, which no ladder allows; the schedule reads 15/30/45/60/75. `Radiance`'s `Spell Unlocking` feats are
+genuinely scrambled by NAME (ranks 2-4 all under 60-80, rank 5 under 20-40) — but the name band was never the
+level: those feats' featclass levels are 30/45/60/75, in order. Its effect bands are still shifted one rank
+(ending at 91, past the level cap), which is why the band repair correctly declined it.
+
+⚠️ `Spells.Level` is left alone. It is the RDB record's own field and stays what it always was — a trainer /
+full-power level, a different fact (see `ClassSpell.GrantLevel`'s own remark) — and the grant level is per CLASS,
+which a per-spell column cannot express.
 
 ## Field 132 `ManaCost` is usually a PERCENTAGE of the caster's mana pool
 

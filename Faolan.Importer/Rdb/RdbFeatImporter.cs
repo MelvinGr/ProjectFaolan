@@ -375,16 +375,18 @@ namespace Faolan.Importer.Rdb
 			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || comboAttackModRows > 0 || procRows > 0 || classRows > 0)
 				await db.SaveChangesAsync();
 
+			var grantLevels = await DeriveClassSpellGrantLevels(db, logger);
+
 			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
 			// says so - see the type-id guard in ParseSpellStatModifiers (Gitea #595).
 			if (misSlicedElements > 0)
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs, {ClassRows} featclass rows.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs, {ClassRows} featclass rows, {GrantLevels} class-spell grant levels.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, grantLevels);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, grantLevels);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -618,6 +620,88 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return entries;
+		}
+
+		/// <summary>
+		///     Fills <see cref="ClassSpell.GrantLevel" /> from the featclass table: the level of the AUTO-TRAINED feat
+		///     that teaches the spell IS the level retail grants it at (#853).
+		/// </summary>
+		/// <remarks>
+		///     ⭐⭐ <b>14 of 14.</b> Every capture-proven grant level in the database is reproduced exactly by this
+		///     derivation, across three classes - including all ten where <c>Spells.Level</c> disagrees with the
+		///     capture (<c>Frenzy</c> 5 vs 25, <c>Ice Shackle</c> 5 vs 20, <c>Contract of Protection</c> 5 vs 10,
+		///     <c>Desecrating Essence</c> 3 vs 5, ...). <c>Spells.Level</c> matches only 4 of the 14. So this is the
+		///     same fact the captures record, available offline for the whole catalog instead of the 14 rows a
+		///     capture happened to catch.
+		///     <para>
+		///         Two further controls, because agreeing with 14 rows is a small sample:
+		///         <list type="bullet">
+		///             <item><description>
+		///                 <b>Ladders.</b> Over the 86 families whose every rank resolves, this level is monotonic on
+		///                 <b>all</b> of them; <c>Spells.Level</c> breaks one - <c>Quell the Ether</c>
+		///                 (45/30/45/60/75), the contradiction #853 filed as unrecoverable. It reads 15/30/45/60/75
+		///                 here.
+		///             </description></item>
+		///             <item><description>
+		///                 <b>The captured spellbooks.</b> A level-24 Herald of Xotli holds
+		///                 <c>Hellfire Breath (Rank 1)</c> and <c>Arcane Abatement (Rank 1)</c>, which
+		///                 <c>Spells.Level</c> rates 25 and 30 - two spells retail demonstrably gave him that the
+		///                 stated level says he cannot have. This level violates no captured character's book
+		///                 anywhere: 0 violations over 196 resolved spells against 2.
+		///             </description></item>
+		///         </list>
+		///     </para>
+		///     <para>
+		///         ⚠️ A CAPTURE still wins. It never has to - they agree on all 14 - but the rule that retail leads
+		///         should not be quietly inverted by a derivation that merely happens to match it.
+		///     </para>
+		///     <para>
+		///         ⚠️ MIN over the teaching feats, and per CLASS. A spell taught by two auto-trained feats arrives at
+		///         the earlier one; and the same spell genuinely unlocks at different levels for different classes,
+		///         which is why this writes <see cref="ClassSpell" /> rather than <c>Spells.Level</c> - a per-class
+		///         fact cannot live on a per-spell column. That is also what the 36 spells with several feat levels
+		///         are: not ambiguity, just more than one class.
+		///     </para>
+		///     <para>
+		///         ⛔ Only the AUTO-TRAINED feats. A tree feat's level is when the feat may be BOUGHT, not when its
+		///         spell is handed over - the player may never buy it - so folding those in would state a grant that
+		///         does not happen.
+		///     </para>
+		/// </remarks>
+		private static async Task<int> DeriveClassSpellGrantLevels(DatabaseContext db, ILogger? logger)
+		{
+			var levels = await (from entry in db.FeatClassEntries.Where(e => e.Autotrain && e.Class != null)
+				join map in db.FeatIdMaps on entry.FeatId equals map.WireFeatId
+				join grant in db.FeatSpellGrants on map.TemplateId equals grant.FeatId
+				group entry.Level by new { Class = entry.Class!.Value, grant.SpellId }
+				into g
+				select new { g.Key.Class, g.Key.SpellId, Level = g.Min() }).ToListAsync();
+
+			if (levels.Count == 0)
+				return 0;
+
+			var rows = (await db.ClassSpells.ToListAsync()).ToDictionary(c => (c.Class, c.SpellId));
+			var written = 0;
+			foreach (var derived in levels)
+			{
+				// No ClassSpell row means the class has no ACCESS to the spell, which is a different table's claim -
+				// a grant level for a spell the class cannot cast would be inventing membership, not filling a level.
+				if (!rows.TryGetValue((derived.Class, derived.SpellId), out var row) || row.GrantLevel != null)
+					continue;
+
+				if (derived.Level is 0 or > byte.MaxValue)
+					continue;
+
+				row.GrantLevel = (byte)derived.Level;
+				written++;
+			}
+
+			if (written > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("RdbFeatImporter: derived {Written} ClassSpell.GrantLevel(s) from the featclass table ({Pairs} (class, spell) pairs offered).", written, levels.Count);
+
+			return written;
 		}
 
 		// The PREREQUISITE edges of the same entries: columns 2/3/4 (offsets +8/+12/+16) are wire feat ids a feat
@@ -984,6 +1068,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs, int ClassRows);
+			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs, int ClassRows, int GrantLevels);
 	}
 }
