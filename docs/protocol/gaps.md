@@ -36,12 +36,28 @@ before anything else — `StatIIR [class 0xC350][handle][env 0x00][stat 0x41A][3
 the flip real to the client (see [combat.md](../subsystems/combat.md)). It is sent **twice**: two separate packets
 in one TCP segment, byte-identical, with no second value and no `env` 0x00/0x01 pair. 3 of 3 in the corpus, and
 those three are the only character `CarsGroup == 3` records in all 134 captures. We replay both because the
-capture says so; **why there is a second copy** is not known. The likeliest reading is two emitters firing on one
-event (the collision layer and the gamecode layer, the shape `SkillPointService` documents for Runspeed) — but
-under that reading the copies should differ in some field, and they do not. Close it by finding the client's
-consumer of stat 0x41A on a character and identifying both writers, or by capturing a DIFFERENT dialogue-driven
-hostile flip (the corpus has only Saddur's). Tracked in Gitea #842.
-`[V0: why the second copy.]`
+capture says so.
+
+⭐ **The doubling is not specific to the hostile flip** (`--report duplicate-records`). Retail sends a whole
+FAMILY of stats as an exact back-to-back pair, every time — measured over 30,125 `StatIIR` records:
+
+| stat | pairs | singles |
+|---|---|---|
+| `WaypointType` | 336 | 336 |
+| `SoulFragments` | 56 | 56 |
+| `GuildID` | 38 | 38 |
+| `MovementMultiplier` | 35 | 35 |
+| `CarsGroup == 3` (the flip) | 3 | 3 |
+
+A doubled count *equal* to the single count is one "first" and one "repeat" per event — i.e. **always** a pair.
+`FeatTrainerID` is doubled 15,829 times against 348 singles, so it is nearly always one too. So the second copy
+is a property of retail's stat SENDER across a set of stats, not something about turning an NPC hostile, and the
+"two emitters on one event" reading is an ordinary shape rather than a puzzle specific to this record.
+
+⚠️ What remains unknown is why retail's sender doubles *at all*, and that is about its server internals: it is
+recoverable from neither the client (which merely applies what it is told) nor the corpus (which shows the
+behaviour without explaining it). Tracked in Gitea #842.
+`[V0: why retail's stat sender emits a pair for this family of stats.]`
 
 ---
 

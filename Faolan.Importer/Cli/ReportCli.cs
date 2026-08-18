@@ -482,6 +482,11 @@ namespace Faolan.Importer.Cli
 					return InterestRadius(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "duplicate-records":
+				{
+					return DuplicateRecords(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

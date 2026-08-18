@@ -736,7 +736,15 @@ So the restate is the FIRST thing retail sends on the flip, ahead of everything 
 (`NpcTurnsHostileTests`). Two details are copied from the capture rather than reasoned out and are marked as such
 in the code: it is a **character** record carrying the **world-object `env` byte** (0x00 — the same "restate the
 dynel-layer copy first" shape `SkillPointTests` pins on Runspeed), and retail sends it **twice**, as two packets
-in one segment, in all three captures. `[V0: why the second copy.]`
+in one segment, in all three captures.
+
+⭐ **That second copy is not about the flip.** Retail sends a whole family of stats as an exact back-to-back pair
+every time (`--report duplicate-records`, over 30,125 `StatIIR` records): `WaypointType` 336 pairs / 336 singles,
+`SoulFragments` 56/56, `GuildID` 38/38, `MovementMultiplier` 35/35 — and `CarsGroup == 3` itself 3/3. A doubled
+count *equal* to the single count is one "first" and one "repeat" per event, i.e. always a pair. So the doubling
+is a property of retail's stat sender across a set of stats rather than something specific to turning an NPC
+hostile, and copying it here is copying a general behaviour.
+`[V0: why retail's stat sender emits a pair for this family of stats.]`
 
 That retail treats the group as *live* state is also independent evidence for the tier-4 reading above: the value
 it moves a creature to when it starts fighting is the value the rule keys on. `NpcStatCore.MobCarsGroup` is the

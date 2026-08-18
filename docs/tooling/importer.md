@@ -326,6 +326,12 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`duplicate-records` (#842: which s2c `StatIIR` records does retail send twice, back to back and byte-identical?
+⭐ Answers the question that decides whether that ticket is special — and it is not: a whole family of stats is
+**always** sent as a pair (`WaypointType` 336/336, `SoulFragments` 56/56, `GuildID` 38/38,
+`MovementMultiplier` 35/35, and the hostile flip itself 3/3), where a doubled count equal to the single count
+means one "first" and one "repeat" per event. ⚠️ Adjacency is required rather than mere recurrence, or a
+frequently-sent stat would dominate the count) ·
 `interest-radius` (#856: how far from the player does retail DESPAWN an entity? Measures the DESPAWN side
 because it is immune to the contaminant that defeated the spawn-side attempt - nothing bulk-despawns at login,
 so there is no burst to exclude. Four named filters: a despawn arriving in a burst is a ZONE CHANGE (21,736 of
