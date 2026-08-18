@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
@@ -70,6 +71,156 @@ namespace Faolan.Importer.Cli
 
 						break;
 				}
+			}
+		}
+
+		/// <summary>
+		///     The THIRD place a cost could live, and the only one that is a message WE build: the
+		///     <c>PetIIR</c> owner-assign's <c>(f1, f2, f3)</c> KIND triple (#823).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The reason to look. <c>PetCodec</c> carries the triple as two named constants -
+		///     <c>CombatKind = (0, 2, 2)</c> and <c>SocialKind = (5, 0, 1)</c> - and its own comment says where they
+		///     come from: <i>"the capture shows a COMBAT pet = (0,2,2) and a SOCIAL pet = (5,0,1)"</i>. Two capture
+		///     rows, generalised to every pet. So the server sends a literal <b>2</b> in two of the three slots for
+		///     every combat pet it ever summons, and the symptom this ticket opened on is that <b>every pet costs
+		///     2</b>. That coincidence is worth measuring before anything else.
+		///     <para />
+		///     The test is the corpus: resolve each assign's PET HANDLE to the creature it spawned as, and cross-tab
+		///     the triple against that creature's cost. If a slot is the cost it reads 1, 2 and 4 on the right ones.
+		///     <para />
+		///     ⚠️ A miss here is weaker than a hit. The triple could be a UI slot or a command set and the client
+		///     could still cost from its own RDB - so "no slot equals the cost" leaves the constant unjustified
+		///     rather than exonerated, which is why the observed triples are printed either way.
+		/// </remarks>
+		private static void PetAssignKinds(IReadOnlyList<NamedCapture> captures, Dictionary<string, uint> costOf)
+		{
+			Console.WriteLine();
+			Console.WriteLine("  ⭐ the PetIIR owner-assign's (f1,f2,f3) KIND triple, against the pet's cost (#823):");
+
+			var rows = new List<(string Creature, uint Cost, uint F1, uint F2, uint F3)>();
+			var assigns = 0;
+			var unresolved = 0;
+			foreach (var c in captures)
+			{
+				// Handle -> creature name, from the same capture's spawns. A pet's assign names it only by handle, so
+				// the spawn is the only thing that says WHICH creature was bound.
+				var nameOf = new Dictionary<uint, string>();
+				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
+				{
+					if (e.Name != null)
+						nameOf[e.Handle] = e.Name;
+				}
+
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: PetCodec.Opcode })
+						continue;
+
+					if (!p.TryParse(PetCodec.Parse, out var pet) || pet.Mode != PetCodec.ModeAssign)
+						continue;
+
+					assigns++;
+					if (!nameOf.TryGetValue(pet.Pet, out var creature) || !costOf.TryGetValue(creature, out var cost))
+					{
+						unresolved++;
+						continue;
+					}
+
+					rows.Add((creature, cost, pet.Kind.F1, pet.Kind.F2, pet.Kind.F3));
+				}
+			}
+
+			// ⚠️ The control, first: "no slot carries the cost" and "no assign was resolved" print the same otherwise.
+			Console.WriteLine($"    control - {assigns} owner-assign(s) captured, {rows.Count} resolved to a costed creature ({unresolved} unresolved)");
+			if (rows.Count == 0)
+			{
+				Console.WriteLine("    ⛔ nothing to test: no captured assign resolves to a creature with a known cost.");
+				return;
+			}
+
+			foreach (var g in rows.GroupBy(r => r.Creature).OrderBy(g => g.Key))
+				Console.WriteLine($"      {g.Key,-20} cost {g.First().Cost}  triples: {string.Join(" ", g.GroupBy(r => (r.F1, r.F2, r.F3)).Select(t => $"({t.Key.F1},{t.Key.F2},{t.Key.F3})x{t.Count()}"))}");
+
+			foreach (var g in rows.GroupBy(r => (r.F1, r.F2, r.F3)).OrderBy(g => g.Key.F1).ThenBy(g => g.Key.F2))
+			{
+				var costs = string.Join(", ", g.GroupBy(r => r.Cost).OrderBy(x => x.Key).Select(x => $"cost {x.Key} x{x.Count()}"));
+				Console.WriteLine($"    ({g.Key.F1},{g.Key.F2},{g.Key.F3})  {g.Count(),3} assign(s)  [{costs}]  {string.Join(", ", g.Select(r => r.Creature).Distinct())}");
+			}
+
+			foreach (var (slot, get) in new (string Slot, Func<(string Creature, uint Cost, uint F1, uint F2, uint F3), uint> Get)[]
+			         { ("f1", r => r.F1), ("f2", r => r.F2), ("f3", r => r.F3) })
+			{
+				var equal = rows.Count(r => get(r) == r.Cost);
+				Console.WriteLine($"    {slot} equals the cost on {equal}/{rows.Count}"
+				                  + (equal == rows.Count ? "  ⭐ CARRIES IT" : rows.Select(get).Distinct().Count() == 1 ? "  (constant across the corpus)" : ""));
+			}
+		}
+
+		/// <summary>
+		///     The second sweep: which fields DETERMINE the cost, as opposed to carrying it (#823).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The first sweep asks "does this field EQUAL the cost", and its negative is real but narrower than it
+		///     reads. If the client looks a cost UP - by the summoning spell, by the pet's template - then the field
+		///     it reads carries a KEY, and a key does not equal what it resolves to. That sweep would miss it, and
+		///     the refutation it produced ("the pet's spawn does not carry its cost") is only about the value.
+		///     <para />
+		///     So: group the samples by the field's value and ask whether every group is one cost. That is what a key
+		///     looks like.
+		///     <para />
+		///     ⚠️ <b>Purity alone would name dozens</b>, and the reason is the trap this repo has hit before: a field
+		///     that is nearly UNIQUE per sample determines everything for free (a handle, a position, a timestamp).
+		///     The distinct-value count is printed beside every hit and the interpretation is stated with it - a field
+		///     with as many values as there are CREATURES is the creature's identity, which is a real answer; a field
+		///     with as many values as there are SAMPLES is telling you nothing.
+		/// </remarks>
+		private static void DeterminesTheCost(List<(string Field, uint Cost, ulong Value)> numeric, int samples)
+		{
+			Console.WriteLine();
+			Console.WriteLine("  ⭐ which fields DETERMINE the cost (a KEY the client could look a cost up by), rather than carrying it:");
+
+			var hits = new List<(string Field, int Distinct, string Shape)>();
+			foreach (var g in numeric.GroupBy(n => n.Field))
+			{
+				var rows = g.ToList();
+				if (rows.Count < samples)
+					continue;
+
+				var byValue = rows.GroupBy(r => r.Value).ToList();
+				if (byValue.Any(v => v.Select(r => r.Cost).Distinct().Count() > 1))
+					continue; // one value, two costs - it cannot be the key
+
+				var distinct = byValue.Count;
+				if (distinct < 2)
+					continue; // a constant determines nothing; it is the base rate wearing a purity score
+
+				// ⚠️ The whole judgement is here, and it is about the VALUE COUNT rather than the purity.
+				var shape = distinct >= rows.Count
+					? "⛔ one value per SAMPLE - determines everything for free, says nothing"
+					: distinct <= 4
+						? "⭐ few values - a cost CLASS or the creature's kind"
+						: "one value per creature-ish - an identity the client could key on";
+				hits.Add((g.Key, distinct, shape));
+			}
+
+			if (hits.Count == 0)
+			{
+				Console.WriteLine("    ⛔ NONE - no field partitions the samples by cost at all, so the client is not keying off the spawn.");
+				return;
+			}
+
+			foreach (var (field, distinct, shape) in hits.OrderBy(h => h.Distinct).ThenBy(h => h.Field))
+			{
+				Console.WriteLine($"    {field,-46} {distinct,4} distinct value(s)   {shape}");
+
+				// ⭐ The MAPPING, for the ones small enough to read. A key is only actionable once you can see what
+				// retail put in it - that is what says whether OUR spawn sends the same value.
+				if (distinct > 24)
+					continue;
+
+				foreach (var v in numeric.Where(n => n.Field == field).GroupBy(n => n.Value).OrderBy(v => v.Key))
+					Console.WriteLine($"        {v.Key,12} -> cost {v.First().Cost}   ({v.Count()} sample(s))");
 			}
 		}
 
@@ -194,6 +345,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ A pet's spawn is a CREATURE spawn: two pet types differ in a great many fields, so the test is");
 			Console.WriteLine("     'does the field EQUAL the cost', never 'does the field differ'. The latter would name dozens.");
+
+			DeterminesTheCost(numeric, seen.Count);
+			PetAssignKinds(captures, costOf);
 			return 0;
 		}
 	}

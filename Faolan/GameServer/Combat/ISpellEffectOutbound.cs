@@ -18,9 +18,13 @@ namespace Faolan.GameServer.Combat
 
 		// Summon a creature TYPE as the player's pet. Returns false when no spawnable type matches the name - a
 		// content gap the caller reports rather than swallows.
-		Task<bool> SummonPet(INetworkClient client, string template, bool combat);
+		//
+		// `pointCost` is the summoning spell's own `SummonPointCost`, and it goes ON THE WIRE: the PetIIR assign's
+		// `f2` slot is what the client's pet-point bar counts (#823), and the server is the only thing that ever
+		// states it (stat 0x1C8 is never sent).
+		Task<bool> SummonPet(INetworkClient client, string template, bool combat, uint pointCost);
 
 		// Summon a pet that lives for `duration`, or EXTEND the one already out (clamped to `cap`, if any).
-		Task SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap);
+		Task SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap, uint pointCost);
 	}
 }

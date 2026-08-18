@@ -174,8 +174,44 @@ A summon is only written as a row when its pet name matches an `NpcTemplates` ro
 the runtime can spawn — **30 of the 319** today. The rest are counted and reported by the module rather than
 silently dropped; they grow with `NpcTemplates`, i.e. with the corpus.
 
-⚠️ `pointCost` (the pet-point budget a pet occupies) and `petBuff` are lifted onto `Spell` and **nothing reads
-them yet** — pet points are not modelled.
+### ⭐⭐ `pointCost` GOES ON THE WIRE — it is `f2` of the assign's kind triple (#823)
+
+The symptom was that **every necromancer pet showed as costing 2** in the client's pet-point bar, whatever it
+was: four `Dread Archmage: Blood Arcanist` (cost 4 each) read as 8 rather than 16.
+
+The accounting is entirely client-side — stat `0x1C8 PetPoints` appears in **zero** updates across all 59
+necromancer captures — so whatever the client counts, it counts from something already in front of it. Two
+readings were tried and refuted: the pet's own spawn body carries no field equal to its cost (29 varying numeric
+fields, none of them the cost), and the only field that *determines* the cost is `npc_stats.TemplateId`, which
+determines it merely by identifying the creature — and **our TemplateIds already match retail's exactly**
+(11736 Blood Arcanist, 11735 Archmagus, 11733 Arcanist, …), so the client was being handed the same key.
+
+⭐ It is in the one message we build ourselves. `PetCodec` carried the kind triple as two constants —
+`CombatKind = (0, 2, 2)` and `SocialKind = (5, 0, 1)` — generalised from the two pets in the decode capture. The
+middle slot is the cost, measured over the corpus by `--report pet-cost`:
+
+| triple | assigns | costs | creatures |
+|---|---:|---|---|
+| `(0,1,1)` | 14 | cost 1 ×14 | Blighted One, Corruptor, Harvester, Life-stealer, Mutilator, Necrotic Bomb |
+| `(0,2,2)` | 12 | cost 2 ×12 | Arcanist, Magus, Reaper |
+| `(0,4,2)` | 36 | cost 4 ×35, cost 1 ×1 | Archmagus, Blood Arcanist, *Demon Avenger* |
+
+**`f2` equals the summoning spell's `SummonPointCost` on 61 of 62 resolved assigns.** So the server was sending
+a literal 2 for every pet in the game, and that is the whole bug.
+
+⚠️ The single exception is our own join, not a counterexample: the report maps creature→cost by NAME, and several
+spells can name one creature, so `Demon Avenger` picks up the cost-1 spell while retail assigns 4. The server
+does not use that join — `SpellEffectService` reads `SummonPointCost` off **the spell it actually cast**.
+
+⚠️ `f3` is the fitted half and is written as fitted: 1 on the cost-1 pets, 2 on both the cost-2 and the cost-4
+ones, so over the three cost classes the corpus holds it reads as a coarse tier rather than a second copy of the
+cost. A cost-3 pet would decide it; the corpus has none. A social pet carries 1 there too, which fits the tier
+reading.
+
+⚠️ A pet with no spell behind it — the `.pet` GM command — summons at **0**, which is the value retail's own
+social pets carry rather than an invented one.
+
+`petBuff` is still lifted onto `Spell` and read by nothing.
 
 ## A live pet costs retail 50 packets a second, forever — and it is a retail DEFECT (#777)
 

@@ -18,7 +18,7 @@ namespace Faolan.Importer.Rdb
 	// There are TWO spellings, and which one a spell uses is what says whether the pet fights:
 	//   spawnHash=YU86;pointCost=2;petBuff=1366140;spellID=385781     a COMBAT pet
 	//   Type=Pet;Tag=3681                                              the social COMPANION
-	// Every captured summon agrees: all 11 spawnHash pets bind with PetCodec.CombatKind and the one Type=Pet pet
+	// Every captured summon agrees: all 11 spawnHash pets bind with PetBindings.CombatKind and the one Type=Pet pet
 	// with SocialKind (docs/subsystems/summon-pet-decode.md). So `Companion` is read off the spelling rather than
 	// carried as a third fact.
 	//

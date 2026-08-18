@@ -124,8 +124,8 @@ namespace Faolan.Tests
 				return Task.CompletedTask;
 			}
 
-			public Task<bool> SummonPet(INetworkClient client, string template, bool combat) => Task.FromResult(false);
-			public Task SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap) => Task.CompletedTask;
+			public Task<bool> SummonPet(INetworkClient client, string template, bool combat, uint pointCost) => Task.FromResult(false);
+			public Task SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap, uint pointCost) => Task.CompletedTask;
 		}
 	}
 }

@@ -254,13 +254,17 @@ namespace Faolan.Core.Database.Tables
 
 		// Which of the two param spellings the record used, and so whether the pet FIGHTS: the `spawnHash=` form is a
 		// combat pet, the `Type=Pet;Tag=` form the social companion. Every captured summon agrees - all 11 spawnHash
-		// pets bind with PetCodec.CombatKind on the wire and the one Type=Pet pet with SocialKind - which is what
+		// pets bind with PetBindings.CombatKind on the wire and the one Type=Pet pet with SocialKind - which is what
 		// makes this readable off the record instead of needing a capture per pet.
 		public bool SummonIsCompanion { get; set; }
 
 		// The buff the summon applies alongside the pet, and the pet-POINT cost of keeping it out - both straight out
-		// of the same params string. Null on a spell that is not a summon. Nothing consults them yet; they are lifted
-		// because they are free here and a re-harvest is not.
+		// of the same params string. Null on a spell that is not a summon.
+		//
+		// ⭐ `SummonPointCost` GOES ON THE WIRE (#823): it is `f2` of the `PetIIR` owner-assign's kind triple, which
+		// is what the client's pet-point bar counts. The accounting is client-side - stat 0x1C8 `PetPoints` appears
+		// in zero updates across all 59 necromancer captures - so this triple is the only place the server ever
+		// states a cost, and it used to state a constant 2 for every pet. See `PetBindings.CombatKind`.
 		public uint? SummonPetBuff { get; set; }
 		public uint? SummonPointCost { get; set; }
 

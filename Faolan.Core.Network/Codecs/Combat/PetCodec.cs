@@ -23,10 +23,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public const uint ModeAssign = 0;
 		public const uint ModeRemove = 1;
 
-		// (f1,f2,f3) kind triples observed in the capture.
-		public static readonly (uint F1, uint F2, uint F3) CombatKind = (0, 2, 2);
-		public static readonly (uint F1, uint F2, uint F3) SocialKind = (5, 0, 1);
-
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(PetIIR value)
 		{
@@ -73,9 +69,50 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// PetIIR (0x1F4CB0F7). `Kind` is only on the wire for `ModeAssign`.
 	public sealed record PetIIR(uint Owner, byte Env, uint Mode, uint Pet, (uint F1, uint F2, uint F3) Kind);
 
-	// The two owner-binding forms, as VALUE factories.
+	// The two owner-binding forms, as VALUE factories - and the KIND triples they take.
+	//
+	// ⚠️ These live here rather than on `PetCodec` because a codec's public surface is `Build` and `Parse` and
+	// nothing else (CLAUDE.md's codec rule 1, gated by `CodecSurfaceConventionTests`). A named form of a value is
+	// exactly what a value factory beside the codec is for, the same way `MoveTaskNodes.Path`/`.Patrol` sit beside
+	// `MoveTaskCodec`.
 	public static class PetBindings
 	{
+		/// <summary>The SOCIAL pet triple: no point cost, and <c>f1 = 5</c> is what marks it social.</summary>
+		public static readonly (uint F1, uint F2, uint F3) SocialKind = (5, 0, 1);
+
+		/// <summary>
+		///     The COMBAT pet triple for a pet costing <paramref name="pointCost" /> pet points.
+		/// </summary>
+		/// <remarks>
+		///     ⭐⭐ <b><c>f2</c> IS THE POINT COST</b> (#823). This was a constant <c>(0, 2, 2)</c>, generalised from
+		///     the one combat pet in the decode capture - and that is precisely why every necromancer pet showed as
+		///     costing 2 in the client's pet-point bar however expensive it was. The accounting is client-side (stat
+		///     <c>0x1C8 PetPoints</c> appears in ZERO updates across all 59 necromancer captures), so this triple is
+		///     the only place the server ever states a cost, and it was stating the same one every time.
+		///     <para />
+		///     Measured over the corpus by <c>--report pet-cost</c> - 62 owner-assigns resolved to a creature whose
+		///     summon spell states a cost, and <c>f2</c> equals that cost on <b>61</b> of them:
+		///     <list type="table">
+		///         <item><description><c>(0,1,1)</c> ×14 — every one a cost-1 pet (Blighted One, Corruptor, Harvester, Life-stealer, Mutilator, Necrotic Bomb)</description></item>
+		///         <item><description><c>(0,2,2)</c> ×12 — every one a cost-2 pet (Arcanist, Magus, Reaper)</description></item>
+		///         <item><description><c>(0,4,2)</c> ×36 — 35 cost-4 pets (Archmagus, Blood Arcanist) and one exception</description></item>
+		///     </list>
+		///     The exception is <c>Demon Avenger</c>, which retail assigns at 4 while the spell that names it states
+		///     1. That is our own name→spell join, not a counterexample: the cost is read off the summoning SPELL and
+		///     several spells can name one creature. The server does not use that join - it passes the cost of the
+		///     spell it actually cast.
+		///     <para />
+		///     ⚠️ <b><c>f3</c> is fitted and says so.</b> It is 1 on the cost-1 pets and 2 on both the cost-2 and the
+		///     cost-4 ones, so over the three cost classes the corpus holds it reads as a coarse tier rather than a
+		///     second copy of the cost - but 2 and 4 sharing a value is the only evidence separating those readings,
+		///     and a cost-3 pet would decide it. A social pet carries 1 here too, which fits the tier reading.
+		/// </remarks>
+		public static (uint F1, uint F2, uint F3) CombatKind(uint pointCost)
+		{
+			return (0, pointCost, pointCost <= 1 ? 1u : 2u);
+		}
+
+
 		// mode-0 owner-assign: binds `pet` to `owner` with a kind triple (combat/social).
 		public static PetIIR Assign(uint owner, uint pet, (uint F1, uint F2, uint F3) kind)
 		{

@@ -84,9 +84,15 @@ namespace Faolan.GameServer.Combat
 						return false;
 					}
 
+					// ⭐ The pet's POINT COST comes from the spell that summoned it (#823) and goes on the wire in the
+					// PetIIR assign, because the client counts its pet-point bar from there and the server states it
+					// nowhere else. Read from the SPELL rather than joined by creature name: several spells can name
+					// one creature, and the name join is what makes `Demon Avenger` read 1 where retail assigns 4.
+					var pointCost = (await _database.GetSpell(effect.SpellId))?.SummonPointCost ?? 0;
+
 					if (effect.DurationMs is not { } durationMs)
 					{
-						if (await _outbound.SummonPet(client, effect.Template, effect.Combat))
+						if (await _outbound.SummonPet(client, effect.Template, effect.Combat, pointCost))
 							return true;
 
 						// The cast HAPPENED - the player paid for it and the client is waiting for a pet. Say which
@@ -99,7 +105,7 @@ namespace Faolan.GameServer.Combat
 					// rule); it has no "nothing spawned" answer to give back, so a missing type is reported there.
 					await _outbound.SummonTimedPet(client, effect.Template, TimeSpan.FromMilliseconds(durationMs), effect.MaxDurationMs is { } cap
 						? TimeSpan.FromMilliseconds(cap)
-						: null);
+						: null, pointCost);
 					return true;
 				}
 

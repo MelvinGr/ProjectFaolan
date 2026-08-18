@@ -32,14 +32,14 @@ namespace Faolan.GameServer
 				: SpellChainWalk.Registry());
 		}
 
-		async Task<bool> ISpellEffectOutbound.SummonPet(INetworkClient client, string template, bool combat)
+		async Task<bool> ISpellEffectOutbound.SummonPet(INetworkClient client, string template, bool combat, uint pointCost)
 		{
-			return await SummonPetForPlayer(client, template, combat) != null;
+			return await SummonPetForPlayer(client, template, combat, pointCost) != null;
 		}
 
-		Task ISpellEffectOutbound.SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap)
+		Task ISpellEffectOutbound.SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap, uint pointCost)
 		{
-			return SummonTimedPetForPlayer(client, template, duration, cap);
+			return SummonTimedPetForPlayer(client, template, duration, cap, pointCost);
 		}
 
 		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
 		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a spell with a SummonPet effect).
 		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
-		internal async Task<WorldEntity?> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
+		internal async Task<WorldEntity?> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat, uint pointCost = 0)
 		{
 			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (columns: StatCore + Equipment + Morphs), no world
 			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
@@ -88,8 +88,12 @@ namespace Faolan.GameServer
 			entity.OwnerHandle = owner;
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, b =>
 				b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Assign(owner, entity.Handle, combat
-					? PetCodec.CombatKind
-					: PetCodec.SocialKind)))));
+					// ⭐ The pet's own POINT COST rides here (#823) - `f2` is what the client's pet-point bar counts, and
+					// this used to be the constant 2 for every pet in the game. `pointCost` is the SUMMONING SPELL's
+					// `SummonPointCost`; a pet with no spell behind it (the `.pet` GM command) summons at 0, which is
+					// the value retail's own social pets carry rather than an invented one.
+					? PetBindings.CombatKind(pointCost)
+					: PetBindings.SocialKind)))));
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
 			return entity;
@@ -100,7 +104,7 @@ namespace Faolan.GameServer
 		// already have a Frozen Hatred pet, the duration of the pet will increase by another 60 seconds. This timer is
 		// capped at 5 minutes." (in-client tooltip). One field carries both halves - DespawnAt is pushed out on each
 		// fatality and clamped to the cap, and the world tick fades whatever it finds expired.
-		internal async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan? cap)
+		internal async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan? cap, uint pointCost = 0)
 		{
 			var owner = _simulation.PlayerWorldEntity(client);
 			if (owner == null)
@@ -123,7 +127,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var pet = await SummonPetForPlayer(client, petTemplate, true);
+			var pet = await SummonPetForPlayer(client, petTemplate, true, pointCost);
 			if (pet == null)
 			{
 				// No creature type by that name: say so rather than silently granting nothing - the buff that asked for
