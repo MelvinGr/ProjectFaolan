@@ -59,6 +59,15 @@ recoverable from neither the client (which merely applies what it is told) nor t
 behaviour without explaining it). Tracked in Gitea #842.
 `[V0: why retail's stat sender emits a pair for this family of stats.]`
 
+### The spell FLAGS word's bits 8 and 19
+
+`FUN_007ebe70` (on the magic apply route, called from 13 sites and from the damage path) runs a block only when
+**both** bit 19 and bit 8 are clear, so either bit suppresses it. The block builds and emits something through
+the client's string/feedback machinery, but the emitted text is not resolved, so what is being suppressed is
+named only structurally. Bits 8 and 19 are therefore one question, not two. See
+[spell-record-fields.md](../rdb/spell-record-fields.md). Tracked in Gitea #632.
+`[V0: what the block bits 8 and 19 suppress actually does.]`
+
 ---
 
 ## Transport

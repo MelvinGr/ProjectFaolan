@@ -864,3 +864,47 @@ dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg
 # per-record join (#633, field 210).
 dotnet run --project Faolan.Importer -- --report rdb-field-coverage --report-arg 1040005:210 --Content:RdbDir <rdb-dir> --out <dir>
 ```
+
+## Which unnamed FLAGS bits the client reads AT ALL (#632)
+
+The sweep's percentage table asks *which predicate a bit correlates with*. The prior question is whether the
+client reads the bit at all — a bit nothing consumes is not a decode gap, however well it scores. Answered over
+the whole image with `tools/ghidra/DumpFlagBitReads.java`:
+
+```
+OFFSET=c8 WINDOW=12 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
+  -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpFlagBitReads.java
+```
+
+⚠️ **`+0xC8` is a common displacement**, so sites are classified by ADDRESS RANGE, not counted. The magic
+subsystem is roughly `0x0075xxxx–0x007Fxxxx` with the combat half around `0x0114xxxx` (`FUN_0114efa0` is
+`DealDamage`, self-named). Anything else reading `+0xC8` is a different struct wearing the same offset.
+
+| bit | set | verdict |
+|---|---:|---|
+| **0** | 16,229 (78%) | ⛔ **NOT READ.** Its only hit is `__tolower_l` — a CRT function. The second most common bit in the word has no consumer at all |
+| 3 | 79 | ⛔ NOT READ — `__atof_l` and one CRT-range site |
+| 5, 6, 7 | 4 / 4 / 67 | ⚠️ read only inside `FUN_017594b0 / 01759690 / 01759a70 / 01759e30` — four adjacent functions reading four adjacent bits, i.e. a bitfield of its own. Bit 8 appears there **and** in the magic subsystem, which is what identifies that cluster as the other struct |
+| 8 | 2,389 | ⭐ `FUN_007e9b50` (the feedback-verb builder bit 15 is named from) + `FUN_007ebe70` |
+| 14 | 2,814 | ⭐ `FUN_01141480 / 011417f0 / 01141c30` — the combat cluster, two of which also read bit 15 |
+| 19 | 7,692 | ⭐ `FUN_007ebe70`, sharing **one guard** with bit 8 |
+| 20 | 2,289 | ⭐ `FUN_007ee710` (bit 16's timed-effect path) + `FUN_00769220` (which also reads bit 15) |
+| 21 | 778 | ⭐ `FUN_007f17d0 / FUN_007f1860` |
+| 29 | — | ⭐ `FUN_007d7ee0` |
+| all others | — | no read site anywhere in the image |
+
+⭐ **Bit 0 is the finding.** It is set on 78% of records and would head any hunt for meaning; it has no consumer,
+so its correlations can only be coincidence. That retires the sweep's largest unexplained column.
+
+⭐ **Bits 8 and 19 share one guard**, which is why they belong together rather than being chased separately. In
+`FUN_007ebe70`:
+
+```c
+if (flagsAt0xDE != 0 && (spell == 0 || ((flags >> 0x13 & 1) == 0 && (flags & 0x100) == 0)) && param3 == 0) {
+    ...                                   // bit 19 clear            // bit 8 clear
+}
+```
+
+Either bit **suppresses** the same block, so they are two reasons for one outcome rather than two properties.
+`FUN_007ebe70` is called from 13 sites across the magic subsystem and from the damage path (`FUN_0114e6b0`), and
+also reads bit 16 — so it sits on the apply route. `[V0: what the block bits 8 and 19 suppress actually does.]`

@@ -43,6 +43,48 @@ namespace Faolan.Importer.Cli
 		private static readonly HashSet<uint> ProcKinds = [53211, 53212, 53213];
 
 		/// <summary>
+		///     Which of the UNNAMED bits the client reads at all, and where - the census that turns "30 unnamed bits"
+		///     into a short list with addresses (#632).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ Produced by `tools/ghidra/DumpFlagBitReads.java` over the whole image:
+		///     <code>
+		///     OFFSET=c8 WINDOW=12 /opt/ghidra/support/analyzeHeadless &lt;data-repo&gt;/Ghidra aoc \
+		///       -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DumpFlagBitReads.java
+		///     </code>
+		///     ⚠️ **`+0xC8` is a common displacement and the script says so**, so the sites are classified by ADDRESS
+		///     RANGE rather than counted. The magic subsystem is ~`0x0075xxxx-0x007Fxxxx` with the combat half around
+		///     `0x0114xxxx` (`FUN_0114efa0` is `DealDamage`, self-named); anything else reading `+0xC8` is a
+		///     different struct wearing the same offset.
+		///     <para />
+		///     ⛔ That reclassifies the sweep's own biggest lead. **Bit 0 is set on 16,229 of 20,847 records - 78%,
+		///     the second most common bit in the word - and NOTHING in the spell subsystem reads it.** Its one hit is
+		///     `__tolower_l`, a CRT function. So it is not a decode gap at all, and a predicate score against it can
+		///     only ever be a coincidence. Bit 3 is the same story (`__atof_l`).
+		///     <para />
+		///     ⚠️ Bits 5, 6 and 7 are read ONLY inside `FUN_017594b0/01759690/01759a70/01759e30` - four adjacent
+		///     functions reading four adjacent bits, which is a bitfield of its own at the same displacement. Bit 8
+		///     appears there too AND in the magic subsystem, which is what identifies that cluster as the other
+		///     struct rather than as more spell reads.
+		/// </remarks>
+		private static readonly string[] UnnamedBitReadSites =
+		[
+			"  the UNNAMED bits, by whether the client reads them AT ALL (see UnnamedBitReadSites):",
+			"    bit  0  ⛔ NOT READ - 78% of records carry it and its only hit is __tolower_l. Not a decode gap",
+			"    bit  3  ⛔ NOT READ - __atof_l and one CRT-range site",
+			"    bit  5  ⚠️ only in FUN_01759{4b0,690,a70,e30} - a different struct at the same +0xC8, not this word",
+			"    bit  6  ⚠️ only in FUN_01759{4b0,690,a70,e30} - likewise",
+			"    bit  7  ⚠️ only in FUN_01759{4b0,690,e30} - likewise",
+			"    bit  8  ⭐ READ: FUN_007e9b50 (the feedback-verb builder bit 15 is named from) + FUN_007ebe70",
+			"    bit 14  ⭐ READ: FUN_01141480 / 011417f0 / 01141c30 - the combat cluster, two of which also read bit 15",
+			"    bit 19  ⭐ READ: FUN_007ebe70, sharing ONE guard with bit 8 - `bit19 == 0 && bit8 == 0` gates the same block",
+			"    bit 20  ⭐ READ: FUN_007ee710 (the timed-effect path of bit 16) + FUN_00769220 (which also reads bit 15)",
+			"    bit 21  ⭐ READ: FUN_007f17d0 / FUN_007f1860",
+			"    bit 29  ⭐ READ: FUN_007d7ee0",
+			"    the rest  no read site anywhere in the image",
+		];
+
+		/// <summary>
 		///     The bits whose meaning came out of the CLIENT rather than out of this sweep, printed in the header so
 		///     the table is read beside them (#632).
 		/// </summary>
@@ -177,6 +219,10 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  bits named from the CLIENT's own reads (tools/ghidra/DumpFlagBitReads.java finds the sites):");
 			foreach (var (bit, meaning) in NamedBits.OrderBy(n => n.Bit))
 				Console.WriteLine($"    bit {bit,2}  {meaning}");
+
+			Console.WriteLine();
+			foreach (var line in UnnamedBitReadSites)
+				Console.WriteLine(line);
 
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ A RARE bit scores high against a rare predicate for free: both are mostly false, so they");
