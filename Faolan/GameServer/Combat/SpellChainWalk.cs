@@ -75,7 +75,7 @@ namespace Faolan.GameServer.Combat
 		///     ⚠️ WHICH member wins is the open half, and it is the walk's arrival order - the table's sequence 0,
 		///     which for line 44235 is rank 10. That is a pick, not a decode. What is NOT the answer is level
 		///     scaling: measured over the shipped data, <b>97 of the 105</b> rank tables have every target at the
-		///     SAME level, so a level cannot choose between them. Gitea #813 holds the remainder.
+		///     SAME level, so a level cannot choose between them. Gitea #861 holds the selection question.
 		/// </remarks>
 		public bool TryEnter(uint spellBaseId, uint stackingLine = 0)
 		{

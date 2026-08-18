@@ -56,7 +56,8 @@ is a property of retail's stat SENDER across a set of stats, not something about
 
 ⚠️ What remains unknown is why retail's sender doubles *at all*, and that is about its server internals: it is
 recoverable from neither the client (which merely applies what it is told) nor the corpus (which shows the
-behaviour without explaining it). Tracked in Gitea #842.
+behaviour without explaining it), so Gitea #842 is CLOSED as answered in substance rather than left open for a
+route that cannot exist. This entry is the residue.
 `[V0: why retail's stat sender emits a pair for this family of stats.]`
 
 ### The spell FLAGS word's bits 8 and 19

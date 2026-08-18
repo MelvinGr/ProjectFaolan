@@ -93,7 +93,8 @@ namespace Faolan.Core.Progression
 		///     <para />
 		///     ⚠️ The non-automatic cost itself is still a PLACEHOLDER: max(1, the rank baked into the id's low two
 		///     digits). The real per-feat cost is not sourced from anything. So this fixes the interaction, not the
-		///     number - #850 keeps the rest.
+		///     number - #862 keeps the rest (where a cost comes from, and why we grant 77 automatic feats where
+		///     retail's captured level-80 carries 25).
 		/// </remarks>
 		public static int PointCost(uint featId, IReadOnlySet<uint>? free = null)
 		{

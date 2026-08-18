@@ -2061,7 +2061,7 @@ Only claiming the *targets'* lines catches it.
 ⚠️ **Which member wins is the open half** — it is the walk's arrival order, i.e. the table's sequence 0, which for
 line 44235 is rank 10. That is a pick, not a decode. What it is **not** is level scaling: measured over the
 shipped data, **97 of the 105** rank tables have every target at the same level, so a level cannot choose between
-them. That candidate is refuted; Gitea #813 holds the rest.
+them. That candidate is refuted; Gitea #861 holds the selection question.
 
 ## Terrain line-of-sight after the bake fix (#832/#833)
 
