@@ -85,6 +85,16 @@ namespace Faolan.Importer.Cli
 		{
 			var matches = new List<RespawnMatch>();
 			var misses = new List<string>();
+
+			// #855's second closing condition: is the non-observation a property of the SOLO playfield rather than of
+			// a long timer? Every anchored death is recorded with the map its creature lives on so the two can be
+			// separated.
+			var deathsByMap = new Dictionary<uint, int>();
+			var matchesByMap = new Dictionary<uint, int>();
+
+			// ⚠️ The CONTROL on the Solo split: a map with deaths and no respawns proves nothing if none of those
+			// deaths had enough capture after it to see one. This counts the deaths that DID.
+			var harvestableByMap = new Dictionary<uint, int>();
 			var deathsTotal = 0;
 			var deathsAnchored = 0;
 			var harvestable = 0;
@@ -108,12 +118,16 @@ namespace Faolan.Importer.Cli
 						continue; // a player death, or a creature streamed before the dump opened
 
 					deathsAnchored++;
-					if (endSeconds - death.Seconds >= HarvestWindowSeconds)
-						harvestable++;
 
 					var home = own[0].Position;
 					var died = own[^1].Position;
 					var dead = own[^1];
+					var deadMap = MapOfTemplate(dead.Template);
+					if (endSeconds - death.Seconds >= HarvestWindowSeconds)
+					{
+						harvestable++;
+						harvestableByMap[deadMap] = harvestableByMap.GetValueOrDefault(deadMap) + 1;
+					}
 
 					var fill = sightings.FirstOrDefault(s => s.Seconds > death.Seconds
 					                                        && s.Handle != death.Handle
@@ -135,10 +149,13 @@ namespace Faolan.Importer.Cli
 							.OrderBy(x => x.Distance)
 							.FirstOrDefault();
 						misses.Add(near == default ? "no later spawn of this creature at all" : Miss(near.Distance, near.Fresh));
+						deathsByMap[deadMap] = deathsByMap.GetValueOrDefault(deadMap) + 1;
 						continue;
 					}
 
 					claimed.Add(fill.Handle);
+					deathsByMap[deadMap] = deathsByMap.GetValueOrDefault(deadMap) + 1;
+					matchesByMap[deadMap] = matchesByMap.GetValueOrDefault(deadMap) + 1;
 					var anchor = Ground(fill.Position - home) <= Ground(fill.Position - died) ? home : died;
 					matches.Add(new RespawnMatch(c.Name, dead, fill, death.Seconds, fill.Seconds - death.Seconds,
 						Ground(fill.Position - anchor), anchor == home ? "home" : "died"));
@@ -156,6 +173,8 @@ namespace Faolan.Importer.Cli
 			foreach (var m in matches.OrderBy(m => m.Seconds))
 				Console.WriteLine($"  {m.Seconds,8:0.0}s {m.Distance,5:0.0}u  {m.Anchor,-6}  {(m.Fill.Fresh ? "yes" : "-"),-5}  {m.DeathSeconds,7:0}s"
 				                  + $"  {m.Dead.Level,3}  {Trim(m.Dead.Name, 24),-24}  {m.Dead.Template,-9}  {Trim(m.Capture, 42)}");
+
+			SoloPlayfieldSplit(deathsByMap, matchesByMap, harvestableByMap);
 
 			Console.WriteLine();
 			Console.WriteLine($"the {misses.Count} anchored death(s) that matched NOTHING, by what was closest (would loosening the filters pay?):");
@@ -411,6 +430,107 @@ namespace Faolan.Importer.Cli
 			public uint Normalset { get; init; }
 			public uint ProfessionType { get; init; }
 		}
+
+		// Creature TEMPLATE -> the map its placements sit on, loaded once. 0 when the creature has no placement at
+		// all - an ambient-pool or summoned type, which is a real answer rather than a lookup failure.
+		private static Dictionary<uint, uint>? _templateMaps;
+
+		private static uint MapOfTemplate(uint template)
+		{
+			if (_templateMaps == null)
+			{
+				using var db = OpenDb();
+				_templateMaps = db.NpcSpawns.GroupBy(n => n.NpcTemplateId)
+					.Select(g => new { g.Key, Map = g.Min(n => n.MapId) })
+					.ToDictionary(x => x.Key, x => x.Map);
+			}
+
+			return _templateMaps.GetValueOrDefault(template);
+		}
+
+		/// <summary>
+		///     #855's second closing condition: are the creatures that never respawn simply the ones on a SOLO
+		///     playfield?
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The hypothesis is that an open-world creature on a Solo map does not come back for the life of the
+		///     instance, which would make the right model a per-map FLAG rather than any timer. It matters because
+		///     Tortage Island (4010) is one of only four Solo maps and is where nearly every capture was taken - so
+		///     "no respawn observed" could be about the playfield rather than about the interval.
+		///     <para />
+		///     ⚠️ A map with deaths and no matches is NOT by itself evidence: it may simply have no capture long
+		///     enough after them. Read it beside the interval table - a map that yields a MEASURED timer has settled
+		///     the question for itself.
+		/// </remarks>
+		private static void SoloPlayfieldSplit(Dictionary<uint, int> deathsByMap, Dictionary<uint, int> matchesByMap, Dictionary<uint, int> harvestableByMap)
+		{
+			Console.WriteLine();
+			Console.WriteLine("=== ⭐ is the non-observation about the SOLO playfield rather than the timer? (#855) ===");
+			Console.WriteLine();
+			Console.WriteLine($"  {"map",6}  {"solo",5}  {"deaths",7}  {"watched",8}  {"respawns",9}  name");
+
+			using var db = OpenDb();
+			var names = db.Maps.ToDictionary(m => m.Id, m => m.Name);
+			foreach (var (map, deaths) in deathsByMap.OrderByDescending(kv => kv.Value))
+			{
+				var solo = SoloMaps.Contains(map);
+				Console.WriteLine($"  {(map == 0 ? "-" : map.ToString()),6}  {(solo ? "SOLO" : ""),5}  {deaths,7}  {harvestableByMap.GetValueOrDefault(map),8}  {matchesByMap.GetValueOrDefault(map),9}  "
+				                  + (map == 0 ? "(creature has no placement - ambient or summoned)" : names.GetValueOrDefault(map, "?")));
+			}
+
+			var soloDeaths = deathsByMap.Where(kv => SoloMaps.Contains(kv.Key)).Sum(kv => kv.Value);
+			var soloMatches = matchesByMap.Where(kv => SoloMaps.Contains(kv.Key)).Sum(kv => kv.Value);
+			var openDeaths = deathsByMap.Where(kv => !SoloMaps.Contains(kv.Key) && kv.Key != 0).Sum(kv => kv.Value);
+			var openMatches = matchesByMap.Where(kv => !SoloMaps.Contains(kv.Key) && kv.Key != 0).Sum(kv => kv.Value);
+
+			Console.WriteLine();
+			var soloWatched = harvestableByMap.Where(kv => SoloMaps.Contains(kv.Key)).Sum(kv => kv.Value);
+			var openWatched = harvestableByMap.Where(kv => !SoloMaps.Contains(kv.Key) && kv.Key != 0).Sum(kv => kv.Value);
+			Console.WriteLine($"  SOLO maps:  {soloDeaths,4} death(s), {soloWatched,4} watched >= {HarvestWindowSeconds:0}s, {soloMatches,3} respawn(s)");
+			Console.WriteLine($"  OPEN maps:  {openDeaths,4} death(s), {openWatched,4} watched >= {HarvestWindowSeconds:0}s, {openMatches,3} respawn(s)");
+			Console.WriteLine();
+			// ⚠️ The OPEN maps that also yield nothing despite being watched. They are what stops this being a clean
+			// Solo-vs-open split, and naming them is the difference between a finding and an overclaim.
+			var silentOpen = harvestableByMap
+				.Where(kv => kv.Key != 0 && !SoloMaps.Contains(kv.Key) && kv.Value > 0 && matchesByMap.GetValueOrDefault(kv.Key) == 0)
+				.OrderByDescending(kv => kv.Value)
+				.ToList();
+
+			if (soloMatches > 0)
+			{
+				Console.WriteLine("  ⛔ REFUTED: a Solo map DOES respawn, so the non-observation elsewhere is about the timer or the");
+				Console.WriteLine("     sample rather than the playfield, and #855's per-map-flag alternative is out.");
+			}
+			else if (soloWatched > 0 && openMatches > 0)
+			{
+				Console.WriteLine($"  ⭐ The Solo maps yield NOTHING from {soloWatched} deaths watched long enough to see a respawn, while the open");
+				Console.WriteLine($"     maps yield {openMatches} from {openWatched}. So 'too little capture time' does not explain the Solo silence.");
+
+				if (silentOpen.Count > 0)
+				{
+					Console.WriteLine();
+					Console.WriteLine("  ⚠️ ...but it is NOT a clean Solo-vs-open split, and this is the part to weigh before believing it:");
+					foreach (var kv in silentOpen)
+						Console.WriteLine($"       map {kv.Key} is OPEN, {kv.Value} death(s) watched, and yields none either");
+
+					Console.WriteLine("     So 'does not respawn' is not a property of the Solo MODE - some open maps behave the same way.");
+					Console.WriteLine("     What the data supports is a per-MAP or per-CREATURE rule, of which Solo may only be a correlate.");
+				}
+
+				Console.WriteLine();
+				Console.WriteLine("  ⚠️ And one Solo map carries the whole Solo column: 4010 is Tortage Island, a story zone as well as a");
+				Console.WriteLine("     Solo one, so 'Solo' and 'this particular playfield' are confounded here and cannot be separated.");
+			}
+			else
+			{
+				Console.WriteLine("  ⚠️ Neither: the split has no watched Solo deaths or no open respawns to compare, so it says nothing yet.");
+			}
+			Console.WriteLine($"  ⚠️ `watched` is the control: a map with deaths and no respawns says nothing unless those deaths had"
+			                  + $" at least {HarvestWindowSeconds:0}s of capture after them, which is the window a respawn could appear in.");
+		}
+
+		// The four playfields the server runs in `MapInstanceMode.Solo`.
+		private static readonly HashSet<uint> SoloMaps = [4010, 5001, 5007, 5008];
 
 		private sealed record RespawnMatch(string Capture, RespawnSighting Dead, RespawnSighting Fill, double DeathSeconds, double Seconds, float Distance, string Anchor);
 
