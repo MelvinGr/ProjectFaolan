@@ -63,10 +63,15 @@ namespace Faolan.Core.Database.Tables
 		// A capture still wins where both speak - it never has to, but the rule that retail leads should not be
 		// inverted by a derivation that merely happens to match it. Null = neither source answers.
 		//
-		// This is the real unlock gate and it is NOT `Spells.Level`. Retail grants at or BELOW that field, never above
-		// - Desecrating Essence R1 is granted at 3 but Spells.Level says 5; Contract of Protection R1 at 5 vs 10; Ice
-		// Strike R1 in the create kit at 1 vs 7. So the RDB field is a trainer /
-		// full-power level, a DIFFERENT fact, not a worse measurement of this one.
+		// This is the real unlock gate and it is NOT `Spells.Level`: Desecrating Essence R1 is granted at 3 but
+		// Spells.Level says 5; Contract of Protection R1 at 5 vs 10; Ice Strike R1 in the create kit at 1 vs 7. So the
+		// RDB field is a trainer / full-power level, a DIFFERENT fact, not a worse measurement of this one.
+		//
+		// ⛔ This used to add "retail grants at or BELOW that field, never above", and that is FALSE - refuted by the
+		// capture-proven rows themselves (#864). `Pestilential Blast (Rank 1)` is granted at **7** where the record
+		// says **1**, and `Dance: Aquilonian` at 5 where the record says 0. Over the 432 rows that now carry a grant
+		// level, 363 agree with `Spells.Level`, 69 differ, and 14 of those differ UPWARD. The two fields are simply
+		// independent; the one-directional rule was read off three rows that all happened to point the same way.
 		//
 		// ⚠️ `Spells.Level` is the fallback only where NEITHER source above answers - which is now the minority. It
 		// is also the source that is wrong where they differ: it breaks one rank ladder (`Quell the Ether`

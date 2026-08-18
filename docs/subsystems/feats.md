@@ -597,6 +597,13 @@ and 57.
 Herald is level 24, and no captured character is a Tempest of Set. `--report spell-grant-check` is unchanged at
 EXTRA 0 / DROPPED 0 on every character.
 
+⛔ **And it refutes a documented rule in passing.** `ClassSpell.GrantLevel` carried *"retail grants at or BELOW
+`Spells.Level`, never above"*, written from three rows that all pointed the same way. Over the **432** rows that
+now carry a grant level, **363 agree, 69 differ, and 14 differ UPWARD** — including `Pestilential Blast (Rank 1)`,
+granted at **7** where the record says **1**, which is one of the *capture-proven* rows rather than a derived one.
+The two fields are independent. **1,242** `ClassSpells` rows with a real (`Level > 0`) gate still have no grant
+level and so still ride `Spells.Level`; that is the residue #864 tracks.
+
 ### A feat costs ONE POINT PER RANK, and the captures pin it exactly
 
 `FeatRules.PointCost` is `rank + 1` — the rank baked into the wire id's low two digits is 0-based, so holding
