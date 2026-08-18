@@ -79,25 +79,44 @@ namespace Faolan.Core.Progression
 			return missing;
 		}
 
-		public static int PointCost(uint featId)
+		/// <summary>
+		///     What a feat costs in points. <paramref name="free" /> holds the wire ids that cost NOTHING - the
+		///     AUTOMATIC feats a character is handed on the way up rather than buying.
+		/// </summary>
+		/// <remarks>
+		///     ⛔ The automatic exemption is not a tweak, it is what makes the budget usable at all (#850). Measured
+		///     over the shipped catalog, the automatic feats a level-80 accumulates cost <b>153 points</b> for one
+		///     class (77 feats), 97 for another and 89 for a third - against a level-80 budget of <b>79</b>. Three
+		///     classes therefore overspend the whole tree budget before the player chooses anything, and a real train
+		///     request is rejected outright. Since the tree is now the only path to its spells
+		///     (<c>FeatService.GrantSpellsTaughtBy</c>), that blocks content rather than merely miscounting.
+		///     <para />
+		///     ⚠️ The non-automatic cost itself is still a PLACEHOLDER: max(1, the rank baked into the id's low two
+		///     digits). The real per-feat cost is not sourced from anything. So this fixes the interaction, not the
+		///     number - #850 keeps the rest.
+		/// </remarks>
+		public static int PointCost(uint featId, IReadOnlySet<uint>? free = null)
 		{
+			if (free != null && free.Contains(featId))
+				return 0;
+
 			return Math.Max(1, (int)(featId % 100));
 		}
 
-		public static int TotalCost(IEnumerable<uint> featIds)
+		public static int TotalCost(IEnumerable<uint> featIds, IReadOnlySet<uint>? free = null)
 		{
 			var sum = 0;
 			foreach (var id in featIds)
-				sum += PointCost(id);
+				sum += PointCost(id, free);
 
 			return sum;
 		}
 
 		// Whether a character at `level` may hold `featIds` (existing + would-be-trained) without overspending its
-		// feat-point budget.
-		public static bool WithinBudget(uint level, IEnumerable<uint> featIds)
+		// feat-point budget. `free` are the automatic feats, which cost nothing - see PointCost.
+		public static bool WithinBudget(uint level, IEnumerable<uint> featIds, IReadOnlySet<uint>? free = null)
 		{
-			return TotalCost(featIds) <= PointBudget(level);
+			return TotalCost(featIds, free) <= PointBudget(level);
 		}
 	}
 }

@@ -44,6 +44,9 @@ namespace Faolan.Core.Database.Repositories
 
 		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
 
+		// The WIRE ids of the AUTOMATIC feats - the handed-out ones, which cost no feat points (#850).
+		Task<HashSet<uint>> GetAutomaticFeatWireIds();
+
 		// The inverse: the TREE spells a set of just-trained feats teaches. See the implementation's remarks.
 		Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
@@ -614,6 +617,30 @@ namespace Faolan.Core.Database.Repositories
 		// not one of them appears, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of
 		// them her class track. So training one would be inventing wire content to satisfy a criterion that
 		// demonstrably does not need it.
+		/// <summary>
+		///     The WIRE feat ids of every <see cref="Feat.AutomaticUnlockCategory" /> feat - the ones a character is
+		///     handed on the way up rather than buying with a point.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ They cost NOTHING (#850). They have to: measured over the shipped catalog, the automatic feats a
+		///     level-80 accumulates come to <b>153 points for one class</b> (77 feats), 97 for another and 89 for a
+		///     third, against a level-80 budget of <b>79</b>. So three classes spend their entire tree budget, and
+		///     more, before the player picks anything - and since the tree is now the only path to its spells, that
+		///     blocks content rather than just a number.
+		///     <para />
+		///     ⚠️ Charging them zero is not the same as saying our grant matches retail's. The captured level-80
+		///     Necromancer casts all 109 of her spells carrying <b>25</b> feats in total, so retail is plainly not
+		///     handing out one automatic feat per spell the way we do. Making them free removes the interaction; how
+		///     many of them retail actually grants is a separate and still-open question on #850.
+		/// </remarks>
+		public async Task<HashSet<uint>> GetAutomaticFeatWireIds()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return (await (from feat in ctx.Feats.Where(f => f.TemplateCategory == Feat.AutomaticUnlockCategory)
+				join map in ctx.FeatIdMaps on feat.Id equals map.TemplateId
+				select map.WireFeatId).Distinct().ToListAsync()).ToHashSet();
+		}
+
 		public async Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds)
 		{
 			var wanted = spellIds as IReadOnlyCollection<uint> ?? [.. spellIds];

@@ -228,10 +228,15 @@ namespace Faolan.GameServer.Feats
 			var characterId = client.Session.Character.Id;
 			var existing = await _database.GetCharacterFeats(characterId);
 			var after = existing.Concat(requested.Where(id => !existing.Contains(id))).ToList();
-			if (!FeatRules.WithinBudget(level, after))
+
+			// #850: the AUTOMATIC feats cost nothing. A character accumulates them by levelling, not by spending, and
+			// counting them was enough on its own to reject every train request at level 80 for three classes - their
+			// automatic set alone comes to 153, 97 and 89 points against a budget of 79.
+			var free = await _database.GetAutomaticFeatWireIds();
+			if (!FeatRules.WithinBudget(level, after, free))
 			{
-				_logger.LogWarning("Character {CharacterId} feat train rejected: {Spent} points > budget {Budget} (level {Level}).", characterId, FeatRules.TotalCost(existing.Concat(requested)),
-					FeatRules.PointBudget(level), level);
+				_logger.LogWarning("Character {CharacterId} feat train rejected: {Spent} points > budget {Budget} (level {Level}).", characterId,
+					FeatRules.TotalCost(existing.Concat(requested), free), FeatRules.PointBudget(level), level);
 				return -1;
 			}
 

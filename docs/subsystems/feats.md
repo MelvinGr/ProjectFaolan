@@ -506,3 +506,34 @@ dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <r
   `FeatComboModifier`'s reuse-time half yet), **#298** (skills scaffold gates spell usability), **#313**
   (create-flow combos, same server-held-key class).
 - Memories: `feat_trees_decode_251` (the correction + FeatIIR), `snapshot_known_spell_list`, `player_spawn_scaffold_generated`.
+
+## An AUTOMATIC feat costs no points (#850)
+
+`FeatRules.PointCost` is a placeholder — `max(1, the rank baked into the id's low two digits)` — and it was
+charging for the feats a character never chose. Two paths disagreed about them: `LevelUpService.
+GrantCastabilityFor` trains the feats that teach a newly learned spell with **no** budget check, and
+`FeatService.TrainWithinBudget` then counts the character's whole feat set against `FeatRules.PointBudget`.
+
+⛔ **The interaction is not marginal, it is fatal.** Measured over the shipped catalog, the automatic feats a
+level-80 accumulates cost:
+
+| class | automatic feats | points | budget at 80 |
+|---|---|---|---|
+| 41 | 77 | **153** | 79 |
+| 44 | 54 | **97** | 79 |
+| 24 | 47 | **89** | 79 |
+
+So three classes overspend the entire tree budget before the player picks anything, and every train request is
+rejected outright. Since the tree is the only path to its spells (`FeatService.GrantSpellsTaughtBy`), that blocks
+content rather than merely miscounting.
+
+`Feat.AutomaticUnlockCategory` (7063) is already modelled, so the exemption is a set lookup:
+`GetAutomaticFeatWireIds` maps it through `FeatIdMaps` to the wire ids the budget actually sees.
+
+⚠️ It is an exemption, not a bypass — a tree feat is still charged, so the budget still binds on what it is meant
+to bind on.
+
+⚠️ **And charging them zero is not the same as matching retail.** The captured level-80 Necromancer casts all 109
+of her spells carrying **25** feats in total, so retail is plainly not handing out one automatic feat per spell
+the way we do. Making them free removes the interaction; how many retail actually grants — and what a
+non-automatic feat really costs, which is still unsourced — stays open on #850.

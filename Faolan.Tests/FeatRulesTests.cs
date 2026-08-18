@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Faolan.Core.Progression;
 using Xunit;
 
@@ -46,6 +47,49 @@ namespace Faolan.Tests
 		public void PointCost_IsMaxOneAndRank(uint featId, int expected)
 		{
 			Assert.Equal(expected, FeatRules.PointCost(featId));
+		}
+
+		// ⛔ #850: an AUTOMATIC feat costs NOTHING, and that exemption is what makes the budget usable at all. The
+		// automatic feats a level-80 accumulates come to 153 points for one class (77 feats), 97 for another and 89
+		// for a third, against a level-80 budget of 79 - so three classes overspend the entire tree budget before
+		// the player chooses anything, and every train request is rejected. Since the tree is the only path to its
+		// spells, that blocks content rather than merely miscounting.
+		[Fact]
+		public void AnAutomaticFeat_CostsNothing()
+		{
+			IReadOnlySet<uint> free = new HashSet<uint> { 800110u };
+
+			Assert.Equal(0, FeatRules.PointCost(800110u, free));
+			Assert.Equal(10, FeatRules.PointCost(800110u)); // ...and still costs its rank when it is not exempt
+		}
+
+		// The realistic shape: a pile of handed-out feats that would blow the budget on their own leaves the whole
+		// budget available for the tree.
+		[Fact]
+		public void ABudgetIsNotSpentByTheFeatsAPlayerNeverChose()
+		{
+			var automatic = new HashSet<uint>();
+			for (var i = 0u; i < 77; i++)
+				automatic.Add(800000u + i * 100 + 10); // 77 feats at rank 10 = 770 points if they were charged
+
+			var held = new List<uint>(automatic) { 900005u }; // ...plus one the player actually trained
+
+			Assert.False(FeatRules.WithinBudget(80, held));
+			Assert.True(FeatRules.WithinBudget(80, held, automatic));
+		}
+
+		// ⚠️ And the exemption is exactly that - an exemption, not a bypass. A tree feat outside the free set is
+		// still charged, so the budget still binds on what it is meant to bind on.
+		[Fact]
+		public void ATreeFeatIsStillCharged_EvenBesideTheExemptOnes()
+		{
+			IReadOnlySet<uint> free = new HashSet<uint> { 800110u };
+
+			// One exempt feat plus 80 points of tree feats against a level-80 budget of 79.
+			var held = new List<uint> { 800110u, 900040u, 900140u };
+
+			Assert.Equal(80, FeatRules.TotalCost(held, free));
+			Assert.False(FeatRules.WithinBudget(80, held, free));
 		}
 	}
 }
