@@ -165,6 +165,8 @@ namespace Faolan.Importer.Cli
 
 				foreach (var kind in new[] { UntaughtTopRank, RankOneFromAClassFeat })
 					Console.WriteLine($"  {collapsed.Count(c => c.Diagnosis.Contains(kind, StringComparison.Ordinal)),3} x {kind}");
+
+				RankOneCandidates(collapsed, learnable);
 			}
 
 			if (!string.IsNullOrWhiteSpace(familyFilter))
@@ -182,6 +184,86 @@ namespace Faolan.Importer.Cli
 			                  + "faolan.db predates RdbSpellImporter.RankLadderFromEffectBands. Re-run:");
 			Console.WriteLine("      dotnet run --project Faolan.Importer -- --only rdb-spells --Content:RdbDir <dir>");
 			return 1;
+		}
+
+		/// <summary>
+		///     What rank 1's level WOULD be if the family's own ladder step were continued one rung down - printed as
+		///     a CANDIDATE, never applied.
+		/// </summary>
+		/// <remarks>
+		///     ⛔ #853 established that rank 1's true level is not recoverable from the client: rank 1 is granted by a
+		///     <c>&lt;Class&gt; Class Feat NNN</c>, which states no level band, so field 125 has nothing of rank 1's
+		///     own to carry and repeats its neighbour's. Two sources were checked and rejected - the feat record has
+		///     no level field, and a class feat is not a single-level unlock.
+		///     <para />
+		///     ⭐ What CAN be said is that where a family has a second source, rank 1 lands exactly one ladder step
+		///     below rank 2. `Chill` is the control: repaired from its effect bands it reads 15/30/45/60/75, and 15 is
+		///     30 minus the family's own 15-level step. This prints how many of the repaired families agree, so the
+		///     extrapolation is quoted with its own control rather than on its own.
+		///     <para />
+		///     ⚠️ It stays a CANDIDATE. A regular ladder is not a promise that the designers used one - `Spark of
+		///     Life` steps by 25 and would extrapolate to level 0, which is not a level a spell is granted at, and
+		///     that alone shows the rule is not universal. Writing these into `Spells.Level` would be shipping a
+		///     fitted curve into content the ticket deliberately left alone; the thing that settles it is a capture
+		///     of one of these grants, which lands in `ClassSpell.GrantLevel` and already wins where it exists.
+		/// </remarks>
+		private static void RankOneCandidates(
+			List<(string Family, string Field, string Band, string Diagnosis, bool Repairable)> collapsed,
+			IReadOnlyCollection<KeyValuePair<string, List<(uint Id, string Name, byte Level, int Rank)>>> learnable)
+		{
+			var affected = collapsed.Where(c => c.Diagnosis.Contains(RankOneFromAClassFeat, StringComparison.Ordinal)).ToList();
+			if (affected.Count == 0)
+				return;
+
+			Console.WriteLine();
+			Console.WriteLine("  ⭐ where the ladder's OWN step is continued one rung down (a CANDIDATE - nothing is written):");
+			Console.WriteLine($"     {"family",-28}  {"shipped",-22}  step  rank 1 would be");
+			foreach (var c in affected)
+			{
+				var levels = c.Field.Split('/').Select(v => int.TryParse(v, out var n) ? n : -1).ToList();
+				if (levels.Count < 3 || levels.Any(l => l < 0))
+					continue;
+
+				// The step is taken from ranks 2->3, which are both real: rank 1 is the corrupted one and rank 2's
+				// value is what it was copied FROM, so a step measured across 1->2 would be zero by construction.
+				var step = levels[2] - levels[1];
+				var candidate = levels[1] - step;
+				Console.WriteLine($"     {c.Family,-28}  {c.Field,-22}  {step,4}  {(candidate > 0 ? candidate.ToString() : $"{candidate} ⛔ not a grantable level")}");
+			}
+
+			// The CONTROL, and the reason the block above is quotable at all: the families whose ladder a second
+			// source already fixed should satisfy the same rule, and how many do is the measurement.
+			var controls = learnable.Select(f => f.Value).Where(f => f.Select(r => r.Level).Distinct().Count() == f.Select(r => r.Rank).Distinct().Count()).ToList();
+			var agree = 0;
+			var tested = 0;
+			foreach (var family in controls)
+			{
+				var byRank = family.GroupBy(r => r.Rank).OrderBy(g => g.Key).Select(g => (int)g.First().Level).ToList();
+				if (byRank.Count < 3)
+					continue;
+
+				var step = byRank[2] - byRank[1];
+				if (step <= 0)
+					continue;
+
+				tested++;
+				if (byRank[0] == byRank[1] - step)
+					agree++;
+			}
+
+			var rate = tested == 0 ? 0 : agree * 100.0 / tested;
+			Console.WriteLine($"     control - of {tested} families whose ladder is already one level per rank, {agree} put rank 1 exactly one step below rank 2"
+			                  + $" ({rate:F0}%).");
+
+			// ⛔ The verdict, and it is the CONTROL that gives it rather than the candidates above. An extrapolation
+			// is only worth applying if it is right where the answer is already known, and this one is not: a rule
+			// that is wrong on four families in ten would write a fabricated level into content that currently
+			// carries a merely-duplicated one. The candidate column stays because a HUMAN reading one family at a
+			// time can weigh it; a sweep cannot.
+			Console.WriteLine(rate >= 95
+				? "     ⭐ The control is strong enough that the candidates above are worth taking seriously per family."
+				: $"     ⛔ REFUTED as a rule: right on only {rate:F0}% of the families where the answer is known, so applying it would"
+				  + " fabricate a level for roughly two in five. It stays a per-family reading for a human, never a sweep.");
 		}
 
 		private const string UntaughtTopRank = "untaught top rank (not level-granted)";
