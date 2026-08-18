@@ -49,10 +49,16 @@ namespace Faolan.Core.Database.Tables
 		// The element's ordinal within the record's element list - stable across re-harvests of the same record.
 		public uint Sequence { get; set; }
 
+		// `Kind` for a CHAIN edge - `e_Type_GC_GameAction_CastNano`, "also run spell X" on the same subject, with no
+		// area at all. Named here rather than repeated as a literal: this layer cannot reach
+		// `GameActionTypes` (it lives in Faolan.Core.Rdb, which the database does not reference), and the value is
+		// the one every chain query keys on.
+		public const uint CastNanoKind = 53051;
+
 		// The GameAction type that stated this link (AreaFormula 53087, FilteredAreaFormula 53088, ConeFormula 53259,
-		// … or CastNano 53051). Carried rather than flattened away because the KIND is what says how targets are
-		// chosen - a cone is not a ring, and a chain edge is not an area at all - and the server honours only the
-		// shapes it can justify.
+		// … or CastNano - see CastNanoKind). Carried rather than flattened away because the KIND is what says how
+		// targets are chosen - a cone is not a ring, and a chain edge is not an area at all - and the server honours
+		// only the shapes it can justify.
 		public uint Kind { get; set; }
 
 		// The spell this link runs - the element's `KeySpell` on an area kind, its key 39 on `CastNano`. This is the

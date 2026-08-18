@@ -206,6 +206,7 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var featGated = await FeatMapCovers(ctx, @class);
+			var increments = await StackingIncrements(ctx); // #854: a rank table's members are not book spells
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
@@ -218,6 +219,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(x => !ctx.Combos.Any(c => c.GameActionId == x.s.Id))
 				.Where(x => !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id)))
 				.Where(x => !ctx.SpellAreaEffects.Any(chain => chain.EffectSpellId == x.s.Id && ctx.Combos.Any(c => c.GameActionId == chain.SpellId)))
+				.Where(x => !increments.Contains(x.s.Id))
 				.Where(x => !featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 				.OrderBy(x => x.Gate)
 				.ThenBy(x => x.s.Id)
@@ -265,6 +267,63 @@ namespace Faolan.Core.Database.Repositories
 		///         residue stays on Gitea #852.
 		///     </para>
 		/// </remarks>
+		/// <summary>
+		///     The spells that are a STACKING INCREMENT of a rank table, not book spells in their own right (#854).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ A rank TABLE is a spell in NO stacking line carrying more than one <c>CastNano</c> edge INTO one
+		///     line - the shape #813 found putting all ten ranks of <c>Furious Inspiration</c> on the bar at once.
+		///     <c>Colossus of War</c> is the same thing one link over: ids 3275545/3275640, `GuiStackingLine` 0,
+		///     chaining twenty members of line 22200, and the level path was offering a Conqueror all twenty AS
+		///     TWENTY SPELLS.
+		///     <para />
+		///     ⛔ Structural, NOT a name match. #854 asks for exactly that and warns against the alternative - a rule
+		///     keyed on the <c>(N)</c> suffix is the kind of string heuristic this codebase has repeatedly had to
+		///     unwind.
+		///     <para />
+		///     ⭐ Checked against the same oracle the combo and effect exclusions use, the captured known-spell lists:
+		///     of the <b>383</b> spells this catches, <b>zero</b> appear in any captured spellbook, while 210 of them
+		///     are currently offered by the level path.
+		///     <para />
+		///     ⚠️ The CARRIER must be in no stacking line, and that narrowing is load-bearing rather than tidy.
+		///     Without it the rule also catches <c>Bleeding Puncture I..IV</c> (levels 5/36/52/64), which read as an
+		///     ordinary learnable line - a carrier that is itself in a line is a rank LADDER rung, not a table
+		///     header. It is also what keeps <c>Flesh to Worms (Rank 1)</c> safe, which is the trap #847 is shaped
+		///     around: the spell a level-2 Necromancer ding exists to teach must not be deleted by "anything some
+		///     spell points at".
+		///     <para />
+		///     ⚠️ The oracle covers four characters of four classes, and no Conqueror among them - so this is
+		///     supported by an absence rather than by a positive Conqueror reading. What makes that acceptable here
+		///     is that the rule is structural and its false-positive candidate was found and excluded by narrowing,
+		///     not by listing.
+		/// </remarks>
+		// `internal` so the suite can gate the SET itself rather than only its consequences: the combo rules already
+		// exclude some of the same spells, so an observable-effect test cannot tell this rule's narrowing from theirs.
+		internal static async Task<HashSet<uint>> StackingIncrements(DatabaseContext ctx)
+		{
+			// Materialised rather than expressed as a nested EXISTS in each caller: the predicate is a
+			// count-per-(carrier, line), which does not translate cleanly, and the set is a few hundred ids.
+			var edges = await (from chain in ctx.SpellAreaEffects.Where(e => e.Kind == SpellAreaEffect.CastNanoKind)
+				join target in ctx.Spells on chain.EffectSpellId equals target.Id
+				join carrier in ctx.Spells on chain.SpellId equals carrier.Id
+				where target.GuiStackingLine != 0 && carrier.GuiStackingLine == 0
+				select new
+				{
+					Carrier = carrier.Id,
+					target.GuiStackingLine,
+					Target = target.Id
+				}).ToListAsync();
+
+			return edges.GroupBy(e => new
+				{
+					e.Carrier,
+					e.GuiStackingLine
+				})
+				.Where(g => g.Select(e => e.Target).Distinct().Count() > 1)
+				.SelectMany(g => g.Select(e => e.Target))
+				.ToHashSet();
+		}
+
 		private static Task<bool> FeatMapCovers(DatabaseContext ctx, ConanClass @class)
 		{
 			return ctx.ClassSpells.Where(cs => cs.Class == @class)
@@ -544,6 +603,7 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var featGated = await FeatMapCovers(ctx, @class);
+			var increments = await StackingIncrements(ctx); // #854, as in GetClassSpellsUnlockedBetween
 			return await ctx
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new
@@ -559,6 +619,7 @@ namespace Faolan.Core.Database.Repositories
 				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id)
 					&& !ctx.Spells.Any(applier => applier.EffectSpell == x.s.Id && applier.Level > 0 && ctx.ClassSpells.Any(cs => cs.SpellId == applier.Id))
 					&& !ctx.SpellAreaEffects.Any(chain => chain.EffectSpellId == x.s.Id && ctx.Combos.Any(c => c.GameActionId == chain.SpellId))
+					&& !increments.Contains(x.s.Id)
 					&& (!featGated || ctx.FeatSpellGrants.Any(g => g.SpellId == x.s.Id && g.Feat.TemplateCategory == Feat.AutomaticUnlockCategory))
 					&& (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level

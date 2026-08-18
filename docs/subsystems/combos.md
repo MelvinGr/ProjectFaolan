@@ -767,3 +767,32 @@ because what is worth catching is a NEW path starting to mint NPCs. It names the
 stamp fails it with *"AmbientPoolService.cs (no ClassComboIds)"*. That specificity matters here, since #838 wired
 the two weapon-reach properties into the ambient pool and left the two combo ones behind — a half-fix is exactly
 what this catches.
+
+## A rank table's increments are not book spells (#854)
+
+The level path was offering a Conqueror **twenty** spells at level 20 — `Colossus of War (1)` … `(20)`, ids
+3275588–3275639. They are the stacking increments of a spell simply named `Colossus of War` (3275545/3275640).
+
+⭐ **Structurally this is #813's rank TABLE, one link over.** The carrier is in **no** stacking line
+(`GuiStackingLine` 0) and carries more than one `CastNano` edge INTO one line — here twenty edges into line
+22200. That is the same shape as the `Furious Inspiration` header that was putting all ten of its ranks on the
+buff bar at once; #813 stops it being *applied*, and this stops it being *taught*.
+
+⛔ **The rule is structural, not a name match.** #854 asks for exactly that and warns against the alternative: a
+rule keyed on the `(N)` suffix is the kind of string heuristic this codebase has repeatedly had to unwind.
+
+⭐ Checked against the same oracle the combo (#298) and effect (#847) exclusions use — the captured known-spell
+lists: of the **383** spells the rule catches, **zero** appear in any captured spellbook, while **210** were
+being offered by the level path. `--report spell-grant-check` is unchanged by it (97/96/5/0/3 matched, EXTRA 0,
+DROPPED 0), which is what "zero in a captured spellbook" predicts.
+
+⚠️ **The carrier must be in no stacking line, and that narrowing is load-bearing rather than tidy.** A carrier
+that is itself in a line is a rank *ladder* rung, not a table header. Without the clause the rule also swallows
+`Bleeding Puncture I..IV` (Ranger, levels 5/36/52/64), which read as an ordinary learnable line — the broader
+form catches 437 spells where the narrow one catches 383. It is also what keeps `Flesh to Worms (Rank 1)` safe,
+which is the trap #847 is shaped around.
+
+⚠️ **What this does not have is a positive Conqueror reading.** The oracle covers four characters of four
+classes and none of them is a Conqueror, so the support is an absence. What makes that acceptable is that the
+rule is structural and its one false-positive candidate was found and removed by *narrowing the rule*, not by
+listing an exception.

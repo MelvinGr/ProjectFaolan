@@ -334,6 +334,72 @@ namespace Faolan.Tests
 			Assert.True(combos * 100 >= gated.Count * 80, $"only {combos} of {gated.Count} melee level-gated entries are combos");
 		}
 
+		// ⭐ #854: `Colossus of War` (3275545/3275640) is in NO stacking line and chains TWENTY members of line
+		// 22200 - a rank TABLE, the same shape as the `Furious Inspiration` header that #813 found putting all ten
+		// of its ranks on the bar at once. The level path was offering a Conqueror all twenty AS TWENTY SPELLS.
+		//
+		// ⛔ The exclusion is STRUCTURAL, not a name match. #854 asks for exactly that and warns against the
+		// alternative: a rule keyed on the `(N)` suffix is the kind of string heuristic this codebase has repeatedly
+		// had to unwind. And it is checked against the same oracle the combo and effect rules use - of the 383 spells
+		// it catches, ZERO appear in any captured spellbook.
+		[Fact]
+		public async Task AConqueror_IsNotTaughtTwentyColossusOfWarIncrements()
+		{
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+
+			var book = await repo.GetStartingSpells(80, ConanClass.Conqueror);
+			var dinged = await repo.GetClassSpellsUnlockedBetween(ConanClass.Conqueror, 0, 80);
+
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var increments = await db.Spells.AsNoTracking()
+				.Where(s => s.GuiStackingLine == ColossusLine)
+				.Select(s => s.Id)
+				.ToListAsync(ct);
+
+			Assert.Equal(20, increments.Count); // the population is real - otherwise this gate is vacuous
+			Assert.Empty(book.Intersect(increments));
+			Assert.Empty(dinged.Intersect(increments));
+		}
+
+		// ⚠️ The narrowing that makes it safe, gated on the SET itself rather than on its consequences - the combo
+		// rules already exclude some of the same spells, so an observable-effect test could not tell this rule's
+		// narrowing from theirs.
+		//
+		// The carrier must be in NO stacking line: a carrier that is itself in a line is a rank LADDER rung, not a
+		// table header. Without that clause the rule also swallows `Bleeding Puncture I..IV` (Ranger, levels
+		// 5/36/52/64), which read as an ordinary learnable line - and `Flesh to Worms (Rank 1)`, which is the trap
+		// #847 is shaped around: the spell a level-2 Necromancer ding exists to teach must survive "anything some
+		// spell points at".
+		[Fact]
+		public async Task TheIncrementSet_CatchesTheRankTableAndNothingOrdinary()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var increments = await DatabaseRepository.StackingIncrements(db);
+			Assert.NotEmpty(increments); // the rule finds something at all - otherwise every claim below is vacuous
+
+			var colossus = await db.Spells.AsNoTracking().Where(s => s.GuiStackingLine == ColossusLine).Select(s => s.Id).ToListAsync(ct);
+			Assert.Equal(20, colossus.Count);
+			Assert.All(colossus, id => Assert.Contains(id, increments));
+
+			var punctures = await db.Spells.AsNoTracking()
+				.Where(s => s.Name != null && s.Name.StartsWith("Bleeding Puncture"))
+				.Select(s => s.Id)
+				.ToListAsync(ct);
+			Assert.NotEmpty(punctures);
+			Assert.All(punctures, id => Assert.DoesNotContain(id, increments));
+
+			Assert.DoesNotContain(FleshToWormsRank1, increments);
+		}
+
+		// The spell the Necromancer's 1 -> 2 ding exists to teach - #847's trap, re-checked against this rule.
+		private const uint FleshToWormsRank1 = 1206011;
+
+		// The Colossus increments' shared stacking line - the thing that makes them one mutually-exclusive family.
+		private const uint ColossusLine = 22200;
+
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
 			public DatabaseContext CreateDbContext()
