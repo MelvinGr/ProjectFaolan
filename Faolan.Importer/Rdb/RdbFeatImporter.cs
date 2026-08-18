@@ -681,25 +681,54 @@ namespace Faolan.Importer.Rdb
 				return 0;
 
 			var rows = (await db.ClassSpells.ToListAsync()).ToDictionary(c => (c.Class, c.SpellId));
+			var levelOf = await db.Spells.Select(sp => new { sp.Id, sp.Level }).ToDictionaryAsync(x => x.Id, x => x.Level);
 			var written = 0;
+			var access = 0;
 			foreach (var derived in levels)
 			{
-				// No ClassSpell row means the class has no ACCESS to the spell, which is a different table's claim -
-				// a grant level for a spell the class cannot cast would be inventing membership, not filling a level.
-				if (!rows.TryGetValue((derived.Class, derived.SpellId), out var row) || row.GrantLevel != null)
+				if (derived.Level is 0 or > byte.MaxValue)
 					continue;
 
-				if (derived.Level is 0 or > byte.MaxValue)
+				if (!rows.TryGetValue((derived.Class, derived.SpellId), out var row))
+				{
+					// ⭐ The schedule is also a MEMBERSHIP statement: a feat the client auto-trains FOR THIS CLASS
+					// teaches this spell, so the class has access to it. That is the client's own word, and it reaches
+					// what `ClassSpells`' usual source cannot - membership is derived from `Spell.GuiStackingLine`'s
+					// `ConanClass * 1000 + index` encoding, and every spell this adds carries a line that is NOT in
+					// that form (71, 76, 232), so the class map was blind to them by construction.
+					//
+					// ⛔ LEVEL > 0 only, and the exclusion is the whole safety of this. Every class auto-trains the
+					// four `Dance:` emotes at level 5, and a Level-0 record belongs to no class - mounts, pets,
+					// emotes and travel unlocks are restored from the character's OWN rows on login
+					// (`GrantCharacterSpells`), never from a class query. Writing them here would claim that a
+					// Barbarian's class catalog contains `Dance: Stygian`, which is what the Level-0 rule exists to
+					// prevent. It is the difference between 12 rows and 57.
+					if (!levelOf.TryGetValue(derived.SpellId, out var spellLevel) || spellLevel == 0)
+						continue;
+
+					row = new ClassSpell
+					{
+						Class = derived.Class,
+						SpellId = derived.SpellId
+					};
+					db.ClassSpells.Add(row);
+					rows[(derived.Class, derived.SpellId)] = row;
+					access++;
+				}
+
+				if (row.GrantLevel != null)
 					continue;
 
 				row.GrantLevel = (byte)derived.Level;
 				written++;
 			}
 
-			if (written > 0)
+			if (written > 0 || access > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbFeatImporter: derived {Written} ClassSpell.GrantLevel(s) from the featclass table ({Pairs} (class, spell) pairs offered).", written, levels.Count);
+			logger?.LogInformation(
+				"RdbFeatImporter: derived {Written} ClassSpell.GrantLevel(s) and {Access} class-access row(s) from the featclass table ({Pairs} (class, spell) pairs offered).",
+				written, access, levels.Count);
 
 			return written;
 		}

@@ -13,7 +13,16 @@ namespace Faolan.Core.Database.Tables
 	// MEMBERSHIP comes from the client's own catalog (#296): a Spell.GuiStackingLine encoded as
 	// `ConanClass * 1000 + lineIndex` names the class that line belongs to, so RdbSpellImporter fills all twelve
 	// classes offline. The create-flow captures add the two facts the catalog cannot see - IsStarter and GrantLevel -
-	// and are never overwritten by it. An AoC-fandom-wiki scrape used to be the membership source, on the belief that
+	// and are never overwritten by it.
+	//
+	// ⭐ A SECOND offline membership source (#864): the client's featclass SCHEDULE. A feat the client auto-trains
+	// FOR A CLASS, teaching a spell, says that class has access to it - `RdbFeatImporter.DeriveClassSpellGrantLevels`
+	// writes those rows. It reaches exactly what the line encoding cannot: the 12 it adds all carry a
+	// `GuiStackingLine` that is NOT of the `class * 1000 + index` form (71, 76, 232 on the Herald's
+	// `Arcane Abatement` ranks 2-5, `Burning Skull` and `Exultation of Xotli`), so the class map was blind to them by
+	// construction - while rank 1 of the same family had a row, from the captured spellbook source.
+	// ⛔ LEVEL > 0 only: every class auto-trains the four `Dance:` emotes at level 5, and a Level-0 record belongs to
+	// no class. That exclusion is the difference between 12 rows and 57. An AoC-fandom-wiki scrape used to be the membership source, on the belief that
 	// "the client RDB spell record has no class field"; it has one, and the two agreed on 342 of the 343 rows where
 	// both spoke.
 	//

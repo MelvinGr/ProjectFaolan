@@ -576,6 +576,27 @@ EXTRA 0, DROPPED 0.
 ⚠️ The bug was visible in one line once the table was read: a level-4 test character was carrying
 `Spell Unlocking 20-40`, `40-60` and `60-80` — feats retail hands over at 30, 45 and 75.
 
+### ⭐ The schedule is a MEMBERSHIP source as well as a level one (#864)
+
+The same derivation answers a second question. A feat the client auto-trains **for a class**, teaching a spell,
+says that class has access to that spell — so `ClassSpells` gains a row where it had none. It adds **12**, and
+what makes them interesting is *which*: the Herald of Xotli's `Arcane Abatement` ranks 2–5, `Burning Skull` 1–3
+and `Exultation of Xotli` 1–4, plus the Tempest of Set's `Lightning Sparks`.
+
+Every one carries a `GuiStackingLine` of **71 / 76 / 232** — not the `ConanClass * 1000 + index` form membership
+is normally derived from, so the class map was blind to them by construction. `Arcane Abatement` **rank 1** did
+have a row, from the captured-spellbook source; ranks 2–5 had no source at all, which is why a Herald could never
+have been offered them.
+
+⛔ **`Level > 0` only, and that exclusion is the whole safety of it.** Every class auto-trains the four `Dance:`
+emotes at level 5, and a Level-0 record belongs to no class — mounts, pets, emotes and travel unlocks are
+restored from the character's own rows on login, never from a class query. It is the difference between 12 rows
+and 57.
+
+⚠️ No captured character can be over-offered by this: the Herald spells all gate at 30+ and the only captured
+Herald is level 24, and no captured character is a Tempest of Set. `--report spell-grant-check` is unchanged at
+EXTRA 0 / DROPPED 0 on every character.
+
 ### A feat costs ONE POINT PER RANK, and the captures pin it exactly
 
 `FeatRules.PointCost` is `rank + 1` — the rank baked into the wire id's low two digits is 0-based, so holding
