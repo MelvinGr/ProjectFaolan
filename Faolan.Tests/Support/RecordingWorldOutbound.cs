@@ -59,6 +59,13 @@ namespace Faolan.Tests.Support
 				: []);
 		}
 
+		// #813: no stacking line in the fake - these tests drive the chain by id, and a real line map would need the
+		// spell catalog behind it. A 0 means "in no line", which is the non-interfering answer.
+		public Task<uint> StackingLineOf(uint spellId)
+		{
+			return Task.FromResult(0u);
+		}
+
 		public Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId)
 		{
 			return Task.FromResult(Chains.TryGetValue(spellId, out var links)

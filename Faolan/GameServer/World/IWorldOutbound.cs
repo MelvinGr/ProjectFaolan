@@ -214,6 +214,11 @@ namespace Faolan.GameServer.World
 		// chain edge is not an area at all (`SpellAreaCatalog`).
 		Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId);
 
+		// #813: the stacking LINE a spell belongs to (0 = none). The chain walk claims it per edge, because a line is
+		// a mutual-exclusion group and a walk applying two of its members has produced something the client cannot
+		// show - see SpellChainWalk.TryEnter.
+		Task<uint> StackingLineOf(uint spellId);
+
 		// The chain edges that re-run on a CADENCE while the carrier's buff is up (#786) - `Repeats == -1` plus a
 		// non-zero interval. Separate from `ChainedSpellsFor` because the cast path wants every edge exactly once and
 		// the tick wants only the repeating ones.

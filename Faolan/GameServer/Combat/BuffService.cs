@@ -600,7 +600,10 @@ namespace Faolan.GameServer.Combat
 		{
 			foreach (var link in await _spellAreas.ChainedSpells(carrierBase))
 			{
-				if (!chain.TryEnter(link.EffectSpellId))
+				// #813: claim the target's STACKING LINE as well as its id. Ten edges into one line is a rank table,
+				// not ten buffs, and the line is a mutual-exclusion group - so the first arrival wins and the rest
+				// are refused.
+				if (!chain.TryEnter(link.EffectSpellId, await _spellAreas.StackingLineOf(link.EffectSpellId)))
 					continue;
 
 				_logger.LogDebug("Spell {Carrier} chains {Chained} onto 0x{Target:X8}.", carrierBase, link.EffectSpellId, applyTo);

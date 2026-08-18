@@ -2029,3 +2029,28 @@ the aura cadence — but on a chain edge it fits "re-run every N" and "run once 
 nothing has been read that decides. The edge runs ONCE when the carrier lands, which is the reading that cannot
 over-apply; open in **#786**.
 [V3: SpellChainWalkTests.AnEffectLandingOnAMob_AlsoLandsTheSpellItsChainEdgeNames]
+
+## A chain walk applies at most ONE member of a stacking line (#813)
+
+`SpellAreaEffects.Kind = 53051` is #784's *"when this lands, also run X"*, and two shapes in the data are not
+that. A fatality put **all ten ranks** of `Furious Inspiration` on the killer's bar at once for 15 seconds, and
+the walk's visit set was the only reason it stopped at ten rather than looping.
+
+| shape | what it is | population |
+|---|---|---|
+| **rank LADDER** | each rank additionally chains the rank BELOW it, so entering anywhere applies everything under it | 116 edges / 62 carriers |
+| **rank TABLE** | a nameless, duration-less line header carrying one edge per rank (seq 0 → rank 10 … seq 9 → rank 1) | 105 carriers |
+| a real chain | the target is in a DIFFERENT stacking line — #784's actual mechanic | 10,432 edges |
+
+⭐ Both collapse under one rule, because **a stacking line is a mutual-exclusion group**: a walk that applies two
+members of one line has produced something the client cannot represent. `SpellChainWalk.TryEnter` claims the
+target's `GuiStackingLine` alongside its id.
+
+⚠️ **Keying it on the CARRIER's own line is not enough**, which is the trap here: the table's header (299074) is
+in line **0**, so it shares no line with its targets and the ladder rule alone leaves all ten edges running.
+Only claiming the *targets'* lines catches it.
+
+⚠️ **Which member wins is the open half** — it is the walk's arrival order, i.e. the table's sequence 0, which for
+line 44235 is rank 10. That is a pick, not a decode. What it is **not** is level scaling: measured over the
+shipped data, **97 of the 105** rank tables have every target at the same level, so a level cannot choose between
+them. That candidate is refuted; Gitea #813 holds the rest.

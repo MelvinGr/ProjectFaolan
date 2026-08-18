@@ -1496,7 +1496,9 @@ namespace Faolan.GameServer.World
 			// re-run from the aura tick instead (#786, `EmitAuraAreas`).
 			foreach (var link in await _output.ChainedSpellsFor(effectSpellId))
 			{
-				if (!chain.TryEnter(link.EffectSpellId))
+				// #813: the target's STACKING LINE is claimed with its id - ten edges into one line is a rank table,
+				// not ten buffs. Same rule as the player-side walk in BuffService.
+				if (!chain.TryEnter(link.EffectSpellId, await _output.StackingLineOf(link.EffectSpellId)))
 					continue;
 
 				_logger.LogDebug("Effect {Effect} chains {Chained} onto {Npc} (0x{Handle:X8}).", effectSpellId, link.EffectSpellId, victim.Name, victim.Handle);

@@ -25,6 +25,10 @@ namespace Faolan.GameServer.Combat
 		public const int MaxApplications = 32;
 
 		private readonly HashSet<uint> _visited = [];
+
+		// #813: the stacking LINES this walk has already put a member of on the subject. A line is a
+		// mutual-exclusion group, so a second member is not a second buff - see TryEnter.
+		private readonly HashSet<uint> _lines = [];
 		private bool _sealed;
 
 		// ⭐ A walk that refuses EVERY edge, for a carrier whose 53051 rows are a candidate REGISTRY rather than a
@@ -42,10 +46,38 @@ namespace Faolan.GameServer.Combat
 		// be looked at rather than inferred.
 		public bool Truncated { get; private set; }
 
-		// Claim `spellBaseId` for this walk. False = already applied here (a cycle or a diamond), or the cap is spent.
-		// Callers seed it with the spell that STARTED the walk, so a chain edge pointing back at the carrier is a
-		// no-op rather than an infinite re-apply.
-		public bool TryEnter(uint spellBaseId)
+		/// <summary>
+		///     Claim <paramref name="spellBaseId" /> for this walk. False = already applied here (a cycle or a
+		///     diamond), its stacking line is already spoken for, or the cap is spent. Callers seed it with the spell
+		///     that STARTED the walk, so a chain edge pointing back at the carrier is a no-op rather than an infinite
+		///     re-apply.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ **One member per STACKING LINE** (#813). A stacking line is a mutual-exclusion group, so a walk that
+		///     applies two members of one line has produced something the client cannot represent - and it did: a
+		///     fatality put all ten ranks of `Furious Inspiration` (line 44235) on the bar at once, for 15 seconds,
+		///     with the visit set the only reason it stopped at ten.
+		///     <para />
+		///     Two different shapes in the data both collapse under this one rule, which is why it is one rule:
+		///     <list type="bullet">
+		///         <item>
+		///             a rank LADDER - each rank additionally chains the rank BELOW it, so entering anywhere applies
+		///             everything under it. 116 such edges across 62 carriers. Both ends are in the same line, so the
+		///             second is refused. ⛔ This half needs no new decode at all: an edge landing in the CARRIER's
+		///             own line cannot mean "also run this".
+		///         </item>
+		///         <item>
+		///             a rank TABLE - a nameless, duration-less line header carrying one edge per rank (105
+		///             carriers). Its own line is 0, so the ladder rule alone does not touch it; this one does,
+		///             because the ten targets share a line with each other.
+		///         </item>
+		///     </list>
+		///     ⚠️ WHICH member wins is the open half, and it is the walk's arrival order - the table's sequence 0,
+		///     which for line 44235 is rank 10. That is a pick, not a decode. What is NOT the answer is level
+		///     scaling: measured over the shipped data, <b>97 of the 105</b> rank tables have every target at the
+		///     SAME level, so a level cannot choose between them. Gitea #813 holds the remainder.
+		/// </remarks>
+		public bool TryEnter(uint spellBaseId, uint stackingLine = 0)
 		{
 			// A registry walk claims nothing, so `ApplySpell`'s own seeding call is a no-op too and every edge below
 			// it is refused. The carrier itself is applied by the caller before the walk is consulted.
@@ -53,6 +85,10 @@ namespace Faolan.GameServer.Combat
 				return false;
 
 			if (!_visited.Add(spellBaseId))
+				return false;
+
+			// A line of 0 is "in no stacking line", which is most spells - it must never collide with another.
+			if (stackingLine != 0 && !_lines.Add(stackingLine))
 				return false;
 
 			if (_visited.Count <= MaxApplications)

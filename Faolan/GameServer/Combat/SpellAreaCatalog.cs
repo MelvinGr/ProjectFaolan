@@ -33,6 +33,11 @@ namespace Faolan.GameServer.Combat
 		private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		private Dictionary<uint, SpellAreaEffect[]>? _bySpell;
 
+		// #813: spell id -> its `GuiStackingLine`, cached the same way and for the same reason. The chain walk needs
+		// it per EDGE, and a stacking line is a mutual-exclusion group, so this is what stops one walk applying ten
+		// members of one line.
+		private Dictionary<uint, uint>? _lineOf;
+
 		public SpellAreaCatalog(IDatabaseRepository database)
 		{
 			_database = database;
@@ -89,6 +94,43 @@ namespace Faolan.GameServer.Combat
 		private static bool IsArea(SpellAreaEffect link)
 		{
 			return GameActionTypes.AreaTargetKinds.Contains(link.Kind);
+		}
+
+		/// <summary>
+		///     The <c>GuiStackingLine</c> `spellId` belongs to, or 0 when it is in none.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ A stacking line is a MUTUAL-EXCLUSION group, which is what makes it the right key for #813: a chain
+		///     walk that applies two members of one line has applied something the client cannot represent. The
+		///     Furious Inspiration case put all ten ranks of line 44235 on the bar at once.
+		/// </remarks>
+		public async Task<uint> StackingLineOf(uint spellId)
+		{
+			if (_lineOf == null)
+			{
+				await _lock.WaitAsync();
+				try
+				{
+					// Last-wins on a duplicate id, which cannot happen (Spells.Id is the key) but costs nothing to
+					// state - `ToDictionary` would throw where this simply picks.
+					_lineOf ??= BuildLineMap(await _database.GetSpellLineMembers());
+				}
+				finally
+				{
+					_lock.Release();
+				}
+			}
+
+			return _lineOf.GetValueOrDefault(spellId);
+		}
+
+		private static Dictionary<uint, uint> BuildLineMap((uint Line, uint SpellId)[] members)
+		{
+			var map = new Dictionary<uint, uint>(members.Length);
+			foreach (var (line, spellId) in members)
+				map[spellId] = line;
+
+			return map;
 		}
 
 		private async Task<SpellAreaEffect[]> ForSpell(uint spellId)

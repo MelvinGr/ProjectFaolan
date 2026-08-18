@@ -140,6 +140,11 @@ namespace Faolan.GameServer
 			return _spellAreas.RepeatingChains(spellId);
 		}
 
+		Task<uint> IWorldOutbound.StackingLineOf(uint spellId)
+		{
+			return _spellAreas.StackingLineOf(spellId);
+		}
+
 		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.ChainedSpellsFor(uint spellId)
 		{
 			return _spellAreas.ChainedSpells(spellId);
