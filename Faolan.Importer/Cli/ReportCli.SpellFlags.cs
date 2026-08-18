@@ -75,12 +75,14 @@ namespace Faolan.Importer.Cli
 			"    bit  5  ⚠️ only in FUN_01759{4b0,690,a70,e30} - a different struct at the same +0xC8, not this word",
 			"    bit  6  ⚠️ only in FUN_01759{4b0,690,a70,e30} - likewise",
 			"    bit  7  ⚠️ only in FUN_01759{4b0,690,e30} - likewise",
-			"    bit  8  ⭐ READ: FUN_007e9b50 (the feedback-verb builder bit 15 is named from) + FUN_007ebe70",
 			"    bit 14  ⭐ READ: FUN_01141480 / 011417f0 / 01141c30 - the combat cluster, two of which also read bit 15",
-			"    bit 19  ⭐ READ: FUN_007ebe70, sharing ONE guard with bit 8 - `bit19 == 0 && bit8 == 0` gates the same block",
 			"    bit 20  ⭐ READ: FUN_007ee710 (the timed-effect path of bit 16) + FUN_00769220 (which also reads bit 15)",
-			"    bit 21  ⭐ READ: FUN_007f17d0 / FUN_007f1860",
-			"    bit 29  ⭐ READ: FUN_007d7ee0",
+			"    bit 21  ⭐ READ: FUN_007f17d0 / FUN_007f1860 - and at both sites it skips the SAME pair of calls, an "
+			+ "insert into a sorted container (FUN_00805000 + FUN_00803af0). ⚠️ Stat 0xB1 `MoreFlags` bit 0 is tested "
+			+ "right beside it and skips the same thing, so naming one names the other",
+			"    bit 29  ⭐ READ: FUN_007d7ee0 - SHAPE ONLY: on the damage path (its caller FUN_0114d4c0 logs "
+			+ "\"Apply missing multihitdamage (hit N) damage: X (of maxdamage: Y)\" on GameCode/Combat) it propagates "
+			+ "a float to every sibling sharing one key, raising each to the max. What the float IS is not recovered",
 			"    the rest  no read site anywhere in the image",
 		];
 
@@ -111,6 +113,21 @@ namespace Faolan.Importer.Cli
 			(20, "the magic's stated duration is neither DRAWN nor counted down - the tooltip's duration line renders empty "
 			     + "(`FUN_01499b10`) and `CoreMagicHolder::UpdateBuff` suppresses its 'remaining time' warning when it "
 			     + "expires; it rides into the spawn apply beside bit 16 (`FUN_007f43a0`)"),
+			(8, "the effect is NEVER NARRATED - no on-screen line when it lands and none when it ends. ⭐ The whole "
+			    + "body of the feedback-sentence builder `FUN_007e9b50` (the one bit 15 is named from) is guarded on "
+			    + "this bit being CLEAR, so a bit-8 spell emits no `YouAffectOtherByEffect` / `YouAfflictOtherByEffect` "
+			    + "/ `AffectSelfByEffect` at all; and it is half of the pair that suppresses the expiry line under bit "
+			    + "19. That solo site is what SPLITS the 8/19 pair, the same way bit 30's solo guard split 23/30. The "
+			    + "data agrees: its 2,389 records are the derived halves - `Formation:`/`Discipline:` auras, "
+			    + "`Furious Inspiration`, and the DoTs `Rend Flesh`, `Lacerate`, `Intense Heat` - and 1,127 of them "
+			    + "(47%) are one half of a same-NAME pair whose twin lacks the bit, against ~23% catalog-wide"),
+			(19, "the buff's EXPIRY is silent - no `Effect %s terminated.` line when it drops off. ⭐ `DeactivateBuff` "
+			     + "(`FUN_007ebe70`, named by its own \"DeactivateBuff missing spell %d\" log) emits LDB category 100 "
+			     + "id 596 - English `Effect %s terminated.` - and skips it when `bit19 || bit8`. Bit 8 is the broader "
+			     + "flag (see above), so 19 is the one that suppresses ONLY the ending. Its 7,692 records are the "
+			     + "states whose ending you would not narrate: `Death Penalty 1-3`, `Exhausted`, `Immunity to Root`, "
+			     + "`Immunity to Stun`, `Leader of the Pack Effect`, `TeamPropagatedBuff Test Slave`, and the "
+			     + "instantaneous `Healing` / `Roar`, which have no expiry to announce"),
 			(4, "SHAPE ONLY. Its single read site `FUN_007e0820` writes 5 instead of 1 into one field of a struct it "
 			    + "builds - the same 1/3/5 mode family bit 15 selects from in `FUN_007f4120`. The enum is not "
 			    + "recovered, so this is a narrowing rather than a name (249 records)"),

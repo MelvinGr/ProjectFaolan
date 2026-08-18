@@ -112,6 +112,8 @@ the yardstick every other row is read against.
 | 26 | 264 | **no post-cast notification at all**, and it switches which record the stacking comparison reads — it marks the propagated/derived COPY of a buff (below) |
 | 11 | 2,086 | **a hostile spell that does not raise the hostile-act signal** — operative only on its 523 hostile members (below) |
 | 15 | 12,069 | **the spell is HOSTILE** — the client picks "afflict" over "affect" on it (below) |
+| 8 | 2,389 | **the effect is never NARRATED** — no line when it lands and none when it ends (below) |
+| 19 | 7,692 | **the buff's EXPIRY is silent** — no `Effect %s terminated.` when it drops off (below) |
 
 ### ⭐ Bit 15: HOSTILE, and the client says it in English
 
@@ -129,20 +131,63 @@ second way that agrees: it selects a targeting mode (5 when the bit is clear, 3 
 and that is expected rather than a problem — none of the twelve predicates is "is this spell hostile", so this is
 another row named from the client's reads and NOT from its score, like bits 1 and 20 before it.
 
-### The unnamed bits, narrowed to their SHAPE (#632)
+### ⭐⭐ Bits 8 and 19 SPLIT: never narrated, and silent expiry
 
-Two more are no longer "a bit with N read sites" even though neither has a name yet, and both turn out to be
-SUPPRESSORS — the inverse of the 23/30 enabling pair:
+They appear in ONE guard together, which is why they were recorded as an inseparable pair. The function is
+`FUN_007EBE70`, and it names itself: it logs *"DeactivateBuff missing spell %d"*. So this is buff REMOVAL.
 
-* **bit 21** (1,576 set) suppresses one magic-side call pair, at both of its sites — and so does **bit 0 of stat
-  `0xB1` `MoreFlags`**, tested right beside it in `FUN_007F17D0`. So naming `MoreFlags` bit 0 names bit 21 too;
-  they gate the same thing from two different records.
-* **bits 19 and 8** (7,692 and 2,389 set) appear in ONE guard together — `(bit19 == 0) && ((flags & 0x100) == 0)`
-  — so either one set suppresses the same action. They are a pair the way 23/30 are, and should be named
-  together rather than separately.
+```c
+if (holder->+0xDE != 0 && (spell == 0 || (bit19 == 0 && bit8 == 0)) && param3 == 0)
+    <emit>                                  // skipped when EITHER bit is set
+```
 
-⚠️ Neither suppressed action carries a log string, which is why they stop here: the technique that named bits 1,
-11, 15, 20, 23, 26 and 30 is the client's own English, and these two call into code that says nothing.
+⭐ **What it emits is English after all.** The block carries no log string — which is where the previous pass
+stopped — but it calls `FUN_0060EBB0(0x64, 0x254)`, and that is an **LDB (category, id) fetch**: the pipeline
+behind it (`FUN_0060F190`) binds the message's `name` and `npcname` parameters before rendering it. Category
+**100**, id **596** resolves to:
+
+> `Effect %s terminated.`
+
+(French *"Effet %s terminé."*, German *"Effekt '%s' beendet."* — `--report ldb-strings --report-arg "id:#596"`.)
+
+⚠️ **This is a reusable way past "the code says nothing".** A numeric `(category, id)` pair pushed at a call site
+is the client speaking English one indirection away; it does not have to be a `char*` in the function to be read.
+The pair is small integers, not the 28-bit ELF hash the token form uses, so it does not look like a string id at a
+glance.
+
+**And bit 8 has a SOLO site, which splits the pair** — the same shape that split 23/30. The whole body of
+`FUN_007E9B50`, the feedback-sentence builder bit 15 is named from, is guarded on bit 8 being **clear**:
+
+```c
+if (spell != 0 && target != 0 && actor != 0 && ((flags >> 8 & 1) == 0)) { ...the whole function... }
+```
+
+So a bit-8 spell emits no `YouAffectOtherByEffect` / `YouAfflictOtherByEffect` / `AffectSelfByEffect` either. Bit
+8 is therefore the broader flag — **narrate nothing, at any point in the effect's life** — and bit 19 is the one
+that suppresses only the ending.
+
+The data agrees with both readings, and neither was fitted to it:
+
+| | bit 8 (2,389) | bit 19 (7,692) |
+|---|---|---|
+| what they are | the derived halves — `Formation:` / `Discipline:` auras, `Furious Inspiration`, and the DoTs `Rend Flesh`, `Lacerate`, `Intense Heat` | states whose ENDING you would not narrate — `Death Penalty 1-3`, `Exhausted`, `Immunity to Root`, `Immunity to Stun`, `Leader of the Pack Effect`, `TeamPropagatedBuff Test Slave` |
+| same-NAME twin without the bit | **1,127 (47%)**, against ~23% catalog-wide | 2,966 (39%) |
+
+The bit-8 twin rate is the same evidence bit 26 was named on: a record that is one half of a same-name pair is a
+derived copy, and it is the copy that stays quiet while its twin speaks. ⚠️ Neither bit is contained in the
+other (the containment sweep lists no 8 ⊂ 19), so they really are two suppressions sharing one guard rather than
+one flag stated twice.
+
+### The bits still unnamed, narrowed to their SHAPE (#632)
+
+* **bit 21** (1,576 set) suppresses one call pair at both of its sites — an insert into a sorted container
+  (`FUN_00805000` + `FUN_00803AF0`), which says nothing in English. **Bit 0 of stat `0xB1` `MoreFlags`** is
+  tested right beside it in `FUN_007F17D0` and skips the same thing, so naming either names both.
+* **bit 29** (156 set) is on the DAMAGE path — its caller `FUN_0114D4C0` logs *"Apply missing multihitdamage
+  (hit N) damage: X (of maxdamage: Y)"* on `GameCode/Combat`. Set, it propagates a float to every sibling
+  sharing one key, raising each to the maximum. What the float IS is not recovered.
+* **bit 14** (2,814 set) is read only in the combat cluster `FUN_01141480 / 011417F0 / 01141C30`, two of which
+  also read bit 15.
 
 ### ⭐ Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
 
