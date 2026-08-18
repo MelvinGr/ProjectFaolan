@@ -397,3 +397,33 @@ memory `snapshot_tails_construction_scope`):
 
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture and
 docs/re/spawn-dissection.md for the wider (NPC/inventory/conversation) dissection history.
+
+## Where the CLIENT reads the scaffold lists (#466)
+
+#466 proposes attacking the remaining undecoded field through *"the `ReadSubClass` for the spawn scaffold, via
+`DumpVtableReaders.java`"*. ⛔ **That points at the wrong function.**
+`SimpleCharFullUpdateIIR_t::ReadSubClass` (`FUN_01121c00`, self-named by its own
+`"...Received a bad stream upon entering!"` assert and `simplecharfullupdateiir.cpp`) contains **zero loops** —
+it is a flat sequence of fixed-field reads. A counted, variable-length entry table cannot be read there.
+
+⭐ The scaffold lists are read by **`FUN_0145ac80`**, which asserts with
+`CoreCharacter\IIR\CoreCharacterFullUpdateIIR.cpp` and carries **three** `do` loops. Found by anchoring on the
+`.cpp` name rather than on a vtable slot — the asserts name their own translation unit, which is the cheaper
+route into this subsystem.
+
+The list readers under it:
+
+| function | shape | what it is |
+|---|---|---|
+| `FUN_0145ba10` | reads a word, divides by `0x3F1`, calls `FUN_014578e0` per element | a `ListFrame`-counted list |
+| `FUN_014578e0` | `u32, u32, u32, u8` — **13 bytes** | the ID-list TAIL RECORD (`[0xC350][id][0][kind]`) |
+| `FUN_0145b8a0` | `ListFrame`-counted, allocates `0x18` per element | the richer per-element list |
+
+⚠️ Both framing readers divide by `0x3F1` to recover the count, which is the same `ListFrame` arithmetic
+CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is
+confirmed from the client side here, not just inferred from captures.
+
+⭐ **And the parse does NOT branch on the entry flag.** `FUN_014578e0` stores its trailing byte unconditionally;
+there is no float-vs-int branch at read time. So whatever the flag-1 entry means, its meaning lives in the
+CONSUMER of the stored struct, not in the reader — which is where the next attempt should look, and is why more
+staring at the parse will not answer it.
