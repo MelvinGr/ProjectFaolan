@@ -736,3 +736,34 @@ harvested archetype resolving the three the weapon cannot, the shield-bearing Ba
 the ack moving.
 
 Open work — spellweaving polish — is tracked on **Gitea #141**.
+
+## Every path that mints an NPC has to stamp its combat kit (#837)
+
+Four properties decide how an NPC fights and nothing else derives them: `RangedAttacker`, `AttackRange`,
+`MeleeComboId` and `ClassComboIds`. They come from the kit the NPC is wearing, and the only code that knows the
+kit is the code that mints the entity — so every mint site has to stamp them, and for a long time only
+`ZonePopulationLoader` (the placed spawns) did.
+
+`AmbientPoolService` (#363 spawn-area pools) stamped none, and `EncounterService` (the #502 boss swap, its lure
+and #528 quest ambushers) stamped none. Every pooled or encounter NPC therefore fought unarmed with no combo,
+whatever its type or its outfit said.
+
+⚠️ **It was invisible, which is why it lasted.** No ambient pool currently resolves to an archer — the bow
+carriers are their own templates — and every captured `Poacher` kit is melee, so the beach crowd fought correctly
+*by luck rather than by construction*. It would have surfaced as a one-zone bug report the first time a pool
+resolved to an archer, long after the cause.
+
+The ambient pool resolves one combo set **per outfit**, at pool load: `SpawnMember` cannot await (`Replenish` is
+an iterator), and a pool of eight draws from a handful of harvested kits, so this is a few lookups per pool
+rather than one per mob. ⚠️ The outfit and its combo set are picked with **one** index — deriving them from two
+separate counts would let a mob swing a combo its weapon is not holding the moment the two drift.
+
+The encounter path has no outfit at all (`BuildFromType` is called with none), so its weapon-derived half
+correctly answers "unarmed" and the value is in the class half: `NpcStatCore.ComboClass` is a harvested archetype
+that needs no equipment to say which family a mob swings.
+
+`NpcCombatKitChokePointTests` is the gate — a per-file census of `WorldEntity.ForNpc` callers, coarse on purpose,
+because what is worth catching is a NEW path starting to mint NPCs. It names the missing property: reverting one
+stamp fails it with *"AmbientPoolService.cs (no ClassComboIds)"*. That specificity matters here, since #838 wired
+the two weapon-reach properties into the ambient pool and left the two combo ones behind — a half-fix is exactly
+what this catches.

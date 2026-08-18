@@ -41,11 +41,17 @@ namespace Faolan.GameServer.World
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public AmbientPoolService(WorldSimulation sim, INpcRepository database, RuntimeHandleAllocator handles, ILogger logger)
+		// #837: which combos a member SWINGS, derived from the outfit it is wearing. Resolved at pool LOAD rather
+		// than per member, because the spawn path cannot await - `Replenish` is an iterator and `SpawnMember` is
+		// called from inside it.
+		private readonly ComboService _combos;
+
+		public AmbientPoolService(WorldSimulation sim, INpcRepository database, RuntimeHandleAllocator handles, ComboService combos, ILogger logger)
 		{
 			_sim = sim;
 			_database = database;
 			_handles = handles;
+			_combos = combos;
 			_logger = logger;
 		}
 
@@ -71,7 +77,20 @@ namespace Faolan.GameServer.World
 					continue;
 
 				var level = type.StatCore.Level ?? 0;
-				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, variants.GetValueOrDefault(type.TemplateId, []), level, level > 0
+				var outfits = variants.GetValueOrDefault(type.TemplateId, []);
+
+				// #837: one combo set per OUTFIT, resolved here because this is the only async context on the path -
+				// and it is per outfit rather than per member for the same reason the outfits are: a pool of eight
+				// draws from a handful of harvested kits, so this is a handful of lookups per pool, not one per mob.
+				// A pool with NO harvested outfit gets one entry built from nothing, which is what its members wear.
+				var comboSets = new ComboSet[Math.Max(1, outfits.Length)];
+				for (var o = 0; o < comboSets.Length; o++)
+				{
+					var kit = outfits.Length > 0 ? outfits[o].Equipment : null;
+					comboSets[o] = new ComboSet(await _combos.NpcMeleeComboId(kit), await _combos.NpcClassComboIds(kit, level, type.StatCore?.ComboClass));
+				}
+
+				var pool = new AmbientPool(area.Id, area.MaxCount, points, type, outfits, comboSets, level, level > 0
 					? CombatResolver.NpcMaxHealthForLevel(level)
 					: 1u, type.StatCore.Disposition ?? WorldEntity.DispositionFriendly, SpawnAreaLabels.FormatAreaLabel(area));
 				pools.Add(pool);
@@ -126,9 +145,12 @@ namespace Faolan.GameServer.World
 			// ambient pools) and that SpawnTransformPatch could not fix (it only overwrites a 4-byte token in place).
 			// Round-robin the harvested outfits by how many of this pool are already standing, so eight Poachers are
 			// eight individuals and the assignment is stable rather than random (a respawn re-draws in the same order).
-			var wearing = pool.Outfits.Length > 0
-				? pool.Outfits[zone.Entities.Count(e => e.SpawnAreaId == pool.AreaId) % pool.Outfits.Length]
-				: null;
+			// ⚠️ ONE index for both the outfit and its combos, computed once. Deriving them from two separate counts
+			// would let a mob swing a combo its weapon is not holding the moment the two drift apart.
+			var slot = pool.Outfits.Length > 0
+				? zone.Entities.Count(e => e.SpawnAreaId == pool.AreaId) % pool.Outfits.Length
+				: 0;
+			var wearing = pool.Outfits.Length > 0 ? pool.Outfits[slot] : null;
 			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken, wearing);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
@@ -141,6 +163,12 @@ namespace Faolan.GameServer.World
 			// They come from the OUTFIT this member was dressed in, which is a real harvested placement's kit.
 			entity.RangedAttacker = NpcWeapon.IsRanged(wearing?.Equipment);
 			entity.AttackRange = NpcWeapon.AttackRange(wearing?.Equipment, WorldState.NpcMeleeRange);
+			// #837: and WHICH combos it swings - the half that was still missing after #838 wired the weapon reach.
+			// A pooled mob used to fight with no combo at all, whatever it was holding, which is silently wrong
+			// everywhere rather than only for the archers.
+			var combos = pool.Combos[Math.Min(slot, pool.Combos.Length - 1)];
+			entity.MeleeComboId = combos.MeleeId;
+			entity.ClassComboIds = combos.ClassIds;
 			entity.SpawnBody = body;
 			entity.SpawnAreaId = pool.AreaId;
 			entity.OverheadNameOverride = pool.Label; // #363 dev nameplate label, sent via SetNameIIR when .togglenpcgroup is on
@@ -185,6 +213,10 @@ namespace Faolan.GameServer.World
 		// Outfits: the distinct harvested appearances of this creature, drawn from in spawn order so a pool is a crowd
 		// of individuals rather than a uniform (#836). Empty for a type we have no placement of - the type's own
 		// appearance is then the fallback, which is what a summoned pet has always used.
-		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, NpcSpawn[] Outfits, uint Level, uint MaxHealth, uint Disposition, string Label);
+		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, NpcSpawn[] Outfits, ComboSet[] Combos, uint Level, uint MaxHealth,
+			uint Disposition, string Label);
+
+		// The combos one OUTFIT swings - the generic weapon combo plus the level-gated class family (#623/#675).
+		private sealed record ComboSet(uint MeleeId, uint[] ClassIds);
 	}
 }

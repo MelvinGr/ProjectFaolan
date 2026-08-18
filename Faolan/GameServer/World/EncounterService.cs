@@ -34,11 +34,17 @@ namespace Faolan.GameServer.World
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
-		public EncounterService(WorldSimulation sim, IDatabaseRepository database, RuntimeHandleAllocator handles, Func<WorldEntity, Task> broadcastDespawn, ILogger logger)
+		// #837: which combos a TYPE-built encounter NPC swings. The placed-spawn loader has derived these since
+		// #623/#675; this path never did, so a boss or an ambusher fought with none.
+		private readonly ComboService _combos;
+
+		public EncounterService(WorldSimulation sim, IDatabaseRepository database, RuntimeHandleAllocator handles, ComboService combos, Func<WorldEntity, Task> broadcastDespawn,
+			ILogger logger)
 		{
 			_sim = sim;
 			_database = database;
 			_handles = handles;
+			_combos = combos;
 			_broadcastDespawn = broadcastDespawn;
 			_logger = logger;
 		}
@@ -82,6 +88,7 @@ namespace Faolan.GameServer.World
 			entity.Hostile = true;
 			entity.LootContainer = boss.LootContainerTemplateId;
 			entity.SpawnBody = body;
+			await StampCombatKit(entity, boss);
 			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
 			entity.EncounterLureTemplateId = lure.NpcTemplateId;
 			foreach (var sp in boss.Spells)
@@ -113,6 +120,7 @@ namespace Faolan.GameServer.World
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = lureLevel;
 			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken);
+			await StampCombatKit(entity, lure);
 			entity.NoRespawn = true;
 			entity.ArmEncounter(encounter);
 
@@ -158,6 +166,26 @@ namespace Faolan.GameServer.World
 			}, _logger);
 		}
 
+		/// <summary>
+		///     Stamp the three combat properties a TYPE-built NPC would otherwise be missing (#837): what it shoots
+		///     with, how far, and which combos it swings.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ These NPCs are built from a TEMPLATE and wear nothing - `NpcSpawnBuilder.BuildFromType` is called
+		///     with no outfit here, unlike a placed spawn or an ambient pool member. So the weapon-derived half
+		///     answers "unarmed", which is what they are, and the value is in the CLASS half: `NpcStatCore.ComboClass`
+		///     is a harvested archetype that needs no equipment to say which family a mob swings. Without this a
+		///     Damsel-in-Distress boss or a quest ambusher fought with no combo at all, whatever its type states.
+		/// </remarks>
+		private async Task StampCombatKit(WorldEntity entity, NpcTemplate type)
+		{
+			var equipment = type.Equipment;
+			entity.RangedAttacker = NpcWeapon.IsRanged(equipment);
+			entity.AttackRange = NpcWeapon.AttackRange(equipment, WorldState.NpcMeleeRange);
+			entity.MeleeComboId = await _combos.NpcMeleeComboId(equipment);
+			entity.ClassComboIds = await _combos.NpcClassComboIds(equipment, entity.Level, type.StatCore?.ComboClass);
+		}
+
 		private async Task SpawnAmbusher(Zone zone, NpcAmbush ambush, Vector3 position, Quaternion rotation)
 		{
 			var type = await _database.GetNpcByTemplateId(ambush.NpcTemplateId);
@@ -177,6 +205,7 @@ namespace Faolan.GameServer.World
 			entity.Hostile = true;
 			entity.LootContainer = type.LootContainerTemplateId;
 			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken);
+			await StampCombatKit(entity, type);
 			entity.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
 			foreach (var sp in type.Spells)
 				entity.Spells.Add(new NpcSpellCast(sp.SpellId, NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8)));

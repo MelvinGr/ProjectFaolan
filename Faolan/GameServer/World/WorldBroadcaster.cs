@@ -142,11 +142,11 @@ namespace Faolan.GameServer.World
 			_tortageIntro = tortageIntro;
 			_combos = combos;
 			_applySelfBuff = applySelfBuff;
-			_ambient = new AmbientPoolService(sim, database, _handles, logger);
+			_ambient = new AmbientPoolService(sim, database, _handles, combos, logger);
 			_questMarkers = new QuestMarkerResolver(database, logger);
 			_zones = new ZonePopulationLoader(sim, database, combos, _ambient, logger);
 			Bags = new LootBagContents(sim, database, logger);
-			_encounters = new EncounterService(sim, database, _handles, BroadcastEntityDespawn, logger);
+			_encounters = new EncounterService(sim, database, _handles, combos, BroadcastEntityDespawn, logger);
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
