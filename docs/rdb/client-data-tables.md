@@ -311,7 +311,7 @@ String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 10005
 (29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
 Decoded past their shape: 1000042 (layout), 1000043, 1000071, 1000099, 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
-1000517, 1000518, 1000520, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
+1000517, 1000518, 1000520, 1000521, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
 ⭐ **`--report data-table --report-arg <type>[:<id>]` renders any of the fixed-width ones as ROWS**, with
@@ -616,6 +616,110 @@ Necromancer's `1000184`, five ranks each. RDB **1000099** ("feat point cost info
 its point cost — 2,880 rows, two kinds, values 1..30 — and it covers the AA trees and *nothing else*. So #150 has
 the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the AA UI or
 of a perk being bought.
+
+## Partly decoded: 1000627 `GroupFinderActivitiesTable` — the group-finder activity list
+
+**12,012 bytes and NOT fixed-width** — no (header, count, stride) triple divides it, which is the table's own way
+of saying its records carry strings. What is legible without the callback:
+
+* a 12-byte RDB header, then a **byte** (`1`) and a u32 `4`, then four `[u32 index][u32 id]` pairs
+  (`249298753..756`) — the same "count is a BYTE" shape 1000520 uses, so the usual `DataTable_c` walk does not
+  apply here either;
+* the record bodies carry NAMES: **`LFRTeleport`** ten times and **`TP_Start`** after them, i.e. each activity
+  carries a teleport target. That is the group finder's own content — the raid/dungeon list the
+  `CsPlayerAgentListener` groupfinder tier would advertise.
+
+⛔ **Its parse callback resists a static read**, and that is worth recording rather than re-attempting blind.
+`FUN_013B21C0` hands `FUN_013B4E40` to the loader, and that function builds a set of
+`std::tr1::_Bind` / `_Callable_obj` lambdas over `IOBuffer` (`unsigned int`, `float`, `bool`, `String` readers)
+and drives a generic reflective walk with them. So the field ORDER is not in the function body the way
+1000043's and 1000099's are — there is no sequence of `read()` calls to transcribe.
+
+⚠️ `249298753` is **not** an LDB id: it does not resolve in any category, over a scan that read every plaintext
+page. So the leading pairs point at something else.
+
+## ⭐ Decoded: 1000521 `GuildRenownRewardDataTable` — the guild-city reward ladder, in retail's own words
+
+**57 records × 12 bytes**, a 20-byte header with the count in word 3:
+
+```
+[u32 rewardId][u32 guildRenownLevel][u32 ldbDescriptionId]
+```
+
+⭐ **The third column is an LDB id in category `10021`**, which is what turns a table of numbers into content: it
+is the reward's own description text. All **57 resolve**, and the scan behind that was complete over the
+plaintext LDB (0 unreadable, and category 10021 is not among the encrypted ones), so this is the whole ladder
+rather than the part that happened to resolve.
+
+Levels run **1..20** with 2–4 rewards each. It is the guild-city / renown progression the client shows in its
+renown window, and it names mechanics nothing else in the data does — bodyguards for hire from the Barracks,
+decoration tiers, Border Kingdom PvP vendors, per-archetype companions, the arena and sparring areas.
+
+| renown level | reward id | LDB 10021 | what the client says it unlocks |
+|---:|---:|---:|---|
+| 1 | 1 | 227020769 | Vendors sell various social items. |
+| 1 | 2 | 227020770 | Your city Barracks hire out bodyguards. |
+| 2 | 3 | 227021026 | Vendors sell seasonal headwreaths. |
+| 2 | 4 | 227021025 | Vendors sell purified, longer-lasting potions. |
+| 2 | 5 | 227021027 | Your city supports small decorations, and decoration vendors move to your city. |
+| 3 | 6 | 227017185 | Vendors sell men and women's clothing and the recipe for a guild city Tavern. |
+| 3 | 7 | 227017186 | Vendors sell convenient three-in-one potion restoratives. |
+| 3 | 8 | 227017187 | Border Kingdom vendors sell items to boost PvP experience gain. |
+| 3 | 9 | 227017188 | Some decoration vendors upgrade their wares. |
+| 4 | 10 | 227017441 | Vendors sell improvised hand-to-hand weapons. |
+| 4 | 11 | 227017442 | Vendors sell colorful varieties of two cloak styles. |
+| 4 | 12 | 227017443 | Some decoration vendors upgrade their wares. |
+| 5 | 14 | 227017698 | Vendors sell charms to ward off the curse of death. |
+| 5 | 15 | 227017699 | You may compete in the Khemi Sparring Area. |
+| 5 | 16 | 227017700 | Some decoration vendors upgrade their wares. |
+| 5 | 17 | 227017953 | Vendors sell chicken, pig, and sheep companions. |
+| 6 | 18 | 227017954 | Hub city vendors sell sneezing powder to prevent enemy stealthing. |
+| 6 | 19 | 227017955 | Your city supports centerpiece decorations, and decoration vendors move to your city. |
+| 6 | 42 | 142657777 | Your city gains a cultural retreat under the Keep. |
+| 7 | 13 | 227017697 | Vendors sell horses with new varieties of colored armor. |
+| 7 | 21 | 227018210 | Vendors sell contracts to summon traveling merchants. |
+| 7 | 22 | 227018211 | Some decoration vendors upgrade their wares. |
+| 8 | 23 | 227018465 | Quests to gain companions. |
+| 8 | 24 | 227018466 | Hub city vendors sell lodestones to weigh you down. |
+| 9 | 25 | 227018721 | Vendors sell colorful varieties of two more cloak styles. |
+| 9 | 26 | 227018722 | Hub city vendors sell lodestones to lighten your opponents. |
+| 9 | 58 | 227018723 | Dance masters across the world will teach you other races' dances. |
+| 10 | 27 | 142658289 | Vendors sell a swift Shemite horse. |
+| 10 | 28 | 142658290 | Vendors sell recipes to build Megaliths and Astrolabes. |
+| 10 | 29 | 142658291 | You may quest to gain recipes for Cimmerian wards. |
+| 11 | 30 | 142658545 | Vendors sell recipes for building a guild city Tavern II. |
+| 11 | 31 | 142658546 | Border Kingdom vendors sell morale-boosting items. |
+| 12 | 32 | 142658801 | Vendors sell vittles to help your fortune in resource harvesting. |
+| 12 | 33 | 142658802 | Border Kingdom vendors sell improved PvP experience gain items. |
+| 13 | 34 | 142657009 | Vendors sell horse tricks and Tavern plans. |
+| 13 | 35 | 142657010 | Hub city vendors sell itching powder to prevent enemy Path-using. |
+| 13 | 36 | 142657011 | Some decoration vendors upgrade their wares. |
+| 14 | 37 | 142657265 | Vendors sell living rats, scorpions, snakes, and spiders to wear. |
+| 14 | 38 | 142657266 | Vendors sell recipes to weave the Soldier's Haversack. |
+| 14 | 39 | 142657267 | Some decoration vendors upgrade their wares. |
+| 15 | 40 | 142657521 | Quest to gain the Stygian Halfbreed horse mount. |
+| 15 | 41 | 142657522 | You may compete in the Coils of the Serpent arena. |
+| 16 | 43 | 142657778 | Vendors sell recipes to build improved Megaliths. |
+| 16 | 44 | 142657779 | Some decoration vendors upgrade their wares. |
+| 16 | 48 | 142656241 | Vendors sell recipes for building a guild city Tavern III. |
+| 17 | 45 | 142655985 | Quest to gain a companion unique to your race. |
+| 17 | 46 | 142655986 | Border Kingdom vendors sell improved PvP experience gain items. |
+| 17 | 47 | 142655987 | Some decoration vendors upgrade their wares. |
+| 18 | 49 | 142656242 | Vendors sell charms to resurrect your friends. |
+| 18 | 50 | 142656243 | Hub city vendors sell resonators with which to detect hidden enemies. |
+| 18 | 51 | 142656244 | You may quest to gain recipes for exquisite marble statues. |
+| 19 | 52 | 142656497 | Quest to gain one of three companions unique to your archetype. |
+| 19 | 53 | 142656498 | Border Kingdom vendors sell improved morale-boosting items. |
+| 19 | 54 | 142656499 | Master architects may quest to learn to build superior Megaliths. |
+| 20 | 55 | 142662385 | Quest to gain the Tarpani Stallion horse mount. |
+| 20 | 56 | 142662386 | Vendors sell recipes to weave the Commander's Haversack. |
+| 20 | 57 | 142662387 | Some decoration vendors upgrade their wares. |
+
+⚠️ The reward is a DESCRIPTION, not a grant: the row carries no item, recipe or spell id, so what actually
+becomes available is stated in prose and would have to be wired per line. That is a content statement about the
+table, not a decode gap — there is no fourth column.
+
+Related: #147 (guild cities), #335 (the renown block on the guild full-update).
 
 ## Decoded: 1000520 `CoreTokenHolder` — the alternate-CURRENCY catalog
 

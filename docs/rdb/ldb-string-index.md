@@ -520,6 +520,12 @@ dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <r
 #   YouCanNotUseYet -> 5372612  cat 130 page 222116 [English]: 'Your class cannot use this item until level %d '
 ```
 
+⭐ **`--report ldb-strings --report-arg "id:#<n>,<n>,..."` resolves SEVERAL ids in ONE pass**, which is what a
+decoded table wants: the scan reads all 1,026 pages / 1.4 M entries once, so asking id by id costs that pass per
+id. The guild-renown ladder's 57 rows (#469) resolved in a single run that way. ⚠️ Two different id spaces live
+in that table and only one is a hash: a `(category, id)` pair pushed at a call site carries a SMALL integer
+(`Effect %s terminated.` is `(100, 596)`), while the token form is the 28-bit ELF hash below.
+
 Verified on 21 independent token/value pairs: `SkywalkingCommand_Description` → 97813470
 (`"This command enables skywalking."`), `SkywalkingEnabled` → 80504532, `SkywalkingDisabled` → 137024644, and
 18 `<Class>Command_Name` tokens each landing on exactly the expected verb in category **10002** -

@@ -999,9 +999,29 @@ namespace Faolan.Importer.Cli
 				{
 					// `id:<text>` searches by VALUE; `id:#<number>` searches by the id itself. The second is what tells
 					// a "this id is gone" story from a "this id was never an LDB id" one.
+					//
+					// ⭐ `id:#a,b,c` resolves SEVERAL ids in ONE pass. The scan reads every LDB page - about a minute -
+					// so asking for a table's worth of ids one at a time costs that minute per id. A decoded table
+					// whose column IS an LDB id (the guild renown ladder's 57 rows, #469) is the normal case, not an
+					// exception.
 					var wanted = arg![3..].Trim();
-					uint wantedId = 0;
-					var byNumber = wanted.StartsWith('#') && uint.TryParse(wanted[1..], out wantedId);
+					var wantedIds = new HashSet<uint>();
+					var byNumber = wanted.StartsWith('#');
+					if (byNumber)
+					{
+						foreach (var part in wanted[1..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+						{
+							if (!uint.TryParse(part, out var one))
+							{
+								Console.WriteLine($"ldb-strings: '{part}' is not a numeric id (expected `id:#<n>` or `id:#<n>,<n>,...`)");
+								return 1;
+							}
+
+							wantedIds.Add(one);
+						}
+
+						byNumber = wantedIds.Count > 0;
+					}
 					using var rdb = OpenRdb(RdbDir());
 					var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
 					var hits = 0;
@@ -1050,7 +1070,7 @@ namespace Faolan.Importer.Cli
 						{
 							entries++;
 							var match = byNumber
-								? entry.Id == wantedId
+								? wantedIds.Contains(entry.Id)
 								: string.Equals(entry.Value, wanted, StringComparison.OrdinalIgnoreCase);
 							if (!match)
 								continue;
