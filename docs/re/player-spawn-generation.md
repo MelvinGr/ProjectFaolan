@@ -418,6 +418,19 @@ The list readers under it:
 | `FUN_0145ba10` | reads a word, divides by `0x3F1`, calls `FUN_014578e0` per element | a `ListFrame`-counted list |
 | `FUN_014578e0` | `u32, u32, u32, u8` — **13 bytes** | the ID-list TAIL RECORD (`[0xC350][id][0][kind]`) |
 | `FUN_0145b8a0` | `ListFrame`-counted, allocates `0x18` per element | the richer per-element list |
+| `FUN_0145c0b0` | a SECOND `ListFrame` count inside it, `FUN_007ed9b0` per element | what `FUN_0145b8a0`'s elements contain |
+| `FUN_007ed9b0` | allocates a `BuffInfo_c` (`FUN_00c9cce0(200, 4, 0)` + ctor `FUN_00849770`) and fills it field by field | ⭐ **a BUFF** |
+
+⭐ **So `FUN_0145b8a0` is a nested list whose leaf is a `BuffInfo_c`.** That matters beyond this page:
+`FUN_007ed9b0` is the one open route [`docs/subsystems/npc-spell-applyspell.md`](../subsystems/npc-spell-applyspell.md)
+names for the still-unsourced `MagicBuff` descriptor fields (Gitea #658) — *"the client persists/transports a buff
+in a layout whose fourth field IS `bool2`, and that is a place a value can be lined up against something
+observable"*. This says WHERE that layout comes from on the wire: the character full-update stream, i.e. the same
+family of bytes the corpus already holds 1,471 parsed `ScaffoldBuff` records of.
+
+⚠️ Which of our modelled lists it is has NOT been pinned — the call order under `FUN_0145ac80` puts it between the
+id-list loop and `FUN_0145ba10` (the pets), and lining that up against our own grammar is the step that would
+make the claim usable. Recorded as a located route, not as an identification.
 
 ⚠️ Both framing readers divide by `0x3F1` to recover the count, which is the same `ListFrame` arithmetic
 CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is
