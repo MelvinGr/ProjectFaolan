@@ -492,6 +492,11 @@ namespace Faolan.Importer.Cli
 					return MagicBuffDescriptor(NamedCapture.LoadAll(capturesDir), RdbDir());
 				}
 
+				case "pet-cost":
+				{
+					return await PetCost(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

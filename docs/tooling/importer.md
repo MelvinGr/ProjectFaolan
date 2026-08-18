@@ -326,6 +326,11 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`pet-cost` (#823: which field of a summoned pet's spawn carries the point it costs? The corpus discriminates well
+- three cost classes, 89 cost-1 / 13 cost-2 / 53 cost-4 spawns - and ⛔ **nothing carries it**: `generic_stats` is
+empty on every pet, and of 64 numeric fields on the character message, 60 present on all 155 samples with 29
+varying, none equals the cost. That refutes the ticket's reading that the client costs "the pet it receives".
+Prints the field counts as a control, since "no field matches" and "no fields collected" print the same) ·
 `magicbuff-descriptor` (#658: where do the MagicBuff apply payload's `descriptor[0]` and `bool2` come from? Both
 are near-per-spell, so this cross-tabs them against the spell's RDB record. ⛔ **Both of the ticket's proposed
 routes are eliminated**: no FLAGS bit scores above +7 against a +50 yardstick, and no PROPERTY FIELD carries
