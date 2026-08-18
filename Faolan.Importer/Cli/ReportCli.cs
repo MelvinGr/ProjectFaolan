@@ -477,6 +477,11 @@ namespace Faolan.Importer.Cli
 					return await NpcAggression();
 				}
 
+				case "interest-radius":
+				{
+					return InterestRadius(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

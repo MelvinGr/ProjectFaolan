@@ -326,6 +326,15 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`interest-radius` (#856: how far from the player does retail DESPAWN an entity? Measures the DESPAWN side
+because it is immune to the contaminant that defeated the spawn-side attempt - nothing bulk-despawns at login,
+so there is no burst to exclude. Four named filters: a despawn arriving in a burst is a ZONE CHANGE (21,736 of
+23,765), a stale player position is a teleport gap, a handle that DIED is a corpse timer, and a despawn where the
+player was not RECEDING is a lifecycle event - a dismissed pet, a summon, a mount. ⚠️ Receding rather than
+distance on purpose: filtering by distance would assume the answer in order to decide what counts as evidence
+for it. ⛔ **Verdict is negative and stays that way**: the 69 survivors span 25..850 u, a factor of 35, where a
+hard radius predicts a floor with a tight cluster above it. So the corpus cannot state the radius, and 150 u is
+neither confirmed nor refuted - it merely sits near the median, which is not evidence) ·
 `npc-aggression` (#822: which hostile-COLOURED templates the armed-or-not-humanoid rule leaves passive. Retail
 colours civilians red without them ever fighting, so the name colour and the aggro decision are separate facts.
 Currently **10 of 352**, and every name in the list should read as a civilian - a mob appearing there means a
