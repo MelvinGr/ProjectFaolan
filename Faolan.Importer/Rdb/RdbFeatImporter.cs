@@ -46,6 +46,14 @@ namespace Faolan.Importer.Rdb
 		private const int PrereqSlots = 3;
 		private const int MapHeaderLength = 20;
 
+		// The client's FEATCLASS table (#862): `FeatClassTable_c` loads this resource and reports
+		// "Could not load featclass info" when it cannot. Same 20-byte header as the id map, then `count` 40-byte
+		// entries of ten words - see ParseClassEntries for the columns.
+		private const uint FeatClassType = 1000043;
+		private const uint FeatClassTableId = 1;
+		private const int ClassEntryLength = 40;
+		private const int ClassEntryWords = 10;
+
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
@@ -55,6 +63,7 @@ namespace Faolan.Importer.Rdb
 			// Flags 0x5, not 0x10000005, and was silently excluded until the id map was used as the authority.
 			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
 			var mappedTemplates = map.Select(m => m.Template).ToHashSet();
+			var classEntries = ReadClassEntries(rdb);
 
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
@@ -158,6 +167,21 @@ namespace Faolan.Importer.Rdb
 						RequiresWireFeatId = requires
 					});
 					prereqRows++;
+				}
+			}
+
+			// The client's featclass table (#862). Delete+reinsert like the id map: it too is wholly derived from one
+			// RDB resource, and it is keyed by the client's own row id so a re-import renumbers nothing. No FK to
+			// FeatIdMap, so it needs no ordering against the block above.
+			var classRows = 0;
+			if (classEntries.Count > 0)
+			{
+				db.FeatClassEntries.RemoveRange(await db.FeatClassEntries.ToListAsync());
+				await db.SaveChangesAsync();
+				foreach (var entry in classEntries)
+				{
+					db.FeatClassEntries.Add(entry);
+					classRows++;
 				}
 			}
 
@@ -348,7 +372,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || comboAttackModRows > 0 || procRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || comboAttackModRows > 0 || procRows > 0 || classRows > 0)
 				await db.SaveChangesAsync();
 
 			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
@@ -357,10 +381,10 @@ namespace Faolan.Importer.Rdb
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs, {ClassRows} featclass rows.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -522,6 +546,78 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return map;
+		}
+
+		// The client's FEATCLASS table (RDB 1000043 id 1) - what a class may train, and what the client trains for
+		// itself (#862). Read here rather than in its own importer because it shares this one's RdbReader and is the
+		// same subsystem's data.
+		private static List<FeatClassEntry> ReadClassEntries(RdbReader rdb)
+		{
+			var matches = rdb.EntriesOfType(FeatClassType).Where(e => e.Id == FeatClassTableId).ToList();
+			if (matches.Count == 0)
+				return [];
+
+			try
+			{
+				return ParseClassEntries(rdb.ReadDecompressed(matches[0]));
+			}
+			catch
+			{
+				return [];
+			}
+		}
+
+		/// <summary>
+		///     Parses the featclass table's body. Split out from the RDB read so it can be tested against bytes
+		///     without the client install, exactly like <see cref="ParseIdMap" />.
+		/// </summary>
+		/// <remarks>
+		///     `[u32 type][u32 id][u32 1][u32 count][u32 version]` then `count` 40-byte entries of ten words:
+		///     <c>[rowId][class][level][wireFeatId][autotrain][treeId][column][flag][tier][pointsRequired]</c>. The
+		///     class word carries the <see cref="ConanClass" /> value directly - all twelve appear - and 0 for the
+		///     188 rows that name no class.
+		///     <para>
+		///         The client's own parser (<c>FUN_0078e2b0</c>) accepts version 2 or 3 and checks the 40-byte stride
+		///         on version 2; the shipped table is version 3. Word 4 is the one that matters - it is what
+		///         <c>FUN_0078cdc0</c> tests before calling the autotrain walk.
+		///     </para>
+		/// </remarks>
+		public static List<FeatClassEntry> ParseClassEntries(byte[] body)
+		{
+			var entries = new List<FeatClassEntry>();
+			if (body.Length < MapHeaderLength || Word(body, 0) != FeatClassType)
+				return entries;
+
+			var count = (int)Word(body, 12);
+			if (count <= 0 || MapHeaderLength + ((long)count * ClassEntryLength) > body.Length)
+				return entries;
+
+			for (var i = 0; i < count; i++)
+			{
+				var at = MapHeaderLength + (i * ClassEntryLength);
+				var w = new uint[ClassEntryWords];
+				for (var c = 0; c < ClassEntryWords; c++)
+					w[c] = Word(body, at + (c * 4));
+
+				if (w[0] == 0 || w[3] == 0)
+					continue; // a blank slot, not an entry - carrying it would put a row naming no feat in the table
+
+				entries.Add(new FeatClassEntry
+				{
+					Id = w[0],
+					Class = w[1] == 0 ? null : (ConanClass)w[1],
+					Level = w[2],
+					FeatId = w[3],
+					Autotrain = w[4] != 0,
+					TreeId = w[5],
+					TreeColumn = w[6],
+					Flag = w[7],
+					Tier = w[8],
+					TreePointsRequired = w[9]
+				});
+			}
+
+			return entries;
 		}
 
 		// The PREREQUISITE edges of the same entries: columns 2/3/4 (offsets +8/+12/+16) are wire feat ids a feat
@@ -888,6 +984,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs);
+			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs, int ClassRows);
 	}
 }

@@ -232,7 +232,7 @@ namespace Faolan.GameServer.Feats
 			// #850: the AUTOMATIC feats cost nothing. A character accumulates them by levelling, not by spending, and
 			// counting them was enough on its own to reject every train request at level 80 for three classes - their
 			// automatic set alone comes to 153, 97 and 89 points against a budget of 79.
-			var free = await _database.GetAutomaticFeatWireIds();
+			var free = await _database.GetAutotrainedFeatWireIds();
 			if (!FeatRules.WithinBudget(level, after, free))
 			{
 				_logger.LogWarning("Character {CharacterId} feat train rejected: {Spent} points > budget {Budget} (level {Level}).", characterId,

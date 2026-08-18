@@ -42,10 +42,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task<FeatSpellStatModifier[]> GetCharacterFeatSpellStatModifiers(uint characterId);
 
-		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
 
 		// The WIRE ids of the AUTOMATIC feats - the handed-out ones, which cost no feat points (#850).
-		Task<HashSet<uint>> GetAutomaticFeatWireIds();
+		Task<HashSet<uint>> GetAutotrainedFeatWireIds();
 
 		// The inverse: the TREE spells a set of just-trained feats teaches. See the implementation's remarks.
 		Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds);
@@ -618,47 +617,31 @@ namespace Faolan.Core.Database.Repositories
 		// them her class track. So training one would be inventing wire content to satisfy a criterion that
 		// demonstrably does not need it.
 		/// <summary>
-		///     The WIRE feat ids of every <see cref="Feat.AutomaticUnlockCategory" /> feat - the ones a character is
-		///     handed on the way up rather than buying with a point.
+		///     The WIRE feat ids the CLIENT trains by itself - <see cref="FeatClassEntry.Autotrain" />, straight out
+		///     of the client's own featclass table.
 		/// </summary>
 		/// <remarks>
-		///     ⭐ They cost NOTHING (#850). They have to: measured over the shipped catalog, the automatic feats a
-		///     level-80 accumulates come to <b>153 points for one class</b> (77 feats), 97 for another and 89 for a
-		///     third, against a level-80 budget of <b>79</b>. So three classes spend their entire tree budget, and
-		///     more, before the player picks anything - and since the tree is now the only path to its spells, that
-		///     blocks content rather than just a number.
+		///     ⭐ These must never be in a character's feat list (#862). The list goes on the wire; the client builds
+		///     its own auto-trained set from this table plus the character's class and level, and
+		///     <c>FeatHolder::TrainFeat</c> refuses one outright ("will break feats!"). All 56 feat ids across the
+		///     four captured characters are auto-train FALSE, so retail agrees without exception.
 		///     <para />
-		///     ⚠️ Charging them zero is not the same as saying our grant matches retail's. The captured level-80
-		///     Necromancer casts all 109 of her spells carrying <b>25</b> feats in total, so retail is plainly not
-		///     handing out one automatic feat per spell the way we do. Making them free removes the interaction; how
-		///     many of them retail actually grants is a separate and still-open question on #850.
+		///     ⚠️ Was <c>Feat.AutomaticUnlockCategory</c> (7063) until #862 - a proxy measured over the
+		///     spell-granting feats, which disagrees with the client on 204 of 9,907 rows. The category still
+		///     classifies a spell GRANT; this decides what may be trained.
+		///     <para />
+		///     Used as the free set for <c>FeatRules.PointCost</c>, which should now find nothing to exempt: the
+		///     grant that put these in a character's list is gone. It stays as the guard for rows written before it
+		///     was removed.
 		/// </remarks>
-		public async Task<HashSet<uint>> GetAutomaticFeatWireIds()
+		public async Task<HashSet<uint>> GetAutotrainedFeatWireIds()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return (await (from feat in ctx.Feats.Where(f => f.TemplateCategory == Feat.AutomaticUnlockCategory)
-				join map in ctx.FeatIdMaps on feat.Id equals map.TemplateId
-				select map.WireFeatId).Distinct().ToListAsync()).ToHashSet();
-		}
-
-		public async Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds)
-		{
-			var wanted = spellIds as IReadOnlyCollection<uint> ?? [.. spellIds];
-			if (wanted.Count == 0)
-				return [];
-
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var progressionTracks = ctx.FeatIdMaps.GroupBy(m => m.BaseIndex).Where(g => g.Max(m => m.Rank) >= FeatIdMap.MaxRank).Select(g => g.Key);
-
-			return await (from grant in ctx.FeatSpellGrants.Where(g => wanted.Contains(g.SpellId))
-				join map in ctx.FeatIdMaps on grant.FeatId equals map.TemplateId
-				where !progressionTracks.Contains(map.BaseIndex)
-				select map.WireFeatId).Distinct().ToArrayAsync();
+			return (await ctx.FeatClassEntries.Where(e => e.Autotrain).Select(e => e.FeatId).Distinct().ToListAsync()).ToHashSet();
 		}
 
 		/// <summary>
-		///     The spells a set of just-TRAINED feats teaches - the inverse of
-		///     <see cref="GetFeatsTeachingSpells" />, and the other half of the spell-grant story (#847).
+		///     The spells a set of just-TRAINED feats teaches - the other half of the spell-grant story (#847).
 		/// </summary>
 		/// <remarks>
 		///     The catalog carries two grant mechanisms and the level path only owns one of them
@@ -675,8 +658,8 @@ namespace Faolan.Core.Database.Repositories
 		///     </para>
 		///     <para>
 		///         ⚠️ Takes WIRE feat ids, like <c>CharacterFeat.FeatId</c>, and hops through
-		///         <see cref="FeatIdMap" /> to the RDB TEMPLATE id the grant is keyed by - the same two id spaces
-		///         <see cref="GetFeatsTeachingSpells" /> bridges in the other direction (#467).
+		///         <see cref="FeatIdMap" /> to the RDB TEMPLATE id the grant is keyed by - the two id spaces #467
+		///         bridges.
 		///     </para>
 		/// </remarks>
 		public async Task<uint[]> GetSpellsTaughtByFeats(IEnumerable<uint> wireFeatIds)

@@ -1366,6 +1366,46 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Feats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatClassEntry", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Autotrain")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte?>("Class")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Flag")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Tier")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TreeColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TreeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TreePointsRequired")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FeatClassEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_FeatClassEntry_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboAttackModifier", b =>
                 {
                     b.Property<uint>("FeatId")

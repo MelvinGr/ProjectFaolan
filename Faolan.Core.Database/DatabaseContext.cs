@@ -25,6 +25,7 @@ namespace Faolan.Core.Database
 		DbSet<FeatProc> FeatProcs { get; }
 		DbSet<FeatIdMap> FeatIdMaps { get; }
 		DbSet<FeatPrereq> FeatPrereqs { get; }
+		DbSet<FeatClassEntry> FeatClassEntries { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
 		DbSet<Achievement> Achievements { get; }
@@ -143,6 +144,7 @@ namespace Faolan.Core.Database
 		public DbSet<FeatProc> FeatProcs { get; set; }
 		public DbSet<FeatIdMap> FeatIdMaps { get; set; }
 		public DbSet<FeatPrereq> FeatPrereqs { get; set; }
+		public DbSet<FeatClassEntry> FeatClassEntries { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
 		public DbSet<Achievement> Achievements { get; set; }
@@ -317,6 +319,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Achievement>().Property(a => a.Id).ValueGeneratedNever(); // the client's TAG id (#748)
 			modelBuilder.Entity<Feat>().Property(f => f.Id).ValueGeneratedNever(); // the RDB template id, the same id space the wire uses
 			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter (#646)
+			modelBuilder.Entity<FeatClassEntry>().Property(f => f.Id).ValueGeneratedNever(); // the client's own row id in RDB 1000043 (#862)
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Faction>().Property(f => f.Id).ValueGeneratedNever(); // the client's own faction id (10, 20, ... 330), #310

@@ -326,6 +326,14 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`feat-autotrain-check` (#862: does the client's own auto-train flag agree with what retail puts in a feat list, and
+does one point per rank reproduce the budget those lists spend? Both sides are data neither of which is ours - the
+client's featclass table (`FeatClassEntry`, RDB 1000043) against the feat lists harvested off the captured player
+spawns. Currently OK on all three captured characters, each spending its level budget EXACTLY (79/79/16) and none
+of them holding a feat the client auto-trains. Returns non-zero on a character that does hold one, which is the
+only direction that can only be a defect; an unspent budget is printed, since a player may simply not have spent
+it. ⚠️ A test cannot do this - `faolan.sql` excludes every `Character*` table, so the fixture holds no
+`CharacterFeats` and the assertion would pass on an empty left side) ·
 `pet-cost` (#823: which field of a summoned pet's spawn carries the point it costs? The corpus discriminates well
 - three cost classes, 89 cost-1 / 13 cost-2 / 53 cost-4 spawns - and ⛔ **nothing carries it**: `generic_stats` is
 empty on every pet, and of 64 numeric fields on the character message, 60 present on all 155 samples with 29

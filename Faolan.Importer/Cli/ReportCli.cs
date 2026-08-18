@@ -457,6 +457,11 @@ namespace Faolan.Importer.Cli
 					return await SpellGrantCheck(arg);
 				}
 
+				case "feat-autotrain-check":
+				{
+					return await FeatAutotrainCheck();
+				}
+
 				case "inventory-token-check":
 				{
 					return await InventoryTokenCheck();

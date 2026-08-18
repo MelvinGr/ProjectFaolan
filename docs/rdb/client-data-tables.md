@@ -310,7 +310,7 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B), 1000520
 (29 entries, 760 B) and 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Decoded past their shape: 1000042 (layout), 1000043, 1000071, 1000099 (partly), 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
+Decoded past their shape: 1000042 (layout), 1000043, 1000071, 1000099, 1000505, 1000506, 1000507, 1000508, 1000509, 1000510, 1000511, 1000512, 1000513,
 1000517, 1000518, 1000520, 1000626, 1000080/1000081, 1065101 and 1065103 - see the sections below. The rest are counts and strides only, and open
 work is tracked in Gitea #469.
 
@@ -560,8 +560,15 @@ the AA trees Gitea #150 had been unable to find anywhere.
 
 ```
 1065101   49 records   [u32 treeId][u32 classId][u32 0][u32 0]
-1000043 9916 records   [u32 featId][u32 classId][u32 levelGate][u32 lineId][u32 0][u32 treeId][u32 rank]…
+1000043 9916 records   [rowId][classId][level][wireFeatId][autotrain][treeId][column][flag][tier][pointsRequired]
 ```
+
+⚠️ **1000043's columns were mis-assigned here until #862**, and the mistake mattered: word 0 was read as the
+feat id and word 3 as a "line id". Word 0 is the row's OWN id — which is why it "matches neither `Feats.Id` nor
+`FeatIdMaps.WireFeatId`, 0 of 9,916" — and **word 3 is the wire feat id**, resolving on 9,907 of 9,916. Word 4
+was read as a constant zero because the AA rows this section was written from are uniformly trainable; over the
+whole table it is the **auto-train flag** (`FeatClassEntry.Autotrain`, true on 3,839 rows). See
+[feats.md](../subsystems/feats.md) for the full column table and what the flag settles.
 
 `1065101` is the **registry**: 48 trees plus one zero row, and exactly **4 trees per class** across the twelve
 playable `ConanClass` values. `1000043` is the **membership**, and its own `classId` agrees with the registry's
@@ -602,9 +609,13 @@ each, recovered here from nothing but which line ids two trees have in common.
 ⚠️ **Which bucket is PerkLine 1 versus 3 is an inference** from the client's naming (`1 = PerkGeneral`,
 `3 = PerkClass`) laid over the sharing structure. The structure is measured; the numbering is read onto it.
 
-⚠️ **The perk NAMES are not reachable.** `1000043`'s `featId` column matches **neither** `Feats.Id` nor
-`FeatIdMaps.WireFeatId` — 0 of 9,916 in both — so it is a third id space, and nothing we hold names the 240
-lines. That, not the tree structure, is what #150 is now blocked on.
+⭐ **The perk names ARE reachable** — this section used to say they were not, on the mis-assigned column above.
+Resolving word 3 through `FeatIdMap` names **all 2,880** AA rows (268 distinct perks), and words 8/9 place each
+one in its tree: `Electric Wards`, `Fire Wards` and `Pressing Strikes` sit at tier 1 columns 2/3/4 of the
+Necromancer's `1000184`, five ranks each. RDB **1000099** ("feat point cost info") then gives each of those rows
+its point cost — 2,880 rows, two kinds, values 1..30 — and it covers the AA trees and *nothing else*. So #150 has
+the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the AA UI or
+of a perk being bought.
 
 ## Decoded: 1000520 `CoreTokenHolder` — the alternate-CURRENCY catalog
 
@@ -858,7 +869,7 @@ Entry 0 adds `21, 23, 30` to Soldier, `25, 26, 27` to Priest, `19, 33, 35, 36` t
 documentation was right, and it is now corroboration rather than the source: all twelve placements agree with entry
 1 exactly. `--report class-hierarchy` re-runs that comparison and fails loudly on any drift.
 
-## Partly decoded: 1000099 `FeatClassTable_c` — the feat POINT COST table
+## ⭐ Decoded: 1000099 `FeatClassTable_c` — the feat POINT COST table
 
 Named by its loader's two error strings — *"Could not load feat point cost info."* and, in the parse callback
 (`FUN_0078e560`), *"Invalid class point cost data size -- Expected[…] Got[…]"*. The callback also rejects any
@@ -884,10 +895,17 @@ Measured over the shipped 3,096 records:
 currency (a currency would give every feat both rows) and not the 1000505 class tier (which is 1 or 3 in this
 build, never 2).
 
-⚠️ **The key's id space is unidentified.** It joins to nothing we hold — not `Feats.Id`, not
-`FeatIdMaps.WireFeatId` or `.TemplateId`, not any column of 1000042 `Feat_t`, not `Items.Id` or `Spells.Id`, and
-`LDB` has no string at it in any category. Stated as an open question rather than guessed at; tracked in Gitea
-#469.
+⭐ **The key is 1000043's ROW ID** (#862) — its word 0, the column that section used to read as a feat id. All
+3,096 rows resolve, and joining through it names every one: the key is a `(class, level, feat, tree, tier)` row,
+so a cost is attached to a feat's PLACEMENT in a tree rather than to the feat. It joined to nothing before
+because the search was for a feat id, and word 0 is not one.
+
+⭐ **And what it covers is the answer to "where does a feat's point cost come from?"** — every one of the 2,880
+rows it names sits in the fourteen level-20/80 mastery trees (`treeId` 1000177–1000190), and no ordinary tree
+feat has a row at all. Ordinary feats have no cost table because they do not need one: they cost **one point per
+rank**, which reproduces all three captured characters' point budgets exactly (see
+[feats.md](../subsystems/feats.md)). Costs of 1–30 could not be per-feat point costs anyway under a level-80
+budget of 79.
 
 
 ## 1000042 `Feat_t` — the layout, from the loader's own parse callback

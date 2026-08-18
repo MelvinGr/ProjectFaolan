@@ -23,6 +23,11 @@ data comes from.
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
   conflated the two; that has been corrected across code + memories.
+- ⭐ **A feat's point cost is ONE PER RANK, and an AUTO-TRAINED feat is never on the wire** (#862). The client's
+  own featclass table (RDB 1000043, imported as `FeatClassEntry`) marks 3,839 of its 9,916 rows auto-trained and
+  hands them over itself at the level it names; all 56 captured feat ids are on the other side of that flag, and
+  summing `rank + 1` over each captured feat list reproduces its level's point budget exactly (79/79/16). See the
+  last section of this page.
 - **The feat CATALOG now exists** (#251): `Feat` (**19,777** rows from the RDB 1000020 plaintext templates - id, name,
   description, tree, group, rank) + `FeatEffect` (**23,033** stat modifiers, 161 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
@@ -451,6 +456,10 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 
 ## Why a learned spell may still refuse to cast — the feat criterion
 
+⚠️ **This is not a reason for the server to grant a feat** (#862). The criterion runs against the client's own
+`FeatHolder`, which already carries every auto-trained feat — the client puts them there itself, off RDB 1000043.
+See the section at the end of this page.
+
 A spell in the book is not a castable spell. The client runs a generic criteria evaluator
 (`FUN_006dd970`, log channel `GameCode/Criteria`) on an actual action attempt, and **case `0x5d` is the FEAT
 criterion**: it asks the character's feat holder whether it carries feat *F*, with **no level comparison of any
@@ -507,15 +516,15 @@ dotnet run --project Faolan.Importer -- --report ldb-resolve --Content:RdbDir <r
   (create-flow combos, same server-held-key class).
 - Memories: `feat_trees_decode_251` (the correction + FeatIIR), `snapshot_known_spell_list`, `player_spawn_scaffold_generated`.
 
-## An AUTOMATIC feat costs no points (#850)
+## An AUTOMATIC feat costs no points (#850) — and is never in a feat list at all (#862)
 
-`FeatRules.PointCost` is a placeholder — `max(1, the rank baked into the id's low two digits)` — and it was
-charging for the feats a character never chose. Two paths disagreed about them: `LevelUpService.
-GrantCastabilityFor` trains the feats that teach a newly learned spell with **no** budget check, and
-`FeatService.TrainWithinBudget` then counts the character's whole feat set against `FeatRules.PointBudget`.
+`FeatRules.PointCost` used to be a placeholder — `max(1, the rank baked into the id's low two digits)` — and it
+was charging for the feats a character never chose. Two paths disagreed about them: `LevelUpService.
+GrantCastabilityFor` trained the feats that teach a newly learned spell with **no** budget check, and
+`FeatService.TrainWithinBudget` then counted the character's whole feat set against `FeatRules.PointBudget`.
 
-⛔ **The interaction is not marginal, it is fatal.** Measured over the shipped catalog, the automatic feats a
-level-80 accumulates cost:
+⛔ **The interaction was not marginal, it was fatal.** Measured over the shipped catalog, the automatic feats a
+level-80 accumulated cost:
 
 | class | automatic feats | points | budget at 80 |
 |---|---|---|---|
@@ -523,17 +532,74 @@ level-80 accumulates cost:
 | 44 | 54 | **97** | 79 |
 | 24 | 47 | **89** | 79 |
 
-So three classes overspend the entire tree budget before the player picks anything, and every train request is
-rejected outright. Since the tree is the only path to its spells (`FeatService.GrantSpellsTaughtBy`), that blocks
-content rather than merely miscounting.
+So three classes overspent the entire tree budget before the player picked anything, and every train request was
+rejected outright. Exempting them (#850) removed the interaction. **#862 removed the cause**: those feats are not
+the server's to grant, and both halves of that ticket resolve to the same client table.
 
-`Feat.AutomaticUnlockCategory` (7063) is already modelled, so the exemption is a set lookup:
-`GetAutomaticFeatWireIds` maps it through `FeatIdMaps` to the wire ids the budget actually sees.
+### The client trains them ITSELF — RDB 1000043, the featclass table
 
-⚠️ It is an exemption, not a bypass — a tree feat is still charged, so the budget still binds on what it is meant
-to bind on.
+`FeatClassTable_c` loads **RDB type 1000043 id 1** at startup ("Could not load featclass info" is its own error
+string). Imported as `FeatClassEntry` (**9,916** rows), it is a 20-byte header then 40-byte entries of ten words:
 
-⚠️ **And charging them zero is not the same as matching retail.** The captured level-80 Necromancer casts all 109
-of her spells carrying **25** feats in total, so retail is plainly not handing out one automatic feat per spell
-the way we do. Making them free removes the interaction; how many retail actually grants — and what a
-non-automatic feat really costs, which is still unsourced — stays open on #850.
+| word | column | what it holds |
+|---:|---|---|
+| 0 | `Id` | the client's own row id (106..738078) — a natural key, so a re-import renumbers nothing |
+| 1 | `Class` | the `ConanClass` value, or 0 (→ `null`) on the 188 rows that name no class |
+| 2 | `Level` | the character level the row applies at, 1..80 |
+| 3 | `FeatId` | the **WIRE** feat id — 9,907 of 9,916 resolve through `FeatIdMap` |
+| 4 | `Autotrain` | ⭐ **the client trains this feat by itself**; true on 3,839 rows |
+| 5 | `TreeId` | 1000001..1000190 for a real tree, `900` innate, `9000` the class progression track |
+| 6 | `TreeColumn` | the feat's column within its tier row in the tree UI |
+| 7 | `Flag` | undecoded — see the column's own comment for the census |
+| 8 | `Tier` | its tier (row) in the tree, 1..9 |
+| 9 | `TreePointsRequired` | points that must already be spent IN THAT TREE — `(Tier - 1) * 5` on all but 57 of 3,197 ordinary-tree rows |
+
+⭐ **`Autotrain` is why a captured feat list is so short.** The client builds a per-class level→feat map from these
+rows (`FUN_0078c990`, which logs *"Autotrain feat: `<id>` for class: `<class>` at level: `<level>`"*) and trains
+them with no server involvement. Everything the old level-up grant handed out is one of them: the
+`Spell Unlocking <lo>-<hi>` bands, the `<Class> Class Feat NNN` tracks and `Pet Mastery`. Read straight off the
+table, the Necromancer's schedule is `Necromancer Class Feat 001` ranks 0..9 at levels 1..10, then
+`Spell Unlocking 20-40` at 20/25/30/35, `40-60` at 40/45/50/55 and `60-80` at 60/65/70/75/80.
+
+**The captures agree without exception**: all **56** feat ids across the four captured characters are
+`Autotrain = false`. Not one automatic feat is on the wire anywhere in the corpus, and the characters that DID
+level up during a capture (Blablabla, Blablatest, Stihetfv) end with an empty feat list despite learning spells.
+
+⛔ **And sending one is not merely redundant.** `FeatHolder::TrainFeat` (`FUN_01135e20`, `Feat\FeatHolder.cpp:74`)
+refuses a class feat outright, asserting `pcFeat->GetCategory() != e_ClassFeat` and logging *"Character:%d called
+TrainFeat on class feat : %d ( will break feats! )"*. So `LevelUpService.GrantCastabilityFor` no longer trains
+anything; it grants the class skill scaffold and nothing else, and `GetAutotrainedFeatWireIds` (the client's flag,
+replacing the `Feat.AutomaticUnlockCategory` proxy, which disagrees with it on 204 of 9,907 rows) is what the
+budget exempts. The spellbook offer is unaffected — `--report spell-grant-check` is unchanged at 97/96/5 matched,
+EXTRA 0, DROPPED 0.
+
+⚠️ The bug was visible in one line once the table was read: a level-4 test character was carrying
+`Spell Unlocking 20-40`, `40-60` and `60-80` — feats retail hands over at 30, 45 and 75.
+
+### A feat costs ONE POINT PER RANK, and the captures pin it exactly
+
+`FeatRules.PointCost` is `rank + 1` — the rank baked into the wire id's low two digits is 0-based, so holding
+rank 4 means five points were spent walking it up. Summing that over each captured character's feat list
+reproduces `PointBudget` for its level **to the point**:
+
+| character | level | feats | points | budget |
+|---|---:|---:|---:|---:|
+| NecroL80 | 80 | 25 | **79** | 79 |
+| DemoL80 | 80 | 25 | **79** | 79 |
+| Hakotep (Herald of Xotli) | 24 | 6 | **16** | 16 |
+
+Three characters at two different levels, each spending its budget to the last point, against a budget that comes
+from the client's own `FeatPointsTable` and feat lists that come off the wire. Nothing was fitted. Under the old
+`max(1, rank)` all three had points left over (60, 61, 13) — headroom that never binds, which is precisely why the
+wrong cost survived so long (the same trap `PointBudget` itself fell into).
+
+⚠️ **There is no per-feat cost table for an ordinary feat, and that is a finding rather than a gap.** RDB
+**1000099** *does* exist — the client calls it "feat point cost info" and it is a flat vector of
+`(featclassRowId, kind, value)` triples — but all **2,880** of its rows belong to the fourteen level-20/80
+mastery trees (`TreeId` 1000177..1000190), whose values run to 30 and could not be point costs under a budget of
+79. Not one feat any captured character holds has a row in it. Kinds 2 and 3 appear 1,548 times each.
+`--report feat-autotrain-check` is the standing measurement for both halves of this section.
+
+The client's other feat resources, found the same way (`FUN_0078de40` loads all four before building the
+auto-train map): **1000506** id 1 "classmembership info" and **1065101** id 0 "featspecializedtrees info" — both
+present in the RDB, neither yet read.

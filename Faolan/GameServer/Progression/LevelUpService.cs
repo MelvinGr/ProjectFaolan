@@ -184,7 +184,7 @@ namespace Faolan.GameServer.Progression
 				await _database.AddCharacterSpell(character.Id, spellId);
 			}
 
-			await GrantCastabilityFor(character, learned);
+			await GrantCastabilityFor(character);
 		}
 
 		// Raises the player's live vitals to the new max and refills them (a ding heals), then pushes the new Level +
@@ -218,29 +218,33 @@ namespace Faolan.GameServer.Progression
 				leveled.Level = level;
 		}
 
-		// What makes a just-learned spell CASTABLE (#298). Learning a spell puts it in the book, which is enough for
-		// it to render and for the level to read right, but the client refuses the cast until the character carries
-		// the FEAT that teaches it (its criteria evaluator's feat case, `YouCanNotUseYet`). Two grants, and they are
-		// different things:
+		// What makes a just-learned spell CASTABLE (#298): the class SKILL scaffold, and nothing else.
 		//
-		//   1. the TEACHING FEATS, read backwards out of FeatSpellGrants - exact, per spell, and available for all
-		//      twelve classes because it comes from the client RDB rather than from a capture. It deliberately stops
-		//      short of the class PROGRESSION tracks, which retail never puts in a feat list (see
-		//      GetFeatsTeachingSpells);
-		//   2. the class SKILL scaffold, which is the older stand-in and is kept because it is a different table
-		//      (skills, not feats) and still covers whatever the feat grants do not.
+		// ⛔ This used to ALSO train the feats that teach the newly learned spells, on the reading that the client's
+		// criteria evaluator refuses the cast until the character carries the teaching feat (its feat case,
+		// `YouCanNotUseYet`). That grant is GONE (#862), because the client trains those feats itself:
 		//
-		// The scaffold alone only ever worked for the four classes with a high-level capture (Necromancer,
-		// Demonologist, Assassin, Herald of Xotli) - `FullSkillIdsFor` returns null for the other eight, so their
-		// level-up spells stayed gated. The feat grant is what closes that.
+		//   * The client's own FEATCLASS table (`FeatClassEntry`, RDB 1000043) marks 3,839 of its 9,916 rows
+		//     `Autotrain`, and builds a per-class level -> feat map from them (`FUN_0078c990`, which logs
+		//     "Autotrain feat: <id> for class: <class> at level: <level>"). `Spell Unlocking 20-40`,
+		//     `<Class> Class Feat NNN` and `Pet Mastery` - everything the grant handed out - are exactly those rows.
+		//   * So retail never sends one, and the captures agree with no exception: all 56 feat ids across the four
+		//     captured characters are `Autotrain = false`, and the level-80 Necromancer casts all 109 of her spells
+		//     carrying 25 tree feats and not one automatic feat.
+		//   * Sending one is not merely redundant. `FeatHolder::TrainFeat` (`Feat\FeatHolder.cpp:74`) refuses a
+		//     class feat outright and logs "called TrainFeat on class feat : %d ( will break feats! )".
 		//
-		// Both take effect on the next world entry: feats ride the spawn scaffold's pre-IIR frame, so there is no
-		// mid-session feat packet to send and none is invented here.
+		// The feat list goes on the wire, so training one was inventing content to satisfy a criterion the client
+		// satisfies for itself - and it did so at the WRONG level, which is what made it visible: a level-4 test
+		// character was carrying `Spell Unlocking 20-40`, `40-60` and `60-80`, feats retail hands over at 30, 45
+		// and 75.
 		//
-		// The five classes that came out of the feat grant with ZERO coverage - Barbarian, Guardian, Conqueror,
-		// Assassin, Ranger - were not a gap: 227 of their 259 level-gated catalog entries are COMBOS, which no feat
-		// teaches and which never reach this method any more (see GetClassSpellsUnlockedBetween). What is left is an
-		// ordinary catalog gap of the same kind the caster classes have, Conqueror's ~36 real spells being most of it.
+		// The scaffold only ever worked for the four classes with a high-level capture (Necromancer, Demonologist,
+		// Assassin, Herald of Xotli) - `FullSkillIdsFor` returns null for the other eight. That is a real gap and it
+		// is tracked as such; it is not a reason to put feats retail does not send into a character's list.
+		//
+		// It takes effect on the next world entry: the scaffold rides the spawn's post-IIR frame, so there is no
+		// mid-session packet to send and none is invented here.
 		//
 		// ⚠️ The scaffold in (2) is a CAPTURED character's id list, so what it may grant is the class's CONTENT and
 		// never that character's own state. Two bands used to ride along and both showed up in-client on a level-2
@@ -249,15 +253,8 @@ namespace Faolan.GameServer.Progression
 		// player's trained TRADESKILL rungs, which made it a Grandmaster weapon- and armoursmith. Both are out of
 		// FullSkillIdsByClass now - the progression entry is DERIVED per character at spawn time
 		// (PlayerSpawnScaffoldRows.ClassProgressionIdFor) and a profession is trained, not dinged into.
-		private async Task GrantCastabilityFor(Character character, IReadOnlyCollection<uint> learnedSpellIds)
+		private async Task GrantCastabilityFor(Character character)
 		{
-			var teachingFeats = await _database.GetFeatsTeachingSpells(learnedSpellIds);
-			if (teachingFeats.Length > 0)
-			{
-				await _database.AddCharacterFeats(character.Id, teachingFeats);
-				_logger.LogInformation("Level-up: trained {Count} feat(s) that teach {Spells} newly learned spell(s) for {Name}.", teachingFeats.Length, learnedSpellIds.Count, character.Name);
-			}
-
 			var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
 			if (fullScaffold != null)
 				await _database.EnsureCharacterSkills(character.Id, fullScaffold);
