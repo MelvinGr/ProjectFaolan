@@ -108,7 +108,20 @@ namespace Faolan.Tests
 
 			// Here the factory's read comes FIRST, so the recovered time falls SHORT by the gap - bracketed, not a
 			// fixed window (#624).
-			Assert.InRange(recovered, remainingCs - (long)(serverTimeMs - before) / 10, remainingCs);
+			//
+			// ⚠️ The bound ROUNDS UP, and that is the whole of #860. `recovered` is `(10*R - d) / 10` for a gap `d`
+			// in milliseconds, and C# truncation of a subtraction makes that `R - ceil(d/10)`; a bound written as
+			// `R - g/10` is `R - floor(g/10)`. So the two straddle a centisecond boundary in OPPOSITE directions and
+			// the bound comes out one centisecond too tight whenever the elapsed gap is not a multiple of 10 ms.
+			// Normally all three clock reads land inside one millisecond and the gap is 0, which is why it passed;
+			// under a loaded full-suite run it does not, and the test failed for a reason that had nothing to do with
+			// what it measures.
+			//
+			// ⭐ Its neighbour above looks symmetric and is NOT affected, which is the tell: that one ADDS the gap
+			// (`stamp - serverTime` with the pong read first), so both sides floor and the inequality survives. Only
+			// the subtracting direction flips the rounding.
+			var gapCs = (long)(serverTimeMs - before + 9) / 10; // ceil, to match `recovered`'s own truncation
+			Assert.InRange(recovered, remainingCs - gapCs, remainingCs);
 			Assert.True(recovered < fullDurationCs, "a resumed buff must come back short of the spell's full duration");
 			Assert.Equal(remainingCs, resumed.Duration);
 		}
