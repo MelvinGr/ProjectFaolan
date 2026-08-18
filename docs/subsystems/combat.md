@@ -2062,3 +2062,33 @@ Only claiming the *targets'* lines catches it.
 line 44235 is rank 10. That is a pick, not a decode. What it is **not** is level scaling: measured over the
 shipped data, **97 of the 105** rank tables have every target at the same level, so a level cannot choose between
 them. That candidate is refuted; Gitea #813 holds the rest.
+
+## Terrain line-of-sight after the bake fix (#832/#833)
+
+`TerrainService.HasTerrainLineOfSight` blocks a ray when the sampled terrain exceeds the eye-line by
+`OcclusionMargin` (1.5 u). It reads the same baked grid the loot drop does — and before #832 that grid was a
+per-playfield surface with the playfield's *trees and buildings baked in*, so **43% of the walkable positions
+measured on map 4010 read 10–60 m above the player**: a phantom canopy standing between an NPC and its target,
+suppressing aggro on open beach.
+
+#832 rebuilt the bake as the lower envelope of the tilemap group. #833 asked whether that actually changed
+anything, since the claim was inference from the shared grid rather than an observation. Measured
+(`--report terrain-los --report-arg 4010`, 95 NPC spawns × 8 directions):
+
+| range | clear | terrain | collision |
+|---|---|---|---|
+| 6 u | 97.9% | 0.1% | 2.0% |
+| 12 u | 92.4% | 1.1% | 6.6% |
+| 15 u | 85.9% | 3.0% | 11.1% |
+| **20 u** (`NpcAggroRange`) | **73.0%** | **9.7%** | **17.2%** |
+
+⭐ **The phantom canopy is gone.** The spawn-to-ground deltas now run min −0.17 / median 0 / max **1.46 u**, and
+of the 42 spawns sitting below ground *none* is more than the 1.5 u eye height below — against the old 10–60 m.
+Terrain contributes ~1% of blocked rays out to 12 u and is not the dominant blocker at any range.
+
+⚠️ **What still climbs with range is COLLISION, not terrain** — 17.2% against 9.7% at the aggro boundary. So if
+aggro is still short on 4010 the remaining suppression is real geometry (huts, rocks) plus whatever the range and
+vertical gates do, and terrain is no longer the thing to look at. That is the input #577 needs.
+
+⚠️ Not an in-client observation. This measures the grid the gate reads, over real spawn positions; it does not
+watch a mob acquire.
