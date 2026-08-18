@@ -487,6 +487,11 @@ namespace Faolan.Importer.Cli
 					return DuplicateRecords(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "magicbuff-descriptor":
+				{
+					return MagicBuffDescriptor(NamedCapture.LoadAll(capturesDir), RdbDir());
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

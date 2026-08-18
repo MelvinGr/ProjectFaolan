@@ -326,6 +326,12 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`magicbuff-descriptor` (#658: where do the MagicBuff apply payload's `descriptor[0]` and `bool2` come from? Both
+are near-per-spell, so this cross-tabs them against the spell's RDB record. ⛔ **Both of the ticket's proposed
+routes are eliminated**: no FLAGS bit scores above +7 against a +50 yardstick, and no PROPERTY FIELD carries
+either — the one 80% candidate, field 54, matches **0 of 46** informative records, so its agreement is entirely
+base rate (`descriptor[0]` is 1 on 83% of spells, so a mostly-1 field agrees for free). Also tests the level pair
+by within-spell variance, which is confounded by the corpus being a handful of characters and says so) ·
 `duplicate-records` (#842: which s2c `StatIIR` records does retail send twice, back to back and byte-identical?
 ⭐ Answers the question that decides whether that ticket is special — and it is not: a whole family of stats is
 **always** sent as a pair (`WaypointType` 336/336, `SoulFragments` 56/56, `GuildID` 38/38,
