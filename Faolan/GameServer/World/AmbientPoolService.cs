@@ -158,6 +158,8 @@ namespace Faolan.GameServer.World
 			entity.Level = pool.Level;
 			entity.Disposition = pool.Disposition;
 			entity.Hostile = pool.Disposition == WorldEntity.DispositionHostile;
+			// #822: same split as the placed spawns - the colour is the disposition, the aggression is the kit.
+			entity.Aggressive = NpcWeapon.Initiates(wearing?.Equipment, wearing is { Morphs.Count: > 0 });
 			entity.LootContainer = pool.Type.LootContainerTemplateId; // drop this type's container on death
 			// #837/#838: the pool used to stamp neither of these, so a pooled archer fought as an unarmed melee mob.
 			// They come from the OUTFIT this member was dressed in, which is a real harvested placement's kit.

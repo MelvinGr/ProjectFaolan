@@ -558,10 +558,30 @@ namespace Faolan.GameServer.World
 		// since the entity is recreated at world entry.
 		public bool GodMode { get; set; }
 
-		// Whether this NPC attacks players on sight. Driven by Disposition (only cCategory 1 = hostile aggros);
-		// friendly/neutral NPCs (Citizens, vendors, guards, wildlife) never aggro. Set at zone load. Players are
-		// never hostile here.
+		// Whether this NPC is hostile to the player at all - the captured `cCategory` (only 1 = hostile). It drives
+		// the NAME COLOUR and it gates fighting back; friendly/neutral NPCs (Citizens, vendors, wildlife) do neither.
+		// Set at zone load. Players are never hostile here.
+		//
+		// ⚠️ This used to drive AGGRO as well, and that is #822: retail colours the Town Crier hostile - 62 unanimous
+		// votes - and he never once attacks. See `Aggressive` below.
 		public bool Hostile { get; set; }
+
+		/// <summary>
+		///     Whether this NPC INITIATES - engages a player who simply walks past. Distinct from
+		///     <see cref="Hostile" />, which is the name colour.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ #822: one flag was doing both jobs, so every hostile-COLOURED NPC attacked. Retail colours civilians
+		///     hostile without them ever fighting, the Town Crier being the reported case.
+		///     <para />
+		///     The rule is <see cref="NpcWeapon.Initiates" /> - an armed humanoid, or anything that is not humanoid -
+		///     and its derivation and validation are documented there.
+		///     <para />
+		///     ⚠️ INITIATION only. Retaliation stays on <see cref="Hostile" />, so a passive NPC still fights back
+		///     when attacked; this can make something unprovoked, never inert. Defaults TRUE so a mint site that does
+		///     not think about it keeps the old behaviour rather than silently pacifying its NPC.
+		/// </remarks>
+		public bool Aggressive { get; set; } = true;
 
 		// Whether this NPC SHOOTS rather than swings - its main hand holds a bow/crossbow/thrown weapon
 		// (`NpcWeapon.IsRanged`). Stamped from the spawn's equipment at load, because that is where the rows are

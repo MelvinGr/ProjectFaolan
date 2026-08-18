@@ -472,6 +472,11 @@ namespace Faolan.Importer.Cli
 					return QuestContainer(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "npc-aggression":
+				{
+					return await NpcAggression();
+				}
+
 				case "broadcast-check":
 				{
 					return BroadcastCheck(NamedCapture.LoadAll(capturesDir));

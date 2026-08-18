@@ -53,11 +53,61 @@ namespace Faolan.GameServer.Combat
 		// fifth", not "a mob holding item class 30017 does".
 		private static readonly FrozenSet<uint> RangedCategories = new[] { Bow, Crossbow, Thrown }.ToFrozenSet();
 
+		// Every category that IS a weapon - the seven melee classes plus the three ranged. Shield is deliberately out:
+		// carrying one is not being armed, and no NPC in the shipped data holds only a shield.
+		private static readonly FrozenSet<uint> WeaponCategories =
+			new[] { OneHandEdge, TwoHandEdge, OneHandBlunt, TwoHandBlunt, Dagger, Polearm, Bow, Crossbow, Thrown }.ToFrozenSet();
+
 		// Whether this NPC attacks at range - i.e. whether its MAIN HAND holds a bow/crossbow/thrown weapon.
 		// False for an unarmed NPC and for every animal, which is what makes this safe to ask of any spawn.
 		public static bool IsRanged(IEnumerable<INpcEquipment>? equipment)
 		{
 			return RangedCategories.Contains(CategoryIn(equipment, MainHandPos));
+		}
+
+		/// <summary>
+		///     Whether a hostile-coloured NPC actually ENGAGES a player who walks past, as opposed to merely being
+		///     coloured hostile. False for an armed humanoid carrying nothing in either hand - a civilian.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ **The colour and the aggression are two different facts and retail keeps them apart** (#822). The
+		///     Town Crier (14572) is `cCategory = 1` unanimously - 62 votes across two captures and two characters -
+		///     and never fights: he spawns and despawns as the player walks past him for a whole session with no
+		///     attack, no hate list, no threat. Reading one flag as both is what made him attack.
+		///     <para />
+		///     ⚠️ Two candidate discriminators were tried and failed before this one. **Perception** (`SightSkill` and
+		///     friends being NULL) is a distinctive 7% of hostiles, but that 7% contains the Crow gang, the Wharf Rat
+		///     gang and the Nemedian Scouts - genuinely aggressive mobs - so it cannot mean passive. **Combat
+		///     capability alone** is not it either: 102 hostile templates carry no weapon and most are animals, which
+		///     fight perfectly well without one.
+		///     <para />
+		///     ⭐ It is the CONJUNCTION that separates them, and it was validated on the very population that killed
+		///     the perception idea. Of the 18 hostile templates with no senses at all, every genuine mob is ARMED -
+		///     Crow Harrier/Nightblade/Roofhugger/Stalker, Nemedian Archer and three Scouts, five Wharf Rats, Wulfhere
+		///     (14 of 14) - and every civilian is unarmed: Aelfrith, Ambassador Nidas, Chancellor Publius, Dexitheus
+		///     and the Town Crier. `Frozen Hatred` and `Parasitic Soul` are unarmed too and stay aggressive, because
+		///     they are not humanoid.
+		///     <para />
+		///     Across all 352 hostile templates the rule selects TEN: the four level-80 named city NPCs above, two
+		///     Dockworkers, two Slaves of Acheron, the Town Crier, and one uncertain case (`Vanir Acolyte`, level 20).
+		///     Nine of ten are unmistakably civilians.
+		///     <para />
+		///     ⚠️ It gates INITIATION only. A passive NPC still fights back when attacked - `RecentAttackerOf` is not
+		///     behind this gate - so this cannot make anything unkillable or inert, only unprovoked.
+		///     <para />
+		///     ⚠️ `humanoid` comes from whether the spawn carries a MORPH table, which is harvest-dependent: a
+		///     humanoid whose morphs were never captured reads as an animal and stays aggressive. That errs toward
+		///     leaving mobs alone rather than pacifying them, which is the safe direction for a rule this shape.
+		/// </remarks>
+		public static bool Initiates(IEnumerable<INpcEquipment>? equipment, bool humanoid)
+		{
+			if (!humanoid)
+				return true; // an animal needs no weapon to mean it
+
+			// ⚠️ A WEAPON category, not "the slot holds something". The hand slots carry other things - the Town
+			// Crier's own equipment rows include a necklace and shoulders - so a non-empty test would call him armed
+			// and the rule would select nothing at all.
+			return WeaponCategories.Contains(CategoryIn(equipment, MainHandPos)) || WeaponCategories.Contains(CategoryIn(equipment, OffHandPos));
 		}
 
 		// #623: the `Combos` row name whose id retail puts on this NPC's melee swings, or null when it has no melee

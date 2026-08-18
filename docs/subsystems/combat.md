@@ -598,6 +598,49 @@ Decode: `CombatDamageCodecTests` (98/98 frames of the strickenbla capture). Buil
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
 semantically decoded - capture-typical defaults for the live send.
 
+## Hostile-COLOURED is not hostile-BEHAVED (#822)
+
+The Town Crier attacked the player, and the data underneath was right: template 14572 is `cCategory = 1`
+unanimously — **62 votes** across two captures and two characters — and he **never fights**. He spawns and
+despawns as the player walks past him for a whole session with no attack, no hate list, no threat. Retail
+colours him red and leaves him alone; our code read one flag as both.
+
+So `WorldEntity.Hostile` (the colour, and the right to fight back) and `WorldEntity.Aggressive` (whether
+walking past is enough) are separate now.
+
+⚠️ **Two discriminators were tried and failed first**, which is why the rule is a conjunction:
+
+* **Perception** — the crier has NULL `SightSkill`/`HearingSkill`/`SmellingSkill`, a distinctive 7% of hostiles.
+  But that 7% also holds the Crow gang, the Wharf Rats and the Nemedian Scouts, which are genuinely aggressive.
+* **Combat capability alone** — 102 hostile templates carry no weapon, and most of them are animals, which fight
+  perfectly well without one.
+
+⭐ **`NpcWeapon.Initiates` is armed-OR-not-humanoid, and it was validated on the exact population that killed
+perception.** Of the 18 hostile templates with no senses at all:
+
+| | |
+|---|---|
+| **armed → stays aggressive** (14) | Crow Harrier / Nightblade / Roofhugger / Stalker, Nemedian Archer + 3× Scout, 5× Wharf Rat, Wulfhere |
+| **unarmed** (5) | Aelfrith, Ambassador Nidas, Chancellor Publius, Dexitheus, Town Crier |
+
+Every mob armed, every civilian not. `Frozen Hatred` and `Parasitic Soul` are unarmed too and stay aggressive,
+because they are not humanoid.
+
+Across all **352** hostile templates the rule selects **10** (`--report npc-aggression`): the four level-80 named
+city NPCs, two Dockworkers, two Slaves of Acheron, the Town Crier, and one uncertain case — `Vanir Acolyte`,
+level 20. Nine of ten are unmistakably civilians.
+
+⚠️ **It gates INITIATION only.** Retaliation stays on `Hostile`, so a passive NPC still fights back when
+attacked — this can make something unprovoked, never inert. And `Aggressive` **defaults to true**, so a mint site
+that never considers it keeps the old behaviour rather than silently pacifying its NPC.
+
+⚠️ The humanoid signal is whether the spawn carries a **morph table**, which is harvest-dependent: a humanoid
+whose morphs were never captured reads as an animal and stays aggressive. That errs toward leaving mobs alone
+rather than pacifying them.
+
+⚠️ A trap met on the way, worth repeating: **three** templates share the name *"Red Hand Sentry"* (2271 and 2279
+hostile, 9551 friendly). Comparing by NAME gives a completely wrong picture of the dispositions.
+
 ## Where an NPC's hostility comes from (#256/#715/#731/#840/#841)
 
 `NpcStatCore.Disposition` is retail's own `cCategory` — the third word of the `DispatchUpdateAggroStatus` reply,

@@ -541,8 +541,13 @@ namespace Faolan.GameServer.World
 					// the `target == null` branch below and REVIVES TO FULL, every tick. So every hit after the first
 					// was erased before the next one landed ("the first hit is fine, everything following is not"), and
 					// the mob stood there while it happened.
+					// #822: INITIATION and RETALIATION are separately gated. `Aggressive` decides whether walking past
+					// is enough; `Hostile` alone is enough to fight back once hit, so a passive NPC (the Town Crier)
+					// is unprovoked rather than inert - attack him and he still defends himself.
 					var target = entity.Hostile
-						? NearestPlayerInRange(zone, entity, NpcAggroRange) ?? RecentAttackerOf(zone, entity)
+						? (entity.Aggressive
+							? NearestPlayerInRange(zone, entity, NpcAggroRange)
+							: null) ?? RecentAttackerOf(zone, entity)
 						: null;
 
 					var homeDx = entity.SpawnPosition.X - entity.Position.X;
@@ -1015,7 +1020,9 @@ namespace Faolan.GameServer.World
 			if (entity.WalksRoute && !entity.RouteDwelling)
 				return false;
 
-			return !entity.Hostile || NearestPlayerInRange(zone, entity, NpcAggroRange) == null;
+			// #822: an NPC that never initiates keeps idling while a player stands beside it - it is not about to
+			// fight, so it has no reason to drop its ambient animation.
+			return !entity.Hostile || !entity.Aggressive || NearestPlayerInRange(zone, entity, NpcAggroRange) == null;
 		}
 
 		// A pause drawn from an exponential with the given MEDIAN - the shape the measured ambient-animation gaps have

@@ -326,6 +326,11 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`npc-aggression` (#822: which hostile-COLOURED templates the armed-or-not-humanoid rule leaves passive. Retail
+colours civilians red without them ever fighting, so the name colour and the aggro decision are separate facts.
+Currently **10 of 352**, and every name in the list should read as a civilian - a mob appearing there means a
+template whose weapon was never harvested. A report and not a test per #729: the RULE is gated in
+`NpcAggressionTests`, this prints who it selects) ·
 `quest-container` (#843: what takes an item out of the quest container `0x71` - the goal that SPENDS it, or the
 quest COMPLETING? The two readings make different predictions about the rest of the corpus and this measures
 them. Verdict: **7 of the 17 completions that happened while the container held something KEPT their items**, so

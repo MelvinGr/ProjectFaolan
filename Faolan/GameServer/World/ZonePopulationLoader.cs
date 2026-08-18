@@ -276,6 +276,10 @@ namespace Faolan.GameServer.World
 				// is the population the friendly default is actually right for.
 				entity.Disposition = npc.NpcTemplate.StatCore?.Disposition ?? WorldEntity.DispositionFriendly;
 				entity.Hostile = entity.Disposition == WorldEntity.DispositionHostile;
+				// #822: hostile-COLOURED is not hostile-BEHAVED. An armed humanoid engages; an unarmed one is a
+				// civilian retail happens to colour red (the Town Crier, the Tarantia nobles, the Dockworkers), and
+				// anything non-humanoid needs no weapon to mean it. Morph rows are the humanoid signal.
+				entity.Aggressive = NpcWeapon.Initiates(npc.Equipment, npc.Morphs.Count > 0);
 				if (npc.NpcTemplate.StatCore?.Disposition == null)
 				{
 					undisposed++;
