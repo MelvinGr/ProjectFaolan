@@ -65,13 +65,13 @@ namespace Faolan.Tests
 
 			Assert.Equal(2, s.Post.BuffRecords.Count);
 
-			// The record is decoded now, not a 60-byte blob (#475): each carries a real spell id, the standard
-			// [EntityClass.Character][handle] reference to the character it is running on, and a timer pair whose
-			// remaining half never exceeds its total.
-			Assert.All(s.Post.BuffRecords, r =>
+			// The list is decoded to the client's own carve now (#475 flat, #658 grouped): per SPELL a group whose
+			// inner list holds the records - each with the standard [EntityClass.Character][handle] reference to the
+			// character it is running on and a timer pair whose remaining half never exceeds its total.
+			Assert.All(s.Post.BuffRecords, g =>
 			{
-				Assert.NotEqual(0u, r.SpellId);
-				Assert.Equal(ScaffoldBuff.DefaultKind, r.Kind);
+				Assert.NotEqual(0u, g.SpellId);
+				var r = Assert.Single(g.Records);
 				Assert.Equal(EntityClass.Character, r.TargetClass);
 				Assert.Equal(s.Handle, r.TargetHandle);
 				Assert.InRange(r.CasterLevel, 1u, 80u);

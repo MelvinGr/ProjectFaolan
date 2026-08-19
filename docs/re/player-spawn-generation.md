@@ -138,10 +138,12 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
 - **post-IIR stream** (contiguous to EOF; nothing follows it):
   - header: a **plain-counted list** `[u32 n][n x u32]` then the constant `[u32 4]`. Read as the constant pair
     `[u32 0][u32 4]` until #251 — `n` is 0 on all but 2 captured spawns, which carry a single word (60).
-  - `[u32 2][u32 0x3F1 * (nBuffs+1)]` — the second field is the framing word of the **60-byte buff record**
-    list, i.e. the count of `ScaffoldBuff`s that follow (spell id, timer pair, caster level, the
-    `[EntityClass.Character][handle]` reference to whoever the buff is on — decoded in #475). An empty list
-    frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
+  - `[u32 2][u32 ListFrame]` — the buff list, GROUPED BY SPELL, in the client's own carve
+    (`FUN_0145b8a0`/`FUN_0145c0b0`/`FUN_007ed9b0`, #658): per group `[u32 spellId][u32 ListFrame]` then that
+    many 52-byte records (a discarded u32 + twelve fields: timer pair, caster level, the
+    `[EntityClass.Character][handle]` reference to whoever the buff is on — decoded flat in #475, re-carved
+    grouped). The inner frame was the flat model's "Kind = ForCount(1) constant": every captured group holds
+    one record. An empty list frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
   - ⭐⭐ **the ENTRY SLOT — ONE grammar for both families, and the old player carve was 8 bytes OFF the
     client's** (#466, decided by `FUN_010087b0`/`FUN_0079cfd0` — see "Where the CLIENT reads the scaffold
     lists" below). The client reads:
@@ -470,9 +472,8 @@ in a layout whose fourth field IS `bool2`, and that is a place a value can be li
 observable"*. This says WHERE that layout comes from on the wire: the character full-update stream, i.e. the same
 family of bytes the corpus already holds 1,471 parsed `ScaffoldBuff` records of.
 
-⚠️ Which of our modelled lists it is has NOT been pinned — the call order under `FUN_0145ac80` puts it between the
-id-list loop and `FUN_0145ba10` (the pets), and lining that up against our own grammar is the step that would
-make the claim usable. Recorded as a located route, not as an identification.
+⭐ It IS our buff list — pinned by the full read order (`FUN_0145b8a0` is the first list after the protobuf,
+exactly where our grammar has the buffs), and `SpawnPostIir.BuffRecords` now carries the client's grouped carve.
 
 ### ⭐⭐ `BuffInfo_c` is the SAME object the MagicBuff apply builds
 
@@ -501,13 +502,17 @@ bridge them:
 That is a second, independent population for #658's unsourced apply fields: the corpus holds 1,471 parsed buff
 records off the character full-update stream, and they carry the same object's fields under a different framing.
 
-⛔ **And the framings do not agree, which is its own finding.** `FUN_0145c0b0`'s element is **one discarded u32
-followed by `FUN_007ed9b0`'s twelve** — 13 words, **52 bytes** — inside a `ListFrame`-counted list. Our
-`ScaffoldBuff` is **60 bytes / 15 words**, and it round-trips byte-exact over the whole corpus, so neither
-reading is wrong: two of our fifteen words are framing the client consumes elsewhere, or our record boundary is
-shifted against the client's. 60 − 52 = 8, exactly the width of the `[u32 class][u32 handle]` `ID32` pair our
-grammar calls `TargetClass`/`TargetHandle` — which is the obvious candidate for the pair read by a different
-helper, and is not yet confirmed. Open work tracked in Gitea #466.
+⭐ **The 60-vs-52-byte disagreement is RESOLVED, and the earlier guess was wrong.** The old flat `ScaffoldBuff`
+was 60 bytes; the client's element is 52. The extra 8 bytes are NOT the `TargetClass`/`TargetHandle` pair (the
+candidate the first pass named) — they are the GROUP HEAD: `FUN_0145b8a0` reads `[u32 spellId]` per outer
+element and `FUN_0145c0b0` the inner `ListFrame` word, i.e. the flat carve's `SpellId` + "`Kind` constant". The
+model now matches the client (`ScaffoldBuffGroup { SpellId, Records }`), the discarded u32 opens each record
+(our `SourceHandle` — the client reads it and throws it away), and a stream whose group holds TWO records — the
+case the flat carve would have misparsed — now reads. `UpdateBuff`'s own store block (`007eeb5e`) also anchors
+the timer pair: `+0x18` receives duration x stat `0x1D0 DurationModifier` x a constant (the client COMPUTES the
+scaled total the scaffold carries precomputed) and `+0x1c` the unscaled duration, and `+0x24` receives the raw
+arg-3 POINTER to the descriptor — so on the apply path that slot holds a pointer where the scaffold wire carries
+a small int, and the two paths share the object but not that field's kind.
 
 ⚠️ Both framing readers divide by `0x3F1` to recover the count, which is the same `ListFrame` arithmetic
 CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is

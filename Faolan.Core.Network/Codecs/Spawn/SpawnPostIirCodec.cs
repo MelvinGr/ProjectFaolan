@@ -55,8 +55,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				stream.WriteUInt32(word);
 
 			stream.WriteUInt32((uint)slot.Length + 4).WriteUInt32(post.MovementMode).WriteArray(slot).WriteUInt32(ListFrame.ForCount(post.BuffRecords.Count));
-			foreach (var buff in post.BuffRecords)
-				WriteBuff(stream, buff);
+			foreach (var group in post.BuffRecords)
+			{
+				stream.WriteUInt32(group.SpellId).WriteUInt32(ListFrame.ForCount(group.Records.Count));
+				foreach (var buff in group.Records)
+					WriteBuff(stream, buff);
+			}
 
 			WriteSlot(stream, post.Slot);
 
@@ -109,7 +113,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var count = r.ReadListCount();
 			for (var n = 0; n < count; n++)
-				value.BuffRecords.Add(ReadBuff(ref r));
+			{
+				// The client's carve (#658): one u32 spell id per group, then an INNER ListFrame'd record list -
+				// the word the flat model carried as a per-record "Kind" constant.
+				var group = new ScaffoldBuffGroup
+				{
+					SpellId = r.ReadU32Be()
+				};
+				var records = r.ReadListCount();
+				for (var m = 0; m < records; m++)
+					group.Records.Add(ReadBuff(ref r));
+
+				value.BuffRecords.Add(group);
+			}
 
 			return value;
 		}
@@ -174,8 +190,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var buff = new ScaffoldBuff
 			{
-				SpellId = r.ReadU32Be(),
-				Kind = r.ReadU32Be(),
 				SourceHandle = r.ReadU32Be(),
 				Stamp = r.ReadU32Be(),
 				TimerTotal = r.ReadU32Be(),
@@ -185,7 +199,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				TargetClass = r.ReadU32Be(),
 				TargetHandle = r.ReadU32Be()
 			};
-			for (var w = 0; w < ScaffoldBuff.TrailerWords; w++)
+			for (var w = 0; w < buff.Trailer.Length; w++)
 				buff.Trailer[w] = r.ReadU32Be();
 
 			return buff;
@@ -196,8 +210,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private static void WriteBuff(FaolanStream s, ScaffoldBuff buff)
 		{
 			s
-				.WriteUInt32(buff.SpellId)
-				.WriteUInt32(buff.Kind)
 				.WriteUInt32(buff.SourceHandle)
 				.WriteUInt32(buff.Stamp)
 				.WriteUInt32(buff.TimerTotal)

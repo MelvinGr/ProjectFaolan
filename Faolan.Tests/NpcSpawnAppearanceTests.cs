@@ -91,7 +91,11 @@ namespace Faolan.Tests
 				Flag = 1
 			};
 			for (var n = 0; n < buffs; n++)
-				runtime.BuffRecords.Add(new ScaffoldBuff { SpellId = 1148789, TargetHandle = 0x1310001 });
+			{
+				var group = new ScaffoldBuffGroup { SpellId = 1148789 };
+				group.Records.Add(new ScaffoldBuff { TargetHandle = 0x1310001 });
+				runtime.BuffRecords.Add(group);
+			}
 
 			using var post = new FaolanStream();
 			SpawnPostIirCodec.Write(post, runtime);

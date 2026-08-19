@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//   [u32 headWordCount][headWordCount x u32][u32 firstRecordLen][u32 word2]   the header
 	//   [firstRecordLen-4 move-task slot][u32 list frame]                         the FIRST RECORD, ending in the
 	//                                                                             buff list's count frame
-	//   [count x 60-byte ScaffoldBuff]                                            the active buffs
+	//   [count x ScaffoldBuffGroup]                                               the active buffs, grouped by spell
 	//   [SpawnEntrySlot]                                                          appearance + skills + pets
 	//   [u32 c1][c1 x 8][u32 c2][c2 x 8]                                          two PLAIN-counted pair lists
 	//   [u32 list frame][n x 8]                                                   the count-framed third
@@ -68,7 +68,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// modes the MoveTaskIIR packet uses (path x1,636, approach-facing x22, approach-target x18, ...).
 		public MoveTaskNode? MoveTask { get; set; }
 
-		public List<ScaffoldBuff> BuffRecords { get; } = [];
+		// The active buffs, GROUPED BY SPELL - the client's own carve (#658): FUN_0145b8a0 reads the outer frame
+		// and one u32 spell id per group, FUN_0145c0b0 the inner frame, FUN_007ed9b0 each record. The list was long
+		// modelled FLAT as 60-byte records whose word 1 was a "Kind = ForCount(1) on all 1,471" - that word is the
+		// INNER frame, constant only because no captured entity carries two records of one spell. The flat carve
+		// would have MISPARSED the first M>=2 stream; this one reads it.
+		public List<ScaffoldBuffGroup> BuffRecords { get; } = [];
 
 		// The appearance/skills/pets slot - one grammar for both families; an NPC's skill and pet lists are empty.
 		public SpawnEntrySlot Slot { get; set; } = new SpawnEntrySlot();
@@ -205,55 +210,52 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// Value = its value - see EndPairs3, Gitea #466).
 	public readonly record struct ScaffoldPair(uint Id, int Value);
 
-	// One 60-byte ACTIVE BUFF record, an element of the count-framed list that closes the stream's first record.
-	// Fifteen u32, decoded over all 1033 captured records (Gitea #475) - it was carried as an opaque byte[] described
-	// only as "buff/timer state".
+	// One SPELL's group in the buff list: the spell id, then an inner ListFrame'd list of records. Decoded over
+	// all 1,471 captured records (#475 flat, #658 re-carved to the client's own grammar - see BuffRecords).
 	//
-	// NOT a player record: it lives in the shared part of the stream and NPCs carry it too. Nine distinct spells turn
-	// up on NPC spawns, all rows in our own Spells table - Stagger, Hearty Meal, Shrink, Frozen Hatred, two
+	// NOT a player record: it lives in the shared part of the stream and NPCs carry it too. Nine distinct spells
+	// turn up on NPC spawns, all rows in our own Spells table - Stagger, Hearty Meal, Shrink, Frozen Hatred, two
 	// necromancer PET summons - which is corroboration from a direction the walk knows nothing about.
+	public sealed class ScaffoldBuffGroup
+	{
+		// THE find of #475: the distinct values are rows in our own Spells catalog, and they read as a buff bar -
+		// "Hearty Meal", "Focused Mind", "Refresh Strength", "Death Penalty 1", "Spirit of the Bear (Rank 1)".
+		public uint SpellId { get; set; }
+
+		// ForCount(1) on every captured group - one record per spell - which is why the flat carve's "Kind" word
+		// read as a constant.
+		public List<ScaffoldBuff> Records { get; } = [];
+	}
+
+	// One 52-byte buff record: a leading u32 the client READS AND DISCARDS (FUN_0145c0b0), then twelve u32 the
+	// client stores onto a BuffInfo_c (200 bytes, ctor FUN_00849770) at the offsets below (FUN_007ed9b0) - the SAME
+	// object a MagicBuffIIR apply fills through CoreMagicHolder::UpdateBuff, whose own stores anchor four of them
+	// (#658). Field names predate the offset mapping and are corpus-derived where the client is silent:
 	//
-	// What the corpus establishes, and what it does not:
-	//   SpellId       w0  - THE find: the distinct values are rows in our own Spells catalog, and they read as a buff
-	//                       bar - "Hearty Meal", "Focused Mind", "Refresh Strength", "Death Penalty 1", "Spirit of
-	//                       the Bear (Rank 1)". That is what identifies the record.
-	//   Kind          w1  - ListFrame.ForCount(1) on all 1033. ⚠️ Whether that is a CONSTANT or a real one-element
-	//                       list count cannot be decided from this corpus, so it is written as ForCount(1) rather
-	//                       than as a magic number, and CARRIED per record.
-	//   SourceHandle  w2  - 0 on nearly all; the exceptions carry a value in the same 0x131xxxx range as TargetHandle.
-	//   Stamp         w3  - large values (874724..98289218), unrelated to the timer pair. Unknown.
-	//   TimerTotal    w4  } TimerRemaining <= TimerTotal on ALL 941 records, which is what makes them a PAIR rather
-	//   TimerRemaining w5 } than two independent numbers. Their unit is not pinned; only the ordering is evidence.
-	//   CasterLevel   w7  - 0..82 across both families. #438 independently found the caster's LEVEL in the MagicBuff
-	//                       payload - but 82 is ABOVE the level cap, so no bound is asserted on it.
-	//   TargetClass   w8  - EntityClass.Character on all 941, and
-	//   TargetHandle  w9  - the spawning character's own handle on nearly all: the standard [class][handle] entity
-	//                       reference, i.e. who the buff is ON.
-	//   Word6, Trailer    - zero on every record. Carried rather than asserted.
-	// One ACTIVE BUFF on the entity being spawned, in the post-IIR's count-framed list.
+	//   SourceHandle    the DISCARDED word - 0 on nearly all; the exceptions carry a value in the same 0x131xxxx
+	//                   range as TargetHandle
+	//   Stamp           -> +0x14   large values (874724..98289218), unrelated to the timer pair. Unknown
+	//   TimerTotal      -> +0x18   ⭐ the apply path COMPUTES this slot itself: duration x stat 0x1D0
+	//                   DurationModifier x a constant (UpdateBuff @007eeb5e), so the scaffold carries the same
+	//                   scaled total precomputed. TimerRemaining <= TimerTotal on ALL 941 timed records
+	//   TimerRemaining  -> +0x1c   the apply path stores its unscaled duration here
+	//   Word6           -> +0x20   zero on every record. Carried rather than asserted
+	//   CasterLevel     -> +0x24   ⚠️ on the APPLY path this slot receives the POINTER to the 7-word descriptor
+	//                   (UpdateBuff arg 3, stored raw @007eeb6d) - so the two paths do NOT store the same kind of
+	//                   value here, and the corpus reading (0..82, plausibly a level; 82 is above the cap, so no
+	//                   bound is asserted) names only the scaffold's half
+	//   TargetClass     -> +0x28   EntityClass.Character on all 941, and
+	//   TargetHandle    -> +0x2c   the spawning character's own handle on nearly all: who the buff is ON
+	//   Trailer[0..4]   -> +0xa8 +0xac +0xb8 +0xbc +0xc0   zero on every record. On the apply path +0xa8 gets the
+	//                   constant 0, +0xac the Duration (gated > 0) and +0xc0 the CasterID - so a scaffold record
+	//                   arrives with no duration in the slot the apply gates on, carrying its time in the pair above
 	//
-	// ⚠️ This is how retail tells an OBSERVER about buffs on an entity streaming into view (#677), and it settles
-	// both halves of that ticket without a new capture. It ATTACHES them to the spawn - measured over the corpus,
-	// 1,064 of 17,717 parsed spawn bodies carry at least one, 1,471 records in all - so there is no MagicBuffIIR
-	// fan-out to design.
-	//
-	// ⚠️ And `TimerRemaining` is what retires the ticket's other half. It reasoned that an observer arriving
-	// mid-buff has no apply event to count down from, so an ABSOLUTE expiry stamp on the server's uptime clock
-	// "earns its place" here - and that the observer's client would therefore need `ServerTime_c` live from a
-	// `DispatchPong` reply. None of that is needed: the record states the remaining time directly, and it is a real
-	// remainder rather than the total under another name (it is <= TimerTotal everywhere, and differs from it).
-	// `SourceHandle`/`TargetHandle` carry the attribution a fan-out would have had to invent a place for.
+	// ⚠️ This is how retail tells an OBSERVER about buffs on an entity streaming into view (#677) - it ATTACHES
+	// them to the spawn (1,064 of 17,717 parsed spawn bodies carry at least one), so there is no MagicBuffIIR
+	// fan-out to design, and TimerRemaining states the remaining time directly.
 	// [V3: SpawnBuffRecordTests.RemainingIsNotJustTheTotalAgain]
 	public sealed class ScaffoldBuff
 	{
-		public const int ByteCount = 60;
-		public const int TrailerWords = 5;
-
-		// See the Kind note above: ForCount(1) on every captured record, and not provably a constant.
-		public static readonly uint DefaultKind = ListFrame.ForCount(1);
-
-		public uint SpellId { get; set; }
-		public uint Kind { get; set; } = DefaultKind;
 		public uint SourceHandle { get; set; }
 		public uint Stamp { get; set; }
 		public uint TimerTotal { get; set; }
@@ -262,6 +264,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public uint CasterLevel { get; set; }
 		public uint TargetClass { get; set; } = EntityClass.Character;
 		public uint TargetHandle { get; set; }
-		public uint[] Trailer { get; set; } = new uint[TrailerWords];
+		public uint[] Trailer { get; set; } = new uint[5];
 	}
 }

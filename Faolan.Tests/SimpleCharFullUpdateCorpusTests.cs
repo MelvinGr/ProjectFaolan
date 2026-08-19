@@ -118,9 +118,11 @@ namespace Faolan.Tests
 			}, modes);
 		}
 
-		// Every 60-byte record the reader finds, on NPCs and players alike, is a ScaffoldBuff. The spell ids are the
-		// proof that this is a buff list and not an arithmetic coincidence: they resolve in our own catalog and read
-		// as a buff bar - and nine of them turn up on NPCs, two of those being necromancer PET summons.
+		// Every buff group the reader finds, on NPCs and players alike, is a ScaffoldBuffGroup with exactly ONE
+		// record (the inner frame the flat carve knew as "Kind = ForCount(1)" - a spawn carrying two records of one
+		// spell has never been captured). The spell ids are the proof that this is a buff list and not an
+		// arithmetic coincidence: they resolve in our own catalog and read as a buff bar - and nine of them turn up
+		// on NPCs, two of those being necromancer PET summons.
 		[Fact]
 		public void EverySixtyByteRecordTheReaderFinds_IsAScaffoldBuff()
 		{
@@ -134,13 +136,13 @@ namespace Faolan.Tests
 				if (!SpawnBodyReader.TryParse(body, out var spawn))
 					continue;
 
-				foreach (var buff in spawn.Post.BuffRecords)
+				foreach (var group in spawn.Post.BuffRecords)
 				{
+					spellIds.Add(group.SpellId);
+					var buff = Assert.Single(group.Records);
 					records++;
-					spellIds.Add(buff.SpellId);
 					casterLevels.Add(buff.CasterLevel);
 					classes[buff.TargetClass] = classes.GetValueOrDefault(buff.TargetClass) + 1;
-					Assert.Equal(ScaffoldBuff.DefaultKind, buff.Kind);
 					Assert.True(buff.TimerRemaining <= buff.TimerTotal, "the remaining timer must not exceed the total");
 				}
 			}

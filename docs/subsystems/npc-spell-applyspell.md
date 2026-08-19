@@ -294,6 +294,20 @@ byte-swaps it when a flag byte on the writer is set, and hands it to `FUN_00cba0
 So the client persists/transports a buff in a layout whose fourth field IS `bool2`, and that is a place a value
 can be lined up against something observable — which none of the five closed routes offered.
 
+**That stream is now pinned and parsed** (#466/#658 re-carve): it is the character full-update's buff list,
+grouped by spell — `[outer ListFrame] N × { [u32 spellId][inner ListFrame] M × [u32 discarded][12 fields] }` —
+modelled as `ScaffoldBuffGroup`/`ScaffoldBuff` with each field's client offset documented on the type. The
+corpus holds 1,471 records. Two anchors fell out of reading `UpdateBuff`'s store block (`007eeb5e`) against it:
+
+* `+0x18` (`TimerTotal`) is COMPUTED on the apply path — duration × stat `0x1D0 DurationModifier` × a constant —
+  so the scaffold carries the same scaled total precomputed, and `+0x1c` gets the unscaled duration.
+* ⚠️ `+0x24` receives the raw arg-3 **pointer** to the 7-word descriptor on the apply path (`MOV [EBX+0x24],EAX`
+  with `EAX = [EBP+0x10]`), while the scaffold wire writes a small int (0..82, the field the corpus reading
+  calls `CasterLevel`). So the two paths fill the same object but NOT the same kind of value in that slot —
+  lining scaffold `+0x24` against apply `descriptor[0]` directly would be comparing a value to a pointer, and
+  the level-pair cross-tab has to go through the SPAWN's own level instead (the scaffold record arrives attached
+  to an entity whose level the same packet states).
+
 ### Two readings killed, and the one the numbers now favour (#658)
 
 ⛔ **`descriptor[0]` gates NOTHING in the payload.** The old cross-tab asked that of slots `[1]` and `[4]` only,

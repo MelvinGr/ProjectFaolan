@@ -95,7 +95,7 @@ namespace Faolan.Tests
 					continue;
 
 				withBuffs++;
-				buffs.AddRange(post.BuffRecords);
+				buffs.AddRange(post.BuffRecords.SelectMany(g => g.Records));
 			}
 
 			return (spawns, withBuffs, buffs);
