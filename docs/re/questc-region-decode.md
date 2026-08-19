@@ -199,6 +199,34 @@ still the best fit for their magnitudes, but the client does not obviously need 
 `GetQuestLevel()` returning "the Stat value" or "the Quest value" says a goal's level has two sources, which is
 the kind of level-adjacent pairing `@+0x118` (level..level+5) already hints at.
 
+## ⭐ The LIVE goal reader is pinned, and it names two "reserved" words (#464, 2026-08-19)
+
+The snapshot-side note above ("pinning the exact reader needs a dynamic trace") does not bind the LIVE path:
+`QuestFullUpdateIIR::ReadSubClass` is **`FUN_00917e20`** (vtable slot 8; self-named by its own
+`"QuestFullUpdateIIR::ReadSubClass() Wrong IIR_t version %d"` log and its `iir\questfullupdateiir.cpp` assert).
+It allocates a `Quest_c` (0x120 bytes, ctor `FUN_0091cf10`) and hands the stream to **`FUN_0091df50`** — so the
+live full-update body IS one `Quest_c` record, goals included, and the goal grammar can be read statically.
+
+Per goal the reader fills an 18-word (0x48-byte) struct from the record's last 16 u32, in this wire→offset map
+(`QuestObjectiveGoalCodec`'s field names):
+
+```
+n -> +0x00      goalIdRepeat -> +0x04    requiredCount -> +0x18
+r0 -> +0x1C     r1..r4 -> +0x08..+0x14   r5 -> +0x30    r6 -> +0x34
+subId/mapId/markerX/markerY -> +0x20..+0x2C
+unknown1 -> +0x38    unknown2 -> +0x3C
+```
+
+* ⭐ **`reserved[5]`/`reserved[6]` are the goal list's SORT KEYS.** After the list is read, the client
+  `std::sort`s it (`FUN_009202d0`) with comparator `FUN_0091ce70`, which orders on `+0x30` then `+0x34` — the
+  pair is the journal's display order, which is why it is per-goal data that never reads as anything else.
+* **`unknown1` (+0x38) / `unknown2` (+0x3C)** now have object offsets for the consumer hunt. Data leads, not
+  client-named: `unknown1 > 0` implies a marker on **24 of 24** shipped goals (base rate 140/7,318), with round
+  map-unit values 3..170 on ReachArea and roaming-hunt goals — a marker RADIUS shape (NB our ReachArea marker
+  fallback invents 40 u where these goals state a value); `unknown2`'s **17** shipped carriers are all
+  dungeon-objective goals (Xibaluku, Abyss of Kun Whu, Kang Pagoda, …), several with degenerate `(1,1)`
+  markers — a marker-display modifier shape. Open work tracked in Gitea #464.
+
 **Exhausted anchors, so don't repeat them:** the vtable (3 slots, none of them a getter), the reader's callers,
 a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), and the
 module's strings. What is left is the semantic route: follow a parsed record from `FUN_0091f5c0` into the

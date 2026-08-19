@@ -11,6 +11,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   [1 lead][k][instance][questId][goalId][n][goalIdRepeat][requiredCount]
 	//   [reserved ×7][subId][mapId][markerX][markerY][unknown1][unknown2]
 	//   [u32 len][objective <remoteformat 50304>]  [u16 len][text record <remoteformat 51200>/<localized 51000>]
+	//
+	// ⭐ The LIVE reader is pinned (#464): `QuestFullUpdateIIR::ReadSubClass` (FUN_00917e20) allocates a `Quest_c`
+	// and `FUN_0091df50` reads the goal list - per goal the record's last 16 u32 into an 18-word struct
+	// (n->+0x00, goalIdRepeat->+0x04, requiredCount->+0x18, reserved r0->+0x1C, r1..r4->+0x08..+0x14,
+	// r5->+0x30, r6->+0x34, subId/mapId/markerX/markerY->+0x20..+0x2C, unknown1->+0x38, unknown2->+0x3C).
+	// Two payoffs:
+	//   - reserved[5]/[6] are the goal list's SORT KEYS - the client std::sorts the goals with a comparator
+	//     (FUN_0091ce70) on +0x30 then +0x34, so the pair is the display order;
+	//   - unknown1/unknown2 now have OBJECT OFFSETS for a consumer hunt. Data leads (not yet client-named):
+	//     unknown1 > 0 implies a marker on 24 of 24 shipped goals, round map-unit values 3..170 on
+	//     ReachArea/hunt-area goals - a marker RADIUS shape; unknown2's 17 shipped carriers are all
+	//     dungeon-objective goals, several with degenerate (1,1) markers - a marker-display modifier shape.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.
