@@ -329,6 +329,14 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`fixture-stats` (#555 step 1: what would a REPRESENTATIVE SELECTION of the corpus slice keep, and what would it
+throw away? Prints per IIR the bodies, the distinct body LENGTHS the ticket's rule would keep one of, the distinct
+bodies once the volatile 32-byte head is masked, and the bytes one-per-length would retain. ⛔ **It refutes the rule
+as written**: `MagicBuffIIR` has 4,666 bodies across **2** lengths, so one-per-length keeps TWO of them and every
+gate that reads all 2,929 captured applies goes vacuous — while costing nothing, because those 4,666 bodies are
+291 KB of a 75 MB corpus. The size is somewhere else entirely: `FullPlayerCharacterIIR` is **50 MB of the 75** at
+2.4 bodies per class, and `SimpleCharFullUpdateIIR` another 20 MB at 14.9. So the selection is worth making
+per-IIR and not uniformly, and this is the table that says where it is cheap) ·
 `rank-tables` (#861, **SOLVED by it**: which member of a rank TABLE does a chain apply? A rank table is a spell in
 no stacking line fanning out one `CastNano` edge per rank of one line, and #813 established that exactly one member
 may land while leaving WHICH to the walk's arrival order — stated in the code as "a pick, not a decode". It is a

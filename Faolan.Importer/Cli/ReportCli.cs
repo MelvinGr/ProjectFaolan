@@ -457,6 +457,11 @@ namespace Faolan.Importer.Cli
 					return await SpellGrantCheck(arg);
 				}
 
+				case "fixture-stats":
+				{
+					return FixtureStats(arg ?? System.IO.Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+				}
+
 				case "rank-tables":
 				{
 					return await RankTables(arg);

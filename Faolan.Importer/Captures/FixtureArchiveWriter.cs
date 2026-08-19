@@ -263,6 +263,26 @@ namespace Faolan.Importer.Captures
 			return named;
 		}
 
+		/// <summary>One corpus body of the archive, for the #555 selection measurement.</summary>
+		public readonly record struct CorpusBody(uint Iir, byte[] Body);
+
+		/// <summary>
+		///     The corpus half's bodies and their IIR, for <c>--report fixture-stats</c> (Gitea #555).
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ Returns the 0x2000 BODY rather than the full packet - the same span <c>CorpusExtract.Entry.Body</c>
+		///     hands the gates - because the framing head carries a length and a CRC that differ on every packet and
+		///     would make every body look distinct.
+		/// </remarks>
+		public static IReadOnlyList<CorpusBody> ReadCorpusForStats(string archivePath)
+		{
+			return Read(archivePath).Corpus.Select(e =>
+			{
+				var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(e.Full.AsSpan(8, 4));
+				return new CorpusBody(e.Iir, e.Full[(12 + headerLength)..]);
+			}).ToList();
+		}
+
 		private static (Dictionary<string, int> Counts, List<CorpusEntry> Corpus, SortedDictionary<string, byte[]> Named) Read(string archivePath)
 		{
 			var raw = File.ReadAllBytes(archivePath);
