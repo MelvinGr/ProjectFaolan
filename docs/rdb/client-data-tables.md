@@ -67,7 +67,7 @@ from what the table appears to hold.
 | 1000521 | `FUN_013b1a10` | `GuildRenownRewardDataTable` |
 | 1000625 | `FUN_00847890` | `TokenStateTable` |
 | 1000626 | `FUN_006cb5f0` | `CoreChatFilterDataTable` |
-| 1000627 | `FUN_013b21c0` | `GroupFinderActivitiesTable` |
+| 1000627 | `FUN_013b21c0` | `GroupFinderActivitiesTable` — the group-finder activity catalog (decoded below) |
 | 1065103 | `FUN_008379e0` | `PvPConRating_c` — a per-level con rating (decoded below) |
 
 ## Decoded: 1000505 `RDBPlayerClassData_c` — the class registry
@@ -617,26 +617,53 @@ its point cost — 2,880 rows, two kinds, values 1..30 — and it covers the AA 
 the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the AA UI or
 of a perk being bought.
 
-## Partly decoded: 1000627 `GroupFinderActivitiesTable` — the group-finder activity list
+## Decoded: 1000627 `GroupFinderActivitiesTable` — the group-finder activity catalog
 
-**12,012 bytes and NOT fixed-width** — no (header, count, stride) triple divides it, which is the table's own way
-of saying its records carry strings. What is legible without the callback:
+**12,012 bytes, decoded BY HAND from the bytes** (#469) — the parse callback resists a static read
+(`FUN_013B21C0` drives a reflective `std::tr1::_Bind` walk with no transcribable `read()` sequence), so the
+grammar below comes from aligning the records against each other, and the SEMANTICS from every id resolving in
+our own `Maps` table (26 of 26 distinct candidates).
 
-* a 12-byte RDB header, then a **byte** (`1`) and a u32 `4`, then four `[u32 index][u32 id]` pairs
-  (`249298753..756`) — the same "count is a BYTE" shape 1000520 uses, so the usual `DataTable_c` walk does not
-  apply here either;
-* the record bodies carry NAMES: **`LFRTeleport`** ten times and **`TP_Start`** after them, i.e. each activity
-  carries a teleport target. That is the group finder's own content — the raid/dungeon list the
-  `CsPlayerAgentListener` groupfinder tier would advertise.
+```
+[12-byte RDB header]
+[u8 1][u32 4][4 x [u32 i][u32 0x0EDDE941..44]]     a 4-entry id prelude (ids resolve in no LDB category)
+[u32 81]                                            record count
+81 records:
+  [u32 seq (1-based)][u32 index (0-based)]
+  [u32 kind]            0 = an activity row; 2/3 = a SECTION HEADER (rows 1, 12, 66)
+  [u32 idB]             0x0A2087xx / 0x020879xx / small-hash style; sequential within a section
+  [u32 idC]             0x01F5xxxx on the raid rows, else 0
+  [u32 D][u32 E]        see below
+  [u32 F][u32 G][u32 H] zeros; on TP_Start rows H = 1,3,5..0x1D (an odd-numbered slot)
+  [u32 len][len bytes]  a LANDMARK name ("LFRTeleport", "TP_Start", "Frost_Swamp_Zone_In",
+                        "Teleport_From_Kheshatta", "StartPlace") - or EMPTY, and then:
+  [f32 x][f32 y][f32 z][u32 heading°]   an EXPLICIT destination (headings 45/90/180/270 in the data);
+                        zeros when the name carries the destination instead
+  [u32 x6]              the PARTY SHAPE: [24, 4, 14, 6, 18, 12] on every raid row,
+                        [6, 1, 4, 1, 0, 2] on every dungeon row - 24-man raid vs 6-man dungeon
+  [char[4] "UCM\0"][3 flag bytes]
+[u32 91][91 x [u32 index][u32 2401][u32 0x009FE2CB]]   a per-index constant pair
+[pairs of record indexes]                               an index remap (activity -> its twin teleport)
+```
 
-⛔ **Its parse callback resists a static read**, and that is worth recording rather than re-attempting blind.
-`FUN_013B21C0` hands `FUN_013B4E40` to the loader, and that function builds a set of
-`std::tr1::_Bind` / `_Callable_obj` lambdas over `IOBuffer` (`unsigned int`, `float`, `bool`, `String` readers)
-and drives a generic reflective walk with them. So the field ORDER is not in the function body the way
-1000043's and 1000099's are — there is no sequence of `read()` calls to transcribe.
+The content, every id resolved through `Maps`:
 
-⚠️ `249298753` is **not** an LDB id: it does not resolve in any category, over a scan that read every plaintext
-page. So the leading pairs point at something else.
+* **Rows 2–11 — the RAID FINDER list** (`LFRTeleport`, 24-man): Thoth-Amon's Stronghold Lower/Upper (33032/
+  33042), Temple of Erlik (37040), The Jade Citadel Courtyard/The Jade Citadel (36420/36421), Chamber of Lost
+  Dreams (36427), The Palace of Cetriss ×3 (33082–84), Black Ring Citadel (33045) — `D = E =` the playfield.
+* **Rows 13–27 (E=20000 Kuthchemes) and 67–81 (E=20010 Skull Gate Pass)** — fifteen `TP_Start` entries each,
+  H = the odd slot 1..0x1D: the two dungeons' internal start points.
+* **Rows 28–65 — the six-man GROUP FINDER dungeons**: named zone-ins (Frost Swamp 1214, Imirian Ravine 2205,
+  Oasis of Zaara 3204) and coordinate teleports into Toirdealbach's Tomb (1024), Cradle of Decay (1026), Halls
+  of Eternal Frost (1082), The Amphitheatre of Karutonia (1092), The Cistern (2030), The Main System (2032),
+  The Catacombs (2033), Sanctum of the Burning Souls (2085), Black Castle (3001), Caravan Raider's Hideout
+  (3033), The Scorpion Cave (3035) — `E` = the playfield, `D` = a 5,078,5xx location id (unresolved), the
+  destination in the record's own `[x][y][z][heading]`.
+
+⚠️ Left unnamed: `idB`/`idC` (no LDB category resolves them; the style matches the prelude ids), the
+5,078,5xx `D` ids on coordinate rows, the exact meaning of the six party-shape words past "24-man vs 6-man",
+and the trailing remap. Naming those needs the reflective consumer at runtime — content for the group-finder
+tier when it is built (#669's neighbourhood), not a table decode.
 
 ## ⭐ Decoded: 1000521 `GuildRenownRewardDataTable` — the guild-city reward ladder, in retail's own words
 
