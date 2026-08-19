@@ -392,8 +392,18 @@ namespace Faolan.Importer.Cli
 				case "QuestIIR":
 				{
 					var quest = QuestCodec.Parse(content);
-					return $"quest {quest.QuestId} state {quest.State}"
-					       + quest.State switch { QuestCodec.StateActive => " (active)", QuestCodec.StateCompleted => " (completed)", _ => "" };
+					// ⚠️ State 4 means COMPLETED only s2c. The client sends the identical record UP to abandon a quest
+					// (`QuestIIR_c` is its `DeleteQuest`), and over the whole corpus c2s carries state 4 and NOTHING
+					// ELSE - 3 of them, against 50 s2c completions and 47 s2c updates. Labelling one "(completed)"
+					// reads a deletion as its opposite, which is exactly what it did on the group-finder capture where
+					// the player deleted a quest to make journal room.
+					var meaning = quest.State switch
+					{
+						QuestCodec.StateActive => " (active)",
+						QuestCodec.StateCompleted => e.Direction == "c2s" ? " (the client's DeleteQuest - ABANDON, not completion)" : " (completed)",
+						_ => ""
+					};
+					return $"quest {quest.QuestId} state {quest.State}{meaning}";
 				}
 				case "DispatchAddSpecialAbility":
 				{

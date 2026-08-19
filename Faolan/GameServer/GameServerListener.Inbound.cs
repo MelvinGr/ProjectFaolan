@@ -413,8 +413,14 @@ namespace Faolan.GameServer
 					// The client's OWN copy of the record the server sends as QuestIIR (QuestCodec.Build) - same
 					// grammar, other direction: [u32 entity class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0].
 					// The client names this method "DeleteQuest" (QuestIIR_c, docs/protocol/gen/iir-types.md) and sends it
-					// with state = QuestCodec.StateCompleted when the player drops a quest from the journal - both corpus
-					// instances are in the Hakotep "delete-quests" capture (quest 0x388F and 0x3919).
+					// with state = QuestCodec.StateCompleted when the player drops a quest from the journal. THREE corpus
+					// instances: two in the Hakotep "delete-quests" capture (quest 0x388F and 0x3919) and one in
+					// chat-annotated-4, where the player deletes quest 15051 to make journal room for a group-finder
+					// signup that had just been refused for having too many quests.
+					//
+					// ⚠️ State 4 c2s is NOT a completion, and the corpus is unambiguous about it: c2s carries state 4
+					// and nothing else, while s2c carries 2 (x47) and 4 (x50). The code is the slot; the direction is
+					// the meaning.
 					//
 					// NB the old read was [u32][u32][u8][u32][u32] - one byte early from the [u32 0][u8 01] pair onward. It
 					// still landed on the right questId (the misalignment is self-cancelling across those five bytes), which
