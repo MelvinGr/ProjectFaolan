@@ -119,7 +119,7 @@ operator	branch	name	evidence
 112	006e578c		
 113	006e59cf		
 114	006e2490	(target distance)	string: Criteria_TargetIsTooClose / Criteria_TargetIsTooFarAway / Criteria_TargetIsNotACharacter
-115	006e2b56		
+115	006e2b56	(target geometry)	code: FUN_006eeea0, a float/SIMD test taking `target class == 0xC350` - the SAME check spell FLAGS bit 14 bypasses in the cast path (#632); neighbours 114/122/123 are the distance family
 116	006dde2d	SUBJECT SELECTOR	code: resolves the dynel the subject`s +0x37c/+0x380 handle names and makes IT the subject
 117	006e5f5f	(not a case)	falls to the switch default - the client rejects it as e_Operator_Illegal
 118	006e5a28	MustBeInCombat	string: MustBeInCombatToUseThisItem

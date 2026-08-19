@@ -75,7 +75,16 @@ namespace Faolan.Importer.Cli
 			"    bit  5  ⚠️ only in FUN_01759{4b0,690,a70,e30} - a different struct at the same +0xC8, not this word",
 			"    bit  6  ⚠️ only in FUN_01759{4b0,690,a70,e30} - likewise",
 			"    bit  7  ⚠️ only in FUN_01759{4b0,690,e30} - likewise",
-			"    bit 14  ⭐ READ: FUN_01141480 / 011417f0 / 01141c30 - the combat cluster, two of which also read bit 15",
+			"    bit 14  ⭐ it BYPASSES a target-GEOMETRY check and the cast refusal that check raises. At all three sites "
+			+ "(FUN_01141480 / 011417f0 / 01141c30) the shape is identical: `if (entity+0x171 == 0 && bit14 clear && "
+			+ "!FUN_006eeea0(...)) -> refusal code 0x12`, so a bit-14 spell skips the check entirely. ⭐⭐ And that check "
+			+ "is not combat-local - `CriteriaItem_t::CheckCriteria` (FUN_006dd970) calls it at 006e2c26, which lands "
+			+ "inside criteria operator 115's branch (006e2b56..006e2cc4), so FUN_006eeea0 IS operator 115. Its "
+			+ "neighbours 114/122/123 are the target-DISTANCE family (Criteria_TargetIsTooClose / "
+			+ "Criteria_TargetIsTooFarAway / Criteria_TargetIsNotACharacter), and it takes `target class == 0xC350 (a "
+			+ "Character)` as an argument - the same premise those strings name. The same 0x12 is also raised by "
+			+ "FUN_00744580(caster, target, 180, -90), an ANGLE test. ⚠️ So the bit's FUNCTION is pinned and its NAME "
+			+ "is not: naming operator 115 names the bit",
 			"    bit 20  ⭐ READ: FUN_007ee710 (the timed-effect path of bit 16) + FUN_00769220 (which also reads bit 15)",
 			"    bit 21  ⭐ READ: FUN_007f17d0 / FUN_007f1860 - and at both sites it skips the SAME pair of calls, an "
 			+ "insert into a sorted container (FUN_00805000 + FUN_00803af0). ⚠️ Stat 0xB1 `MoreFlags` bit 0 is tested "

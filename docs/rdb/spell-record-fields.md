@@ -178,6 +178,42 @@ derived copy, and it is the copy that stays quiet while its twin speaks. ⚠️ 
 other (the containment sweep lists no 8 ⊂ 19), so they really are two suppressions sharing one guard rather than
 one flag stated twice.
 
+### ⭐⭐ Bit 14 bypasses a TARGET-GEOMETRY check — and that check is a criteria OPERATOR
+
+All three read sites (`FUN_01141480 / 011417f0 / 01141c30`) have the identical shape:
+
+```c
+if ((entity[0x171] == 0) && ((flags >> 0xe & 1) == 0) && (FUN_006eeea0(...) == 0))
+    refusal = max(refusal, 0x12);          // written to the cast object's +0xB4
+```
+
+So a bit-14 spell — or an entity carrying the `+0x171` flag — **skips the check and the refusal it produces**.
+`FUN_006eeea0` is a large float/SIMD function with no strings of its own, which is where a read of the combat
+cluster alone stops.
+
+⭐⭐ **It is not combat-local.** `CriteriaItem_t::CheckCriteria` (`FUN_006dd970`, #790) calls it at **`006e2c26`**,
+and that lands inside criteria operator **115**'s branch — the operator switch puts 115 at `006e2b56` and the
+next entry, operator 10, at `006e2cc4`. So `FUN_006eeea0` **is** operator 115's implementation, and the bit
+exempts a spell from a condition the criteria vocabulary can also state.
+
+Which makes its neighbours the evidence for what it tests. In
+[`criteria-operators.tsv`](../re/criteria-operators.tsv):
+
+| op | branch | what its strings name |
+|---:|---|---|
+| 114 | `006e2490` | `Criteria_TargetIsTooClose` / `Criteria_TargetIsTooFarAway` / `Criteria_TargetIsNotACharacter` |
+| **115** | `006e2b56` | **(no string — this one)** |
+| 122 | `006e273e` | `Criteria_TargetIsTooClose` / `Criteria_TargetIsNotACharacter` |
+| 123 | `006e294a` | `Criteria_TargetIsTooFarAway` / `Criteria_TargetIsNotACharacter` |
+
+and the cast site passes it `target class == 0xC350 (a Character)` as an argument — the same premise
+`Criteria_TargetIsNotACharacter` names. The same `0x12` refusal is raised on the neighbouring branch by
+`FUN_00744580(caster, target, 180, -90)`, an **angle** test.
+
+⚠️ **The bit's FUNCTION is pinned; its NAME is not.** "Bypasses the target-geometry requirement" is what the code
+says; calling it *line of sight* or *no facing requirement* would be a guess between the members of that family.
+Naming operator 115 names the bit, and vice versa.
+
 ### The bits still unnamed, narrowed to their SHAPE (#632)
 
 * **bit 21** (1,576 set) suppresses one call pair at both of its sites — an insert into a sorted container
@@ -186,8 +222,6 @@ one flag stated twice.
 * **bit 29** (156 set) is on the DAMAGE path — its caller `FUN_0114D4C0` logs *"Apply missing multihitdamage
   (hit N) damage: X (of maxdamage: Y)"* on `GameCode/Combat`. Set, it propagates a float to every sibling
   sharing one key, raising each to the maximum. What the float IS is not recovered.
-* **bit 14** (2,814 set) is read only in the combat cluster `FUN_01141480 / 011417F0 / 01141C30`, two of which
-  also read bit 15.
 
 ### ⭐ Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
 
@@ -989,7 +1023,7 @@ subsystem is roughly `0x0075xxxx–0x007Fxxxx` with the combat half around `0x01
 | 3 | 79 | ⛔ NOT READ — `__atof_l` and one CRT-range site |
 | 5, 6, 7 | 4 / 4 / 67 | ⚠️ read only inside `FUN_017594b0 / 01759690 / 01759a70 / 01759e30` — four adjacent functions reading four adjacent bits, i.e. a bitfield of its own. Bit 8 appears there **and** in the magic subsystem, which is what identifies that cluster as the other struct |
 | 8 | 2,389 | ⭐ `FUN_007e9b50` (the feedback-verb builder bit 15 is named from) + `FUN_007ebe70` |
-| 14 | 2,814 | ⭐ `FUN_01141480 / 011417f0 / 01141c30` — the combat cluster, two of which also read bit 15 |
+| 14 | 2,814 | ⭐ **bypasses a target-GEOMETRY check** and the `0x12` cast refusal it raises — see below |
 | 19 | 7,692 | ⭐ `FUN_007ebe70`, sharing **one guard** with bit 8 |
 | 20 | 2,289 | ⭐ `FUN_007ee710` (bit 16's timed-effect path) + `FUN_00769220` (which also reads bit 15) |
 | 21 | 778 | ⭐ `FUN_007f17d0 / FUN_007f1860` |
