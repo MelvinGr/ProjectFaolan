@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -69,7 +70,7 @@ namespace Faolan.Tests
 				Rung(1, 613812, CharacterStatId.NonCombatHealthRegen, 2000)
 			};
 
-			var totals = MaxStatAggregatorTotals(reached);
+			var totals = Selected(reached);
 
 			Assert.Equal(8, totals[CharacterStatId.PetPoints]);
 			Assert.Equal(-4400, totals[CharacterStatId.PetDamageCoefficient]);
@@ -89,7 +90,7 @@ namespace Faolan.Tests
 				Rung(1, 613812, CharacterStatId.CrossbowRangeModifier, 200)
 			};
 
-			Assert.Equal(600, MaxStatAggregatorTotals(reached)[CharacterStatId.CrossbowRangeModifier]);
+			Assert.Equal(600, Selected(reached)[CharacterStatId.CrossbowRangeModifier]);
 		}
 
 		// ⛔ The exclusion the whole derivation rests on: the class PROGRESSION track is applied through
@@ -107,9 +108,16 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(FeatRules.ClassProgressionTrackMarker, "Mage");
 		}
 
-		private static System.Collections.Generic.IReadOnlyDictionary<CharacterStatId, int> MaxStatAggregatorTotals(AutoTrainedFeatLadder.Rung[] reached)
+		// The selected rows' own values, summed per stat. ⚠️ Deliberately NOT through `MaxStatAggregator`: that
+		// applies the stat's wire SCALE (#865), which is a different property and would make these assertions about
+		// two things at once.
+		private static Dictionary<CharacterStatId, int> Selected(AutoTrainedFeatLadder.Rung[] reached)
 		{
-			return Faolan.GameServer.Combat.MaxStatAggregator.AggregateFeatBonuses(AutoTrainedFeatLadder.Select(reached), 80);
+			var totals = new Dictionary<CharacterStatId, int>();
+			foreach (var effect in AutoTrainedFeatLadder.Select(reached))
+				totals[effect.StatId] = totals.GetValueOrDefault(effect.StatId) + effect.Value;
+
+			return totals;
 		}
 	}
 }

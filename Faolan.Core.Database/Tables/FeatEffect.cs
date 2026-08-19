@@ -58,14 +58,26 @@ namespace Faolan.Core.Database.Tables
 		// the same reason SpellStatEffect carries it.
 		public uint EffectKind { get; set; }
 
-		// The modifier magnitude, in DISPLAY units.
+		// The modifier magnitude, as the RAW WIRE value - the same convention as ItemStatModifier.Amount, and it must
+		// be divided by CharacterStatId.GetScale() before it means anything.
 		//
 		// ⚠️ On the INTERPOLATED kinds this is only the ramp's LOW endpoint - see HighValue below.
 		//
-		// ⚠️ NOT the same convention as ItemStatModifier.Amount, which is the RAW WIRE value and must be divided by
-		// CharacterStatId.GetScale(). These are already divided: Strength (scale 10) carries 1..9 here, which as raw
-		// wire would be +0.1 Strength, and HealthMax (scale 100) carries 100..700, which as raw wire would be +1 HP.
-		// Applying the gear convention to these would silently under-grant every feat by 10x or 100x.
+		// ⛔ This said DISPLAY units until #865, and MaxStatAggregator did not divide, which over-granted HealthMax
+		// by 100x and the attributes by 10x. The old note reasoned from a subset ("Strength carries 1..9, HealthMax
+		// 100..700"); over the whole table HealthMax runs to 99,000 and Strength to 2,300. Three things settle it:
+		//   1. ⭐⭐ The SAME BYTES are read twice. This column and ClassAttributeBase.Amount are both
+		//      `ItemTemplateStatModifiers.Modifier.WireAmount`, off the same `<Class> Class Feat NNN` templates -
+		//      `Necromancer Class Feat 071` carries HealthMax 38,600 and the ClassAttributeBases row for
+		//      (Necromancer, 80) is 38,600 - and CharacterMaxStats.Pool adds that in HUNDREDTHS and divides by 100
+		//      for the +386 health verified against every captured pool.
+		//   2. `Barbarian: HP (1) 10` carries 26,800 and `Vitality`'s top rank ramps to 80,000, against a level-80
+		//      pool of ~6,300. No display reading survives that.
+		//   3. The unexplained flat health term #588 is hunting is 73 - tens, not thousands.
+		//
+		// ⚠️ SPELLS are the odd one out, not this: BuffStatEffects.SpellScale keeps attributes at scale 1 because the
+		// spell record really does store those in display units. Three sources, three conventions; the PARSER a
+		// source goes through is what says which one it uses.
 		//
 		// ⛔ SIGNED, and it has to be. This was a `uint` until #863, and the shipped table held 44 rows that the
 		// client states as a NEGATIVE and we stored as ~4.29 billion: `Pet Mastery`'s Pet Damage Coefficient ladder

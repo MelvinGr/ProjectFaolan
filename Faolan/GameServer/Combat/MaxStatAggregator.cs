@@ -55,14 +55,29 @@ namespace Faolan.GameServer.Combat
 		// and interpolating the ramped ones at <paramref name="level" /> - the carrier's level, which is what the
 		// client ramps over (LevelRamp).
 		//
-		// ⚠️ NO GetScale() division here, unlike the gear path above. FeatEffect.Value is already a DISPLAY value:
-		// Strength (scale 10) carries 1..9 in the feat table, which as a raw wire value would be +0.1 Strength, and
-		// HealthMax (scale 100) carries 100..700, which would be +1 HP. Dividing these would under-grant every feat
-		// by 10x or 100x. The two sources genuinely use different conventions - the item template stores raw wire,
-		// the feat table stores display.
+		// ⛔ THE SCALE DIVISION IS REQUIRED, and this used to omit it (#865). The old comment claimed
+		// `FeatEffect.Value` is already a DISPLAY value - "Strength carries 1..9, HealthMax carries 100..700" - and
+		// that was measured on a subset. Over the whole table HealthMax runs to 99,000 and Strength to 2,300, and
+		// three independent things say those are RAW WIRE:
+		//
+		//   1. ⭐⭐ The same bytes are read TWICE. `ClassAttributeBase.Amount` and `FeatEffect.Value` are both
+		//      `ItemTemplateStatModifiers.Modifier.WireAmount`, off the same `<Class> Class Feat NNN` templates -
+		//      `Necromancer Class Feat 071` carries HealthMax 38,600 and the `ClassAttributeBases` row for
+		//      (Necromancer, 80) is 38,600. `CharacterMaxStats.Pool` adds that in HUNDREDTHS and divides by 100 for
+		//      +386 health, which is the value verified against every captured pool. One convention, two tables.
+		//   2. The magnitudes are impossible read as display: `Barbarian: HP (1) 10` carries 26,800, and a level-80's
+		//      WHOLE pool is ~6,300. As raw wire it is +268 health, which is a feat.
+		//   3. The flat health term #588 is hunting for is 73 - tens, not thousands.
+		//
+		// So feats follow the ITEM convention, which is what the parser they share implies. ⚠️ NOT the SPELL one:
+		// `BuffStatEffects.SpellScale` keeps attributes at scale 1 because spell records really do store those in
+		// display units. Three sources, three conventions, and the parser is what says which.
 		public static IReadOnlyDictionary<CharacterStatId, int> AggregateFeatBonuses(IEnumerable<FeatEffect> effects, uint level)
 		{
-			var totals = new Dictionary<CharacterStatId, int>();
+			// ⭐ Accumulated in WIRE units and divided ONCE per stat, which is how `CharacterMaxStats.Pool` handles the
+			// same numbers: dividing each row first throws away the remainder of every one of them, and a stat built
+			// from several feats then reads low by up to one display point per row.
+			var wire = new Dictionary<CharacterStatId, int>();
 			foreach (var effect in effects)
 			{
 				if (!FlatFeatKinds.Contains(effect.EffectKind))
@@ -75,8 +90,12 @@ namespace Faolan.GameServer.Combat
 					? new LevelRamp(effect.Value, high, low, top).ValueAt(level)
 					: effect.Value;
 
-				totals[effect.StatId] = totals.GetValueOrDefault(effect.StatId) + bonus;
+				wire[effect.StatId] = wire.GetValueOrDefault(effect.StatId) + bonus;
 			}
+
+			var totals = new Dictionary<CharacterStatId, int>(wire.Count);
+			foreach (var (stat, amount) in wire)
+				totals[stat] = amount / (int)stat.GetScale();
 
 			return totals;
 		}
