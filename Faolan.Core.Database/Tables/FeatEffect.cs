@@ -66,7 +66,13 @@ namespace Faolan.Core.Database.Tables
 		// CharacterStatId.GetScale(). These are already divided: Strength (scale 10) carries 1..9 here, which as raw
 		// wire would be +0.1 Strength, and HealthMax (scale 100) carries 100..700, which as raw wire would be +1 HP.
 		// Applying the gear convention to these would silently under-grant every feat by 10x or 100x.
-		public uint Value { get; set; }
+		//
+		// ⛔ SIGNED, and it has to be. This was a `uint` until #863, and the shipped table held 44 rows that the
+		// client states as a NEGATIVE and we stored as ~4.29 billion: `Pet Mastery`'s Pet Damage Coefficient ladder
+		// (-550 per rank down to -4400), the caster classes' Weapon Damage Ranged (-3000), `Mind Phase` and
+		// `Subtlety`'s -1..-5. Every one of them is summed by MaxStatAggregator, so a feat that lowers a stat raised
+		// it by four billion instead. The word on the wire was always signed - only the column was not.
+		public int Value { get; set; }
 
 		// The LEVEL RAMP the INTERPOLATED kinds carry (53220/53221/53068, Gitea #599), null on every other kind. Such
 		// an element is not a flat bonus at all: it grants `lerp(Value@LowLevel, HighValue@HighLevel)` over the

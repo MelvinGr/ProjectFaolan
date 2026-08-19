@@ -285,6 +285,29 @@ namespace Faolan.GameServer.World
 		public IReadOnlyDictionary<CharacterStatId, int> GearBonuses { get; set; } = new Dictionary<CharacterStatId, int>();
 
 		/// <summary>
+		///     This entity's out-of-combat MANA regen base, in display units per second - the flat term
+		///     <c>RegenRates.ManaPerSecond</c> adds on top of the Int+Wis sum. 0 for a class that has none, which is
+		///     every rogue and soldier.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ Unlike health's and stamina's, mana's flat term is CLASS data rather than a universal seed, and it
+		///     comes from two client sources that add: <see cref="ClassBase" />'s stat 280 and the auto-trained
+		///     <c>Mage</c> / <c>Priest</c> feat (#863). Both are RAW WIRE (the stat's display scale is 100), which is
+		///     why this divides and the attribute path does not - and no item in the catalog carries 280, so the
+		///     bonus dictionary's entry can only have come from that feat.
+		///     <para>
+		///         It reproduces all three captured observations: 2200 for a level-80 Necromancer or Demonologist
+		///         (a 200 class base plus the 2000 feat), 2000 for a level-24 Herald of Xotli (whose class templates
+		///         carry no 280 row at all) and nothing for a level-23 Assassin, whose class trains neither feat.
+		///         Those are the numbers <c>RegenRates</c> recorded as observed-but-unsourced.
+		///     </para>
+		/// </remarks>
+		public double NonCombatManaRegenBase =>
+			(ClassBase.GetValueOrDefault(CharacterStatId.NonCombatManaRegen)
+			 + GearBonuses.GetValueOrDefault(CharacterStatId.NonCombatManaRegen))
+			/ (double)CharacterStatId.NonCombatManaRegen.GetScale();
+
+		/// <summary>
 		///     The per-SPELL boosts this entity's trained feats grant (#590), as <c>spellId -> percent x 100</c> - a
 		///     Necromancer with `Decomposition` rank 5 carries +3500 on every RANK of Flesh to Worms. The feat names a
 		///     spell LINE; the fan-out to its ranks is resolved once at world entry (beside the gear bonuses) so the

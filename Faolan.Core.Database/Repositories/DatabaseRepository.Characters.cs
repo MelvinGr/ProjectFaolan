@@ -64,6 +64,23 @@ namespace Faolan.Core.Database.Repositories
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 
 		/// <summary>
+		///     The stat effects of the feats the CLIENT trains by itself for this class at or below this level - the
+		///     second, derived half of a character's feat contribution (Gitea #863).
+		/// </summary>
+		/// <remarks>
+		///     These feats are deliberately absent from <c>CharacterFeats</c>: retail never puts one on the wire and
+		///     <c>FeatHolder::TrainFeat</c> refuses one outright, so the character has no list to read them off. The
+		///     client derives them from (class, level) against its featclass table and so does this. No wire change -
+		///     server-side stat contributions only.
+		///     <para>
+		///         ⭐ It is a LADDER PICK, not a sum, and the class progression track is excluded because
+		///         <see cref="GetClassAttributeBase" /> already applies it - see <see cref="AutoTrainedFeatLadder" />
+		///         for both, and for the three captured regen observations that corroborate the rule.
+		///     </para>
+		/// </remarks>
+		Task<FeatEffect[]> GetClassAutoTrainedFeatEffects(ConanClass characterClass, uint level);
+
+		/// <summary>
 		///     The per-SPELL boosts a character's trained feats grant (#590), as <c>spellId -> percent x 100</c>.
 		///     Resolved through the spell LINE the feat actually names, so every rank of a boosted spell is in the
 		///     result and combat needs no line lookup of its own. Summed per spell, because two different feats can
@@ -688,6 +705,26 @@ namespace Faolan.Core.Database.Repositories
 				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
 				join effect in ctx.FeatEffects on map.TemplateId equals effect.FeatId
 				select effect).ToArrayAsync();
+		}
+
+		// The AUTO-TRAINED half (#863). Same two id-space hops as the trained path above, but the left side is the
+		// client's featclass SCHEDULE rather than a character's list, because these feats are never in one.
+		//
+		// ⛔ Two filters carry the whole correctness of this, and both are argued in AutoTrainedFeatLadder: the class
+		// PROGRESSION track is excluded (ClassAttributeBases already applies it, from the same client templates), and
+		// what survives is LADDER-PICKED per stat rather than summed.
+		public async Task<FeatEffect[]> GetClassAutoTrainedFeatEffects(ConanClass characterClass, uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var reached = await (from entry in ctx.FeatClassEntries.AsNoTracking()
+					.Where(e => e.Autotrain && e.Class == characterClass && e.Level <= level)
+				join map in ctx.FeatIdMaps on entry.FeatId equals map.WireFeatId
+				join feat in ctx.Feats on map.TemplateId equals feat.Id
+				join effect in ctx.FeatEffects on map.TemplateId equals effect.FeatId
+				where feat.Name == null || !feat.Name.Contains(FeatRules.ClassProgressionTrackMarker)
+				select new AutoTrainedFeatLadder.Rung(entry.Level, entry.Id, effect)).ToArrayAsync();
+
+			return AutoTrainedFeatLadder.Select(reached);
 		}
 
 		public async Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId)

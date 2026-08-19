@@ -1488,7 +1488,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("StatId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("Value")
+                    b.Property<int>("Value")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("FeatId", "Sequence");

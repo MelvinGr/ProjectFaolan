@@ -72,8 +72,8 @@ namespace Faolan.GameServer.Combat
 				// parse could not complete): fall back to the low endpoint, which is exactly what shipped before -
 				// an under-grant, never a wrong stat.
 				var bonus = effect is { HighValue: { } high, LowLevel: { } low, HighLevel: { } top }
-					? new LevelRamp((int)effect.Value, high, low, top).ValueAt(level)
-					: (int)effect.Value;
+					? new LevelRamp(effect.Value, high, low, top).ValueAt(level)
+					: effect.Value;
 
 				totals[effect.StatId] = totals.GetValueOrDefault(effect.StatId) + bonus;
 			}

@@ -10,6 +10,21 @@ namespace Faolan.Core.Progression
 	// docs/subsystems/feats.md.
 	public static class FeatRules
 	{
+		/// <summary>
+		///     What the class PROGRESSION track's feats are called - <c>Necromancer Class Feat 001</c>,
+		///     <c>Ranger Class Feat 071</c>: the eighty per-class templates that carry a character's attribute and
+		///     health BASE, one per level, in blocks of ten.
+		/// </summary>
+		/// <remarks>
+		///     ⛔ It is a name and not a tree id on purpose. The client files these under <c>TreeId</c> 9000, but so
+		///     are <c>Spell Unlocking</c>, the <c>Light Weapon Combos</c> bands and <c>Pet Mastery</c> - and Pet
+		///     Mastery is the one auto-trained feat outside the track that carries stat effects, so a tree-id filter
+		///     would drop precisely the rows #863 exists to apply. The client's own importer for the track
+		///     (<c>ClassAttributeBaseModule</c>) keys on this same name, which is what keeps the two halves from
+		///     double-counting each other.
+		/// </remarks>
+		public const string ClassProgressionTrackMarker = " Class Feat ";
+
 		// Levels that grant TWO feat points instead of one. Straight out of the client's own FeatPointsTable - RDB
 		// type 1000044 id 1, the resource FeatClassTable_c::LoadStaticData reads - which is 71 entries of
 		// [level 10..80][points][tsPoints].

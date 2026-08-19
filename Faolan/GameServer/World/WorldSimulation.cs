@@ -720,7 +720,7 @@ namespace Faolan.GameServer.World
 						: RegenRates.Gain(RegenRates.HealthPerSecond(constitution, strength), elapsedSeconds),
 					RegenRates.Gain(RegenRates.StaminaPerSecond(constitution, strength, dexterity), elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
 						? 0u
-						: RegenRates.Gain(RegenRates.ManaPerSecond(intelligence, wisdom), elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
+						: RegenRates.Gain(RegenRates.ManaPerSecond(intelligence, wisdom, entity.NonCombatManaRegenBase), elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (!changed)
 					continue;
 

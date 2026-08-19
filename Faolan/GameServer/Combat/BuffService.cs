@@ -497,9 +497,7 @@ namespace Faolan.GameServer.Combat
 				return; // not in the world yet - world entry will build the aggregate itself
 
 			var character = client.Session.Character;
-			entity.GearBonuses = MaxStatAggregator.Combine(
-				MaxStatAggregator.AggregateGearBonuses(await _database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
-				MaxStatAggregator.AggregateFeatBonuses(await _database.GetCharacterFeatEffects(character.Id), character.Level));
+			entity.GearBonuses = await CharacterStatBonuses.For(_database, character);
 
 			// Recompute the derived live fields off the new aggregate - max pools (which clamps current when a max
 			// shrinks), magic damage, the regen rates. The returned change list is DELIBERATELY DISCARDED: it is what

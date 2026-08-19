@@ -519,17 +519,16 @@ namespace Faolan.GameServer
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
-			// #3/#251: the additive stat bonuses the player carries into the world - equipped GEAR plus trained FEATS -
-			// so their live vitals seed with both.
+			// #3/#251/#863: the additive stat bonuses the player carries into the world - equipped GEAR, the feats they
+			// TRAINED, and the feats the client trains for them - so their live vitals seed with all three.
 			//
-			// A character routinely gets NOTHING from the feat half, and that is a BUILD, not a gap (#589). The feat
-			// pipeline is whole: FeatIdMaps carries all 6,593 entries of the client's own FeatTable_t, 2,939 of them
-			// have stat effects and 808 grant HealthMax (`Mage: HP 1`..`5` among them). Our three imported characters
-			// spend every point they have - both level-80 mages come to exactly 79 - on class-tree abilities and spell
-			// nodes, so their feat contribution is a true zero. Do not read an empty result here as missing data.
-			var statBonuses = MaxStatAggregator.Combine(
-				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
-				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id), character.Level));
+			// A character routinely gets NOTHING from the TRAINED feat half, and that is a BUILD, not a gap (#589).
+			// The feat pipeline is whole: FeatIdMaps carries all 6,593 entries of the client's own FeatTable_t, 2,939
+			// of them have stat effects and 808 grant HealthMax (`Mage: HP 1`..`5` among them). Our three imported
+			// characters spend every point they have - both level-80 mages come to exactly 79 - on class-tree
+			// abilities and spell nodes, so their trained contribution is a true zero. Do not read an empty result
+			// here as missing data. The AUTO-TRAINED half is never empty, and is never in a feat list either.
+			var statBonuses = await CharacterStatBonuses.For(Database, character);
 			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
 			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
 			var classBase = await Database.GetClassAttributeBase(character.Class, character.Level);

@@ -336,7 +336,13 @@ spawns. Currently OK on all three captured characters, each spending its level b
 of them holding a feat the client auto-trains. Returns non-zero on a character that does hold one, which is the
 only direction that can only be a defect; an unspent budget is printed, since a player may simply not have spent
 it. ⚠️ A test cannot do this - `faolan.sql` excludes every `Character*` table, so the fixture holds no
-`CharacterFeats` and the assertion would pass on an empty left side) ·
+`CharacterFeats` and the assertion would pass on an empty left side. ⭐ It also carries the EFFECTS half (#863):
+of 8,255 auto-trained effect rows, 5,828 are the class PROGRESSION track that `ClassAttributeBases` already
+applies and 2,427 are the derived source - and it asserts that the derived half touches **no pool and no attribute
+stat**, which is what makes it impossible for it to move a captured stat sheet. It prints the LADDER PICK beside
+the sum it refuses (Assassin 29,112 picked against 75,695 summed - the ladders state totals, not increments) and
+the mana-regen corroboration table, where class base + the auto-trained `Mage` / `Priest` feat reproduces all four
+of retail's observed stat-280 values) ·
 `pet-cost` (#823, **SOLVED by it**: where does a summoned pet's point cost come from? Three sweeps, and the answer
 is in the third. ⛔ *Which field EQUALS the cost* - nothing: `generic_stats` is empty on every pet and of 64
 numeric fields on the character message, 60 present on all 155 samples with 29 varying, none equals it. ⛔ *Which

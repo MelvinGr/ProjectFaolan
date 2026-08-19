@@ -604,6 +604,61 @@ granted at **7** where the record says **1**, which is one of the *capture-prove
 The two fields are independent. **1,242** `ClassSpells` rows with a real (`Level > 0`) gate still have no grant
 level and so still ride `Spells.Level`; that is the residue #864 tracks.
 
+### ⭐⭐ The auto-trained STAT effects: a ladder PICK, never a sum (#863)
+
+An auto-trained feat is in no character's feat list, so `GetCharacterFeatEffects` — which joins `CharacterFeats`
+→ `FeatIdMap` → `FeatEffect` — contributes nothing for one. The client applies them all the same, off (class,
+level), and so does the server now: `GetClassAutoTrainedFeatEffects` is a second, derived source folded in beside
+the trained one by `CharacterStatBonuses`. No wire change; these are server-side stat contributions only.
+
+Two rules carry the whole correctness of it.
+
+⭐⭐ **The ladders state TOTALS, not increments.** One stat's ladder runs across four differently NAMED feats —
+`Climbing Skill` → `Basic Climbing` → `Advanced Climbing` → `Expert Climbing`, reading 100 / 200 / 300 … 900 at
+levels 1, 10, 23 … 78 — and the value at each rung is the character's whole score. A level-80 has passed every
+rung, so summing them gives **4500** where the client's answer is **900**. `AutoTrainedFeatLadder.Select` takes
+the single highest rung reached, per stat, and breaks a same-level tie on the client's own row id (`Pet Mastery`
+hands out two ranks at each of levels 5/10/15/20, and 715380..715387 ascend with rank).
+
+The proof is not that the numbers look cumulative — it is an independent path over the same data.
+`ClassAttributeBases` is imported from the very same class-progression templates, through the RDB 1000020 item
+parser rather than the feat catalog; it takes the value **at** the level rather than a sum; and it reproduces all
+four captured characters' pools exactly. A sum could not.
+
+⛔ **The class PROGRESSION track is excluded, because it is already applied.** `<Class> Class Feat NNN` *is* what
+`ClassAttributeBases` holds, so folding it in again would double every attribute and the health base — a level-80
+Necromancer's 38,600 health base counted twice. The marker is a NAME (`FeatRules.ClassProgressionTrackMarker`)
+and not a tree id: the client files the track under `TreeId` 9000, but so are `Spell Unlocking`, the
+`Light Weapon Combos` bands and `Pet Mastery` — and Pet Mastery is the one auto-trained feat outside the track
+that carries stat effects, so a tree-id filter would drop precisely the rows this exists to apply.
+
+⚠️ **The check #863 asked for passes structurally, which is stronger than numerically.** The worry was that
+folding in 70–80 effect rows per class would move a captured stat sheet. What remains after the exclusion touches
+**no pool and no attribute at all** — not HealthMax, not one of the five attributes — so there is nothing for it
+to move. `--report feat-autotrain-check` asserts that direction.
+
+⭐ **And it sources three retail numbers that were previously only observed.** `RegenRates` recorded the
+out-of-combat mana base (stat 280) as *0 for a level-23 Assassin, 2000 for a level-24 Herald of Xotli, 2200 for
+both level-80 mages* with no explanation. The auto-trained `Mage` feat grants 2000 to the Necromancer, Herald of
+Xotli and Demonologist, its `Priest` twin grants 2000 to the three priest classes, and the class base adds 200
+where the class templates carry a 280 row:
+
+| class | class base | auto-trained feat | total | retail |
+|---|---:|---:|---:|---|
+| Assassin | 0 | 0 | **0** | ✅ 0 |
+| Herald of Xotli | 0 | 2000 | **2000** | ✅ 2000 |
+| Necromancer | 200 | 2000 | **2200** | ✅ 2200 |
+| Demonologist | 200 | 2000 | **2200** | ✅ 2200 |
+
+Four for four, against a derivation that was not fitted to them. `WorldEntity.NonCombatManaRegenBase` is the sum
+and `WorldSimulation` passes it to `RegenRates.ManaPerSecond`, which had been defaulting it to 0.
+
+⛔ **`FeatEffect.Value` is SIGNED**, as of this work. It was a `uint`, and 44 shipped rows held a word the client
+states as negative and we stored as its 2³² complement — `Pet Mastery`'s Pet Damage Coefficient ladder
+(−550 per rank to −4400), the caster classes' Weapon Damage Ranged (−3000), `Mind Phase`, `Subtlety`. Every one
+is summed by `MaxStatAggregator`, so a feat that LOWERED a stat raised it by four billion instead. The word on
+the wire was always signed; only the column was not.
+
 ### A feat costs ONE POINT PER RANK, and the captures pin it exactly
 
 `FeatRules.PointCost` is `rank + 1` — the rank baked into the wire id's low two digits is 0-based, so holding

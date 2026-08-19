@@ -170,9 +170,7 @@ namespace Faolan.GameServer.Combat
 		public async Task<EntityVitals> ReseedFromMaxStats(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			var statBonuses = MaxStatAggregator.Combine(
-				MaxStatAggregator.AggregateGearBonuses(await _database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
-				MaxStatAggregator.AggregateFeatBonuses(await _database.GetCharacterFeatEffects(character.Id), character.Level));
+			var statBonuses = await CharacterStatBonuses.For(_database, character);
 			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
 			var seeded = EntityVitals.FromCharacter(character, statBonuses, classBase);
 			var vitals = GetOrAddPlayerVitals(client);

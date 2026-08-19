@@ -52,11 +52,11 @@ namespace Faolan.GameServer.Combat
 	///         terms are fitted - the server's formula and the client's display are the same computation.
 	///     </para>
 	///     <para>
-	///         ⚠️ The rates need the character's TOTAL attribute scores, which the client computes locally: retail sends
+	///         The rates need the character's TOTAL attribute scores, which the client computes locally: retail sends
 	///         Strength/Constitution/… as a flat 10 in the snapshot stat sheet, so the class/level attribute BASE is not
-	///         on the wire and is not in any of the client's 10005xx data tables either (open work tracked in Gitea #444).
-	///         Until it is decoded the server only knows the gear + buff part, so a geared character regenerates slower
-	///         than retail - the shape and the constants are right, one input is short.
+	///         on the wire and is not in any of the client's 10005xx data tables either. It IS decoded now - the RDB's
+	///         per-class, per-level class-feat templates (#444, <c>ClassAttributeBaseModule</c>) - and reaches this
+	///         through <c>WorldEntity.AttributeScore</c>, so a geared character no longer regenerates short.
 	///     </para>
 	/// </summary>
 	public static class RegenRates
@@ -81,6 +81,12 @@ namespace Faolan.GameServer.Combat
 		// stat 280 (Non Combat Mana Regen). Observed: never written at all for a level 23 Assassin (so 0), 2000 for a
 		// level 24 Herald of Xotli, and 2200 for both level 80 mage classes (a 2000 seed plus 200 from their class
 		// template). Callers pass it; 0 is the no-mana-base default, NOT a claim that every class has none.
+		//
+		// ⭐ All three of those observations are now SOURCED rather than merely recorded (#863). The 2000 is the
+		// auto-trained `Mage` feat (Necromancer / Herald of Xotli / Demonologist) and its `Priest` twin, which the
+		// CLIENT trains off its featclass table at level 1 and never puts on the wire; the 200 is the class
+		// progression template, already in ClassAttributeBases. The Assassin's class trains neither, hence nothing.
+		// `WorldEntity.NonCombatManaRegenBase` is the sum, and the simulation passes it here.
 		public const double ManaFlatRate = 0.0;
 
 		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).

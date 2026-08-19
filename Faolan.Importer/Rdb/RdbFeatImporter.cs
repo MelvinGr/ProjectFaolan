@@ -363,7 +363,11 @@ namespace Faolan.Importer.Rdb
 						Sequence = i,
 						StatId = (CharacterStatId)list[i].StatId,
 						EffectKind = list[i].Kind,
-						Value = list[i].WireAmount,
+						// ⛔ REINTERPRETED, not converted. `WireAmount` is the record's word carried unsigned and the
+						// word is signed - `Pet Mastery`'s Pet Damage Coefficient is -550 per rank, not 4294966746
+						// (#863). An `unchecked` cast is what puts the sign back; a range check would throw on data
+						// that is perfectly well-formed.
+						Value = unchecked((int)list[i].WireAmount),
 						HighValue = ramp?.HighValue,
 						LowLevel = ramp?.LowLevel,
 						HighLevel = ramp?.HighLevel
