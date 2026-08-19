@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
@@ -53,27 +54,54 @@ namespace Faolan.Importer.Cli
 			// targeted debuff always other, which reproduces "nearly per-spell" without being a property of the
 			// spell at all, and the handful of spells that VARY would be exactly the ones cast both ways.
 			var context = new List<(byte Bool2, uint Descriptor0, bool SelfCast, bool NoCaster)>();
+
+			// ⭐ The SEPARATING population for the level pair (the per-apply cross-tab above is confounded: the
+			// corpus is a handful of characters, so a caster level barely varies within one spell). An apply whose
+			// CASTER and TARGET are at DIFFERENT levels can tell the two slots apart - and the levels come from the
+			// same capture's own spawn bodies, which state every entity's level next to its handle.
+			var separated = new List<(uint SpellId, uint Descriptor3, uint CastingLevel, uint CasterLevel, uint TargetLevel)>();
 			var arrivals = 0;
 			var applies = 0;
 
 			foreach (var capture in captures)
-			foreach (var p in capture.Packets)
 			{
-				if (p is not { IsDownload: true, IsIirCarrier: true, SubOpcode: MagicBuffCodec.Opcode })
-					continue;
+				// handle -> the level its own spawn body stated, filled in the same forward walk (a spawn always
+				// precedes any apply that references its handle).
+				var levels = new Dictionary<uint, uint>();
 
-				arrivals++;
-				if (!p.TryParse(MagicBuffCodec.Parse, out var buff) || buff.Form != ApplyForm || buff.Data.Length != ApplyPayloadLength)
-					continue;
+				foreach (var p in capture.Packets)
+				{
+					if (!p.IsIirCarrier || !p.IsDownload)
+						continue;
 
-				applies++;
-				if (!perSpell.TryGetValue(buff.SpellBaseId, out var seen))
-					perSpell[buff.SpellBaseId] = seen = ([], []);
+					if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode)
+					{
+						if (p.Body.Length > SpawnPacketBuilder.HandleOffset + 4 && SpawnBodyReader.TryReadCharacterMessage(p.Body, out var read) && read.Message?.Stats != null)
+							levels[p.Body.ReadU32Be(SpawnPacketBuilder.HandleOffset)] = read.Message.Stats.Level;
 
-				seen.Descriptor0.Add(buff.Data.ReadU32Be(Descriptor0Offset));
-				seen.Bool2.Add(buff.Data[Bool2Offset]);
-				levelPairs.Add((buff.SpellBaseId, buff.Data.ReadU32Be(Descriptor3Offset), buff.Data.ReadU32Be(CastingLevelOffset)));
-				context.Add((buff.Data[Bool2Offset], buff.Data.ReadU32Be(Descriptor0Offset), buff.ApplyTo == buff.ApplyFrom, buff.ApplyFrom == 0));
+						continue;
+					}
+
+					if (p.SubOpcode != MagicBuffCodec.Opcode)
+						continue;
+
+					arrivals++;
+					if (!p.TryParse(MagicBuffCodec.Parse, out var buff) || buff.Form != ApplyForm || buff.Data.Length != ApplyPayloadLength)
+						continue;
+
+					applies++;
+					if (!perSpell.TryGetValue(buff.SpellBaseId, out var seen))
+						perSpell[buff.SpellBaseId] = seen = ([], []);
+
+					seen.Descriptor0.Add(buff.Data.ReadU32Be(Descriptor0Offset));
+					seen.Bool2.Add(buff.Data[Bool2Offset]);
+					levelPairs.Add((buff.SpellBaseId, buff.Data.ReadU32Be(Descriptor3Offset), buff.Data.ReadU32Be(CastingLevelOffset)));
+					context.Add((buff.Data[Bool2Offset], buff.Data.ReadU32Be(Descriptor0Offset), buff.ApplyTo == buff.ApplyFrom, buff.ApplyFrom == 0));
+
+					if (buff.ApplyFrom is { } caster && caster != 0 && caster != buff.ApplyTo
+					    && levels.TryGetValue(caster, out var casterLevel) && levels.TryGetValue(buff.ApplyTo, out var targetLevel))
+						separated.Add((buff.SpellBaseId, buff.Data.ReadU32Be(Descriptor3Offset), buff.Data.ReadU32Be(CastingLevelOffset), casterLevel, targetLevel));
+				}
 			}
 
 			Console.WriteLine("=== where do the MagicBuff apply's descriptor[0] and bool2 come from? (#658) ===");
@@ -145,6 +173,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine();
 			LevelPair(levelPairs);
+			LevelPairSeparated(separated);
 
 			Console.WriteLine();
 			Console.WriteLine("  ⚠️ EXCESS over chance, in points - a rare bit scores high against a rare predicate for free.");
@@ -364,6 +393,38 @@ namespace Faolan.Importer.Cli
 		///     same spell is cast by characters of different levels. So the two hypotheses make opposite predictions
 		///     about within-spell variance, and no caster-level oracle is needed to tell them apart.
 		/// </remarks>
+		// The level pair, scored on the population that can actually SEPARATE the two slots: applies whose caster
+		// and target are at DIFFERENT levels, both read off the same capture's own spawn bodies (#658).
+		private static void LevelPairSeparated(List<(uint SpellId, uint Descriptor3, uint CastingLevel, uint CasterLevel, uint TargetLevel)> rows)
+		{
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ the level pair on the SEPARATING population - both entities' levels known from their own spawn");
+			Console.WriteLine($"     bodies, caster resolved and distinct from the target: {rows.Count} applies");
+
+			var split = rows.Where(r => r.CasterLevel != r.TargetLevel).ToList();
+			Console.WriteLine($"     of those, caster level != target level (the applies that can tell the slots apart): {split.Count}");
+			if (split.Count == 0)
+			{
+				Console.WriteLine("     ⚠️ zero separating applies - this population says nothing; the confounded per-spell view above stands.");
+				return;
+			}
+
+			foreach (var (name, pick) in new (string, Func<(uint SpellId, uint Descriptor3, uint CastingLevel, uint CasterLevel, uint TargetLevel), uint>)[]
+			         {
+				         ("descriptor[3] @26", r => r.Descriptor3),
+				         ("CastingLevel  @42", r => r.CastingLevel)
+			         })
+			{
+				var caster = split.Count(r => pick(r) == r.CasterLevel);
+				var target = split.Count(r => pick(r) == r.TargetLevel);
+				var neither = split.Count - split.Count(r => pick(r) == r.CasterLevel || pick(r) == r.TargetLevel);
+				Console.WriteLine($"     {name}: == caster {caster,4}   == target {target,4}   neither {neither,4}");
+			}
+
+			foreach (var row in split.Take(12))
+				Console.WriteLine($"       spell {row.SpellId}  d3={row.Descriptor3}  c42={row.CastingLevel}  caster@{row.CasterLevel}  target@{row.TargetLevel}");
+		}
+
 		private static void LevelPair(List<(uint SpellId, uint Descriptor3, uint CastingLevel)> pairs)
 		{
 			var disagree = pairs.Count(p => p.Descriptor3 != p.CastingLevel);
