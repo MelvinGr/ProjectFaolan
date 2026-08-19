@@ -642,8 +642,9 @@ our own `Maps` table (26 of 26 distinct candidates).
   [u32 x6]              the PARTY SHAPE: [24, 4, 14, 6, 18, 12] on every raid row,
                         [6, 1, 4, 1, 0, 2] on every dungeon row - 24-man raid vs 6-man dungeon
   [char[4] "UCM\0"][3 flag bytes]
-[u32 91][91 x [u32 index][u32 2401][u32 0x009FE2CB]]   a per-index constant pair
-[pairs of record indexes]                               an index remap (activity -> its twin teleport)
+[u32 91][91 x [u32 index][u32 b][u32 c]]   (b,c) takes 4 values: (2401,0x9FE2CB) x53, (2468,0) x28,
+                                            (2469,0xD50D890) x9, (2420,..) x1 - per-index attributes, unnamed
+[index-pair remap sections]                 activity -> teleport mappings, un-walked
 ```
 
 The content, every id resolved through `Maps`:
