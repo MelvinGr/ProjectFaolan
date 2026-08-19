@@ -61,11 +61,38 @@ ENDS, which is what a builder needs.
 | `@0` | u32 **`Counter`** `+0x30` | we send 0; meaning undecoded, but `Activate` skips the whole update when it is 0 |
 | `@4` | u32 **`CounterType`** `+0x34` | we send 0 |
 | `@8` | u32 **`Duration`** `+0x44` | centiseconds — `Activate` does `* 10` to get ms. The early "`@10` u16" is this word's low half. |
-| `@12` | bool flag `+0x48` | passed to the buff-add |
-| `@13` | bool flag `+0x49` | passed to the buff-add (the "flag A" of the empirical map) |
+| `@12` | bool flag `+0x48` | passed to the buff-add **and dropped there** — see below |
+| `@13` | bool flag `+0x49` | passed to the buff-add **and dropped there** (the "flag A" of the empirical map) |
 | `@14–41` | **7-word sub-struct** `+0x4C` | read by `FUN_00897b60`, passed to the buff-add BY POINTER. Wire words land in slots `[0],[2],[1],[3],[8],[4],[5]` — so `@22` → slot `[1]` = the spell base id again, and `@26` → slot `[3]`. |
 | `@42` | u32 **`CastingLevel`** `+0x38` | the caster's level |
 | `@46–53` | u64 **expiry stamp** `+0x70` | NOT a nonce — see below |
+
+### ⭐ The buff-add call, argument by argument — and the two bools go nowhere (#658)
+
+`Activate`'s call into the magic holder is `[entity+0x2D8]`'s vtable slot 2, `CoreMagicHolder::UpdateBuff`
+(`FUN_007ee710`, named by its own log string). It is a **ten**-argument `__thiscall`, and the call site
+(`007a164d..007a1671`) pushes:
+
+| arg | pushed | what it is |
+|---:|---|---|
+| 1 | `&ESP+0x30` | an out slot |
+| 2 | `[IIR+0x2C]` | `BuffTemplate` — the spell base id |
+| 3 | `&IIR+0x4C` | **the 7-word descriptor, by pointer** |
+| 4 | `[IIR+0x44]` | `Duration`, centiseconds |
+| 5 | `0` | — |
+| 6 | `&IIR+0x3C` | `CasterID`, the two-word `ID32`, by pointer |
+| 7 | `[IIR+0x48]` | payload **`@12`** |
+| 8 | `[IIR+0x49]` | payload **`@13`** |
+| 9, 10 | `0`, `0` | — |
+
+Inside the callee, four of them are stored on the buff object in one block at `007eeb52..007eeb7f`:
+`arg3 → buff+0x24`, `arg4 → buff+0xAC`, `arg5 → buff+0xA8`, `arg6 → buff+0xC0`. The duration is then gated
+`CMP [buff+0xAC], 0 / JLE` — a zero-duration buff is dropped, which is the same refusal `ActivateBuff` logs.
+
+⛔ **`[EBP+0x20]` and `[EBP+0x24]` — args 7 and 8 — are read NOWHERE in the function.** Both bool bytes are
+passed and discarded, so whatever they mean, they do not reach the buff the client builds through this path.
+That is a real constraint on #658: their meaning is not "something the buff-add needs", and a builder that gets
+them wrong cannot change what the client stores.
 
 **`@46–53` is an absolute expiry, not a counter.** `Activate` computes `(stamp64 - <global clock>) / 10` and, if
 that is positive and *shorter* than `Duration`, overwrites `Duration` with it. That is how retail resumes a buff

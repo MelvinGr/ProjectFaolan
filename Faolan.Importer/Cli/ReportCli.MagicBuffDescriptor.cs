@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {
@@ -36,7 +38,7 @@ namespace Faolan.Importer.Cli
 		private const int ApplyPayloadLength = 54;
 		private const byte ApplyForm = 0; // ⚠️ ZERO, not 1 - the value MagicBuffCorpusTests filters on
 
-		private static int MagicBuffDescriptor(IReadOnlyList<NamedCapture> captures, string rdbDir)
+		private static async Task<int> MagicBuffDescriptor(IReadOnlyList<NamedCapture> captures, string rdbDir)
 		{
 			// spell -> the descriptor[0] / bool2 values its captured applies carried.
 			var perSpell = new Dictionary<uint, (List<uint> Descriptor0, List<byte> Bool2)>();
@@ -44,6 +46,13 @@ namespace Faolan.Importer.Cli
 			// The level pair, per apply rather than per spell: the question is whether either slot is the SPELL's own
 			// level, which is a per-spell constant, so a slot that tracks it must do so on every cast.
 			var levelPairs = new List<(uint SpellId, uint Descriptor3, uint CastingLevel)>();
+
+			// ⭐ The CONTEXT hypotheses, per apply rather than per spell (#658). The record's own fields are
+			// exhausted - neither value is a flags bit nor a property field - so the next place to look is the cast
+			// itself. `applyTo == applyFrom` is the leading candidate for a boolean: a self-buff is always self and a
+			// targeted debuff always other, which reproduces "nearly per-spell" without being a property of the
+			// spell at all, and the handful of spells that VARY would be exactly the ones cast both ways.
+			var context = new List<(byte Bool2, uint Descriptor0, bool SelfCast, bool NoCaster)>();
 			var arrivals = 0;
 			var applies = 0;
 
@@ -64,6 +73,7 @@ namespace Faolan.Importer.Cli
 				seen.Descriptor0.Add(buff.Data.ReadU32Be(Descriptor0Offset));
 				seen.Bool2.Add(buff.Data[Bool2Offset]);
 				levelPairs.Add((buff.SpellBaseId, buff.Data.ReadU32Be(Descriptor3Offset), buff.Data.ReadU32Be(CastingLevelOffset)));
+				context.Add((buff.Data[Bool2Offset], buff.Data.ReadU32Be(Descriptor0Offset), buff.ApplyTo == buff.ApplyFrom, buff.ApplyFrom == 0));
 			}
 
 			Console.WriteLine("=== where do the MagicBuff apply's descriptor[0] and bool2 come from? (#658) ===");
@@ -125,6 +135,15 @@ namespace Faolan.Importer.Cli
 			MatchField("bool2", fieldsOf, b2.ToDictionary(kv => kv.Key, kv => (uint)kv.Value));
 
 			Console.WriteLine();
+			ApplyContext(context);
+
+			Console.WriteLine();
+			await CastableOrDerived(d0, b2);
+
+			Console.WriteLine();
+			await NameTheGroups(d0, b2);
+
+			Console.WriteLine();
 			LevelPair(levelPairs);
 
 			Console.WriteLine();
@@ -133,6 +152,133 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  ⚠️ And a bit the client never READS cannot be the source however well it scores - see the read-site");
 			Console.WriteLine("     census in `--report spell-flags` (bit 0 is set on 78% of records and has no consumer at all).");
 			return 0;
+		}
+
+		/// <summary>
+		///     ⭐⭐ Is the record a CASTABLE or an EFFECT-ONLY one? (#658.)
+		/// </summary>
+		/// <remarks>
+		///     The hypothesis the NAME listing below produced, tested structurally rather than by reading it off the
+		///     names. Both groups read as records a player never casts directly - <c>Racer</c>, <c>Chicken Buff</c>,
+		///     <c>Knockback immunity</c>, <c>Deathless Acolyte: Arcanist</c>, <c>Wrath</c>, <c>Furious
+		///     Inspiration</c> - i.e. the thing that LANDS rather than the thing that was cast.
+		///     <para />
+		///     Four independent predicates for "a player can cast this", because no single one of them is clean: a
+		///     class-catalog row, a cast time, a mana cost, and being the target of a chain edge (which says the
+		///     opposite - it is reached BY something). A hypothesis that is right will move all four the same way.
+		/// </remarks>
+		private static async Task CastableOrDerived(Dictionary<uint, uint> descriptor0, Dictionary<uint, byte> bool2)
+		{
+			await using var db = OpenDb();
+			var ids = descriptor0.Keys.ToList();
+
+			var classSpells = (await db.ClassSpells.AsNoTracking().Where(c => ids.Contains(c.SpellId)).Select(c => c.SpellId).Distinct().ToListAsync()).ToHashSet();
+			var chainTargets = (await db.SpellAreaEffects.AsNoTracking().Where(a => ids.Contains(a.EffectSpellId)).Select(a => a.EffectSpellId).Distinct().ToListAsync()).ToHashSet();
+			var spells = await db.Spells.AsNoTracking().Where(s => ids.Contains(s.Id)).Select(s => new { s.Id, s.CastTime, s.ManaCost }).ToDictionaryAsync(s => s.Id, s => s);
+
+			(string Name, Func<uint, bool> Holds)[] predicates =
+			[
+				("in a class catalog", id => classSpells.Contains(id)),
+				("has a cast time", id => (spells.GetValueOrDefault(id)?.CastTime ?? 0) > 0),
+				("has a mana cost", id => (spells.GetValueOrDefault(id)?.ManaCost ?? 0) > 0),
+				("is a chain/area TARGET", chainTargets.Contains)
+			];
+
+			Console.WriteLine("  ⭐ is the record a CASTABLE or an EFFECT-ONLY one? (the hypothesis the name listing produced)");
+			Console.WriteLine($"     {"predicate",-24} {"all",6} {"d0!=1",8} {"d0==1",8} {"b2==0",8} {"b2==1",8}");
+
+			foreach (var (name, holds) in predicates)
+			{
+				string Rate(IEnumerable<uint> group)
+				{
+					var members = group.ToList();
+					return members.Count == 0 ? "-" : $"{100.0 * members.Count(holds) / members.Count:F0}%";
+				}
+
+				Console.WriteLine($"     {name,-24} {Rate(ids),6} {Rate(ids.Where(id => descriptor0[id] != 1)),8} {Rate(ids.Where(id => descriptor0[id] == 1)),8}"
+				                  + $" {Rate(ids.Where(id => bool2[id] == 0)),8} {Rate(ids.Where(id => bool2[id] == 1)),8}");
+			}
+
+			Console.WriteLine("     ⚠️ Read the SPREAD between the two halves of a pair, not the absolute rate: the corpus is what a");
+			Console.WriteLine("        few characters cast, so every column sits well below the catalog's own base rate.");
+		}
+
+		/// <summary>
+		///     ⭐ The two groups, BY NAME - the oracle of last resort when a numeric sweep has come up empty.
+		/// </summary>
+		/// <remarks>
+		///     Neither value is a flags bit, a property field, or a property of the cast's target. What is left is to
+		///     read the populations: a partition the client draws is usually a partition a HUMAN can see the moment
+		///     the members are listed, and the catalog's own names are the only description of a spell we hold that
+		///     was not written by us.
+		/// </remarks>
+		private static async Task NameTheGroups(Dictionary<uint, uint> descriptor0, Dictionary<uint, byte> bool2)
+		{
+			await using var db = OpenDb();
+			var names = await db.Spells.AsNoTracking()
+				.Where(s => descriptor0.Keys.Contains(s.Id))
+				.ToDictionaryAsync(s => s.Id, s => new { s.Name, s.DurationMs, s.GuiStackingLine, s.Level });
+
+			foreach (var (label, members) in new[]
+			         {
+				         ("descriptor[0] == 2 or 3", descriptor0.Where(kv => kv.Value != 1).Select(kv => kv.Key).ToArray()),
+				         ("bool2 == 0", bool2.Where(kv => kv.Value == 0).Select(kv => kv.Key).ToArray())
+			         })
+			{
+				Console.WriteLine($"  {label}: {members.Length} spell(s)");
+				foreach (var id in members.OrderBy(id => names.GetValueOrDefault(id)?.Name, StringComparer.Ordinal).Take(60))
+				{
+					var spell = names.GetValueOrDefault(id);
+					Console.WriteLine($"     {id,-9} {spell?.Name ?? "?",-38} dur {spell?.DurationMs ?? 0,8} ms  line {spell?.GuiStackingLine ?? 0,-8} lvl {spell?.Level ?? 0}");
+				}
+
+				if (members.Length > 60)
+					Console.WriteLine($"     ... and {members.Length - 60} more");
+
+				Console.WriteLine();
+			}
+		}
+
+		/// <summary>
+		///     ⭐ Is either value a property of the CAST rather than of the spell? (#658.)
+		/// </summary>
+		/// <remarks>
+		///     The spell record is exhausted - the flags word scores nothing above base rate and no property field
+		///     carries either value - so what is left is the apply's own context. The candidate this scores is
+		///     <c>applyTo == applyFrom</c>: it would look "nearly per-spell" for free, because a self-buff is always
+		///     self and a targeted debuff always other, and the spells that VARY under it would be precisely the ones
+		///     cast both ways (a heal on yourself or on a team-mate).
+		///     <para />
+		///     ⚠️ Scored per APPLY here, deliberately, and the opposite of what the per-spell scoring above needs: a
+		///     context value has to agree on every individual cast, so collapsing to the modal value per spell would
+		///     hide the disagreements that refute it.
+		/// </remarks>
+		private static void ApplyContext(List<(byte Bool2, uint Descriptor0, bool SelfCast, bool NoCaster)> context)
+		{
+			if (context.Count == 0)
+				return;
+
+			var selfCasts = context.Count(c => c.SelfCast);
+			Console.WriteLine($"  is either value a property of the CAST? {context.Count} applies, {selfCasts} of them SELF ({100.0 * selfCasts / context.Count:F0}%)");
+
+			// bool2 against "the target is the caster", both polarities - the sign of the mapping is not assumed.
+			var agreeSelf = context.Count(c => (c.Bool2 == 1) == c.SelfCast);
+			var agreeOther = context.Count(c => (c.Bool2 == 1) != c.SelfCast);
+			Console.WriteLine($"     bool2 == 1  <=>  applyTo == applyFrom : {100.0 * agreeSelf / context.Count:F1}%   (inverted: {100.0 * agreeOther / context.Count:F1}%)");
+
+			// The same for a descriptor[0] of 1 vs anything else, so a three-valued field is not scored as a boolean
+			// by accident - and the value BREAKDOWN per polarity, which is what would show a 1/2/3 that means
+			// self/other/no-caster.
+			foreach (var group in context.GroupBy(c => (c.SelfCast, c.NoCaster)).OrderBy(g => g.Key.SelfCast).ThenBy(g => g.Key.NoCaster))
+			{
+				var d0 = string.Join(" ", group.GroupBy(c => c.Descriptor0).OrderBy(g => g.Key).Select(g => $"{g.Key}x{g.Count()}"));
+				var b2 = string.Join(" ", group.GroupBy(c => c.Bool2).OrderBy(g => g.Key).Select(g => $"{g.Key}x{g.Count()}"));
+				var label = group.Key.NoCaster ? "no caster " : group.Key.SelfCast ? "SELF cast " : "on ANOTHER";
+				Console.WriteLine($"     {label} n={group.Count(),5}   descriptor[0]: {d0,-28}   bool2: {b2}");
+			}
+
+			Console.WriteLine("     ⚠️ A split that is CLEAN in this table is the answer; one that merely leans is the same");
+			Console.WriteLine("        base-rate trap the bit sweep above corrects for - most applies are self-buffs.");
 		}
 
 		/// <summary>

@@ -499,7 +499,7 @@ namespace Faolan.Importer.Cli
 
 				case "magicbuff-descriptor":
 				{
-					return MagicBuffDescriptor(NamedCapture.LoadAll(capturesDir), RdbDir());
+					return await MagicBuffDescriptor(NamedCapture.LoadAll(capturesDir), RdbDir());
 				}
 
 				case "pet-cost":
