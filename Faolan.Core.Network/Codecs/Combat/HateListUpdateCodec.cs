@@ -6,7 +6,8 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Combat
 {
 	// HateListUpdateIIR (0x8A01E5A1) - a hate/aggro entry: a flag byte then three u32s (FUN_007a93a0); in the capture
-	// the trio is [0xC350 marker][target handle][count].
+	// the trio is [u32 targetClass][u32 target handle][count] - the leading word is the standard [class][handle]
+	// entity-reference pair's CLASS half (0xC350 = EntityClass.Character on every captured record), not a marker.
 	//
 	// ⚠️ The carrier handle is the entity whose THREAT LIST this updates - the PLAYER - and `Target` is the creature
 	// that now threatens them. Not the other way round: this comment used to say the carrier was "the hater (the NPC)"
@@ -47,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var handle = r.ReadU32Be();
 			var env = r.ReadU8();
 			var flag = r.ReadU8();
-			return new HateListUpdateIIR(handle, env, flag, r.ReadU32Be(), r.ReadU32Be(), r.ReadU32Be());
+			return new HateListUpdateIIR(handle, env, flag, TargetClass: r.ReadU32Be(), Target: r.ReadU32Be(), Count: r.ReadU32Be());
 		}
 
 		internal static void Write(FaolanStream s, HateListUpdateIIR v)
@@ -58,12 +59,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(v.Handle)
 				.WriteByte(v.Env)
 				.WriteByte(v.Flag)
-				.WriteUInt32(v.Marker)
+				.WriteUInt32(v.TargetClass)
 				.WriteUInt32(v.Target)
 				.WriteUInt32(v.Count);
 		}
 	}
 
 	// HateListUpdateIIR (0x8A01E5A1).
-	public sealed record HateListUpdateIIR(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count);
+	// (TargetClass, Target) is the wire's usual [class][handle] entity reference - TargetClass was long named
+	// "Marker" for its constant 0xC350 face.
+	public sealed record HateListUpdateIIR(uint Handle, byte Env, byte Flag, uint TargetClass, uint Target, uint Count);
 }
