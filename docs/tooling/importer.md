@@ -329,6 +329,15 @@ own candidate set instead of seeding from the book. ⭐ It also carries the thre
 book spell's effect, and no captured feat list holds a progression track. Those are ASSERTED rather than printed —
 a count moves with the corpus, but a combo turning up in a retail spellbook does not move, it refutes the exclusion
 rule itself. An empty oracle returns non-zero rather than reporting success) ·
+`rank-tables` (#861, **SOLVED by it**: which member of a rank TABLE does a chain apply? A rank table is a spell in
+no stacking line fanning out one `CastNano` edge per rank of one line, and #813 established that exactly one member
+may land while leaving WHICH to the walk's arrival order — stated in the code as "a pick, not a decode". It is a
+decode: every edge carries a CRITERION run gating it on `MustHavePassiveAbilityRunning <the rank below it>`, and
+the importer had simply never carried criteria on these rows. Over the 65 tables: **43 upgrade ladders** (the gate
+names another member), **4 trained-rank lookups** (the gate names a spell outside the table — the passive rank the
+character holds), 4 mixed and 14 with no gate at all, where arrival order really is all there is. 42 tables' FIRST
+edge gates on ITSELF, which is the refresh-at-the-cap rung and the asymmetry that identifies the shape.
+`--report-arg <spell id>` prints one table edge by edge with each gate resolved to a name) ·
 `feat-autotrain-check` (#862: does the client's own auto-train flag agree with what retail puts in a feat list, and
 does one point per rank reproduce the budget those lists spend? Both sides are data neither of which is ours - the
 client's featclass table (`FeatClassEntry`, RDB 1000043) against the feat lists harvested off the captured player

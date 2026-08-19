@@ -3750,6 +3750,31 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("SpellAreaEffects");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffectCriterion", b =>
+                {
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("CriterionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Operator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SpellId", "Sequence", "Pos");
+
+                    b.ToTable("SpellAreaEffectCriteria");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
                 {
                     b.Property<uint>("SpellId")
@@ -5825,6 +5850,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Spell");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellAreaEffectCriterion", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.SpellAreaEffect", "Effect")
+                        .WithMany()
+                        .HasForeignKey("SpellId", "Sequence")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Effect");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>

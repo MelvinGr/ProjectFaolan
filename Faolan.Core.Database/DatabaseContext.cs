@@ -122,6 +122,7 @@ namespace Faolan.Core.Database
 		DbSet<SpellEffect> SpellEffects { get; }
 		DbSet<SpellStatEffect> SpellStatEffects { get; }
 		DbSet<SpellStatEffectCriterion> SpellStatEffectCriteria { get; }
+		DbSet<SpellAreaEffectCriterion> SpellAreaEffectCriteria { get; }
 		DbSet<SpellAreaEffect> SpellAreaEffects { get; }
 		DbSet<SpellSpellStatModifier> SpellSpellStatModifiers { get; }
 		DbSet<StockPhrase> StockPhrases { get; }
@@ -241,6 +242,7 @@ namespace Faolan.Core.Database
 		public DbSet<SpellEffect> SpellEffects { get; set; }
 		public DbSet<SpellStatEffect> SpellStatEffects { get; set; }
 		public DbSet<SpellStatEffectCriterion> SpellStatEffectCriteria { get; set; }
+		public DbSet<SpellAreaEffectCriterion> SpellAreaEffectCriteria { get; set; }
 		public DbSet<SpellAreaEffect> SpellAreaEffects { get; set; }
 		public DbSet<SpellSpellStatModifier> SpellSpellStatModifiers { get; set; }
 		public DbSet<StockPhrase> StockPhrases { get; set; }
@@ -355,6 +357,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
 			// #791: a criterion belongs to its effect, so a re-harvest that drops the effect drops its conditions with it.
 			modelBuilder.Entity<SpellStatEffect>().HasMany<SpellStatEffectCriterion>().WithOne(c => c.Effect).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<SpellAreaEffect>().HasMany<SpellAreaEffectCriterion>().WithOne(c => c.Effect).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellAreaEffect>().WithOne(a => a.Spell).OnDelete(DeleteBehavior.Cascade); // #772
 			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
 

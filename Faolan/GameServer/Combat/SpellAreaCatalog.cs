@@ -38,6 +38,10 @@ namespace Faolan.GameServer.Combat
 		// members of one line.
 		private Dictionary<uint, uint>? _lineOf;
 
+		// #861: (spell, link sequence) -> the link's CONDITION run, in wire order. Cached with the links themselves
+		// because the chain walk needs it per edge on the same hot path.
+		private Dictionary<(uint SpellId, uint Sequence), ItemTemplateStatModifiers.Criterion[]>? _criteria;
+
 		public SpellAreaCatalog(IDatabaseRepository database)
 		{
 			_database = database;
@@ -131,6 +135,37 @@ namespace Faolan.GameServer.Combat
 				map[spellId] = line;
 
 			return map;
+		}
+
+		/// <summary>
+		///     The CONDITIONS on one link, in wire order — empty when it carries none, which is most links.
+		/// </summary>
+		/// <remarks>
+		///     ⭐⭐ On a rank TABLE this run IS the selection (#861). Each edge is gated on
+		///     <c>MustHavePassiveAbilityRunning &lt;the rank below it&gt;</c> and the edges are stored
+		///     highest-rank-first, so evaluating them in order and taking the first that passes is a one-rank-per-proc
+		///     upgrade: nothing running → rank 1, rank 5 running → rank 6, and the top edge ORs in ITSELF so a
+		///     character at the cap refreshes rather than falling off it.
+		/// </remarks>
+		public async Task<IReadOnlyList<ItemTemplateStatModifiers.Criterion>> CriteriaFor(SpellAreaEffect link)
+		{
+			if (_criteria == null)
+			{
+				await _lock.WaitAsync();
+				try
+				{
+					_criteria ??= (await _database.GetSpellAreaEffectCriteria())
+						.GroupBy(c => (c.SpellId, c.Sequence))
+						.ToDictionary(g => g.Key, g => g.OrderBy(c => c.Pos)
+							.Select(c => new ItemTemplateStatModifiers.Criterion(c.CriterionId, c.Value, c.Operator)).ToArray());
+				}
+				finally
+				{
+					_lock.Release();
+				}
+			}
+
+			return _criteria.GetValueOrDefault((link.SpellId, link.Sequence), []);
 		}
 
 		private async Task<SpellAreaEffect[]> ForSpell(uint spellId)

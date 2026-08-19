@@ -2058,10 +2058,53 @@ target's `GuiStackingLine` alongside its id.
 in line **0**, so it shares no line with its targets and the ladder rule alone leaves all ten edges running.
 Only claiming the *targets'* lines catches it.
 
-⚠️ **Which member wins is the open half** — it is the walk's arrival order, i.e. the table's sequence 0, which for
-line 44235 is rank 10. That is a pick, not a decode. What it is **not** is level scaling: measured over the
-shipped data, **97 of the 105** rank tables have every target at the same level, so a level cannot choose between
-them. That candidate is refuted; Gitea #861 holds the selection question.
+### ⭐⭐ Which member wins IS a decode — the criterion run selects it (#861)
+
+That was filed as an open pick: the walk took arrival order, i.e. the table's sequence 0, which for line 44235 is
+rank 10. Level scaling was refuted as a rival (97 of the 105 tables have every target at the same level, so a
+level has nothing to choose between). What nobody had looked at was the elements' own **criteria** — the
+`[id][value][operator]` run every GameAction element carries — because the importer never carried them on these
+rows. `SpellAreaEffectCriterion` does now, and the answer was on the wire all along.
+
+`Furious Inspiration` (299074), verbatim (`--report rank-tables --report-arg 299074`):
+
+```
+  seq  0 -> 299064  Furious Inspiration (10)   requires 299064 '(10)' OR 299073 '(9)'
+  seq  1 -> 299073  Furious Inspiration (9)    requires 299072 '(8)'
+  seq  2 -> 299072  Furious Inspiration (8)    requires 299071 '(7)'
+  ...
+  seq  8 -> 299066  Furious Inspiration (2)    requires 299065 '(1)'
+  seq  9 -> 299065  Furious Inspiration (1)    (no gate - always permitted)
+```
+
+The operator is `MustHavePassiveAbilityRunning` (91), whose operand is a **spell**, and each edge requires the
+rank BELOW it. Read in the order the record stores them — highest rank first — and taking the first that passes,
+the table is a **one-rank-per-proc upgrade ladder**: nothing running gives rank 1, rank 5 running gives rank 6.
+
+⭐ **The top edge ORs in ITSELF, and nothing else in the table does.** That single asymmetry is what makes a
+subject at the cap *refresh* rather than fall back to rank 1, and it is very hard to read as anything else.
+42 of the 65 tables carry it.
+
+⚠️ **Two mechanisms, and the criterion is what says which** — a global rule would have got one of them wrong:
+
+| shape | the gate names | tables |
+|---|---|---:|
+| **upgrade ladder** | another member of the same table (the rank below) | **43** |
+| **trained-rank lookup** | a spell OUTSIDE the table — the passive rank the character holds | **4** |
+| mixed | both | 4 |
+| ungated | nothing at all — arrival order really is all there is | 14 |
+
+The four lookups are `Rampaging Horde` and friends, whose ten edges each require a different rank of the trained
+ability. ⛔ Note that *is* "the rank you trained", the rule #813 ruled out for line 44235 — it was ruled out
+correctly for that table and is right for these four. The data decides per table; a server-side rule cannot.
+
+40 of the 43 ladders gate **every** edge on the next one in the record, so the record's own order is the ladder.
+The 14 ungated tables keep arrival order, which is the honest residue rather than a claim.
+
+`BuffService.ApplyChainedSpells` evaluates the run through `CriteriaEvaluator` before `SpellChainWalk.TryEnter`,
+so the stacking-line rule still admits exactly one member — it is now the member the ladder selects rather than
+whichever edge happened to be listed first.
+[V3: RankTableLadderTests.EachProc_UpgradesByExactlyOneRank]
 
 ## Terrain line-of-sight after the bake fix (#832/#833)
 

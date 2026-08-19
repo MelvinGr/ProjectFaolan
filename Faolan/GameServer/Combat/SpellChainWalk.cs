@@ -72,10 +72,13 @@ namespace Faolan.GameServer.Combat
 		///             because the ten targets share a line with each other.
 		///         </item>
 		///     </list>
-		///     ⚠️ WHICH member wins is the open half, and it is the walk's arrival order - the table's sequence 0,
-		///     which for line 44235 is rank 10. That is a pick, not a decode. What is NOT the answer is level
-		///     scaling: measured over the shipped data, <b>97 of the 105</b> rank tables have every target at the
-		///     SAME level, so a level cannot choose between them. Gitea #861 holds the selection question.
+		///     ⭐⭐ WHICH member wins is decided BEFORE this is called, and it is a decode rather than a pick (#861).
+		///     Every edge of a rank table carries a CRITERION run gating it on
+		///     <c>MustHavePassiveAbilityRunning &lt;the rank below&gt;</c>, the edges are stored highest-rank-first,
+		///     and the top one ORs in itself - so <c>BuffService.ApplyChainedSpells</c> evaluates the run and the
+		///     first edge that passes is a one-rank-per-proc UPGRADE. This class still admits exactly one member per
+		///     line; it is simply no longer the one that happened to be listed first. ⚠️ 14 of the 65 tables carry no
+		///     gate at all, and there arrival order remains the whole of it.
 		/// </remarks>
 		public bool TryEnter(uint spellBaseId, uint stackingLine = 0)
 		{

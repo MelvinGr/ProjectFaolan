@@ -14,6 +14,10 @@ namespace Faolan.Tests
 	//   * a rank TABLE - a nameless, duration-less line header (299074) carrying one edge per rank, seq 0 -> rank 10
 	//     down to seq 9 -> rank 1. 105 carriers.
 	//
+	// ⭐ WHICH member applies is settled and is NOT this class's arrival order any more - each edge is gated on a
+	// criterion naming the rank below it, so the ladder selects (see RankTableLadderTests, #861). What is gated here
+	// is the invariant that survives either way: whatever arrives FIRST is the only member of its line that lands.
+	//
 	// ⭐ Both collapse under ONE rule, which is why it is one rule: a `GuiStackingLine` is a MUTUAL-EXCLUSION group,
 	// so a walk that applies two members of one line has produced something the client cannot represent. The ladder's
 	// two ends share a line; the table's ten targets share a line with each other.

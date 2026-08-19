@@ -40,8 +40,14 @@ namespace Faolan.Core.Rdb
 		/// <param name="caster">Reads a stat off the entity that applied the element. Never null.</param>
 		/// <param name="target">Reads a stat off the entity it is applied to; falls back to <paramref name="caster" />.</param>
 		/// <param name="unevaluated">How many operators this build could not evaluate, and therefore let through.</param>
+		/// <param name="hasRunning">
+		///     ⭐ Whether the SUBJECT currently has a given spell running — what
+		///     <c>MustHavePassiveAbilityRunning</c> asks, and the one operator in the named set that is not a stat
+		///     read (Gitea #861). Null means the caller cannot answer, and the operator then falls through to the
+		///     unevaluated path exactly as an unnamed one does.
+		/// </param>
 		public static bool Permits(IReadOnlyList<ItemTemplateStatModifiers.Criterion> criteria, Func<CharacterStatId, int?> caster,
-			Func<CharacterStatId, int?>? target, out int unevaluated)
+			Func<CharacterStatId, int?>? target, out int unevaluated, Func<uint, bool>? hasRunning = null)
 		{
 			unevaluated = 0;
 			if (criteria.Count == 0)
@@ -78,6 +84,16 @@ namespace Faolan.Core.Rdb
 					case CriteriaOperator.Or:
 					case CriteriaOperator.Not:
 						return false;
+
+					// ⭐ ---- the buff-state operator (#861) ----
+					//
+					// `MustHavePassiveAbilityRunning` names a SPELL in its `value` slot, not a stat value, and asks
+					// whether the subject is carrying it. It is what a rank TABLE's edges are gated on - each edge
+					// requires the rank BELOW it - so without this one case a ten-edge ladder reads as ten
+					// unconditional alternatives and the walk picks whichever it reaches first.
+					case CriteriaOperator.MustHavePassiveAbilityRunning when hasRunning != null:
+						stack.Push(hasRunning(c.Value));
+						continue;
 
 					// ---- comparisons: `subject.stat <op> value` ----
 					//

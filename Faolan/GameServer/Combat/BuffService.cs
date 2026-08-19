@@ -10,6 +10,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Rdb;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -596,11 +597,38 @@ namespace Faolan.GameServer.Combat
 		// early is the only alternative.
 		private async Task ApplyChainedSpells(INetworkClient client, uint applyTo, uint applyFrom, uint carrierBase, SpellChainWalk chain)
 		{
+			var subject = SubjectEntity(client, applyTo);
+
 			foreach (var link in await _spellAreas.ChainedSpells(carrierBase))
 			{
+				// ⭐⭐ #861: the edge's own CONDITION run, and on a rank TABLE it IS the selection. Each edge of such a
+				// table is gated on `MustHavePassiveAbilityRunning <the rank below it>`, the edges are stored
+				// highest-rank-first, and the top one ORs in itself - so evaluating in order and taking the first that
+				// passes is a one-rank-per-proc UPGRADE. Nothing running gets rank 1; rank 5 running gets rank 6;
+				// someone at the cap refreshes.
+				//
+				// ⛔ This replaces a PICK with a reading. #813 could only take the walk's arrival order, which for
+				// `Furious Inspiration` handed rank 10 - the top of a ten-rank ladder - to a character who had never
+				// proc'd it once. The criteria were on the wire all along; they were simply not imported.
+				var conditions = await _spellAreas.CriteriaFor(link);
+				var unevaluated = 0;
+				if (conditions.Count > 0 && !CriteriaEvaluator.Permits(conditions, SubjectStat, SubjectStat, out unevaluated, HasRunning))
+				{
+					_logger.LogDebug("Spell {Carrier}'s edge to {Chained} is gated by {Count} criteria that do not hold on 0x{Target:X8} - not applied.",
+						carrierBase, link.EffectSpellId, conditions.Count, applyTo);
+					continue;
+				}
+
+				if (unevaluated > 0)
+				{
+					_logger.LogDebug("Spell {Carrier}'s edge to {Chained} carries {Count} condition(s) this build cannot evaluate; applied (the conservative direction).",
+						carrierBase, link.EffectSpellId, unevaluated);
+				}
+
 				// #813: claim the target's STACKING LINE as well as its id. Ten edges into one line is a rank table,
 				// not ten buffs, and the line is a mutual-exclusion group - so the first arrival wins and the rest
-				// are refused.
+				// are refused. With the criteria above read, "first" is now the rung the ladder selects rather than
+				// whichever edge happens to be listed first.
 				if (!chain.TryEnter(link.EffectSpellId, await _spellAreas.StackingLineOf(link.EffectSpellId)))
 					continue;
 
@@ -610,6 +638,58 @@ namespace Faolan.GameServer.Combat
 
 			if (chain.Truncated)
 				_logger.LogWarning("Spell {Carrier}'s chain hit the {Cap}-application cap and was truncated.", carrierBase, SpellChainWalk.MaxApplications);
+
+			return;
+
+			// ⭐ `MustHavePassiveAbilityRunning` names a SPELL, and the registry is keyed by the WIRE id
+			// (`base << 8`) - so the comparison has to shift, not equate. A subject we cannot resolve answers FALSE
+			// rather than null: an entity with no registry has no buff running, which is a fact about it, and the
+			// alternative (letting the condition through unevaluated) would put the whole ladder back on arrival
+			// order.
+			bool HasRunning(uint spellBase)
+			{
+				if (subject == null)
+					return false;
+
+				foreach (var wireId in subject.ActiveBuffs.Keys)
+				{
+					if (wireId >> 8 == spellBase)
+						return true;
+				}
+
+				return false;
+			}
+
+			// The subject's sheet for the comparison operators, on the same NULL-means-unevaluated contract
+			// BuffStatEffects uses - reading an absent stat as 0 would fail every `> n` gate and drop edges that
+			// apply today.
+			int? SubjectStat(CharacterStatId stat)
+			{
+				if (subject == null)
+					return null;
+
+				return stat switch
+				{
+					CharacterStatId.Level => (int)subject.Level,
+					CharacterStatId.HealthCurrent => (int?)subject.Vitals?.Health,
+					_ => subject.BuffedStats.TryGetValue(stat, out var value) ? (int)value : null
+				};
+			}
+		}
+
+		// The entity a spell is landing on, by handle - the player themselves or anything in their zone. Null when the
+		// caller is not in the world yet, or when the handle names something the zone no longer holds (a mob that died
+		// between the cast and the landing).
+		private WorldEntity? SubjectEntity(INetworkClient client, uint handle)
+		{
+			if (_sim.PlayerWorldEntity(client) is not { } player)
+				return null;
+
+			return player.Handle == handle
+				? player
+				: _sim.World.ZoneForEntity(player).TryGet(handle, out var other)
+					? other
+					: null;
 		}
 
 		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)

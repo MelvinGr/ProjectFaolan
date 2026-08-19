@@ -41,6 +41,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> LockedTemplateIdsForConsumableLine(uint lockSpellLine);
 		Task<SpellEffect[]> GetSpellEffects();
 		Task<SpellAreaEffect[]> GetSpellAreaEffects();
+		Task<SpellAreaEffectCriterion[]> GetSpellAreaEffectCriteria();
 		Task<SpellSpellStatModifier[]> GetSpellStatModifiers();
 		Task<(uint Line, uint SpellId)[]> GetSpellLineMembers();
 		Task<Spell[]> GetSpells();
@@ -482,6 +483,15 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.SpellAreaEffects.AsNoTracking().OrderBy(a => a.SpellId).ThenBy(a => a.Sequence).ToArrayAsync();
+		}
+
+		// #861: the CONDITIONS on those links, read whole and by the same caller for the same reason. Ordered by
+		// `Pos` because the run is a postfix EXPRESSION - re-ordering it changes what it means.
+		public async Task<SpellAreaEffectCriterion[]> GetSpellAreaEffectCriteria()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.SpellAreaEffectCriteria.AsNoTracking()
+				.OrderBy(c => c.SpellId).ThenBy(c => c.Sequence).ThenBy(c => c.Pos).ToArrayAsync();
 		}
 
 		// #710: every spell-scoped stat modifier a SPELL carries, read whole - 1,571 rows the importer owns, cached by

@@ -457,6 +457,11 @@ namespace Faolan.Importer.Cli
 					return await SpellGrantCheck(arg);
 				}
 
+				case "rank-tables":
+				{
+					return await RankTables(arg);
+				}
+
 				case "feat-autotrain-check":
 				{
 					return await FeatAutotrainCheck();
@@ -941,6 +946,19 @@ namespace Faolan.Importer.Cli
 								: string.Join(" ", type.Keys.Select((k, i) => $"{k}={(i < el.Values.Length ? el.Values[i].ToString() : "-")}"));
 							var texts = string.Join(" ", el.Texts.Where(t => !string.IsNullOrEmpty(t)).Select(t => $"\"{t}\""));
 							Console.WriteLine($"      {el.Kind} {type?.Name ?? "?"}  {keys} {texts}".TrimEnd());
+
+							// ⭐ The element's own CONDITION run (#790/#791). Printed here because an element read
+							// without its criteria is only half of what the record states - two elements with the
+							// same decoded slots are routinely the same effect under different conditions, and a
+							// list of them with EMPTY criteria is itself a finding (Gitea #861 turned on exactly
+							// that: the rank tables condition nothing).
+							foreach (var criterion in el.Criteria)
+							{
+								var opName = Enum.IsDefined(typeof(CriteriaOperator), criterion.Operator)
+									? ((CriteriaOperator)criterion.Operator).ToString()
+									: criterion.Operator.ToString();
+								Console.WriteLine($"          if [{criterion.Id}] {opName} {criterion.Value}");
+							}
 						}
 					}
 
