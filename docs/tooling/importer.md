@@ -334,11 +334,16 @@ of them holding a feat the client auto-trains. Returns non-zero on a character t
 only direction that can only be a defect; an unspent budget is printed, since a player may simply not have spent
 it. ⚠️ A test cannot do this - `faolan.sql` excludes every `Character*` table, so the fixture holds no
 `CharacterFeats` and the assertion would pass on an empty left side) ·
-`pet-cost` (#823: which field of a summoned pet's spawn carries the point it costs? The corpus discriminates well
-- three cost classes, 89 cost-1 / 13 cost-2 / 53 cost-4 spawns - and ⛔ **nothing carries it**: `generic_stats` is
-empty on every pet, and of 64 numeric fields on the character message, 60 present on all 155 samples with 29
-varying, none equals the cost. That refutes the ticket's reading that the client costs "the pet it receives".
-Prints the field counts as a control, since "no field matches" and "no fields collected" print the same) ·
+`pet-cost` (#823, **SOLVED by it**: where does a summoned pet's point cost come from? Three sweeps, and the answer
+is in the third. ⛔ *Which field EQUALS the cost* - nothing: `generic_stats` is empty on every pet and of 64
+numeric fields on the character message, 60 present on all 155 samples with 29 varying, none equals it. ⛔ *Which
+field DETERMINES it* (a KEY the client could look a cost up by - the question the equality test cannot ask, since
+a key never equals what it resolves to) - exactly one, `npc_stats.TemplateId`, and it determines the cost only by
+identifying the creature, ⚠️ which our own TemplateIds already match retail's on. ⭐ *The `PetIIR` owner-assign's
+`(f1,f2,f3)` KIND triple* - the one message we build ourselves - where **`f2` IS the cost**, equal on 61 of 62
+resolved assigns: `(0,1,1)` on the cost-1 pets, `(0,2,2)` on cost-2, `(0,4,2)` on cost-4. We had been sending the
+constant `(0,2,2)` for every pet in the game. Prints the field counts as a control, since "no field matches" and
+"no fields collected" print the same) ·
 `magicbuff-descriptor` (#658: where do the MagicBuff apply payload's `descriptor[0]` and `bool2` come from? Both
 are near-per-spell, so this cross-tabs them against the spell's RDB record. ⛔ **Both of the ticket's proposed
 routes are eliminated**: no FLAGS bit scores above +7 against a +50 yardstick, and no PROPERTY FIELD carries
