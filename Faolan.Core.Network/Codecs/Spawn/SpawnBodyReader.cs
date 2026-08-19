@@ -42,9 +42,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Whether a decoded spawn is a PLAYER's: no move-task slot in its first record (a player's first record IS
 		// the buff list's framing word, length 4) and the player's own word2. Both were bare literals in the old
 		// player-only codec, which is how they came to read as protocol constants - an NPC carries 5 and 1/2/3.
+		// The entry slot is ONE grammar for both families (#466), so it no longer discriminates.
 		public static bool IsPlayer(SimpleCharFullUpdateIIR spawn)
 		{
-			return spawn.Post is { HasMoveTaskSlot: false, MovementMode: SpawnPostIirs.PlayerMovementMode, Slot: PlayerEntrySlot };
+			return spawn.Post is { HasMoveTaskSlot: false, MovementMode: SpawnPostIirs.PlayerMovementMode };
 		}
 
 		public static bool TryReadCharacterMessage(byte[] body, out Result result)

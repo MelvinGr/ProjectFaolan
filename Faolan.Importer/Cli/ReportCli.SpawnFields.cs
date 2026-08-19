@@ -127,10 +127,10 @@ namespace Faolan.Importer.Cli
 					// while the importer's own lift found a THIRD carrying spawn (Valkyrie Skalla) that the dedup had
 					// dropped. A census that silently answers a narrower question than it states is the failure mode
 					// this whole field's history is made of.
-					if (captured.Post?.Slot is NpcEntrySlot { Morphs.Count: > 0 } census)
+					if (captured.Post?.Slot is { Appearance.Count: > 0, Skills.Count: 0, Pets.Count: 0 } census)
 					{
 						word2Tables++;
-						var nonZero = census.Morphs.FindAll(m => m.Word2 != 0);
+						var nonZero = census.Appearance.FindAll(m => m.Word2 != 0);
 						if (nonZero.Count > 0)
 						{
 							word2NonZero++;
@@ -140,8 +140,8 @@ namespace Faolan.Importer.Cli
 
 							// "the first N entries and no others" is the shape an ordered appearance field has and
 							// scattered runtime state does not.
-							var prefix = census.Morphs.FindIndex(m => m.Word2 == 0);
-							var contiguous = prefix >= 0 && !census.Morphs.Skip(prefix).Any(m => m.Word2 != 0);
+							var prefix = census.Appearance.FindIndex(m => m.Word2 == 0);
+							var contiguous = prefix >= 0 && !census.Appearance.Skip(prefix).Any(m => m.Word2 != 0);
 							var key = contiguous ? $"{prefix} entries" : "scattered";
 							word2Prefix[key] = word2Prefix.GetValueOrDefault(key) + 1;
 						}
@@ -283,18 +283,16 @@ namespace Faolan.Importer.Cli
 				var post = captured.Post;
 				if (post == null)
 					return "the post-IIR did not decode";
-				if (post.Slot is not NpcEntrySlot npc)
-					return $"the entry slot is {post.Slot?.GetType().Name ?? "absent"}, not an NPC slot";
-				if (npc.Morphs.Count == 0)
+				if (post.Slot is null)
+					return "the entry slot is absent";
+				if (post.Slot.Appearance.Count == 0)
 					return "the table is empty (the minimal no-morph form)";
 
-				// Word2 came OFF this veto with #672 - it is an ordinal, not runtime state, and the column now carries
-				// it - so only the never-observed Flag still declines a table.
-				var flagged = npc.Morphs.FindIndex(m => m.Flag != 0);
-				if (flagged >= 0)
-					return $"entry {flagged} sets the never-observed Flag ({npc.Morphs[flagged].Flag})";
-				if (npc.EntryTableX != ListFrame.Empty || npc.EntryTableMarker != ListFrame.Empty)
-					return $"the entry table is not empty (X=0x{npc.EntryTableX:X}, marker=0x{npc.EntryTableMarker:X})";
+				// Word2 came OFF this veto with #672 - it is an ordinal, not runtime state, and the column now
+				// carries it. (The old never-observed-Flag veto died with the field: it was the u16 string length's
+				// high byte, #466.) A non-empty skill or pet list marks a PLAYER stream.
+				if (post.Slot.Skills.Count > 0 || post.Slot.Pets.Count > 0)
+					return $"the slot carries skills/pets ({post.Slot.Skills.Count}/{post.Slot.Pets.Count}) - a player stream";
 				if (post.EndPairs.Count > 0 || post.EndPairs2.Count > 0 || post.EndPairs3.Count > 0)
 					return $"a closing list is not empty ({post.EndPairs.Count}/{post.EndPairs2.Count}/{post.EndPairs3.Count} pairs)";
 
@@ -303,8 +301,8 @@ namespace Faolan.Importer.Cli
 
 			static List<(uint, float)> Morphs(SimpleCharFullUpdateIIR spawn)
 			{
-				return spawn.Post?.Slot is NpcEntrySlot npc
-					? npc.Morphs.Select(m => (m.MorphId, m.Value)).ToList()
+				return spawn.Post?.Slot is { Skills.Count: 0, Pets.Count: 0 } slot
+					? slot.Appearance.Select(m => (m.MorphId, m.Value)).ToList()
 					: [];
 			}
 		}

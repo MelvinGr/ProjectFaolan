@@ -52,7 +52,7 @@ namespace Faolan.Tests
 				if (!rebuilt.AsSpan().SequenceEqual(record))
 					mismatches.Add($"{source}: {record.Length} -> {rebuilt.Length} bytes");
 
-				var family = spawn.Post.Slot is NpcEntrySlot ? "npc" : "player";
+				var family = spawn.Post.HasMoveTaskSlot ? "npc" : "player";
 				census[family] = census.GetValueOrDefault(family) + 1;
 			}
 

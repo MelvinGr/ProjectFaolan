@@ -8,18 +8,25 @@ PRE-IIR feat list - see `decode_unlocked_feats.py` - plus the FeatIIR 0x28da68a0
 byte-identical (the pre-IIR feat list is what changed). See the feat_trees_decode_251 memory. This tool + the
 scaffold still matter (the list gates spell usability, #298), it's just skills, not feats.
 
-The ability/skill list a high-level character carries is the tail ID-list of its own FA015807 player spawn:
-5-byte `[u8 rank][u32 featId]` groups, ascending featId, terminated by id 0x3F1 (the same list the C# codec
-PlayerSpawnScaffoldCodec parses into ScaffoldIdEntry(Rank, Id), and that PlayerSpawnScaffoldRows maps to
-CharacterSkill(SkillId, Rank)). This tool surfaces that list per character straight from the captures - the
-source the hand-transcribed PlayerSpawnScaffoldRows.FullSkillIdsByClass came from, but WITH the rank byte that
-the hand list dropped.
+The ability/skill list a high-level character carries is the SKILL list of its own FA015807 player spawn.
+
+!! CARVE CORRECTION (Gitea #466): the client reads this list as a ListFrame'd `[u32 id][u8 rank]` - the id FIRST -
+opening with the archetype ability (100/200/300/400) and framed by the word the old carve called "the closer tag".
+This tool still parses the OLD 8-bytes-off grouping (`[u8 rank][u32 id]` behind a trailing terminator), which walks
+the same bytes but pairs each rank with the WRONG NEIGHBOUR (the id after it) and drops the first skill. The
+per-id output below is therefore shifted by one position against the client's own pairing - re-measure before
+trusting any (id, rank) association from here; the C# model (SpawnEntrySlot.Skills / CharacterSkill) carries the
+client's pairing. The id SET (bar the archetype ability) and the byte-walk are unaffected.
+
+This tool surfaces that list per character straight from the captures - the source the hand-transcribed
+PlayerSpawnScaffoldRows.FullSkillIdsByClass came from, but WITH the rank byte that the hand list dropped.
 
 The character's CLASS is self-identified: the FIRST feat id is the profession feat == (Class enum value) * 100
 (Necromancer 0x29 -> 4100, Demonologist 0x2C -> 4400, Assassin 0x22 -> 3400, HeraldOfXotli 0x2B -> 4300, ...).
 
-The 5-byte group's leading byte (the codec calls it `Rank`) is really a per-FEAT TAG, not a per-character trained
-rank: across all captures it is INVARIANT per feat id (153/156 distinct ids carry one value; only 3 vary, all
+The 5-byte group's leading byte was measured as a per-FEAT TAG, not a per-character trained rank - but NOTE that
+measurement used the old pairing (see the carve correction above), so "per feat id" really means "per the id one
+position over": across all captures it is INVARIANT per feat id (153/156 distinct ids carry one value; only 3 vary, all
 between 0x00 and their nonzero tag). It is 0x00 on a base-scaffold entry and a feat-specific nonzero tag once the
 feat is trained (e.g. 326000 is always 0x49, 331300 always 0x0a). Bands seen: 0x03 (the 1.4M-range spell-grant
 feats), 0x08, 0x0a, and a 0x41..0x4b band on the mid-tier feat-tree feats. Its exact meaning (tier / tree-tab /

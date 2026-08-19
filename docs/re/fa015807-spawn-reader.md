@@ -272,7 +272,7 @@ after them as an opaque `byte[]`. One shared reader walks both:
 [u32 headCount][headCount x u32]        the plain-counted head word list
 [u32 firstRecordLen][u32 word2]         <- the player's "4" and "2"
 [firstRecordLen bytes]                  the first record, ENDING in the buff list's framing word
-[the entry slot]                        NPC: the morph table · PLAYER: entry table + ID list
+[the entry slot]                        appearance table + skills + pets (ONE grammar, #466)
 [u32 count] pairs, [u32 count] pairs    two PLAIN-counted pair lists
 [u32 ListFrame] pairs                   the count-framed third
 ```
@@ -465,17 +465,17 @@ bodies carry per-session runtime bloat (same Crocodile type at 469/649/733 B). C
 byte-exact drop needed clean per-type captures. The typed-column path above is the actual answer.
 </details>
 
-## Player spawn entry-table CLOSER is per-class (#250, 2026-06-19)
+## Player spawn entry-table "CLOSER" (#250, 2026-06-19; resolved as framing by #466)
 
-The fresh-character player-spawn scaffold's entry-table **closer** record (the final `[u16 tag][u32 value]`
-entry) is **per-class**, not a constant. Stamping one class's closer on another **crashes the client's
-CoreCharacter construction on relog** (in-client: a Necromancer carrying the Barbarian closer `0x56B6/0x12C`
-crashes the loading screen; its own `0x4301/0x190` loads). Fix (`PlayerSpawnScaffoldRows.FreshCloser(Class)`,
-commit 303fd9c): **value = archetype × 100** (Soldier 100 / Priest 200 / Rogue 300 / Mage 400). The **tag**
-was first modelled as a per-class constant, but #269 (`parse_spawn_scaffold.py`, 117 player self-spawns,
-zero violations) settled it as fully DERIVED: **tag = (fresh feat/skill IdList length + 2) × 0x3F1** — a
-count marker the client uses to read the feat list, which is exactly why a mismatched one crashes. It is
-race-independent (same class → same fresh feat list → same count → same tag) and holds for feat counts from
-14 (Assassin → `0x3F10`) up to 47 (leveled chars); the old per-class hardcoded tags matched only because each
-class's feat-list length is fixed. The skill IdList (incl. Necro's feat `85200`) was already faithful to the
-dumps and is NOT the crash cause.
+The fresh-character player-spawn scaffold's "closer" record — read at the time as a final `[u16 tag][u32 value]`
+entry — is **per-class**, and stamping one class's on another **crashes the client's CoreCharacter construction
+on relog** (in-client: a Necromancer carrying the Barbarian `0x56B6/0x12C` crashes the loading screen; its own
+`0x4301/0x190` loads). #269 (`parse_spawn_scaffold.py`, 117 player self-spawns, zero violations) settled the
+derivation: **value = archetype × 100** (Soldier 100 / Priest 200 / Rogue 300 / Mage 400), **tag = (fresh
+feat/skill list length + 2) × 0x3F1**.
+
+⭐ #466 then explained WHY those are the formulas: the "closer" was never a record. The old carve sat 8 bytes off
+the client's — the "tag" IS the skill list's `ListFrame` word and the "value" the first skill's id (the
+archetype ability), which is why a mismatched one crashes: the client's skill parse validates the frame word.
+See `docs/re/player-spawn-generation.md` for the corrected grammar; the writer now derives both structurally
+(`ListFrame.ForCount(Skills.Count)` / `ArchetypeSkillId`).

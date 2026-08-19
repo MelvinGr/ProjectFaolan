@@ -47,11 +47,9 @@ namespace Faolan.Tests
 
 		// Decompose a golden capture into the inputs BuildBody takes (IIR header, transform, token, message, morphs)
 		// and reassemble from scratch - the same decomposition BuildLive performs off the DB columns.
-		private static byte[] BuildFromGolden(SimpleCharFullUpdateIIR golden, out List<NpcAppearanceMorph> morphs)
+		private static byte[] BuildFromGolden(SimpleCharFullUpdateIIR golden, out List<AppearanceEntry> morphs)
 		{
-			morphs = golden.Post.Slot is NpcEntrySlot npc
-				? npc.Morphs.ToList()
-				: [];
+			morphs = golden.Post.Slot.Appearance.ToList();
 
 			return NpcSpawnBuilder.BuildBody(golden.Handle, golden.CoreCharIirHeader, golden.Position, golden.Rotation, (uint)golden.Playfield, golden.Character, morphs);
 		}

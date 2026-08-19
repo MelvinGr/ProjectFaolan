@@ -124,7 +124,7 @@ namespace Faolan.Importer.Captures
 			// gear + morphs onto the level-10 child, which its own captured spawn doesn't carry (floating gear). The
 			// template id is the stable per-type key: distinct templates stay separate, while genuinely-same NPCs
 			// (same template across captures) still merge.
-			var morphsByTemplate = new Dictionary<uint, IReadOnlyList<NpcAppearanceMorph>>();
+			var morphsByTemplate = new Dictionary<uint, IReadOnlyList<AppearanceEntry>>();
 			foreach (var e in perCap.SelectMany(p => p.All))
 			{
 				if (e.Morphs.Count > 0 && (!morphsByTemplate.TryGetValue(e.TemplateId, out var cur) || e.Morphs.Count > cur.Count))

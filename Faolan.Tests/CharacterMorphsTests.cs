@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
 using Xunit;
@@ -32,16 +33,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildEntries_SkipsDefaultSlidersAndNullBody()
 		{
-			Assert.Empty(CharacterMorphs.BuildEntries(null, 7));
-			Assert.Empty(CharacterMorphs.BuildEntries(new CharacterBody(), 7));
+			Assert.Empty(CharacterMorphs.BuildEntries(null));
+			Assert.Empty(CharacterMorphs.BuildEntries(new CharacterBody()));
 
 			var body = new CharacterBody
 			{
 				Thigh = -30
 			};
-			var only = Assert.Single(CharacterMorphs.BuildEntries(body, 7));
-			Assert.Equal((ushort)0x0105, only.Tag);
-			Assert.Equal(0xBCF5C28Fu, only.Value); // -0.03f
+			var only = Assert.Single(CharacterMorphs.BuildEntries(body));
+			Assert.Equal(0x0105u, only.MorphId);
+			Assert.Equal(0xBCF5C28Fu, BitConverter.SingleToUInt32Bits(only.Value)); // -0.03f
 		}
 
 		[Fact]
@@ -51,14 +52,13 @@ namespace Faolan.Tests
 			foreach (var (morph, raw) in HoxxlingStream)
 				Assert.True(CharacterMorphs.TryApply(body, morph, Zz(raw)), morph); // Zz = the read-side zigzag decode
 
-			var entries = CharacterMorphs.BuildEntries(body, 7);
+			var entries = CharacterMorphs.BuildEntries(body);
 
 			Assert.Equal(HoxxlingWire.Length, entries.Count);
 			for (var i = 0; i < entries.Count; i++)
 			{
-				Assert.Equal(7u + (uint)i, entries[i].Index);
-				Assert.Equal(HoxxlingWire[i].Tag, entries[i].Tag);
-				Assert.Equal(HoxxlingWire[i].Bits, entries[i].Value);
+				Assert.Equal(HoxxlingWire[i].Tag, (ushort)entries[i].MorphId);
+				Assert.Equal(HoxxlingWire[i].Bits, BitConverter.SingleToUInt32Bits(entries[i].Value));
 			}
 		}
 

@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// (#605).
 		//
 		// The u32 carrier length belongs to the SENDER (#530 rule 2) - what comes back is the record.
-		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs)
+		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<AppearanceEntry> morphs)
 		{
 			var movementMode = message.ShouldSerializeMovementMode() ? message.MovementMode : SpawnPostIirs.DefaultMovementMode;
 			return SimpleCharFullUpdateCodec.Build(new SimpleCharFullUpdateIIR
@@ -102,7 +102,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				? wearing.Morphs.OrderBy(m => m.Ordinal).Select(m => (m.MorphId, m.Value, m.Word2, m.Text))
 				: npc.Morphs.OrderBy(m => m.Ordinal).Select(m => (m.MorphId, m.Value, m.Word2, m.Text));
 			var morphs = morphSource
-				.Select(m => new NpcAppearanceMorph
+				.Select(m => new AppearanceEntry
 				{
 					MorphId = m.MorphId,
 					Value = m.Value,
@@ -148,7 +148,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var morphs = row
 				.Morphs.OrderBy(m => m.Ordinal)
-				.Select(m => new NpcAppearanceMorph
+				.Select(m => new AppearanceEntry
 				{
 					MorphId = m.MorphId,
 					Value = m.Value,

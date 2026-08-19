@@ -11,15 +11,16 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the weighted-appearance pipeline: the create editor's resource refs (SetMorphValue "*..." values),
-	// resolved through the client registry (RDB 1000076 -> MorphTarget; the record's leading id IS the wire tag), must
-	// reproduce the weighted (1.0) entries of the captured spawn. faolanx is the reference case: his 7
+	// resolved through the client registry (RDB 1000076 -> MorphTarget; the record's leading id IS the wire key), must
+	// reproduce the weighted (1.0) appearance elements of the captured spawn. faolanx is the reference case: his 7
 	// weighted entries resolve 7/7 bit-exact against this client's registry (the other captured characters
-	// have 1-2 entries of live-server data-version drift; see the plan doc).
+	// have 1-2 entries of live-server data-version drift; see the plan doc). The always-sent face paint is the
+	// EIGHTH: the old carve read it as the "EntryTableX" scalar and skipped it here (#466).
 	public class WeightedAppearanceTests
 	{
 		private static readonly (string Ref, ushort Tag, byte Category)[] Registry =
 		[
-			("*beardmesh_3181870", 0x02BB, 4), ("*hairmesh_566206", 0x012C, 3), ("*texscript_1136960", 0x0193, 10), ("*texscript_183875", 0x01B3, 2), // face paint - never emitted in spawns
+			("*beardmesh_3181870", 0x02BB, 4), ("*hairmesh_566206", 0x012C, 3), ("*texscript_1136960", 0x0193, 10), ("*texscript_183875", 0x00B7, 2), // face paint - the FIRST element of every created spawn (#466); 0xB7 is its real wire key
 			("*texscript_202393", 0x00E3, 8), ("*texscript_213934", 0x0112, 7), ("*texscript_3113027", 0x01CF, 6), ("*texscript_3770894", 0x0323, 9)
 		];
 
@@ -30,7 +31,8 @@ namespace Faolan.Tests
 			"*beardmesh_3181870", "*hairmesh_566206", "*texscript_1136960", "*texscript_183875", "*texscript_202393", "*texscript_213934", "*texscript_3113027", "*texscript_3770894"
 		];
 
-		private static readonly ushort[] FaolanxWire = [0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323];
+		// The face paint FIRST (retail's slot 1), then his other choices in editor send order.
+		private static readonly ushort[] FaolanxWire = [0x00B7, 0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323];
 
 		// There is NO substitute face. Each of these used to return null, and the caller then spliced in Dikketest's
 		// captured 6 weighted attributes - a hair the player never chose plus two face-marking texscripts - and
@@ -41,9 +43,10 @@ namespace Faolan.Tests
 		{
 			Assert.Empty(PlayerSpawnScaffoldRows.BuildWeightedEntries(null, RegistryDict()));
 
-			// Only the never-emitted face-paint category (2) resolved: captured spawns never carry it, so an empty
-			// entry list is the CORRECT wire, not a missing one.
-			Assert.Empty(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
+			// The face paint alone yields exactly the face paint - the old carve skipped category 2 as "never
+			// emitted", which was its own 8-bytes-off reading hiding the element inside the "EntryTableX" scalar.
+			var paintOnly = Assert.Single(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
+			Assert.Equal(0xB7u, paintOnly.MorphId);
 		}
 
 		// The registry is 1072 rows of static seed content that every spawn resolves through, so its absence is seed
@@ -75,11 +78,11 @@ namespace Faolan.Tests
 
 			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, RegistryDict()));
 
-			// 7 weighted + no morphs + the closer at idx 8.
+			// 8 weighted (face paint first) + no morphs; Word2 slot ordinals 1..8. No closer - the record the old
+			// carve appended here was the skill list's frame word + first skill, which the writer now derives (#466).
 			Assert.Equal(8, entries.Count);
-			Assert.Equal(FaolanxWire, entries.Take(7).Select(e => e.Tag));
-			Assert.Equal(8u, entries[7].Index);
-			Assert.Equal(0x4301, entries[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
+			Assert.Equal(FaolanxWire.Select(t => (uint)t), entries.Select(e => e.MorphId));
+			Assert.Equal(Enumerable.Range(1, 8).Select(i => (uint)i), entries.Select(e => e.Word2));
 		}
 
 		[Fact]
@@ -90,9 +93,8 @@ namespace Faolan.Tests
 			Assert.Equal(FaolanxWire.Length, entries!.Count);
 			for (var i = 0; i < entries.Count; i++)
 			{
-				Assert.Equal((uint)i + 1, entries[i].Index);
-				Assert.Equal(FaolanxWire[i], entries[i].Tag);
-				Assert.Equal(0x3F800000u, entries[i].Value); // weight 1.0
+				Assert.Equal(FaolanxWire[i], (ushort)entries[i].MorphId);
+				Assert.Equal(1f, entries[i].Value); // weight 1.0
 			}
 		}
 

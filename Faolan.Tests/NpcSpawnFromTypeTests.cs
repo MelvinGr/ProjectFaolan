@@ -50,7 +50,7 @@ namespace Faolan.Tests
 
 				// The built record carries the type's worn equipment and (for a humanoid) its appearance table.
 				Assert.Equal(npc.Equipment.Count, read.Message.InventoryEntries.Count);
-				var morphs = Assert.IsType<NpcEntrySlot>(SimpleCharFullUpdateCodec.Parse(body).Post.Slot).Morphs;
+				var morphs = SimpleCharFullUpdateCodec.Parse(body).Post.Slot.Appearance;
 				if (npc.Morphs.Count > 0)
 					Assert.Equal(npc.Morphs.Count, morphs.Count);
 			}

@@ -27,7 +27,7 @@ namespace Faolan.Importer.Extractors
 
 		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
 		// post-IIR generate from rows instead of the Data blob.
-		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
+		public IReadOnlyList<AppearanceEntry> Morphs { get; init; } = [];
 
 		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
 		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).

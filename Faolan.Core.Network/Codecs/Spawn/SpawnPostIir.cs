@@ -6,14 +6,13 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// The FA015807 post-IIR stream - the bytes after the embedded CoreCharacterIIR (Gitea #475). PLAYER and NPC are
-	// the SAME grammar; the entry slot in the middle is the only place the two differ:
+	// the SAME grammar, entry slot included (#466 - the slot was long modelled as two family shapes; it is one):
 	//
 	//   [u32 headWordCount][headWordCount x u32][u32 firstRecordLen][u32 word2]   the header
 	//   [firstRecordLen-4 move-task slot][u32 list frame]                         the FIRST RECORD, ending in the
 	//                                                                             buff list's count frame
 	//   [count x 60-byte ScaffoldBuff]                                            the active buffs
-	//   [SpawnEntrySlot]                                                          PLAYER: entry table + id list
-	//                                                                             NPC:    the morph table
+	//   [SpawnEntrySlot]                                                          appearance + skills + pets
 	//   [u32 c1][c1 x 8][u32 c2][c2 x 8]                                          two PLAIN-counted pair lists
 	//   [u32 list frame][n x 8]                                                   the count-framed third
 	//
@@ -71,8 +70,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		public List<ScaffoldBuff> BuffRecords { get; } = [];
 
-		// The one place the two families differ.
-		public SpawnEntrySlot Slot { get; set; } = new PlayerEntrySlot();
+		// The appearance/skills/pets slot - one grammar for both families; an NPC's skill and pet lists are empty.
+		public SpawnEntrySlot Slot { get; set; } = new SpawnEntrySlot();
 
 		// The first of the three closing lists IS the faction-reputation block (#315); see ScaffoldPair.
 		public List<ScaffoldPair> EndPairs { get; } = [];
@@ -99,80 +98,70 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public List<ScaffoldPair> EndPairs3 { get; } = [];
 	}
 
-	// The ENTRY SLOT: the one region of the post-IIR stream whose grammar depends on which family the spawn is.
-	// Both open with a u32 count, and when that count is ZERO the two readings are the SAME twelve bytes - which is
-	// why a fully-empty stream (the 40-byte create-editor preview) round-trips whichever way it is read.
-	public abstract record SpawnEntrySlot;
-
-	// The PLAYER's slot: the weighted-attribute / feat ENTRY TABLE, then the skill ID list.
+	// The ENTRY SLOT - ONE region, ONE grammar for both families. It was long modelled as two family-specific
+	// shapes (a player "entry table + id list" vs an NPC "morph table + two trailing constants"); the client reads
+	// both through the same CoreCharacterFullUpdateIIR::ReadSubClass (FUN_0145ac80), and its carve sat 8 bytes OFF
+	// the old player reading (#466):
 	//
-	//   [u32 count][u32 EntryTableX]
-	//   count > 0: [u32 1.0f][count x 14-byte entry][ID list ... ][u8 rank][u32 tailFrame][tail records]
-	//   count = 0: [u32 Marker]
-	public sealed record PlayerEntrySlot : SpawnEntrySlot
+	//   [u32 count][count x appearance entry]          FUN_010087b0 - each entry -> MorphValues_c::SetMorphValue
+	//   [u32 ListFrame][n x [u32 id][u8 rank]]         FUN_0079cfd0 - the SKILLS, stored map[id] = rank
+	//   [u32 ListFrame][m x 13-byte pet record]        FUN_0145ba10 - the PETS (ScaffoldPetRef)
+	//
+	// An NPC is simply a stream whose skill and pet lists are EMPTY - their two ForCount(0) frame words are what
+	// used to be carried as the "EntryTableX + EntryTableMarker" trailing constants. The old player carve hid the
+	// same two words inside invented fields; see AppearanceEntry for the full unwind.
+	public sealed record SpawnEntrySlot
 	{
-		// The weight word every non-empty entry table opens with: IEEE 1.0f.
-		public const uint EntryWeightOne = 0x3F800000;
+		// The appearance/morph table - empty on animals and on the create-editor preview.
+		public List<AppearanceEntry> Appearance { get; } = [];
 
-		public List<ScaffoldEntry> Entries { get; } = [];
+		// The skill list. EMPTY on every NPC; every captured player spawn with an appearance carries its archetype
+		// ability first (100/200/300/400 = archetype x 100, rank 0 on all 296 - derived per character, like the
+		// class-progression entry, see PlayerSpawnScaffoldRows).
+		public List<ScaffoldSkill> Skills { get; } = [];
 
-		// The per-char u32 after the entry count (Strie 0xB7, NecroL80 0x2B6, editor 0x3F1).
-		public uint EntryTableX { get; set; }
-
-		// The word that stands in for the whole ID list when the entry table is EMPTY. ForCount(0) on every captured
-		// stream - carried rather than asserted, because 0x3F1 wearing the face of a terminator is the exact trap
-		// ListFrame documents.
-		public uint Marker { get; set; } = ListFrame.Empty;
-
-		public List<ScaffoldIdEntry> IdList { get; } = [];
-
-		// The rank byte on the ID list's terminating group. Zero on most captured spawns, which is why it was long
-		// asserted to BE zero - across the corpus 23 spawns carry a non-zero one, and the parse still consumes to
-		// exactly the body's end, so it is a carried value and not a corruption.
-		public byte IdListTerminatorRank { get; set; }
-
-		// ⭐ The character's active PETS. The list that CLOSES the ID list; its count word is what the grammar long
-		// called "the 0x3F1 terminator" (0x3F1 is ListFrame.ForCount(0), so on the ~200 spawns whose list is empty
-		// the word reads as a constant and the mistake is invisible). 17 captured spawns carry ForCount(1) or
-		// ForCount(2). See ScaffoldPetRef for how the client names them.
+		// The pet list that closes the slot. See ScaffoldPetRef.
 		public List<ScaffoldPetRef> Pets { get; } = [];
 	}
 
-	// The NPC's slot: the APPEARANCE / morph table, then two words.
+	// One element of the slot's appearance table: [u32 key][f32 value][u32 word2][u16 len][len x Latin1]. The
+	// client hands (key, value, word2) plus the name string to MorphValues_c::SetMorphValue (FUN_01008070, log
+	// channel GameCode/MorphValues), which upserts a 76-byte morph-value entry keyed on `key` and zeroes rival
+	// entries of the same EXCLUSIVE appearance category (the DAT_01f268b4 category set). The NAME is the editor
+	// spelling ("*hairmesh_208094"); it is EMPTY on every captured element of BOTH families, where the key carries
+	// the identity - but the client can read a named one, so the u16 length is real grammar, not padding. On a
+	// weighted resource entry Value is the registry weight (1.0); on a morph slider entry, the slider float. Word2
+	// is a per-character slot ordinal (the NPC texscript case is argued on NpcSpawnMorph.Word2).
 	//
-	//   [u32 count][count x morph entry][u32 EntryTableX][u32 EntryTableMarker]
+	// ⭐⭐ This ONE element shape is what unwound the player entry table (#466). The player slot was long carved as
+	// [u32 count][u32 X][f32 1.0][count x [u32 idx][u32 flag][u16 tag][u32 value]] + an id list closed by a
+	// "terminator" - a reading that round-trips byte-exact (it covers the same bytes) and is 8 bytes OFF the
+	// client's. Every invented field was this element seen through a shifted frame:
 	//
-	// Dropping the table renders the NPC bald (#243), which is why the minimal form is not a safe default for a
-	// humanoid. The two trailing words are ForCount(0) on every captured NPC-shaped stream - which per ListFrame's
-	// own warning most likely makes them two EMPTY LISTS rather than constants, so they are carried per stream.
-	public sealed record NpcEntrySlot : SpawnEntrySlot
+	//   - "EntryTableX" + the asserted 1.0f = the FIRST element's (key, value) - a real appearance choice, usually
+	//     the always-sent face-paint texscript (X = 0xB7 = 183), which the old carve then LOST on regeneration;
+	//   - each entry's (tag, value) = one element's (key, value); its "idx" = the NEXT element's word2;
+	//   - the "closer" record (tag = k x 0x3F1, value = a round hundred) = the SKILL list's ListFrame word plus
+	//     the first skill's id (the archetype ability);
+	//   - the "flag-1 entry" (7 distinct tags matching nothing we hold) = that same frame word once the character
+	//     has >= 65 skills and (skills + 1) x 0x3F1 overflows 16 bits: all seven tags satisfy
+	//     (0x10000 | tag) % 0x3F1 == 0, framing 71..120 skills - and the u16-truncating writer would have CRASHED
+	//     any generated 65+-skill character at world entry (#250's failure mode);
+	//   - the id-list "terminator rank" = the LAST skill's rank (nonzero on 28 captured spawns).
+	//
+	// [V3: SpawnPostIirGrammarTests.EveryPlayerSlot_OpensItsSkillListWithTheArchetypeAbility]
+	public sealed class AppearanceEntry
 	{
-		public List<NpcAppearanceMorph> Morphs { get; } = [];
-		public uint EntryTableX { get; set; } = ListFrame.Empty;
-		public uint EntryTableMarker { get; set; } = ListFrame.Empty;
+		public uint MorphId { get; set; }
+		public float Value { get; set; }
+		public uint Word2 { get; set; }
+		public string Text { get; set; } = "";
 	}
 
-	// One uniform 14-byte entry [u32 index][u32 flag][u16 tag][u32 value] of the player's entry table: the weighted
-	// attributes read as tag=value/value=0x3F800000 (weight 1.0), the feats as tag=(type<<8|subindex)/value=float
-	// bits.
-	//
-	// Flag was asserted to be ZERO. Twelve of the 296 captured spawns with a non-empty entry table carry a 1, and
-	// the shape is tight enough to be a constraint rather than an observation (#466):
-	//
-	//   * NEVER more than one per spawn, and ALWAYS the LAST entry;
-	//   * its Value is a ROUND HUNDRED in 100..400, where a flag-0 entry's Value is IEEE float bits - so the flag
-	//     discriminates how Value is READ, rather than being padding;
-	//   * its Tag is in its own space: 7 distinct tags across the twelve, none of which collides with any of the 268
-	//     distinct flag-0 `(type << 8 | subindex)` feat/attribute tags.
-	//
-	// Seven different characters carry one, so it is not one account's quirk. Carried, not interpreted - naming it
-	// needs a client-side consumer, since the tag matches nothing we hold.
-	// [V3: SpawnPostIirGrammarTests.TheEntryTablesFlaggedEntry_IsAtMostOneRoundHundredAtTheEnd]
-	public readonly record struct ScaffoldEntry(uint Index, ushort Tag, uint Value, uint Flag = 0);
-
-	// One 5-byte ID-list group [u8 rank][u32 id]. Ids USUALLY ascend and were long asserted to - 17 captured spawns
-	// break the order (a re-trained/re-ordered list), so the order is carried as captured rather than enforced.
-	public readonly record struct ScaffoldIdEntry(byte Rank, uint Id);
+	// One 5-byte element [u32 id][u8 rank] of the slot's skill list (FUN_0079cfd0 reads the u32 THEN the byte and
+	// stores map[id] = rank client-side). Ids ascend on all but a few captured spawns (re-trained/re-ordered
+	// lists), so order is carried, not enforced.
+	public readonly record struct ScaffoldSkill(uint Id, byte Rank);
 
 	/// <summary>
 	///     One 13-byte record closing the ID list - <c>[u32 50000][u32 PetInstance][u32 SlotSelector][u8 Kind]</c>,
@@ -215,23 +204,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// Factions window - see CharacterScaffoldPair / Gitea #315), and list 3 is a STAT list (Id = a wire stat id,
 	// Value = its value - see EndPairs3, Gitea #466).
 	public readonly record struct ScaffoldPair(uint Id, int Value);
-
-	// One entry in a HUMANOID NPC's APPEARANCE / morph table: a morph id, its float value, and an optional texscript
-	// string (e.g. the "*ii=-1;*bl=-1" colour ref carried on the id 0x10D entry). This is the data the minimal
-	// post-IIR drops, which renders the NPC bald (Gitea #243). Lifting it into rows lets the post-IIR generate from
-	// the DB so NpcSpawn.Data can be retired (#185). Grammar + round-trip oracle: tools/capture/decode_npc_morphs.py.
-	public sealed class NpcAppearanceMorph
-	{
-		public uint MorphId { get; set; }
-		public float Value { get; set; }
-
-		// Zero on every CLEAN appearance entry, which is what the appearance classifier requires to call a body an
-		// appearance-bearing type. A mid-session capture carries runtime state here, so the general reader carries
-		// these instead of asserting them and those streams round-trip byte-exact.
-		public uint Word2 { get; set; }
-		public byte Flag { get; set; }
-		public string Text { get; set; } = "";
-	}
 
 	// One 60-byte ACTIVE BUFF record, an element of the count-framed list that closes the stream's first record.
 	// Fifteen u32, decoded over all 1033 captured records (Gitea #475) - it was carried as an opaque byte[] described

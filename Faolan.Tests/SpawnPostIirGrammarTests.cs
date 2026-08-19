@@ -23,60 +23,40 @@ namespace Faolan.Tests
 	public class SpawnPostIirGrammarTests
 	{
 
-		// ⭐ #466 item 2: the entry table's `flag` word. It was pinned from two spawns as "a 1 on the LAST entry whose
-		// Value is a plain integer (300, 400)". Over the whole corpus the shape is far sharper than that, and every
-		// part of it is a constraint a generated spawn would otherwise have to guess:
-		//
-		//   * 12 of the 296 spawns with a non-empty entry table carry one, and NEVER more than one;
-		//   * it is ALWAYS the LAST entry - not merely observed last, but last on all twelve;
-		//   * its Value is always a ROUND HUNDRED in 100..400 (100, 200, 300 x3, 400 x2), where a flag-0 entry's
-		//     Value is IEEE float bits;
-		//   * its Tag lives in its own space - 7 distinct tags across the twelve, and ZERO of them collide with any
-		//     of the 268 distinct flag-0 tags, which are the `(type << 8 | subindex)` feat/attribute tags.
-		//
-		// Seven different characters carry one (their per-char `EntryTableX` all differ), so it is not one account's
-		// quirk. What it MEANS is still undecoded [V0: the entry table's flag-1 tag and value] - naming it needs a
-		// client-side consumer, since the tag matches nothing we hold. This gate is here so the shape cannot drift
-		// while that is open.
+		// ⭐ #466, closed: the "flag-1 entry" was never a field. The player entry slot's old carve sat 8 bytes off
+		// the client's reading, and its final 14-byte "entry" was really the SKILL list's ListFrame word plus the
+		// first skill's id (see AppearanceEntry). The "flag" was the frame word's high 16 bits, which go non-zero
+		// once the character has 65+ skills ((n+1) x 0x3F1 > 0xFFFF) - hence "12 spawns, always last, tag matching
+		// nothing". Under the client's carve the parse itself validates the frame word, so what is left to gate is
+		// the SEMANTIC invariant the old "closer value" observation becomes: every captured player skill list opens
+		// with the character's archetype ability - a round hundred in 100..400 - at rank 0.
+		// The old flag-1 numbers survive as arithmetic: 12 of 296 tables framed 65+ skills.
 		[Fact]
-		public void TheEntryTablesFlaggedEntry_IsAtMostOneRoundHundredAtTheEnd()
+		public void EveryPlayerSlot_OpensItsSkillListWithTheArchetypeAbility()
 		{
-			var flagged = new List<ScaffoldEntry>();
-			var tagsFlag0 = new HashSet<ushort>();
-			var tagsFlag1 = new HashSet<ushort>();
-			var carriers = 0;
 			var tables = 0;
+			var over64 = 0;
 
 			foreach (var (body, _) in Streams())
 			{
-				if (!SpawnBodyReader.TryParse(body, out var spawn) || spawn.Post.Slot is not PlayerEntrySlot slot || slot.Entries.Count == 0)
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || !SpawnBodyReader.IsPlayer(spawn) || spawn.Post.Slot.Appearance.Count == 0)
 					continue;
 
 				tables++;
-				foreach (var entry in slot.Entries)
-					(entry.Flag == 0 ? tagsFlag0 : tagsFlag1).Add(entry.Tag);
+				var skills = spawn.Post.Slot.Skills;
+				Assert.NotEmpty(skills);
+				var first = skills[0];
+				Assert.True(first.Id % 100 == 0 && first.Id is >= 100 and <= 400, $"first skill id {first.Id} is not an archetype ability");
+				Assert.Equal(0, first.Rank);
+				Assert.True(PlayerSpawnScaffoldRows.IsArchetypeSkillId(first.Id));
+				Assert.Single(skills, sk => PlayerSpawnScaffoldRows.IsArchetypeSkillId(sk.Id));
 
-				var flags = slot.Entries.Where(e => e.Flag != 0).ToList();
-				if (flags.Count == 0)
-					continue;
-
-				carriers++;
-				Assert.Single(flags); // never more than one
-				Assert.Equal(slot.Entries[^1].Index, flags[0].Index); // and it is the LAST entry
-				flagged.Add(flags[0]);
+				if (skills.Count >= 65)
+					over64++;
 			}
 
 			Assert.Equal(296, tables);
-			Assert.Equal(12, carriers);
-			Assert.All(flagged, e => Assert.Equal(1u, e.Flag));
-
-			// A round hundred, and small - the reading that says its Value is an integer rather than float bits.
-			Assert.All(flagged, e => Assert.True(e.Value % 100 == 0 && e.Value is >= 100 and <= 400, $"value {e.Value} is not a round hundred in 100..400"));
-
-			// Its tag is in a DIFFERENT space from the feat/attribute tags, which is the structural reason it reads
-			// as a different KIND of entry rather than a feat with an odd value.
-			Assert.Empty(tagsFlag0.Intersect(tagsFlag1));
-			Assert.Equal(7, tagsFlag1.Count);
+			Assert.Equal(12, over64); // the twelve spawns the old carve reported as "flag-1 carriers"
 		}
 
 		// The MINIMAL forms, whose entry slot and pair lists are all empty: what is being pinned here is the header
@@ -200,10 +180,10 @@ namespace Faolan.Tests
 		private const uint MaxEnergyStat = 1000029;
 		private const uint EnergyRegenStat = 1351;
 
-		private static List<NpcAppearanceMorph> MorphsOf(SimpleCharFullUpdateIIR spawn)
+		private static List<AppearanceEntry> MorphsOf(SimpleCharFullUpdateIIR spawn)
 		{
-			return spawn.Post.Slot is NpcEntrySlot npc
-				? npc.Morphs
+			return spawn.Post.Slot.Skills.Count == 0 && spawn.Post.Slot.Pets.Count == 0
+				? spawn.Post.Slot.Appearance
 				: [];
 		}
 

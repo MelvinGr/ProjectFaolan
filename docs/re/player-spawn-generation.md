@@ -32,14 +32,15 @@ just logs a warning and skips the spawn):
    items built like `SnapshotItems`); `SpawnPacketBuilder.SetCharacterMessage` splices it back.
 3. **Scaffold frame** — `SimpleCharFullUpdateCodec` (byte-exact parse/generate of the full body) +
    `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character:
-   - the uniform entry table is **DERIVED, not stored** (`PlayerSpawnScaffoldRows.BuildAppearanceEntries`):
-     weighted entries from `CharacterBodyResource` through the `MorphTarget` registry, morph entries from
-     `CharacterBody`, the closer from `Character.Class`. Indices are `1..n` in that order.
-   - `CharacterSkill` — the feat/ability ID list (`SkillId` ascending + a `Rank` byte)
+   - the APPEARANCE table is **DERIVED, not stored** (`PlayerSpawnScaffoldRows.BuildAppearanceEntries`):
+     weighted elements from `CharacterBodyResource` through the `MorphTarget` registry (face paint first —
+     retail's slot 1), morph elements from `CharacterBody`. `Word2` slot ordinals are `1..n` in that order.
+   - `CharacterSkill` — the SKILL list (`SkillId` + `Rank`, the client's `[u32 id][u8 rank]` pairing); the
+     archetype ability that opens it (archetype × 100) and the class-progression entry are DERIVED per send
    - `CharacterScaffoldPair` — the two ending `[id][s32]` pair lists (`ListIndex` 0/1)
-   - the pre-IIR frame + `EntryTableX` scalar are CONSTRUCTED from `Character.Class`
-     (`PlayerSpawnScaffoldRows.FreshPreFrame`; `EntryTableX` is const `0xB7`), NOT stored as rows — they
-     carry no per-character data (there is no `CharacterSpawnFrame` table)
+   - the pre-IIR frame is CONSTRUCTED from `Character.Class`
+     (`PlayerSpawnScaffoldRows.FreshPreFrame`), NOT stored as rows — it
+     carries no per-character data (there is no `CharacterSpawnFrame` table)
 
 The entry table used to be persisted as `CharacterAttributes` rows and re-synced from the appearance model on
 every edit path; the table is gone. The registry it resolves through reaches the builder as a parameter
@@ -141,22 +142,35 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     list, i.e. the count of `ScaffoldBuff`s that follow (spell id, timer pair, caster level, the
     `[EntityClass.Character][handle]` reference to whoever the buff is on — decoded in #475). An empty list
     frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
-  - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
-    (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `SimpleCharFullUpdateIIR.EntryTableX`.
-  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = the appearance entry table.
-    `flag` was read as a constant 0; 2 captured spawns carry a 1 on their LAST entry, and there `value` is a
-    plain integer (300, 400) rather than float bits — so it discriminates how `value` is read.
-    Three payload flavors share the shape: weighted attributes (`tag` = value, `value` = 0x3F800000 weight),
-    **morph entries** (`tag` = type<<8|sliderId, `value` = float bits — see the morph finding below) and the
-    closing `[u16][u32]` record. Wire order is the LIST order, not ascending idx: `idx` is a per-character
-    slot id retail keeps across appearance edits, so DemoL80's re-chosen hair/beard sit at 24/23 after its
-    morphs and its closer is out of order.
-  - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending (ranks are
-    small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability ids). The list is CLOSED by a group whose "id" is
-    a **`ListFrame` word**, followed by that many **13-byte records** — ⭐ the character's **PETS**, see below.
-    `0x3F1` is `ForCount(0)`, which is why the close was long written down as a terminator constant; 17 captured
-    spawns carry `ForCount(1)`/`ForCount(2)`. The closing group's rank byte is nonzero on 23 spawns and is
-    carried, not asserted. Iff count==0: a bare `[u32 0x3F1]` instead.
+  - ⭐⭐ **the ENTRY SLOT — ONE grammar for both families, and the old player carve was 8 bytes OFF the
+    client's** (#466, decided by `FUN_010087b0`/`FUN_0079cfd0` — see "Where the CLIENT reads the scaffold
+    lists" below). The client reads:
+
+    ```
+    [u32 count]  count × [u32 key][f32 value][u32 word2][u16 nameLen][name]   the APPEARANCE table
+    [u32 ListFrame][n × [u32 id][u8 rank]]                                    the SKILLS
+    [u32 ListFrame][m × [u32 50000][u32 inst][u32 slot][u8 kind]]             the PETS
+    ```
+
+    Each appearance element goes to `MorphValues_c::SetMorphValue(key, value, word2, name)`; the name is empty
+    on every captured element (the key carries the identity), which makes the element 14 bytes and is why a
+    shifted 14-byte grouping (`[u32 idx][u32 flag][u16 tag][u32 value]` behind an "X scalar + 1.0 weight word"
+    header) round-tripped byte-exact for years. Under the client's carve, every invented field dissolves:
+    "EntryTableX" + the asserted 1.0f were the FIRST element (usually the face paint `0xB7`, retail's slot 1;
+    NecroL80's `0x2B6` is his beard, his face-paint slot vacated); each old entry's `(tag, value)` was one
+    element's `(key, value)` with `idx` belonging to the NEXT element as its `word2` slot ordinal; the
+    "closer" record was the SKILL list's frame word + the first skill's id; the "flag-1 entry" was that frame
+    word overflowing 16 bits on 65+-skill characters (all seven mystery tags satisfy
+    `(0x10000|tag) % 0x3F1 == 0`, framing 71..120 skills); and the ID list's "terminator rank" was the last
+    skill's rank. Weighted elements carry `value` = the registry weight (1.0), morph elements the slider float.
+    `word2` is a per-character slot id retail keeps across appearance edits, so DemoL80's re-chosen hair/beard
+    sit at 24/23 after its morphs.
+  - **the SKILLS** = `CharacterSkill`, `[u32 id][u8 rank]` per element (the client stores `map[id] = rank`).
+    Every captured player's list opens with its ARCHETYPE ability (100/200/300/400 = archetype × 100, rank 0 on
+    all 296) and ascends from there. The last element's rank is nonzero on 28 captured spawns.
+  - **the PETS**: the second `ListFrame`'d list — ⭐ see below.
+    `0x3F1` is `ForCount(0)`, which is why both closes were long written down as terminator constants; 17
+    captured spawns carry pets `ForCount(1)`/`ForCount(2)`.
   - ending: TWO **plain**-counted pair lists `[u32 N][N x (u32 id, s32 value)]` = `CharacterScaffoldPair` (ids
     are decades 10,20,...,110; DemoL80 has both lists non-empty), then a THIRD pair list that is **count-framed**
     (`[u32 ListFrame word][n x (u32 id, s32 value)]`). That word is what used to be called the final `0x3F1`
@@ -277,7 +291,7 @@ cracked and implemented (`CharacterMorphs.TryApply`, driven by the create-flow `
   **ears is the odd one out: type 0x00, sliderId 0xFF**. (arm/chest 0↔1 settled by send order; the editor
   always moves them together anyway.)
 - **Wire entry order = editor send order**: face by ascending slot, then body alphabetically. Unmoved
-  sliders produce NO entry (strickenbla, zero morphs: 6 weighted attributes + closer at idx 7).
+  sliders produce NO entry (strickenbla, zero morphs: 7 weighted elements and nothing else).
 Locked by `CharacterMorphsTests` (Hoxxling's raw editor stream → his 28 wire entries bit-exact) and the
 re-pointed `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture` (Dikketest's raw stream → his captured
 spawn byte-for-byte). The old verdict in spawn-dissection.md ("the floats are progression skills, NOT
@@ -296,9 +310,10 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
 - **Wire tag = registry id − 1** — for the weighted entries AND the morph sliders (one unified id space:
   "02_BrowLow" id 3 → wire 2 = the slot prefix; "arm" id 0x101 → wire 0x100).
 - The editor's `SetMorphValue` **resource refs** ("*texscript_1108153" = the chosen options) ARE the
-  weighted-entry source: wire order = editor send order, weight = the registry weight (1.0), and
-  **category 2 (face paint, the always-sent `*texscript_183875`) is never emitted**. faolanx resolves
-  **7/7 bit-exact** against this client's registry; the other five create chars resolve 4-6 of 6, the
+  weighted-entry source: wire order = editor send order with ONE exception — **category 2 (face paint, the
+  always-sent `*texscript_183875`, wire key `0xB7`) moves to the FRONT** (retail's slot 1; the old carve read
+  it as the "EntryTableX scalar" and recorded it as "never emitted", #466) — weight = the registry weight
+  (1.0). faolanx resolves **7/7 bit-exact** against this client's registry; the other five create chars resolve 4-6 of 6, the
   residuals (e.g. tint_char_blank consistently −4) being live-server↔client data-version drift — the same
   drift visible in the body sliders, where retail's wire (arse=0x104/thigh=0x105/leg=0x106, proven across
   37 spawns) disagrees with this client's registry (arse=0x106/thigh=0x107/leg=0x37). Generation follows
@@ -315,10 +330,10 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
   `CreateFlowService.ReportUnresolvableAppearance` still names an unimported ref once, at creation, where it
   is still actionable. Locked by `WeightedAppearanceTests` (faolanx 7/7) and, against the shipped catalog in
   both directions, by `PlayerSpawnScaffoldRowsTests`.
-- **The closing record is session state, not character data**: its tag is always a multiple of **0x3F1**
-  (the grammar's magic: Dikketest 22×0x3F1, Hoxxling 18/19/22/32×0x3F1 across his logins — same char,
-  different sessions) and its value one of 100/300/400. Like the buff records it varies per login, so the
-  stored Dikketest closer (22×0x3F1 / 300) is kept for generated spawns.
+- **The "closing record" was not a record** (#466): its "tag, always a multiple of 0x3F1" was the SKILL
+  list's `ListFrame` word (varying per login because the skill count does), and its "value, one of
+  100/300/400" the first skill's id — the archetype ability. Both are derived by the writer now
+  (`ListFrame.ForCount(Skills.Count)` / `PlayerSpawnScaffoldRows.ArchetypeSkillId`).
 
 ## IIR looks fields — WIRED (2026-06-10, fifth session)
 
@@ -411,15 +426,42 @@ it is a flat sequence of fixed-field reads. A counted, variable-length entry tab
 `.cpp` name rather than on a vtable slot — the asserts name their own translation unit, which is the cheaper
 route into this subsystem.
 
-The list readers under it:
+The list readers under it, in READ ORDER (the whole post-protobuf sequence is
+`FUN_0145b8a0` → `FUN_010087b0` → `FUN_0079cfd0` → `FUN_0145ba10` → two plain pair loops → `FUN_004d5900`):
 
 | function | shape | what it is |
 |---|---|---|
-| `FUN_0145ba10` | reads a word, divides by `0x3F1`, calls `FUN_014578e0` per element | a `ListFrame`-counted list |
-| `FUN_014578e0` | `u32, u32, u32, u8` — **13 bytes** | the ID-list TAIL RECORD (`[0xC350][id][0][kind]`) |
 | `FUN_0145b8a0` | `ListFrame`-counted, allocates `0x18` per element | the richer per-element list |
 | `FUN_0145c0b0` | a SECOND `ListFrame` count inside it, `FUN_007ed9b0` per element | what `FUN_0145b8a0`'s elements contain |
 | `FUN_007ed9b0` | allocates a `BuffInfo_c` (`FUN_00c9cce0(200, 4, 0)` + ctor `FUN_00849770`) and fills it field by field | ⭐ **a BUFF** |
+| `FUN_010087b0` | plain count; per element 3 × u32 + a `[u16 len]` string (`FUN_0048f840` → the string reader `FUN_00cbf840`) | ⭐⭐ **the APPEARANCE table** — each element handed to `FUN_01008070` |
+| `FUN_01008070` | `(container, u32 key, f32 value, u32 word2, 0)` + the name string | **`MorphValues_c::SetMorphValue`** — its own log strings on channel `GameCode/MorphValues`; upserts a 76-byte entry keyed on `key` (vector reserved by `FUN_00ff5b60`, stride `0x4C`) and ZEROES rival entries whose category is in the exclusive set at `DAT_01f268b4` (hair/colour-style one-of choices). The category comes from the NAME (`FUN_01008b90`); an empty name — every captured element — leaves the key as the identity |
+| `FUN_0079cfd0` | `ListFrame`-counted, per element `[u32 id][u8 rank]`, stored `map[id] = rank` | ⭐⭐ **the SKILLS** |
+| `FUN_0145ba10` | reads a word, divides by `0x3F1`, calls `FUN_014578e0` per element | the PETS list |
+| `FUN_014578e0` | `u32, u32, u32, u8` — **13 bytes** | the pet record (`[0xC350][id][slot][kind]`) |
+
+### ⭐⭐ The appearance reader is what closed #466: the old player carve was 8 bytes OFF
+
+`FUN_010087b0`'s element — `[u32 key][f32 value][u32 word2][u16 nameLen][name]`, 14 bytes when the name is
+empty (it is, on every captured element of BOTH families) — walks the same bytes as the old
+`[u32 count][u32 X][f32 1.0][count × [u32 idx][u32 flag][u16 tag][u32 value]]` player carve, shifted by 8. Both
+consume the region byte-exactly, which is why the round-trip gates could never see it; what decided it is the
+client's own read order. Every invented field of the old carve dissolves into this element (the "EntryTableX"
+scalar = the first element's key, the "closer" = the skills frame word + first skill id, the "flag-1 entry" =
+that frame word overflowing u16 on 65+-skill characters, the "terminator rank" = the last skill's rank — the
+full unwind is on `AppearanceEntry` in `SpawnPostIir.cs`, and the grammar section above carries the corrected
+reading). Three corroborations from directions the carve argument does not touch:
+
+* all seven "flag-1 tags" satisfy `(0x10000 | tag) % 0x3F1 == 0` — exact `ListFrame` words framing 71..120
+  skills;
+* the skill list opens with the archetype ability (`archetype × 100`) on all 296 captured player slots — the
+  value the old carve knew as "the closer's value = archetype × 100" (#269);
+* `MorphTargets` id 183 (`0xB7`) IS `*texscript_183875`, the "always-sent, never-emitted" face paint — i.e.
+  the constant "X" was the face-paint element retail puts in slot 1.
+
+It also unifies the families: an NPC's slot is the same grammar with EMPTY skill and pet lists (the two
+`ForCount(0)` words long carried as "EntryTableX + EntryTableMarker" constants), so `SpawnEntrySlot` is one
+type and the codec's old try-both-families parse is gone.
 
 ⭐ **So `FUN_0145b8a0` is a nested list whose leaf is a `BuffInfo_c`.** That matters beyond this page:
 `FUN_007ed9b0` is the one open route [`docs/subsystems/npc-spell-applyspell.md`](../subsystems/npc-spell-applyspell.md)
@@ -471,7 +513,5 @@ helper, and is not yet confirmed. Open work tracked in Gitea #466.
 CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is
 confirmed from the client side here, not just inferred from captures.
 
-⭐ **And the parse does NOT branch on the entry flag.** `FUN_014578e0` stores its trailing byte unconditionally;
-there is no float-vs-int branch at read time. So whatever the flag-1 entry means, its meaning lives in the
-CONSUMER of the stored struct, not in the reader — which is where the next attempt should look, and is why more
-staring at the parse will not answer it.
+⭐ (An earlier pass noted "the parse does not branch on the entry flag" and sent the hunt toward a consumer of a
+stored flag. Superseded: there is no flag — see the appearance-reader section above.)

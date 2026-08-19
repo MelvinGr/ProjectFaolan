@@ -39,12 +39,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			new Slider("thigh", 0x01, 5, b => b.Thigh, (b, v) => b.Thigh = v)
 		];
 
-		// Generates the spawn-scaffold morph entries for the body's non-default sliders, indexed from
-		// startIndex, in the retail wire order. A null body (character never touched a slider) yields none -
-		// exactly the captured shape of an unmorphed character.
-		public static List<ScaffoldEntry> BuildEntries(CharacterBody? body, uint startIndex)
+		// Generates the spawn-scaffold morph entries for the body's non-default sliders, in the retail wire order.
+		// A null body (character never touched a slider) yields none - exactly the captured shape of an unmorphed
+		// character. Word2 (the per-character slot ordinal) is stamped by BuildAppearanceEntries over the whole
+		// table, so it is left 0 here.
+		public static List<AppearanceEntry> BuildEntries(CharacterBody? body)
 		{
-			var entries = new List<ScaffoldEntry>();
+			var entries = new List<AppearanceEntry>();
 			if (body == null)
 				return entries;
 
@@ -54,20 +55,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (value == 0)
 					continue;
 
-				var bits = BitConverter.SingleToUInt32Bits((float)(value / 1000.0));
-				entries.Add(new ScaffoldEntry(startIndex + (uint)entries.Count, (ushort)((slider.Type << 8) | slider.SliderId), bits));
+				entries.Add(new AppearanceEntry
+				{
+					MorphId = (uint)((slider.Type << 8) | slider.SliderId),
+					Value = (float)(value / 1000.0)
+				});
 			}
 
 			return entries;
 		}
 
-		// Whether a scaffold entry tag is one of the morph sliders (rather than a weighted appearance entry). The type
-		// byte alone will NOT do: type 0x01 is shared - the weighted rows use it too, with slider ids outside the
-		// slider table - so the whole (type, id) pair has to match.
-		public static bool IsMorphTag(ushort tag)
+		// Whether an appearance element's key is one of the morph sliders (rather than a weighted appearance entry).
+		// The type byte alone will NOT do: type 0x01 is shared - the weighted rows use it too, with slider ids
+		// outside the slider table - so the whole (type, id) pair has to match.
+		public static bool IsMorphKey(uint key)
 		{
-			var type = (byte)(tag >> 8);
-			var sliderId = (byte)(tag & 0xFF);
+			if (key > ushort.MaxValue)
+				return false;
+
+			var type = (byte)(key >> 8);
+			var sliderId = (byte)(key & 0xFF);
 			return Sliders.Any(s => s.Type == type && s.SliderId == sliderId);
 		}
 
@@ -80,23 +87,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// scaffold's morph entries from CharacterBody - so the first appearance edit of an imported character would
 		// have silently wiped the captured morphs it never knew about.
 		//
-		// Entries that are not morph sliders (the weighted appearance rows, the closer) simply do not match a slider
-		// and are skipped. Returns how many landed.
-		public static int ApplyEntries(CharacterBody body, IEnumerable<(ushort Tag, uint Value)> entries)
+		// Elements that are not morph sliders (the weighted appearance rows) simply do not match a slider and are
+		// skipped. Returns how many landed.
+		public static int ApplyEntries(CharacterBody body, IEnumerable<AppearanceEntry> entries)
 		{
 			var applied = 0;
-			foreach (var (tag, bits) in entries)
+			foreach (var entry in entries)
 			{
-				var type = (byte)(tag >> 8);
-				var sliderId = (byte)(tag & 0xFF);
+				if (entry.MorphId > ushort.MaxValue)
+					continue;
+
+				var type = (byte)(entry.MorphId >> 8);
+				var sliderId = (byte)(entry.MorphId & 0xFF);
 
 				foreach (var slider in Sliders)
 				{
 					if (slider.Type != type || slider.SliderId != sliderId)
 						continue;
 
-					// BuildEntries stores value / 1000 as float bits; undo exactly that.
-					slider.Set(body, BitConverter.UInt32BitsToSingle(bits) * 1000f);
+					// BuildEntries stores value / 1000; undo exactly that.
+					slider.Set(body, entry.Value * 1000f);
 					applied++;
 					break;
 				}

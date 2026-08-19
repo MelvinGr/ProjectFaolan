@@ -12,31 +12,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//
 	// A SUB-RECORD codec (#530 §2 rule 5c): composed inside SimpleCharFullUpdateCodec, so it declares no opcode.
 	//
-	// ⚠️ Its reader takes the WHOLE remaining stream rather than a `ref SpanReader`, deliberately: the grammar is
-	// END-ANCHORED. The entry slot is the one region whose reading depends on the family, and what proves the slot
-	// was read as the right element is that the three closing pair lists land on the stream's LAST byte - a
-	// mis-parsed slot lands somewhere else. So the reader needs the end, and it is the end-exactness (not a per-field
-	// guess) that resolves the family.
+	// The reader used to try the stream BOTH ways (a "player" and an "NPC" entry-slot carve, end-exactness picking
+	// the winner). #466 removed the need: the client reads one slot grammar for both families, so there is nothing
+	// to resolve and the parse is a single pass.
 	internal static class SpawnPostIirCodec
 	{
 		internal static SpawnPostIir Read(in ReadOnlySpan<byte> post)
 		{
-			// The move-task slot's presence is what tells the two families apart: an NPC's first record carries one
-			// (5 bytes on a fresh spawn), a player's first record IS the buff frame (4 bytes). A stream whose entry
-			// slot is EMPTY reads identically either way - the same twelve bytes - so the fallback below only ever
-			// fires on a genuinely mixed-up classification, and when it does it is the end-exactness that decides.
-			var probe = new SpanReader(post, nameof(SpawnPostIirCodec));
-			var prologue = ReadPrologue(ref probe);
+			var r = new SpanReader(post, nameof(SpawnPostIirCodec));
+			var value = ReadPrologue(ref r);
+			value.Slot = ReadSlot(ref r);
 
-			var first = prologue.HasMoveTaskSlot;
-			try
-			{
-				return ReadFrom(post, first);
-			}
-			catch (CodecParseException)
-			{
-				return ReadFrom(post, !first);
-			}
+			ReadPairs(ref r, value.EndPairs);
+			ReadPairs(ref r, value.EndPairs2);
+			var tail = r.ReadListCount();
+			for (var n = 0; n < tail; n++)
+				value.EndPairs3.Add(new ScaffoldPair(r.ReadU32Be(), r.ReadI32Be()));
+
+			// The stream is end-anchored: a walk that lands on the last byte is a walk that read the whole thing.
+			r.EnsureAtEnd();
+			return value;
 		}
 
 		internal static void Write(FaolanStream stream, SpawnPostIir post)
@@ -63,25 +58,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var buff in post.BuffRecords)
 				WriteBuff(stream, buff);
 
-			switch (post.Slot)
-			{
-				case PlayerEntrySlot player:
-				{
-					WritePlayerSlot(stream, player);
-					break;
-				}
-
-				case NpcEntrySlot npc:
-				{
-					WriteNpcSlot(stream, npc);
-					break;
-				}
-
-				default:
-				{
-					throw new ArgumentOutOfRangeException(nameof(post), post.Slot?.GetType().Name, "unknown spawn entry slot");
-				}
-			}
+			WriteSlot(stream, post.Slot);
 
 			foreach (var pairs in new[] { post.EndPairs, post.EndPairs2 })
 			{
@@ -97,26 +74,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// ---- read ------------------------------------------------------------------------------------------
-
-		private static SpawnPostIir ReadFrom(in ReadOnlySpan<byte> post, bool npcSlot)
-		{
-			var r = new SpanReader(post, nameof(SpawnPostIirCodec));
-			var value = ReadPrologue(ref r);
-			value.Slot = npcSlot
-				? ReadNpcSlot(ref r)
-				: ReadPlayerSlot(ref r);
-
-			ReadPairs(ref r, value.EndPairs);
-			ReadPairs(ref r, value.EndPairs2);
-			var tail = r.ReadListCount();
-			for (var n = 0; n < tail; n++)
-				value.EndPairs3.Add(new ScaffoldPair(r.ReadU32Be(), r.ReadI32Be()));
-
-			// The end-exactness is the check doing the real work in this grammar: a mis-parsed entry slot lands
-			// somewhere else, so a walk that ends on the stream's last byte is a walk that read the whole thing.
-			r.EnsureAtEnd();
-			return value;
-		}
 
 		// The header, the first record and the buff list - everything ahead of the entry slot.
 		private static SpawnPostIir ReadPrologue(ref SpanReader r)
@@ -157,90 +114,46 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return value;
 		}
 
-		private static PlayerEntrySlot ReadPlayerSlot(ref SpanReader r)
+		private static SpawnEntrySlot ReadSlot(ref SpanReader r)
 		{
-			var slot = new PlayerEntrySlot();
+			var slot = new SpawnEntrySlot();
 			var count = r.ReadU32Be();
 			if (count > 0x1000)
-				throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), r.Position - 4, "a plausible entry count", count.ToString());
-
-			slot.EntryTableX = r.ReadU32Be();
-			if (count == 0)
-			{
-				// The ID list exists iff the entry table does; otherwise a bare list word stands in for it.
-				slot.Marker = r.ReadU32Be();
-				return slot;
-			}
-
-			r.ExpectU32Be(PlayerEntrySlot.EntryWeightOne, "entry-table weight (1.0)");
-			for (var n = 0; n < count; n++)
-			{
-				var index = r.ReadU32Be();
-				var flag = r.ReadU32Be();
-				var tag = r.ReadU16Be();
-				slot.Entries.Add(new ScaffoldEntry(index, tag, r.ReadU32Be(), flag));
-			}
-
-			while (true)
-			{
-				var rank = r.ReadU8();
-				var at = r.Position;
-				var id = r.ReadU32Be();
-
-				// The closing group's "id" is a count-framed LIST WORD, not the constant 0x3F1 it was read as for
-				// years - 0x3F1 is simply ForCount(0). Ids ascend, so a value that frames AND is not larger than the
-				// last real id is the close, never a member. The end-exactness check is what ultimately proves the
-				// choice: guess wrong and the walk does not land on the stream's end.
-				if (ListFrame.TryCountOf(id, out var tailCount) && (slot.IdList.Count == 0 || id < slot.IdList[^1].Id))
-				{
-					// The terminator's rank byte is USUALLY zero and used to be asserted as such; 23 captured spawns
-					// carry a non-zero one and still consume to exactly the body's end, so it is carried.
-					slot.IdListTerminatorRank = rank;
-					for (var n = 0; n < tailCount; n++)
-					{
-						// ⚠️ The third word is a SLOT SELECTOR, not a zero constant - `PetHolder_c::RegisterPet`
-						// tests it for 1 and routes that pet to the holder's single primary slot (#466). It is 0 on
-						// every captured spawn only because no captured character had a primary pet out, so
-						// asserting it would have thrown on a body retail can legitimately send.
-						r.ExpectU32Be(EntityClass.Character, $"pet record {n} entity class");
-						var petInstance = r.ReadU32Be();
-						var slotSelector = r.ReadU32Be();
-						slot.Pets.Add(new ScaffoldPetRef(petInstance, r.ReadU8(), slotSelector));
-					}
-
-					return slot;
-				}
-
-				// Ids ascend. Kept as a hard failure: it is what exposed the trap above, and a descending id that
-				// does NOT frame means the walk diverged earlier and should say so rather than read on.
-				if (slot.IdList.Count > 0 && id < slot.IdList[^1].Id)
-					throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), at, "an ascending ID-list id", $"0x{id:X8}");
-
-				slot.IdList.Add(new ScaffoldIdEntry(rank, id));
-			}
-		}
-
-		private static NpcEntrySlot ReadNpcSlot(ref SpanReader r)
-		{
-			var slot = new NpcEntrySlot();
-			var count = r.ReadU32Be();
-			if (count > 0x100)
-				throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), r.Position - 4, "a plausible morph count", count.ToString());
+				throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), r.Position - 4, "a plausible appearance-entry count", count.ToString());
 
 			for (var n = 0; n < count; n++)
 			{
-				slot.Morphs.Add(new NpcAppearanceMorph
+				slot.Appearance.Add(new AppearanceEntry
 				{
 					MorphId = r.ReadU32Be(),
 					Value = r.ReadF32Be(),
 					Word2 = r.ReadU32Be(),
-					Flag = r.ReadU8(),
-					Text = Encoding.Latin1.GetString(r.ReadBytesU8Length())
+					Text = Encoding.Latin1.GetString(r.ReadBytesU16Length())
 				});
 			}
 
-			slot.EntryTableX = r.ReadU32Be();
-			slot.EntryTableMarker = r.ReadU32Be();
+			// Both closing lists are ListFrame'd, and the client VALIDATES the framing (the word must be an exact
+			// multiple of 0x3F1) - ReadListCount throws on anything else, which is the same check.
+			var skills = r.ReadListCount();
+			for (var n = 0; n < skills; n++)
+			{
+				var id = r.ReadU32Be();
+				slot.Skills.Add(new ScaffoldSkill(id, r.ReadU8()));
+			}
+
+			var pets = r.ReadListCount();
+			for (var n = 0; n < pets; n++)
+			{
+				// ⚠️ The third word is a SLOT SELECTOR, not a zero constant - `PetHolder_c::RegisterPet` tests it
+				// for 1 and routes that pet to the holder's single primary slot (#466). It is 0 on every captured
+				// spawn only because no captured character had a primary pet out, so asserting it would have thrown
+				// on a body retail can legitimately send.
+				r.ExpectU32Be(EntityClass.Character, $"pet record {n} entity class");
+				var petInstance = r.ReadU32Be();
+				var slotSelector = r.ReadU32Be();
+				slot.Pets.Add(new ScaffoldPetRef(petInstance, r.ReadU8(), slotSelector));
+			}
+
 			return slot;
 		}
 
@@ -297,42 +210,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				s.WriteUInt32(word);
 		}
 
-		private static void WritePlayerSlot(FaolanStream s, PlayerEntrySlot slot)
+		private static void WriteSlot(FaolanStream s, SpawnEntrySlot slot)
 		{
-			s.WriteUInt32((uint)slot.Entries.Count).WriteUInt32(slot.EntryTableX);
-			if (slot.Entries.Count == 0)
-			{
-				s.WriteUInt32(slot.Marker);
-				return;
-			}
-
-			s.WriteUInt32(PlayerEntrySlot.EntryWeightOne);
-			foreach (var entry in slot.Entries)
-				s.WriteUInt32(entry.Index).WriteUInt32(entry.Flag).WriteUInt16(entry.Tag).WriteUInt32(entry.Value);
-
-			foreach (var entry in slot.IdList)
-				s.WriteByte(entry.Rank).WriteUInt32(entry.Id);
-
-			// ForCount(0) IS 0x3F1, so a spawn with an empty tail regenerates the exact byte it always did.
-			s.WriteByte(slot.IdListTerminatorRank).WriteUInt32(ListFrame.ForCount(slot.Pets.Count));
-			foreach (var pet in slot.Pets)
-				s.WriteUInt32(EntityClass.Character).WriteUInt32(pet.PetInstance).WriteUInt32(pet.SlotSelector).WriteByte(pet.Kind);
-		}
-
-		private static void WriteNpcSlot(FaolanStream s, NpcEntrySlot slot)
-		{
-			s.WriteUInt32(slot.Morphs.Count);
-			foreach (var morph in slot.Morphs)
+			s.WriteUInt32((uint)slot.Appearance.Count);
+			foreach (var entry in slot.Appearance)
 			{
 				s
-					.WriteUInt32(morph.MorphId)
-					.WriteFloat(morph.Value)
-					.WriteUInt32(morph.Word2)
-					.WriteByte(morph.Flag)
-					.WriteArrayByteLength(Encoding.Latin1.GetBytes(morph.Text ?? ""));
+					.WriteUInt32(entry.MorphId)
+					.WriteFloat(entry.Value)
+					.WriteUInt32(entry.Word2)
+					.WriteArrayUInt16Length(Encoding.Latin1.GetBytes(entry.Text ?? ""));
 			}
 
-			s.WriteUInt32(slot.EntryTableX).WriteUInt32(slot.EntryTableMarker);
+			// ForCount(0) IS 0x3F1, so an empty list regenerates the exact "constant" it was long read as.
+			s.WriteUInt32(ListFrame.ForCount(slot.Skills.Count));
+			foreach (var skill in slot.Skills)
+				s.WriteUInt32(skill.Id).WriteByte(skill.Rank);
+
+			s.WriteUInt32(ListFrame.ForCount(slot.Pets.Count));
+			foreach (var pet in slot.Pets)
+				s.WriteUInt32(EntityClass.Character).WriteUInt32(pet.PetInstance).WriteUInt32(pet.SlotSelector).WriteByte(pet.Kind);
 		}
 	}
 }

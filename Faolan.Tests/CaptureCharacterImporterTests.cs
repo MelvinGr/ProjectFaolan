@@ -110,7 +110,7 @@ namespace Faolan.Tests
 				// BuildEntries skips a zero slider, so 7 entries means all 7 body sliders are non-zero.
 				float[] bodyMorphs = [character.Body!.Arm, character.Body.Chest, character.Body.Bosom, character.Body.Stomach, character.Body.Arse, character.Body.Thigh, character.Body.Leg];
 				Assert.All(bodyMorphs, m => Assert.NotEqual(0f, m));
-				Assert.Equal(7, CharacterMorphs.BuildEntries(character.Body, 1).Count);
+				Assert.Equal(7, CharacterMorphs.BuildEntries(character.Body).Count);
 
 				// The weighted entries are recovered as resource refs (the inverse of BuildWeightedEntries, which maps
 				// a ref to its MorphTarget's Id = the entry tag). This test seeds no MorphTargets, so NOTHING should
@@ -118,7 +118,11 @@ namespace Faolan.Tests
 				// never invents a ref. The real inversion is exercised against the shipped catalog by
 				// PlayerSpawnScaffoldRowsTests, where every captured tag resolves.
 				Assert.Empty(character.BodyResources);
-				Assert.Equal(20, character.Skills.Count);
+
+				// His 20 captured ability/feat ids plus the archetype ability (300, Rogue) that opens every player's
+				// skill list - a real element of the list under the client's carve (#466), so the extract keeps it.
+				Assert.Equal(21, character.Skills.Count);
+				Assert.Contains(character.Skills, sk => sk.SkillId == 300);
 
 				// Re-run: nothing added, nothing changed.
 				var rerun = await CaptureCharacterImporter.ImportAsync(db, [capture]);

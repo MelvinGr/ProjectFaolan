@@ -80,7 +80,7 @@ namespace Faolan.Tests
 		// A mid-session body: Casilda's morph table behind a RUNTIME first record (the entity's current move task,
 		// #477) and `buffs` active buff records - the shape a capture taken in play carries, where a fresh spawn
 		// drops both.
-		private static byte[] BuildRuntimeBearing(byte[] body, int postStart, System.Collections.Generic.List<NpcAppearanceMorph> morphs, int buffs)
+		private static byte[] BuildRuntimeBearing(byte[] body, int postStart, System.Collections.Generic.List<AppearanceEntry> morphs, int buffs)
 		{
 			// The runtime state is a MOVE TASK - decoded in #477, and the reader requires the slot to BE one rather
 			// than accepting any bytes of the right length. A mode-3 Jump node is the shortest real task.
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 
 		// The canonical FRESH appearance post-IIR for a set of morph rows: what the from-DB build emits, and the
 		// form both lift paths are compared through.
-		private static byte[] AppearancePostIir(System.Collections.Generic.IReadOnlyList<NpcAppearanceMorph> morphs)
+		private static byte[] AppearancePostIir(System.Collections.Generic.IReadOnlyList<AppearanceEntry> morphs)
 		{
 			using var s = new FaolanStream();
 			SpawnPostIirCodec.Write(s, SpawnPostIirs.Npc(SpawnPostIirs.MovementModeRun, morphs));

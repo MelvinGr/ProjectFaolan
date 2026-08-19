@@ -3,6 +3,7 @@ using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -11,9 +12,9 @@ namespace Faolan.Tests
 {
 	// Locks the scaffold <-> character mapping: extracting a captured spawn into the character's rows - CharacterSkill
 	// / CharacterScaffoldPair / CharacterFeat, plus the APPEARANCE MODEL (CharacterBody sliders + CharacterBodyResource
-	// refs) - and regenerating from those reproduces the captured content byte-for-byte. The pre-IIR frame +
-	// EntryTableX are NOT stored - they're reconstructed from Character.Class (FreshPreFrame) - so a capture
-	// round-trips to its CONSTRUCTED form: the buff records + transient frame islands drop out.
+	// refs) - and regenerating from those reproduces the captured content byte-for-byte. The pre-IIR frame is NOT
+	// stored - it is reconstructed from Character.Class (FreshPreFrame) - so a capture round-trips to its
+	// CONSTRUCTED form: the buff records + transient frame islands drop out.
 	//
 	// The entry table is not stored either (#483). It is DERIVED from the appearance model on every send, so these
 	// round-trips now gate the derivation: a captured tag has to survive being turned into a resource ref and resolved
@@ -60,16 +61,16 @@ namespace Faolan.Tests
 			var captured = SimpleCharFullUpdateCodec.Parse(ConstructedForm(body, @class));
 			var rebuilt = SimpleCharFullUpdateCodec.Parse(RoundTripThroughRows(body, @class));
 
-			// Every entry's payload survives - same records, same float bits, closer included.
-			Assert.Equal(PlayerSlot(captured).Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)), PlayerSlot(rebuilt).Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)));
+			// Every element's payload survives - same (key, value) pairs, same float bits.
+			Assert.Equal(PlayerSlot(captured).Appearance.OrderBy(e => e.MorphId).Select(e => (e.MorphId, e.Value)), PlayerSlot(rebuilt).Appearance.OrderBy(e => e.MorphId).Select(e => (e.MorphId, e.Value)));
 
 			// ...and the slot numbering is what does not, which is the whole of the divergence.
-			Assert.NotEqual(PlayerSlot(captured).Entries.Select(e => e.Index), PlayerSlot(rebuilt).Entries.Select(e => e.Index));
-			Assert.Equal(Enumerable.Range(1, PlayerSlot(rebuilt).Entries.Count).Select(i => (uint)i), PlayerSlot(rebuilt).Entries.Select(e => e.Index));
+			Assert.NotEqual(PlayerSlot(captured).Appearance.Select(e => e.Word2), PlayerSlot(rebuilt).Appearance.Select(e => e.Word2));
+			Assert.Equal(Enumerable.Range(1, PlayerSlot(rebuilt).Appearance.Count).Select(i => (uint)i), PlayerSlot(rebuilt).Appearance.Select(e => e.Word2));
 
-			// Everything else in the record is byte-identical: swap the entry tables and the bytes match exactly.
-			PlayerSlot(captured).Entries.Clear();
-			PlayerSlot(captured).Entries.AddRange(PlayerSlot(rebuilt).Entries);
+			// Everything else in the record is byte-identical: swap the appearance tables and the bytes match exactly.
+			PlayerSlot(captured).Appearance.Clear();
+			PlayerSlot(captured).Appearance.AddRange(PlayerSlot(rebuilt).Appearance);
 			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(captured)), Convert.ToHexString(SimpleCharFullUpdateCodec.Build(rebuilt)));
 		}
 
@@ -89,7 +90,7 @@ namespace Faolan.Tests
 		public void ClassProgressionEntry_IsTheCharactersLevel(string name, int level, uint expectedId)
 		{
 			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(Golden(name)));
-			var ids = PlayerSlot(scaffold).IdList.Select(e => e.Id).ToArray();
+			var ids = PlayerSlot(scaffold).Skills.Select(e => e.Id).ToArray();
 
 			// Exactly one progression id in the whole list - a character is at one level, and a second entry would
 			// mean the run boundaries are wrong.
@@ -201,27 +202,35 @@ namespace Faolan.Tests
 			Assert.Empty(PlayerSpawnScaffoldRows.ExtractPreFrameFeats(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer)));
 		}
 
+		// What the old carve called the Assassin's "closer" (#269): its tag 0x3F10 was the skill list's ListFrame
+		// word (15 skills), its value 300 the archetype ability that opens the list. Both are derived now, so the
+		// same facts are asserted where they actually live.
 		[Fact]
-		public void FreshCloser_Assassin_Is0x3F10()
+		public void FreshAssassin_SkillList_Opens300AndFramesAs0x3F10()
 		{
 			var character = new Character
 			{
 				Id = 0x02000009,
 				Class = ConanClass.Assassin
 			};
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []).Last();
-			Assert.Equal(0x3F10, closer.Tag); // 14 feats -> (14+2)*0x3F1
-			Assert.Equal(300u, closer.Value);
+			var scaffold = new SimpleCharFullUpdateIIR();
+			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold, MorphRegistry.ByName));
+
+			var skills = scaffold.Post.Slot.Skills;
+			Assert.Equal(300u, skills[0].Id); // Rogue archetype x 100
+			Assert.Equal(15, skills.Count); // the archetype ability + 13 fresh + the derived class-progression entry
+			Assert.Equal(0x3F10u, ListFrame.ForCount(skills.Count)); // the word the old carve read as the closer's TAG
 		}
 
-		// #269 (decoded over 117 retail player self-spawns, zero violations): the closer tag is NOT a per-class
-		// constant - it is a COUNT marker, tag = (feat/skill IdList length + 2) * 0x3F1. So a fresh character's closer
-		// tag must equal that formula for EVERY class (this is why a mismatched closer crashes - #250). Includes the
-		// Assassin (14 feats -> 0x3F10), whose earlier hardcoded 0x56B6 guess was wrong.
+		// #269 (decoded over 117 retail player self-spawns, zero violations): a fresh character's skill list opens
+		// with its archetype ability and frames as (count + 1) x 0x3F1 - what the old carve called the closer's
+		// value and tag (this is why a mismatched closer crashed - #250: the client's skill parse validates the
+		// frame word). Holds for EVERY class.
 		[Theory, InlineData(ConanClass.Guardian), InlineData(ConanClass.Conqueror), InlineData(ConanClass.DarkTemplar), InlineData(ConanClass.Barbarian), InlineData(ConanClass.Assassin), InlineData(ConanClass.Ranger),
 		 InlineData(ConanClass.BearShaman), InlineData(ConanClass.PriestOfMitra), InlineData(ConanClass.TempestOfSet), InlineData(ConanClass.Necromancer), InlineData(ConanClass.Demonologist), InlineData(ConanClass.HeraldOfXotli)]
-		public void FreshCloser_TagIsDerivedFromFeatCount(ConanClass @class)
+		public void FreshSkillList_OpensWithTheArchetypeAbility(ConanClass @class)
 		{
 			var character = new Character
 			{
@@ -230,9 +239,15 @@ namespace Faolan.Tests
 			};
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []).Last();
-			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
-			Assert.Equal(expectedTag, closer.Tag);
+			var scaffold = new SimpleCharFullUpdateIIR();
+			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold, MorphRegistry.ByName));
+
+			var skills = scaffold.Post.Slot.Skills;
+			Assert.Equal(PlayerSpawnScaffoldRows.ArchetypeSkillId(@class), skills[0].Id);
+
+			// One more than the seeded rows: the archetype ability is derived, the progression entry replaces the
+			// seeded run anchor 1:1.
+			Assert.Equal(character.Skills.Count + 1, skills.Count);
 		}
 
 		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the scaffold grows by 4 bytes per
@@ -308,8 +323,10 @@ namespace Faolan.Tests
 				// to reproduce his spawn byte-for-byte (#239 - the feat tree is the client's class source).
 				Class = ConanClass.Barbarian,
 				Body = new CharacterBody(),
-				// His editor choices, in send order: hair, hair colour, body marking, face marking, eye colour, skin
-				// colour - exactly ONE per category. No beard: he chose none, and nothing invents one for him.
+				// His editor choices: the always-sent face paint (*texscript_183875 - the FIRST element of his
+				// captured spawn, key 0xB7, which the old carve read as the "EntryTableX" scalar, #466), then in
+				// send order: hair, hair colour, body marking, face marking, eye colour, skin colour - exactly ONE
+				// per category. No beard: he chose none, and nothing invents one for him.
 				//
 				// This list is recovered from his captured entry table THROUGH the registry, so until #240 it
 				// inherited the registry's own off-by-one-record error and named two of his choices wrongly: the hair
@@ -317,7 +334,7 @@ namespace Faolan.Tests
 				// read as `*texscript_3114637`, a category-10 FACE MARKING - which is why the old comment here
 				// claimed he chose no skin colour and two face markings. That is the same mis-tagging that put an
 				// unwanted marking on a player's face in #240, preserved in a golden.
-				BodyResources = new[] { "*hairmesh_208096", "*texscript_1108153", "*texscript_1136777", "*texscript_198071", "*texscript_213930", "*texscript_3113362" }
+				BodyResources = new[] { "*texscript_183875", "*hairmesh_208096", "*texscript_1108153", "*texscript_1136777", "*texscript_198071", "*texscript_213930", "*texscript_3113362" }
 					.Select((r, i) => new CharacterBodyResource
 					{
 						CharacterId = 0x02000005,
@@ -350,16 +367,11 @@ namespace Faolan.Tests
 				Class = ConanClass.Barbarian
 			};
 
-			// A character that chose nothing and morphed nothing carries ONLY the closer. It used to carry 7 entries:
-			// Dikketest's 6 captured weighted attributes stood in for the appearance nobody had chosen, so an
-			// appearance-less character shipped somebody else's hair and face markings.
-			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []);
-			Assert.Single(entries);
-
-			var closer = entries[^1];
-			Assert.Equal(1u, closer.Index);
-			Assert.Equal(0x56B6, closer.Tag);
-			Assert.Equal(300u, closer.Value);
+			// A character that chose nothing and morphed nothing carries NO appearance at all. It used to carry
+			// Dikketest's 6 captured weighted attributes standing in for the appearance nobody had chosen, so an
+			// appearance-less character shipped somebody else's hair and face markings. (The "closer" the old model
+			// appended here was the skill list's framing, not an appearance entry - #466.)
+			Assert.Empty(PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []));
 		}
 
 		// A never-seeded character has nothing to describe a spawn with, and the marker for that is its SKILL rows -
@@ -377,9 +389,9 @@ namespace Faolan.Tests
 			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null!, scaffold, MorphRegistry.ByName));
 		}
 
-		// The frame + EntryTableX are no longer stored - TryApplyFrom reconstructs them from the character's class. So
-		// a captured spawn round-trips to its CONSTRUCTED form: identical appearance/feats/pairs + IIR, with the frame
-		// regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
+		// The frame is no longer stored - TryApplyFrom reconstructs it from the character's class. So a captured
+		// spawn round-trips to its CONSTRUCTED form: identical appearance/feats/pairs + IIR, with the frame
+		// regenerated as FreshPreFrame(class) and transient buff/session records dropped.
 		private static byte[] ConstructedForm(byte[] body, ConanClass @class)
 		{
 			var s = SimpleCharFullUpdateCodec.Parse(Record(body));
@@ -387,7 +399,6 @@ namespace Faolan.Tests
 			// round-trip - so the constructed form keeps the captured feats (spliced into the canonical frame).
 			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.PreIir);
 			s.PreIir = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
-			PlayerSlot(s).EntryTableX = PlayerSpawnScaffoldRows.FreshEntryTableX;
 			s.Post.BuffRecords.Clear();
 			return SimpleCharFullUpdateCodec.Build(s);
 		}
@@ -404,9 +415,9 @@ namespace Faolan.Tests
 			return body[4..];
 		}
 
-		private static PlayerEntrySlot PlayerSlot(SimpleCharFullUpdateIIR spawn)
+		private static SpawnEntrySlot PlayerSlot(SimpleCharFullUpdateIIR spawn)
 		{
-			return Assert.IsType<PlayerEntrySlot>(spawn.Post.Slot);
+			return spawn.Post.Slot;
 		}
 
 		// The pre-IIR scaffold composes into a spawn record rather than standing alone (#530 rule 5c).

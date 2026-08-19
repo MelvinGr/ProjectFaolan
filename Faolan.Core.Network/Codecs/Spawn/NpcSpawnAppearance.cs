@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// whose entries carry runtime state. Those are left to the minimal-scaffold path. STRICT additionally
 		// requires the stream to be FRESH - a first record with nothing in front of the buff list's framing word,
 		// and no buffs in that list.
-		public static bool TryLift(byte[] body, out List<NpcAppearanceMorph> morphs)
+		public static bool TryLift(byte[] body, out List<AppearanceEntry> morphs)
 		{
 			morphs = [];
 			if (!TryLiftLenient(body, out var table) || !TryParsePost(body, out var post))
@@ -37,10 +37,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// ⚠️ It used to find the table by ARITHMETIC - straight after the first record - which is where the table
 		// sits only when the character has NO active buffs, because each buff pushes it 60 bytes further. A buffed
 		// humanoid was therefore classified no-morph and would spawn BALD (#243's own failure mode).
-		public static bool TryLiftLenient(byte[] body, out List<NpcAppearanceMorph> morphs)
+		public static bool TryLiftLenient(byte[] body, out List<AppearanceEntry> morphs)
 		{
 			morphs = [];
-			if (!TryParsePost(body, out var post) || post.Slot is not NpcEntrySlot npc)
+			if (!TryParsePost(body, out var post))
 				return false;
 
 			// An empty table is the minimal (no-morph) form, not an appearance; an entry carrying runtime state, or
@@ -54,16 +54,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			//
 			// It is now CARRIED (`NpcSpawnMorph.Word2` / `NpcMorph.Word2`) rather than rejected, which is what makes
 			// accepting it safe: `NpcSpawnBuilder` emits the column, so a lifted table still round-trips byte-exact.
-			// `Flag` keeps its veto - nothing in the corpus ever sets it, so accepting it would be accepting a shape
-			// we have never measured, and the veto is therefore free.
-			if (npc.Morphs.Count == 0 || npc.Morphs.Exists(m => m.Flag != 0))
-				return false;
-			if (npc.EntryTableX != ListFrame.Empty || npc.EntryTableMarker != ListFrame.Empty)
+			// (The old `Flag` veto died with the field: the byte was the u16 string length's high half, #466.)
+			//
+			// A non-empty SKILL or PET list marks the stream as a PLAYER's - the slot grammar is shared (#466), so
+			// the appearance table alone no longer says whose it is. A player's appearance is CharacterBody data,
+			// not an NPC type's.
+			if (post.Slot.Appearance.Count == 0 || post.Slot.Skills.Count > 0 || post.Slot.Pets.Count > 0)
 				return false;
 			if (post.EndPairs.Count > 0 || post.EndPairs2.Count > 0 || post.EndPairs3.Count > 0)
 				return false;
 
-			morphs = npc.Morphs;
+			morphs = post.Slot.Appearance;
 			return true;
 		}
 

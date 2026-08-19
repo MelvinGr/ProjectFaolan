@@ -16,21 +16,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// world entry; the same role Strie's template played, but with a genuinely fresh scaffold).
 	// See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
 	//
-	// The ENTRY TABLE is DERIVED, never stored (#483). It used to be persisted as CharacterAttribute rows and kept
-	// in step with the appearance model by explicit refresh calls on every edit path - two copies of one fact, and
-	// forgetting one froze the avatar's face permanently. BuildAppearanceEntries is the single generator now:
+	// The APPEARANCE TABLE is DERIVED, never stored (#483). It used to be persisted as CharacterAttribute rows and
+	// kept in step with the appearance model by explicit refresh calls on every edit path - two copies of one fact,
+	// and forgetting one froze the avatar's face permanently. BuildAppearanceEntries is the single generator now:
 	// weighted entries from CharacterBodyResources through the MorphTarget registry, morph entries from
-	// CharacterBody, the closer from the class.
+	// CharacterBody. The slot's SKILL list opens with the archetype ability (archetype x 100, what the old carve
+	// called the closer's "value") - derived from the class like the class-progression entry, never stored (#466).
 	public static class PlayerSpawnScaffoldRows
 	{
 		// The pre-IIR frame's grammar lives in SpawnPreIir / SpawnPreIirCodec - it is the client's
 		// SimpleCharFullUpdateIIR scaffold, not a blob with islands, and the character's UNLOCKED FEAT list is the
 		// nested count-framed list inside its sublist (see docs/subsystems/feats.md +
 		// tools/capture/decode_unlocked_feats.py). Nothing here addresses the frame by offset any more.
-
-		// The per-character u32 that follows the entry count. Constant on every generated spawn; captured characters
-		// carry their own (Strie 0xB7, NecroL80 0x2B6, the create editor 0x3F1) and it is reproduced, not derived.
-		public const uint FreshEntryTableX = 0xB7;
 
 		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
@@ -163,11 +160,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The ONE thing still skipped is category 2 (face paint, e.g. the always-sent *texscript_183875): captured
 		// spawns never carry it, so emitting it would be inventing wire. That is proven grammar, not a fallback - a
 		// character whose only choice is category 2 legitimately builds an EMPTY entry list.
-		public static List<ScaffoldEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget> registry)
+		public static List<AppearanceEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			ArgumentNullException.ThrowIfNull(registry);
 
-			var entries = new List<ScaffoldEntry>();
+			var entries = new List<AppearanceEntry>();
 			if (resources == null)
 				return entries;
 
@@ -180,37 +177,46 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					$"Character {ordered[0].CharacterId:X8} chose appearance resource(s) {string.Join(", ", unresolved)}, which are not in MorphTargets - its own looks cannot be built. Import them (Faolan.Importer --only rdb-morph-targets).");
 			}
 
-			foreach (var resource in ordered)
+			// ⭐ Category 2 (the always-sent face-paint texscript) is NOT skipped: it is the FIRST element of every
+			// captured created character - what the old 8-bytes-off carve read as the "EntryTableX scalar"
+			// (0xB7 = 183 = *texscript_183875). The old skip was the same artifact from the other side (#466).
+			//
+			// And it goes FIRST regardless of the editor's send position (the editor sends it mid-stream; the spawn
+			// opens with it). Retail's Word2 slots corroborate: slot 1 is the face-paint slot - NecroL80, who
+			// REMOVED his, runs slots 2..15 with slot 1 vacated and opens with his beard instead. The OrderBy is
+			// stable, so everything else keeps its send order.
+			foreach (var resource in ordered.OrderBy(r => registry[r.Ref].Category == 2 ? 0 : 1))
 			{
 				var target = registry[resource.Ref];
-				if (target.Category == 2)
-					continue;
-
-				entries.Add(new ScaffoldEntry((uint)entries.Count + 1, (ushort)target.Id, BitConverter.SingleToUInt32Bits(target.Weight)));
+				entries.Add(new AppearanceEntry
+				{
+					MorphId = (uint)target.Id,
+					Value = target.Weight
+				});
 			}
 
 			return entries;
 		}
 
-		// The scaffold's ENTRY TABLE, built WHOLE from the character's appearance model - the one generator, used by
-		// every spawn. In wire order: the weighted appearance entries (the character's chosen editor resources,
-		// resolved through the registry by BuildWeightedEntries - EMPTY when it chose none, never somebody else's
-		// face), then the character's OWN editor morphs (CharacterMorphs - absent sliders yield no entry, the captured shape of an
-		// unmorphed character), then the closing record. Indices are 1..n in that order.
+		// The scaffold's APPEARANCE TABLE, built WHOLE from the character's appearance model - the one generator,
+		// used by every spawn. In wire order: the weighted appearance entries (the character's chosen editor
+		// resources, resolved through the registry by BuildWeightedEntries - EMPTY when it chose none, never
+		// somebody else's face), then the character's OWN editor morphs (CharacterMorphs - absent sliders yield no
+		// entry, the captured shape of an unmorphed character). Word2 slot ordinals are 1..n in that order.
 		//
-		// NB retail's captured indices are NOT always 1..n: they are per-character SLOT ids that survive appearance
-		// edits, so a re-barbered character carries gaps and appends its new hair/beard after its morphs
-		// (SpawnNecroKingsCastle starts at 2, SpawnDemoRandomActions runs 4..13,24,23). Nothing derives them, and
-		// nothing needs to - every character we create spawns with 1..n and renders correctly in-client.
-		public static List<ScaffoldEntry> BuildAppearanceEntries(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance)
+		// NB retail's captured ordinals are NOT always 1..n: they are per-character SLOT ids that survive appearance
+		// edits, so a re-barbered character carries gaps and appends its new hair/beard after its morphs. Nothing
+		// derives them, and nothing needs to - every character we create spawns with 1..n and renders correctly
+		// in-client.
+		public static List<AppearanceEntry> BuildAppearanceEntries(Character character, IReadOnlyList<AppearanceEntry> weightedAppearance)
 		{
 			ArgumentNullException.ThrowIfNull(weightedAppearance);
 
-			var entries = new List<ScaffoldEntry>(weightedAppearance);
-			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
+			var entries = new List<AppearanceEntry>(weightedAppearance);
+			entries.AddRange(CharacterMorphs.BuildEntries(character.Body));
+			for (var i = 0; i < entries.Count; i++)
+				entries[i].Word2 = (uint)i + 1;
 
-			var closer = FreshCloser(character.Class);
-			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
 			return entries;
 		}
 
@@ -275,9 +281,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			ArgumentNullException.ThrowIfNull(refsByTag);
 
-			var slot = PlayerSlotOf(scaffold);
-			character.Skills = slot
-				.IdList.Select(s => new CharacterSkill
+			character.Skills = scaffold
+				.Post.Slot.Skills.Select(s => new CharacterSkill
 				{
 					CharacterId = character.Id,
 					SkillId = s.Id,
@@ -287,9 +292,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			character.ScaffoldPairs = scaffold.Post.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.Post.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
 
-			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR IdList, which is skills). It IS
-			// character data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame +
-			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
+			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR skill list). It IS character
+			// data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame is constants
+			// reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
 			// Specs are preserved rather than flattened (#474): a character with four saved specs round-trips as
 			// four CharacterFeatSpec rows, and the same feat id may legitimately appear in several of them.
 			character.FeatSpecs = scaffold.PreIir.Sublist
@@ -313,16 +318,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return ExtractAppearance(character, scaffold, refsByTag);
 		}
 
-		// The entry table read back into the APPEARANCE MODEL - the inverse of BuildAppearanceEntries, and the reason
-		// a captured character's looks survive without a stored copy of the table.
+		// The appearance table read back into the APPEARANCE MODEL - the inverse of BuildAppearanceEntries, and the
+		// reason a captured character's looks survive without a stored copy of the table.
 		//
-		//   - morph entries  -> CharacterBody columns (CharacterMorphs.ApplyEntries, pure arithmetic),
-		//   - weighted rows  -> CharacterBodyResources, by looking the wire tag back up as a resource ref,
-		//   - the closer     -> dropped; it is derived from the class (FreshCloser).
+		//   - morph elements    -> CharacterBody columns (CharacterMorphs.ApplyEntries, pure arithmetic),
+		//   - weighted elements -> CharacterBodyResources, by looking the wire key back up as a resource ref.
 		//
-		// A morph slider is never mistaken for a resource: the two share a tag SPACE (the registry carries entries
-		// literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1 slider tags), so the
-		// discriminator is CharacterMorphs.IsMorphTag - the whole (type, id) pair - and it is checked FIRST.
+		// A morph slider is never mistaken for a resource: the two share a key SPACE (the registry carries entries
+		// literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1 slider keys), so the
+		// discriminator is CharacterMorphs.IsMorphKey - the whole (type, id) pair - and it is checked FIRST.
 		private static (int Morphs, int Resources) ExtractAppearance(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
 			character.Body ??= new CharacterBody
@@ -330,14 +334,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				CharacterId = character.Id
 			};
 
-			var entries = PlayerSlotOf(scaffold).Entries;
-			var morphs = CharacterMorphs.ApplyEntries(character.Body, entries.Select(e => (e.Tag, e.Value)));
+			var entries = scaffold.Post.Slot.Appearance;
+			var morphs = CharacterMorphs.ApplyEntries(character.Body, entries);
 
-			// Everything but the closer, which is the LAST record and carries a count marker, not appearance.
 			character.BodyResources.Clear();
-			foreach (var entry in entries.Take(Math.Max(0, entries.Count - 1)))
+			foreach (var entry in entries)
 			{
-				if (CharacterMorphs.IsMorphTag(entry.Tag) || !refsByTag.TryGetValue(entry.Tag, out var resourceRef))
+				if (CharacterMorphs.IsMorphKey(entry.MorphId) || entry.MorphId > ushort.MaxValue || !refsByTag.TryGetValue((ushort)entry.MorphId, out var resourceRef))
 					continue;
 
 				character.BodyResources.Add(new CharacterBodyResource
@@ -505,49 +508,40 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (character?.Skills is not { Count: > 0 })
 				return false;
 
-			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask, feats) is the
-			// constant skeleton with the archetype/class island written from the character's class, the vanity
-			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
-			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
-			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
+			// The frame is CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask, feats) is the constant
+			// skeleton with the archetype/class island written from the character's class, the vanity hidden-slots
+			// mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden piece
+			// survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
+			// Transient session islands are correctly absent.
 			scaffold.PreIir = FreshPreFrame(character.Class, character.VanityShownMask, SpecsOf(character));
-			var slot = PlayerSlotOf(scaffold);
-			slot.EntryTableX = FreshEntryTableX;
+			var slot = scaffold.Post.Slot;
 			scaffold.Post.BuffRecords.Clear();
 
-			slot.Entries.Clear();
-			slot.Entries.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
+			slot.Appearance.Clear();
+			slot.Appearance.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
 
-			// The id list is the character's stored skill rows with ONE substitution: the class-progression entry is
-			// DERIVED from (Class, Level) here rather than read back, the same rule the entry table follows (#483).
-			// It is a restatement of the character's level, so a stored copy goes stale on every ding - and stale is
-			// not cosmetic here: the client reads that entry's `<Class> Class Feat NNN` template for the five
-			// attributes and MaxHealth it draws, so an entry left at the level the row was written renders those at
-			// that level for ever. It reached the client the same way twice over: the level-up grant handed every
-			// dinged character the CAPTURED L80's entry (#298's full scaffold), and any level change at all left the
-			// stored one behind. Deriving is the only version that cannot drift.
+			// The skill list is the character's stored rows with TWO substitutions, both DERIVED here rather than
+			// read back, the same rule the appearance table follows (#483):
+			//
+			//   - the ARCHETYPE ability that opens every captured player's list (100/200/300/400 = archetype x 100,
+			//     rank 0 on all 296 captured spawns) - a restatement of the class, so deriving cannot drift. The old
+			//     carve knew it as the closer's "value" (#466);
+			//   - the CLASS-PROGRESSION entry - a restatement of the character's level, and stale is not cosmetic:
+			//     the client reads that entry's `<Class> Class Feat NNN` template for the five attributes and
+			//     MaxHealth it draws, so an entry left at the level the row was written renders those at that level
+			//     for ever. Deriving is the only version that cannot drift.
 			//
 			// Every OTHER row is passed through untouched, ranks included - a captured character's professions and
-			// abilities are its own and are not second-guessed here.
-			slot.IdList.Clear();
-			var storedSkills = character.Skills?.Where(s => !IsClassProgressionId(s.SkillId)).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)) ?? [];
+			// abilities are its own and are not second-guessed here. The skill count feeds the list's ListFrame
+			// word, which the old carve knew as the closer's TAG - and which its writer truncated to u16, a crash
+			// waiting for the first generated 65+-skill character (#250's failure mode); the frame is a u32 now.
+			slot.Skills.Clear();
+			slot.Skills.Add(new ScaffoldSkill(ArchetypeSkillId(character.Class), 0));
+			var storedSkills = character.Skills?.Where(s => !IsClassProgressionId(s.SkillId) && !IsArchetypeSkillId(s.SkillId)).Select(s => new ScaffoldSkill(s.SkillId, s.Rank)) ?? [];
 			if (ClassProgressionIdFor(character.Class, character.Level) is { } progressionId)
-				storedSkills = storedSkills.Append(new ScaffoldIdEntry(0, progressionId));
+				storedSkills = storedSkills.Append(new ScaffoldSkill(progressionId, 0));
 
-			slot.IdList.AddRange(storedSkills.OrderBy(s => s.Id));
-
-			// The closer (last entry-table record) carries the COUNT MARKER the client uses to read the feat list:
-			// TAG = (IdList.Count + 2) * 0x3F1 (see FreshCloser). It was stored at the FRESH skill count, so once the
-			// class feat scaffold is granted on level-up (#298) the skill count grows and the stored tag goes stale ->
-			// the client miscounts the feat list and CoreCharacterFullUpdateIIR asserts (a_cBlob.HasFailed). Recompute
-			// it from the ACTUAL IdList here so the wire is always self-consistent (value/archetype is left intact).
-			if (slot.Entries.Count > 0)
-			{
-				slot.Entries[^1] = slot.Entries[^1] with
-				{
-					Tag = (ushort)ListFrame.ForCount(slot.IdList.Count + 1) // frames ONE MORE than the id list holds; truncated to u16
-				};
-			}
+			slot.Skills.AddRange(storedSkills.OrderBy(s => s.Id));
 
 			scaffold.Post.EndPairs.Clear();
 			scaffold.Post.EndPairs2.Clear();
@@ -577,38 +571,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 		}
 
-		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). #250: stamping the WRONG
-		// closer crashes the client's character construction at world entry. DECODED (#269, 117 player self-spawns
-		// across every capture, zero violations - parse_spawn_scaffold.py): the closer is fully DERIVED, not a
-		// per-class constant.
-		//   VALUE = archetype index x 100 (Soldier=100, Priest=200, Rogue=300, Mage=400).
-		//   TAG   = (feat/skill IdList length + 2) x 0x3F1.
-		// So the tag is a COUNT marker the client uses to read the feat list - which is exactly why a mismatched one
-		// crashes. It is race-independent (same class -> same fresh feat list -> same count -> same tag) and holds
-		// for feat counts from 14 (Assassin -> 0x3F10) up to 47 (leveled chars). The old per-class hardcoded tags
-		// happened to match only because each class's feat-list length is fixed; computing it is correct for every
-		// feat list (incl. Assassin, whose interim 0x56B6 guess was wrong - 14 feats -> 0x3F10).
-		private static (ushort Tag, uint Value) FreshCloser(ConanClass @class)
+		// The ARCHETYPE ability that opens every captured player's skill list: FrameArchetype x 100 (Soldier=100,
+		// Priest=200, Rogue=300, Mage=400; rank 0 on all 296 captured spawns). The old 8-bytes-off carve knew this
+		// id as the "closer record's value" (#269/#466); #250's crash-on-wrong-closer was the client's skill parse
+		// failing on a wrong ListFrame word next to it.
+		public static uint ArchetypeSkillId(ConanClass @class)
 		{
-			var value = @class switch
-			{
-				ConanClass.Guardian or ConanClass.Conqueror or ConanClass.DarkTemplar => 100u, // Soldier
-				ConanClass.PriestOfMitra or ConanClass.TempestOfSet or ConanClass.BearShaman => 200u, // Priest
-				ConanClass.Barbarian or ConanClass.Assassin or ConanClass.Ranger => 300u, // Rogue
-				_ => 400u // Mage
-			};
-
-			var tag = (ushort)ListFrame.ForCount(FreshSkillIdsFor(@class).Length + 1); // as above: one more than the ids
-			return (tag, value);
+			return FrameArchetype(@class) * 100u;
 		}
 
-		// The spawn's entry slot as the PLAYER's. Everything in this file describes a character, so a body whose slot
-		// is the NPC morph table is not a player spawn at all - and saying so is what the caller wants to be told,
-		// the same way the old player codec asserted the header's two family words.
-		private static PlayerEntrySlot PlayerSlotOf(SimpleCharFullUpdateIIR scaffold)
+		// Whether `id` is ANY archetype's ability - the same drop-before-derive rule IsClassProgressionId serves:
+		// a stored or captured copy is dropped and the entry re-derived from the character's own class.
+		public static bool IsArchetypeSkillId(uint id)
 		{
-			return scaffold.Post.Slot as PlayerEntrySlot
-			       ?? throw new InvalidOperationException($"the spawn's entry slot is {scaffold.Post.Slot.GetType().Name}, not a player's entry table");
+			return id is 100 or 200 or 300 or 400;
 		}
 
 		private static CharacterScaffoldPair Pair(uint characterId, byte listIndex, ScaffoldPair p)

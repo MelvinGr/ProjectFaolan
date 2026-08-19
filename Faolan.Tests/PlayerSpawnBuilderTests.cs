@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			// The scaffold rows (id list / feats) plus the APPEARANCE MODEL (Body morphs + BodyResources refs) on a
 			// Character. Strie is an Assassin; the pre-IIR frame is now reconstructed from that class (not stored), so
 			// the from-scratch body equals the template's CONSTRUCTED form - same transform/rows/IIR, canonical
-			// FreshPreFrame(Assassin), EntryTableX 0xB7, no buff records.
+			// FreshPreFrame(Assassin), no buff records.
 			//
 			// The entry table is not carried across as rows any more: extraction turns Strie's six weighted entries
 			// into resource refs through the catalog, and generation resolves those refs back to the same six tags. So
@@ -61,7 +61,6 @@ namespace Faolan.Tests
 			Assert.NotNull(built);
 			var expected = SimpleCharFullUpdateCodec.Parse(template);
 			expected.PreIir = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
-			SimpleCharFullUpdateCodecTests.PlayerSlot(expected).EntryTableX = PlayerSpawnScaffoldRows.FreshEntryTableX;
 			expected.Post.BuffRecords.Clear();
 			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(expected)), Convert.ToHexString(built));
 		}

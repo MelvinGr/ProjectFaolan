@@ -73,8 +73,8 @@ namespace Faolan.Tests
 				var expected = row.Morphs.OrderBy(m => m.Ordinal).Select(m => (m.MorphId, m.Word2)).ToArray();
 				var built = SimpleCharFullUpdateCodec.Parse(NpcSpawnBuilder.BuildLive(row, 0x1000, 0x00A00001));
 
-				var slot = Assert.IsType<NpcEntrySlot>(built.Post.Slot);
-				Assert.Equal(expected, slot.Morphs.Select(m => (m.MorphId, m.Word2)).ToArray());
+				var slot = built.Post.Slot;
+				Assert.Equal(expected, slot.Appearance.Select(m => (m.MorphId, m.Word2)).ToArray());
 
 				// The claim the acceptance rests on: the non-zero entries are a CONTIGUOUS PREFIX of the table, and
 				// their values are a PERMUTATION of 1..N - dense, distinct, gapless. Runtime state accrued in play
@@ -84,17 +84,17 @@ namespace Faolan.Tests
 				// Kincaid's first four hold 1/2/3/4", which reads as sorted and is not: Kincaid's are 3, 1, 2, 4. So
 				// whatever it ordinals, it is not the table's own position, and asserting the sorted form would have
 				// baked that misreading in.
-				var nonZero = slot.Morphs.TakeWhile(m => m.Word2 != 0).Select(m => m.Word2).ToArray();
+				var nonZero = slot.Appearance.TakeWhile(m => m.Word2 != 0).Select(m => m.Word2).ToArray();
 				Assert.NotEmpty(nonZero);
 				Assert.Equal(Enumerable.Range(1, nonZero.Length).Select(i => (uint)i), nonZero.Order());
-				Assert.All(slot.Morphs.Skip(nonZero.Length), m => Assert.Equal(0u, m.Word2));
+				Assert.All(slot.Appearance.Skip(nonZero.Length), m => Assert.Equal(0u, m.Word2));
 
 				// ⭐ And WHAT it is attached to: every entry that carries it is a `*texscript_*` morph, i.e. a texture
 				// script rather than a face/body slider or a hair mesh. That is the strongest single argument that it
 				// is appearance data - runtime state would not confine itself to one KIND of entry - and it is why
 				// the ordinal is not the table position: it orders the texscript run, whatever that ordering drives.
 				var texscripts = names.Where(kv => kv.Value.StartsWith("*texscript", StringComparison.Ordinal)).Select(kv => kv.Key).ToHashSet();
-				Assert.All(slot.Morphs.Where(m => m.Word2 != 0), m => Assert.Contains(m.MorphId, texscripts));
+				Assert.All(slot.Appearance.Where(m => m.Word2 != 0), m => Assert.Contains(m.MorphId, texscripts));
 			}
 		}
 

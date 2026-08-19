@@ -131,11 +131,7 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 5u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = true,
-					Slot = new NpcEntrySlot
-					{
-						EntryTableX = 0x3F1u,
-						EntryTableMarker = 0x3F1u
-					}
+					Slot = new SpawnEntrySlot()
 				}
 			};
 		}
@@ -247,11 +243,7 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 5u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = true,
-					Slot = new NpcEntrySlot
-					{
-						EntryTableX = 0x3F1u,
-						EntryTableMarker = 0x3F1u
-					}
+					Slot = new SpawnEntrySlot()
 				}
 			};
 		}
@@ -397,11 +389,7 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 5u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = true,
-					Slot = new NpcEntrySlot
-					{
-						EntryTableX = 0x3F1u,
-						EntryTableMarker = 0x3F1u
-					}
+					Slot = new SpawnEntrySlot()
 				}
 			};
 		}
@@ -578,11 +566,7 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 5u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = true,
-					Slot = new NpcEntrySlot
-					{
-						EntryTableX = 0x3F1u,
-						EntryTableMarker = 0x3F1u
-					}
+					Slot = new SpawnEntrySlot()
 				}
 			};
 		}
@@ -792,28 +776,24 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 5u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = true,
-					Slot = new NpcEntrySlot
+					Slot = new SpawnEntrySlot
 					{
-						Morphs = {
-							new NpcAppearanceMorph
+						Appearance = {
+							new AppearanceEntry
 							{
 								MorphId = 0x324u,
 								Value = 0.7686341f,
 								Word2 = 0u,
-								Flag = 0x00,
 								Text = ""
 							},
-							new NpcAppearanceMorph
+							new AppearanceEntry
 							{
 								MorphId = 0x343u,
 								Value = 0.12378088f,
 								Word2 = 0u,
-								Flag = 0x00,
 								Text = ""
 							}
-						},
-						EntryTableX = 0x3F1u,
-						EntryTableMarker = 0x3F1u
+						}
 					}
 				}
 			};
@@ -888,12 +868,7 @@ namespace Faolan.Core.Network.Constants
 					FirstRecordLen = 4u,
 					MovementMode = 2u,
 					HasMoveTaskSlot = false,
-					Slot = new PlayerEntrySlot
-					{
-						EntryTableX = 0x3F1u,
-						Marker = 0x3F1u,
-						IdListTerminatorRank = 0x00
-					}
+					Slot = new SpawnEntrySlot()
 				}
 			};
 		}

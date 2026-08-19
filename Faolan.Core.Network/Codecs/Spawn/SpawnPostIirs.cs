@@ -62,11 +62,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// terminators". They are not constants: they are an EMPTY buff list, an EMPTY morph table and three EMPTY
 		// closing pair lists, four of whose framing words are ForCount(0) - which is 0x3F1, the exact face the 0x3F1
 		// trap wears (see ListFrame).
-		public static SpawnPostIir Npc(uint movementMode = DefaultMovementMode, IReadOnlyList<NpcAppearanceMorph>? morphs = null)
+		public static SpawnPostIir Npc(uint movementMode = DefaultMovementMode, IReadOnlyList<AppearanceEntry>? morphs = null)
 		{
-			var slot = new NpcEntrySlot();
+			var slot = new SpawnEntrySlot();
 			if (morphs != null)
-				slot.Morphs.AddRange(morphs);
+				slot.Appearance.AddRange(morphs);
 
 			return new SpawnPostIir
 			{
@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				MovementMode = PlayerMovementMode,
 				HasMoveTaskSlot = false,
-				Slot = new PlayerEntrySlot()
+				Slot = new SpawnEntrySlot()
 			};
 		}
 

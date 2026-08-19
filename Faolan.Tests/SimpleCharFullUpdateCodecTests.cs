@@ -37,7 +37,7 @@ namespace Faolan.Tests
 
 			var back = SimpleCharFullUpdateCodec.Parse(rebuilt);
 			Assert.Equal("Strie", back.Character.Name);
-			Assert.Equal(PlayerSlot(s).Entries.Count, PlayerSlot(back).Entries.Count);
+			Assert.Equal(s.Post.Slot.Appearance.Count, back.Post.Slot.Appearance.Count);
 		}
 
 		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroKingsCastle"), InlineData("SpawnDemoRandomActions"), InlineData("SpawnHoxxlingBuffed")]
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 				Assert.All(r.Trailer, word => Assert.Equal(0u, word));
 			});
 
-			Assert.Equal(35, PlayerSlot(s).Entries.Count);
+			Assert.Equal(35, s.Post.Slot.Appearance.Count);
 		}
 
 		[Fact]
@@ -90,8 +90,11 @@ namespace Faolan.Tests
 			// The scaffold with one feat spec carrying 25 feats. The 339 the old model reported included the 5
 			// bytes of the embedded CoreCharacter header its parse happened to cut into; those are the message's.
 			Assert.Equal(339 - 5, s.PreIir.ByteCount);
-			Assert.Equal(14, PlayerSlot(s).Entries.Count);
-			Assert.Equal(0x2B6u, PlayerSlot(s).EntryTableX);
+			// His first appearance element is his BEARD (*beardmesh_3181878, wire key 0x2B6) - the value the old
+			// 8-bytes-off carve called "EntryTableX". He has no face-paint element: retail's slot 1 is vacated
+			// (his Word2 ordinals run 2..15), i.e. he removed it (#466).
+			Assert.Equal(14, s.Post.Slot.Appearance.Count);
+			Assert.Equal(0x2B6u, s.Post.Slot.Appearance[0].MorphId);
 			Assert.Equal(8, s.Post.EndPairs.Count);
 			Assert.Equal(new ScaffoldPair(10, -14375), s.Post.EndPairs[0]);
 		}
@@ -114,24 +117,25 @@ namespace Faolan.Tests
 			Assert.Equal(239 - 5, s.PreIir.ByteCount);
 			Assert.Empty(s.Post.BuffRecords);
 
-			// Strie: 7 entries (the weighted attributes idx 1..6 with weight 1.0 + the [u16][u32] closer at 7).
-			var slot = PlayerSlot(s);
-			Assert.Equal(7, slot.Entries.Count);
-			Assert.Equal(new ScaffoldEntry(1, 0x0311, 0x3F800000), slot.Entries[0]);
-			Assert.Equal(new ScaffoldEntry(7, 0x3F10, 0x12C), slot.Entries[6]);
+			// Strie: 7 weighted appearance elements, slot ordinals 1..7, weight 1.0, opening with the always-sent
+			// face paint (0xB7 = *texscript_183875 - what the old carve read as the "EntryTableX" scalar).
+			var slot = s.Post.Slot;
+			Assert.Equal(7, slot.Appearance.Count);
+			Assert.Equal(0xB7u, slot.Appearance[0].MorphId);
+			Assert.Equal(1f, slot.Appearance[0].Value);
+			Assert.Equal(1u, slot.Appearance[0].Word2);
+			Assert.Equal(0x311u, slot.Appearance[1].MorphId);
+			Assert.All(slot.Appearance, e => Assert.Equal("", e.Text));
 
-			// 14 ability/feat ids, ascending, all rank 0; no ending pairs.
-			Assert.Equal(14, slot.IdList.Count);
-			Assert.Equal(0xD48u, slot.IdList[0].Id);
-			Assert.Equal(0x50E24u, slot.IdList[^1].Id);
-			Assert.All(slot.IdList, id => Assert.Equal(0, id.Rank));
+			// 15 ability/feat ids: the archetype ability (300, Rogue) first - the old carve's "closer value" - then
+			// 14 ascending; all rank 0. The list's frame word is what the old carve called the closer's TAG.
+			Assert.Equal(15, slot.Skills.Count);
+			Assert.Equal(300u, slot.Skills[0].Id);
+			Assert.Equal(0xD48u, slot.Skills[1].Id);
+			Assert.Equal(0x50E24u, slot.Skills[^1].Id);
+			Assert.All(slot.Skills, sk => Assert.Equal(0, sk.Rank));
 			Assert.Empty(s.Post.EndPairs);
 			Assert.Empty(s.Post.EndPairs2);
-		}
-
-		internal static PlayerEntrySlot PlayerSlot(SimpleCharFullUpdateIIR spawn)
-		{
-			return Assert.IsType<PlayerEntrySlot>(spawn.Post.Slot);
 		}
 
 		// The captured body minus the leading u32 carrier length - i.e. the record the codec owns.
