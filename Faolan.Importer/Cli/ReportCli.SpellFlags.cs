@@ -86,12 +86,20 @@ namespace Faolan.Importer.Cli
 			+ "FUN_00744580(caster, target, 180, -90), an ANGLE test. ⚠️ So the bit's FUNCTION is pinned and its NAME "
 			+ "is not: naming operator 115 names the bit",
 			"    bit 20  ⭐ READ: FUN_007ee710 (the timed-effect path of bit 16) + FUN_00769220 (which also reads bit 15)",
-			"    bit 21  ⭐ READ: FUN_007f17d0 / FUN_007f1860 - and at both sites it skips the SAME pair of calls, an "
-			+ "insert into a sorted container (FUN_00805000 + FUN_00803af0). ⚠️ Stat 0xB1 `MoreFlags` bit 0 is tested "
-			+ "right beside it and skips the same thing, so naming one names the other",
-			"    bit 29  ⭐ READ: FUN_007d7ee0 - SHAPE ONLY: on the damage path (its caller FUN_0114d4c0 logs "
-			+ "\"Apply missing multihitdamage (hit N) damage: X (of maxdamage: Y)\" on GameCode/Combat) it propagates "
-			+ "a float to every sibling sharing one key, raising each to the max. What the float IS is not recovered",
+			"    bit 21  ⛔ read only by DEAD CODE. Its two read sites FUN_007f17d0 / FUN_007f1860 (which skip a "
+			+ "sorted-container insert when bit 21 or spell stat 0xB1 `MoreFlags` bit 0 is set) are UNREACHABLE: zero "
+			+ "code xrefs, zero absolute pointers anywhere in the data blocks (a raw byte scan, controlled against a "
+			+ "known vtable slot), zero instruction immediates, and zero raw E8 rel32 calls targeting either "
+			+ "(controlled against a known direct-called fn = 2 hits). So the shipped client never consults it - a "
+			+ "compiled-out feature, the bit-0/-3 verdict with real logic behind it. Not a decode gap",
+			"    bit 29  ⭐ the multihit template LOCK propagates to the whole STACKINGLINE - all ranks of a combo "
+			+ "cool down together. When a multihit's damage completes (FUN_0114d4c0, hits > 1), the client locks the "
+			+ "template for hitsLanded/hitsTotal x a global base (FUN_007d7ee0 -> FUN_0074a270, which logs \"Locking "
+			+ "template %d\" on GameCode/Chars - the LockTemplate cooldown), max-raising, never shortening. With bit "
+			+ "29 it walks every loaded spell whose stackingline (FUN_005eed00: the ref at +0xD8, else +0x134) "
+			+ "matches and raises THEIR locks to the same value. The carriers agree: all 156 are combo rank families "
+			+ "(Whirlwind, Jagged Cut, Counterstrike, ...), 155/156 trainable, 0/156 hostile-flagged - exactly the "
+			+ "spells where dodging a cooldown by casting a sibling rank must not work",
 			"    the rest  no read site anywhere in the image",
 		];
 

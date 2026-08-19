@@ -214,14 +214,33 @@ and the cast site passes it `target class == 0xC350 (a Character)` as an argumen
 says; calling it *line of sight* or *no facing requirement* would be a guess between the members of that family.
 Naming operator 115 names the bit, and vice versa.
 
-### The bits still unnamed, narrowed to their SHAPE (#632)
+### Bit 29: the multihit lock propagates to the whole STACKINGLINE (all combo ranks cool down together)
 
-* **bit 21** (1,576 set) suppresses one call pair at both of its sites — an insert into a sorted container
-  (`FUN_00805000` + `FUN_00803AF0`), which says nothing in English. **Bit 0 of stat `0xB1` `MoreFlags`** is
-  tested right beside it in `FUN_007F17D0` and skips the same thing, so naming either names both.
-* **bit 29** (156 set) is on the DAMAGE path — its caller `FUN_0114D4C0` logs *"Apply missing multihitdamage
-  (hit N) damage: X (of maxdamage: Y)"* on `GameCode/Combat`. Set, it propagates a float to every sibling
-  sharing one key, raising each to the maximum. What the float IS is not recovered.
+When a multihit spell's damage application completes (`FUN_0114D4C0`, the *"Apply missing multihitdamage"*
+function, guarded on `hits > 1`), the client calls `FUN_007D7EE0(holder, templateId,
+hitsLanded / hitsTotal)` — the float is the **fraction of the multihit that landed**. Scaled by a global base,
+that becomes a **template LOCK duration**: `FUN_0074A270` stores `now .. now + seconds` and logs itself as
+*"Locking template %d"* on `GameCode/Chars` — the same LockTemplate mechanism the cooldown work identified —
+and the lock is only ever RAISED (`FUN_0074A140` reads the remaining time; a shorter new lock is discarded).
+
+**With bit 29 set, the raise walks every other loaded spell whose STACKINGLINE matches** (`FUN_005EED00`: the
+ref at `+0xD8`, falling back to the id at `+0x134`) and raises their locks to the same value. The carriers are
+the confirmation: all **156** are combo rank families — `Whirlwind II–IV`, `Jagged Cut I–IV`, `Counterstrike`,
+`Plexus Strike`, `Guard Destroyer`, `Shield Sweep`, `Burn to Death`, `Grim Corruption`, `Slow Death Strike`,
+`Stunning Punch`, `Clobber`, `Ferocious Smack`, … — 155/156 trainable, 0/156 hostile-flagged. It is exactly the
+rule that stops a player dodging a combo's cooldown by casting a sibling rank.
+
+### Bit 21 is read only by DEAD CODE — the shipped client never consults it
+
+Its two read sites `FUN_007F17D0` / `FUN_007F1860` (adjacent wrappers that skip a sorted-container insert when
+bit 21 **or** spell stat `0xB1` `MoreFlags` bit 0 is set) are **unreachable**: zero code xrefs, zero absolute
+pointers to either address anywhere in the initialized data blocks (raw byte scan, `tools/ghidra/ScanPtrData.java`,
+controlled against `FUN_01121C00`'s known vtable slot = 1 hit), zero instruction immediates, and zero raw
+`E8 rel32` calls targeting either (`ScanRelCalls.java`, controlled against the direct-called
+`MorphValues_c::SetMorphValue` = 2 hits). So bit 21 joins bits 0 and 3 — set on 1,576 records, consumed by
+nothing that can run — with the nuance that its dead readers are real spell logic: a compiled-out feature, not
+garbage. Its carriers (Death Penalty, Exhausted, the Formations, the food buffs) presumably mattered to that
+feature, but no reachable code distinguishes them by this bit.
 
 ### ⭐ Bits 23 and 30 SPLIT: `NoAutomaticReplace` and `NoAutomaticStackReplace`
 
