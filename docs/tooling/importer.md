@@ -309,6 +309,9 @@ residual collapse against the TEACHING FEATS, which split the 19 into two struct
 (no feat grants it while every rank below has one, and it repeats the level below; all nine sit in one late id block
 ≥ 4487431, and the captured level-80s know the rank below but never it) and a *rank 1 from a class feat* (rank 1's
 only grant is a `<Class> Class Feat`, which states no band, so field 125 copied band-granted rank 2's level onto it).
+⭐ It finally prints the **whole-sweep diff** of the featclass schedule against field 125, PER CLASS (#864): 432 rows,
+363 agree, 69 differ — and the 14 that differ *upward* are named, because they refute the rule that field 125 bounds
+the grant. The five melee classes appear nowhere in it, which is the caveat made visible: no feat teaches a combo.
 See the field-125 section of [spell-record-fields.md](../rdb/spell-record-fields.md)) ·
 `spell-grant-check` (does the level path offer a captured character the spellbook retail gave them? Runs the
 SHIPPING queries — `GetStartingSpells` and `GetStartingBarSpells` — for every character in the DB against its own

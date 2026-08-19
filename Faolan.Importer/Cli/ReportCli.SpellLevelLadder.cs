@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Faolan.Core.Enums;
 using Faolan.Core.Progression;
 using Microsoft.EntityFrameworkCore;
 
@@ -175,6 +177,8 @@ namespace Faolan.Importer.Cli
 				RankOneCandidates(collapsed, learnable, bySpell);
 				LadderMonotonicity(learnable, bySpell);
 			}
+
+			await ScheduleVersusStatedLevel(db);
 
 			if (!string.IsNullOrWhiteSpace(familyFilter))
 				Detail(learnable, familyFilter, bands, teachers, known, classSpells);
@@ -351,6 +355,74 @@ namespace Faolan.Importer.Cli
 
 				return false;
 			}
+		}
+
+		/// <summary>
+		///     The two level sources side by side, PER CLASS: <c>ClassSpell.GrantLevel</c> (the client's featclass
+		///     schedule) against <c>Spells.Level</c> (RDB field 125), over every row the schedule answers.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ This is the measurement Gitea #864 asked for, and its point is the DISAGREEMENTS. The two fields are
+		///     independent - the schedule says when a CLASS is handed the spell, field 125 is the record's own level
+		///     word - so a difference is not automatically a defect. What the ticket ruled out with it is the rule
+		///     "retail never grants above field 125": the rows that differ UPWARD refute it outright, and they are
+		///     printed by name rather than counted, because a one-directional rule read off three rows is exactly the
+		///     thing a full sweep exists to kill.
+		///     <para />
+		///     ⚠️ PRINTED, not asserted (Gitea #729): both populations are shipped data and both move whenever the RDB
+		///     import is re-run. The gate that CAN only be a defect is <c>--report spell-grant-check</c>, which scores
+		///     the gate this column feeds against the captured spellbooks.
+		/// </remarks>
+		private static async Task ScheduleVersusStatedLevel(DatabaseContext db)
+		{
+			var rows = await db.ClassSpells.AsNoTracking()
+				.Where(cs => cs.GrantLevel != null)
+				.Join(db.Spells.AsNoTracking(), cs => cs.SpellId, s => s.Id, (cs, s) => new
+				{
+					cs.Class,
+					s.Name,
+					Schedule = (int)cs.GrantLevel!.Value,
+					Stated = (int)s.Level
+				})
+				.ToListAsync();
+
+			if (rows.Count == 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  (no ClassSpell.GrantLevel rows - run `--only rdb-feats` to derive the schedule)");
+				return;
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"  ⭐ the featclass SCHEDULE against Spells.Level, per class ({rows.Count} rows the schedule answers):");
+			Console.WriteLine($"     {"class",-18} {"rows",5} {"agree",6} {"differ",7} {"below",6} {"above",6}");
+			foreach (var group in rows.GroupBy(r => r.Class).OrderBy(g => g.Key.ToString(), StringComparer.Ordinal))
+			{
+				var differ = group.Where(r => r.Schedule != r.Stated).ToList();
+				Console.WriteLine($"     {group.Key.ToString(),-18} {group.Count(),5} {group.Count() - differ.Count,6} {differ.Count,7}"
+				                  + $" {differ.Count(r => r.Schedule < r.Stated),6} {differ.Count(r => r.Schedule > r.Stated),6}");
+			}
+
+			var all = rows.Where(r => r.Schedule != r.Stated).ToList();
+			Console.WriteLine($"     {"TOTAL",-18} {rows.Count,5} {rows.Count - all.Count,6} {all.Count,7}"
+			                  + $" {all.Count(r => r.Schedule < r.Stated),6} {all.Count(r => r.Schedule > r.Stated),6}");
+
+			// ⚠️ The classes the schedule says NOTHING about, printed because their absence is the finding: the melee
+			// kit is mostly COMBOS, and no feat teaches a combo - so the schedule can only ever corroborate or correct
+			// field 125 on the caster classes, never replace it wholesale (Gitea #864).
+			var silent = Enum.GetValues<ConanClass>().Where(c => c != default && rows.All(r => r.Class != c)).ToList();
+			if (silent.Count > 0)
+				Console.WriteLine($"     ⚠️ the schedule answers NOTHING for {string.Join(", ", silent)} - no feat teaches a combo, so these classes stay on Spells.Level.");
+
+			// ⛔ The refuting half, named. These are the rows where the class is handed the spell ABOVE the level its
+			// own record states - i.e. field 125 is not a ceiling, which is what #864 closed on.
+			var above = all.Where(r => r.Schedule > r.Stated).OrderByDescending(r => r.Schedule - r.Stated).ToList();
+			if (above.Count == 0)
+				return;
+
+			Console.WriteLine($"     ⛔ granted ABOVE the stated level on {above.Count} row(s) - field 125 is not a ceiling:");
+			foreach (var row in above)
+				Console.WriteLine($"        {row.Class,-18} {row.Name,-34} schedule {row.Schedule,3}  stated {row.Stated,3}");
 		}
 
 		private const string UntaughtTopRank = "untaught top rank (not level-granted)";

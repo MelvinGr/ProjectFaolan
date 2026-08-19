@@ -737,6 +737,31 @@ level: those feats' featclass levels are 30/45/60/75, in order. Its effect bands
 full-power level, a different fact (see `ClassSpell.GrantLevel`'s own remark) — and the grant level is per CLASS,
 which a per-spell column cannot express.
 
+### The whole-sweep diff, and the one-directional rule it kills
+
+`--report spell-level-ladder` prints the two sources side by side per class over every row the schedule answers.
+Measured over the shipped data: **432** rows, **363** agree with field 125, **69** differ — **55** below and
+**14 above**.
+
+| class | rows | agree | differ | below | above |
+|---|---:|---:|---:|---:|---:|
+| BearShaman | 39 | 33 | 6 | 6 | 0 |
+| DarkTemplar | 35 | 28 | 7 | 7 | 0 |
+| Demonologist | 97 | 87 | 10 | 5 | 5 |
+| HeraldOfXotli | 35 | 29 | 6 | 5 | 1 |
+| Necromancer | 98 | 80 | 18 | 15 | 3 |
+| PriestOfMitra | 68 | 61 | 7 | 4 | 3 |
+| TempestOfSet | 60 | 45 | 15 | 13 | 2 |
+
+⛔ **Those 14 refute "retail grants at or below field 125, never above."** That rule was read off three rows that
+all happened to point the same way; over the whole sweep `Pestilential Blast (Rank 1)` is scheduled at **7** where
+the record says 1, `Soul of Mitra` at **80** where it says 40, and `Dance: Aquilonian` at **5** where it says 0.
+The two fields are simply independent, and neither bounds the other.
+
+⚠️ **Five classes are missing from that table and their absence is the finding.** The schedule says *nothing* for
+Barbarian, Guardian, Conqueror, Assassin and Ranger: no feat teaches a combo, and the melee kit is mostly combos.
+So the schedule can CORROBORATE or CORRECT field 125 on the caster classes; it can never replace it wholesale.
+
 ## Field 132 `ManaCost` is usually a PERCENTAGE of the caster's mana pool
 
 Read straight, 132's values look too small to be a cost: `Ice Strike (Rank 6)` carries **9**. They are
