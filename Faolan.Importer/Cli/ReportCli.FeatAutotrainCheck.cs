@@ -91,9 +91,11 @@ namespace Faolan.Importer.Cli
 				? $"OK: {checkedChars} character(s), no auto-trained feat in any feat list."
 				: $"FAIL: {offenders} auto-trained feat(s) across {checkedChars} character(s).");
 
-			await AutoTrainedEffects(db);
+			// ⛔ The effects half gates too, and on its own direction: a derived row that touches a pool or an
+			// attribute would move a captured stat sheet, which is the one thing #863 promised could not happen.
+			var leaked = await AutoTrainedEffects(db);
 
-			return offenders == 0 ? 0 : 1;
+			return offenders == 0 && leaked == 0 ? 0 : 1;
 		}
 
 		/// <summary>
@@ -115,8 +117,10 @@ namespace Faolan.Importer.Cli
 		///             Dexterity, which is asserted here and is the only direction that can be a defect.
 		///         </item>
 		///     </list>
+		///     Returns how many derived rows carry a sheet stat - the caller folds it into the exit code, so this is
+		///     an assertion and not a print.
 		/// </remarks>
-		private static async Task AutoTrainedEffects(DatabaseContext db)
+		private static async Task<int> AutoTrainedEffects(DatabaseContext db)
 		{
 			// The stats a captured sheet would notice - the five attributes and the health pool. Nothing derived here
 			// may carry one.
@@ -140,7 +144,7 @@ namespace Faolan.Importer.Cli
 				}).ToListAsync();
 
 			if (rows.Count == 0)
-				return;
+				return 0;
 
 			var track = rows.Where(r => r.Name != null && r.Name.Contains(FeatRules.ClassProgressionTrackMarker, StringComparison.Ordinal)).ToList();
 			var derived = rows.Except(track).ToList();
@@ -166,6 +170,8 @@ namespace Faolan.Importer.Cli
 			}
 
 			await ManaRegenBaseCorroboration(db, derived.Select(r => (r.Class, r.Level, r.Id, r.Effect)));
+
+			return leaked.Count;
 		}
 
 		/// <summary>

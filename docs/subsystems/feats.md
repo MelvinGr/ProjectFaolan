@@ -63,9 +63,11 @@ data comes from.
   It used to dedup on the exact id, which would have put an entry on the spawn's list that retail never sends.
 - **Feats GRANT their stats.** `MaxStatAggregator.AggregateFeatBonuses` sums `FeatEffect` into the same additive
   bonus table gear feeds, applied at world entry (`GameServerListener.WorldEntry`).
-  ⚠️ **No `GetScale()` division**, unlike the gear path: `FeatEffect.Value` is a DISPLAY value where
-  `ItemStatModifier.Amount` is raw wire. Strength (scale 10) carries 1..9 in the feat table and HealthMax
-  (scale 100) carries 100..700 - dividing those would under-grant every feat by 10x or 100x.
+  ⛔ **It DOES divide by `GetScale()`, exactly like the gear path** — `FeatEffect.Value` is the RAW WIRE value,
+  the same as `ItemStatModifier.Amount`. This page said the opposite until #865, and the code matched it, so a
+  HealthMax feat granted a hundred times what it should and an attribute feat ten. The old reasoning
+  ("Strength carries 1..9, HealthMax 100..700") was measured on a subset; over the whole table HealthMax runs to
+  99,000 and Strength to 2,300. See the section below for the three things that settle it.
   **2,720 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
   their feats name a real feat - but only 6 of those 56 carry stat effects.
 - ⚠️ **The other 50 are NOT feats "whose record has no modifier region" — that claim was wrong (#590).** Their
@@ -652,6 +654,28 @@ where the class templates carry a 280 row:
 
 Four for four, against a derivation that was not fitted to them. `WorldEntity.NonCombatManaRegenBase` is the sum
 and `WorldSimulation` passes it to `RegenRates.ManaPerSecond`, which had been defaulting it to 0.
+
+### ⛔ `FeatEffect.Value` is RAW WIRE, not display (#865)
+
+The same bytes are read twice under two conventions, and that is the proof. `ClassAttributeBase.Amount` and
+`FeatEffect.Value` are **both** `ItemTemplateStatModifiers.Modifier.WireAmount`, off the same
+`<Class> Class Feat NNN` templates: `Necromancer Class Feat 071` carries HealthMax **38,600** and the
+`ClassAttributeBases` row for (Necromancer, 80) is **38,600**. `CharacterMaxStats.Pool` adds that one in
+HUNDREDTHS and divides by 100, giving the `+386` health it documents and that is verified against every captured
+pool. One number, one parser, two readings — and the verified reading divides.
+
+Two more, each sufficient alone:
+
+* `Barbarian: HP (1) 10` carries **26,800** and `Vitality`'s top rank ramps to **80,000**, against a level-80's
+  *whole* pool of ~6,300. No display reading survives that; as wire values they are +268 and +800 health.
+* The unexplained flat health term #588 is hunting for is **73** — tens, not thousands.
+
+⚠️ **SPELLS keep their own convention and that is not an inconsistency.** `BuffStatEffects.SpellScale` holds
+attributes at scale 1 because the spell record really does store those in display units. Three sources, three
+conventions, and the PARSER a source goes through is what says which one it uses.
+
+⚠️ Accumulation happens in WIRE units with the scale applied **once per stat**, the way `CharacterMaxStats.Pool`
+does it — dividing each row first discards every row's remainder.
 
 ⛔ **`FeatEffect.Value` is SIGNED**, as of this work. It was a `uint`, and 44 shipped rows held a word the client
 states as negative and we stored as its 2³² complement — `Pet Mastery`'s Pet Damage Coefficient ladder

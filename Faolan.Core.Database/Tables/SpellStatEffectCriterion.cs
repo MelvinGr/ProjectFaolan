@@ -15,6 +15,11 @@ namespace Faolan.Core.Database.Tables
 	///         <c>CriteriaEvaluator</c> is what reads them back.
 	///     </para>
 	///     <para>
+	///         ⭐ Its AREA/CHAIN twin is <see cref="SpellAreaEffectCriterion" /> (#861), added once it turned out that
+	///         a rank table's whole selection rule lives in the criteria on its <c>CastNano</c> edges. The parser
+	///         produced both halves all along; only this one was persisted.
+	///     </para>
+	///     <para>
 	///         ⚠️ Stored VERBATIM, including the operators nothing can evaluate yet. `CriteriaOperator` names ~40 of
 	///         the 201 the client's switch handles; dropping the rest on import would make the table look complete
 	///         while silently deciding those conditions are absent, which is the one reading the bytes do not support.
