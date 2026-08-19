@@ -432,6 +432,41 @@ family of bytes the corpus already holds 1,471 parsed `ScaffoldBuff` records of.
 id-list loop and `FUN_0145ba10` (the pets), and lining that up against our own grammar is the step that would
 make the claim usable. Recorded as a located route, not as an identification.
 
+### ⭐⭐ `BuffInfo_c` is the SAME object the MagicBuff apply builds
+
+`FUN_007ed9b0` reads **twelve consecutive u32** and stores them at
+
+```
++0x14  +0x18  +0x1c  +0x20  +0x24  +0x28  +0x2c  +0xa8  +0xac  +0xb8  +0xbc  +0xc0
+```
+
+(the 6th and 7th are read into locals first and stored `+0x2c` before `+0x28`, which is a scheduling artefact —
+the READ order is still sequential). The object is 200 bytes (`FUN_00c9cce0(200, 4, 0)`), so `+0xC0` is its last
+field.
+
+⭐ **Four of those offsets are exactly the ones `CoreMagicHolder::UpdateBuff` writes** when a `MagicBuffIIR`
+apply lands (`docs/subsystems/npc-spell-applyspell.md`): `+0x24`, `+0xA8`, `+0xAC` and `+0xC0`, at `007eeb52`.
+So the scaffold's buff record and the apply payload are **two encodings of one client object**, and the offsets
+bridge them:
+
+| offset | what `UpdateBuff` puts there | position in `FUN_007ed9b0`'s read |
+|---|---|---:|
+| `+0x24` | the 7-word descriptor, by pointer | 5th |
+| `+0xA8` | the constant `0` (arg 5) | 8th |
+| `+0xAC` | `Duration`, centiseconds — later gated `> 0` | 9th |
+| `+0xC0` | `CasterID`, the `ID32`, by pointer | 12th |
+
+That is a second, independent population for #658's unsourced apply fields: the corpus holds 1,471 parsed buff
+records off the character full-update stream, and they carry the same object's fields under a different framing.
+
+⛔ **And the framings do not agree, which is its own finding.** `FUN_0145c0b0`'s element is **one discarded u32
+followed by `FUN_007ed9b0`'s twelve** — 13 words, **52 bytes** — inside a `ListFrame`-counted list. Our
+`ScaffoldBuff` is **60 bytes / 15 words**, and it round-trips byte-exact over the whole corpus, so neither
+reading is wrong: two of our fifteen words are framing the client consumes elsewhere, or our record boundary is
+shifted against the client's. 60 − 52 = 8, exactly the width of the `[u32 class][u32 handle]` `ID32` pair our
+grammar calls `TargetClass`/`TargetHandle` — which is the obvious candidate for the pair read by a different
+helper, and is not yet confirmed. Open work tracked in Gitea #466.
+
 ⚠️ Both framing readers divide by `0x3F1` to recover the count, which is the same `ListFrame` arithmetic
 CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is
 confirmed from the client side here, not just inferred from captures.
