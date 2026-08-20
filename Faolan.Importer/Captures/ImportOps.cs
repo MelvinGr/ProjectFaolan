@@ -1240,6 +1240,7 @@ namespace Faolan.Importer.Captures
 						{
 							GoalId = hg.GoalId,
 							Sequence = hg.Sequence,
+							RegionOrder = hg.RegionOrder,
 							Partial = hg.Partial
 						});
 					}
@@ -1271,6 +1272,33 @@ namespace Faolan.Importer.Captures
 					g.Extra4 = hg.Extra4;
 					g.Extra5 = hg.Extra5;
 					g.Extra6 = hg.Extra6;
+
+					// The wire step ordinal and the scalar echoes the full-update carries for every goal (#866) -
+					// the same values the snapshot path harvests where both exist, so a nonzero reading refreshes
+					// and a zero one never clobbers what a snapshot supplied.
+					if (hg.Sequence != 0)
+						g.Sequence = hg.Sequence;
+					if (hg.GoalIdEcho != 0)
+						g.GoalIdEcho = hg.GoalIdEcho;
+					if (hg.SubId != 0)
+						g.SubId = hg.SubId;
+					if (hg.Unknown1 != 0)
+						g.Unknown1 = hg.Unknown1;
+					if (hg.Unknown2 != 0)
+						g.Unknown2 = hg.Unknown2;
+
+					// The TRAILING text record - fill-if-unset, for the same variant-spelling reason the extractor
+					// documents (a snapshot row stores its own F0 variant's spelling; the byte-exact region
+					// regeneration depends on it staying).
+					if (g.TrailingCategory == 0 && hg.TrailingCategory != 0)
+					{
+						g.TrailingRefId = hg.TrailingRefId;
+						g.TrailingCategory = hg.TrailingCategory;
+						g.TrailingKey = hg.TrailingKey;
+						g.TrailingLocalized = hg.TrailingLocalized;
+						g.TrailingFlags = hg.TrailingFlags;
+						g.TrailingToken = hg.TrailingToken;
+					}
 
 					// EVERY goal carries its own map pin (#540). "The marker block describes the primary goal only" was
 					// an artefact of the old byte scan, which could see just the one block sitting before the first

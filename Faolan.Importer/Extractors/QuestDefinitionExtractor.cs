@@ -288,7 +288,7 @@ namespace Faolan.Importer.Extractors
 				? null
 				: new TextRecord(xml.Contains("<localized", StringComparison.Ordinal)
 					? "localized"
-					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!);
+					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!, Attr(xml, "token"));
 		}
 
 		// Find-or-create the goal by GoalId within the quest and set the WIRE fields off the goal RECORD. Leaves the
@@ -311,7 +311,14 @@ namespace Faolan.Importer.Extractors
 				def.Goals.Add(goal = new QuestGoalDefinition
 				{
 					GoalId = record.GoalId,
-					Sequence = sequence,
+					// The wire's own step ordinal, NOT the list position: the two differ on real quests (12369's
+					// list is [N=2, N=1]), the snapshot harvest has always stored the wire N here, and the region
+					// builder writes the record's N slot back from this column. The position goes to RegionOrder,
+					// 0-based, the snapshot convention.
+					Sequence = record.N != 0
+						? record.N
+						: sequence,
+					RegionOrder = sequence - 1,
 					Partial = partial
 				});
 			}
@@ -323,6 +330,34 @@ namespace Faolan.Importer.Extractors
 			goal.ObjectiveRefId = objective.Id;
 			goal.ObjectiveCategory = objective.Category;
 			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new ProtoDecryptionKey();
+
+			// The full-update carries the goal's WHOLE record (#866), so the wire scalars the snapshot path harvests
+			// land here too - a quest the captures only ever full-updated stops carrying zeros for them. All are
+			// echoes/ids the region variants agree on, so a nonzero reading refreshes.
+			if (record.GoalIdRepeat != 0)
+				goal.GoalIdEcho = record.GoalIdRepeat;
+			if (record.SubId != 0)
+				goal.SubId = record.SubId;
+			if (record.Unknown1 != 0)
+				goal.Unknown1 = record.Unknown1;
+			if (record.Unknown2 != 0)
+				goal.Unknown2 = record.Unknown2;
+
+			// ...and its TRAILING text record, without which the goal cannot be rebuilt at all (a row missing it
+			// builds an `id=0 key=!!!!` record). ⚠️ Fill-if-unset, deliberately: a snapshot-harvested row stores the
+			// spelling of the region variant its def's F0 tags, and the live full-update's spelling differs on
+			// category 51200 (localized vs remoteformat, same id/category/key) - overwriting would break the
+			// byte-exact snapshot regeneration the 99/99 gate holds. The live builder re-spells at send time
+			// (QuestFullUpdates.LiveGoal), so which variant the row stores does not decide what the wire gets.
+			if (goal.TrailingCategory == 0 && TextRef(record.TextRecord) is { } trailing)
+			{
+				goal.TrailingRefId = trailing.Id;
+				goal.TrailingCategory = trailing.Category;
+				goal.TrailingKey = LdbKey.Decode(trailing.Key) ?? new ProtoDecryptionKey();
+				goal.TrailingLocalized = trailing.Tag == "localized";
+				goal.TrailingFlags = trailing.Flags;
+				goal.TrailingToken = trailing.Token;
+			}
 
 			// The goal's KIND TAG and its required amount (#548). The full-update carries both for EVERY goal, not
 			// just the primary - measured against the snapshot journal, which is the source that was thought to hold
@@ -345,6 +380,6 @@ namespace Faolan.Importer.Extractors
 			return goal;
 		}
 
-		private sealed record TextRecord(string Tag, uint Id, uint Category, string Key, string Flags);
+		private sealed record TextRecord(string Tag, uint Id, uint Category, string Key, string Flags, string? Token = null);
 	}
 }

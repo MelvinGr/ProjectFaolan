@@ -63,7 +63,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelCodec` | [V3: NewLevelCodecTests.Build_MatchesCapturedLevelUpEvent] |
 | V3 | `PetIIR` | `0x1F4CB0F7` | `PetCodec` | [V3: PetCodecTests.Assign_Combat_MatchesCapture] |
 | V3 | `PlayfieldFIIR` | `0x5D85BFC7` | `PlayfieldFCodec` | [V3: PlayfieldFCodecTests.Parse_ReadsBackWhatTheBuilderWrote] |
-| V3 | `QuestFullUpdateIIR` | `0x63268258` | `QuestFullUpdateCodec` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
+| V3 | `QuestFullUpdateIIR` | `0x63268258` | `QuestFullUpdateCodec` | [V3: QuestFullUpdateGenerationTests.CapturedLiveGrants_RebuildTheirGoalLists_ByteExact] |
 | V3 | `QuestGoalIIR` | `0x0774C8C1` | `QuestGoalCodec` | [V3: QuestTests.BuildQuestGoal_MatchesCapture] |
 | V3 | `QuestIIR` | `0x97E02314` | `QuestCodec` | [V3: QuestTests.BuildQuestIir_MatchesCapture] |
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `QuestJournalCodec` | [V3: QuestTests.BuildQuestJournal_MatchesCasildaCapture] |

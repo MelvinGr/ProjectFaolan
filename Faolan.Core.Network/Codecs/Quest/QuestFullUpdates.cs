@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
@@ -67,6 +68,37 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
+			// ⭐ Retail's full-update carries the quest's WHOLE goal list, not just the primary (#866): 28 of the 79
+			// captured QuestFullUpdate bodies hold 2+ goals - every one of them GRANT-shaped (all goals at
+			// SolvedTimes 0), including the beach starter sent with both its step-1 and step-2 goals on all 20
+			// create captures and one quest granted with 12 at once - and the client's reader (FUN_0091df50, #464)
+			// reads a count-framed goal list capped at 100. Sequencing is not a reason to hold goals back: the
+			// captured grants state later steps up front, with the step ordinal in each goal's own N.
+			//
+			// The list is built through the same per-row builder the snapshot region uses, behind the same gate the
+			// snapshot applies (a goal with no captured kind word would build a K=0 record, and a region the client
+			// cannot parse takes the login down - statlist.cpp:134) PLUS a text-completeness clause of its own: a
+			// goal row harvested without its text refs would build `id=0 key=!!!!` records, and the kind-word gate
+			// cannot see that. A quest that fails either keeps the synthesized single-goal grant below: the shape
+			// the Casilda golden pins, and the only one its rows can state.
+			if (CanBuildFullGoalList(def))
+			{
+				// PARTIAL rows ride along when their wire fields are complete: retail's live list includes them
+				// (quest 12369's grant carries goal 7134, a row that is Partial because nothing can ADVANCE it, not
+				// because the wire lacks it). The snapshot region keeps excluding them - its verified captures do.
+				var region = new QuestObjectiveRegion
+				{
+					Goals =
+					[
+						.. def.Goals.Where(g => !g.Partial || g.Separator != null && g.ObjectiveCategory != 0 && g.TrailingCategory != 0)
+							.OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence)
+							.Select(g => LiveGoal(def, g, playerHandle))
+					]
+				};
+
+				return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, region));
+			}
+
 			var row = def.Goals.FirstOrDefault(g => g.GoalId == def.GoalId);
 
 			var goal = new QuestObjectiveGoal
@@ -95,7 +127,52 @@ namespace Faolan.Core.Network.Codecs.Quest
 				TextRecord = QuestTextTokens.Record(def, QuestTextSlot.ObjectiveLocalized)
 			};
 
-			var record = new QuestcRecord
+			return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, new QuestObjectiveRegion
+			{
+				Goals = [goal]
+			}));
+		}
+
+		// Whether the quest's rows can state the FULL goal list: the snapshot region's own gate (every non-partial
+		// goal carries its wire kind word, or the region is capture-verified) plus a text-completeness clause of
+		// this path's own - a goal row harvested without its text refs would build `id=0 key=!!!!` records, and the
+		// kind-word gate cannot see that. Every captured text carries a category (100/50200/51000/51200 in the
+		// corpus), so a zero category is the un-harvested default, not content.
+		public static bool CanBuildFullGoalList(QuestDefinition def)
+		{
+			ArgumentNullException.ThrowIfNull(def);
+			return (def.ObjectiveRegionVerified || SnapshotTails.IsObjectiveRegionBuildable(def))
+			       && def.Goals.Where(g => !g.Partial).All(g => g.ObjectiveCategory != 0 && g.TrailingCategory != 0);
+		}
+
+		// One goal of the live grant: the snapshot region's per-row builder, with ONE live-context override.
+		//
+		// ⚠️ The trailing record's SPELLING is per-variant, and the LIVE variant differs from the stored one on
+		// exactly one category. A goal row stores the region variant its def's F0 tags (retail ships more than one
+		// spelling of a region - ObjectiveGoalExtractor.CapturedRegions), and the stored category-51200 trailing is
+		// the snapshot variant's `<remoteformat>`; every captured LIVE grant spells 51200 `<localized>` - 19 of 19,
+		// and the whole live census is category-uniform (51200/51000/100 localized, 50200 remoteformat; 118 goals,
+		// zero exceptions). Same id, category and key - only the wrapper changes, so the override rebuilds the
+		// record through the localized token builder from the same row fields.
+		private static QuestObjectiveGoal LiveGoal(QuestDefinition def, QuestGoalDefinition g, uint playerHandle)
+		{
+			var goal = QuestObjectiveRegions.ForGoal(def, g, playerHandle);
+			if (g.TrailingLocalized || g.TrailingCategory != 51200)
+				return goal;
+
+			return goal with
+			{
+				TextRecord = g.TrailingToken is { Length: > 0 } token
+					? QuestTextTokens.LocalizedToken(token, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
+					: QuestTextTokens.Localized(g.TrailingRefId, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
+			};
+		}
+
+		// The live-grant QuestcRecord around a goal list - the scalars the Casilda golden pins, shared by the
+		// full-list and the synthesized-single-goal paths above.
+		private static QuestcRecord LiveRecord(QuestDefinition def, uint level, QuestObjectiveRegion objectives)
+		{
+			return new QuestcRecord
 			{
 				QuestId = def.QuestId,
 				Level = level,
@@ -115,13 +192,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				XpReward = LiveField28,
 				FieldF0 = LiveFieldF0,
 				FieldF8 = 0,
-				Objectives = new QuestObjectiveRegion
-				{
-					Goals = [goal]
-				}
+				Objectives = objectives
 			};
-
-			return new QuestFullUpdateIIR(playerHandle, record);
 		}
 	}
 }
