@@ -644,8 +644,32 @@ our own `Maps` table (26 of 26 distinct candidates).
   [char[4] "UCM\0"][3 flag bytes]
 [u32 91][91 x [u32 index][u32 b][u32 c]]   (b,c) takes 4 values: (2401,0x9FE2CB) x53, (2468,0) x28,
                                             (2469,0xD50D890) x9, (2420,..) x1 - per-index attributes, unnamed
-[index-pair remap sections]                 activity -> teleport mappings, un-walked
+[u32 94][94 x [u32 activity][u32 b][u32 c]] the finder WINDOW's category/child layout - see below
+[352 u32 tail]                              un-walked
 ```
+
+⚠️ **The record is LITTLE-endian**, unlike most of the wire. An earlier reading of this table quoted its words
+byte-swapped (`0x0EDDE941` for the prelude's `0x41E9DD0E`); the field VALUES above are the LE ones.
+
+### ⭐ The ActivityId is the record's 1-based SEQUENCE — and the capture, not the table, is what proves it
+
+The scry script that starts an entry carries `CategoryId=4;ActivityId=38`, and the natural reading of the
+94-entry section is that an activity is indexed *within* its category. **The corpus refutes that.** Record
+**seq 38** is playfield **1092** (The Amphitheatre of Karutonia) carrying the destination `(112, 70, 39)` —
+the exact arrival the captured `N3TeleportIIR` produced. Counting 38 within category 4's own block instead
+lands on record 65, *Oasis of Zaara* (3204), which is a landmark-addressed row with no coordinate at all. So
+the two readings disagree on the one case there is evidence for, and the evidence picks the **flat sequence**.
+[V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-4.tshark.json the 20:22 entry]
+
+That makes the 94-entry section a *secondary* structure — the finder window's category/child layout, i.e. what
+the UI lists under each tab — rather than the id→record mapping, and the server needs none of it. Shipped as
+`GroupFinderActivityCatalog` (ten coordinate-carrying activities, all ten resolving in our own `Maps`), gated
+by `GroupFinderActivityCatalogTests`, including the rival-keying control.
+
+⚠️ The catalog holds only the rows that state an explicit `[x][y][z][heading]`. The rest of the six-man block
+addresses its destination by a **landmark name** (`Frost_Swamp_Zone_In`, `Imirian_Ravine_Zone_In`,
+`Oasis_of_Zaara_Zone_In`, `StartPlace`), which needs a per-playfield landmark table we do not hold — those
+activities are left out rather than entered at an invented point.
 
 The content, every id resolved through `Maps`:
 
@@ -663,8 +687,9 @@ The content, every id resolved through `Maps`:
 
 ⚠️ Left unnamed: `idB`/`idC` (no LDB category resolves them; the style matches the prelude ids), the
 5,078,5xx `D` ids on coordinate rows, the exact meaning of the six party-shape words past "24-man vs 6-man",
-and the trailing remap. Naming those needs the reflective consumer at runtime — content for the group-finder
-tier when it is built (#669's neighbourhood), not a table decode.
+and the 352-word tail. Naming those needs the reflective consumer at runtime — content for the group-finder
+tier (#669's neighbourhood), not a table decode. ⭐ The `activity -> teleport` mapping that used to sit on this
+list is **no longer open**: it is the record sequence, established above.
 
 ## ⭐ Decoded: 1000521 `GuildRenownRewardDataTable` — the guild-city reward ladder, in retail's own words
 

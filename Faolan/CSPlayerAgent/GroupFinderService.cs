@@ -7,6 +7,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.GroupFinder;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.Core.Progression;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
@@ -38,13 +39,11 @@ namespace Faolan.CSPlayerAgent
 		// "still needs" is matchmaking state we do not model, so every activity advertises the captured value.
 		private const uint CapturedNeededRoles = 0x1;
 
-		// Activity id -> (playfield, arrival). RDB 1000627 names the six-man dungeon playfields and each record's
-		// own [x][y][z][heading] destination, but the per-category ActivityId->record remap at the table's tail is
-		// still un-walked - so only the CAPTURED pair is mapped: activity 38 = The Amphitheatre of Karutonia (1092),
-		// arrival (112, 70, 39) straight off the captured N3Teleport. An unmapped activity completes the signup flow
-		// and logs instead of teleporting, rather than guessing a destination retail never confirmed.
-		private static readonly ConcurrentDictionary<uint, (uint MapId, System.Numerics.Vector3 Arrival)> ActivityDestinations = new(
-			new[] { new System.Collections.Generic.KeyValuePair<uint, (uint, System.Numerics.Vector3)>(38, (1092u, new System.Numerics.Vector3(112.0f, 70.0f, 39.0f))) });
+		// Where an activity ENTERS is the client's own table now, not the single captured pair: `ActivityId` is RDB
+		// 1000627's 1-based record sequence, and the capture is what proves it rather than an assumed indexing -
+		// activity 38 is record 38 is playfield 1092 at the exact arrival the captured N3Teleport used. See
+		// GroupFinderActivityCatalog. An activity the table addresses by LANDMARK rather than by coordinate still
+		// completes the signup flow and logs, because a landmark needs a per-playfield table we do not hold.
 
 		// characterId -> the signup that passed the quest gate, held until the ready check resolves it.
 		private readonly ConcurrentDictionary<uint, QueueGroupFinderRequest> _pendingSignups = [];
@@ -125,17 +124,19 @@ namespace Faolan.CSPlayerAgent
 			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderActivityStarted, []);
 
 			var activityId = ActivityOf(signup);
-			if (!ActivityDestinations.TryGetValue(activityId, out var destination))
+			if (GroupFinderActivityCatalog.ActivityFor(activityId) is not { } destination)
 			{
-				// The flow completed but the ActivityId->playfield remap of RDB 1000627 is un-walked past the
-				// captured pair; refusing to guess beats teleporting into an invented destination.
-				logger.LogWarning("GroupFinder: activity {Activity} has no mapped destination (only the captured 38 -> 1092 is); team 0x{Team:X8} formed, no teleport.",
+				// The table addresses this one by a landmark name (or it is a raid row, or not in the table at all),
+				// and a landmark needs a per-playfield table we do not hold. Refusing to guess beats teleporting into
+				// an invented destination.
+				logger.LogWarning("GroupFinder: activity {Activity} has no explicit destination in RDB 1000627 (landmark-addressed or not an activity); team 0x{Team:X8} formed, no teleport.",
 					activityId, teamId);
 
 				return;
 			}
 
-			logger.LogInformation("GroupFinder: {CharacterId:X8} enters activity {Activity} - map {MapId} as team 0x{Team:X8}.", characterId, activityId, destination.MapId, teamId);
+			logger.LogInformation("GroupFinder: {CharacterId:X8} enters activity {Activity} - {MapName} ({MapId}) as team 0x{Team:X8}.", characterId, activityId, destination.MapName,
+				destination.MapId, teamId);
 			await gameServerDispatcher.TeleportCharacter(characterId, destination.MapId, destination.Arrival);
 		}
 
