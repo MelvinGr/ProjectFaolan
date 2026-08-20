@@ -634,3 +634,13 @@ than a clamp on at least two counters — the corpus runs `DailyQuestsCompleted`
 `DailyPvEKills` to **13** against a cap of 5. ⚠️ But it does not generalise cleanly: `DailyPvPKills` stops dead on
 exactly **20**, its own cap, in three independent captures. So the two behaviours coexist and the remaining
 question is why that one counter is bounded when the other two are not.
+
+## How many vulnerability-window changes a guild gets
+
+**Tracked: Gitea #147.** [V0: how many window changes a guild gets.] The client refuses a move with *"There are
+no more changes left to the vulnerability window."* (LDB 100/245141412), so a cap exists — but no string, tweak
+or table states its value, and no capture performs a move.
+
+`GuildCityRules.CanMoveVulnerabilityWindow` therefore takes `changesRemaining` from its caller rather than
+holding a number: the rule that running out refuses is retail's, the allowance is not ours to invent. The same
+applies to how many free city spots a realm has, which is content we do not hold.

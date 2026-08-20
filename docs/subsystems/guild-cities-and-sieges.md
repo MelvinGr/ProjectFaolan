@@ -1,8 +1,9 @@
 # Guild cities, Battlekeeps and sieges
 
-Nothing here is implemented. What this page records is the **ruleset**, and the reason it is worth writing down
-is that retail states almost all of it **in its own words**: the client's LDB carries the preconditions, the
-timers, the party sizes and the win condition as ordinary user-facing text.
+No siege or city message is sent, and none can be: not one occurs anywhere in the capture corpus. What this page
+records is the **ruleset** — and the reason that is worth writing down is that retail states almost all of it
+**in its own words**, in ordinary user-facing LDB text: the preconditions, the timers, the party sizes and the
+win condition. The decision layer built from it is in [What is implemented](#what-is-implemented) below.
 
 Six sweeps of this subsystem before this one all searched the **wire** and the **RDB data tables**, and correctly
 concluded that the corpus contains zero siege traffic and the tables carry no ownership or build state. The LDB
@@ -106,6 +107,27 @@ nice-to-have prerequisite, it is the only stated route from a harvested PvP reso
 Queue position for the right to attack is itself PvP-earned: *"there will be a queue of guilds waiting for the
 opportunity to conquer a city. Guilds can manipulate this queue by earning PvP rewards elsewhere in Hyboria,
 through minigames like Annihilation"* (50020/691) — which is the link to the minigame tier.
+
+## What is implemented
+
+⚠️ **The decision layer only, and nothing that touches the wire.** Not one siege or city message occurs in the
+corpus, so every body that would carry these outcomes is unknown and none is sent. What is encoded is what the
+server has to *decide*:
+
+* **`GuildCityRules`** — the precondition chain (`CanBookCitySpot`, `CanBuild`, `CanApplyForBattlekeep`), the
+  window arithmetic (`IsVulnerable`, `CanMoveVulnerabilityWindow`) and the two battle-time rules
+  (`CanRaiseSiegeCamp`, `CanRepairOrBuildDuringBattle`). Every constant is a quoted string, cited in place.
+* **`GuildCityRefusal`** — one member per real client refusal, each carrying the LDB id it comes from. So when
+  the message that delivers one is finally captured, there is already a decision to attach it to.
+* **`GuildCityState`** — the guild snapshot the rules read, passed in rather than fetched, because nothing
+  persists a city yet. When something does, that is the shape it has to produce.
+
+Gated by `GuildCityRulesTests`, which asserts the quoted numbers and — more usefully — the **boundaries**: 23 vs
+24 members, tier 2 vs 3, the half-open two-hour window, and minute 15 vs 16 of the move grace.
+
+⚠️ Two values are deliberately **not** hard-coded, because retail states the rule and not the number: how many
+free city spots a realm has, and how many window changes a guild gets (*"There are no more changes left…"* names
+the cap without giving it). Both are caller-supplied. `[V0: how many window changes a guild gets.]`
 
 ## What exists in our data today
 
