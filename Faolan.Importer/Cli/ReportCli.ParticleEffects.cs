@@ -27,8 +27,15 @@ namespace Faolan.Importer.Cli
 	//    client ships the documentation. Same shape as RDB 1010203 being plain-text XML while its 1010501 twin is
 	//    the merged binary.
 	//
+	// ⭐⭐ **AND THE NAME TABLE INDEXES THIS TYPE, so 7,779 of the 8,163 (95.3%) have a name - not just the 189.**
+	// This report shipped naming only the authored ones until chasing RDB 1010031 (attractor-FX placements, which
+	// reference an effect by name) showed the name table resolves those names to real 1010207 ids: of the 69 names
+	// those placements use, 64 resolve and ALL 64 land on an existing record, with no ambiguity. So the name table
+	// is the primary name source here and the authored path is extra context, not the other way round.
+	//
 	// A name beats a texture list at the "which id" question by a mile: `spell_demonologist_summonpet_gather35`,
-	// `combo_generic_pbaoe_knockback_bright2`, `environ_water_jump_splash` say what the effect IS.
+	// `combo_generic_pbaoe_knockback_bright2`, `environ_water_jump_splash` say what the effect IS. And the id a name
+	// resolves to IS the wire value - `SimpleDynelVisualChangeIIR e_StartParticleEffect` carries it.
 	//
 	// ⚠️ The two populations are DISJOINT - a record is either the XML or the compiled binary, never both - so the
 	// XML ones cannot be used as a Rosetta stone to decode their own binary twins (there are none). Zero of the
@@ -65,6 +72,11 @@ namespace Faolan.Importer.Cli
 			using var reader = OpenRdb(rdb);
 			var entries = reader.EntriesOfType(ParticleEffectType).ToList();
 
+			// ⭐ The NAME TABLE is the primary name source and covers 95.3% of the type - far more than the 189
+			// authored-XML records do. This report shipped naming only those 189 until the attractor chase (#880)
+			// showed the name table indexes 1010207 too.
+			var names = RdbNameTable.Load(reader);
+
 			// `xml:<id>` prints one authored source whole - the schema is worth reading rather than summarising.
 			if (filter != null && filter.StartsWith("xml:", StringComparison.Ordinal))
 			{
@@ -92,40 +104,48 @@ namespace Faolan.Importer.Cli
 				var text = System.Text.Encoding.Latin1.GetString(body);
 				var assets = AssetPath.Matches(text).Select(m => m.Value).Distinct().ToList();
 				var isXml = text.Contains("<particlesystem>", StringComparison.Ordinal);
-				var name = isXml && ExportPath.Match(text) is { Success: true } m ? EffectName(m.Groups[1].Value) : null;
+				var authoredPath = isXml && ExportPath.Match(text) is { Success: true } m ? EffectName(m.Groups[1].Value) : null;
+
+				// The name table's name wins for the LABEL (95.3% coverage); the authored path is kept beside it
+				// because it carries the artist's folder, which the flat name does not.
+				var name = names.TryGetValue(e.Id, out var indexed) ? TrimEffectSuffix(indexed) : null;
 
 				if (isXml)
 					authored++;
 				if (assets.Count > 0)
 					withAssets++;
-				if (name == null && assets.Count == 0)
+				if (name == null && authoredPath == null && assets.Count == 0)
 					continue;
 
-				rows.Add(new Effect(e.Id, name, assets, isXml ? Looping(text) : null));
+				rows.Add(new Effect(e.Id, name, authoredPath, assets, isXml ? Looping(text) : null));
 			}
 
 			Console.WriteLine($"particle-effects: {entries.Count:N0} records of RDB {ParticleEffectType}, {unreadable:N0} would not inflate.");
-			Console.WriteLine($"  {authored:N0} are the ARTIST'S AUTHORED XML and carry a real effect NAME; {entries.Count - authored:N0} are the compiled binary form.");
+			Console.WriteLine($"  {rows.Count(r => r.Name != null):N0} are NAMED by the RDB name table (1000010/1).");
+			Console.WriteLine($"  {authored:N0} are the artist's authored XML - those also carry a folder path and a duration; {entries.Count - authored:N0} are the compiled binary.");
 			Console.WriteLine($"  {withAssets:N0} carry at least one texture asset path.");
 
 			var matched = filter == null
 				? rows
 				: rows.Where(r => (r.Name?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
+					|| (r.AuthoredPath?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false)
 					|| r.Assets.Any(a => a.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToList();
 
 			if (filter != null)
 				Console.WriteLine($"  filtered to name or texture containing \"{filter}\": {matched.Count:N0} record(s).");
 
 			Console.WriteLine();
-			Console.WriteLine("  a NAMED row is authored XML; the rest are named by the textures they draw with.");
-			Console.WriteLine("  `loops` = loopcountmax says the effect runs until something STOPS it; `once` ends by itself.");
+			Console.WriteLine("  the id IS what goes on the wire (SimpleDynelVisualChangeIIR e_StartParticleEffect).");
+			Console.WriteLine("  `loops` = loopcountmax says the effect runs until something STOPS it; a time ends by itself.");
+			Console.WriteLine("  a row with no name is one of the 4.7% the name table does not index.");
 			Console.WriteLine();
 
 			var limit = filter == null ? 40 : 400;
 			foreach (var r in matched.OrderBy(r => r.Name == null).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Id).Take(limit))
 			{
 				var label = r.Name ?? string.Join("  |  ", r.Assets.Select(ShortAsset));
-				Console.WriteLine($"  {ParticleEffectType}:{r.Id,-10} {r.Loop,-5} {label}");
+				var extra = r.AuthoredPath != null ? $"   [{r.AuthoredPath}]" : "";
+				Console.WriteLine($"  {ParticleEffectType}:{r.Id,-10} {r.Loop,-5} {label}{extra}");
 			}
 
 			if (matched.Count > limit)
@@ -198,6 +218,22 @@ namespace Faolan.Importer.Cli
 			return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
 		}
 
-		private sealed record Effect(uint Id, string? Name, List<string> Assets, string? Loop);
+		/// <summary>
+		///     Strips the name table's asset suffix. It carries the record's FORM, not part of its name, and the two
+		///     forms partition the type exactly: 7,590 compiled records are named <c>*.particleeffect</c> and the 189
+		///     authored ones <c>*.xml</c> - the same 189, set-for-set, that inflate to a <c>&lt;particlesystem&gt;</c>
+		///     document. So the name table is not colliding with some other type that happens to share an id; it names
+		///     both halves of this one.
+		/// </summary>
+		private static string TrimEffectSuffix(string name)
+		{
+			foreach (var suffix in (string[])[".particleeffect", ".xml"])
+				if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+					return name[..^suffix.Length];
+
+			return name;
+		}
+
+		private sealed record Effect(uint Id, string? Name, string? AuthoredPath, List<string> Assets, string? Loop);
 	}
 }
