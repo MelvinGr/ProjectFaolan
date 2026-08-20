@@ -599,3 +599,25 @@ against its own cap of **5**. Either the caps bound what counts toward the daily
 counter (and then `1000070` stopping dead on 20 needs another explanation), or `DailyPvEKillsCap` is not that
 counter's cap. That is the sharpened question.
 
+
+## The daily-challenge reset timestamps are never on the wire
+
+**Tracked: Gitea #509.** [V0: the reset timestamps' wire form.] The daily-challenge block is twelve contiguous
+character stats (1000066–1000077, see [daily-challenges.md](../subsystems/daily-challenges.md)), and retail
+pushes the **nine counters** routinely — each occurs in 46–72 of the 134 captures. The three RESET INSTANTS
+(`DailyResetTimestamp` 1000066, `WeeklyResetTimestamp` 1000067, `MonthlyResetTimestamp` 1000068) occur **zero**
+times across the whole corpus.
+
+That asymmetry is the finding: it is not that the block is unobserved, it is that these three members of it
+specifically never travel, while their nine neighbours do. So either retail keeps them server-side, or they ride
+a message no capture contains.
+
+⚠️ Their unit and epoch are therefore **ours** — `DailyChallengeService` stores unix seconds of the last boundary
+applied. Nothing observable depends on the choice, because the client is never shown them; if a capture ever
+carries one, that is the moment to check it rather than to assume this was right.
+
+⭐ **A neighbouring question this DOES answer**, for the #656 entry above: a cap is a completion THRESHOLD rather
+than a clamp on at least two counters — the corpus runs `DailyQuestsCompleted` to **7** against a cap of 3 and
+`DailyPvEKills` to **13** against a cap of 5. ⚠️ But it does not generalise cleanly: `DailyPvPKills` stops dead on
+exactly **20**, its own cap, in three independent captures. So the two behaviours coexist and the remaining
+question is why that one counter is bounded when the other two are not.

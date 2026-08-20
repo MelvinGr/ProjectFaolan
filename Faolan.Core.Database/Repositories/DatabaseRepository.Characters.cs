@@ -160,6 +160,16 @@ namespace Faolan.Core.Database.Repositories
 		///     a position no capture has.
 		/// </summary>
 		Task SaveCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
+
+		/// <summary>
+		///     The same write, but MINTING a sheet slot for an id the character has no row for (#509 - the daily
+		///     challenge counters). Deliberately a separate method rather than a flag on
+		///     <see cref="SaveCharacterStats" />: that one's refusal to invent an ordinal is a rule the skillpoint
+		///     spend depends on, and this is the one case where minting is right - retail's own login snapshots carry
+		///     stats 1000066..1000077 (46-72 of the 134 captures), so a character that has never had one is missing a
+		///     row retail would have sent. A new row is appended after the character's highest ordinal.
+		/// </summary>
+		Task UpsertCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
@@ -1108,6 +1118,31 @@ namespace Faolan.Core.Database.Repositories
 			var rows = await ctx.CharacterStats.Where(s => s.CharacterId == characterId && ids.Contains(s.StatId)).ToArrayAsync();
 			foreach (var row in rows)
 				row.Value = values[row.StatId];
+
+			await ctx.SaveChangesAsync();
+		}
+
+		public async Task UpsertCharacterStats(uint characterId, IReadOnlyDictionary<CharacterStatId, uint> values)
+		{
+			if (values.Count == 0)
+				return;
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var ids = values.Keys.ToArray();
+			var rows = await ctx.CharacterStats.Where(s => s.CharacterId == characterId && ids.Contains(s.StatId)).ToArrayAsync();
+			foreach (var row in rows)
+				row.Value = values[row.StatId];
+
+			var missing = values.Keys.Except(rows.Select(r => r.StatId)).ToArray();
+			if (missing.Length != 0)
+			{
+				// Append after the character's highest ordinal - the sheet is ordered by it, so an appended stat lands
+				// at the END of the snapshot's stat block rather than displacing a captured one.
+				var nextOrdinal = await ctx.CharacterStats.Where(s => s.CharacterId == characterId).Select(s => (int?)s.Ordinal).MaxAsync() ?? -1;
+				foreach (var statId in missing)
+					ctx.CharacterStats.Add(new CharacterStat { CharacterId = characterId, Ordinal = ++nextOrdinal, StatId = statId, Value = values[statId] });
+			}
 
 			await ctx.SaveChangesAsync();
 		}

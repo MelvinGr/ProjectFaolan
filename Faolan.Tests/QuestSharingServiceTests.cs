@@ -14,6 +14,7 @@ using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Faolan.GameServer.Progression;
 
 namespace Faolan.Tests
 {
@@ -250,7 +251,7 @@ namespace Faolan.Tests
 				outbound.Place(id);
 
 			var questOutbound = new RecordingQuestOutbound();
-			var progression = new QuestProgressionService(database, questOutbound, null!, null!, null!, new QuestRewardService(database, questOutbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), NullLogger.Instance);
+			var progression = new QuestProgressionService(database, questOutbound, null!, null!, null!, new QuestRewardService(database, questOutbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), new DailyChallengeService(database, NullLogger.Instance), NullLogger.Instance);
 			var service = new QuestSharingService(database, new FixedRoster(roster), outbound, progression, NullLogger.Instance);
 
 			return new Harnessed(service, database, outbound, questOutbound);

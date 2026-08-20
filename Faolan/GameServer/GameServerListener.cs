@@ -167,6 +167,10 @@ namespace Faolan.GameServer
 		private readonly ClaimService _claims;
 		private readonly QuestRewardService _questRewards;
 
+		// #509: the daily-challenge counters. Composed here because the quest engine is the one subsystem with a
+		// MEASURED trigger into it (a quest line ending); the other four categories have no modelled trigger yet.
+		private readonly DailyChallengeService _dailyChallenges;
+
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
 		private readonly CombatService _combat;
@@ -322,7 +326,8 @@ namespace Faolan.GameServer
 			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
 			_levelUp = new LevelUpService(database, _simulation, this, logger);
 			_questRewards = new QuestRewardService(database, _broadcaster, this, _levelUp.ApplyXp, logger);
-			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, logger);
+			_dailyChallenges = new DailyChallengeService(database, logger);
+			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellAreas = new SpellAreaCatalog(database);
 			_spellModifiers = new SpellModifierService(database);

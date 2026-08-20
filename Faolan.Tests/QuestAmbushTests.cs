@@ -13,6 +13,7 @@ using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Faolan.GameServer.Progression;
 
 namespace Faolan.Tests
 {
@@ -111,7 +112,7 @@ namespace Faolan.Tests
 
 			var database = new DatabaseRepository(new Factory(options));
 			var outbound = new RecordingQuestOutbound();
-			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), new QuestRewardService(database, outbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), NullLogger.Instance);
+			var service = new QuestProgressionService(database, outbound, null!, null!, new ChatServerDispatcher(), new QuestRewardService(database, outbound, null!, (_, _) => Task.CompletedTask, NullLogger.Instance), new DailyChallengeService(database, NullLogger.Instance), NullLogger.Instance);
 
 			var client = new RecordingNetworkClient(CharacterId);
 			await service.Grant(client, QuestId, nameof(QuestAmbushTests));

@@ -13,6 +13,7 @@ using Faolan.GameServer.World;
 using System.Numerics;
 using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Logging;
+using Faolan.GameServer.Progression;
 
 namespace Faolan.GameServer.Quest
 {
@@ -47,8 +48,12 @@ namespace Faolan.GameServer.Quest
 		private readonly QuestRewardService _rewards;
 		private readonly TortageIntroService _tortageIntro;
 
+		// #509: a quest LINE ending is one of retail's daily challenges, and the tick rides the completion it is
+		// measured against - see DailyChallengeService for why the hook is the chain END rather than every stage.
+		private readonly DailyChallengeService _dailyChallenges;
+
 		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, TortageIntroService tortageIntro,
-			IChatServerDispatcher agents, QuestRewardService rewards, ILogger logger)
+			IChatServerDispatcher agents, QuestRewardService rewards, DailyChallengeService dailyChallenges, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
@@ -56,6 +61,7 @@ namespace Faolan.GameServer.Quest
 			_tortageIntro = tortageIntro;
 			_agents = agents;
 			_rewards = rewards;
+			_dailyChallenges = dailyChallenges;
 			_logger = logger;
 		}
 
@@ -622,6 +628,11 @@ namespace Faolan.GameServer.Quest
 		{
 			await SendStageCompletion(client, quest.QuestId, goalId);
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Completed, required, required, quest.GoalTargetName);
+
+			// #509: retail ticks DailyQuestsCompleted HERE and not on a superseded stage - the chain end is the event
+			// its five captured occurrences line up with, one for one.
+			await _dailyChallenges.RecordQuestLineCompleted(client, character.Id, DateTimeOffset.UtcNow);
+
 			_logger.LogInformation("Quest {Quest} completed for {Char} (chain end).", quest.QuestId, character.Name);
 			await _agents.SendSystemMessage(character.Id, "Quest complete!");
 		}
