@@ -87,7 +87,7 @@ Capture-sourced (default group, run in dependency order):
 | `npc-ambient-animations` (per-creature idle animations from the captured `Emote` records — #766) | — |
 | `npc-follow-pairs` (which creature TYPE walks with which, from the captured mode-07 formation MoveTasks — #741) | — |
 | `world-objects` | — |
-| `world-teleports` (zone-line door destinations: captured use→teleport sequences, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
+| `world-teleports` (zone-line door destinations, three tiers in precedence: captured use→teleport sequences, then the client's own teleport table RDB 1000087, then the rest by name against the playfield table — [teleport-changemap.md](../subsystems/teleport-changemap.md)) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
 | `quests` (definitions + the hand-decoded seed steps) | — |
 | `buff-durations` (the duration retail STATES, for rows whose RDB record leaves property field 8 empty — #659) | `spells` |

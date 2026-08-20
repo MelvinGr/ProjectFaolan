@@ -429,6 +429,13 @@ namespace Faolan.Importer.Cli
 				}
 
 				// #880: name every particle effect by the textures its payload references.
+				// #883: does the client's own teleport table line up with our door rows?
+				case "teleport-match":
+				{
+					await TeleportMatch(RdbDirOrNull());
+					return 0;
+				}
+
 				case "particle-effects":
 				{
 					ParticleEffects(RdbDirOrNull(), arg);

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
+using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;
@@ -1103,6 +1105,15 @@ namespace Faolan.Importer.Modules
 	{
 		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
 
+		// #883: how far the client table's teleport TRIGGER point may sit from the door OBJECT's own position. Wider
+		// than PositionTolerance on purpose - those two are the same import's coordinates for the same thing, these
+		// are two different things (the trigger sits in front of the door). Measured: 58% of matchable rows land
+		// within 0.5 u, 90.9% within 8 u, and the tail past that is a different door.
+		private const float ClientTableTolerance = 8f;
+
+		// A runner-up this much closer than the best (plus half a unit of slack) makes the pick ambiguous.
+		private const float AmbiguityRatio = 1.5f;
+
 		// No hard DependsOn (mirrors NpcDispositionModule): it enriches whatever zone-line WorldObjects already exist,
 		// and registration order already sequences it right after `world-objects` in a full default run. A hard dep
 		// would drag the heavy world-objects re-import into a targeted `--only world-teleports` run - which fails on a
@@ -1169,6 +1180,11 @@ namespace Faolan.Importer.Modules
 				matched++;
 			}
 
+			// TIER 2 (#883): the client's own teleport table. Runs AFTER the capture harvest and BEFORE the name
+			// fallback, which is exactly its standing: better than guessing from a door's name, worse than a
+			// capture (it has no arrival position, and the capture is what retail actually did).
+			var (fromRdb, rdbAmbiguous) = ResolveFromClientTable(ctx, zoneLines);
+
 			var (named, ambiguous) = await ResolveByNameAsync(ctx, zoneLines);
 			var confirms = await WriteTravelConfirmsAsync(ctx, links);
 
@@ -1178,6 +1194,7 @@ namespace Faolan.Importer.Modules
 				? $"cleared {cleared}; "
 				: "";
 			return new ImportResult($"{prefix}{links.Count} teleport links harvested, {matched} matched to world objects, {misses} unmatched; " +
+				$"{fromRdb} more from the client's teleport table, {rdbAmbiguous} skipped as ambiguous (#883); " +
 				$"{named} more resolved by name against the playfield table, {ambiguous} named but unresolved (#341); " +
 				$"{confirms} destination map(s) carry a travel confirmation box (#637).");
 		}
@@ -1273,6 +1290,91 @@ namespace Faolan.Importer.Modules
 
 		// The stored zone-line row for a harvested link: same map + name, nearest to the captured source position
 		// (a name can repeat across maps; within a map the position disambiguates). Null when none is within tolerance.
+		// #883: TIER 2 - the client's own complete teleport table (RDB 1000087). The capture harvest can only ever see
+		// a door somebody walked through on camera (160 links over 24 maps); this table states all 675 outright.
+		//
+		// PRECEDENCE, and each step of it is measured rather than assumed (`--report teleport-match`):
+		//   * a CAPTURED link always wins. It carries the arrival POSITION, which this table does not have at all,
+		//     and it is what retail actually did. ⚠️ The two differ in a way that matters: the table is a DESIGN-TIME
+		//     export naming a canonical destination, and the runtime picks a variant of it. Of the 45 doors where both
+		//     sources speak, 41 agree and the 4 that do not are day/night or state variants of the same place -
+		//     `Renton's House` (4572) vs `Renton's House Night` (4582), `Villa Camillus` vs `Villa Camillus - Cursed`.
+		//     So the table is right about WHICH PLACE and the capture is right about WHICH INSTANCE OF IT.
+		//   * this table beats the #341 NAME fallback, which is why it runs first. Two of those four disagreements are
+		//     against a name guess, and on `City of Tortage Night` the table's `Renton's House Night` is plainly the
+		//     better answer than the name match's daytime `Renton's House`.
+		//
+		// ⚠️ The match is POSITION-ONLY - the table carries no door name, so `NearestZoneLine`'s name check is not
+		// available here. Guarded two ways: a hard 8 u cap (90.9% of measurable rows land inside it, 58% inside 0.5 u)
+		// and a runner-up test, because the danger of a position-only key is picking the neighbouring door rather than
+		// missing. Nothing is written for a row that already has a destination.
+		//
+		// ⚠️ Only 88 of the 675 rows can be matched at all today, because 587 are on maps with no imported world
+		// objects. That is the world data being incomplete, not a defect here - the yield grows on its own as maps land.
+		private static (int Resolved, int Ambiguous) ResolveFromClientTable(ImportContext ctx, IReadOnlyList<WorldObject> zoneLines)
+		{
+			if (string.IsNullOrWhiteSpace(ctx.RdbDir) || !Directory.Exists(ctx.RdbDir))
+			{
+				ctx.Out.WriteLine("  (no client RDB configured - skipping the client teleport table, #883)");
+				return (0, 0);
+			}
+
+			using var rdb = new RdbReader(ctx.RdbDir, ctx.RdbProxyBase);
+			var table = RdbTeleportExtractor.Extract(rdb);
+			if (table.Count == 0)
+			{
+				ctx.Out.WriteLine($"  ⚠️ RDB {RdbTeleportExtractor.ResourceType}:{RdbTeleportExtractor.RecordId} is not readable in this client - no teleport table (#883).");
+				return (0, 0);
+			}
+
+			// Only rows the capture pass left inert are candidates; a harvested destination always wins.
+			var byMap = zoneLines.Where(o => o.InteractAction == InteractAction.None)
+				.GroupBy(o => o.MapId)
+				.ToDictionary(g => g.Key, g => g.ToList());
+
+			int resolved = 0, ambiguous = 0;
+			foreach (var teleport in table)
+			{
+				if (!byMap.TryGetValue(teleport.SourceMapId, out var candidates))
+					continue;
+
+				var ranked = candidates.Select(o => (Door: o, Dist: Distance(o, teleport))).OrderBy(r => r.Dist).ToList();
+				if (ranked[0].Dist > ClientTableTolerance)
+					continue;
+
+				// A position-only key fails by picking the NEIGHBOUR, not by missing - so when a second door is
+				// nearly as close, decline rather than choose. Zero rows hit this on the current data; it is here
+				// because the guard's absence would be invisible until it was wrong.
+				if (ranked.Count > 1 && ranked[1].Dist <= ranked[0].Dist * AmbiguityRatio + 0.5f)
+				{
+					ambiguous++;
+					continue;
+				}
+
+				var row = ranked[0].Door;
+				row.InteractAction = teleport.DestMapId == row.MapId
+					? InteractAction.Teleport
+					: InteractAction.ProxyTeleport;
+				row.DestinationMapId = teleport.DestMapId;
+
+				// NO arrival: the table does not carry one, and the runtime already falls back to the destination
+				// map's default spawn for exactly this case. Writing an invented position would be the worse bug.
+				row.DestinationX = row.DestinationY = row.DestinationZ = null;
+				resolved++;
+			}
+
+			return (resolved, ambiguous);
+		}
+
+		private static float Distance(WorldObject o, RdbTeleport t)
+		{
+			var dx = o.PositionX - t.X;
+			var dy = o.PositionY - t.Y;
+			var dz = o.PositionZ - t.Z;
+
+			return MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+		}
+
 		private static WorldObject? NearestZoneLine(IReadOnlyList<WorldObject> zoneLines, TeleportLink link)
 		{
 			WorldObject? best = null;

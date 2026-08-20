@@ -108,17 +108,49 @@ is not yet derivable from the data; it stays a parameter with the capture defaul
 
 A zone-line door is a `WorldObject` (a `DoorFullUpdateIIR` `0x33A56FB0`, or a `SimpleDynelFullUpdateIIR`
 `0x66AEDD50` where the door backs a building entrance) whose `InteractAction` is `Teleport` (same playfield) or
-`ProxyTeleport` (cross playfield). Using it runs the records above. The destination has **two independent
-sources**, and which one a row has decides what happens on use:
+`ProxyTeleport` (cross playfield). Using it runs the records above. The destination has **three independent
+sources**, in a strict precedence, and which one a row has decides what happens on use:
 
-| source | what it yields | what the server does |
-|---|---|---|
-| **The wire.** A captured `UseObject` → `IntendedTeleport` + `n3Teleport` (`WorldTeleportExtractor`) | destination map **and** arrival position | teleports to the exact arrival — same-playfield doors relocate with no loading screen |
-| **The door's own name.** Its name is the playfield behind it, matched against the client's playfield table (`Maps`, RDB 1070003) — `ZoneLineNames`, Gitea #341 | destination map only | change-maps to that map's **default spawn** (`GetDefaultSpawn`), the same fallback `.teleport <map>` takes |
-| neither | nothing | the door reports that it has no known destination |
+| # | source | what it yields | what the server does |
+|--:|---|---|---|
+| 1 | **The wire.** A captured `UseObject` → `IntendedTeleport` + `n3Teleport` (`WorldTeleportExtractor`) | destination map **and** arrival position | teleports to the exact arrival — same-playfield doors relocate with no loading screen |
+| 2 | **The client's own teleport table**, RDB **1000087** — `RdbTeleportExtractor`, Gitea #883 | destination map only | change-maps to that map's **default spawn** |
+| 3 | **The door's own name.** Its name is the playfield behind it, matched against the client's playfield table (`Maps`, RDB 1070003) — `ZoneLineNames`, Gitea #341 | destination map only | as above |
+| — | none of them | nothing | the door reports that it has no known destination |
 
-The name pass runs after the harvest and only over doors the harvest left inert, so a captured destination
-always wins. It is checked against that harvest, which is the only ground truth: of the captured cross-map
+Each pass runs only over doors the pass above it left inert, so the order *is* the precedence.
+
+### Tier 2 — the client's own table (#883)
+
+One plain-text XML record (`1000087:0`, ~140 KB) stating **675 teleports over 298 source playfields, reaching
+212 destinations**, as `SourcePlayfieldID` + `SourcePosX/Y/Z` + `DestinationPlayfieldID`. Against that, the
+capture harvest holds 30 links: it can only ever see a door somebody walked through on camera.
+
+⚠️ **The element has exactly those four attributes** — censused across all 675, not read off the first one. Two
+absences follow, and both shape how it is used:
+
+- **No arrival position.** Which is why it ranks below the wire, and why it writes a null arrival rather than an
+  invented one — the default-spawn fallback already exists for exactly this case.
+- **No door name.** So the match back to a `WorldObject` row is **position-only**, where tier 1 can also require
+  the name to agree. A position-only key fails by picking the *neighbouring* door rather than by missing, so it
+  is guarded twice: a hard 8 u cap, and a runner-up test that declines when a second door is nearly as close.
+  Measured on the current data — 58% of matchable rows land within 0.5 u, 90.9% within 8 u, and **zero** are
+  ambiguous.
+
+⭐ **Why the wire still outranks it, with the evidence.** Where both sources speak (45 doors), **41 agree**. The
+four that differ are all **day/night or state variants of the same place** — `Renton's House` (4572) vs
+`Renton's House Night` (4582), `Villa Camillus` (2141) vs `Villa Camillus - Cursed` (2146). So the table is a
+**design-time export naming a canonical destination** and the runtime picks the variant: the table is right
+about *which place*, the capture about *which instance of it*. Two of those four disagreements are against a
+name guess rather than a capture, and there the table is plainly the better answer — on `City of Tortage Night`
+its `Renton's House Night` beats the name match's daytime `Renton's House`. That is the whole argument for
+slotting it between the two existing tiers rather than at either end.
+
+⚠️ **587 of the 675 rows are on maps with no imported world objects**, so only 88 can be matched at all today
+and 60 land. That is the world data being incomplete, not a defect in the table — the yield grows on its own as
+maps are imported. `--report teleport-match` prints the whole measurement.
+
+### Tier 3 — the door's name (#341) It is checked against that harvest, which is the only ground truth: of the captured cross-map
 doors whose name matches a playfield, every one names the playfield the capture actually teleported to
 (Conall's Valley 1010, Conarch Village 1000, Field of the Dead 1020, Spider Caverns 1004, Ymir's Pass 1090,
 Tarantia Noble District 2010, Old Tarantia 2000, Thunder River 2090, City of Tortage 4020).
