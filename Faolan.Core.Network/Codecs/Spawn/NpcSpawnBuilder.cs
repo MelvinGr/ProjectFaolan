@@ -92,7 +92,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// individuals of a type differently - the three captured beach Poachers wear three different kits, sharing only
 		// their leather legs - so a pool of eight built from the single type default is a uniform that retail never
 		// fields. The type's appearance stays the fallback for a creature we have no placement of (a summoned pet).
-		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, uint playfieldToken, NpcSpawn? wearing = null)
+		public static byte[] BuildFromType(NpcTemplate npc, uint handle, Vector3 position, Quaternion rotation, uint playfieldToken, NpcSpawn? wearing = null,
+			uint? normalsetOverride = null)
 		{
 			if (npc?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
@@ -111,6 +112,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 			var message = BuildMessageFromType(npc, wearing);
+			if (normalsetOverride is { } typeNormalset)
+				(message.npc_stats ??= new ProtoCoreCharacterIIR.NpcStats()).Normalset = typeNormalset;
 			return BuildBody(handle, x, position, rotation, playfieldToken, message, morphs);
 		}
 
@@ -140,7 +143,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// "BCC State" (CharacterStatId 0x14). It decides which behaviour tree runs, so it is state in the same way the
 		// pose is: 1,186 templates carry the ordinary 1, and Casilda's 80 is her CAPTIVE tree. Retail flips it to 1 by
 		// StatUpdate at the moment of her rescue (#827).
-		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null, uint? animIdleId = null, uint? bccState = null)
+		// `normalsetOverride` replaces the type's nameplate DECORATION set (`NpcStats.normalset`, the skull/frame
+		// selector - #508/#758): like the three overrides above it is per-spawn STATE, not identity - retail sends
+		// the SAME creature with normalset absent in a normal instance and 13 (the elite frame) in the epic copy
+		// (#309, the back-to-back Spider Caverns entries).
+		public static byte[] BuildLive(NpcSpawn row, uint handle, uint playfieldToken, uint? movementMode = null, uint? animIdleId = null, uint? bccState = null,
+			uint? normalsetOverride = null)
 		{
 			if (row?.NpcTemplate?.StatCore?.IirHeader is not { } x)
 				throw new InvalidOperationException(
@@ -164,6 +172,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				(message.Bcc ??= new ProtoCoreCharacterIIR.CharacterBcc()).AnimIdleId = idle;
 			if (bccState is { } bcc)
 				(message.Stats ??= new ProtoCoreCharacterIIR.CharacterStats()).BccState = bcc;
+			if (normalsetOverride is { } normalset)
+				(message.npc_stats ??= new ProtoCoreCharacterIIR.NpcStats()).Normalset = normalset;
 
 			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 		}

@@ -80,7 +80,8 @@ namespace Faolan.GameServer.World
 			_sim.World.Remove(lure);
 
 			var handle = _handles.Next();
-			var body = NpcSpawnBuilder.BuildFromType(boss, handle, position, rotation, zone.PlayfieldToken);
+			var body = NpcSpawnBuilder.BuildFromType(boss, handle, position, rotation, zone.PlayfieldToken,
+				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(boss.StatCore) : null);
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, boss.Name, EntityVitals.FromMax(bossHealth, 0, bossHealth), boss.TemplateId);
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = bossLevel;
@@ -119,7 +120,8 @@ namespace Faolan.GameServer.World
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, boss.Position, boss.Rotation, lure.Name, EntityVitals.FromMax(lureHealth, 0, lureHealth), lure.TemplateId);
 			entity.InstanceId = zone.InstanceId;
 			entity.Level = lureLevel;
-			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken);
+			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken,
+				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(lure.StatCore) : null);
 			await StampCombatKit(entity, lure);
 			entity.NoRespawn = true;
 			entity.ArmEncounter(encounter);
@@ -204,7 +206,8 @@ namespace Faolan.GameServer.World
 			entity.Disposition = WorldEntity.DispositionHostile; // it is an ambush - it attacks on arrival
 			entity.Hostile = true;
 			entity.LootContainer = type.LootContainerTemplateId;
-			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken);
+			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(type, handle, position, rotation, zone.PlayfieldToken,
+				normalsetOverride: zone.IsEpic ? EpicDecorations.NormalsetFor(type.StatCore) : null);
 			await StampCombatKit(entity, type);
 			entity.NoRespawn = true; // it corpse-fades; the ambush is a one-off, not a placement that comes back
 			foreach (var sp in type.Spells)

@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -43,6 +45,35 @@ namespace Faolan.Tests
 			foreach (var s in fallback.Take(20))
 				_out.WriteLine($"  {s.NpcTemplate?.Name} map={s.MapId}");
 			Assert.Empty(fallback);
+		}
+
+		// #309: an EPIC copy serves the normal population wearing the ELITE decorations - the builder's
+		// normalsetOverride retags `NpcStats.normalset` exactly as the back-to-back Spider Caverns captures show
+		// (regulars absent -> 13, minions 1 -> 9, zero exceptions over 171 spawns), and the default build keeps the
+		// stored set so a NORMAL zone is untouched.
+		[Fact]
+		public void BuildLive_EpicNormalsetOverride_RetagsTheDecoration_AndDefaultKeepsTheStoredOne()
+		{
+			using var ctx = new DatabaseContext(TestDb.ReadOnly(TestPaths.FaolanDb));
+			var row = ctx
+				.NpcSpawns.Include(s => s.NpcTemplate)
+				.ThenInclude(n => n.StatCore)
+				.Include(s => s.Morphs)
+				.AsNoTracking()
+				.First(s => s.NpcTemplate!.Name == "Cavecrawler");
+
+			Assert.Equal(4u, row.NpcTemplate!.StatCore!.NpcType); // a regular mob - the measured elite retag applies
+			var stored = row.NpcTemplate.StatCore.Normalset;
+			Assert.Equal(EpicDecorations.EliteNormalset, EpicDecorations.NormalsetFor(row.NpcTemplate.StatCore));
+
+			var normal = SimpleCharFullUpdateCodec.Parse(NpcSpawnBuilder.BuildLive(row, 0x1000, 0x00A00001));
+			var epic = SimpleCharFullUpdateCodec.Parse(NpcSpawnBuilder.BuildLive(row, 0x1000, 0x00A00001, normalsetOverride: EpicDecorations.NormalsetFor(row.NpcTemplate.StatCore)));
+
+			Assert.Equal(stored ?? 0u, normal.Character.npc_stats?.Normalset ?? 0u);
+			Assert.Equal(EpicDecorations.EliteNormalset, epic.Character.npc_stats!.Normalset);
+
+			// Mini-bosses/bosses are unmeasured in the epic window, so the policy leaves them alone.
+			Assert.Null(EpicDecorations.NormalsetFor(new NpcStatCore { NpcType = 3 }));
 		}
 
 		// #672: the appearance entry's third word was read as "runtime state" and used to decline a whole morph

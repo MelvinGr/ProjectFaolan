@@ -197,7 +197,10 @@ TWO protobuf fields (a full recursive field diff finds nothing else):
   capture's own normalset census: 1 minion · 2/10 boss (npc_type 3) · 3 mini-boss (npc_type 2) · 4 prey ·
   9 epic minion · 13 elite · 16 player pets · 32 guards.
 
-Until the tuning rule is modelled an epic zone loads the normal population (normal decorations included), and
-`NpcSpawnExtractor` skips epic windows so the tuning can never poison the normal stat columns. Remaining
-#309/#511 work: the epic stat + normalset tuning, encounter content (bosses/raids), and the retail leave-side
-lockout above.
+⭐ **The decoration half is BUILT** (`EpicDecorations`): an epic zone serves the normal population wearing the
+elite frames — every spawner (placed, ambient pool, encounter) retags `normalset` through the builders'
+`normalsetOverride` exactly as measured (npc_type 4 → 13, npc_type 1 → 9; mini-bosses/bosses unmeasured and left
+alone), and a normal zone is untouched. The HEALTH retune stays deliberately unmodelled (the ~8× is not a flat
+multiplier and one dungeon cannot pin the rule), and `NpcSpawnExtractor` skips epic windows so the tuning can
+never poison the normal stat columns. Remaining #309/#511 work: the epic health rule, encounter content
+(bosses/raids), and the retail leave-side lockout above.

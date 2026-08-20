@@ -151,7 +151,9 @@ namespace Faolan.GameServer.World
 				? zone.Entities.Count(e => e.SpawnAreaId == pool.AreaId) % pool.Outfits.Length
 				: 0;
 			var wearing = pool.Outfits.Length > 0 ? pool.Outfits[slot] : null;
-			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken, wearing);
+			// #309: an epic copy's pool members wear the elite decorations like the placed spawns do.
+			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken, wearing,
+				zone.IsEpic ? EpicDecorations.NormalsetFor(pool.Type.StatCore) : null);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
 			entity.InstanceId = zone.InstanceId;

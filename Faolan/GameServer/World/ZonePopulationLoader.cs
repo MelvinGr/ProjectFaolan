@@ -321,8 +321,12 @@ namespace Faolan.GameServer.World
 				// creature. Ours were locked to whatever value the type happened to be lifted with, which for the
 				// Old Tarantia patrollers is 2, so they ran their beats.
 				var spawnMovementMode = npc.PatrolNodes is { Count: > 0 } ? SpawnPostIirs.MovementModeWalk : (uint?)null;
-				var token = _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken;
-				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, spawnMovementMode);
+				var bodyZone = _sim.World.ZoneFor(mapId, instanceId);
+				var token = bodyZone.PlayfieldToken;
+				// #309: an EPIC copy serves the normal population wearing the ELITE decorations - the one spawn-level
+				// change beside health the captures show, and health is deliberately not retuned yet.
+				var epicNormalset = bodyZone.IsEpic ? EpicDecorations.NormalsetFor(npc.NpcTemplate.StatCore) : null;
+				entity.SpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, spawnMovementMode, normalsetOverride: epicNormalset);
 
 				// #827: a quest ESCORTEE gets a second body for after its rescue. Two things differ, and both were
 				// reported in-client against Casilda:
@@ -339,7 +343,7 @@ namespace Faolan.GameServer.World
 				// walk mode widened the gap the 6-unit segment broadcast then closes by snapping her forward. The
 				// remaining slide is that same server-step vs client-speed mismatch and is NOT fixed here - see #829.
 				if (entity.IsQuestEscortee)
-					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId, OrdinaryBccState);
+					entity.FreedSpawnBody = NpcSpawnBuilder.BuildLive(npc, handle, token, null, GenericIdleAnimationId, OrdinaryBccState, epicNormalset);
 
 				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.NpcTemplate.Spells, loaded
 				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
