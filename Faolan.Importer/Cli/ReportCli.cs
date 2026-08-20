@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// Which local-travel trips the captures yield - the listing the wiring module's count cannot give.
+				case "travel-trips":
+				{
+					TravelTrips(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #697: the last unread feat-modifier table - what Amount and Trigger mean.
 				case "feat-procs":
 				{

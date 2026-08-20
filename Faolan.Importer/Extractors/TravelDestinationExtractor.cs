@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Protocol;
@@ -86,6 +87,31 @@ namespace Faolan.Importer.Extractors
 				// special case.
 				if (p is { IsDownload: true, SubOpcode: N3ToClientQuitCodec.Opcode } && active && npc != 0
 				    && p.TryParse(N3ToClientQuitCodec.Parse, out var quit) && quit.Handle == npc)
+				{
+					active = false;
+					continue;
+				}
+
+				// ⛔ **A DOOR takes the teleport back.** The changemap branch below attributes the next cross-map
+				// teleport to whoever the player last spoke to, and until this guard it did so however long ago that
+				// was and whatever happened in between.
+				//
+				// The Architect found it: talk to him inside Black Castle (t=199), walk away, then USE THE EXIT DOOR
+				// (t=306) - and the door's own changemap was written up as "travel with The Architect to Old
+				// Tarantia", carrying the door's exact arrival. That is the Casilda bug (guarded below) wearing a
+				// different face: her window ended because she despawned, his because the player simply left.
+				//
+				// ⚠️ The CLOSE of the chat window is NOT the discriminator, however much it looks like one. Retail
+				// closes the window and travels on the very next packet - measured, `NecroL80_..._annotated_5` packet
+				// #3808 CLOSE then #3809 the travel action - so disarming on the close throws away the real trips
+				// (it took the harvest from 20 to 3). What actually distinguishes them is that a door use CLAIMS the
+				// teleport: `WorldTeleportExtractor` harvests that same teleport as a zone-line link, and the two
+				// extractors must not both write it up.
+				//
+				// A trip is entered through the NPC (UseCharacter), never through a dynel, so this cannot disarm one.
+				if (!p.IsDownload && p is { IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode } && active
+				    && p.TryParse(BehaviorControlCenterCodec.Parse, out var interaction)
+				    && interaction.BehaviorId is (uint)BehaviorId.UseDynel or (uint)BehaviorId.ObjectInteraction)
 				{
 					active = false;
 					continue;
