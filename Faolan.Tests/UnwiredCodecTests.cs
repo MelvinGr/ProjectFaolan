@@ -42,12 +42,17 @@ namespace Faolan.Tests
 			// which is exactly the case this allowlist is for. A decode with no sender is not a gap; a decode with no
 			// RECORDED reason is.
 			["CashRepositoryCodec"] = "the bank's cash line; nothing moves bank cash separately from the wallet yet (#654)",
-			["DungeonPlayfieldCodec"] = "needs a playfield to be classified as a dungeon, which is #309/#511",
 			["OpenSiteInBrowserCodec"] = "retail used it for its own item shop; we have no store and should not point a player's browser anywhere by default",
 			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
 			["RequestGetEffectCodec"] = "all eight captured frames ask for effect 0, so what to ask FOR is unknown (#874)",
 			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363"
 		};
+
+		// DungeonPlayfieldCodec came OFF the list with #882. Its entry said "needs a playfield to be classified as a
+		// dungeon", and the group-finder capture IS that classification: both captured `01` frames land on a playfield
+		// the finder queues into (Black Castle / The Amphitheatre of Karutonia) and the `00` on an ordinary city
+		// login, so `GroupFinderActivityCatalog.IsFinderDestination` separates the two populations and the world-entry
+		// burst sends it. The entry became a lie the moment the sender existed, and this failed rather than rotting.
 
 		// The quest reward pair came OFF this list when #815 was wired: QuestRewardService now sends the offer from
 		// QuestProgressionService.CompleteObjective and the listener routes the c2s pick into it. That is the gate

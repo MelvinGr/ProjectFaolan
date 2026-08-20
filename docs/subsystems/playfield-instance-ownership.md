@@ -85,11 +85,36 @@ captured `[0][0x20][0]` = bit 37 = activity 38) plus `wantsLeader`/`privateTeam`
 **45 held quests** (`Quest_MaxQuestPerPremiumPlayer`, RDB 1000516) with the captured category-10035 remoteformat.
 Below the cap the captured handshake runs: role select → signup success + ready check → the solo confirm forms
 the one-member private team (`TeamService.FormGroupFinderTeam` — roster, `AddToGroupIIR`, `~Team`) and the world
-tier teleports it into the activity's playfield, which the team then owns. Only the **captured** activity is
-mapped to a destination (38 → 1092, arrival (112, 70, 39) off the captured `N3Teleport`) — the
-`ActivityId → record` remap at the tail of RDB 1000627 is still un-walked, and an unmapped activity completes
-the signup but logs instead of guessing a teleport. Matchmaking with strangers is not modelled; every signup
-runs the private-team path the capture shows. Gated byte-exact by `GroupFinderTests`.
+tier teleports it into the activity's playfield, which the team then owns. The destinations come from the
+client's own table — `GroupFinderActivityCatalog` reads RDB 1000627, whose 1-based record sequence IS the
+`ActivityId`, pinned by the captured 38 → 1092 arrival (112, 70, 39). Rows that address their destination by a
+LANDMARK name instead are deliberately left out, and such an activity completes the signup but logs rather than
+guessing a teleport. Matchmaking with strangers is not modelled; every signup runs the private-team path the
+capture shows. Gated byte-exact by `GroupFinderTests`.
+
+### The rotating-activity pair, and the dungeon flag (Gitea #882)
+
+Two more pieces of the finder are wired off a second capture
+(`…_annotated_group-finder-dungeon`, a Black Castle run):
+
+* **`RequestRotatingActivityChildInfo` → `DispatchGroupFinderReceivedRotatingActivityChildInfo`.** The window asks
+  once per session which child of the rotating activity is up. All five captured replies are byte-identical
+  (`1, 2, 3`), so nothing in the corpus carves them — what does is the client's own recovered field list,
+  `activityId, currentChildIndex, nextChildIndex`, which is three fields against a 12-byte body.
+  `RotatingActivityChildInfoCodec` builds it; we model no rotation schedule, so the captured pair goes out with
+  the requested activity echoed back. What a rotation would key on is open.
+* **`DispatchInDungeonPlayfield` now has a source.** The one-byte per-playfield flag was decoded in #874 but had
+  nothing to set it. Both captured `01` frames land in a playfield the finder queues into — Black Castle (3001)
+  and The Amphitheatre of Karutonia (1092), activities 29 and 38 — and the lone `00` is an ordinary city
+  world-entry, so `GroupFinderActivityCatalog.IsFinderDestination` is the classification the corpus supports and
+  the world-ready burst sends it there, in the position retail does (between the ability grants and the
+  `CharInPlayIIR` echo). ⚠️ That is NARROWER than "is a dungeon": a dungeon walked into on foot surely sends `01`
+  too, but no capture shows one and no client table we hold carries a dungeon flag to widen it with.
+  `[V0: the dungeon flag for a playfield the finder does not queue into]`
+
+Six group-finder methods still have zero frames — the ready-check rejection, the two playfield-info pushes, the
+featured-raid role counter, and the two client echoes — and every one is what a SECOND PLAYER exercises. Open
+work tracked in Gitea #882.
 
 ## The "Select instance" window — `DispatchInstanceSelectionForCurrentPlayfield`
 

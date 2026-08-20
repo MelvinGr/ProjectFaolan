@@ -7,8 +7,10 @@ about everything they do not.
 
 Two sources, kept apart on purpose:
 
-* **Captured** — seen in `<data-repo>/Captures/*.tshark.json`. Four c2s messages and two s2c replies, all of them
-  the "is anything going on?" polls a client sends on login. Every one is handled today.
+* **Captured** — seen in `<data-repo>/Captures/*.tshark.json`. The login polls, **plus the whole minigame QUEUE**:
+  a 2026-08-20 capture (`…_annotated_group-finder_pvp-matchmaking`) signs up for four different minigames, brings
+  the board to life and dequeues again, with the player annotating each step as they take it. Every one is
+  handled today.
 * **Client-recovered** — the rest. Method names and parameter types come from
   [`aoc-client-rpc-methods.json`](aoc-client-rpc-methods.json); field widths come from each
   `<Class>InterfaceDispatch_t::<Method>` reader in `AgeOfConan.exe`, which bails out per field with a string
@@ -18,22 +20,83 @@ Two sources, kept apart on purpose:
 
 ## What the captures contain
 
-Swept over all 120 dumps, both directions, for every opcode in the two systems' ranges:
+Swept over all 137 dumps, both directions, for every opcode in the two systems' ranges:
 
 | dir | class | method | n | body |
 |---|---|---|---|---|
-| c2s | CSPlayerAgent `0x54` | `PvPMatchMakingRequestInfo` | 16 | `[u32 queueType]`, always 0 |
-| c2s | CSPlayerAgent `0x55` | `PvPMatchMakingIsInMatchMaking` | 6 | empty |
+| c2s | CSPlayerAgent `0x52` | `PvPMatchMakingPutIntoMatchMaking` | 8 | `[u32 map][u32 type][u8 bringTeam][u32 queueType]` |
+| c2s | CSPlayerAgent `0x53` | `PvPMatchMakingRemoveFromMatchMaking` | 4 | empty |
+| c2s | CSPlayerAgent `0x54` | `PvPMatchMakingRequestInfo` | 59 | `[u32 queueType]`, always 0 |
+| c2s | CSPlayerAgent `0x55` | `PvPMatchMakingIsInMatchMaking` | 7 | empty |
 | c2s | CSPlayerAgent `0x77` | `MassivePvpInfoRequest` | 150 | empty |
 | c2s | GameCharAgent `0x8D` | `RequestMassivePvPScoreData` | 6 | empty |
-| s2c | CSPlayerInterface `0x92` | `DispatchPvPMatchMakingInfoRequestReturn` | 16 | `[0x3F1][u32 0]` — an empty list, "not queued" |
-| s2c | CSPlayerInterface `0xA5` | `DispatchMassivePvpInfoRequestReturn` | 147 | the board, below |
+| s2c | CSPlayerInterface `0x80` | `DispatchPvPMatchMakingYouAreInMatchMaking` | 8 | the signup echoed + two flags |
+| s2c | CSPlayerInterface `0x81` | (no client-recovered name) | 4 | empty — the removal's ack |
+| s2c | CSPlayerInterface `0x92` | `DispatchPvPMatchMakingInfoRequestReturn` | 59 | **the queue board, below** |
+| s2c | CSPlayerInterface `0xA5` | `DispatchMassivePvpInfoRequestReturn` | 147 | the guild board, below |
 
-**Nothing else in either system appears anywhere in the corpus** — no match creation, no side picking, no capture
-zone, no score update. That is not a gap in the captures so much as a fact about them: no session ever queued for
-a minigame. Note also that retail answers `PvPMatchMakingIsInMatchMaking` and `RequestMassivePvPScoreData` with
-**no packet at all** when there is nothing to report, which is why both are consumed silently rather than replied
-to.
+**Nothing beyond the queue appears anywhere in the corpus** — no match creation, no side picking, no capture zone,
+no score update. Queueing is now captured; a match forming out of the queue is not. Note also that retail answers
+`PvPMatchMakingIsInMatchMaking` and `RequestMassivePvPScoreData` with **no packet at all** when there is nothing
+to report — and it answers the former with silence *even in the capture where the player was queued*, which is
+what says the silence is the answer rather than a gap.
+
+## The minigame QUEUE (Gitea #882)
+
+The four c2s messages and their two replies, walked end to end at t=1057…1150 of
+`NecroL80_mage-necromancer_login_gameplay_annotated_group-finder_pvp-matchmaking` — seven signups, four removals,
+43 board polls. Codec: `PvpMatchMakingSignupCodec` / `PvpMatchMakingStatusCodec` / `PvpMatchMakingInfoCodec` ·
+service: `PvpMatchMakingService` · gate: `PvpMatchMakingTests`.
+
+```
+c PvPMatchMakingPutIntoMatchMaking [u32 i_nMap][u32 i_nType][u8 i_bBringTeam][u32 i_QueueType]      (13 B)
+                             -> s  [u32 i_nMap][u32 i_nType][u8 i_ShowFifo][u8 i_AsTeamMember][u32 i_queueType]   (14 B)
+c PvPMatchMakingRemoveFromMatchMaking  (empty)  -> s the empty 0x2081, ~0.3 s later, 1:1 with all four removals
+c PvPMatchMakingRequestInfo [u32 i_QueueType]   -> s the board:
+
+  [u32 (types + 1) * 0x3F1]
+    types × [u32 minigameType] [u32 (maps + 1) * 0x3F1]
+      maps × [u32 mapId] [u32 (queues + 1) * 0x3F1]
+        queues × [u32 queueType] [u32 signups]
+  [u32 i_nNumberOfAnyApplies]
+```
+
+⭐ **The board is LIVE state, and the capture proves it by moving.** Until this capture the message was on record
+here as "captured empty" — `[0x3F1][u32 0]` in every login dump — and the server shipped that constant. It is the
+EMPTY BOARD, not the message's shape: across the 43 bodies every field tracks the player's own signups second by
+second. All 43 parse to the packet end under the grammar above, and the board *constructed* from a live registry
+reproduces a captured body byte for byte (`Board_BuiltFromLiveSignupsIsTheCapturedBody`).
+
+Three things fall out of watching it move:
+
+* **A character holds exactly ONE signup.** Every `PutIntoMatchMaking` raises its own map's count by one *and*
+  drops the previously chosen map's by one, in the same board — which is also why
+  `PvPMatchMakingRemoveFromMatchMaking` needs no argument.
+* **The registry is sticky.** A map appears the first time anyone queues for it and stays listed at 0 afterwards,
+  so the board is a per-server registry seeded by activity, not a catalog — and an empty one is what a server
+  nobody has queued on sends, which is exactly the four login captures.
+* **`i_nNumberOfAnyApplies` is the "join first available" tally**, and the annotations name both edges: it goes
+  0 → 1 on the `(map 0, type 0)` signup annotated *"selected join first avaialble instead"* and back on the
+  removal annotated *"disabled join first avaialbl"*. Those signups are counted there and are deliberately **not**
+  listed as a type-0 group.
+
+⭐ **Both leading words of a signup resolve outside this message.** `i_nMap` is a PLAYFIELD id — the four captured
+maps are 5006 / 5201 / 5012 / 5005, which are `The Call of Jhebbal Sag` / `Blood Ravine` / `Lost Temple` /
+`Hallowed Vaults` in `Maps`, a table harvested from a file that knows nothing about this message. And `i_nType` is
+the **LDB 802 objective id**: the player annotated *"signed up for conquest pvp"* over the type-4 signup and
+*"signed up for capture the skull"* over the type-5 ones, and LDB 802 key 4 is `Conquest`, key 5 is
+`Capture The Skull`. Same corroboration pattern as the Massive-PvP board's `areaId`.
+
+⚠️ `0x7E2` here is the ONE-ELEMENT list frame, not a constant: the innermost frame is `0x7E2` in all 43 bodies
+because every captured signup carries `i_QueueType` 0, so each map has exactly one queue. The innermost KEY is 0
+throughout for the same reason, so reading it as `queueType` is inference from the two messages that carry that
+field rather than measurement. `[V0: the innermost map key of the matchmaking board]`
+
+⚠️ `i_bBringTeam` is 0 and `i_AsTeamMember` is 0 in every captured frame — the session was solo, so the corpus
+shows only one side of each. `[V0: i_AsTeamMember with a team]`
+
+⛔ **Matchmaking PROPER is still uncaptured.** Nothing pops out of the queue in this capture: no
+`WantsToStart`, no `YouJoinedMatch`, no minigame instance. That needs enough players to fill one.
 
 ## `DispatchMassivePvpInfoRequestReturn` (0x20A5) — the battlekeep board
 
@@ -141,7 +204,8 @@ Scalar bodies, complete:
 [`../protocol/02-rpc.md`](../protocol/02-rpc.md).
 
 The three messages carrying a whole match — `YouJoinedMatch` / `MatchInfo` (`i_cMatch`) and `SearchResult`
-(`i_cMatches`) — read a `PvPMatchRules_c` element (`FUN_0055bdb0` → `FUN_00558b70`, three u32 and a string
+(`i_cMatches`) — have zero captured instances even now that queueing is captured, because no captured queue ever
+filled. They read a `PvPMatchRules_c` element (`FUN_0055bdb0` → `FUN_00558b70`, three u32 and a string
 group, then `FUN_0053b020`). Its column layout is not pinned here: with zero captured instances there is nothing
 to check a field split against, and the element reader is shared with the search filter.
 `[V0: the PvPMatchRules_c element layout]`

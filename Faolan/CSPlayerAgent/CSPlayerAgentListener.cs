@@ -14,6 +14,7 @@ using Faolan.Core.Network.Codecs.Raid;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.Pvp;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.ChatServer;
@@ -45,6 +46,10 @@ namespace Faolan.CSPlayerAgent
 		// way raids are, because the finder's product IS a team.
 		private readonly GroupFinderService _groupFinder;
 
+		// Composed collaborator: the PvP minigame queue (#882) - the signup, the withdrawal and the live board the
+		// minigame window polls. Built on the team service too, because `i_bBringTeam` queues a whole team.
+		private readonly PvpMatchMakingService _pvpMatchMaking;
+
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
@@ -68,6 +73,7 @@ namespace Faolan.CSPlayerAgent
 			_raids = new RaidService(logger, _teams, ClientForCharacter);
 
 			_groupFinder = new GroupFinderService(logger, database, _teams, gameServerDispatcher);
+			_pvpMatchMaking = new PvpMatchMakingService(logger, _teams, ClientForCharacter);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -75,6 +81,20 @@ namespace Faolan.CSPlayerAgent
 			// Registered here rather than injected, so the world listener can reach the team roster it does not own.
 			_csPlayerAgentDispatcher.Register(this);
 			return base.StartAsync(cancellationToken);
+		}
+
+		// The matchmaking board is LIVE state (#882): a signup counted for a character who has logged off is a row
+		// the next poller reads as a queued player. Retail's board only ever shows who is there, so the signup goes
+		// when the connection does. The group-finder pending signup rides along for the same reason.
+		protected override async Task ClientDisconnected(INetworkClient client)
+		{
+			if (client.Session.Character is { } character)
+			{
+				_pvpMatchMaking.Forget(character.Id);
+				_groupFinder.Forget(character.Id);
+			}
+
+			await base.ClientDisconnected(client);
 		}
 
 		public override Task StopAsync(CancellationToken cancellationToken)
@@ -165,16 +185,16 @@ namespace Faolan.CSPlayerAgent
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
+					// The featured-activity list, EMPTY - and `0x3F1` is that emptiness, not a terminator constant
+					// (ListFrame.ForCount(0)). All 135 captured frames are 4 bytes, so retail's own list was empty in
+					// every one of them too; we feature nothing, so nothing is what goes out.
 					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGroupFinderUpdateFeaturedActivities,
-						b => b.WriteArray(0x00, 0x00, 0x03, 0xF1)));
+						b => b.WriteUInt32(ListFrame.ForCount(0))));
 
-					//if(character.Name == null)
-					{
-						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGroupFinderRemoved,
-							b => b
-								.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
-								.WriteByte(0x01)));
-					}
+					// The login push: "you are not in the finder", reason `GroupFinderCharacterLeftPlayfield`, silent = 1.
+					// Retail sends it on every Authenticate handshake. The spelling (and its LDB key) lives in the codec.
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GroupFinderRemovedCodec.Method,
+						GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.CharacterLeftPlayfield(true))));
 
 					break;
 				}
@@ -232,6 +252,14 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// 0x2083 RequestRotatingActivityChildInfo(uint32 activityId): which child of a rotating activity is
+				// running now. The corpus's only requests ask about activity 1 (#882).
+				case CSPlayerAgentMethods.RequestRotatingActivityChildInfo:
+				{
+					await _groupFinder.HandleRequestRotatingActivityChildInfo(client, body.ReadUInt32());
+					break;
+				}
+
 				// 0x207A QueueGroupFinder(const std::vector<uint32>& activites, bool wantsLeader, bool privateTeam):
 				// the signup itself - where the quest-log gate refuses or the role select opens.
 				case CSPlayerAgentMethods.QueueGroupFinder:
@@ -257,11 +285,13 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				// 0x207C LeaveGroupFinder(): withdraw from the queue. No captured s2c answer; the in-instance leave
-				// is the zone-line path, not this.
+				// 0x207C LeaveGroupFinder(): withdraw from the queue. It DOES have a captured answer - #882's two
+				// captures answer all three withdrawals with DispatchGroupFinderRemoved carrying the LDB token
+				// `GroupFinderLeaderDequeued`, ~0.3 s later. (The in-instance leave is still the zone-line path, not
+				// this one; that push rides the Authenticate flow with the other token.)
 				case CSPlayerAgentMethods.LeaveGroupFinder:
 				{
-					_groupFinder.HandleLeave(client.Session.Character.Id);
+					await _groupFinder.HandleLeave(client);
 					break;
 				}
 
@@ -606,23 +636,38 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// --- PvP minigame queue (#882) ------------------------------------------------------------------
+				// The four c2s messages the corpus carries, and the two live replies they get. The BOARD is live
+				// state, not the `[0x3F1][0]` constant this used to send: see PvpMatchMakingService.
+
+				// 0x2052 PvPMatchMakingPutIntoMatchMaking(map, type, bringTeam, queueType): sign up for a minigame.
+				case CSPlayerAgentMethods.PvPMatchMakingPutIntoMatchMaking:
+				{
+					await _pvpMatchMaking.HandlePutIntoMatchMaking(client, PvpMatchMakingSignupCodec.Parse(body.ReadRemainingArray()));
+					break;
+				}
+
+				// 0x2053 PvPMatchMakingRemoveFromMatchMaking(): withdraw. No argument - a character holds one signup.
+				case CSPlayerAgentMethods.PvPMatchMakingRemoveFromMatchMaking:
+				{
+					await _pvpMatchMaking.HandleRemoveFromMatchMaking(client);
+					break;
+				}
+
+				// 0x2054 PvPMatchMakingRequestInfo(int i_QueueType): the board poll, every ~5 s while the minigame
+				// window is open.
 				case CSPlayerAgentMethods.PvPMatchMakingRequestInfo:
 				{
-					// PvPMatchMakingRequestInfo(int i_QueueType) - PvP matchmaking info (0x2054 -> 0x2092). Empty /
-					// not-queued result regardless of the queue asked about.
-					var queueType = body.ReadUInt32();
-
-					Logger.LogDebug("PvPMatchMakingRequestInfo queueType {QueueType} - answering not-queued.", queueType);
-
-					await SendPvpMatchMakingInfo(client, packet);
-
+					await _pvpMatchMaking.HandleRequestInfo(client, body.ReadUInt32());
 					break;
 				}
 
 				case CSPlayerAgentMethods.PvPMatchMakingIsInMatchMaking:
 				{
-					// "Am I queued for PvP matchmaking?" (0x2055). Retail sends no response; consume it so it isn't
-					// logged as unhandled.
+					// "Am I queued for PvP matchmaking?" (0x2055). Retail sends no response - not even in the capture
+					// where the player WAS queued, which is what says the silence is the answer and not a gap. The
+					// client learns its own state from the 0x2092 board it polls anyway. Consumed so it isn't logged
+					// as unhandled.
 					break;
 				}
 

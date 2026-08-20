@@ -199,6 +199,14 @@ namespace Faolan.GameServer
 			// unconditionally, so the claims button lit up for every account; see GameServerListener.Claims.cs.
 			await ClaimService.SendNewClaimsGlowIfAny(client);
 
+			// DispatchInDungeonPlayfield (#874 decoded it, #882 gave it a source): the one-byte per-playfield flag
+			// that tells the client it is standing in a dungeon. Retail sends it HERE - both captured `01` frames sit
+			// between the ability grants and the CharInPlayIIR echo below, and the `00` one at the same point of an
+			// ordinary city login. The classification is GroupFinderActivityCatalog.IsFinderDestination, whose remark
+			// carries what the corpus does and does not separate.
+			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
+				GameCharInterfaceProjectMethods.DispatchInDungeonPlayfield, DungeonPlayfieldCodec.Build(GroupFinderActivityCatalog.IsFinderDestination(client.Session.Character.MapId))));
+
 			// record 0: 0x00002000, 17-byte body
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));

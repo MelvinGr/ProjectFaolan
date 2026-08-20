@@ -36,6 +36,10 @@ namespace Faolan.Tests
 		private const string ReadyCheckBody = "0000002600000000";
 		private const string ReadyCheckStatusBody = "000000010000000000000001";
 		private const string LookingForTeamStatusBody = "000000";
+		// #882: the rotating-activity pair. Byte-identical in all five captured exchanges across two captures, which
+		// is why the field split comes from the client's own recovered field list rather than from variance.
+		private const string RotatingActivityRequestBody = "00000001";
+		private const string RotatingActivityChildInfoBody = "000000010000000200000003";
 
 		private readonly List<string> _databases = [];
 
@@ -51,6 +55,57 @@ namespace Faolan.Tests
 		}
 
 		// --- Codecs: the captured body parses, and re-building the parse is the identical bytes -------------------
+
+		// ⭐ DispatchGroupFinderRemoved carries TWO tokens, and the second one is the answer this flow shipped without:
+		// #882's captures answer all three `LeaveGroupFinder` withdrawals with `GroupFinderLeaderDequeued`. Both
+		// builders are compared against the captured bytes whole - the remoteformat spelling, its LDB key's entity
+		// escapes and the trailing `silent` byte included.
+		[Fact]
+		public void GroupFinderRemovedCodec_BuildsBothCapturedReasonsByteExact()
+		{
+			var dequeued = Bytes(
+				"007F3C72656D6F7465666F726D617420746F6B656E3D2247726F757046696E6465724C65616465724465717565756564222063617465676F72793D"
+				+ "2231303022206B65793D2238673075492671756F743B28312E692A262339323B302337615471783322206B6E75626F743D22302220203E3C2F72"
+				+ "656D6F7465666F726D61743E00");
+			var leftPlayfield = Bytes(
+				"008A3C72656D6F7465666F726D617420746F6B656E3D2247726F757046696E6465724368617261637465724C656674506C61796669656C64222063"
+				+ "617465676F72793D2231303022206B65793D226E4B5926616D703B2B684C5E4937262333363B4D40504F607A262333393B593022206B6E75626F"
+				+ "743D22302220203E3C2F72656D6F7465666F726D61743E01");
+
+			Assert.Equal(dequeued, GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.LeaderDequeued()));
+			Assert.Equal(leftPlayfield, GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.CharacterLeftPlayfield(true)));
+
+			var parsed = GroupFinderRemovedCodec.Parse(dequeued);
+			Assert.Contains(GroupFinderRemovedCodec.LeaderDequeued, parsed.Reason, StringComparison.Ordinal);
+			Assert.False(parsed.Silent); // 0 in all three captured dequeues
+			Assert.Equal(dequeued, GroupFinderRemovedCodec.Build(parsed));
+
+			// The login push is the only captured frame with silent = 1; the same builder writes the 0 form retail
+			// sends on an instance exit, so the flag is a field rather than part of the spelling.
+			Assert.Equal(leftPlayfield[..^1], GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.CharacterLeftPlayfield(false))[..^1]);
+			Assert.Equal(0, GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.CharacterLeftPlayfield(false))[^1]);
+		}
+
+		// c2s RequestRotatingActivityChildInfo is a bare u32 (activity 1 in every captured request), and its reply is
+		// three u32s the client names `activityId, currentChildIndex, nextChildIndex`. 12 bytes for three fields is
+		// three u32s and can be nothing else - the arithmetic is what carves a body whose every frame is identical.
+		[Fact]
+		public void RotatingActivityChildInfoCodec_RoundTripsTheCapturedReply()
+		{
+			var captured = Bytes(RotatingActivityChildInfoBody);
+
+			var parsed = RotatingActivityChildInfoCodec.Parse(captured);
+
+			Assert.Equal(1u, parsed.ActivityId); // the activity every captured request asks about
+			Assert.Equal(2u, parsed.CurrentChildIndex);
+			Assert.Equal(3u, parsed.NextChildIndex);
+			Assert.Equal(captured, RotatingActivityChildInfoCodec.Build(parsed));
+			Assert.Equal(captured, RotatingActivityChildInfoCodec.Build(1, 2, 3));
+
+			// The request is the activity id alone, and the reply echoes it into field 0.
+			Assert.Equal(4, Bytes(RotatingActivityRequestBody).Length);
+			Assert.Equal(parsed.ActivityId, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(Bytes(RotatingActivityRequestBody)));
+		}
 
 		[Fact]
 		public void Queue_CapturedBody_RoundTrips_AndNamesActivity38()

@@ -195,10 +195,27 @@ Gitea #146.
 The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
 `MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its reader is recovered
 (`FUN_0055bdb0` → `FUN_00558b70`, three u32 plus a string group, then `FUN_0053b020`) but the field split is not
-pinned: **no capture contains a single instance**, because no captured session ever queued for a minigame, so
-there is nothing to check a split against. Close it by decompiling the element reader field-by-field the way the
-scalar dispatch bodies were done. Tracked in Gitea #146.
+pinned: **no capture contains a single instance**, so there is nothing to check a split against. Queueing IS
+captured now (Gitea #882 — see the minigame-queue section of `docs/re/minigame-massivepvp-messages.md`), but no
+captured queue ever filled, so nothing carrying a whole match was ever sent. Close it by decompiling the element
+reader field-by-field the way the scalar dispatch bodies were done, or by filling a queue. Tracked in Gitea #146.
 `[V0: the PvPMatchRules_c element layout]`
+
+### The matchmaking board's innermost map key
+`DispatchPvPMatchMakingInfoRequestReturn` (0x2092) is a three-level count-framed map that round-trips all 43
+captured bodies (`PvpMatchMakingInfoCodec`), but its innermost key is **0 in every one of them**. It is read as
+`queueType` because that is the one field both `PvPMatchMakingRequestInfo` and `PvPMatchMakingPutIntoMatchMaking`
+carry and both hold at 0 throughout — inference from the neighbouring messages, not measurement. Close it with a
+capture where a client asks about, or signs up under, a non-zero queue type. Tracked in Gitea #882.
+`[V0: the innermost map key of the matchmaking board]`
+
+### `i_AsTeamMember` on a matchmaking signup
+`DispatchPvPMatchMakingYouAreInMatchMaking` (0x2080) carries `[u8 i_ShowFifo][u8 i_AsTeamMember]`, and the eight
+captured acks are `1, 0` without exception — the capture was solo, and `i_bBringTeam` is 0 in all eight signups
+that caused them. So the corpus shows only one side of both flags. The server sets `i_AsTeamMember` on the
+members a `bringTeam` signup drags along, which is the field's evident purpose but is not something a capture has
+confirmed. Close it by queueing as a team. Tracked in Gitea #882.
+`[V0: i_AsTeamMember with a team]`
 
 ### The battlekeep info record's columns
 `DispatchBattleKeepInfoRequestReturnPhase1And2` / `Phase3And4` (0x20A9 / 0x20AA) are framed exactly — a
@@ -213,6 +230,25 @@ struct. Tracked in Gitea #147.
 ---
 
 ## Dungeons and instances
+
+### What makes a playfield a dungeon, beyond the ones the group finder queues into
+`DispatchInDungeonPlayfield` (GameCharInterfaceProject `0x07`) is a one-byte per-playfield flag and the corpus
+carries both values, so it is real state rather than a constant. What it is state ABOUT is only half-pinned:
+both captured `01` frames land in a playfield the group finder queues into (Black Castle 3001, The Amphitheatre
+of Karutonia 1092) and the lone `00` is an ordinary city world-entry, so "the finder queues into it" is what
+separates the two populations and is what the server sends on
+(`GroupFinderActivityCatalog.IsFinderDestination`, Gitea #882). That is certainly NARROWER than "is a dungeon" —
+a dungeon walked into on foot must send `01` too — but no capture shows one, and no client data table we hold
+carries a dungeon flag to widen it with. Close it by capturing a walk-in dungeon entry, or by finding the
+client-side table retail's server read this off. Tracked in Gitea #309.
+`[V0: the dungeon flag for a playfield the finder does not queue into]`
+
+### `DispatchGroupFinderRemoved`'s `silent` flag
+The trailing byte of the finder's removal push (CSPlayerInterface `0xC5`; the client's own argument list is
+`(reason, silent)`). It is 1 on the login push and 0 on every other captured frame — the instance exit and all
+three `LeaveGroupFinder` answers — and three values do not say what makes the login one different. The server
+sends each captured reason with the flag that reason carried. Tracked in Gitea #882.
+`[V0: DispatchGroupFinderRemoved's silent flag]`
 
 ### `DispatchSendPlayfieldLockoutData`'s six `lockoutInfo` fields
 The instance reset/lockout push (GameCharInterface `0xAA`) is fully framed - the dispatcher reader

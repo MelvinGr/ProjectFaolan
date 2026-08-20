@@ -54,6 +54,34 @@ namespace Faolan.Core.Progression
 		}.ToImmutableDictionary(a => a.ActivityId);
 
 		/// <summary>
+		///     Every playfield this table sends a group finder queue into.
+		/// </summary>
+		public static readonly ImmutableHashSet<uint> DestinationMapIds = Activities.Values.Select(a => a.MapId).ToImmutableHashSet();
+
+		/// <summary>
+		///     True when a playfield is one the group finder queues INTO - which is the only classification the corpus
+		///     supports for <c>DispatchInDungeonPlayfield</c> (#882).
+		/// </summary>
+		/// <remarks>
+		///     The corpus carries three frames of that message and it is a per-playfield flag, not a constant: both
+		///     <c>01</c> frames land seconds after a <c>DispatchRedirectToServer</c> into a group-finder activity's
+		///     instance — Black Castle (3001) and The Amphitheatre of Karutonia (1092), which are activities 29 and 38
+		///     of this very table — while the lone <c>00</c> is an ordinary city world-entry with no redirect at all.
+		///     So "the finder queues into it" is what separates the two populations, and it is the whole of what the
+		///     evidence separates them by.
+		///     <para>
+		///         ⚠️ This is therefore NARROWER than "is a dungeon". A dungeon a player walks into on foot certainly
+		///         sends <c>01</c> too, but nothing in the corpus shows one, and there is no per-playfield dungeon flag
+		///         in the client data we hold to widen it with. Widening it would be inventing the classification
+		///         rather than reading it. [V0: the dungeon flag for a playfield the finder does not queue into]
+		///     </para>
+		/// </remarks>
+		public static bool IsFinderDestination(uint mapId)
+		{
+			return DestinationMapIds.Contains(mapId);
+		}
+
+		/// <summary>
 		///     The activity an id names, or null when the table gives it no explicit destination (a landmark-addressed
 		///     row, a raid row, or an id outside the table).
 		/// </summary>

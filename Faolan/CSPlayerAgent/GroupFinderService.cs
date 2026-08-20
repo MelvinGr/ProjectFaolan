@@ -39,6 +39,11 @@ namespace Faolan.CSPlayerAgent
 		// "still needs" is matchmaking state we do not model, so every activity advertises the captured value.
 		private const uint CapturedNeededRoles = 0x1;
 
+		// The child indices retail's DispatchGroupFinderReceivedRotatingActivityChildInfo carried for the rotating
+		// parent (activity 1) - byte-identical in all five captured replies. See RotatingActivityChildInfoCodec.
+		private const uint CapturedCurrentChild = 2;
+		private const uint CapturedNextChild = 3;
+
 		// Where an activity ENTERS is the client's own table now, not the single captured pair: `ActivityId` is RDB
 		// 1000627's 1-based record sequence, and the capture is what proves it rather than an assumed indexing -
 		// activity 38 is record 38 is playfield 1092 at the exact arrival the captured N3Teleport used. See
@@ -51,6 +56,19 @@ namespace Faolan.CSPlayerAgent
 		public async Task HandleRequestNeededRole(INetworkClient client, uint activityId)
 		{
 			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderReceivedNeededRole, GroupFinderNeededRoleCodec.Build(activityId, CapturedNeededRoles));
+		}
+
+		// c2s RequestRotatingActivityChildInfo (0x2083): the finder window asks which child of a ROTATING activity is
+		// running now. Retail answered `(1, 2, 3)` in all five captured replies across two captures - the same
+		// sitting, so that is one moment of its rotation schedule rather than a measured rule. We run no rotation
+		// schedule, so the captured pair is what goes out, with the requested activity echoed back as the client's
+		// own field list has it. #882.
+		public async Task HandleRequestRotatingActivityChildInfo(INetworkClient client, uint activityId)
+		{
+			logger.LogDebug("GroupFinder: rotating-activity child info asked for activity {Activity}; answering with the captured rotation.", activityId);
+
+			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderReceivedRotatingActivityChildInfo,
+				RotatingActivityChildInfoCodec.Build(activityId, CapturedCurrentChild, CapturedNextChild));
 		}
 
 		public async Task HandleQueue(INetworkClient client, QueueGroupFinderRequest request)
@@ -140,12 +158,27 @@ namespace Faolan.CSPlayerAgent
 			await gameServerDispatcher.TeleportCharacter(characterId, destination.MapId, destination.Arrival);
 		}
 
-		public void HandleLeave(uint characterId)
+		// c2s LeaveGroupFinder: withdraw from the queue. #882's captures answer all three withdrawals with
+		// DispatchGroupFinderRemoved carrying the LDB token `GroupFinderLeaderDequeued` (silent = 0) about 0.3 s
+		// later, so the answer goes out whether or not we were holding a signup - the client is asking to be taken
+		// out of the finder, and retail confirms that, not our bookkeeping. Leaving the ENTERED instance is the
+		// zone-line path, not this; that push carries the other token and rides the Authenticate flow.
+		public async Task HandleLeave(INetworkClient client)
 		{
-			// c2s LeaveGroupFinder: withdraw from the queue. Leaving the ENTERED instance is the zone-line path, not
-			// this - the DispatchGroupFinderRemoved push there already rides the Authenticate flow.
+			var characterId = client.Session.Character.Id;
 			if (_pendingSignups.TryRemove(characterId, out _))
 				logger.LogInformation("GroupFinder: {CharacterId:X8} left the queue.", characterId);
+			else
+				logger.LogDebug("GroupFinder: {CharacterId:X8} left the finder while holding no signup.", characterId);
+
+			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderRemoved, GroupFinderRemovedCodec.Build(GroupFinderRemovalReasons.LeaderDequeued()));
+		}
+
+		/// <summary>Drop a pending signup with nothing on the wire - the disconnect hook.</summary>
+		public void Forget(uint characterId)
+		{
+			if (_pendingSignups.TryRemove(characterId, out _))
+				logger.LogDebug("GroupFinder: dropped {CharacterId:X8}'s pending signup on disconnect.", characterId);
 		}
 
 		// The single checked activity of the captured flow. More than one set bit is a multi-select the corpus never

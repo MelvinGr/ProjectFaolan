@@ -132,17 +132,10 @@ namespace Faolan.CSPlayerAgent
 				MassivePvpInfoCodec.Build(MassivePvpInfo.Empty)));
 		}
 
-		// 0x2092 DispatchPvPMatchMakingInfoRequestReturn: PvP matchmaking info (answer to 0x2054
-		// PvPMatchMakingRequestInfo). Retail's "not queued" body is [0x3F1][u32 0] (byte-exact from the login capture);
-		// the header's trailing byte is not a field at all: this method's index is 0x92 = 146, and `method_instance` is
-		// a varint, so any index >= 128 needs a second group - which is that `0x01`. It is not a per-message constant
-		// (#319/#610), and `Rpc` writes it without the call site knowing.
-		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
-		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchPvPMatchMakingInfoRequestReturn, b => b
-				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
-				.WriteUInt32(0))); // trailer
-		}
+		// NB the 0x2092 DispatchPvPMatchMakingInfoRequestReturn sender that used to live here is GONE (#882). It
+		// wrote the constant `[0x3F1][u32 0]` on the strength of the login captures, and the matchmaking capture
+		// shows that body is the EMPTY BOARD rather than the message's shape: the real one is a three-level map that
+		// moves with every signup. It is built by `PvpMatchMakingService` / `PvpMatchMakingInfoCodec` now.
 
 		// 0x200F DispatchTeamSearchResult: the LFG team-search result (answer to 0x200B SearchForTeam). Body is a
 		// 0x3F1-framed list + a trailing byte; retail's own "no results" body is [0x3F1][0x00] (byte-exact from the
