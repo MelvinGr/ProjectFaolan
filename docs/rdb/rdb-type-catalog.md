@@ -24,11 +24,11 @@ fields (compressed on-disk bytes).
 | 1000047 | * CameraPaths (e_RDB_CameraPaths, #80) | 1,071 | 242 | 829 | 426.0 KB |
 | 1000048 | Spawn-point data | 1,060 | 241 | 819 | 35.6 KB |
 | 1000049 | Point-light defs | 1,066 | 242 | 824 | 2.2 MB |
-| 1000050 | Territories (XML) | 1,058 | 241 | 817 | 15.3 MB |
+| 1000050 | Territories - DECODED: plain-text XML, 4,729 named polygons with a `<Height>` and a `(categoryname, categoryvalue)` pair. NOT trigger volumes and NOT a new vocabulary: the pair is the same Race/Community/Superfamily/Name space `NpcSpawnAreas` already carries from 1010506, and 488 of 488 groups on shared playfields already exist there. See [`bounded-areas-1000053.md`](bounded-areas-1000053.md#type-1000050--territories-and-why-they-are-not-a-naming-source) | 1,058 | 241 | 817 | 15.3 MB |
 | 1000052 | QA/test playfield data | 2 | 2 | 0 | 11.0 KB |
 | 1000053 | BOUNDEDAREAS | 478 | 204 | 274 | 3.9 MB |
 | 1000054 | XML data | 325 | 132 | 193 | 421.2 MB |
-| 1000055 | Spawn-area / camp names | 383 | 189 | 194 | 2.2 MB |
+| 1000055 | Bounded areas, COMPILED - the binary twin of 1000053: convex hulls (vertices + triangles) instead of polygon+height, framed with the wire's own `ListFrame` `(n+1)*0x3F1`. Redundant: 5,569 of its 5,731 names are already in 1000053, which holds 3,110 more over 135 extra playfields. Do not import. See [`bounded-areas-1000053.md`](bounded-areas-1000053.md#type-1000055--the-same-areas-compiled-do-not-import) | 383 | 189 | 194 | 2.2 MB |
 | 1000057 | Armor/asset name index | 1,075 | 245 | 830 | 1.0 MB |
 | 1000058 | Environment FX placement | 1,079 | 242 | 837 | 1.7 MB |
 | 1000059 | Environment area defs | 1,059 | 242 | 817 | 70.7 KB |
@@ -97,7 +97,7 @@ fields (compressed on-disk bytes).
 | 1010026 | RTriMesh (runtime tri-mesh) | 84 | 84 | 0 | 1.2 MB |
 | 1010028 | SCRIPTGROUP2 | 2,011 | 2,011 | 0 | 19.1 MB |
 | 1010030 | * MESHINDEXFILE (mesh manifest XML; #275) | 29,854 | 29,854 | 0 | 38.5 MB |
-| 1010031 | Attractor-FX defs | 2,771 | 2,771 | 0 | 546.0 KB |
+| 1010031 | Attractor defs - DECODED: `[u32 typeId][u32 recordId][u32 1000002][u32 0x00010000][u32 count]` then count x `[u32 nameLen][name][f32 x4 quaternion][f32 x3 offset]` - the chain tiles the record exactly on all 400 sampled. A model's named ATTACHMENT POINTS (`attractor:weaponstart`, `attractor:guiitemcamera`) - WHERE an effect plays, which is what "on attractor 10" indexes. It does NOT say WHICH effect plays there | 2,771 | 2,771 | 0 | 546.0 KB |
 | 1010034 | CollisionMesh (aux, not needed for display; #275) | 9,669 | 6,740 | 2,929 | 67.6 MB |
 | 1010035 | * TEXTSCRIPT / texscript (tattoos, colours; #240/#291) | 819 | 819 | 0 | 434.9 KB |
 | 1010040 | Texture (primary/gloss; per DataFilter refs) | 100 | 100 | 0 | 19.7 MB |
@@ -157,9 +157,9 @@ fields (compressed on-disk bytes).
 | 1030001 | TDL1 locale plural-rules | 7 | 7 | 0 | 20.3 KB |
 | 1030002 | * LDB / TextStrings (TDC2 localized strings; #291) | 1,103 | 1,103 | 0 | 110.8 MB |
 | 1040005 | * Spell catalog (spell_cast_fsm) | 21,502 | 21,502 | 0 | 8.5 MB |
-| 1040007 | Spell-system data table (1040xxx)? | 203 | 117 | 86 | 16.8 KB |
-| 1040008 | Spell-system data table (1040xxx)? | 149 | 96 | 53 | 6.3 KB |
-| 1040009 | Spell-system data table (1040xxx)? | 96 | 61 | 35 | 5.9 KB |
+| 1040007 | NOT a spell table - keyed by PLAYFIELD (196 of its 198 local record ids are a `Map.Id`). `[u32 typeId][u32 playfield][u32 1][u32][u32 count]` then count x 16 bytes `[u16 index][u16 0xFFFF][u32][u32][u32]`. Framing carved, semantics unknown | 203 | 117 | 86 | 16.8 KB |
+| 1040008 | NOT a spell table - keyed by PLAYFIELD (147 of its 147 local record ids are a `Map.Id`). `[u32 typeId][u32 playfield][u32 1][u32][u32 count]` then count x 16 bytes `[u16 index][u16 0xFFFF][u32][u32][u32]`. Framing carved, semantics unknown | 149 | 96 | 53 | 6.3 KB |
+| 1040009 | NOT a spell table - keyed by PLAYFIELD (90 of its 90 local record ids are a `Map.Id`). `[u32 typeId][u32 playfield][u32 1][u32][u32 count]` then count x 16 bytes `[u16 index][u16 0xFFFF][u32][u32][u32]`. Framing carved, semantics unknown | 96 | 61 | 35 | 5.9 KB |
 | 1040010 | BOUNDEDAREACOLLECTIONS | 670 | 199 | 471 | 184.7 KB |
 | 1040023 | Spell-system data table (1040xxx)? | 1 | 0 | 1 | 56 B |
 | 1060666 | Environment/main settings (XML) | 128 | 43 | 85 | 711.0 KB |

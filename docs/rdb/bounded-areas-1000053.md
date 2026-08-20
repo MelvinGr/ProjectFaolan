@@ -692,3 +692,56 @@ dotnet run --project Faolan.Importer -- --only rdb-regions --mode overwrite --Co
 dotnet run --project Faolan.Importer -- --report area-banner-names --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1000053:1090 --out <dir> --Content:RdbDir <rdb-dir> --captures <data-repo>/Captures
 ```
+
+## Type 1000055 — the same areas, compiled (do not import)
+
+The client ships a **second** bounded-area table, **1000055**, 383 records keyed by playfield the same way. It is
+binary rather than XML, and it carries the areas as real 3D convex hulls instead of an `(x,z)` polygon plus a
+height range:
+
+```
+[u32 typeId = 1000055][u32 recordId = playfield][u32 1][u32 1]
+[u8 version = 1][u32 ListFrame(areaCount)]
+  per area:  [u16 index][u16 0xFFFF]
+             [u32 ListFrame(vertexCount)]    vertexCount x  [f32 x][f32 y][f32 z]
+             [u32 ListFrame(triCount)]       triCount x     [u32 ListFrame(3)][u32 i0][u32 i1][u32 i2]
+             [u16 nameLen][name]
+  then trailing index and name->ordinal lists, also ListFrame'd
+```
+
+The counts are the repo's own `ListFrame` (`(count + 1) * 0x3F1`) — a box reads as `0x2379` for its 8 vertices,
+`0x333D` for its 12 triangles and `0x0FC4` on each triangle's own 3-element list. That is the same list framing
+the wire uses, in a client asset.
+
+**It is redundant.** Comparing name sets per playfield, case-folded: 1000055 holds 5,731 distinct names and
+**5,569 of them are already in 1000053** (97.2%), while 1000053 holds **3,110 that 1000055 does not**, over 135
+playfields 1000055 has no record for at all. The 162 that are only in 1000055 are mostly generated siblings
+(`<name>_boundedareafixed3d_1`) of an area 1000053 already names. So it is the compiled twin, carrying strictly
+less coverage, and there is nothing to import: read 1000053. Tracked in Gitea #885.
+
+## Type 1000050 — territories, and why they are NOT a naming source
+
+**1000050** is a third, unrelated table: 1,058 records (537 with a real playfield id) holding **4,729 named
+polygons** with a `<Height>`, in plain-text XML. Unlike a bounded area it is not a trigger — its payload is a
+`(categoryname, categoryvalue)` pair, and that pair is **exactly the vocabulary `NpcSpawnAreas` already carries**
+from [1010506](npc-spawn-layout-1010506.md):
+
+| categoryname | territories | distinct values | what the value is |
+|---|---:|---:|---|
+| `Race` | 1,916 | 60 | a race id (RDB 1000508) |
+| `Community` | 1,648 | 156 | a community id |
+| `Superfamily` | 361 | 8 | 1..9 |
+| `Name` | 267 | 55 | an ACG creature token — `Shark (H8AV)`, `Horned Viper (VW2F)` |
+| `no category` | 537 | — | one per record; a root/default entry |
+
+So a territory is *"this polygon contains Race 72"*, the ambient population of
+[the two-population split](npc-spawn-layout-1010506.md) expressed as geometry.
+
+Measured against the shipped spawn areas: on the 119 playfields both cover, **488 of 488** territory
+`(category, value)` groups already exist as an `NpcSpawnArea` row — a complete overlap, no new groups. What it
+adds is therefore not vocabulary but **shape** (a polygon with a height, where `NpcSpawnArea` holds an
+axis-aligned box) and **coverage**: 47 playfields have territories and no spawn areas at all, carrying 24
+`Name`-category groups we do not hold.
+
+That makes the consumer for it the ambient-spawn work, which is blocked on the creature catalog rather than on
+placement — so it stays unimported. Tracked in Gitea #885.
