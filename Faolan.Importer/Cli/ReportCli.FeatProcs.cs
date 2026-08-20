@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Faolan.Core.Rdb;
+using Faolan.Importer.Rdb;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,7 +33,7 @@ namespace Faolan.Importer.Cli
 	// carries only always-fire amounts. That narrows it; it does not name it. See Gitea #697 / #593.
 	public static partial class ReportCli
 	{
-		private static async Task FeatProcs()
+		private static async Task FeatProcs(string? rdbDir = null)
 		{
 			using var db = OpenDb();
 
@@ -81,11 +85,75 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("  Reading: a low Amount is a genuine roll and the text says so; 120 and 200 are \"always\", which is");
 			Console.WriteLine("  how a >100% chance behaves once clamped. The lift runs both ways, so it is not the base rate talking.");
 
+			RawProcSlots(rdbDir);
+
 			Console.WriteLine();
-			Console.WriteLine("== ⛔ Trigger is still unnamed. What is left to settle, and the instrument for it:");
-			Console.WriteLine("   Per EffectKind, one Trigger value carries every chance-bearing row and the other only always-fire");
-			Console.WriteLine("   amounts. Naming them needs the client: hover a proc feat with GM Level = -1, which renders the");
-			Console.WriteLine("   feat's wire ids and the client's own rendered text in the tooltip (see the feat_tooltip note).");
+			Console.WriteLine("== ⛔ Trigger is still unnamed, and TWO offline routes are now closed off:");
+			Console.WriteLine("   1. \"a name transfers BY KEY\" (#593's plan) does not work here. Only 21 of the 150 keys in");
+			Console.WriteLine("      docs/re/gameaction-keylists.tsv are named by ANY type, and key 117 is named by none of the");
+			Console.WriteLine("      five that use it. ⚠️ Worse, the premise is unsafe: key 39 is named Type, Tier, Value AND");
+			Console.WriteLine("      ScriptID by different types, so a name does not reliably transfer even when one exists.");
+			Console.WriteLine("   2. key 73 - the client's `Flags`, the ONLY named slot in the proc family and one the importer");
+			Console.WriteLine("      drops - is 0 on every one of its 320 occurrences. It carries nothing; it is not the trigger.");
+			Console.WriteLine();
+			Console.WriteLine("   What is left is the client: hover a proc feat with GM Level = -1, which renders the feat's wire");
+			Console.WriteLine("   ids and the client's own rendered text in the tooltip (see the feat_tooltip note). Four values.");
+		}
+
+		// The slots the IMPORTER drops. `AddSpellLineProc` (53070) carries key 73, which the client names `Flags` on
+		// nine other types - the only NAMED slot anywhere in the proc family - and `ParseProcs` does not read it. A
+		// named flag word is a better trigger candidate than an unnamed one, so it is worth knowing whether it varies
+		// at all before anyone goes looking in the client.
+		private static void RawProcSlots(string? rdbDir)
+		{
+			var rdb = string.IsNullOrEmpty(rdbDir) ? RdbDirOrNull() : rdbDir;
+			if (string.IsNullOrEmpty(rdb) || !Directory.Exists(rdb))
+			{
+				Console.WriteLine();
+				Console.WriteLine("  (pass --Content:RdbDir to also census the raw element slots the importer drops)");
+				return;
+			}
+
+			using var reader = OpenRdb(rdb);
+			var flags = new SortedDictionary<uint, int>();
+			var triggers = new SortedDictionary<uint, int>();
+			var elements = 0;
+
+			foreach (var e in reader.EntriesOfType(1000020))
+			{
+				byte[] body;
+				try
+				{
+					body = reader.ReadDecompressed(e);
+				}
+				catch (Exception)
+				{
+					continue;
+				}
+
+				if (body.Length <= 12)
+					continue;
+
+				foreach (var el in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+				{
+					if (el.Kind != 53070 && el.Kind != 53212)
+						continue;
+
+					elements++;
+					if (el.Value(GameActionTypes.KeyProcTrigger) is { } t)
+						triggers[t] = triggers.GetValueOrDefault(t) + 1;
+
+					// Key 73 - the client's `Flags`, present on 53070's key list and absent from 53212's.
+					if (el.Value(73) is { } f)
+						flags[f] = flags.GetValueOrDefault(f) + 1;
+				}
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"== raw element slots over {elements:N0} proc elements read straight from the RDB");
+			Console.WriteLine($"  key 117 (our `Trigger`): {string.Join(", ", triggers.Select(t => $"{t.Key} x{t.Value}"))}");
+			Console.WriteLine($"  key  73 (client-named `Flags`, NOT imported): "
+			                  + (flags.Count == 0 ? "(never present)" : string.Join(", ", flags.Select(f => $"{f.Key} x{f.Value}"))));
 		}
 	}
 }

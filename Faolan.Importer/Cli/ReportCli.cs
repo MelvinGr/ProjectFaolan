@@ -417,7 +417,7 @@ namespace Faolan.Importer.Cli
 				// #697: the last unread feat-modifier table - what Amount and Trigger mean.
 				case "feat-procs":
 				{
-					await FeatProcs();
+					await FeatProcs(RdbDirOrNull());
 					return 0;
 				}
 

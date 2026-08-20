@@ -493,9 +493,24 @@ the other carries only always-fire amounts:
 | 3 | 53070 | 27 | 21 | 120, 200 |
 
 That says `Trigger` refines *when* within a hook `EffectKind` has already chosen — it does not say into what.
-Naming it needs the client rather than the data: hover a proc feat with GM Level = -1, which renders the feat's
-wire ids and the client's own text in the tooltip. **Nothing should fire a proc until it is named**: a proc on
-the wrong event is worse than a proc that does not exist, because it looks like it works.
+
+**Two offline routes are closed off**, so nobody spends the time again:
+
+1. ⛔ **"A name transfers BY KEY" (#593's plan) does not work here.** Only **21 of the 150** keys in
+   [`../re/gameaction-keylists.tsv`](../re/gameaction-keylists.tsv) are named by *any* of the 260 types, and key
+   117 is named by **none** of the five that use it (`AddSpellLineProc`, `AddSpellProc`, `AddComboProc`,
+   `AddProc`, `OpenDialog`). Every other unknown slot #593 listed — 236, 237, 88, 187, 1, 66, 67, 55 — is
+   likewise unnamed everywhere.
+   ⚠️ **And the premise itself is unsafe.** Key `39` is named `Type`, `Tier`, `Value` *and* `ScriptID` by
+   different types, and key `209` is both `EventString` and `ScriptParams`. A name is per-TYPE, not per-key, so
+   transferring one would have been a guess even where a name existed.
+2. ⛔ **Key 73 — the client's `Flags`** — is the one named slot anywhere in the proc family (it is on 53070's key
+   list and the importer drops it). It is **0 on all 320 of its occurrences**. It carries nothing, and it is not
+   the trigger.
+
+So naming it needs the client rather than the data: hover a proc feat with GM Level = -1, which renders the
+feat's wire ids and the client's own text in the tooltip. **Nothing should fire a proc until it is named**: a
+proc on the wrong event is worse than a proc that does not exist, because it looks like it works.
 
 ## Why a learned spell may still refuse to cast — the feat criterion
 
