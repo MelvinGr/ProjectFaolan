@@ -35,7 +35,18 @@ namespace Faolan.Tests
 			["KnubotStartTradeCodec"] = "the NPC trade window is not implemented",
 			["KnubotFinishTradeCodec"] = "the NPC trade window is not implemented",
 			["ClientAddGuildRenownCodec"] = "guild renown is never awarded, so nothing calls it",
-			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it"
+			["CharacterActionCodec"] = "a create-editor record the live create flow omits; the client accepts creation without it",
+
+			// The #874 batch: methods the corpus carries that nothing here ever sent. Decoded and byte-exact-pinned
+			// (UnsentMethodCodecTests) so the facts are executable, but each one's TRIGGER belongs to another ticket -
+			// which is exactly the case this allowlist is for. A decode with no sender is not a gap; a decode with no
+			// RECORDED reason is.
+			["CashRepositoryCodec"] = "the bank's cash line; nothing moves bank cash separately from the wallet yet (#654)",
+			["DungeonPlayfieldCodec"] = "needs a playfield to be classified as a dungeon, which is #309/#511",
+			["OpenSiteInBrowserCodec"] = "retail used it for its own item shop; we have no store and should not point a player's browser anywhere by default",
+			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
+			["RequestGetEffectCodec"] = "all eight captured frames ask for effect 0, so what to ask FOR is unknown (#874)",
+			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363"
 		};
 
 		// The quest reward pair came OFF this list when #815 was wired: QuestRewardService now sends the offer from
