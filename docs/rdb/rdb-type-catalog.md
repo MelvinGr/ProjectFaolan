@@ -207,8 +207,18 @@ fields (compressed on-disk bytes).
 `SimpleDynelVisualChangeIIR` `e_StartParticleEffect` carries - the client reads only the id off the wire and
 pairs it with `1010207` itself, then errors as *"StartParticleEffect() Invalid particle resource id"* when it
 does not resolve. The client's own combat log names the same pairing: *"Starting 7 visual effect [ResourceID
-1010207:3667002] on attractor 10"*. The payload is still an undecoded zlib blob (a binary effect graph, no
-strings) - what is decoded is what the id MEANS. See
+1010207:3667002] on attractor 10"*. The payload's binary effect GRAPH is still undecoded - what is decoded is what the id MEANS.
+
+⚠️ **It is not string-less, though, and this page used to say it was.** That claim was the
+`pack_grep_lies` trap in miniature: the record is zlib, so a grep over the pack file finds nothing, and the
+text only appears once it is inflated. Inflated, 559 of the 8,163 records carry the original build-machine paths
+of the textures they draw with - `W:\achardb\conan\particles\smoke\gradient_ab.png` and the like - and all
+8,163 inflate cleanly. `--report particle-effects [--report-arg <substring>]` lists them, which makes the whole
+population searchable BY WHAT THE EFFECT LOOKS LIKE without decoding the graph at all.
+
+That is the question the server actually asks. It never renders a particle effect - it sends an id and the
+client does the rest - so what is needed is never "what does effect 3667002 look like" but "which id is the one
+I want", and a texture name answers that where the graph would not. See
 [`../re/iir-readers-combat-world.md`](../re/iir-readers-combat-world.md).
 
 **Totals:** 873,588 entries · 410,382 local · 463,206 CDN · 84.6 GB indexed.

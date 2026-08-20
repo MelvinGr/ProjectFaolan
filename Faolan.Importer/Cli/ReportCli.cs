@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #880: name every particle effect by the textures its payload references.
+				case "particle-effects":
+				{
+					ParticleEffects(RdbDirOrNull(), arg);
+					return 0;
+				}
+
 				// #877: does a feat's TEA key ride the wire? The #251 instrument, finally given a trigger.
 				case "feat-keys":
 				{
