@@ -12,23 +12,26 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// beside FullCharSnapshotSubClassCodec rather than on it (#530 rule 1: a codec exposes Build and Parse, and
 	// what to build FROM is a different question with a different answer).
 	//
-	// The three regions are each independently proven byte-exact: the generated quest portion (@0..1292), the
-	// game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917) and the stat block
+	// The three regions are each independently proven byte-exact: the generated quest portion (@0..1288), the
+	// game-static access-window catalog (AccessWindowCatalog typed entries, @1288..7917 - its ListFrame word
+	// included, which the old carve misattributed to the quest index as a "terminal") and the stat block
 	// (SubClassStatBlock, @7917..end) authored with the character's vitals/XP + learned spells. For the captured
 	// beach character + instance the three together reproduce BeachTailsTemplate.bin byte-for-byte
 	// (SnapshotTailsFromScratchTests), which is why that template .bin is no longer shipped (#186/#258).
 	public static class SnapshotTails
 	{
 		// The quest portion's length for the beach starter, kept as the documented landmark for the region split.
-		public const int QuestPortionLength = 1292;
+		// 1288, not the historical 1292: the four bytes past it are the access-window table's own ListFrame word
+		// (#464), which the pre-re-carve grammar counted into the quest index as its "terminal".
+		public const int QuestPortionLength = 1288;
 
 		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.QuestLineTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
 
 		// The quest region a character with NO snapshot quests carries. Byte-exact constant across all 20 create
 		// captures: a freshly created character's snapshot has ZERO quest blocks (the starter quest is delivered
 		// LIVE instead - QuestLogList + QuestFullUpdate - then rides the snapshot only on later logins). Words:
-		//   version 0x18 ; empty Quest_c list ; empty completed-journal frame ; empty index marker ; count 0 ;
-		//   terminal QuestIndexRegionCodec.IndexTerminalWord.
+		//   version 0x18 ; empty Quest_c list ; empty completed-journal frame ; empty index marker ; count 0.
+		//   (The old carve appended a fifth "terminal" word - the access-window table's ListFrame, #464.)
 		// That is exactly what the three EMPTY regions encode to, which is why this needs no literals of its own.
 		// See tools/capture/decode_snapshot_quests.py + the *-create captures.
 		public static byte[] EmptyQuestPortion()
@@ -124,7 +127,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				Quests = journal,
 				CompletedQuests = completed,
 				QuestIndex = index,
-				UnknownBeforeAccessWindowTable = [],
 				AccessWindowEntries = [.. AccessWindowCatalog.Entries],
 				PostAccessBlock = block,
 				UnknownAfterAccessWindowTable = []
@@ -208,7 +210,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return live.Count > 0 && live.TrueForAll(g => g.Separator != null);
 		}
 
-		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from
+		// GENERATES the quest PORTION of the tails (@0..1288 = Quest_c journal + @609 objective region + index) from
 		// a quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186).
 		// #255: the multi-quest journal portion from the player's held quests. One QuestcRecord per quest (journal
 		// entries), but the objective (@609) region + the quest index belong to the PRIMARY (tracked) quest only -

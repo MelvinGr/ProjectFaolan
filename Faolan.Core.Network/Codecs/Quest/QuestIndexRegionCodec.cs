@@ -6,34 +6,33 @@ namespace Faolan.Core.Network.Codecs.Quest
 {
 	// The QUEST INDEX region of the 0x737A6DF9 tails - the bytes between the COMPLETED-quest journal
 	// (CompletedQuestJournalRegionCodec) and the access-window table. Decoded byte-exact from the beach template, the
-	// 2-quest capture (#255) AND every progressed journal in the corpus (5..30 active quests, #391):
+	// 2-quest capture (#255) AND every progressed journal in the corpus (5..30 active quests, #391), and re-carved
+	// to the CLIENT's own reader in #464 (`MainQuest_c`, `FUN_00922210` - five head words, the pair list, then a
+	// four-word trailer):
 	//   [u32 (count + 1) * 0x3F1]                 the id-list framing (count = number of held/active quests)
 	//   [u32 questId × count]                     the held quest ids
-	//   [u32 count]
-	//   if count == 0:  [u32 terminal 0x000156E7]   (empty index - a char with no snapshot quests)
-	//   else:
-	//     [u32 leadAreaId]                        the FIRST block's quest QuestLineId (was mis-modelled as a 0x000000F1
-	//                                             "sentinel" - constant only because every golden is a beach char,
-	//                                             QuestLineId 241 == 0xF1; #391)
-	//     ONE goal-table BLOCK per held quest, in the same order as the ids:
-	//       [u32 magic]                           the AREA's goal-table NAME word ("W6QT" 0x57365154, "RRL3" ...)
-	//       [u32 tf1][u32 tf2][u32 tf3]           tf2 == count-1, tf3 == 0 across the corpus
-	//       [u32 n][ (questId, sequence) × n ]    the AREA's full quest catalog; sequence is 1-based but NOT strictly
+	//   [u32 count]                               a PLAIN count (the client's MainQuest_c list uses one)
+	//   ONE goal-table BLOCK per held quest, in the same order as the ids:
+	//     [u32 areaId]                            the quest's QuestLineId - the block's OWN first word. The old carve
+	//                                             hung it off the PREVIOUS block as a "chainWord" (and block 1's off
+	//                                             the region head as "leadAreaId"), which manufactured a chain grammar
+	//                                             and a phantom "terminal word": the last block's "chainWord" was the
+	//                                             ACCESS-WINDOW TABLE's ListFrame(86) == 0x156E7, constant only
+	//                                             because every capture carries the same 86-entry catalog.
+	//     [u32 magic]                             the AREA's goal-table NAME word ("W6QT" 0x57365154, "RRL3" ...)
+	//     [u32 tf1][u32 tf2][u32 tf3]             tf2 == count-1, tf3 == 0 across the corpus
+	//     [u32 n][ (questId, sequence) × n ]      the AREA's full quest catalog; sequence is 1-based but NOT strictly
 	//                                             monotonic (branch/chapter quests repeat a sequence - so the old
 	//                                             "idx == i+1" assertion was a beach-only accident)
-	//       [u32 trailerQuestId][u32 a][u32 b][u32 c][u32 chainWord]
+	//     [u32 trailerQuestId][u32 a][u32 b][u32 c]
 	//                                             trailerQuestId = the AREA's anchor quest; a/b/c vary per quest
-	//                                             (beach 1/0/0); chainWord = the NEXT block's leadAreaId, or the
-	//                                             terminal 0x156E7 for the last block (the chain of area ids)
+	//                                             (beach 1/0/0)
 	//
-	// ⚠️ There is NO leading 0x3F1 "IndexTag": what looked like one is the EMPTY completed-journal frame
-	// (ListFrame.ForCount(0) == 0x3F1) that always precedes the index - see FullCharSnapshotSubClass.
+	// ⚠️ There is NO leading 0x3F1 "IndexTag" (that phantom was the empty completed-journal frame) and NO terminal
+	// word: an EMPTY index is `[0x3F1][u32 0]` and the region simply ends. The next bytes belong to the
+	// access-window table (PfAccessWindowEntryCodec), whose frame word the old grammar consumed as its "terminal".
 	public static class QuestIndexRegionCodec
 	{
-		// The word the LAST block's trailer carries, terminating the chain. Constant across every captured index and
-		// identical to the terminal of the empty quest portion.
-		public const uint IndexTerminalWord = 0x000156E7;
-
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(QuestIndexRegion value)
 		{
@@ -53,7 +52,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		internal static QuestIndexRegion Read(ref SpanReader r)
 		{
 			// The count is the frame's count - read exactly that many ids rather than peeking, so a held quest id
-			// below 0x1000 (or a lead area id above it) cannot mis-split the list.
+			// below 0x1000 (or an area id above it) cannot mis-split the list.
 			var declared = r.ReadListCount();
 			var questIds = new List<uint>(declared);
 			for (var i = 0; i < declared; i++)
@@ -64,17 +63,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (count != questIds.Count)
 				throw CodecParseException.Unexpected(nameof(QuestIndexRegionCodec), at, $"count == the frame-derived {questIds.Count}", count.ToString());
 
-			// An EMPTY index terminates on IndexTerminalWord - what a character with no snapshot quests carries.
-			if (count == 0)
-			{
-				r.ExpectU32Be(IndexTerminalWord, "empty-index terminator");
-				return new QuestIndexRegion();
-			}
-
-			var leadAreaId = r.ReadU32Be();
 			var blocks = new List<QuestIndexRegion.Block>((int)count);
 			for (uint b = 0; b < count; b++)
 			{
+				var areaId = r.ReadU32Be();
 				var magic = r.ReadU32Be();
 				var f1 = r.ReadU32Be();
 				var f2 = r.ReadU32Be();
@@ -91,6 +83,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 				blocks.Add(new QuestIndexRegion.Block
 				{
+					AreaId = areaId,
 					Magic = magic,
 					TableField1 = f1,
 					TableField2 = f2,
@@ -100,15 +93,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 					TrailerQuestId = r.ReadU32Be(),
 					TrailerA = r.ReadU32Be(),
 					TrailerB = r.ReadU32Be(),
-					TrailerC = r.ReadU32Be(),
-					ChainWord = r.ReadU32Be()
+					TrailerC = r.ReadU32Be()
 				});
 			}
 
 			return new QuestIndexRegion
 			{
 				QuestIds = questIds,
-				LeadAreaId = leadAreaId,
 				Blocks = blocks
 			};
 		}
@@ -120,29 +111,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(ListFrame.ForCount(v.QuestIds.Count));
 			foreach (var id in v.QuestIds)
 				s.WriteUInt32(id);
-			s.WriteUInt32(v.QuestIds.Count);
 
-			if (v.QuestIds.Count == 0)
-			{
-				s.WriteUInt32(IndexTerminalWord);
-				return;
-			}
-
-			s.WriteUInt32(v.LeadAreaId);
+			s.WriteUInt32((uint)v.Blocks.Count);
 
 			foreach (var b in v.Blocks)
 			{
-				if (b.AreaQuestSequences.Count != b.AreaQuestIds.Count)
-				{
-					throw new InvalidOperationException(
-						$"Quest index block {b.Magic:X8}: {b.AreaQuestIds.Count} catalog ids but {b.AreaQuestSequences.Count} sequences - the pair is written interleaved, so a generator must supply both (QuestIndexRegions.ForQuests does)");
-				}
+				if (b.AreaQuestIds.Count != b.AreaQuestSequences.Count)
+					throw new InvalidOperationException($"Block {b.TrailerQuestId}: {b.AreaQuestIds.Count} area quest ids but {b.AreaQuestSequences.Count} sequences.");
 
+				s.WriteUInt32(b.AreaId);
 				s.WriteUInt32(b.Magic);
 				s.WriteUInt32(b.TableField1);
 				s.WriteUInt32(b.TableField2);
 				s.WriteUInt32(b.TableField3);
-				s.WriteUInt32(b.AreaQuestIds.Count);
+
+				s.WriteUInt32((uint)b.AreaQuestIds.Count);
 				for (var i = 0; i < b.AreaQuestIds.Count; i++)
 				{
 					s.WriteUInt32(b.AreaQuestIds[i]);
@@ -153,24 +136,23 @@ namespace Faolan.Core.Network.Codecs.Quest
 				s.WriteUInt32(b.TrailerA);
 				s.WriteUInt32(b.TrailerB);
 				s.WriteUInt32(b.TrailerC);
-				s.WriteUInt32(b.ChainWord);
 			}
 		}
 	}
 
-	// The quest index: the held quest ids plus one chained area-catalog block per held quest.
+	// The quest index: the held quest ids plus one area-catalog block per held quest.
 	public sealed record QuestIndexRegion
 	{
-		// The first block's quest QuestLineId (the head of the block chain). Only meaningful when the index is non-empty;
-		// for a beach char this is 241 == 0xF1, which is why it read as a constant "sentinel" until #391.
-		public uint LeadAreaId { get; init; }
-
 		public List<Block> Blocks { get; init; } = [];
 		public List<uint> QuestIds { get; init; } = [];
 
-		// One held quest's area-catalog table + chained trailer.
+		// One held quest's area-catalog table. The client's MainQuest_c (FUN_00922210).
 		public sealed record Block
 		{
+			// The quest's QuestLineId - the block's first wire word. Read as the previous block's "chainWord" (and,
+			// for block 1, as the region's "leadAreaId" - the beach's 241 == 0xF1 "sentinel") until #464.
+			public uint AreaId { get; init; }
+
 			public uint TrailerQuestId { get; init; }
 
 			// The AREA's full quest catalog, ordered by each quest's JournalSequence - NOT this quest's goal ids, which
@@ -184,13 +166,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// it must be carried, not regenerated as i+1 (#391). Write requires the two lists to be the same length.
 			public List<uint> AreaQuestIds { get; init; } = [];
 			public List<uint> AreaQuestSequences { get; init; } = [];
-			public uint ChainWord { get; init; } // next held quest's QuestLineId, or IndexTerminalWord (last)
 			public uint Magic { get; init; } // the area's goal-table name word (W6QT / RRL3 / ...)
 			public uint TableField1 { get; init; }
 			public uint TableField2 { get; init; }
 			public uint TableField3 { get; init; }
 
-			// The block's trailer words after the catalog: [trailerQuestId][a][b][c][chainWord]. The beach block has
+			// The block's trailer words after the catalog: [trailerQuestId][a][b][c]. The beach block has
 			// (a,b,c) == (1,0,0); they vary per quest across the corpus (a up to 8, c 0 or 1) - so they are carried,
 			// not assumed constant (#391).
 			public uint TrailerA { get; init; } = 1;

@@ -13,7 +13,7 @@ namespace Faolan.Tests
 	{
 		// The index opens at its MARKER, not the 0x3F1 at 1168 - that word is the empty completed-journal frame (the
 		// beach char has no completed quests), decoded as a phantom "IndexTag" until #391. The index is 1172..1292.
-		private const int RegionStart = 1172, RegionEnd = 1292;
+		private const int RegionStart = 1172, RegionEnd = 1288; // 1288, not 1292: the last four bytes are the access-window table's ListFrame word (#464)
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
 
 		[Fact]
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			// The region opens on the id-list FRAME - a one-element list, not the 0x7E2 "constant" it reads as.
 			Assert.Equal(ListFrame.ForCount(1), template.ReadU32Be(RegionStart));
 			Assert.Equal(new[] { 10238u }, region.QuestIds);
-			Assert.Equal(241u, region.LeadAreaId); // the beach area id (== 0xF1, the old "sentinel")
+			Assert.Equal(241u, region.Blocks[0].AreaId); // the beach area id (== 0xF1, the old "sentinel"/"leadAreaId")
 			Assert.Single(region.Blocks);
 			Assert.Equal(8, region.Blocks[0].AreaQuestIds.Count); // the eight area-catalog ids (sequence 1..8)
 			Assert.Equal(10238u, region.Blocks[0].AreaQuestIds[0]);

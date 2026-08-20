@@ -76,7 +76,6 @@ namespace Faolan.Tests
 			Assert.Empty(sub.Quests.Records);
 			Assert.Empty(sub.CompletedQuests.Areas);
 			Assert.Empty(sub.QuestIndex!.QuestIds);
-			Assert.Empty(sub.UnknownBeforeAccessWindowTable);
 			Assert.Empty(sub.UnknownAfterAccessWindowTable);
 			Assert.Equal(AccessWindowCatalog.Entries.Count, sub.AccessWindowEntries.Count);
 

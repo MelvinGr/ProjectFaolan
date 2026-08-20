@@ -1,40 +1,66 @@
+using System.Collections.Generic;
+using System.Linq;
+
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	// One `PFAccessWindow_` playfield record out of the FullChar snapshot tails (see AccessWindowCatalog).
 	//
-	// ⚠️ The two `Unknown*` fields below are NOT undecoded-for-lack-of-trying: they are ZERO in all 86 shipped
-	// records, and this table is GAME-STATIC - the beach template and the developed NecroL80 snapshot carry the
-	// same 172 `PFAccessWindow_` name strings, so no capture can ever vary them. The corpus is exhausted as an
-	// evidence source; naming them needs the client-side consumer, not more traffic (Gitea #464). Same for
-	// PfAccessWindowChild.Unknown (0 in all 13) and PfAccessWindowChildDetail.DetailUnknown (0 in all 43).
-	// They are carried verbatim so the region still round-trips byte-exact.
+	// ⭐ Re-carved to the CLIENT's grammar (#464): the table is `PlayfieldAccessHolder`'s ListFrame-framed list
+	// (`CoreCharacter\PlayfieldAccessHolder.cpp`, reader `FUN_0077d220`/`FUN_0077db70`), and under that carve every
+	// one of the old model's four `Unknown*` fields DISSOLVED:
+	//   - `UnknownBeforeChildMode` (u16) + the name's "trailing NUL" + `ChildMode` were ONE big-endian u32 - the
+	//     CHILD COUNT, whose high bytes are zero because no entry has more than 3 children;
+	//   - `PfAccessWindowChild.Unknown` was the two u16 length words of a child's two EMPTY strings;
+	//   - `PfAccessWindowChildDetail.DetailUnknown` + the 3-char "ShortCode" were one big-endian u32 window id;
+	//   - the childMode 1/2/3 "variants", "detail modes" and both lookahead heuristics were artifacts of walking
+	//     a plain `count × child` list through a shifted frame.
+	// What remains genuinely unnamed is exactly ONE field: the head's `Unknown` u32 (zero on all 86 records).
 	public sealed class PfAccessWindowEntry
 	{
 		public uint PlayfieldId { get; init; }
 
-		public PfAccessWindowChild? Child { get; init; }
-		public byte ChildMode { get; init; }
+		// A BOOLEAN on the client (its reader normalises `!= 0`); meaning undecoded. 0 or 1 on all 86 records.
+		public byte Flag { get; init; }
 
-		public byte SectionOrTier { get; init; }
-		public int Offset { get; init; }
+		// 2 or 3 across the catalog (3 on the Khitai/expansion playfields).
+		public uint Kind { get; init; }
+
+		// 0 in all 86 catalog records; a real record field (the client stores it), name unknown (Gitea #464).
+		public uint Unknown { get; init; }
 
 		public string InternalName { get; init; } = null!;
 
-		public uint Kind { get; init; }
-
-		// 0 in all 86 catalog records - see the class note.
-		public uint Unknown { get; init; }
-
-		// 0 in all 86 catalog records - see the class note.
-		public ushort UnknownBeforeChildMode { get; init; }
+		public List<PfAccessWindowChild> Children { get; init; } = [];
 
 		public override string ToString()
 		{
-			var child = Child == null
+			var children = Children.Count == 0
 				? ""
-				: $" | child: {Child}";
+				: $" | children: {string.Join(", ", Children.Select(c => c.ToString()))}";
 
-			return $"0x{Offset:X8}: {PlayfieldId} {InternalName} section={SectionOrTier} kind={Kind} childMode={ChildMode}{child}";
+			return $"{PlayfieldId} {InternalName} flag={Flag} kind={Kind}{children}";
+		}
+	}
+
+	// One child element of a PfAccessWindowEntry: `[u8 flag][u32 id][str displayName][str parentName]` on the wire.
+	// A flag-0 child carries a bare id and two empty strings; a flag-1 child names a window and its parent window.
+	public sealed class PfAccessWindowChild
+	{
+		// A BOOLEAN on the client; 0 = id-only, 1 = named window, on every captured child.
+		public byte Flag { get; init; }
+
+		// The old model read this u32's bytes as `[u8 DetailUnknown][3-char ShortCode]` ("M2W"); it is one id
+		// (5.03M-5.06M across the catalog).
+		public uint Id { get; init; }
+
+		public string DisplayName { get; init; } = "";
+		public string ParentName { get; init; } = "";
+
+		public override string ToString()
+		{
+			return DisplayName.Length == 0
+				? $"[{Flag}] {Id}"
+				: $"[{Flag}] {Id} {DisplayName} < {ParentName}";
 		}
 	}
 }

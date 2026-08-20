@@ -10,8 +10,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public static class QuestIndexRegions
 	{
 		// The index for the held quests, already ordered (primary first). Each quest contributes a goal-table block
-		// from its seeded index fields; the block trailers chain to the next quest's QuestLineId, terminating on
-		// IndexTerminalWord.
+		// from its seeded index fields, opening with its own QuestLineId (#464 - there is no trailer chain and no
+		// terminal word; those were the next block's/next region's own leading words).
 		//
 		// `areas` maps areaId -> that area's QuestLine row; `areaCatalog` maps areaId -> every quest in the area,
 		// ordered by JournalSequence. Both are needed because a block is NOT self-contained (see Block.AreaQuestIds).
@@ -44,6 +44,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 				blocks.Add(new QuestIndexRegion.Block
 				{
+					AreaId = q.QuestLineId,
 					Magic = magic,
 					TableField1 = catalog != null
 						? sequence
@@ -72,22 +73,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 					// beach-only today (IsSnapshotEligible is gated off), so the beach values keep it byte-exact.
 					TrailerA = 1,
 					TrailerB = 0,
-					TrailerC = 0,
-					// The trailers CHAIN: each carries the NEXT held quest's QuestLineId, and the LAST carries the terminal
-					// word - a constant 0x156E7 in every capture, the same word the empty quest portion ends on.
-					ChainWord = i + 1 < ordered.Count
-						? ordered[i + 1].QuestLineId
-						: QuestIndexRegionCodec.IndexTerminalWord
+					TrailerC = 0
 				});
 			}
 
 			return new QuestIndexRegion
 			{
 				QuestIds = [.. ordered.Select(q => q.QuestId)],
-				// The head of the block chain is the first (primary) quest's area; for a beach char this is 241 (0xF1).
-				LeadAreaId = ordered.Count > 0
-					? ordered[0].QuestLineId
-					: 0,
 				Blocks = blocks
 			};
 		}

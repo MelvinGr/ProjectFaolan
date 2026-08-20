@@ -2,7 +2,9 @@ using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +23,16 @@ namespace Faolan.Tests
 		// The compeltefirstquest login snapshot's 2,247-byte quest region, byte-for-byte. Verified against
 		// Golden/QuestPortion2QuestGolden.bin (since deleted, #555) before removal.
 		private const string CapturedRegionSha256 = "9c6dc1223caac6630ed3e1baeddf1b47f0df631f0866686a28c5586bc3121422";
+
+		// The digest above was pinned over the OLD carve's region, whose final word was really the access-window
+		// table's ListFrame (86 catalog entries) - re-appended so the retail anchor survives the #464 re-carve.
+		private static readonly byte[] AccessTableFrameWord = BuildFrameWord();
+
+		private static byte[] BuildFrameWord()
+		{
+			var word = ListFrame.ForCount(AccessWindowCatalog.Entries.Count);
+			return [(byte)(word >> 24), (byte)(word >> 16), (byte)(word >> 8), (byte)word];
+		}
 		private static readonly string DbPath = TestPaths.FaolanDb;
 
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
@@ -33,10 +45,11 @@ namespace Faolan.Tests
 			[
 				0x00, 0x00, 0x00, 0x18, // version 0x18
 				0x00, 0x00, 0x03, 0xF1, // empty Quest_c list ((0+1)*0x3F1)
-				0x00, 0x00, 0x03, 0xF1, // index tag
+				0x00, 0x00, 0x03, 0xF1, // empty completed-journal frame (the phantom "index tag")
 				0x00, 0x00, 0x03, 0xF1, // empty index marker ((0+1)*0x3F1)
-				0x00, 0x00, 0x00, 0x00, // index count = 0
-				0x00, 0x01, 0x56, 0xE7 // terminal constant
+				0x00, 0x00, 0x00, 0x00 // index count = 0
+				// The capture's next word, 0x000156E7, is NOT part of this region: it is the access-window
+				// table's ListFrame(86) - the old carve's phantom "terminal constant" (#464).
 			];
 			Assert.Equal(golden, SnapshotTails.EmptyQuestPortion());
 			// The empty-quest list/null-primary path must route to the same region.
@@ -59,8 +72,11 @@ namespace Faolan.Tests
 			// The captured region's SHA-256 rather than the region: the blob is gone from the repo (#555). This gate
 			// only ever compared against those bytes - both inputs are DB rows - so the digest is the same assertion,
 			// minus the ability to report a first-differing offset. Regenerate the pin only against a capture.
-			Assert.Equal(2247, built.Length);
-			Assert.Equal(CapturedRegionSha256, Sha256(built));
+			// 2243: the captured region's final four bytes under the OLD carve were the access-window table's
+			// ListFrame word (#464). The pinned digest was taken over those 2247 bytes, so the retail anchor is
+			// preserved by re-appending the frame word the table region now owns.
+			Assert.Equal(2243, built.Length);
+			Assert.Equal(CapturedRegionSha256, Sha256([.. built, .. AccessTableFrameWord]));
 		}
 
 		// Single-quest path must still equal the multi-quest portion for one held quest (regression guard for the
@@ -86,7 +102,7 @@ namespace Faolan.Tests
 			// 13479 record is still a comparison against a capture - one hop, not a self-check. (If that gate fails
 			// this one is meaningless, but it fails loudly first.)
 			var region = SnapshotTails.QuestPortion([await LoadDefinition(10238), await LoadDefinition(13479)], await LoadDefinition(10238), CaptureInstance);
-			Assert.Equal(CapturedRegionSha256, Sha256(region));
+			Assert.Equal(CapturedRegionSha256, Sha256([.. region, .. AccessTableFrameWord]));
 
 			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
 			var sig = new byte[] { 0, 0, 0x34, 0xA7, 0, 0, 0, 1, 0, 0, 0x34, 0xA7 };

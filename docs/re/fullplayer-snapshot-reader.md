@@ -70,26 +70,60 @@ index in **all 141** snapshots (`UnknownBeforeAccessWindowTable` 105,744 B → *
    strictly monotonic** (branch/chapter quests repeat one), so the old `idx == i+1` assertion was also a
    beach-only accident.
 
-Corrected grammar (no leading tag), `QuestIndexRegion`:
+Corrected grammar (no leading tag), `QuestIndexRegion` — as re-carved to the client's own `MainQuest_c` reader
+(`FUN_00922210`) in the 2026-08-20 update below (the original #391 write-up hung each block's `areaId` off the
+PREVIOUS block as a "chainWord", manufacturing a chain grammar and a phantom "terminal word"):
 ```
 [u32 marker=(count+1)*0x3F1] [u32 questId × count] [u32 count]
-count==0 -> [u32 terminal 0x000156E7]
-count>0  -> [u32 leadAreaId]                                  # the first block's quest AreaId (head of the chain)
-            per held quest (count blocks, id order):
-              [u32 magic] [u32 tf1] [u32 tf2=count-1] [u32 tf3=0]
-              [u32 n] [ (questId, sequence) × n ]             # the AREA's full quest catalog
-              [u32 trailerQuestId] [u32 a] [u32 b] [u32 c] [u32 chainWord]
+per held quest (count blocks, id order):
+  [u32 areaId] [u32 magic] [u32 tf1] [u32 tf2=count-1] [u32 tf3=0]
+  [u32 n] [ (questId, sequence) × n ]             # the AREA's full quest catalog
+  [u32 trailerQuestId] [u32 a] [u32 b] [u32 c]
 ```
 - `trailerQuestId` is the **area's ANCHOR quest** (catalog sequence 1), NOT the held quest — they coincide only
   when the held quest is the area's first. Beach: held 12371 (seq 5) but the block trailer is 10238 (seq 1).
   (`QuestIndexRegions.ForQuests` had this wrong; fixed — it exposed a real generation bug the beach goldens hid.)
-- `chainWord` = the NEXT block's `leadAreaId`, or the terminal `0x156E7` for the last block (a linked list of
-  area ids). `leadAreaId` + the block chainWords form that chain.
+- There is NO terminal word: the "constant `0x156E7`" the old carve ended on is the ACCESS-WINDOW TABLE's own
+  `ListFrame(86)`, constant only because every capture carries the same 86-entry catalog.
 
-Round-trip (`QuestIndexRegion` carries `LeadAreaId`, per-block `AreaQuestSequences` and `TrailerA/B/C`) is
+Round-trip (`QuestIndexRegion` carries per-block `AreaId`, `AreaQuestSequences` and `TrailerA/B/C`) is
 byte-exact for all 141. GENERATION from the DB is byte-exact only for the single-block beach shape today; the
 multi-area per-quest sequences/trailers are not modelled in the DB yet (generation follow-up, #389), and
 `IsSnapshotEligible` remains gated off, so nothing ships that path.
+
+## UPDATE 2026-08-20 (#464) — the access-window table IS client list D, and the whole subclass reads sequentially
+
+The `PFAccessWindow_` table was carved in #258 as a COUNT-LESS region located by a landmark search (the first
+`PFAccessWindow_` name string), ended by a lookahead heuristic, with four `Unknown*` fields no capture ever
+varied. Lining the tails' client read order against the bytes showed that carve was SHIFTED (#466's failure
+shape): the table is **list D** — `PlayfieldAccessHolder`'s `0x3F1`-framed list (`FUN_0077d220`/`FUN_0077db70`,
+`CoreCharacter\PlayfieldAccessHolder.cpp`) — and under the client's frame every phantom field dissolves:
+
+```
+table = [u32 (count+1)*0x3F1]  count × entry
+entry = [u32 playfieldId][u8 flag][u32 kind][u32 unknown][u16-str name][u32 childCount] childCount × child
+child = [u8 flag][u32 id][u16-str displayName][u16-str parentName]
+```
+
+| old carve | actually |
+|---|---|
+| name's "trailing NUL" + `UnknownBeforeChildMode` (u16) + `childMode` (u8) | ONE big-endian u32 — the CHILD COUNT (≤3 everywhere, so its high bytes read as constants) |
+| childMode 1/2/3 "variants" + "detail modes" + the mode-3 lookahead | plain `count × child` elements |
+| `PfAccessWindowChild.Unknown` (u32, 0 in all 13) | the two u16 length words of a child's two EMPTY strings |
+| `DetailUnknown` (u8) + 3-char `ShortCode` ("M2W") | one big-endian u32 id (5.03M–5.06M) |
+| the quest index's "terminal `0x000156E7`" | the table's own `ListFrame(86)` |
+| each index block's "chainWord" / the region's "leadAreaId" | the NEXT/first block's own leading `areaId` (`MainQuest_c` reads five head words: `FUN_00922210`) |
+
+Verified byte-exact: the beach template's whole region walks under the client grammar to its exact last byte,
+and the re-carved codecs round-trip **all 151** captured subclasses (the suite's corpus gates). The landmark
+search and the `UnknownBeforeAccessWindowTable` gap field are gone — every region is now read SEQUENTIALLY —
+and the one field that remains genuinely unnamed in the whole family is the entry head's `unknown` u32 (zero on
+all 86 records, register: Gitea #464).
+
+⭐ **What the table IS**: playfield ACCESS records. The subsystem's own consumer (`FUN_0077e200`) reads a
+stored record's `+0x14` access type — 0/2 pass, 1/3 log `"Access DENIED"`, anything else asserts
+`"Invalid access type %u for playfield %u"` — i.e. the client half of the instance-entry gate (#511). List E
+(`FUN_0077d5b0`, `[u32 key][str][u32 ×3][u8][str]`, empty in every capture) is the same holder's second list.
 
 ## UPDATE 2026-07-20 (#393) — the PostAccessBlock stat sheet is a BASELINE skeleton, not live stats
 
@@ -257,13 +291,21 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 @0x48]
    [u32 @0x4c][u32 @0x50]` — **all numeric, no strings** (the numeric state/goal tracking; the readable text
    for these quests is in the `Quest_c` journal list, region 2).
-6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record (`FUN_0077db70`, decompiled 2026-07-28):
-   `[u8 flag][u32][u32][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]` — VARIABLE-WIDTH
-   (the inner count is a PLAIN count, not `0x3F1`-framed). **Empty on all 151 captured subclasses.**
+6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
+   (`FUN_0077db70`): `[u8 flag][u32][u32][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`
+   — VARIABLE-WIDTH (the inner count is a PLAIN count, not `0x3F1`-framed).
+   ⭐ **This IS the `PFAccessWindow_` access-window table** (#464): the records are `PlayfieldAccessHolder`'s
+   playfield-access entries (`CoreCharacter\PlayfieldAccessHolder.cpp`, channel `GameCode/PlayfieldAccess`),
+   86 on every captured subclass. An earlier pass called this list "empty on all 151" — that was the
+   off-by-one-list alignment the old landmark-carved table forced (see the 2026-08-20 update below).
 7. **List E** — `FUN_0077d5b0`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
    `FUN_0077df00`: `[string][u32][u32][u32][u8][string]` — also VARIABLE-WIDTH.
-   **Empty on all 151 captured subclasses.**
+   **Empty on all 151 captured subclasses.** Also a `PlayfieldAccessHolder` list; its access-type consumer
+   (`FUN_0077e200`) reads the stored record's `+0x14` and refuses entry on types 1/3 ("Access DENIED"), which
+   is the client half of the #511 instance-entry gate.
 8. **List F** — `FUN_004d5900`: `0x3F1`-framed; `N-1` records, each reads 2 `u32`, stores the 2nd.
+   **Empty on all 151** (the "F×17" of the earlier post-access walk was `StatList_t` #1's own 17 pairs —
+   byte-identical 8-byte records, which is also why that walk had to call the second stat list "stat×0").
 9. **`StatList_t` #1** — `FUN_0139d450` @ `+0x74`: `0x3F1`-framed; `N-1` × `StatPair_t` (`FUN_0139d210` =
    `[u32 statId][u32 value]`, asserts `"StatPair_t:reading %d %d"`). **This is our `PostAccessBlock` stat
    table** (HP/Mana/Stamina/XP/Level/PvP + the archetype-derived stats).

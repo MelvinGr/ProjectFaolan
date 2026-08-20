@@ -114,32 +114,6 @@ namespace Faolan.Tests
 				"the committed BeachTailsTemplate.bin no longer matches what the capture yields - regenerate with FAOLAN_UPDATE_ASSETS=1 if that is intended");
 		}
 
-		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-
-		// identical except their instance references. Proves the beach tails are content-fixed + (level, vitals,
-		// instance), so FullCharSnapshotSubClass's template + instance-swap fully reproduces them for any beach character.
-		[Fact]
-		public void TwoBeachCharacters_TailsDifferOnlyAtInstanceAndStats()
-		{
-			// strie-login-inventory.bin (instance 0x02165EFF) vs a second Strie beach login (different instance).
-			var a = SubClass("strie-login-inventory.bin");
-			var b = SubClass("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
-			Assert.Equal(a.Length, b.Length);
-			// These two are the SAME session capture pair -> identical; the cross-character proof lives in the
-			// committed finding. Here we assert the builder substitutes the instance everywhere.
-			Assert.True(a.SequenceEqual(b));
-			return;
-
-			byte[] SubClass(string file)
-			{
-				var packet = Rpc.Parse(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
-				var s = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
-				s.ReadUInt32();
-				s.ReadUInt32();
-				s.ReadUInt32();
-				return SnapshotPackets.Parse(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
-			}
-		}
-
 		private static (byte[] Prefix, byte[] Root, byte[] SubClass) SplitBeach()
 		{
 			var packet = Rpc.Parse(File.ReadAllBytes(Cap));

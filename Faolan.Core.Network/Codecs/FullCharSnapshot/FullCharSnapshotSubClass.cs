@@ -7,7 +7,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// FullCharSnapshotSubClassCodec reads and writes it, SnapshotTails is what constructs one from a character.
 	//
 	// Wire order (see the codec for the grammar and its provenance):
-	//   quest journal (Quest_c) | completed-quest journal | quest index | [opaque gap] | PFAccessWindow_ catalog |
+	//   quest journal (Quest_c) | completed-quest journal | quest index | PFAccessWindow_ catalog |
 	//   post-access stat block
 	public sealed class FullCharSnapshotSubClass
 	{
@@ -21,13 +21,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
 		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
 
-		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the completed journal and
-		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
+		// The quest INDEX region (the id list + the "W6QT" goal-id table) between the completed journal and the
+		// access-window table; modeled by QuestIndexRegion. There is no gap between it and the catalog - the old
+		// "UnknownBeforeAccessWindowTable" was empty on every captured subclass, and #464's re-carve made the whole
+		// stream sequentially readable.
 		public QuestIndexRegion? QuestIndex { get; init; }
-
-		// Everything between the quest index and the access-window table - still opaque (decoded by
-		// tools/capture/decode_snapshot_quests.py). Carried verbatim so the region round-trips byte-exact.
-		public byte[] UnknownBeforeAccessWindowTable { get; init; } = [];
 
 		// The game-static PFAccessWindow_ playfield catalog - the one tails region that is reference data rather
 		// than generated. Identical for every character; AccessWindowCatalog is the typed copy production emits.

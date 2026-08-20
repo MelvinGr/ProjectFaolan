@@ -74,7 +74,6 @@ namespace Faolan.Core.Network.Constants
 				Quests = new QuestcRegion(),
 				CompletedQuests = new CompletedQuestJournalRegion(),
 				QuestIndex = new QuestIndexRegion(),
-				UnknownBeforeAccessWindowTable = [],
 				AccessWindowEntries = [.. AccessWindowCatalog.Entries],
 				PostAccessBlock = block,
 				UnknownAfterAccessWindowTable = []

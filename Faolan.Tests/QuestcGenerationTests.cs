@@ -44,7 +44,8 @@ namespace Faolan.Tests
 		}
 
 		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
-		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
+		// to the beach template's @0..1288 - so flipping the flag splices identical bytes for a fresh beach char. #186.
+		// (1288: the four bytes at 1288..1292 are the access-window table's own ListFrame word, #464.)
 		[Fact]
 		public async Task BuildSingleQuestPortion_MatchesTemplate_ByteExact()
 		{
@@ -54,7 +55,7 @@ namespace Faolan.Tests
 			var portion = QuestPortionOracle.BuildSingle(def, BeachState, 0x02165EFF);
 
 			Assert.Equal(SnapshotTails.QuestPortionLength, portion.Length);
-			Assert.Equal((await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken))[..1292], portion);
+			Assert.Equal((await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken))[..SnapshotTails.QuestPortionLength], portion);
 		}
 
 		[Fact]
@@ -79,7 +80,7 @@ namespace Faolan.Tests
 			Assert.Equal(template[..RegionEnd], built);
 		}
 
-		// The WHOLE quest portion of the tails (@0..1292 = Quest_c + @609 + index) regenerates byte-exact from the DB
+		// The WHOLE quest portion of the tails (@0..1288 = Quest_c + @609 + index) regenerates byte-exact from the DB
 		// (the journal + per-goal model) plus the per-quest scalars/index data NOW SOURCED FROM THE DB - proving the
 		// .bin's entire quest region authors from server state with ZERO literals (only the per-character state). #186.
 		[Fact]
@@ -108,7 +109,7 @@ namespace Faolan.Tests
 			];
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
-			Assert.Equal(template[..1292], built);
+			Assert.Equal(template[..SnapshotTails.QuestPortionLength], built);
 		}
 
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
