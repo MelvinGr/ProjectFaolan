@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// How many captured frames our own strict Rpc.Parse refuses - the trust check under method-bodies.
+				case "frame-health":
+				{
+					FrameHealth(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				// #868: which object-class word each dynel-family IIR carries - the EntityClass registry's holes.
 				case "entity-classes":
 				{

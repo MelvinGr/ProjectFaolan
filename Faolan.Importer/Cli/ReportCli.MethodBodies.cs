@@ -30,6 +30,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			var matches = new List<(string Method, string Class, string Capture, bool Down, uint SenderInstance, uint ReceiverInstance, byte[] Body)>();
+			var unreadable = new SortedDictionary<string, int>();
 
 			foreach (var capture in captures)
 			foreach (var p in capture.Packets)
@@ -40,13 +41,23 @@ namespace Faolan.Importer.Cli
 				if (names.Count == 0)
 					continue;
 
+				// The endpoints come from the header, and a frame whose header will not parse is COUNTED rather than
+				// dropped: a silent skip here reads as "the corpus does not carry this message", which is the one
+				// conclusion this report exists to make reliable.
 				Rpc rpc;
 				try
 				{
 					rpc = Rpc.Parse(p.Bytes);
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
+					// The BODY does not need the header parsed - `CapturedPacket.Body` slices it by the frame's own
+					// declared header length - so the frame is still shown, with its endpoints reported as unknown.
+					// Dropping it would say "the corpus does not carry this message", which is false and is the one
+					// conclusion this report exists to make reliable. See `--report frame-health`.
+					var key = $"{string.Join("|", names)}: {ex.GetType().Name}: {ex.Message}";
+					unreadable[key] = unreadable.GetValueOrDefault(key) + 1;
+					matches.Add((string.Join("|", names), ClassName(p.ReceiverClass), capture.Name, p.IsDownload, 0, 0, p.Body));
 					continue;
 				}
 
@@ -55,6 +66,8 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine($"method-bodies: {matches.Count} frame(s) matching \"{filter}\"");
+			foreach (var (key, count) in unreadable)
+				Console.WriteLine($"  ⚠️ {count} frame(s) have an UNPARSEABLE header (endpoints shown as 0x0; body is still exact): {key}");
 
 			foreach (var group in matches.GroupBy(m => (m.Method, m.Class, m.Down)).OrderByDescending(g => g.Count()))
 			{

@@ -64,6 +64,38 @@ mechanism.
 - `.criminal [seconds]` is the GM bootstrap — the retail trigger is killing another player, and PvP
   player-versus-player combat is not modelled, so without it the criminal branches are unreachable.
 
+## Team-mates are exempt, and the exemption is a SPELL RESISTANCE (#869)
+
+Joining a team grants a `Criminal Protection` buff (spell **3880938**), and it never travels alone. In the same
+frame, retail sends `DispatchAddSpellResistance(metaType = 2005, percentage = 100)` — and when the buff ends, the
+matching `DispatchRemoveSpellResistance` goes with it. Measured across 5 captures: 10 adds and 7 removes, 1:1 with
+the buff, every one of them 100%.
+
+`metaType 2005` resolves in **LDB category 55200** — the client's spell-effect / metatype catalog — to **"Criminal
+Team"**. So the team-mate exemption is not a special case inside the criminal rules: it is a 100% resistance to a
+metatype whose name is literally the thing being resisted, on a registry of its own.
+
+The measured sequence (`login_2-clients_group-trade-friend`):
+
+| t | | |
+|---|---|---|
+| 53.9 | c2s | `TeamInvite` |
+| 56.5 | c2s | `AcceptTeamInvite` |
+| 56.9 | s2c | `DispatchYouJoinedTeam` / `DispatchTeamJoin` |
+| 56.9 | s2c | **`DispatchAddSpellResistance(2005, 100)`** — once per client |
+| 116.8 | s2c | `MagicBuffIIR` `Criminal Protection` **(end)** + **`DispatchRemoveSpellResistance(2005, 100)`** |
+
+⚠️ **The remove repeats the percentage the add carried — it does not send 0.** A removal names the resistance being
+taken away, not a new value of zero.
+
+⚠️ **A resistance is a THIRD registry**, beside the stat sheet and the buff list. It is added and removed by its own
+message, so a character's resistances are not visible in either of the places the rest of their state lives. The
+only other metatype the corpus carries is **427 = "Knockback"**, also at 100% — knockback immunity, which is a
+different quantity from the `KnockbackResistance` stat (Gitea #496).
+
+`SpellResistanceCodec` and `SpellMetaTypes` are shipped, with `.resist` as the GM bootstrap. What is missing is a
+trigger: nothing grants `Criminal Protection` yet, which is the open half below.
+
 ## What is NOT decoded
 
 - **The ladder.** How many murder points promote Criminal to Murderer, and which of the four `Criminal` spells

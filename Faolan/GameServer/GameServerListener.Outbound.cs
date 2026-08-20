@@ -1069,6 +1069,21 @@ namespace Faolan.GameServer
 		// class curve, so ClassBasePools is null - the max ids fall back to our ceiling, which is not the quantity
 		// that slot holds. Neither blanket is right; the split above is.
 
+		// ---- SPELL RESISTANCE (#869) ----
+		//
+		// `DispatchAddSpellResistance` / `DispatchRemoveSpellResistance` - a per-character resistance to one spell
+		// METATYPE (LDB category 55200), on its own registry rather than on the stat sheet or the buff list.
+		//
+		// ⚠️ Retail never sends this ALONE: every captured frame accompanies a `Criminal Protection` apply or end in
+		// the same frame (`CriminalStatus.CriminalProtectionSpellId`). When #503 grants that buff, the matching
+		// resistance belongs beside it - which is why this takes the add/remove verb rather than being two methods.
+		private static Task SendSpellResistance(INetworkClient client, uint metaType, uint percentage, bool add)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				add ? GameCharInterfaceMethods.DispatchAddSpellResistance : GameCharInterfaceMethods.DispatchRemoveSpellResistance,
+				SpellResistanceCodec.Build(metaType, percentage)));
+		}
+
 		// ---- MAP MARKERS (#868) ----
 		//
 		// `DispatchAddWayPoint` / `DispatchRemoveWayPoint` on GameCharInterface. The endpoint pair is the ordinary

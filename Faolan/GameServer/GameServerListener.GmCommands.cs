@@ -402,7 +402,8 @@ namespace Faolan.GameServer
 				["time"] = TimeCommand,
 				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand,
-				["waypoint"] = WayPointCommand
+				["waypoint"] = WayPointCommand,
+				["resist"] = ResistCommand
 			};
 		}
 
@@ -573,6 +574,53 @@ namespace Faolan.GameServer
 
 		// .position  - print the caller's current map + live position (the in-world entity transform when
 		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
+		// .resist <knockback|criminalteam|<metaTypeId>> [percentage]  - push a spell RESISTANCE, 0 to remove it (#869).
+		//
+		// The retail trigger for the only metatype we have seen in quantity is a `Criminal Protection` buff nothing
+		// grants yet (#503), and the other is knockback immunity for a knockback that is not implemented (#496) - so
+		// this is the standard GM bootstrap for a decoded message with no live trigger.
+		//
+		// A metatype is an id into LDB category 55200, so a raw id is accepted as well as the two named ones: the
+		// catalog has hundreds of entries and this is the instrument for finding out what any of them does in-client.
+		private async Task ResistCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"Usage: .resist <knockback|criminalteam|metaTypeId> [percentage]  (default {SpellMetaTypes.FullImmunity}, 0 removes)");
+				return;
+			}
+
+			var metaType = parts[0].ToLowerInvariant() switch
+			{
+				"knockback" => SpellMetaTypes.Knockback,
+				"criminalteam" => SpellMetaTypes.CriminalTeam,
+				_ => uint.TryParse(parts[0], out var raw) ? raw : 0u
+			};
+
+			if (metaType == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Unknown metatype '{parts[0]}'. Use knockback, criminalteam or an LDB 55200 id.");
+				return;
+			}
+
+			var percentage = SpellMetaTypes.FullImmunity;
+			if (parts.Length > 1 && !uint.TryParse(parts[1], out percentage))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "The percentage must be a number (0 removes).");
+				return;
+			}
+
+			// The remove carries the percentage too - retail's remove frames repeat the value the add carried, they
+			// do not send 0. So a `.resist X 0` sends a REMOVE of the full-immunity value, not an add of zero.
+			var add = percentage > 0;
+			await SendSpellResistance(client, metaType, add ? percentage : SpellMetaTypes.FullImmunity, add);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				add ? $"Resistance to metatype {metaType} set to {percentage}%." : $"Resistance to metatype {metaType} removed.");
+		}
+
 		// .waypoint [off]  - plant a map marker at the player's current position, or take it down (#868).
 		//
 		// The retail trigger is a DEATH: every captured `DispatchAddWayPoint` is a TOMBSTONE pin, labelled
