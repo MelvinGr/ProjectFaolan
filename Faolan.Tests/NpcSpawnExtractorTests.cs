@@ -64,11 +64,40 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
+		// #309: an EPIC-mode window is not evidence for the normal stat columns. Epic re-tunes the SAME templates -
+		// measured on chat-annotated-3's back-to-back Spider Caverns entries, Cavecrawler/Cavehunter carry ~8x the
+		// health at the same name, template and level - so everything under an epic PlayfieldF is skipped until a
+		// normal MapChange arrives.
+		[Fact]
+		public void Extract_SkipsSpawnsInsideAnEpicWindow()
+		{
+			var packets = new List<CapturedPacket>
+			{
+				EpicMapChange(1004),
+				Spawn(0x0004DE8A, 1f, 2f, 3f, "Cavecrawler"),
+				MapChange(1004),
+				Spawn(0x0004DE8B, 4f, 5f, 6f, "Cavecrawler")
+			};
+
+			var entry = Assert.Single(NpcSpawnExtractor.Extract(packets));
+
+			Assert.Equal(0x0004DE8Bu, entry.Handle); // only the NORMAL window's spawn survives
+		}
+
 		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
 		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			return Packet(PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0));
+		}
+
+		// The same record with the EPIC class word in its proxy - what retail sent on the 19:57:15 Spider Caverns
+		// epic entry (0xCABC against the normal 0xC79C).
+		private static CapturedPacket EpicMapChange(uint mapId)
+		{
+			return Packet(PlayfieldFCodec.Build(new PlayfieldFIIR(Vector3.Zero,
+				new PlayfieldProxy(mapId, PlayfieldProxy.EpicPlayfieldClass, 0, 1, PlayfieldProxy.PinnedInstanceWord, 0x01EA7B9C),
+				0u, 15f, 13.86f, 0u, 7u, 0u)));
 		}
 
 		// Frames content as [bodyLen4][content] then a full packet [len4][crc4][headerLen4=0][body].

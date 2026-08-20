@@ -765,7 +765,7 @@ namespace Faolan.GameServer
 		// `DispatchYouJoinedTeam` had announced three seconds earlier. So the pair is switched WHOLE rather than
 		// having the id swapped under the map's own type word: a team id under type 2 would be a shape retail never
 		// sends. Null (the common case) leaves the personal form exactly as it was.
-		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken, uint? teamId = null)
+		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken, uint? teamId = null, bool epic = false)
 		{
 			var character = client.Session.Character;
 			var charInstance = map?.PlayfieldInstanced ?? true
@@ -783,9 +783,12 @@ namespace Faolan.GameServer
 			var ownerType = teamId is null ? fieldA : PlayfieldProxy.TeamOwnerType;
 			var ownerId = teamId ?? charInstance;
 
+			// #309: the proxy's class word is the copy's DIFFICULTY - 0xCABC on the captured epic Spider Caverns
+			// entry against 0xC79C everywhere else. Everything else in the record is mode-independent.
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(PlayfieldFCodec.Build(new Vector3(character.PositionX, character.PositionY, character.PositionZ), character.MapId,
-					ownerId, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, ownerType, fieldC)));
+					ownerId, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, blobLastWord, ownerType, fieldC,
+					epic ? PlayfieldProxy.EpicPlayfieldClass : PlayfieldProxy.PlayfieldClass)));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared

@@ -23,6 +23,12 @@ namespace Faolan.GameServer.World
 		// client only ever sees its own instance).
 		public uint InstanceId { get; set; }
 
+		// #309: whether this copy is the map's EPIC difficulty. Stamped at entry from the player's travel-box pick;
+		// what it changes today is only ROUTING (an epic copy never shares with a normal one) and the MapChange's
+		// class word (0xCABC) - the content is deliberately the normal map's until the epic tuning is modelled
+		// (measured so far: ~8x health on non-minion mobs, see NpcSpawnExtractor's epic-window note).
+		public bool IsEpic { get; set; }
+
 		private uint _nextHandle;
 
 		public uint MapId { get; }

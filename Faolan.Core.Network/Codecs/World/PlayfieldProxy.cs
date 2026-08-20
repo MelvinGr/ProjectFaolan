@@ -14,7 +14,10 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [4] always 0 in every capture
 	//   [5] a small COUNT, not a flag - 1, 2, 4, 5, 6 and 8 all occur (117/16/5/5/3/2). The teleport records only
 	//       ever carry 0 or 1, which is why this used to be modelled as a "ready flag"; the PlayfieldFIIR embedding
-	//       disproves that. What it counts is undecoded. [V0]
+	//       disproves that. What it counts is undecoded [V0] - the best-fitting reading is the map copy's ORDINAL:
+	//       the back-to-back Spider Caverns entries (#309) carry 1 with token 0x50B36B then 2 with the CONSECUTIVE
+	//       token 0x50B36C, i.e. the player's second minted copy of that map. It is NOT the difficulty (that is [0]
+	//       alone): the 4/5/6/8 values occur on maps with no epic mode. We keep emitting 1.
 	//   [6] InstanceWord (0x9C50 = 40016) - a constant that rides with a pinned instance; NOT an entity class id
 	//       (it is below the 50000 base, see EntityClass)
 	//   [7] the playfield INSTANCE token
@@ -138,17 +141,18 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(Trailing ? (byte)0x01 : (byte)0x00);
 		}
 
-		// A proxy naming a map but no particular instance of it - the "begin teleport" form.
-		public static PlayfieldProxy ForMap(uint mapId)
+		// A proxy naming a map but no particular instance of it - the "begin teleport" form. `epic` selects the
+		// difficulty class word (#309/#511) - the captured epic begin differs from the normal one in that word alone.
+		public static PlayfieldProxy ForMap(uint mapId, bool epic = false)
 		{
-			return new PlayfieldProxy(mapId);
+			return new PlayfieldProxy(mapId, epic ? EpicPlayfieldClass : PlayfieldClass);
 		}
 
 		// A proxy pinned to one live playfield instance - the form a destination announce and a team-member record
-		// both carry.
-		public static PlayfieldProxy ForInstance(uint mapId, uint instanceToken)
+		// both carry. `epic` selects the difficulty class word (#309/#511).
+		public static PlayfieldProxy ForInstance(uint mapId, uint instanceToken, bool epic = false)
 		{
-			return new PlayfieldProxy(mapId, InstanceWord: PinnedInstanceWord, Slot5: Ready, InstanceToken: instanceToken);
+			return new PlayfieldProxy(mapId, epic ? EpicPlayfieldClass : PlayfieldClass, InstanceWord: PinnedInstanceWord, Slot5: Ready, InstanceToken: instanceToken);
 		}
 	}
 }

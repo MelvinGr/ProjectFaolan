@@ -27,6 +27,41 @@ namespace Faolan.Tests
 			Assert.Equal("10d27bc00000c35008006f3101620000c79c000007d00000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
 		}
 
+		// #309: the EPIC-mode begin, byte-for-byte against the captured epic Spider Caverns entry
+		// (chat-annotated-3 frame 23843, instance 0x0802E5D4, map 1004=0x3EC). It differs from the normal begin in
+		// the proxy's class word alone - 0xCABC for 0xC79C - which is what Build(epic: true) selects.
+		[Fact]
+		public void BuildTeleportBeginBody_Epic_MatchesCapture()
+		{
+			var body = TeleportCodec.Build(0x0802E5D4, 1004, epic: true);
+			Assert.Equal("10d27bc00000c3500802e5d401620000cabc000003ec0000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
+		}
+
+		// #309: the EPIC destination announce (frame 23847) - class word 0xCABC, and the rest of the record is the
+		// normal grammar with that session's own instance token/arrival. ⚠️ Proxy slot [5] is compared LOOSELY: the
+		// capture carries 2 there where the builder emits its usual 1 - the slot reads as the map copy's ORDINAL
+		// (this was the player's second minted copy; the tokens are consecutive), not part of the mode, and inventing
+		// a per-entry ordinal to chase one observation would be fitting noise. Everything else matches byte-exact.
+		[Fact]
+		public void BuildTeleportDestBody_Epic_MatchesCaptureExceptTheCopyOrdinal()
+		{
+			var captured = Convert.FromHexString(
+				"5a32f0d70000c3500802e5d4000000000000000000000000000000000000000000000000003f800000620000cabc000003ec0000000000000000000000000000000200009c500050b36c00000000000000000000000014000187044392333342300000439940000000015c00");
+			var body = TeleportCodec.Build(0x0802E5D4, 1004, new Vector3(292.4f, 44.0f, 306.5f), 0x0050B36C, 0x0000015C, epic: true);
+
+			Assert.Equal(captured.Length, body.Length);
+			var ordinalOffset = -1;
+			for (var i = 0; i < body.Length; i++)
+			{
+				if (body[i] == captured[i])
+					continue;
+				Assert.Equal(-1, ordinalOffset); // at most ONE differing byte...
+				ordinalOffset = i;
+			}
+
+			Assert.Equal(65, ordinalOffset); // ...and it is proxy slot [5]'s low byte: our 1 against the capture's 2
+		}
+
 		[Fact]
 		public void BuildTeleportBeginBody_SubstitutesInstanceAndMap()
 		{

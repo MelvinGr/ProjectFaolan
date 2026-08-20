@@ -1112,11 +1112,16 @@ namespace Faolan.GameServer
 						break;
 					}
 
+					// #309: the SECOND button of the client's own difficulty picker is EPIC - the client renders the
+					// normal/epic buttons itself on a destination that has an epic mode (the captured Spider Caverns
+					// shows are byte-identical in shape to every plain travel box), so honouring the index is all the
+					// server does. Any option past 2 still travels (normal), logged so an unmodelled picker shows up.
+					var epic = reply.Answer == ScryMessageBoxAnswerCodec.ConfirmSecondOption;
 					if (reply.Answer != ScryMessageBoxAnswerCodec.Confirm)
-						Logger.LogInformation("ScryMessageBoxAnswer chose option {Answer} for the trip to map {MapId} - we offer one, so it travels.", reply.Answer,
-							pending.DestinationMapId);
+						Logger.LogInformation("ScryMessageBoxAnswer chose option {Answer} for the trip to map {MapId}{Epic}.", reply.Answer,
+							pending.DestinationMapId, epic ? " - the EPIC difficulty" : " - we offer one option, so it travels as normal");
 
-					await DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition);
+					await DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition, epic);
 
 					break;
 				}

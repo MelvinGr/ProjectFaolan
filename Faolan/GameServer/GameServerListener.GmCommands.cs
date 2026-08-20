@@ -177,7 +177,10 @@ namespace Faolan.GameServer
 		}
 
 		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
-		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null)
+		// `epic` is the difficulty the player picked at the travel box (#309): it rides PendingEpicEntry across the
+		// handoff (the reconnect's world entry is a new connection) and selects the destination's class word on the
+		// prep packets below.
+		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null, bool epic = false)
 		{
 			var client = ClientForCharacter(characterId);
 			if (client?.Session.Character == null)
@@ -233,13 +236,17 @@ namespace Faolan.GameServer
 			// changemap reconnect carries no 0x205F, so 0x2024 ReadyForPlayScreen would otherwise never fire and the
 			// loading screen would hang - #28). Consumed in the GameServer Hello existing-character branch.
 			PendingTeleportReentry.TryAdd(client.Session.Character.Id, 0);
+			if (epic)
+				PendingEpicEntry.TryAdd(client.Session.Character.Id, 0);
+			else
+				PendingEpicEntry.TryRemove(client.Session.Character.Id, out _);
 
 			// We've just persisted the destination position above; stop THIS (old) connection's imminent disconnect
 			// from saving its stale pre-teleport live position back over it (ClientDisconnected does a fire-and-forget
 			// SavePlayerState that would otherwise clobber the bind/destination - #28).
 			client.Session.IsTeleportingOut = true;
 
-			await SendChangeMapPrep(client, map.Id, position);
+			await SendChangeMapPrep(client, map.Id, position, epic: epic);
 			await SendWorldHandoff(client);
 		}
 

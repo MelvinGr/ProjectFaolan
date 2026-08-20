@@ -91,6 +91,32 @@ namespace Faolan.Tests
 			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
 		}
 
+		// #309: an EPIC entry never shares a zone with normal players, and the two modes of one map are two copies.
+		// Retail's own captured epic re-entry to the map it had just left as normal minted a FRESH instance
+		// (consecutive playfield tokens), which is exactly the stay-in rule refusing a difficulty mismatch.
+		[Fact]
+		public void EpicEntry_GetsItsOwnCopy_AndReentryRespectsTheDifficulty()
+		{
+			var world = new WorldState();
+
+			// A Shared map: normal entry lands in the shared world, an epic one never does.
+			Assert.Equal(WorldState.DefaultInstance, world.ResolveEntryInstance(null, 1004, MapInstanceMode.Shared));
+			var epic = world.ResolveEntryInstance(null, 1004, MapInstanceMode.Shared, epic: true);
+			Assert.NotEqual(WorldState.DefaultInstance, epic);
+
+			// The player stands in their epic copy: an epic re-entry stays, a NORMAL one must not reuse it.
+			var p = Player(1, 0, 0);
+			world.Place(p, 1004, epic, p.Position, Quaternion.Identity);
+			world.ZoneFor(1004, epic).IsEpic = true;
+			Assert.Equal(epic, world.ResolveEntryInstance(p, 1004, MapInstanceMode.Shared, epic: true));
+			Assert.NotEqual(epic, world.ResolveEntryInstance(p, 1004, MapInstanceMode.Shared));
+
+			// A team's epic copy is bound separately from the same team's normal copy of the same map.
+			var teamNormal = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB);
+			var teamEpic = world.ResolveEntryInstance(null, 1092, MapInstanceMode.Group, 0x000F08DB, true);
+			Assert.NotEqual(teamNormal, teamEpic);
+		}
+
 		// #512: a GROUP map is one copy per TEAM. Retail's own group entry names the team in the PlayfieldProxy's
 		// owner slots, so the routing has to be by team id and not by character.
 		[Fact]

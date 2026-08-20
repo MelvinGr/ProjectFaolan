@@ -182,7 +182,7 @@ namespace Faolan.GameServer.World
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
 			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null, IReadOnlyDictionary<uint, ComboFeatBonus>? comboBonuses = null,
-			uint? teamId = null)
+			uint? teamId = null, bool epic = false)
 		{
 			var character = client.Session.Character;
 
@@ -246,7 +246,10 @@ namespace Faolan.GameServer.World
 			// #512: `teamId` is what makes a GROUP map route to the party's copy rather than to a private one. It is
 			// passed IN rather than looked up here, because the roster lives on the CS tier and the world model does
 			// not reach across listeners - the caller crosses that seam.
-			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId);
+			// #309: an EPIC entry routes to an epic copy of the map - same content, never the same zone as a normal
+			// one - and the zone remembers its difficulty so re-entry routing and the (future) stat tuning can ask it.
+			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode, teamId, epic);
+			World.ZoneFor(character.MapId, instanceId).IsEpic = epic;
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
 			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation);
 			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();

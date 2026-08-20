@@ -110,6 +110,11 @@ namespace Faolan.GameServer
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
+		// Characters whose armed teleport chose the EPIC difficulty (#309): set in DoTeleport beside the reentry
+		// mark below, consumed by the reconnect's world entry - the difficulty must survive the handoff because the
+		// entry happens on a NEW connection. Absent = normal, so nothing is stored for the common case.
+		internal static readonly ConcurrentDictionary<uint, byte> PendingEpicEntry = new ConcurrentDictionary<uint, byte>();
+
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
 		// retail changemap capture confirms it - the flag is normally armed by the client's 0x205F at full login), so
@@ -344,7 +349,7 @@ namespace Faolan.GameServer
 			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
-			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport, SendLearnSpell);
+			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
 			_environment = new EnvironmentService(database, this, logger);
 			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);

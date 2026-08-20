@@ -90,10 +90,10 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 
 		public static byte[] Build(Vector3 position, uint mapId, uint charInstance, uint count, uint playfieldToken, float blobFloat1, float blobFloat2, uint flags,
-			uint sceneWord = 0u, uint blobLastWord = 0u, uint fieldA = 0u, uint fieldC = 7u)
+			uint sceneWord = 0u, uint blobLastWord = 0u, uint fieldA = 0u, uint fieldC = 7u, uint classWord = PlayfieldProxy.PlayfieldClass)
 		{
 			return Build(new PlayfieldFIIR(position,
-				new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, OwnerType: fieldA),
+				new PlayfieldProxy(mapId, classWord, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, OwnerType: fieldA),
 				sceneWord, blobFloat1, blobFloat2, blobLastWord, fieldC, flags));
 		}
 

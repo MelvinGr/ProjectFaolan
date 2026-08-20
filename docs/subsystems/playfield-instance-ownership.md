@@ -171,5 +171,21 @@ a fresh one. Retail is stricter: its leave prompt is *"Do you wish to leave? You
 instance."*, so a single member who steps out cannot rejoin **while the others are still inside**. Ours lets them.
 Closing that gap needs the leave-side message box, which is not sent yet.
 
-Still unbuilt: the difficulty mode needs somewhere to live beside `(mapId, instanceId)`. Open work is tracked in
-Gitea #309 and #511.
+⭐ **The difficulty MODE is now BUILT (#309), with epic serving the normal map's content as a deliberate
+interim.** The client renders the normal/epic buttons itself (the two captured Spider Caverns shows are
+byte-identical in shape to every plain travel box), so the server's whole job is honouring the answer INDEX:
+option `2` arms an EPIC teleport (`ScryMessageBoxAnswerCodec.ConfirmSecondOption`), the choice rides
+`PendingEpicEntry` across the handoff (the reconnect's world entry is a new connection), and it lands in three
+places — the prep packets' class word (`TeleportCodec.Build(..., epic: true)` reproduces the captured epic begin
+byte-for-byte), the entry `MapChange`'s class word, and the instance selection. An epic copy never shares a zone
+with a normal one: `Zone.IsEpic` is stamped at entry, the stay-in rule refuses a difficulty mismatch (retail's
+own captured epic re-entry minted a FRESH instance — consecutive playfield tokens), a Shared-mode map's epic
+entry gets a private/team copy, and `TeamInstance` binds per `(teamId, mapId, epic)`.
+
+⚠️ **What epic actually changes on retail is measured and deliberately NOT modelled yet.** The back-to-back
+Spider Caverns entries carry the SAME creatures at the same names, templates and levels — and re-tuned health:
+Cavecrawler/Cavehunter (npc_type 4) 147,600 → 1,186,900 at L27 and 154,500 → 1,292,300 at L28 (~8×), minion-type
+Spiderlings 73,800 → 78,700 (~+6%). Not a flat multiplier (the ratio differs per level), so the rule needs more
+than one dungeon's evidence; until then an epic zone loads the normal population, and `NpcSpawnExtractor` skips
+epic windows so the tuning can never poison the normal stat columns. Remaining #309/#511 work: the epic stat
+tuning, encounter content (bosses/raids), and the retail leave-side lockout above.

@@ -92,7 +92,14 @@ namespace Faolan.Importer.Extractors
 					// Keeping it silently re-attributes everything that follows to the playfield the player just LEFT:
 					// when PlayfieldFCodec refused the zero-scene-entry body, White Sands Night's NPCs were imported
 					// as City of Tortage Night spawns, and the row counts looked like a healthy +50.
-					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) ? change.MapId : 0;
+					//
+					// ⚠️ And an EPIC-mode window must be skipped outright (#309): the proxy's class word says which
+					// difficulty this copy is, and epic re-tunes the SAME templates - measured on chat-annotated-3's
+					// back-to-back Spider Caverns entries, Cavecrawler/Cavehunter carry ~8x the health at the same
+					// name, template and level (147,600 -> 1,186,900 at L27), minion-type Spiderlings ~+6%. Harvesting
+					// an epic window would write those into the NORMAL stat columns; only first-record-wins ordering
+					// has kept them out so far.
+					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) && !change.Proxy.IsEpic ? change.MapId : 0;
 					continue;
 				}
 
@@ -120,8 +127,9 @@ namespace Faolan.Importer.Extractors
 			{
 				if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
 				{
-					// Clear rather than keep the previous map on an unreadable MapChange - see Extract (#818).
-					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) ? change.MapId : 0;
+					// Clear rather than keep the previous map on an unreadable MapChange - see Extract (#818), and
+					// skip an EPIC-mode window outright - epic re-tunes the same templates (~8x health), see Extract (#309).
+					currentMap = p.TryParse(PlayfieldFCodec.Parse, out var change) && !change.Proxy.IsEpic ? change.MapId : 0;
 					sawPoll = false;
 					continue;
 				}

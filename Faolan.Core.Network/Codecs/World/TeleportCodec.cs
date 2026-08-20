@@ -79,9 +79,11 @@ namespace Faolan.Core.Network.Codecs.World
 		// 0x10D27BC0 "begin teleport to map N": carrier + env + a PlayfieldProxy carrying only the class word and the
 		// destination map (instance slots zero) + a trailing bool.
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=01][PlayfieldProxy][u8 bool=0]
-		public static byte[] Build(uint clientInstance, uint destMapId)
+		// `epic` picks the destination's difficulty class word (#309): the captured epic Spider Caverns begin is
+		// byte-identical to the normal one except 0xCABC for 0xC79C (chat-annotated-3 frames 23499/23843).
+		public static byte[] Build(uint clientInstance, uint destMapId, bool epic = false)
 		{
-			return Build(new IntendedTeleportIIR(clientInstance, 0x01, PlayfieldProxy.ForMap(destMapId), 0x00));
+			return Build(new IntendedTeleportIIR(clientInstance, 0x01, PlayfieldProxy.ForMap(destMapId, epic), 0x00));
 		}
 
 		// The SAME-MAP teleport begin (#214): the single IntendedTeleport (0x10D27BC0) that pins the target playfield
@@ -106,11 +108,12 @@ namespace Faolan.Core.Network.Codecs.World
 		// burst via WorldBroadcaster.ResolveMapPlayfieldToken so it matches the reconnect's world-entry stamp (#211).
 		// destDescriptor (0x14 map 2010 / 0xBE map 2000) is the position blob's trailing word - a per-zone descriptor
 		// not yet derivable from the data. Both default to the map-2010 capture values for the golden / a burst-less map.
-		public static byte[] Build(uint clientInstance, uint destMapId, Vector3 position, uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
+		public static byte[] Build(uint clientInstance, uint destMapId, Vector3 position, uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u,
+			bool epic = false)
 		{
 			// The arrival transform stays zero/identity: a cross-map announce states its arrival in the blob.
 			return Build(new N3TeleportIIR(clientInstance, 0x00, Vector3.Zero, Quaternion.Identity,
-				PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken), new N3TeleportSpawnPosition(position, destDescriptor)));
+				PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken, epic), new N3TeleportSpawnPosition(position, destDescriptor)));
 		}
 
 		// The SAME-MAP destination announce: the n3Teleport (0x5A32F0D7) that actually relocates the player on their

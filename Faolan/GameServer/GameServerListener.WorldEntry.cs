@@ -549,10 +549,14 @@ namespace Faolan.GameServer
 			// crit, plus the whole-combo damage that rides the finisher's spell.
 			var comboBonuses = await Database.GetCharacterComboBonuses(character.Id);
 
+			// #309: whether the armed teleport picked the EPIC difficulty - consumed here (the reconnect is a new
+			// connection, so the flag rode PendingEpicEntry) and threaded into BOTH the instance selection (an epic
+			// copy never shares a zone with a normal one) and the MapChange's class word below.
+			var epicEntry = PendingEpicEntry.TryRemove(character.Id, out _);
 			// #512: a GROUP map is one copy per TEAM, so the entry needs the team's id - which the CS tier owns, and
 			// which this listener reaches through the same seam LeaveTeam/KickFromTeam already use.
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
-				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id));
+				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 
 			// #305: the playfield-instance token is sourced PER-MAP (Map.PlayfieldToken), falling back to the beach
@@ -632,7 +636,7 @@ namespace Faolan.GameServer
 				// #512: if this copy of the playfield is a team's, the proxy names the TEAM as its owner rather than
 				// the player. Asked of the ZONE, so every member is told the same owner.
 				BuildMapChange(client, map!, playfieldToken,
-					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null)
+					_simulation.PlayerWorldEntity(client) is { } placed ? _simulation.World.TeamOwning(placed.MapId, placed.InstanceId) : null, epicEntry)
 			};
 
 			// The MapChange is the one place a player is told which playfield they are in, so it is also where their
@@ -727,7 +731,7 @@ namespace Faolan.GameServer
 
 		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
 		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
+		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u, bool epic = false)
 		{
 			var instance = client.Session.Character.Id;
 			// Source the destination playfield token from the destination map's burst so the announce matches the token
@@ -736,7 +740,7 @@ namespace Faolan.GameServer
 			// #792: the zero-length 0x1B first - retail precedes EVERY IntendedTeleport with it, 102 of 102 across the
 			// corpus. The client discards it (its handler is an empty override); we send it because retail does.
 			await SendTeleportPending(client);
-			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor) })
+			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId, epic), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor, epic) })
 			{
 				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}

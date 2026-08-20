@@ -210,7 +210,7 @@ namespace Faolan.GameServer.World
 
 		// #512: which copy of a map a TEAM owns. Keyed by the team so every member routes to one zone; see
 		// TeamInstance for why the entry is validated against the live zone rather than cleaned up on leave.
-		private readonly ConcurrentDictionary<(uint TeamId, uint MapId), uint> _teamInstances = new ConcurrentDictionary<(uint TeamId, uint MapId), uint>();
+		private readonly ConcurrentDictionary<(uint TeamId, uint MapId, bool Epic), uint> _teamInstances = new ConcurrentDictionary<(uint TeamId, uint MapId, bool Epic), uint>();
 
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
@@ -277,15 +277,25 @@ namespace Faolan.GameServer.World
 		// binding is dropped once the copy is EMPTY, so a party that all leaves cannot come back to that copy. It
 		// does NOT stop a single member who stepped out from rejoining while the others are still inside, which
 		// retail refuses; that needs the leave-side message box we do not send yet.
-		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode, uint? teamId = null)
+		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode, uint? teamId = null, bool epic = false)
 		{
-			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance)
-				return existing.InstanceId; // already in a private copy of this same map - stay in it
+			// The stay-in rule only holds when the copy's DIFFICULTY matches the entry's (#309): retail's captured
+			// epic re-entry to the same map minted a fresh instance (consecutive playfield tokens), it did not reuse
+			// the normal copy the player had just left.
+			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance
+			    && _zones.TryGetValue((mapId, existing.InstanceId), out var current) && current.IsEpic == epic)
+				return existing.InstanceId; // already in a matching private copy of this same map - stay in it
+
+			// #309: an EPIC copy never shares a zone with normal players - a Shared-mode map's epic entry gets a
+			// private copy (the captured epic Spider Caverns entry was solo with a fresh instance), and a team's
+			// epic copy is bound separately from its normal one.
+			if (epic && mode == MapInstanceMode.Shared)
+				return teamId is { } epicTeam ? TeamInstance(epicTeam, mapId, true) : NextPlayfieldToken();
 
 			return mode switch
 			{
 				MapInstanceMode.Solo => NextPlayfieldToken(),
-				MapInstanceMode.Group => teamId is { } team ? TeamInstance(team, mapId) : NextPlayfieldToken(),
+				MapInstanceMode.Group => teamId is { } team ? TeamInstance(team, mapId, epic) : NextPlayfieldToken(),
 				_ => DefaultInstance
 			};
 		}
@@ -296,15 +306,17 @@ namespace Faolan.GameServer.World
 		// mints a fresh instance instead. That is the "empty = gone" lifetime the ticket asks for, expressed as a
 		// lookup rather than as a cleanup pass - a zone with no players in it is indistinguishable from one that was
 		// never created, so there is nothing to tear down and no timer to get wrong.
-		private uint TeamInstance(uint teamId, uint mapId)
+		private uint TeamInstance(uint teamId, uint mapId, bool epic = false)
 		{
-			if (_teamInstances.TryGetValue((teamId, mapId), out var existing)
+			// The binding is per-DIFFICULTY (#309): a team's epic copy and its normal copy of one map are two
+			// different zones, so joining "the team's instance" must not land an epic entrant among normal mobs.
+			if (_teamInstances.TryGetValue((teamId, mapId, epic), out var existing)
 			    && _zones.TryGetValue((mapId, existing), out var zone)
 			    && zone.Entities.Any(e => e.IsPlayer))
 				return existing;
 
 			var minted = NextPlayfieldToken();
-			_teamInstances[(teamId, mapId)] = minted;
+			_teamInstances[(teamId, mapId, epic)] = minted;
 			return minted;
 		}
 
@@ -316,7 +328,7 @@ namespace Faolan.GameServer.World
 		/// </remarks>
 		public uint? TeamOwning(uint mapId, uint instanceId)
 		{
-			foreach (var ((teamId, map), instance) in _teamInstances)
+			foreach (var ((teamId, map, _), instance) in _teamInstances)
 			{
 				if (map == mapId && instance == instanceId)
 					return teamId;
