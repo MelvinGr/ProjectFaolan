@@ -232,6 +232,12 @@ XML records are not a Rosetta stone for their own binary twins, because they hav
 records carry a source path. Decoding the compiled form still needs the client's reader; what the XML gives is
 the exact field list to expect when someone writes one.
 
+⭐ **And the `on attractor 10` half of that log line is answered too, by a different type: 1010031.** It is a
+model's list of named ATTACHMENT POINTS - `[u32 nameLen][name][f32 x4 quaternion][f32 x3 offset]` per entry,
+names like `attractor:weaponstart` / `attractor:guiitemcamera` - so the number is an index into WHERE the effect
+plays on the model, not a second selector for WHICH effect. The pair `(1010207 id, attractor index)` is
+therefore fully accounted for: an effect and a socket. Nothing about the compiled graph is needed to read it.
+
 `--report particle-effects [--report-arg <substring>|xml:<id>]` lists the population, searching **by effect name
 and by texture**, and `xml:<id>` prints one authored source whole. That answers the question the server actually
 asks: it never renders an effect - it sends an id and the client does the rest - so what is needed is never
