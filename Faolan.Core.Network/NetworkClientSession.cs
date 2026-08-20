@@ -108,7 +108,14 @@ namespace Faolan.Core.Network
 		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
 		// trance is open, and is fired + cleared on deactivate.
 		bool IsSpellweaving { get; set; }
+
+		// The sprint pair (#867). `IsSprinting` is the state the SERVER granted - what drains the energy pool and what
+		// `DispatchSetIsSprinting` tells the client. `SprintInputRequested` is the last `sprintInput` the client asked
+		// for, kept apart from it because the two legitimately disagree: retail refuses a sprint on an empty pool, and
+		// the client keeps holding the key while refused. Retail answers a CHANGE of the request, not every frame
+		// (2,959 changes -> 2,624 answers over the corpus), which is what the request needs remembering for.
 		bool IsSprinting { get; set; }
+		bool SprintInputRequested { get; set; }
 
 		// True on the OLD connection while a teleport/changemap handoff is in flight: DoTeleport has already
 		// persisted the authoritative destination position, so this connection's disconnect must NOT save its
@@ -354,6 +361,7 @@ namespace Faolan.Core.Network
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsSpellweaving { get; set; }
 		public bool IsSprinting { get; set; }
+		public bool SprintInputRequested { get; set; }
 		public bool IsTeleportingOut { get; set; }
 		public bool IsUnnamedCreatePhase => Character?.Name == null;
 		public bool PostMorphBurstSent { get; set; }

@@ -10,6 +10,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -192,11 +193,24 @@ namespace Faolan.GameServer
 						{
 							exhausted = true;
 							await _buffs.ApplyBuffById(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+
+							// An empty pool ends the sprint, and the client has to be TOLD - otherwise it keeps
+							// rendering a sprint the server has stopped draining for (#867). Both flags ride this
+							// same zero-crossing rather than a threshold of their own: `canSprint` is the refusal the
+							// client checks before it even asks (00 x151 in the corpus), `isSprinting` is the state.
+							if (session.IsSprinting)
+							{
+								session.IsSprinting = false;
+								await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSetIsSprinting, false);
+							}
+
+							await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, false);
 						}
 						else if (session.Energy > 0 && exhausted)
 						{
 							exhausted = false;
 							await _buffs.SendBuffRemoval(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+							await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, true);
 						}
 					}
 
@@ -235,13 +249,45 @@ namespace Faolan.GameServer
 		private static Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x54), client.Endpoint(RpcInterfaces.GameCharInterfaceProjectType),
-				GameCharInterfaceProjectMethods.DispatchUpdateSprintBar, b => b.WriteUInt32(energy).WriteByte(0x01)));
+				GameCharInterfaceProjectMethods.DispatchUpdateSprintBar, SprintBarCodec.Build(energy)));
 		}
 
-		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
+		// One of the three server-owned sprint booleans (#867). All four dispatches in this family share one endpoint
+		// pair in the corpus - sender GameCharAgentProject at the session's own small instance, receiver the player's
+		// GameCharInterfaceProject - which is the pair SendSprintBar already used.
+		private static Task SendSprintFlag(INetworkClient client, GameCharInterfaceProjectMethods method, bool on)
 		{
-			client.Session.IsSprinting = sprinting;
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x54), client.Endpoint(RpcInterfaces.GameCharInterfaceProjectType),
+				method, SprintFlagCodec.Build(on)));
+		}
+
+		// The sprint key changed state. Retail answers a CHANGE of `sprintInput` rather than every frame - 2,959
+		// changes drew 2,624 `DispatchSetIsSprinting` answers over the corpus - and it does NOT merely echo: 14.5% of
+		// answers carry a different value from the input before them, which is the server refusing.
+		//
+		// The one refusal we can justify is an empty pool, and it needs no new rule: it is the same zero-crossing the
+		// Exhausted buff already rides below. Anything finer (a cooldown, a stance, a movement-mode gate) would be
+		// invented - the corpus shows THAT retail refuses, not what else it refuses for.
+		private async Task TrackSprintEnergy(INetworkClient client, bool sprinting)
+		{
+			var session = client.Session;
 			EnsureEnergyLoop(client);
+
+			if (session.SprintInputRequested == sprinting)
+				return;
+
+			session.SprintInputRequested = sprinting;
+
+			var granted = sprinting && session.Energy > 0;
+			session.IsSprinting = granted;
+			await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSetIsSprinting, granted);
+
+			// A sprint ending is where retail puts most of its regen-delayed sends (514 of them follow an
+			// `isSprinting = 0`, median 820 ms later). Every captured frame carries 0 - the corpus proves the CLEAR
+			// and never the set, so this sends only what it can show.
+			// `[V0: what sets regenDelayed - no capture carries a 1]`
+			if (!granted)
+				await SendSprintFlag(client, GameCharInterfaceProjectMethods.DispatchSyncRegenDelayed, false);
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops

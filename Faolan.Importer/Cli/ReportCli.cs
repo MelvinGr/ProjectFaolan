@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #867: the sprint/regen family - what retail answers a sprint key with, and who it is addressed to.
+				case "sprint":
+				{
+					Sprint(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "follow-pairs":
 				{
 					FollowPairs(NamedCapture.LoadAll(capturesDir));

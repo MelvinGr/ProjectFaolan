@@ -132,9 +132,9 @@ namespace Faolan.GameServer
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(RegenCodec.Build(instance, health, mana, stamina))));
 
-			// SyncCanSprint (0x200C, one byte).
+			// SyncCanSprint (0x200C, one byte) - the sprint pool starts available (#867).
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameCharInterfaceProjectType, instance),
-				GameCharInterfaceProjectMethods.DispatchSyncCanSprint, b => b.WriteByte(0x01)));
+				GameCharInterfaceProjectMethods.DispatchSyncCanSprint, SprintFlagCodec.Build(true)));
 
 		}
 

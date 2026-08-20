@@ -1717,15 +1717,17 @@ namespace Faolan.GameServer
 
 				case GameCharAgentProjectMethods.SetSprintInputState: // 0x200C, the sprint key
 				{
-					// A fire-and-forget input-state update retail does NOT reply to (#72). Body = [u16 state] (1 = on,
-					// 0 = off). Sprint drains the yellow ENERGY bar CLIENT-side (retail's server barely streams the bar
-					// during sprint - verified: 1 packet across a sprint-heavy capture). We don't reply or drive the bar;
-					// we only MIRROR the drain into the tracked session.Energy so spellweaving starts from the real
-					// current value and Exhausted can fire at 0 (docs/subsystems/combos.md).
-					var state = body.Length - body.Position >= sizeof(ushort)
-						? body.ReadUInt16()
-						: (ushort)0;
-					TrackSprintEnergy(client, state == 1);
+					// ⚠️ The body is `(bool sprintInput, bool clientCheck)` - TWO bytes, the client's own signature -
+					// and all four combinations occur in the corpus. This used to read it as one u16 and test `== 1`,
+					// which selects `00 01`: sprintInput FALSE with the client's check set, the single most common
+					// frame at 3,714. So the drain ran while the player stood still and the pool REFILLED while they
+					// sprinted, and every one of the 2,661 genuinely-sprinting frames was missed (#867).
+					//
+					// Retail does answer this - `DispatchSetIsSprinting`, once per change of the request - which is
+					// what TrackSprintEnergy now does. The energy pool it drives is what Exhausted fires from at 0
+					// (docs/subsystems/combos.md).
+					var input = SprintInputStateCodec.Parse(body.ReadArray(2));
+					await TrackSprintEnergy(client, input.SprintInput);
 					break;
 				}
 

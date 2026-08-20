@@ -644,3 +644,14 @@ or table states its value, and no capture performs a move.
 `GuildCityRules.CanMoveVulnerabilityWindow` therefore takes `changesRemaining` from its caller rather than
 holding a number: the rule that running out refuses is retail's, the allowance is not ours to invent. The same
 applies to how many free city spots a realm has, which is content we do not hold.
+
+## What sets `regenDelayed`
+
+**Tracked: Gitea #867.** [V0: what sets regenDelayed — no capture carries a 1] `DispatchSyncRegenDelayed` is a
+server-owned boolean the client is told about 1,226 times across 65 captures, and **every one of those frames
+carries `00`** (`--report sprint`). So the corpus proves the transport and the CLEAR, and says nothing about the
+set: retail is only ever observed telling the client that regeneration is no longer held.
+
+The clears cluster just after a sprint ends — 514 of them follow an `isSprinting = 0`, median 820 ms later — which
+is why `TrackSprintEnergy` sends the clear there and sends nothing else. Whatever holds regen (a fight, a cast, the
+sprint itself) is not visible from a message that never carries the flag it would set.

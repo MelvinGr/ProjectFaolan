@@ -396,8 +396,10 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
 
 ### The energy pool is a CLIENT model the server feeds through four stats
 
-The yellow bar is not drawn from the `0x200E` packet alone — it is a client-side simulation, which is why sprinting
-drains the bar with no server traffic at all and only the server-driven WEAVE drain shows up on the wire. The client
+The yellow bar is not drawn from the `0x200E` packet alone — it is a client-side simulation, which is why the
+BAR's own drain during a sprint barely reaches the wire (`0x200E` is 509 frames over just 13 captures, against the
+weave's steady stream). ⚠️ That is a statement about the bar packet only: the sprint itself is *not* silent — see
+the sprint family below, which retail sends 4,835 times. The client
 registers every stat id against a name in a static metadata table (`tools/ghidra/DumpStatNameTable.java`), and four
 of them are the whole model. `FUN_0112ad70` listens on exactly these ids and caches them side by side:
 
@@ -425,6 +427,37 @@ is not a value it wrote. So the client sources the ceiling and the rates itself;
 `Energy`'s own-handle series independently re-confirms `EnergyMaxForClass`: it tops out at **exactly** 9000 for
 casters and **exactly** 14000 for the rest, and retail's cadence is a push every ~3–7s while the pool is moving,
 going silent once it is back at the max.
+
+### The sprint family: four messages, and the server owns the state (#867)
+
+Sprinting has its own method pair, separate from `PerformSpecialAction` and from the bar. `--report sprint` is the
+oracle for everything here (134 captures, 14,164 frames).
+
+| dir | method | body | corpus |
+|---|---|---|---|
+| c2s | `SetSprintInputState(bool sprintInput, bool clientCheck)` | **two** bytes | 9,329 frames / 90 captures — the third-busiest client message there is |
+| s2c | `DispatchSetIsSprinting(isSprinting)` | one byte | 2,624 / 65 |
+| s2c | `DispatchSyncCanSprint(canSprint)` | one byte | 476 / 116 |
+| s2c | `DispatchSyncRegenDelayed(regenDelayed)` | one byte | 1,226 / 65 |
+| s2c | `DispatchUpdateSprintbar(energyValue, forceUpdate)` | `[u32][u8]` | 509 / 13 |
+
+⚠️ **The c2s body is two bools, not one `u16`.** All four combinations occur — `0/1` ×3,714, `0/0` ×2,954, `1/1`
+×1,958, `1/0` ×703 — and the names are the client's own signature. Reading it as a single `u16` compared to `1`
+selects `00 01`, which is the player **not** sprinting: the commonest frame in the whole family. `clientCheck` is
+the client's local verdict on whether it believes it may sprint; the server is not obliged to agree.
+
+**Retail answers a CHANGE of the request, and it does not merely echo.** 2,959 changes of `sprintInput` drew 2,624
+`DispatchSetIsSprinting` frames, and 14.5% of those answers carry a *different* value from the input before them —
+the server refusing. So `isSprinting` is server-owned state, not an ack.
+
+**Each flag is addressed through the RECEIVER ENDPOINT, not the body.** A one-byte body names no entity; the
+character a flag is about is the receiver endpoint's instance, and in all 65 captures carrying `isSprinting` that is
+one instance per capture — the session's own character. These are not broadcasts about other players. The sender is
+`GameCharAgentProject` at the session's small instance, the same pair `0x200E` uses.
+
+`regenDelayed` is **`00` in all 1,226 captured frames** — every send clears the delay, most of them just after a
+sprint ends (514 follow an `isSprinting = 0`, median 820 ms later). The corpus proves the transport and the clear;
+what SETS it is uncaptured. `[V0: what sets regenDelayed — no capture carries a 1]`
 
 **`Exhausted` is server-applied on the sprint path too**, not only the weave. In `Hoxxling_..._gameplay2` the `Energy`
 stat reaches exactly 0 at 20:53:41.247 and in the same millisecond retail sends `ApplySpell 0x6B87E316` carrying spell
