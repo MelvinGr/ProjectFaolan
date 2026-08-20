@@ -62,7 +62,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("> **GENERATED — do not edit.** Derived from the codecs themselves: a codec covers an IIR type when it");
 			sb.AppendLine("> **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)IirTypes.<Type>`);");
 			sb.AppendLine("> a codec has a byte-exact test when a `Faolan.Tests` file references the codec class AND asserts on bytes.");
-			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
+			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.");
 			sb.AppendLine();
 			sb.AppendLine("## Headline");
 			sb.AppendLine();

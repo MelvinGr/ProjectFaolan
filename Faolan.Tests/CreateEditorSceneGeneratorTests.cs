@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	// burst (#364). The same shape `FAOLAN_UPDATE_DOCS` has for the generated protocol pages: normally this only
 	// CHECKS that the committed file still reproduces the capture, and rewrites it when `FAOLAN_UPDATE_SCENE=1`.
 	//
-	//     FAOLAN_UPDATE_SCENE=1 dotnet test Faolan.Tests --filter CreateEditorSceneGenerator
+	//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
 	//
 	// Why generate rather than hand-write: the emitted values are a parse of the capture, so hand-editing them would
 	// be editing a measurement. The byte-exact gate in CreateEditorSceneCharTests is what makes that safe - a wrong
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 					// AUTO-GENERATED (#364) from the captured create-editor initial burst - the five archetype pedestals and the
 					// live avatar preview, as TYPED DATA. Regenerate with:
 					//
-					//     FAOLAN_UPDATE_SCENE=1 dotnet test Faolan.Tests --filter CreateEditorSceneGenerator
+					//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
 					//
 					// Replaces the inline hex bodies `CreateFlowService` used to carry and `CreateEditorCharBuilder.Reconstruct`
 					// parsed back out of themselves - the same treatment #258 gave the access-window table and #651 the editor

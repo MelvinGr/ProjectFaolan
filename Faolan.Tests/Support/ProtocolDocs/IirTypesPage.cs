@@ -54,7 +54,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled `IirTypes` enum in");
 			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
-			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
+			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.");
 			sb.AppendLine();
 			sb.AppendLine("These are the 32-bit type ids carried inside the GameServer `0x2000` (`DispatchPassBlob`) carrier —");
 			sb.AppendLine("the sub-opcode after the RPC method opcode that says which IIR record type the blob holds.");

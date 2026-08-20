@@ -34,7 +34,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("> that builds it, and (V3 only) the golden test that pins it byte-exact — emitted as a live `[V3: …]`");
 			sb.AppendLine("> tag the citation linter resolves. The field-level LAYOUT lives in the linked codec source, which is");
 			sb.AppendLine("> the authoritative spec; this page is the index into it. Shares `CodecIndex` with [`coverage.md`](coverage.md).");
-			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
+			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.");
 			sb.AppendLine();
 			sb.AppendLine("## How to read a message's layout");
 			sb.AppendLine();

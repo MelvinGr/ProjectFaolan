@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Constants
 	// AUTO-GENERATED (#364) from the captured create-editor initial burst - the five archetype pedestals and the
 	// live avatar preview, as TYPED DATA. Regenerate with:
 	//
-	//     FAOLAN_UPDATE_SCENE=1 dotnet test Faolan.Tests --filter CreateEditorSceneGenerator
+	//     FAOLAN_UPDATE_SCENE=1 dotnet test --project Faolan.Tests -- --filter-class '*CreateEditorSceneGeneratorTests'
 	//
 	// Replaces the inline hex bodies `CreateFlowService` used to carry and `CreateEditorCharBuilder.Reconstruct`
 	// parsed back out of themselves - the same treatment #258 gave the access-window table and #651 the editor

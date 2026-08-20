@@ -63,7 +63,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled enums in");
 			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
-			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
+			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.");
 			sb.AppendLine();
 			sb.AppendLine($"{tabled.Count} enums, {total} entries. The 32-bit IIR sub-opcodes carried inside a PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).");
 			sb.AppendLine();

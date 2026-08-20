@@ -2,7 +2,7 @@
 
 > **GENERATED — do not edit.** Source: the compiled `IirTypes` enum in
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
-> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
 
 These are the 32-bit type ids carried inside the GameServer `0x2000` (`DispatchPassBlob`) carrier —
 the sub-opcode after the RPC method opcode that says which IIR record type the blob holds.

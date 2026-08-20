@@ -4,7 +4,7 @@
 > that builds it, and (V3 only) the golden test that pins it byte-exact — emitted as a live `[V3: …]`
 > tag the citation linter resolves. The field-level LAYOUT lives in the linked codec source, which is
 > the authoritative spec; this page is the index into it. Shares `CodecIndex` with [`coverage.md`](coverage.md).
-> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
 
 ## How to read a message's layout
 

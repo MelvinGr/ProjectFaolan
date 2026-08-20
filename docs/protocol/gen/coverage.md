@@ -3,7 +3,7 @@
 > **GENERATED — do not edit.** Derived from the codecs themselves: a codec covers an IIR type when it
 > **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)IirTypes.<Type>`);
 > a codec has a byte-exact test when a `Faolan.Tests` file references the codec class AND asserts on bytes.
-> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
 
 ## Headline
 

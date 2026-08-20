@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,194 NPC types / 3,693 placements · 4,761 items · 20,848 spells · 265 abilities · 19,777 feats · 697 conversation nodes · 110 shops · 5,049 quests · 2,656 world objects · 1,073 patrol routes · 330 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,213 NPC types / 3,790 placements · 4,891 items · 20,848 spells · 265 abilities · 19,777 feats · 753 conversation nodes · 112 shops · 5,049 quests · 2,664 world objects · 1,080 patrol routes · 340 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -30,9 +30,9 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-- **NPC conversations** — 110/118 greeted dialogue NPCs imported (93.2%)
-- **Vendor shops** — 75/75 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,973/77,631 decrypted, **6.4% of the total encrypted**. Keys held per category: 4,708 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **NPC conversations** — 115/123 greeted dialogue NPCs imported (93.5%)
+- **Vendor shops** — 77/77 captured vendors imported (100.0%)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 5,103/77,631 decrypted, **6.6% of the total encrypted**. Keys held per category: 4,838 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -64,8 +64,8 @@ we've seen_, and names the gaps). Regenerate with
   all 25 node types; one swing takes 10% of the node and gives 1 unit. Missing: regrowth in place, the harvest
   ambush, rare cross-drops, and the eleven higher-tier resources with no item in the DB (#494, #732, #746)
 - 🟡 **Ambient wildlife & spawns** — each zone's spawn groups are decoded from the client and a live spawner keeps
-  them stocked and roaming. The creature type per group is server-only, so ~21% are auto-matched and the rest are
-  hand-confirmed (#332, #363)
+  them stocked, roaming and dressed in their placements' own gear — verified in-client (#835, #836). The creature
+  type per group is server-only, so ~21% are auto-matched and the rest are hand-confirmed (#332, #363)
 - 🟡 **Line-of-sight & terrain** — NPCs won't aggro through a hill or wall, and loot settles to the ground, off
   baked per-map terrain. Aggro gating pending an in-client confirm (#284)
 - 🟡 **Damage schools** — every hit carries the element it was dealt with, numbered as the client numbers them,
@@ -105,7 +105,8 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **NPC death animations** — a proper death on the killing blow, per creature type, with more being harvested
   (#362)
 - 🟡 **NPCs swing combos** — a mob's weapon picks the combo it performs, at the rate retail does it (28% of melee
-  swings, 14% of shots), and archers shoot on their own record rather than playing a sword swing. Dagger, polearm
+  swings, 14% of shots), and archers shoot on their own record rather than playing a sword swing — holding their
+  weapon's stated range instead of closing to melee, verified in-client (#838). Dagger, polearm
   and bow mobs also swing their class family; two-handers and shields still swing generic, because which archetype
   those belong to is not in anything the client ships (#623, #675, #676)
 - 🟡 **Outlaw resurrection points** — the client's 49 criminal destinations are imported, but revive still sends
@@ -143,14 +144,16 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Attributes** — Strength/Constitution/Intelligence/Wisdom/Dexterity from the per-class, per-level base plus
   gear and buffs, so regen and mitigation get real inputs. Verified in-client at all eighty levels (#444)
 - 🟡 **Feats** — 19,777 feats imported with trees, ranks and tooltips, 23,033 stat effects and a 5,501-edge
-  prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget, and
-  named specs each keep their own build. Missing: per-feat cost and tier, each class's tree layout, and the retail
-  training trigger — so training runs off a GM command. The decoded feat modifiers are not imported yet (#251,
-  #474, #593)
+  prerequisite graph. Trained feats grant their stats, training enforces prerequisites and the point budget
+  (cost = rank+1; the 3,839 levelling feats are free because the CLIENT auto-trains them itself), and named specs
+  each keep their own build. Tree, column, tier and cost come from the client's own featclass table (#862, #863).
+  Missing: the retail training trigger — training runs off a GM command — and nothing consumes the decoded
+  combo/proc modifier tables (#251, #474, #697)
 - 🟡 **Skill points** — the pool is a function of level, so it is stated on login rather than awarded. Five levels
   are captured and there is no formula for the rest, so those keep what the character already had (#507)
 - 🟡 **Spell unlock levels** — 8,460 spells carry one, read from the client's spell and combo records; 592 come
-  only from the retired community scrapes (#650)
+  only from the retired community scrapes (#650). The client's per-level unlock schedule is imported beside them,
+  and measured: the two disagree on 69 of 432 rows and neither bounds the other (#864)
 - 🟡 **XP curve** — anchored on the retail thresholds the captures carry (levels 1-9, 23-25 and 80); the levels
   between anchors are interpolated (#297)
 - 🟡 **Class spell / combo / ability catalogs** — still filling in; empty spell and item names are backfilled from
@@ -204,7 +207,10 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Quests & dialogue
 
-- ✅ **Quests** — kill / loot / talk / collect / reach objectives, and the journal
+- ✅ **Quests** — kill / loot / talk / collect / reach objectives, and the journal. Completing one pays the XP
+  and cash its record states and pops the reward-choice window when the quest offers one (#815, #820)
+- 🟡 **Quest rewards at scale** — only 21 of 5,049 quests state a payout; the rest knowingly pay nothing until
+  retail's numbers can be read in-client (#859)
 - ✅ **Gather quests work however you get the item** — a collect objective ticks when the item reaches your bags,
   from a corpse, a node, a vendor or a reward; 62 quests that were inert now run (#521)
 - ✅ **"Go there" objectives complete on arrival** — typed from the client's own reference, so 11 more quests run;
@@ -212,7 +218,7 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **The client's quest text is readable** — eleven localized-text categories are encrypted and the key is sent
   per string; all 168 objective texts, the journal titles and summaries, and the NPC dialogue decrypt (#520)
 - ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine; every branch any capture
-  walked is reachable in-game (#642, #644)
+  walked is reachable in-game, and a conversation can turn its NPC hostile — verified in-client (#642, #644, #839)
 - ✅ **NPCs greet you differently the second time** — a full welcome first, a terser line after (#645)
 - ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does;
   the live J-panel refresh that rides along still needs a capture (#457, #482)
@@ -439,8 +445,8 @@ config, so it has its own arguments (see below).
 The test suite uses byte-exact "golden" round-trips against captured packets as its acceptance gates:
 
 ```sh
-dotnet test Faolan.Tests
-dotnet test Faolan.Tests --filter GuildPacketTests        # a single class
+dotnet test --project Faolan.Tests
+dotnet test --project Faolan.Tests -- --filter-class '*GuildPacketTests'  # a single class
 ```
 
 ## Connect a game client

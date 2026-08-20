@@ -3,7 +3,7 @@
 > **GENERATED — do not edit.** Source: the compiled protobuf-net types in
 > `Faolan.Core/Protobuf/AocProtocol.g.cs`, read by reflection over their
 > `[ProtoContract]`/`[ProtoMember]` attributes (the actual wire contract).
-> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
 
 58 message types, 340 fields. These are the protobuf messages recovered from
 `AgeOfConan.exe`; the human-readable schema is `Faolan.Core/Protobuf/aoc-client-protos.proto`,

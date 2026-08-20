@@ -14,6 +14,6 @@
 
 	<ItemGroup>
 		<!-- MCP client: the status page queries the running game server's in-process MCP endpoint (list_sessions) for live presence. Same SDK version as Faolan.Mcp (the server side). -->
-		<PackageReference Include="ModelContextProtocol" Version="2.1.0" />
+		<PackageReference Include="ModelContextProtocol" Version="2.2.0" />
 	</ItemGroup>
 </Project>

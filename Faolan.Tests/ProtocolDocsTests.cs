@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// truth (the compiled opcode enums, the .proto, ...) and compared to what is committed. Editing Opcodes.cs then
 	// FORCES a regenerated page in the same commit - the page can never silently disagree with the code.
 	//
-	// To regenerate after an intentional change: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`
+	// To regenerate after an intentional change: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`
 	// then commit the updated docs/protocol/gen/*.md.
 	public class ProtocolDocsTests
 	{
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 				return;
 			}
 
-			Assert.True(File.Exists(path), $"{relativePath} is missing. Generate it: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
+			Assert.True(File.Exists(path), $"{relativePath} is missing. Generate it: FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'");
 
 			var committed = File.ReadAllText(path).Replace("\r\n", "\n");
 			if (committed == rendered)
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 
 			var diffLine = FirstDiffLine(committed, rendered);
 			Assert.Fail($"{relativePath} is stale (first diff at line {diffLine}). It is GENERATED from Opcodes.cs - " +
-			            "do not hand-edit. Regenerate: FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs");
+			            "do not hand-edit. Regenerate: FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'");
 		}
 
 		private static int FirstDiffLine(string a, string b)

@@ -32,7 +32,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled protobuf-net types in");
 			sb.AppendLine("> `Faolan.Core/Protobuf/AocProtocol.g.cs`, read by reflection over their");
 			sb.AppendLine("> `[ProtoContract]`/`[ProtoMember]` attributes (the actual wire contract).");
-			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
+			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.");
 			sb.AppendLine();
 			sb.AppendLine($"{types.Count} message types, {totalFields} fields. These are the protobuf messages recovered from");
 			sb.AppendLine("`AgeOfConan.exe`; the human-readable schema is `Faolan.Core/Protobuf/aoc-client-protos.proto`,");

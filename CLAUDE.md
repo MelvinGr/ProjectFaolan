@@ -18,10 +18,11 @@ mentions still scattered through **code comments** are historical pointers (left
 # Build (repo root)
 dotnet build ProjectFaolan.slnx
 
-# Tests (xUnit; byte-exact golden round-trips are the acceptance gates)
-dotnet test Faolan.Tests
-dotnet test Faolan.Tests --filter GuildPacketTests          # single class
-dotnet test Faolan.Tests --filter "FullyQualifiedName~Shop" # by substring
+# Tests (xunit.v3 on Microsoft.Testing.Platform - global.json opts `dotnet test` into MTP, so the target is
+# `--project` and filters are MTP options after `--`; the old VSTest `--filter` forms no longer exist)
+dotnet test --project Faolan.Tests
+dotnet test --project Faolan.Tests -- --filter-class '*GuildPacketTests'  # single class
+dotnet test --project Faolan.Tests -- --filter-class '*Shop*'             # class-name substring (--filter-method for methods)
 
 # Run the server (cwd MUST be the repo root: Program.cs loads faolan.json + faolan.db from the CWD,
 # and both live at the repo root). Running from bin/Debug fails with "faolan.json not found".
@@ -427,7 +428,7 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
 - **When a task is done, close the loop before moving on** — a task isn't finished until the code, the tests,
   and the *record* of it agree. Update whatever the change made stale:
   - **Docs:** the relevant `docs/` page(s); if you changed `Opcodes.cs` or a codec, regenerate the `gen/` pages
-    (`FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`); repoint any doc/code pointer you
+    (`FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`); repoint any doc/code pointer you
     moved or deleted; add/verify `[Vn: …]` tags for new protocol claims.
   - **Gitea issue** (the `projectfaolan` repo): comment the outcome and **close** it when the work lands (or strip
     `needs-testing` per its rule after an in-client check — pass OR fail); **create** an issue for any follow-up,
@@ -467,7 +468,7 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
   - `docs/protocol/` — the **verified wire reference**: every fact carries a `[Vn: …]` verification tag a test
     resolves, and `docs/protocol/gen/` is GENERATED from the code (opcodes, IIR types, protobuf, coverage,
     per-message index) — never hand-edit those; regenerate with
-    `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
+    `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
   - `docs/subsystems/` — how OUR server implements a domain (combat, chat, guilds, inventory, economy, …).
   - `docs/rdb/` — client asset formats · `docs/tooling/` — launcher/capture/importer · `docs/re/` — Ghidra
     methodology + raw decode artifacts.
