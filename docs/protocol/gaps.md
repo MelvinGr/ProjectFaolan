@@ -541,14 +541,18 @@ threshold. What it did close is the message bodies (#795) — see `GuildTransfer
 `GuildWithdrawMoneyCodec` / `GuildUpdateCashCodec`, all now `[V2: …]`.
 
 ### What sets the MagicBuff apply payload's hostile flag
-**Tracked: Gitea #658.** [V0: what separates the 134 from those 554] `descriptor[4]` of the 54-byte
+**Tracked: Gitea #464** (the corpus-exhausted register; the decode work was #658, closed). [V0: what separates the 134 from those 554] `descriptor[4]` of the 54-byte
 `MagicBuffIIR` apply payload is a boolean — its only non-zero value is `1` — and it is clear on every one of the
 2,241 captured SELF-applies, so "the caster is not the target" is a necessary condition for it. It is not a
 sufficient one: 554 of the 688 non-self applies leave it clear. The ten spells that do carry it are hostile
 debuffs and DoTs (`Pestilential Blast (Rank 6)`, `Flesh to Worms (Rank 5)`, `Mark of the Devourer`, `Repenting`,
 `Poisoned`, `Ice Shackle`), which is a lead and not a rule — nothing we hold marks a spell hostile, and the
 sweep of the spell's own RDB 1040005 record (every head word, every property field, and every bit of both) finds
-nothing that separates the two populations. `--report buff-descriptor` prints the cross-tab.
+nothing that separates the two populations. `--report buff-descriptor` prints the cross-tab. ⛔ The CLIENT
+cannot name it either: the word is parsed into the `MagicBuffIIR` and never read — the client consumes exactly
+two of the descriptor's seven words, and this is not one of them
+(`docs/subsystems/npc-spell-applyspell.md`, #658) — so the setter rule is retail-server-internal and only a
+larger corpus can characterise it further.
 
 ### Whether an interpolated ACG item's flags can differ from its template1's
 **Tracked: Gitea #756.** [V0: whether an interpolated ACG item's flags can differ from template1's] The client's

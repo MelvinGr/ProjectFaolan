@@ -67,11 +67,10 @@ ENDS, which is what a builder needs.
 | `@42` | u32 **`CastingLevel`** `+0x38` | the caster's level |
 | `@46–53` | u64 **expiry stamp** `+0x70` | NOT a nonce — see below |
 
-### ⭐ The buff-add call, argument by argument — and the two bools go nowhere (#658)
+### ⭐ The buff-add call, argument by argument — and where each payload field lands (#658)
 
-`Activate`'s call into the magic holder is `[entity+0x2D8]`'s vtable slot 2, `CoreMagicHolder::UpdateBuff`
-(`FUN_007ee710`, named by its own log string). It is a **ten**-argument `__thiscall`, and the call site
-(`007a164d..007a1671`) pushes:
+`Activate`'s call into the magic holder is `[entity+0x2D8]`'s vtable slot 2. It is a **ten**-argument
+`__thiscall`, and the call site (`007a164d..007a1671`) pushes:
 
 | arg | pushed | what it is |
 |---:|---|---|
@@ -85,14 +84,78 @@ ENDS, which is what a builder needs.
 | 8 | `[IIR+0x49]` | payload **`@13`** |
 | 9, 10 | `0`, `0` | — |
 
-Inside the callee, four of them are stored on the buff object in one block at `007eeb52..007eeb7f`:
-`arg3 → buff+0x24`, `arg4 → buff+0xAC`, `arg5 → buff+0xA8`, `arg6 → buff+0xC0`. The duration is then gated
-`CMP [buff+0xAC], 0 / JLE` — a zero-duration buff is dropped, which is the same refusal `ActivateBuff` logs.
+⚠️ **The callee is `CoreMagicHolder::ActivateBuff` (`FUN_007eddc0`), not `UpdateBuff`** — an earlier pass named
+it `UpdateBuff` off the *log string inside `Activate`*, but the vtable decides it: `+0x2D8` holds
+`CoreMagicHolder`'s `+8` sub-object, whose vtable (`01fcdaf0`) has `FUN_007eddc0` in slot 2 — the function whose
+own log strings are `"ActivateBuff missing SpellTemplate"` / `"Tried to ActivateBuff with a nonbuff spell"`.
+`ActivateBuff` is the only caller of `CoreMagicHolder::AddBuffInfo` (`FUN_007eca90`), which allocates the
+`BuffInfo_c` and stores the payload onto it:
 
-⛔ **`[EBP+0x20]` and `[EBP+0x24]` — args 7 and 8 — are read NOWHERE in the function.** Both bool bytes are
-passed and discarded, so whatever they mean, they do not reach the buff the client builds through this path.
-That is a real constraint on #658: their meaning is not "something the buff-add needs", and a builder that gets
-them wrong cannot change what the client stores.
+| `BuffInfo_c` slot | receives | verified at |
+|---|---|---|
+| `+0x10` | the spell base id | `AddBuffInfo` body |
+| `+0x14` | the apply INSTANT, centiseconds off the `GameTime_t` clock | `ActivateBuff` sources it from `FUN_004ed7d0()+0x40` |
+| `+0x18` | duration × stat `0x1D0 DurationModifier`, the scaled total | `AddBuffInfo` body |
+| `+0x24` | **wire descriptor `[3]` — the CASTER's level** | `007ee1a2` pushes `[desc+0xC]` as arg 4 → `*(buff+0x24) = arg4` |
+| `+0x28/+0x2C` | `CasterID`, the two-word `ID32` | `AddBuffInfo` body |
+| `+0x20` (u32) / `+0x30` (byte) | the payload's two bools `@12`/`@13` | `AddBuffInfo` body — **stored, not discarded** |
+| `+0xA4` | **wire descriptor `[0]`** | `007ee196` pushes `[desc]` as arg 8 → `007ecb9c MOV [buff+0xA4],EDX` |
+
+(The `@12`/`@13` ↔ `+0x20`/`+0x30` pairing between the two slots is read from the decompiler's argument
+ordering, one step less certain than the rest; the two stores themselves are instruction-verified.)
+
+⭐ `+0x24` receiving the caster's level is the convergence this ticket needed: the spawn scaffold's buff record
+independently fills the same slot, and the corpus measured THAT value as the caster's level at cast time. Two
+wire encodings, one object slot, one meaning — which also confirms the level-pair assignment (`descriptor[3]` =
+caster, `CastingLevel@42` = target) from the client side.
+
+### ⭐ `UpdateBuff` (`FUN_007ee710`) is the COUNTER path, and retail never drives it with a descriptor
+
+The earlier version of this section attributed the ten descriptor-shaped arguments to `UpdateBuff` and read its
+store block (`007eeb52..007eeb7f`) as `arg3=descriptor ptr → buff+0x24` with "args 7 and 8 discarded". Wrong
+function: `UpdateBuff`'s six arguments are the **Counter family**. `Activate` calls it at `007a1897` — only
+when payload `@0 Counter != 0` (a form-0 apply falls through to it; the never-sent form 2 reaches it directly)
+— passing `(BuffTemplate, Duration, CastingLevel@42, Counter@0, CounterType@4, CounterTimeLeft)`, and the store
+block is `CastingLevel → buff+0x24`, `Counter → +0xAC`, `CounterType → +0xA8`, `CounterTimeLeft → +0xC0`, with
+the `CMP [buff+0xAC],0 / JLE` gate being "no counter, nothing to update". Its three other callers
+(`FUN_007f1d30`, `FUN_007f2340`, `FUN_007f32b0`) are the buff-counter GameAction executors. So on a counter
+update the client OVERWRITES `+0x24` with `CastingLevel@42` — the client treats the two wire level slots as one
+"casting level" field, refreshed from whichever encoding arrived last.
+
+### ⛔ `descriptor[0]` is WRITE-ONLY in the client — nothing reads `BuffInfo_c+0xA4` (#658, closed)
+
+The hunt for a consumer that would name the 1-vs-2 split ends in an exhaustive negative:
+
+* the magic module's every `[reg+0xA4]` touch is attributed to OTHER objects (the spell record's own `+0xA4`
+  property word, `+0xA0/+0xA4` vector begin/end pairs, `GameTime_t`, stack slots);
+* all ten callers of `FindBuffInfo` (`FUN_007ed310`) read only the timer pair and `+0x20` (`FUN_007f17a0` is a
+  `GetBuffBool` accessor returning `+0x20`; `FUN_007f16e0` computes time-remaining off `+0x14/+0x18`);
+* the GUI exporter `FUN_00b50270`, which builds the Flash `com.GameInterface.Game.BuffData` object, reads
+  `+0x10`, `+0x14/+0x18` (or `+0xBC/+0xC0` for spells with head-flags bit 20), `+0x2C`, and spell-record
+  properties — not `+0xA4`;
+* the spawn-scaffold serialization (`FUN_007ed9b0`) fills twelve fields and `+0xA4` is not among them — a
+  streamed-in buff never has it;
+* image-wide, exactly one `CMP dword ptr [reg+0xA4], 1/2/3` exists (`FUN_017d0ca0`) and it is a COLLADA physics
+  exporter.
+
+And the `BuffInfo_c` ctor (`FUN_00849770`) **defaults `+0xA4` to 1** — the wire's majority value is the
+client's own neutral state.
+
+So `descriptor[0]` is a server-side provenance tag the client stores and never consumes: `1` = a plain cast
+(the client default), `2` = applied by another spell's effect (the corpus's `d0=2` spells are 0/46 castable and
+83% chain/area-effect targets), `3` = applied by a combo, naming it in `descriptor[1]`. A builder that writes
+`1` for a direct cast — every apply this server currently performs — is correct by construction, and no value
+in this slot can change client behaviour. When effect-chain application lands (#784) it should write `2`; a
+combo-applied buff (#623) writes `3` + the combo id.
+
+⭐ **And the same holds for the rest of the descriptor: the client consumes exactly TWO of its seven words.**
+`ActivateBuff` reads only slots `[0]` and `[3]` off the pointer (`007ee196`/`007ee1a2` — offsets `0` and
+`0xC`), `AddBuffInfo` receives those two by value, and **no other `MagicBuffIIR_c` method touches the parsed
+descriptor region (`IIR+0x4C..+0x6C`) at all** — every vtable method decompiled, zero references. So the combo
+id in `descriptor[1]`, the spell-id echo in `[2]`, the hostile flag at wire `@30` and the two zero words are
+parsed and never read: server-side facts riding along, only recoverable from the corpus. That closes the
+consumer hunt for the `@30` hostile flag (`gaps.md`) the same way as for `descriptor[0]` — there is no consumer
+to name either.
 
 **`@46–53` is an absolute expiry, not a counter.** `Activate` computes `(stamp64 - <global clock>) / 10` and, if
 that is positive and *shorter* than `Duration`, overwrites `Duration` with it. That is how retail resumes a buff
@@ -238,7 +301,9 @@ spells with a readable 1040005 record:
 Nothing coarse separates it. The same sweep answered #630's mana-mode question at a single bit, so the shape
 does work when the answer is there — its absence here says the source is not a single field of the spell record.
 ⭐ For `bool2` that negative is now EXPLAINED rather than open: it is a caster property, so no spell field could
-ever have separated it. `descriptor[0]` stays open, and the readings ruled out for it since are that it is not an
+ever have separated it. `descriptor[0]` is likewise closed — the client stores it at `BuffInfo_c+0xA4` and
+never reads it (see the write-only section above), so no spell field NEEDED to separate it. The readings ruled
+out for it along the way are that it is not an
 arity count (its `2` form populates no extra descriptor slot, unlike the decoded `3`), not a re-apply/refresh
 marker (it appears on both the first and later applies of one target+spell), and not the player-ness of either
 endpoint.

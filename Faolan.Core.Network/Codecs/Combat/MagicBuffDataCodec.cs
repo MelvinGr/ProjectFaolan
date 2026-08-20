@@ -128,8 +128,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// captured apply" was true of the four rows it was written from and is false of the corpus, where it is 1
 		// x3055, 2 x367 and 3 x2 over 3,424 applies (#658). `3` is decoded: it says descriptor[1] names the COMBO
 		// that applied the buff (MagicBuffCorpusTests.DescriptorZeroIsThree_ExactlyWhenDescriptorOneNamesACombo).
-		// `2` is not, and the obvious readings are all measured DEAD - see MagicBuffCorpusTests. 1 is what a plain
-		// cast sends and is what we build.
+		// `2` is not, and the obvious readings are all measured DEAD - see MagicBuffCorpusTests.
+		//
+		// The CLIENT settles what 1-vs-2 can affect: NOTHING. The word lands at `BuffInfo_c+0xA4`
+		// (`ActivateBuff` -> `AddBuffInfo` arg 8) and no code in the client reads that slot - the magic module,
+		// every `FindBuffInfo` caller, the `com.GameInterface.Game.BuffData` GUI exporter and the spawn-scaffold
+		// serialization are all attributed and none touches it - while the `BuffInfo_c` ctor DEFAULTS the slot
+		// to 1. So 1 is the client's own neutral value, the field is a server-side provenance tag (1 = a plain
+		// cast, 2 = applied by another spell's effect, 3 = applied by a combo), and writing 1 for the direct
+		// casts we perform is correct by construction (docs/subsystems/npc-spell-applyspell.md, #658).
 		private const uint PlainCastDescriptorLead = 1;
 
 		// The APPLY form every buff we send uses. `expiryStamp` is an ABSOLUTE instant on the server's uptime-milli

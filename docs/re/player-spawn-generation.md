@@ -487,17 +487,17 @@ exactly where our grammar has the buffs), and `SpawnPostIir.BuffRecords` now car
 the READ order is still sequential). The object is 200 bytes (`FUN_00c9cce0(200, 4, 0)`), so `+0xC0` is its last
 field.
 
-⭐ **Four of those offsets are exactly the ones `CoreMagicHolder::UpdateBuff` writes** when a `MagicBuffIIR`
-apply lands (`docs/subsystems/npc-spell-applyspell.md`): `+0x24`, `+0xA8`, `+0xAC` and `+0xC0`, at `007eeb52`.
-So the scaffold's buff record and the apply payload are **two encodings of one client object**, and the offsets
-bridge them:
+⭐ **Four of those offsets are exactly the ones the apply path also writes** when a `MagicBuffIIR` lands
+(`docs/subsystems/npc-spell-applyspell.md` — `ActivateBuff`→`AddBuffInfo` for the apply itself, `UpdateBuff` =
+`FUN_007ee710` for the counter refresh). So the scaffold's buff record and the apply payload are **two
+encodings of one client object**, and the offsets bridge them:
 
-| offset | what `UpdateBuff` puts there | position in `FUN_007ed9b0`'s read |
+| offset | what the apply path puts there | position in `FUN_007ed9b0`'s read |
 |---|---|---:|
-| `+0x24` | the 7-word descriptor, by pointer | 5th |
-| `+0xA8` | the constant `0` (arg 5) | 8th |
-| `+0xAC` | `Duration`, centiseconds — later gated `> 0` | 9th |
-| `+0xC0` | `CasterID`, the `ID32`, by pointer | 12th |
+| `+0x24` | wire `descriptor[3]` — the **caster's level** (`AddBuffInfo` arg 4); the counter path refreshes it from `CastingLevel@42` | 5th |
+| `+0xA8` | `CounterType@4` (`UpdateBuff`) | 8th |
+| `+0xAC` | `Counter@0` — gated `> 0` in `UpdateBuff` ("no counter, nothing to update") | 9th |
+| `+0xC0` | `CounterTimeLeft` (`UpdateBuff`); the GUI reads it as remaining time for head-flags-bit-20 spells | 12th |
 
 That is a second, independent population for #658's unsourced apply fields: the corpus holds 1,471 parsed buff
 records off the character full-update stream, and they carry the same object's fields under a different framing.
@@ -508,11 +508,13 @@ candidate the first pass named) — they are the GROUP HEAD: `FUN_0145b8a0` read
 element and `FUN_0145c0b0` the inner `ListFrame` word, i.e. the flat carve's `SpellId` + "`Kind` constant". The
 model now matches the client (`ScaffoldBuffGroup { SpellId, Records }`), the discarded u32 opens each record
 (our `SourceHandle` — the client reads it and throws it away), and a stream whose group holds TWO records — the
-case the flat carve would have misparsed — now reads. `UpdateBuff`'s own store block (`007eeb5e`) also anchors
-the timer pair: `+0x18` receives duration x stat `0x1D0 DurationModifier` x a constant (the client COMPUTES the
-scaled total the scaffold carries precomputed) and `+0x1c` the unscaled duration, and `+0x24` receives the raw
-arg-3 POINTER to the descriptor — so on the apply path that slot holds a pointer where the scaffold wire carries
-a small int, and the two paths share the object but not that field's kind.
+case the flat carve would have misparsed — now reads. The apply path's store blocks also anchor the timer pair:
+`+0x18` receives duration x stat `0x1D0 DurationModifier` x a constant (the client COMPUTES the scaled total
+the scaffold carries precomputed) and `+0x1c` the unscaled duration. (An earlier read of `UpdateBuff`'s block
+said `+0x24` receives "the raw arg-3 pointer to the descriptor" — superseded: `UpdateBuff`'s arg 3 is
+`CastingLevel@42`, a level, and the apply's own `AddBuffInfo` stores wire `descriptor[3]`, also a level. Both
+paths fill `+0x24` with the same KIND of value the scaffold carries, so scaffold `+0x24` and the apply's level
+slots line up directly — which is the convergence that confirmed the level-pair assignment.)
 
 ⚠️ Both framing readers divide by `0x3F1` to recover the count, which is the same `ListFrame` arithmetic
 CLAUDE.md records for the whole image (77 functions divide, 59 multiply, none compares) — so the framing is
