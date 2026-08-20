@@ -73,7 +73,7 @@ fields (compressed on-disk bytes).
 | 1000517 | Race/nation name table | 1 | 1 | 0 | 137 B |
 | 1000518 | Relation-title table | 1 | 1 | 0 | 1.1 KB |
 | 1000519 | DECALPROJECTORS | 496 | 8 | 488 | 47.4 KB |
-| 1000520 | Token/relic defs | 1 | 1 | 0 | 760 B |
+| 1000520 | Token/relic defs - DECODED: the `tokenID` table behind `DispatchUpdateTokenAmount` (s2c 0x204D). One 760-byte record, a 12-byte header then 29 fixed-shape entries `[u8][u8][u8 tokenId][u16 nameLen][name][7 bytes]`. The id byte is the only one of the three fixed prefix bytes that takes 29 distinct values, which is what identifies it; the ids are sparse (1..17, 19, 30..36, 50, 60..62) and four of them are corroborated on the wire. Names in [`token-pool-ids.tsv`](../re/token-pool-ids.tsv), enum `TokenPool`. The 7-byte per-entry tail is unread - it is fixed-width, and neither a varint nor a 3x u16 reading of it produces anything that looks like an item template id | 1 | 1 | 0 | 760 B |
 | 1000521 | Game data/enum table (1000500x) | 1 | 1 | 0 | 704 B |
 | 1000523 | Game data/enum table (1000500x) | 1 | 0 | 1 | 20 B |
 | 1000620 | item-template catalog (RDBH, variant of 1000020) | 271 | 271 | 0 | 94.7 KB |

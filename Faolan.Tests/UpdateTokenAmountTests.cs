@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Xunit;
 
@@ -11,23 +12,23 @@ namespace Faolan.Tests
 	public class UpdateTokenAmountTests
 	{
 		// (hex, decoded) - the four distinct captured bodies and the event each was sent on.
-		public static TheoryData<string, byte, ulong> CapturedFrames() => new()
+		public static TheoryData<string, TokenPool, ulong> CapturedFrames() => new()
 		{
 			// five *-create captures, at first world entry, right after N3Teleport
-			{ "010000000000000000000000000000000000", 1, 0 },
+			{ "010000000000000000000000000000000000", TokenPool.VeteranPoints, 0 },
 			// xxx_mage-necromancer_login_play3 - completing Destiny quest 10915 "Nadini"
-			{ "040000000000000001000000000000000000", 4, 1 },
+			{ "040000000000000001000000000000000000", TokenPool.AltAdvancementGeneralToken, 1 },
 			// xxx_mage-necromancer_login_play4 - same character, completing quest 10830 "Rescue Arias"
-			{ "040000000000000002000000000000000000", 4, 2 },
-			// NecroL80_..._group-finder
-			{ "200000000000000002000000000000000000", 0x20, 2 },
+			{ "040000000000000002000000000000000000", TokenPool.AltAdvancementGeneralToken, 2 },
+			// NecroL80_..._group-finder-dungeon - a login-reward claim (CoreClaimIIR "login counter 120"), like Hoxxling's
+			{ "200000000000000002000000000000000000", TokenPool.LotteryToken, 2 },
 			// Hoxxling_..._login_claim_login_reward - beside CoreClaimIIR "login counter 90"
-			{ "320000000000000003000000000000000000", 0x32, 3 }
+			{ "320000000000000003000000000000000000", TokenPool.TeleportCoins, 3 }
 		};
 
 		[Theory]
 		[MemberData(nameof(CapturedFrames))]
-		public void UpdateTokenAmount_RoundTripsEveryCapturedBody(string hex, byte tokenId, ulong gained)
+		public void UpdateTokenAmount_RoundTripsEveryCapturedBody(string hex, TokenPool tokenId, ulong gained)
 		{
 			var captured = Convert.FromHexString(hex);
 			var parsed = UpdateTokenAmountCodec.Parse(captured);
@@ -46,7 +47,7 @@ namespace Faolan.Tests
 		{
 			// Nothing in the corpus sets `spent` or `includeBonus`, so this is the only thing holding their offsets:
 			// spent at 9..16 big-endian, the flag as the last byte.
-			var body = UpdateTokenAmountCodec.Build(new UpdateTokenAmount(0x32, 0x0102030405060708, 0x1112131415161718, true));
+			var body = UpdateTokenAmountCodec.Build(new UpdateTokenAmount(TokenPool.TeleportCoins, 0x0102030405060708, 0x1112131415161718, true));
 
 			Assert.Equal("32010203040506070811121314151617" + "1801", Convert.ToHexStringLower(body));
 		}

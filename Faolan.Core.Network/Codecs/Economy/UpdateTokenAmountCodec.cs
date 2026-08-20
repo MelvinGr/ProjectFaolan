@@ -14,11 +14,12 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// that fits. `spent` and `includeBonus` are 0 in every captured frame, so their widths are inferred, not
 	// measured. [V3: UpdateTokenAmountTests.UpdateTokenAmount_RoundTripsEveryCapturedBody]
 	//
-	// WHICH pool a tokenId names is still open (Gitea #870): the send is event-driven and the corpus shows four
-	// different ids - 1 at character creation/first world entry with 0/0, 4 on a Destiny quest completion (running
-	// total 1 then 2 for the same character), 32 in a group-finder session and 50 on a login-reward claim.
-	// The server never sends this today; the codec exists so the decode is written down where the next caller
-	// looks.
+	// The pool an id names comes from the client's own table, RDB 1000520 - see `TokenPool`. The send is
+	// event-driven, one frame per event: `VeteranPoints` 0/0 at a new character's first world entry,
+	// `AltAdvancementGeneralToken` running 1 -> 2 for one character over two Destiny quest completions, and
+	// `TeleportCoins` / `LotteryToken` on a login-reward claim. So `gained` is a lifetime TOTAL, not a delta.
+	// The server never sends this today - we model no token pool - so the codec exists to write the decode down
+	// where the next caller looks.
 	public static class UpdateTokenAmountCodec
 	{
 		public const uint Method = (uint)GameCharInterfaceMethods.DispatchUpdateTokenAmount;
@@ -44,16 +45,16 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		internal static UpdateTokenAmount Read(ref SpanReader r)
 		{
-			return new UpdateTokenAmount(r.ReadU8(), r.ReadU64Be(), r.ReadU64Be(), r.ReadU8() != 0);
+			return new UpdateTokenAmount((TokenPool)r.ReadU8(), r.ReadU64Be(), r.ReadU64Be(), r.ReadU8() != 0);
 		}
 
 		internal static void Write(FaolanStream s, UpdateTokenAmount v)
 		{
-			s.WriteByte(v.TokenId).WriteUInt64(v.Gained).WriteUInt64(v.Spent).WriteByte((byte)(v.IncludeBonus ? 1 : 0));
+			s.WriteByte((byte)v.TokenId).WriteUInt64(v.Gained).WriteUInt64(v.Spent).WriteByte((byte)(v.IncludeBonus ? 1 : 0));
 		}
 	}
 
 	// DispatchUpdateTokenAmount (0x204D). `Gained`/`Spent` are the pool's lifetime totals - the client subtracts to
 	// get the balance, which is why a fresh character is told 0/0 rather than nothing at all.
-	public sealed record UpdateTokenAmount(byte TokenId, ulong Gained, ulong Spent, bool IncludeBonus);
+	public sealed record UpdateTokenAmount(TokenPool TokenId, ulong Gained, ulong Spent, bool IncludeBonus);
 }
