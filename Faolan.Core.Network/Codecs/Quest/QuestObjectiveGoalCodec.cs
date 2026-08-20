@@ -23,6 +23,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//     unknown1 > 0 implies a marker on 24 of 24 shipped goals, round map-unit values 3..170 on
 	//     ReachArea/hunt-area goals - a marker RADIUS shape; unknown2's 17 shipped carriers are all
 	//     dungeon-objective goals, several with degenerate (1,1) markers - a marker-display modifier shape.
+	//
+	// ⚠️ **Where that consumer hunt stands, so it is not restarted from zero** (#464, 2026-08-21):
+	//   - The two fields are the record's LAST two words from BOTH directions - the reader stores `puVar15[0xe]`
+	//     and `[0xf]` (= +0x38/+0x3C) last, and the writer `FUN_0091d260` emits `[0]`, `[1]`, block `[2..7]`,
+	//     block `[8..0xd]`, `[0xe]`, `[0xf]` in that order. So the carve is confirmed twice over.
+	//   - A `Quest_c` holds **two** goal lists, at `+0x10C` and `+0x110`, each read by the same loop and each
+	//     capped at 100 entries by the reader. A consumer hunt has to cover both.
+	//   - ⛔ The goal is a plain **0x48-byte POD** (`FUN_00c9cce0(0x48,4,0)`, every word zeroed, no vtable stored),
+	//     so there is no class to sweep by RTTI and no virtual to xref. That is WHY offsets are the only handle,
+	//     and why they are a bad one: `+0x24`+`+0x38` co-occur in 4,862 of the binary's 139,441 functions.
+	//   - ⛔ **The obvious hit is a false one.** `FUN_0091df50` itself ends with
+	//     `if (*(uint *)(obj + 0x3c) < *(uint *)(obj + 0x38)) FUN_0091f760();`, which reads exactly like
+	//     "unknown2 vs unknown1". It is not: that loop walks `+0xAC..+0xB0`, a list of REFCOUNTED objects (the
+	//     `+0x10 == 2000000000` / `LOCK INC` idiom, and a vtable at `+0x08`), not the POD goals at `+0x10C`.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.
