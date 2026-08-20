@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,213 NPC types / 3,790 placements · 4,891 items · 20,848 spells · 265 abilities · 19,777 feats · 753 conversation nodes · 112 shops · 5,049 quests · 2,664 world objects · 1,080 patrol routes · 340 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,227 NPC types / 3,813 placements · 5,031 items · 20,848 spells · 265 abilities · 19,777 feats · 764 conversation nodes · 112 shops · 5,049 quests · 2,688 world objects · 1,109 patrol routes · 340 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -30,10 +30,10 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-- **NPC conversations** — 115/123 greeted dialogue NPCs imported (93.5%)
+- **NPC conversations** — 116/124 greeted dialogue NPCs imported (93.5%)
 - **Vendor shops** — 77/77 captured vendors imported (100.0%)
   - of the 8 conversation gap(s): **0 carry a conversation in the corpus** (a real import gap), 8 were clicked but produced no dialogue (not a dialogue NPC)
-- **RDB template catalog** (type 1000020, partly TEA-encrypted) — 5,103/77,631 of the ENCRYPTED entries decrypted (**6.6%**), from 4,838 item and 265 ability keys harvested from captures. (+20,417 plaintext entries need no key at all - the feat catalog is entirely among them.)
+- **RDB template catalog** (type 1000020, partly TEA-encrypted) — 5,243/77,631 of the ENCRYPTED entries decrypted (**6.8%**), from 4,978 item and 265 ability keys harvested from captures. (+20,417 plaintext entries need no key at all - the feat catalog is entirely among them.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -231,21 +231,32 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Mounts** — working; importing more from captures
 - ⬜ Mounted combat — the mount abilities are granted, but a lance charge needs a capture (#667)
 
-### Group PvE content (not started)
+### Group PvE content
 
+- ✅ **Group finder** — queue for a dungeon, pick your role and confirm the ready check; the finder forms the team
+  and teleports it into the instance that team then owns. Destinations come from the client's own activity table,
+  and a full quest log refuses the signup the way retail refuses it (#511, #512)
+- 🟡 Finding you a group of **strangers** is not modelled — every signup runs the private-team path. Six more
+  finder messages are unhandled, and each one is what a second player exercises: a declined ready check, the
+  role counters, the featured-activity pushes. Pending a two-client capture (#882)
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (#309). Group instances are now owned
-  by the team (#512, above); what is still decoded-but-unbuilt is the difficulty an instance is entered at (#511)
-- 🟨 Factions & reputation — the Khitai faction ranks, vendors and companions. The 16-faction catalog and its kill
+  by the team (#512, above); the client is told when it is standing in one. What is still decoded-but-unbuilt is
+  the difficulty an instance is entered at (#511)
+- 🟡 Factions & reputation — the Khitai faction ranks, vendors and companions. The 16-faction catalog and its kill
   payout matrix are imported from the client's own files, the ladder is its tuning sheet's, standing is awarded on
   a kill and restored at world entry. Missing: the encounter TIER (only solo-normal pays), quest/script triggers,
   and standing-gated vendors (#310, #315)
 
-### Guild base & large-scale (not started)
+### Guild base & large-scale
 
 - ⬜ Guild base — player-built guild cities and battlekeeps: the central keep, walls and gates, rank-gated
   structures, and hired NPC guards (#147)
 - ⬜ Sieges — massed guild-vs-guild siege warfare fought over those keeps (#147)
-- ⬜ PvP progression — open-world PvP, minigames, and the PvP-resource layer that feeds base building (#146)
+- 🟡 **PvP minigames** — you can sign up for one, watch the live per-map signup counts move as players queue and
+  leave, and withdraw. No match forms out of the queue: the message that carries a whole match appears in no
+  capture, so building it would be guesswork (#146, #882)
+- ⬜ PvP progression — open-world PvP, minigame matches themselves, and the PvP-resource layer that feeds base
+  building (#146)
 - 🟡 **Criminal status** — killing a player makes you a criminal for five minutes; normal vendors and wagoners
   refuse you, smugglers still serve you. Missing the trigger (PvP combat is not modelled, so it runs off a GM
   command) and the murder-point ladder (#503)
@@ -270,7 +281,7 @@ we've seen_, and names the gaps). Regenerate with
 ### Wire fidelity
 
 - ✅ **One codec per message** — every byte the server sends is built by a single codec with a uniform
-  `Build`/`Parse` surface; 16 convention gates enforce it with no exclusions (#530)
+  `Build`/`Parse` surface; 18 convention gates enforce it with no exclusions (#530)
 - ✅ **Every codec round-trips its captured bytes** — each parses and rebuilds real corpus packets byte-exact,
   with an empty allowlist (#538, #543, #544, #545)
 - ✅ **Behaviour commands fully decoded** — all 34 of the client's behaviour commands and every per-command

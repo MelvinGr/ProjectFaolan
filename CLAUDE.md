@@ -250,7 +250,7 @@ Two things already run ahead of that move:
 
 **Codec conventions** (`Faolan.Core.Network/Codecs/`, enforced by `Faolan.Tests/CodecConventionTests.cs`):
 
-⚠️ **These rules are BINDING — the sweep is done (Gitea #530, waves 0–9) and all 16 gates in
+⚠️ **These rules are BINDING — the sweep is done (Gitea #530, waves 0–9) and all 18 gates in
 `Faolan.Tests/CodecSurfaceConventionTests.cs` are live over every folder under `Codecs/`, with zero skips.** Every
 codec is on the uniform surface, `Faolan/`'s own wire builders moved in (wave 7), `Faolan.Importer/` no longer
 names an IIR or hand-decodes a body a codec owns (wave 8), and `ICodec<T>` is deleted (wave 9) — do not
