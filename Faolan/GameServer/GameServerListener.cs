@@ -397,6 +397,18 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
+		// The CS tier's entry into a world teleport (#511: the group finder putting a formed team into its
+		// instance). The same DoTeleport the travel box and the GM path resume into, so the retail change-map
+		// sequence (announce + handoff + reconnect) is the only teleport shape this server has.
+		public async Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null)
+		{
+			if (ClientForCharacter(characterId) == null)
+				return false;
+
+			await DoTeleport(characterId, mapId, position);
+			return true;
+		}
+
 		public async Task<bool> RunGmCommand(uint characterId, string commandText)
 		{
 			var client = ClientForCharacter(characterId);

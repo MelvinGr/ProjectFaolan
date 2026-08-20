@@ -61,6 +61,14 @@ namespace Faolan.Core.Network.Server.GameServer
 		Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined);
 
 		/// <summary>
+		///     Teleports a connected character to a map, riding the same retail change-map sequence the travel box
+		///     uses (announce + handoff + reconnect). <paramref name="position" /> null lands at the map's default
+		///     spawn. The seam the CS tier's group-finder entry uses to put a formed team into its instance (#511);
+		///     returns false when the character is not connected to this listener.
+		/// </summary>
+		Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null);
+
+		/// <summary>
 		///     Adds <paramref name="amountTin" /> to a connected character's wallet, persists it and pushes the
 		///     UpdateCash the client renders. Returns false when the character is not connected here, so the caller can
 		///     refuse rather than move money nobody will see.

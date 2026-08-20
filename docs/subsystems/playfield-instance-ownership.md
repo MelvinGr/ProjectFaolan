@@ -79,6 +79,18 @@ the **group finder**, forming a team, and *then* entering the instance that team
 `DispatchGroupFinderSignupFailed` with a localized reason id, and the same `QueueGroupFinder` body succeeds once
 the quest log has room.
 
+**This flow is implemented** (`GroupFinderService`, the CsPlayerAgent tier): `QueueGroupFinder` parses as the
+client's own signature — a count-framed `vector<uint32>` that is a **bitmask over the activity catalog** (the
+captured `[0][0x20][0]` = bit 37 = activity 38) plus `wantsLeader`/`privateTeam` — and the quest gate refuses at
+**45 held quests** (`Quest_MaxQuestPerPremiumPlayer`, RDB 1000516) with the captured category-10035 remoteformat.
+Below the cap the captured handshake runs: role select → signup success + ready check → the solo confirm forms
+the one-member private team (`TeamService.FormGroupFinderTeam` — roster, `AddToGroupIIR`, `~Team`) and the world
+tier teleports it into the activity's playfield, which the team then owns. Only the **captured** activity is
+mapped to a destination (38 → 1092, arrival (112, 70, 39) off the captured `N3Teleport`) — the
+`ActivityId → record` remap at the tail of RDB 1000627 is still un-walked, and an unmapped activity completes
+the signup but logs instead of guessing a teleport. Matchmaking with strangers is not modelled; every signup
+runs the private-team path the capture shows. Gated byte-exact by `GroupFinderTests`.
+
 ## The "Select instance" window — `DispatchInstanceSelectionForCurrentPlayfield`
 
 Clicking **Select instance** sends `GetInstanceListForCurrentPlayfield` (GameCharAgent `0x7B`) with an **empty

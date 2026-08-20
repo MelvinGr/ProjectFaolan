@@ -36,6 +36,7 @@ namespace Faolan.Tests
 			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];
 			public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId) => [];
 			public Task<bool> RunGmCommand(uint characterId, string commandText) => Task.FromResult(false);
+			public Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null) => Task.FromResult(false);
 			public Task<bool> SendGuildTag(uint characterId, string guildName) => Task.FromResult(false);
 			public void Register(IGameServerProvider provider) { }
 			public void Unregister(IGameServerProvider provider) { }

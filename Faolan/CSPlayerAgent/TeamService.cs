@@ -120,6 +120,23 @@ namespace Faolan.CSPlayerAgent
 			return TeamFor(characterId).Id;
 		}
 
+		// The group finder forms the team it is about to hand an instance to (#511/#512): a solo queuer gets a
+		// one-member "private team" WITH the full join fan-out - retail's DispatchYouJoinedTeam here carries a
+		// one-record roster (chat-annotated-4 frame 11943), then AddToGroupIIR and the ~Team subscription, exactly
+		// the shape a two-person accept produces. A queuer already grouped keeps their team; the roster re-broadcast
+		// is what retail's re-entry does anyway and the pushes are idempotent.
+		public async Task<uint> FormGroupFinderTeam(uint characterId)
+		{
+			var team = TeamFor(characterId);
+			await BroadcastRoster(team);
+			await PushMembership(team, characterId, true);
+			foreach (var member in team.Members)
+				await _chatServerDispatcher.RefreshTeamChannel(member, team.Id);
+
+			_logger.LogInformation("Team 0x{Team:X8}: formed by the group finder for {CharacterId:X8} ({Count} member(s)).", team.Id, characterId, team.Members.Count);
+			return team.Id;
+		}
+
 		// The team as the wire sees it - the client's `cTeam`, leader first. Null for a team that no longer exists or
 		// whose members are all offline. The raid service composes these; the team flow reaches the same record
 		// through BroadcastRoster.
@@ -375,6 +392,13 @@ namespace Faolan.CSPlayerAgent
 		private static Task Send(INetworkClient client, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
 			return client.SendAsync(new Rpc(PushSender, client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), (ushort)opcode, body));
+		}
+
+		// The same addressed push for the sibling CS services (GroupFinderService), so every CSPlayerInterface
+		// dispatch in the process carries the one sender/receiver shape the remark above pins down.
+		internal static Task SendToClient(INetworkClient client, CSPlayerInterfaceMethods opcode, byte[] body)
+		{
+			return Send(client, opcode, body);
 		}
 
 		// One live team. Members is a snapshot-on-write list so a broadcast can iterate it while another connection

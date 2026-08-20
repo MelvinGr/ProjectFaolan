@@ -7,6 +7,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.GroupFinder;
 using Faolan.Core.Network.Codecs.Raid;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
@@ -36,6 +37,11 @@ namespace Faolan.CSPlayerAgent
 		// rather than beside it, because a raid holds team ids and nothing else.
 		private readonly RaidService _raids;
 
+		// Composed collaborator: the group-finder signup flow (#511) - the quest-log gate, the role/ready
+		// handshake, and the private-team entry into the activity's instance. Built ON the team service the same
+		// way raids are, because the finder's product IS a team.
+		private readonly GroupFinderService _groupFinder;
+
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
@@ -57,6 +63,8 @@ namespace Faolan.CSPlayerAgent
 			// No chat dispatcher: there is deliberately NO ~Raid channel. Only ~Guild and ~Team exist anywhere in the
 			// corpus, so subscribing one would be inventing a channel retail does not have (#663 / #669).
 			_raids = new RaidService(logger, _teams, ClientForCharacter);
+
+			_groupFinder = new GroupFinderService(logger, database, _teams, gameServerDispatcher);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -191,6 +199,49 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentMethods.DeclineTeamInvite:
 				{
 					_teams.Decline(client.Session.Character.Id);
+					break;
+				}
+
+				// --- Group finder (#511) ------------------------------------------------------------------------
+				// The signup flow chat-annotated-4 walks end to end; the service holds the trace and the gate.
+
+				// 0x2082 RequestNeededRole(uint32 activityId): the client selected an activity in the finder window.
+				case CSPlayerAgentMethods.RequestNeededRole:
+				{
+					await _groupFinder.HandleRequestNeededRole(client, body.ReadUInt32());
+					break;
+				}
+
+				// 0x207A QueueGroupFinder(const std::vector<uint32>& activites, bool wantsLeader, bool privateTeam):
+				// the signup itself - where the quest-log gate refuses or the role select opens.
+				case CSPlayerAgentMethods.QueueGroupFinder:
+				{
+					await _groupFinder.HandleQueue(client, GroupFinderQueueCodec.Parse(body.ReadRemainingArray()));
+					break;
+				}
+
+				// 0x207B SelectGroupFinderRoles(uint32 roles): the role bitmask picked in groupFinder_roleSelect.
+				case CSPlayerAgentMethods.SelectGroupFinderRoles:
+				{
+					await _groupFinder.HandleSelectRoles(client, body.ReadUInt32());
+					break;
+				}
+
+				// 0x207D ReadyGroupFinder(bool ready, bool isTimeout): the ready-check answer; a solo confirm forms
+				// the private team and enters the instance.
+				case CSPlayerAgentMethods.ReadyGroupFinder:
+				{
+					var ready = body.ReadByte() != 0;
+					var isTimeout = body.ReadByte() != 0;
+					await _groupFinder.HandleReady(client, ready, isTimeout);
+					break;
+				}
+
+				// 0x207C LeaveGroupFinder(): withdraw from the queue. No captured s2c answer; the in-instance leave
+				// is the zone-line path, not this.
+				case CSPlayerAgentMethods.LeaveGroupFinder:
+				{
+					_groupFinder.HandleLeave(client.Session.Character.Id);
 					break;
 				}
 

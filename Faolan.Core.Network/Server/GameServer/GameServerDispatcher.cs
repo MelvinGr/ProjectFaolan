@@ -47,6 +47,12 @@ namespace Faolan.Core.Network.Server.GameServer
 			return provider != null && await provider.RunGmCommand(characterId, commandText);
 		}
 
+		public async Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null)
+		{
+			var provider = Provider;
+			return provider != null && await provider.TeleportCharacter(characterId, mapId, position);
+		}
+
 		public async Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined)
 		{
 			var provider = Provider;
