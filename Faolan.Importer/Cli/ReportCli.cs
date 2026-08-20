@@ -505,6 +505,11 @@ namespace Faolan.Importer.Cli
 					return await ItemLevelCheck(NamedCapture.LoadAll(capturesDir));
 				}
 
+				case "name-filter-check":
+				{
+					return await NameFilterCheck(RdbDir());
+				}
+
 				case "buff-duration-check":
 				{
 					return await BuffDurationCheck(NamedCapture.LoadAll(capturesDir));

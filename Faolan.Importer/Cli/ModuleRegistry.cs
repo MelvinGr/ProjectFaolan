@@ -31,7 +31,7 @@ namespace Faolan.Importer.Cli
 			new StarterSpellLevelsModule(), // capture-sourced, and the create kit is a LIST, not a level query
 			// --- rdb modules (opt-in, require --rdb) ---
 			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbAchievementsModule(), new RdbFactionsModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
-			new RdbMapsModule(), new RdbRespawnsModule(), new RdbQuestCatalogModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new RdbQuestTextModule(), new RdbDialogueTeleportsModule(), new RdbRegionsModule(), new ClassAttributeBaseModule(), new ClassComboScalingModule(),
+			new RdbMapsModule(), new RdbNameFilterModule(), new RdbRespawnsModule(), new RdbQuestCatalogModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new RdbQuestTextModule(), new RdbDialogueTeleportsModule(), new RdbRegionsModule(), new ClassAttributeBaseModule(), new ClassComboScalingModule(),
 			// --- corrections that must outrank an rdb module ---
 			// LAST on purpose: rdb-spells writes Spells.DurationMs unconditionally, so a capture-sourced duration for
 			// the rows its property run leaves empty has to be applied after it (#659). Registration order is the

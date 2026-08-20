@@ -19,6 +19,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
+using Faolan.Core.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
 using Faolan.GameServer.Scripting;
@@ -117,6 +118,9 @@ namespace Faolan.GameServer.CreateFlow
 		private readonly IDatabaseRepository _database;
 
 		private readonly ILogger _logger;
+
+		// Set on first use by LoadNameFilter; see there.
+		private (IReadOnlySet<string> Hashes, IReadOnlySet<int> Lengths)? _nameFilter;
 
 		// The live world simulation (owns the connected players' authoritative entities + zone model). Used by the
 		// cutscene actor-binding (LiveNpcHandle) to re-address the destiny cinematic to OUR live Kalanthes.
@@ -421,6 +425,18 @@ namespace Faolan.GameServer.CreateFlow
 
 			if (string.Equals(character.Name, name, StringComparison.Ordinal))
 				return NameCommitResult.Committed;
+
+			// Retail's own rules, in the order the client applies them: 4..16 characters (the client states that
+			// number itself and enforces it locally, so this only ever fires for a modified client), then the
+			// client's shipped forbidden-word list (#884). A server whose database has no imported list runs the
+			// length rule alone - the absence is LOGGED once by LoadNameFilter rather than passing silently.
+			var (forbidden, lengths) = await LoadNameFilter();
+			var verdict = CharacterNameRules.Check(name, forbidden, lengths);
+			if (verdict != CharacterNameRules.Verdict.Ok)
+			{
+				_logger.LogInformation("Character-editor: name rejected as {Verdict}.", verdict);
+				return NameCommitResult.Invalid;
+			}
 
 			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
 			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
@@ -1246,6 +1262,27 @@ namespace Faolan.GameServer.CreateFlow
 
 			client.Session.PostMorphBurstSent = true;
 			await SendPostMorphBurst(client);
+		}
+
+		// The client's forbidden-word list, loaded ONCE per process. It is ~200 short hashes and it changes only when
+		// the importer re-reads the client, so re-querying it per name typed in the editor would be pure noise.
+		private async Task<(IReadOnlySet<string> Hashes, IReadOnlySet<int> Lengths)> LoadNameFilter()
+		{
+			if (_nameFilter != null)
+				return _nameFilter.Value;
+
+			var terms = await _database.GetNameFilterTerms();
+			_nameFilter = (terms.Select(t => t.TermHash).ToHashSet(StringComparer.Ordinal), terms.Select(t => t.Length).ToHashSet());
+
+			// An empty table is a real state (the RDB module is opt-in and needs the client install), and it changes
+			// what this server enforces - so say so rather than letting a name filter that filters nothing look
+			// like one that found nothing to filter.
+			if (terms.Length == 0)
+				_logger.LogInformation("Character-editor: no name-filter terms imported (`--only rdb-name-filter`); only the 4..16 length rule applies.");
+			else
+				_logger.LogInformation("Character-editor: {Count} name-filter terms loaded.", terms.Length);
+
+			return _nameFilter.Value;
 		}
 
 		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /

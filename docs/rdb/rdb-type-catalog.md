@@ -165,9 +165,9 @@ fields (compressed on-disk bytes).
 | 1060666 | Environment/main settings (XML) | 128 | 43 | 85 | 711.0 KB |
 | 1060667 | ENVIRONMENTSETTINGS | 4,841 | 4,841 | 0 | 13.5 MB |
 | 1060668 | SKYDOME | 559 | 242 | 317 | 5.9 MB |
-| 1065100 | Name/profanity filter list | 1 | 1 | 0 | 19.4 KB |
-| 1065101 | Text/filter table (1065100x)? | 1 | 1 | 0 | 800 B |
-| 1065102 | Text/filter table (1065100x)? | 1 | 1 | 0 | 4.6 KB |
+| 1065100 | Name/profanity filter list - DECODED: `[u32 typeId][u32 0][u32 1][u32 count]` then count x `[u32 byteLen][UTF-8]`. 1,819 entries / 926 distinct, multilingual (DE/EN/ES/FR/PL + a large Korean block), most terms listed twice non-adjacently. Read by `RdbNameFilterList`, imported HASHED by `rdb-name-filter` - see [`character-names.md`](../subsystems/character-names.md) | 1 | 1 | 0 | 19.4 KB |
+| 1065101 | NOT a text/filter table - 49 fixed 16-byte records after the same 16-byte header, keyed by a single byte 0x41..0xFE (`[u8 key][u8 0x42][u16 0x000F][u32 value][u32 flag][u32 0]`). Unrelated to 1065100's word list and still unread | 1 | 1 | 0 | 800 B |
+| 1065102 | NOT a text/filter table - 1,142 sorted u32s that resolve against the LDB as SPELL ids (category 50210), not names. Header then a flat id array | 1 | 1 | 0 | 4.6 KB |
 | 1065103 | Text/filter table (1065100x)? | 1 | 1 | 0 | 1.6 KB |
 | 1065211 | Text/filter table (1065x)? | 1 | 0 | 1 | 16 B |
 | 1066601 | Terrain/streaming data (1066xxx)? | 409 | 158 | 251 | 209.7 KB |

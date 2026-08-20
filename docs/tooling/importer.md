@@ -105,7 +105,9 @@ names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `rdb-abilities`,
 `rdb-achievements` (the achievement catalog behind `DispatchAddTag` — LDB 55701 titles + 55700 descriptions,
 keyed by TAG id; see [achievements.md](../subsystems/achievements.md)),
-`rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
+`rdb-combos`, `rdb-maps`, `rdb-name-filter` (the client's forbidden-word list for character names, RDB 1065100 —
+stored HASHED, see [character-names.md](../subsystems/character-names.md)), `rdb-respawns` (+ CDN fetch),
+`rdb-items` (template decrypt),
 `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — discovery pads, quest goal regions, area
 banners and the lava hazards; depends on `rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
 

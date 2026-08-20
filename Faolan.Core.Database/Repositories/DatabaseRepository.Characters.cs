@@ -32,6 +32,12 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterClientSettings[]> GetCharacterClientSettingsByAccount(uint accountId);
 		Task SaveCharacterClientSettings(uint characterId, byte[]? settings, byte[]? preview);
 		Task<Character?> GetCharacterByName(string name, uint realmId);
+
+		/// <summary>
+		///     The client's forbidden-word list for character names, as `NameFilterTerm` rows (hash + length). Empty
+		///     when `rdb-name-filter` has not been run, which leaves `CharacterNameRules` enforcing length only.
+		/// </summary>
+		Task<NameFilterTerm[]> GetNameFilterTerms();
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		/// <summary>
 		///     The character's WORN set (container <see cref="ContainerKind.Equipped" />) as slot -> the item instance in
@@ -563,6 +569,12 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Characters.FirstOrDefaultAsync(c => c.RealmId == realmId && c.Name == name);
+		}
+
+		public async Task<NameFilterTerm[]> GetNameFilterTerms()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NameFilterTerms.AsNoTracking().ToArrayAsync();
 		}
 
 		public async Task<CharacterCombo[]> GetCharacterCombos(uint characterId)

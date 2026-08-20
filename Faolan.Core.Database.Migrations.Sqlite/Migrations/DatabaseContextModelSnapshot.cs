@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Ability", b =>
                 {
@@ -2151,6 +2151,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         {
                             t.HasCheckConstraint("CK_Mount_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
                         });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NameFilterTerm", b =>
+                {
+                    b.Property<string>("TermHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("TermHash");
+
+                    b.ToTable("NameFilterTerms");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcAmbientAnimation", b =>
