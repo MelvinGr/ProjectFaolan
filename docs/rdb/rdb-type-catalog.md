@@ -207,18 +207,42 @@ fields (compressed on-disk bytes).
 `SimpleDynelVisualChangeIIR` `e_StartParticleEffect` carries - the client reads only the id off the wire and
 pairs it with `1010207` itself, then errors as *"StartParticleEffect() Invalid particle resource id"* when it
 does not resolve. The client's own combat log names the same pairing: *"Starting 7 visual effect [ResourceID
-1010207:3667002] on attractor 10"*. The payload's binary effect GRAPH is still undecoded - what is decoded is what the id MEANS.
+1010207:3667002] on attractor 10"*.
 
-⚠️ **It is not string-less, though, and this page used to say it was.** That claim was the
-`pack_grep_lies` trap in miniature: the record is zlib, so a grep over the pack file finds nothing, and the
-text only appears once it is inflated. Inflated, 559 of the 8,163 records carry the original build-machine paths
-of the textures they draw with - `W:\achardb\conan\particles\smoke\gradient_ab.png` and the like - and all
-8,163 inflate cleanly. `--report particle-effects [--report-arg <substring>]` lists them, which makes the whole
-population searchable BY WHAT THE EFFECT LOOKS LIKE without decoding the graph at all.
+⚠️ **This page used to call the payload "an undecoded zlib blob (a binary effect graph, no strings)". BOTH
+HALVES WERE WRONG**, each for its own reason, and both are worth keeping written down because each is a named
+trap this catalog walked straight into.
 
-That is the question the server actually asks. It never renders a particle effect - it sends an id and the
-client does the rest - so what is needed is never "what does effect 3667002 look like" but "which id is the one
-I want", and a texture name answers that where the graph would not. See
+**"no strings" was the `pack_grep_lies` trap.** The record is zlib, so a grep over the pack file finds nothing
+and the text only appears once it is inflated. Inflated, all 8,163 records open cleanly and 559 carry the
+original build-machine paths of the textures they draw with -
+`W:\achardb\conan\particles\smoke\gradient_ab.png` and the like.
+
+⭐ **"undecoded" was the `some_rdb_text_xml` trap: 189 of the 8,163 records are not the binary form at all -
+they are the ARTIST'S AUTHORED XML, shipped verbatim.** A `<particlesystem>` document with a **192-tag schema**:
+`<systems>` naming each emitter/particle pair, `<emitters>` with per-axis position and direction, emitter shape
+(box / sphere / radius / height), `<particles>` with alignment, rotation and air resistance, `<textures>` with
+blend mode and animation rows/cols, `<light>`, animated `<curve>`s built from `<controlpoint position="...">`,
+and an `<exportpath>` carrying the source file's own name. So the effect graph's schema was never a
+reverse-engineering problem - the client ships the documentation. Same shape as 1010203 being plain-text XML
+while its 1010501 twin is the merged binary.
+
+⚠️ **The two populations are DISJOINT** - a record is either the XML or the compiled binary, never both - so the
+XML records are not a Rosetta stone for their own binary twins, because they have none. Zero of the 7,974 binary
+records carry a source path. Decoding the compiled form still needs the client's reader; what the XML gives is
+the exact field list to expect when someone writes one.
+
+`--report particle-effects [--report-arg <substring>|xml:<id>]` lists the population, searching **by effect name
+and by texture**, and `xml:<id>` prints one authored source whole. That answers the question the server actually
+asks: it never renders an effect - it sends an id and the client does the rest - so what is needed is never
+"what does effect 3667002 look like" but "which id is the one I want", and
+`spell_demonologist_summonpet_gather35` answers that far better than a texture list does.
+
+⭐ **One authored field is genuinely server-side: `<loopcountmax>`.** It separates a one-shot effect, which ends
+by itself, from one that runs until something stops it - retail's authoring tool writes "forever" as a saturated
+`50000000` / `2000000000` rather than a flag. That is the "does this id need a paired STOP, and how long does it
+last" question, which is what a transient effect on a world object (#698) has to answer. It does NOT say which
+id to send; that half is a different question and is unaffected. See
 [`../re/iir-readers-combat-world.md`](../re/iir-readers-combat-world.md).
 
 **Totals:** 873,588 entries · 410,382 local · 463,206 CDN · 84.6 GB indexed.
