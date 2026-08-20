@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #697: the last unread feat-modifier table - what Amount and Trigger mean.
+				case "feat-procs":
+				{
+					await FeatProcs();
+					return 0;
+				}
+
 				// #880: name every particle effect by the textures its payload references.
 				case "particle-effects":
 				{

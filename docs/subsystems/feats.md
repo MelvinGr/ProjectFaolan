@@ -456,6 +456,47 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   ⚠️ Idempotent by construction — `AddCharacterSpell` reports whether the row was new and only a new one is
   announced — so re-training a feat re-toasts nothing.
 
+## `FeatProcs.Amount` is a percent CHANCE, and >100 means "always" (#697)
+
+`FeatProcs` is the last of #697's four feat-modifier tables with no reader: 876 rows over 159 feats, hanging a
+proc spell off a combo (`EffectKind` 53212) or a spell line (53070). Before any of it can fire, `Amount` has to
+mean something.
+
+It is a **percent chance**. The evidence is a controlled association against the client's own feat descriptions,
+not a reading of a few rows — a feat whose proc really rolls says so (*"Improves all the dark templar's combos
+with **a chance of** reducing the target"*, `Amount` 10), and one that always fires states the effect flatly
+(*"Adds a fizzle debuff to the Lethargy combo"*, `Amount` 200).
+
+| bucket | feats | say "chance" | lift vs control |
+|---|---:|---|---|
+| `Amount <= 100` | 41 | 31 (**75.6%**) | **×2.61** |
+| `Amount > 100` | 118 | 15 (12.7%) | ×0.44 |
+
+⚠️ **The control is what makes this a finding.** Among all 159 proc-carrying feats, 28.9% use the word "chance"
+at all — so "the >100 rows mostly don't say chance" is worth nothing by itself, because most feat text does not.
+What counts is the lift running **both ways** from that base rate. 120 and 200 are what a >100% chance looks
+like once the client clamps it.
+
+Reproduce: `dotnet run --project Faolan.Importer -- --report feat-procs`.
+
+### ⛔ `Trigger` is still not named
+
+It is not free, which narrows it: **0 and 1 occur only with `EffectKind` 53212** (a proc on a combo) and **2 and
+3 only with 53070** (a proc on a spell line). Within each pair, one value carries every chance-bearing row and
+the other carries only always-fire amounts:
+
+| trigger | effectKind | rows | feats | amounts |
+|---:|---:|---:|---:|---|
+| 1 | 53212 | 515 | 51 | 10, 60, 120, 200 |
+| 2 | 53070 | 289 | 82 | 2..200 (23 distinct) |
+| 0 | 53212 | 45 | 5 | 120 |
+| 3 | 53070 | 27 | 21 | 120, 200 |
+
+That says `Trigger` refines *when* within a hook `EffectKind` has already chosen — it does not say into what.
+Naming it needs the client rather than the data: hover a proc feat with GM Level = -1, which renders the feat's
+wire ids and the client's own text in the tooltip. **Nothing should fire a proc until it is named**: a proc on
+the wrong event is worse than a proc that does not exist, because it looks like it works.
+
 ## Why a learned spell may still refuse to cast — the feat criterion
 
 ⚠️ **This is not a reason for the server to grant a feat** (#862). The criterion runs against the client's own
