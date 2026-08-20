@@ -22,8 +22,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// A BOOLEAN on the client (its reader normalises `!= 0`); meaning undecoded. 0 or 1 on all 86 records.
 		public byte Flag { get; init; }
 
-		// 2 or 3 across the catalog (3 on the Khitai/expansion playfields).
-		public uint Kind { get; init; }
+		// ⭐ The ACCESS TYPE - named from the client's own checker (#464): `PlayfieldAccessHolder`'s
+		// `FUN_0077e200` looks the playfield up in this list's map and switches on this word (the stored pair's
+		// +0x14): 0 and 2 pass, 1 and 3 log "Access DENIED" (channel GameCode/PlayfieldAccess), anything else
+		// asserts "Invalid access type %u for playfield %u". Its UI caller (`FUN_014bd250`) opens the
+		// `playfield_access_window` off the same check. The catalog carries 2 on every base-game playfield and 3
+		// on the Khitai / Dragon's Spine ones - i.e. this is the captured ACCOUNT's entitlement state (it did not
+		// own those expansions), not immutable game data; retail presumably serves 2s to an entitled account.
+		public uint AccessType { get; init; }
 
 		// 0 in all 86 catalog records; a real record field (the client stores it), name unknown (Gitea #464).
 		public uint Unknown { get; init; }
@@ -38,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				? ""
 				: $" | children: {string.Join(", ", Children.Select(c => c.ToString()))}";
 
-			return $"{PlayfieldId} {InternalName} flag={Flag} kind={Kind}{children}";
+			return $"{PlayfieldId} {InternalName} flag={Flag} accessType={AccessType}{children}";
 		}
 	}
 

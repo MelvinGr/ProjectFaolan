@@ -9,7 +9,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// the typed AccessWindowCatalog rather than a captured blob (#258), re-carved to the CLIENT's own grammar (#464):
 	//
 	//   table = [u32 (count + 1) * 0x3F1]  count × entry            (a plain ListFrame list - see PfAccessWindowEntry
-	//   entry = [u32 playfieldId][u8 flag][u32 kind][u32 unknown]    for what the old lookahead carve got wrong)
+	//   entry = [u32 playfieldId][u8 flag][u32 accessType][u32 unknown]    for what the old lookahead carve got wrong)
 	//           [u16 len][name][u32 childCount]  childCount × child
 	//   child = [u8 flag][u32 id][u16 len][displayName][u16 len][parentName]
 	//
@@ -72,7 +72,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			var playfieldId = r.ReadU32Be();
 			var flag = r.ReadU8();
-			var kind = r.ReadU32Be();
+			var accessType = r.ReadU32Be();
 			var unknown = r.ReadU32Be();
 			var internalName = r.ReadStringU16Length();
 
@@ -98,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			{
 				PlayfieldId = playfieldId,
 				Flag = flag,
-				Kind = kind,
+				AccessType = accessType,
 				Unknown = unknown,
 				InternalName = internalName,
 				Children = children
@@ -111,7 +111,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			s.WriteUInt32(v.PlayfieldId);
 			s.WriteByte(v.Flag);
-			s.WriteUInt32(v.Kind);
+			s.WriteUInt32(v.AccessType);
 			s.WriteUInt32(v.Unknown);
 			s.WriteString(v.InternalName);
 			s.WriteUInt32((uint)v.Children.Count);

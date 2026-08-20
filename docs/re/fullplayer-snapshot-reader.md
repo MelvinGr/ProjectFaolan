@@ -101,7 +101,7 @@ shape): the table is **list D** — `PlayfieldAccessHolder`'s `0x3F1`-framed lis
 
 ```
 table = [u32 (count+1)*0x3F1]  count × entry
-entry = [u32 playfieldId][u8 flag][u32 kind][u32 unknown][u16-str name][u32 childCount] childCount × child
+entry = [u32 playfieldId][u8 flag][u32 accessType][u32 unknown][u16-str name][u32 childCount] childCount × child
 child = [u8 flag][u32 id][u16-str displayName][u16-str parentName]
 ```
 
@@ -120,10 +120,18 @@ search and the `UnknownBeforeAccessWindowTable` gap field are gone — every reg
 and the one field that remains genuinely unnamed in the whole family is the entry head's `unknown` u32 (zero on
 all 86 records, register: Gitea #464).
 
-⭐ **What the table IS**: playfield ACCESS records. The subsystem's own consumer (`FUN_0077e200`) reads a
-stored record's `+0x14` access type — 0/2 pass, 1/3 log `"Access DENIED"`, anything else asserts
-`"Invalid access type %u for playfield %u"` — i.e. the client half of the instance-entry gate (#511). List E
-(`FUN_0077d5b0`, `[u32 key][str][u32 ×3][u8][str]`, empty in every capture) is the same holder's second list.
+⭐ **What the table IS**: playfield ACCESS records — and the entry's second u32 is NAMED from the consumer:
+it is the **ACCESS TYPE**. `PlayfieldAccessHolder`'s checker (`FUN_0077e200`) looks the playfield up in this
+list's map and switches on the stored pair's `+0x14` — which the insert path (`FUN_0077e9a0`, key at node
+`+0xC`, so pair layout `{key, u8 flag, u32 accessType, u32 unknown, …}`) pins to exactly this word: 0 and 2
+pass, 1 and 3 log `"Access DENIED"`, anything else asserts `"Invalid access type %u for playfield %u"`. Its UI
+caller (`FUN_014bd250`) opens the **`playfield_access_window`** off the same check — the window all these
+`PFAccessWindow_` names belong to — i.e. the client half of the instance-entry gate (#511). The catalog
+carries 2 on every base-game playfield and 3 on the Khitai / Dragon's Spine ones, so the "game-static" table
+is really the captured ACCOUNT's entitlement state (it did not own those expansions); an entitled account
+presumably receives 2s. List E (`FUN_0077d5b0`, `[u32 key][str][u32 ×3][u8][str]`, empty in every capture) is
+the same holder's second list. The entry's `flag` byte is also consumed: the window-open flow reads it
+(node `+0x10`) as a boolean gating an extra item/stat check before the window opens.
 
 ## UPDATE 2026-07-20 (#393) — the PostAccessBlock stat sheet is a BASELINE skeleton, not live stats
 
