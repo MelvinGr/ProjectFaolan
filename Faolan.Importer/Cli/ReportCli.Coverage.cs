@@ -119,8 +119,13 @@ namespace Faolan.Importer.Cli
 						plaintext++;
 				}
 
+				// ⚠️ This line used to end "0 feats (feat keys absent from captures)", which reads as a blocker and is
+				// not one: measured with `--report feat-keys`, ALL 19,777 feat ids are in the catalog and every one of
+				// them is PLAINTEXT. Feats hold no keys because feats need none. Saying "0 keys" about a category that
+				// requires zero keys is a true number that states the opposite of the truth (#877).
 				block.AppendLine(
-					$"- **RDB template catalog** (type 1000020, TEA-encrypted) — {decrypted:N0}/{encrypted:N0} decrypted, **{Pct(decrypted, encrypted)} of the total encrypted**. Keys held per category: {itemsDec:N0} items, {abilitiesDec:N0} abilities, 0 feats (feat keys absent from captures). (+{plaintext:N0} plaintext catalog entries, no key needed.)");
+					$"- **RDB template catalog** (type 1000020, partly TEA-encrypted) — {decrypted:N0}/{encrypted:N0} of the ENCRYPTED entries decrypted (**{Pct(decrypted, encrypted)}**), "
+					+ $"from {itemsDec:N0} item and {abilitiesDec:N0} ability keys harvested from captures. (+{plaintext:N0} plaintext entries need no key at all - the feat catalog is entirely among them.)");
 			}
 
 			Console.WriteLine("Content coverage (capture-relative: of the NPCs/vendors seen in dumps, how many are imported)\n");

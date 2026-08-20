@@ -414,6 +414,13 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #877: does a feat's TEA key ride the wire? The #251 instrument, finally given a trigger.
+				case "feat-keys":
+				{
+					await FeatKeys(capturesDir, RdbDirOrNull(), arg);
+					return 0;
+				}
+
 				// How many captured frames our own strict Rpc.Parse refuses - the trust check under method-bodies.
 				case "frame-health":
 				{

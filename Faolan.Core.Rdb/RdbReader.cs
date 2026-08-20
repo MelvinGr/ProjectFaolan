@@ -284,6 +284,15 @@ namespace Faolan.Core.Rdb
 			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
 		}
 
+		// The entry's bytes exactly as the pack file holds them - still RDBH-wrapped and still encrypted when it is an
+		// encrypted record. Every ordinary caller wants ReadDecompressed / ReadDecrypted instead; this exists for the
+		// one job that needs the CIPHERTEXT rather than the content: hunting a record's TEA key by trial decryption
+		// (FeatKeyScanner, #877). Named for what it gives you so nobody reaches for it by accident.
+		public byte[] ReadRawEntry(Entry e)
+		{
+			return ReadRaw(e);
+		}
+
 		public static byte[] UnwrapIOz1Public(byte[] raw)
 		{
 			return UnwrapIOz1(raw);

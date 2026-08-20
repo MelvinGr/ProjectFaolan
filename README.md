@@ -32,7 +32,8 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 115/123 greeted dialogue NPCs imported (93.5%)
 - **Vendor shops** — 77/77 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 5,103/77,631 decrypted, **6.6% of the total encrypted**. Keys held per category: 4,838 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+  - of the 8 conversation gap(s): **0 carry a conversation in the corpus** (a real import gap), 8 were clicked but produced no dialogue (not a dialogue NPC)
+- **RDB template catalog** (type 1000020, partly TEA-encrypted) — 5,103/77,631 of the ENCRYPTED entries decrypted (**6.6%**), from 4,838 item and 265 ability keys harvested from captures. (+20,417 plaintext entries need no key at all - the feat catalog is entirely among them.)
 <!-- coverage:end -->
 
 ### Connection & session
