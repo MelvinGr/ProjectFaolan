@@ -689,7 +689,14 @@ pair the rest were built on:
 - **`feat-keys`** — do feat records need a TEA key? (No: all 19,777 are plaintext, #877.) It gives #251's
   `FeatKeyScanner` a trigger; the scanner had been wired to nothing.
 - **`feat-procs`** — `FeatProcs`' shape, and the controlled test that `Amount` is a percent chance (#697).
-- **`particle-effects`** — RDB 1010207 named by the texture paths inside its payload (#880).
+- **`particle-effects`** — RDB 1010207 named, so an effect id can be found by what it IS rather than guessed
+  (#880). The RDB name table indexes the type, so 7,779 of the 8,163 have a name; the 189 records that ship the
+  artist's authored XML also carry a folder path and a duration. `--report-arg <substring>` searches name,
+  authored path and texture; `--report-arg xml:<id>` prints one authored source whole.
+- **`teleport-match`** — how well the client's own teleport table (RDB 1000087) lines up with our zone-line
+  `WorldObject` rows (#883). The measurement behind `world-teleports`' tier 2: the nearest-door distance
+  distribution, how many doors would gain a destination, and a cross-check against the destinations we already
+  hold. Re-run it after importing more maps — every figure in the teleport docs comes from here and moves.
 
 ## Decisions
 

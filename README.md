@@ -53,7 +53,9 @@ we've seen_, and names the gaps). Regenerate with
   show green names, hostiles red (#425)
 - ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive says so
 - ✅ **Zone-line doors** — a doorway that changes your location teleports you, within a zone and across a loading
-  screen; the costly ones ask you to confirm first. A few rarer ones only play the open animation (#341, #637)
+  screen; the costly ones ask you to confirm first. Where a door leads comes from three sources in order — a
+  capture, the client's own teleport table, then the door's name — so 181 doors lead somewhere. A few rarer ones
+  only play the open animation (#341, #637, #883)
 - ✅ **Area-name banners** — crossing into a named district floats its title on screen; coverage grows with the
   captures (#377)
 - ✅ **Instanced zones** — solo areas like the Tortage beach give each player their own copy, and a group map is
