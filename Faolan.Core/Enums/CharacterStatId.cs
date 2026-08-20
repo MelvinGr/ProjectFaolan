@@ -507,7 +507,7 @@ namespace Faolan.Core.Enums
 		// The four together ARE the client's energy simulation (`FUN_0112ad70` listens on exactly these ids and caches
 		// them at +0x30/+0x34/+0x38/+0x3c): it holds the pool, its ceiling, and the two rates that move it. That is why
 		// sprinting drains the bar with no server traffic at all - the drain is the CLIENT running this model - and why
-		// only the SPELLWEAVE drain, which the server drives, shows up on the wire as `DispatchUpdateSprintBar`.
+		// only the SPELLWEAVE drain, which the server drives, shows up on the wire as `DispatchUpdateSprintbar`.
 		//
 		// ⚠️ Of the four, retail is only ever observed sending <see cref="Energy" /> (1,650 records across the 120-capture
 		// corpus, on `StatUpdateIIR` 0x96B8DC59, per entity). `MaxEnergy`, `EnergySprintDrain` and

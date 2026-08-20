@@ -838,7 +838,7 @@ RPC class **GameCharInterfaceProject** (id `0x28377648`) · C2S (client→server
 | `0x0B` | `0x200B` | `DispatchSetIsSprinting` |  |
 | `0x0C` | `0x200C` | `DispatchSyncCanSprint` |  |
 | `0x0D` | `0x200D` | `DispatchSyncRegenDelayed` |  |
-| `0x0E` | `0x200E` | `DispatchUpdateSprintBar` |  |
+| `0x0E` | `0x200E` | `DispatchUpdateSprintbar` |  |
 | `0x0F` | `0x200F` | `DispatchOpenSiteInBrowserOnClient` |  |
 
 ## GameInterfaceMethods

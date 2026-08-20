@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// ⚠️ `energyValue` is big-endian like every other raw-body integer in this protocol - it is not a protobuf field.
 	public static class SprintBarCodec
 	{
-		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchUpdateSprintBar;
+		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchUpdateSprintbar;
 
 		public static byte[] Build(SprintBar value)
 		{

@@ -32,7 +32,7 @@ namespace Faolan.Importer.Cli
 			(RpcInterfaces.GameCharInterfaceProjectType, GameCharInterfaceProjectMethods.DispatchSetIsSprinting, "DispatchSetIsSprinting"),
 			(RpcInterfaces.GameCharInterfaceProjectType, GameCharInterfaceProjectMethods.DispatchSyncCanSprint, "DispatchSyncCanSprint"),
 			(RpcInterfaces.GameCharInterfaceProjectType, GameCharInterfaceProjectMethods.DispatchSyncRegenDelayed, "DispatchSyncRegenDelayed"),
-			(RpcInterfaces.GameCharInterfaceProjectType, GameCharInterfaceProjectMethods.DispatchUpdateSprintBar, "DispatchUpdateSprintBar")
+			(RpcInterfaces.GameCharInterfaceProjectType, GameCharInterfaceProjectMethods.DispatchUpdateSprintbar, "DispatchUpdateSprintbar")
 		];
 
 		private sealed record SprintEvent(string Capture, long Ticks, string Method, bool IsDownload, uint ReceiverInstance, byte[] Body,

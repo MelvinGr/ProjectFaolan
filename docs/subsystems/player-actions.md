@@ -67,7 +67,7 @@ named mechanically by the slot rule above.
 |---|---|---|
 | `0x064` | search | answered by `BehaviorId.Search` (32), `flags 8`, `activation 159`, 5-byte zero tail |
 | `0x068` | **hide** (stealth) | answered by `BehaviorId.SneakHide` (30), `flags 10`, tail `00 00 00 64`; emits `SetShadowCoverageIIR` — see below |
-| `0x06A` | rest | annotation `rest`; answered by `StatUpdateIIR` ×4 + `DispatchUpdateSprintBar` ×3 (regen) |
+| `0x06A` | rest | annotation `rest`; answered by `StatUpdateIIR` ×4 + `DispatchUpdateSprintbar` ×3 (regen) |
 | `0x06C` `0x06D` `0x070` `0x0F0` | melee combo inputs | [docs/subsystems/combos.md](combos.md) |
 | `0x0FC` | spellweave toggle — **necromancer** | see *per-class selectors* |
 | `0x0FF` | open Crafting → Recipes book | `…shops_open-crrafting-receipies` |
@@ -79,7 +79,7 @@ named mechanically by the slot rule above.
 | `0x4E1` | Path of Asura (recall to the **bound** location) | behaviour 177216, slot 4 |
 | `0x4E2` | combat toggle (sheathe / draw) | behaviour id varies per class & weapon |
 | `0x4E4` | crouch — a **toggle**, same selector both ways | pressed to crouch and again to stand |
-| `0x4E6` | dash | answered by `DispatchUpdateSprintBar` |
+| `0x4E6` | dash | answered by `DispatchUpdateSprintbar` |
 
 ⚠️ `0x4E1` recalls to the **bound** location. The Totem of Origins is a different destination — the racial home
 city — and is an item use, not a `0x205A` selector. See `StartingData.RacialHomeMap`.
@@ -190,7 +190,7 @@ selectors.
 ⚠️ It also qualifies the rule stated above, that every observed selector is answered by a player BCC. That holds
 for the selectors it was drawn from; it does not hold for these two, where most presses draw none. Whether the
 remainder is client-side or an answer this report does not count (it tallies IIR records, so the
-`DispatchUpdateSprintBar` RPC the dash row above credits would not appear) is itself unresolved.
+`DispatchUpdateSprintbar` RPC the dash row above credits would not appear) is itself unresolved.
 
 | | search (`0x064`) | hide enter (`0x068`) | hide leave (`0x068` again) |
 |---|---|---|---|

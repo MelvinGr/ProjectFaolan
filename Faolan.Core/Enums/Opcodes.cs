@@ -192,7 +192,13 @@ namespace Faolan.Core.Enums
 
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
+	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
+	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
+	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
+	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
+	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
+	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
 	public enum CSPlayerInterfaceMethods : uint
 	{
 		DispatchAuthenticateAck = 0x00,
@@ -989,7 +995,13 @@ namespace Faolan.Core.Enums
 
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
+	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
+	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
+	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
+	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
+	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
+	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
 	//
 	// ⭐ #792: a no-arg slot is nameable through the INTERFACE VTABLE, because its dispatch branch is a bare stub -
 	// `slot index = method id + 1` on this interface family, so 0x04 is vtable +0x14, and `GameInterface_t`'s
@@ -1017,7 +1029,13 @@ namespace Faolan.Core.Enums
 
 	// GameCharInterfaceProject server->client dispatch table (16 methods; +1 inserted).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
+	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
+	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
+	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
+	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
+	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
+	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
 	public enum GameCharInterfaceProjectMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,
@@ -1034,7 +1052,7 @@ namespace Faolan.Core.Enums
 		DispatchSetIsSprinting = 0x0B,
 		DispatchSyncCanSprint = 0x0C,
 		DispatchSyncRegenDelayed = 0x0D,
-		DispatchUpdateSprintBar = 0x0E,
+		DispatchUpdateSprintbar = 0x0E,
 		DispatchOpenSiteInBrowserOnClient = 0x0F
 	}
 
@@ -1069,7 +1087,13 @@ namespace Faolan.Core.Enums
 
 	// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
+	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
+	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
+	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
+	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
+	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
+	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
 	public enum TradepostInterfaceMethods : uint
 	{
 		DispatchOpenTradepost = 0x00,
@@ -1084,7 +1108,13 @@ namespace Faolan.Core.Enums
 
 	// GameCharInterface server->client dispatch table (181 methods; +24 inserted no-arg). The main world s2c surface: inventory (DispatchAddItem 0x20), shop, loot, quests, trade, spells/feats, formations.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN.
+	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
+	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
+	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
+	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
+	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
+	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
+	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
 	public enum GameCharInterfaceMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,

@@ -249,7 +249,7 @@ namespace Faolan.GameServer
 		private static Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x54), client.Endpoint(RpcInterfaces.GameCharInterfaceProjectType),
-				GameCharInterfaceProjectMethods.DispatchUpdateSprintBar, SprintBarCodec.Build(energy)));
+				GameCharInterfaceProjectMethods.DispatchUpdateSprintbar, SprintBarCodec.Build(energy)));
 		}
 
 		// One of the three server-owned sprint booleans (#867). All four dispatches in this family share one endpoint

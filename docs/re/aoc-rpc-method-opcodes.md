@@ -113,6 +113,33 @@ client's `SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTe
 block: `0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
 `groupFinder_readyPrompt` — the name it already had, reproduced by the same read.
 
+### Which `Reserved` slots are worth the vtable route — the census, and the route that is exhausted
+
+`Opcodes.cs` carries **55** `Reserved0xNN` members. Two facts bound the work (Gitea #876, measured 2026-08-21):
+
+**Only 2 of the 55 appear in the corpus at all** (`--report method-census`), and both are already named by
+BEHAVIOUR rather than by a recovered string:
+
+| slot | frames / captures | body | what the corpus says it is |
+|---|---:|---|---|
+| `GameCharInterface 0x1B` | 114 / 63 | empty | the next s2c frame is an `IntendedTeleportIIR` **114 times with no exceptions** — create world-entry, zone-line doors, revive and ACG teleport alike. The client's handler is an EMPTY function, so it is a no-op on the receiving end; we send it from `SendTeleportPending` for byte-stream fidelity. |
+| `CSPlayerInterface 0x81` | 4 / 1 | empty | the answer to `PvPMatchMakingRemoveFromMatchMaking` — 4 sends for that capture's 4 removals, ~200 ms after each (#882). |
+
+The other 53 have **zero** frames, so nothing can be checked against a capture and only static RE can name them.
+
+**And the string route is exhausted, which is now measured rather than assumed.** The client's only per-method
+strings are the `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors — one per
+ARGUMENT, so a no-arg method emits none. They sit in one address-ordered table that runs in registration-index
+order, and dumping the window across a known gap (`DispatchGuildNotEnoughCash` 0x03 → `DispatchUpdateCash` 0x05,
+i.e. across `Reserved0x04`) shows the two neighbours and **nothing between them**. The same 157 GameCharInterface
+and 178 CSPlayerInterface names appear in `AgeOfConan.exe`, `AgeOfConan.exe.bak` and `AgeOfConanDX10.exe`, so
+there is no second build to diff either. Naming one of these needs its dispatcher case, and only where the
+overriding function is not empty — which for `0x1B`, the one with real traffic, it is.
+
+One thing the same sweep did find: diffing every enum member against the client's own spelling turned up exactly
+one mismatch, `DispatchUpdateSprintBar` where the client writes **`DispatchUpdateSprintbar`**
+(`(energyValue, forceUpdate)`). Corrected.
+
 ## s2c (server->client) tables
 `<no-arg>` = an inserted method with no body fields (no `stream bad` string); its opcode slot is known
 but its name is not recoverable FROM STRINGS (catalog also missed it) — see the vtable route above.

@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Constants
 			return false;
 		}
 
-		// The universal ENERGY (yellow sprint-bar) max by class - the value retail pushes on `DispatchUpdateSprintBar`
+		// The universal ENERGY (yellow sprint-bar) max by class - the value retail pushes on `DispatchUpdateSprintbar`
 		// (0x200E) when the bar is FULL. Two flat values, and they are flat: the same 14000 reaches a level-24 Herald
 		// and a level-23 assassin as a level-80 one, so this is per class family, not a level curve.
 		//
