@@ -183,9 +183,21 @@ own captured epic re-entry minted a FRESH instance — consecutive playfield tok
 entry gets a private/team copy, and `TeamInstance` binds per `(teamId, mapId, epic)`.
 
 ⚠️ **What epic actually changes on retail is measured and deliberately NOT modelled yet.** The back-to-back
-Spider Caverns entries carry the SAME creatures at the same names, templates and levels — and re-tuned health:
-Cavecrawler/Cavehunter (npc_type 4) 147,600 → 1,186,900 at L27 and 154,500 → 1,292,300 at L28 (~8×), minion-type
-Spiderlings 73,800 → 78,700 (~+6%). Not a flat multiplier (the ratio differs per level), so the rule needs more
-than one dungeon's evidence; until then an epic zone loads the normal population, and `NpcSpawnExtractor` skips
-epic windows so the tuning can never poison the normal stat columns. Remaining #309/#511 work: the epic stat
-tuning, encounter content (bosses/raids), and the retail leave-side lockout above.
+Spider Caverns entries carry the SAME creatures at the same names, templates and levels — re-tuned in exactly
+TWO protobuf fields (a full recursive field diff finds nothing else):
+
+* **health** (`stats.life/health` and the pool fields that mirror it): Cavecrawler/Cavehunter (npc_type 4)
+  147,600 → 1,186,900 at L27 and 154,500 → 1,292,300 at L28 (~8×), minion-type Spiderlings 73,800 → 78,700
+  (~+6%). Not a flat multiplier (the ratio differs per level), so the rule needs more than one dungeon's
+  evidence.
+* **`npc_stats.normalset`** — the nameplate DECORATION set (#508 pinned the skull to it; #758's "Prey" label is
+  its value 4): regulars go absent → **13** and minions 1 → **9**, with zero exceptions over all 171 spawns.
+  13 is the ELITE decoration normal content already uses on the Ymirish (Destroyer/Sorcerer/Frostmaster in
+  Ymir's Pass), so epic re-tags the same mobs with the elite set rather than inventing new creatures. The
+  capture's own normalset census: 1 minion · 2/10 boss (npc_type 3) · 3 mini-boss (npc_type 2) · 4 prey ·
+  9 epic minion · 13 elite · 16 player pets · 32 guards.
+
+Until the tuning rule is modelled an epic zone loads the normal population (normal decorations included), and
+`NpcSpawnExtractor` skips epic windows so the tuning can never poison the normal stat columns. Remaining
+#309/#511 work: the epic stat + normalset tuning, encounter content (bosses/raids), and the retail leave-side
+lockout above.
