@@ -617,6 +617,35 @@ its point cost — 2,880 rows, two kinds, values 1..30 — and it covers the AA 
 the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the AA UI or
 of a perk being bought.
 
+### ⭐ And the AA CURRENCY is named too — by the tuning sheet
+
+The half the tree tables do not carry is how a perk is *paid for*, and RDB **1000516** states it outright
+(`--report rdb-tweaks --report-arg AlternateAdvancement`):
+
+```
+AlternateAdvancement_XPCap                  1000000     the AA experience pool's ceiling
+AlternateAdvancement_GenericTokensAwarded         1     what a full pool pays out …
+AlternateAdvancement_SpecificTokensAwarded        3     … alongside this
+AlternateAdvancement_UnusedGeneralTokensCap     100     how many unspent tokens may be held
+AlternateAdvancement_UnusedPvETokensCap         100
+AlternateAdvancement_UnusedPvPTokensCap         100
+AlternateAdvancement_PvPModifier                  5
+```
+
+So the economy reads: fill a **1,000,000**-point pool, receive **1 generic + 3 specific** tokens, spend them
+against the 1..30 costs of 1000099, holding at most **100** unspent of each kind.
+
+⭐ **And one of the pool stats is CAPTURED.** `AAPvEXP` (stat **1000007**) occurs in the corpus — 136 records
+over 12 (capture, handle) runs, all on the one level-80 character, running **535,035 … 862,514**, i.e. inside
+that 1,000,000 ceiling, which corroborates the cap being this stat's. Its eight AA siblings
+(`AACurrentFeatPerfected`, `AAFeatPerfectionTimeStamp`, `AATimeSpentPerfectingFeats`,
+`AAFeatPerfectionTimeRemaining`, `AAPvPXP`, `PerkLine`, `PerkSize`, `AATokensGainedSeasonal`) are **absent from
+the corpus entirely** — every capture is a low-level character except that one.
+
+⚠️ What is still missing is therefore narrower than "the wire": it is **how much a kill pays into the pool**
+(the observed within-session steps are 2, 27, 27, 57, 91, 258 on one character, with nothing in the corpus
+naming what was killed for each), and the purchase message itself. Both need a capture of an endgame character.
+
 ## Decoded: 1000627 `GroupFinderActivitiesTable` — the group-finder activity catalog
 
 **12,012 bytes, decoded BY HAND from the bytes** (#469) — the parse callback resists a static read
