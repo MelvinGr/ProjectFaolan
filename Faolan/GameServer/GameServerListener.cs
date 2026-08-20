@@ -350,7 +350,7 @@ namespace Faolan.GameServer
 			_equipment = new EquipmentService(database, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
-			_tradepost = new TradepostService(database, logger, this);
+			_tradepost = new TradepostService(database, logger, this, csPlayerAgentDispatcher);
 			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);

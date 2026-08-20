@@ -117,6 +117,10 @@ namespace Faolan.Core.Network
 		bool IsSprinting { get; set; }
 		bool SprintInputRequested { get; set; }
 
+		// The tag the client says it has SELECTED (c2s SetSelectedTag, #873). UI state, not persisted: no capture
+		// shows a selection surviving a relog, and #748 is still untangling what a tag selection is for.
+		uint SelectedTagId { get; set; }
+
 		// True on the OLD connection while a teleport/changemap handoff is in flight: DoTeleport has already
 		// persisted the authoritative destination position, so this connection's disconnect must NOT save its
 		// stale pre-teleport live position back over it (it would clobber the bind/destination). See #28.
@@ -362,6 +366,7 @@ namespace Faolan.Core.Network
 		public bool IsSpellweaving { get; set; }
 		public bool IsSprinting { get; set; }
 		public bool SprintInputRequested { get; set; }
+		public uint SelectedTagId { get; set; }
 		public bool IsTeleportingOut { get; set; }
 		public bool IsUnnamedCreatePhase => Character?.Name == null;
 		public bool PostMorphBurstSent { get; set; }

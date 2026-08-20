@@ -163,6 +163,11 @@ namespace Faolan.Tests
 
 		private sealed class FakeTeams(params uint[] members) : ICsPlayerAgentProvider
 		{
+			public Task<bool> NotifyMailReceived(uint recipientId, ulong mailId)
+			{
+				return Task.FromResult(false); // no CS tier in these tests
+			}
+
 			public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 			{
 				return Task.FromResult(false); // no guild tier in these tests

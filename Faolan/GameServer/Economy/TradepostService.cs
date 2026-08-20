@@ -9,6 +9,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
@@ -51,11 +52,17 @@ namespace Faolan.GameServer.Economy
 		// whichever one a capture saw.
 		private HashSet<uint>? _auctioneerTemplates;
 
-		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
+		// The "you have mail" push rides the ROUTER tier (CSPlayerInterface), not this one - see
+		// ICsPlayerAgentProvider.NotifyMailReceived (#871). Reached through the seam rather than by holding the
+		// listener, like every other cross-listener action.
+		private readonly ICsPlayerAgentProvider _csPlayerAgent;
+
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, ICsPlayerAgentProvider csPlayerAgent)
 		{
 			_database = database;
 			_logger = logger;
 			_outbound = outbound;
+			_csPlayerAgent = csPlayerAgent;
 		}
 
 		public async Task<bool> IsAuctioneerTemplate(uint npcTemplateId)
@@ -135,6 +142,9 @@ namespace Faolan.GameServer.Economy
 				case TradepostAgentMethods.Close:
 				{
 					_logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session.Character.Name);
+
+					// Retail answers every close with its own (11 for 11 over seven captures, empty body) - #872.
+					await TradepostResponses.SendClose(client, packet.Sender.Instance);
 					break;
 				}
 
@@ -584,6 +594,12 @@ namespace Faolan.GameServer.Economy
 
 			await _database.CreateMail(mail);
 			await TradepostResponses.SendMailSendResult(client, true, packet.Sender.Instance);
+
+			// Tell the RECIPIENT (#871). Retail's notification rides CSPlayerInterface, so it reaches them wherever
+			// they are rather than only when they next open a mailbox. False simply means they are not connected to
+			// this realm's CS tier right now, which is not an error - the mail is already written either way.
+			if (!await _csPlayerAgent.NotifyMailReceived(recipient.Id, mail.MailId))
+				_logger.LogDebug("Tradepost mail: {Recipient} is not on the CS tier, no arrival notification sent.", recipient.Name);
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (attached != null)

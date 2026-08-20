@@ -46,6 +46,19 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		uint? TeamIdOf(uint characterId);
 
 		/// <summary>
+		///     Tell <paramref name="recipientId" /> that mail has arrived (<c>DispatchYouGotMailNotification</c>, #871).
+		///     Returns false when the recipient is not connected to this realm's CS tier, so the caller can tell "not
+		///     notified" from "notified".
+		///     <para>
+		///         The split is the message's own: mail is written on the GAME connection, where the mailbox
+		///         transactions live, but the notification rides <b>CSPlayerInterface</b> - the router tier - which is
+		///         how it reaches a player who is nowhere near a mailbox. Without it a player only learns about mail by
+		///         opening one.
+		///     </para>
+		/// </summary>
+		Task<bool> NotifyMailReceived(uint recipientId, ulong mailId);
+
+		/// <summary>
 		///     Credit <paramref name="amountTin" /> to the guild <paramref name="characterId" /> belongs to - the deposit
 		///     half of the guild bank (#654), and the exact mirror of the withdrawal's
 		///     <c>IGameServerDispatcher.CreditCharacterCash</c>. Returns false when the character is in no guild, or the

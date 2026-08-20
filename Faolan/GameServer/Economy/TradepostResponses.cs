@@ -66,6 +66,17 @@ namespace Faolan.GameServer.Economy
 			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchOpenTradepost, OpenTradepostCodec.Build(position), interfaceInstance));
 		}
 
+		// DispatchClose (0x2001) - the server's own close. Retail answers EVERY client `Close` with one: 11 for 11
+		// across all seven captures that close a tradepost, and the body is empty (#872).
+		//
+		// It matters beyond symmetry. A server-initiated close is how retail ends the session when the player walks
+		// away from the auctioneer, dies or zones - none of which our tradepost session could express, because the
+		// only way it ended was the client's own goodbye.
+		public static Task SendClose(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchClose, [], interfaceInstance));
+		}
+
 		// DispatchRetrieveMailResult (0x2004).
 		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance)
 		{

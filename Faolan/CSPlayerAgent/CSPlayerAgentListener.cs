@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Constants;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -11,6 +13,7 @@ using Faolan.Core.Network.Codecs.GroupFinder;
 using Faolan.Core.Network.Codecs.Raid;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.ChatServer;
@@ -108,6 +111,23 @@ namespace Faolan.CSPlayerAgent
 		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 		{
 			return _guild.DepositToGuildBank(characterId, amountTin);
+		}
+
+		// "You have mail" (#871). Rides CSPlayerInterface rather than the tradepost interface, which is what lets it
+		// reach a player who is nowhere near a mailbox - the mailbox itself is polled, so without this a player only
+		// learns about mail by opening one. The SENDER is the same guild/team server object every other CS push uses.
+		public async Task<bool> NotifyMailReceived(uint recipientId, ulong mailId)
+		{
+			if (ClientForCharacter(recipientId) is not { } client)
+				return false;
+
+			// ⚠️ The RECEIVER is the recipient's OWN CSPlayerInterface instance - its character id, never instance 0.
+			// A push addressed to instance 0 arrives and is dropped (see TeamService.Send).
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.CSPlayerAgentType, 0x04),
+				client.Endpoint(RpcInterfaces.CSPlayerInterfaceType), CSPlayerInterfaceMethods.DispatchYouGotMailNotification,
+				MailNotificationCodec.Build(mailId)));
+
+			return true;
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)

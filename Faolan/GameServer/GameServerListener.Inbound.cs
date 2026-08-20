@@ -1648,6 +1648,44 @@ namespace Faolan.GameServer
 					return;
 				}
 
+				// The three c2s methods the corpus carries that nothing here answered (#873). None of them had a
+				// handler, so the client sent them and the packet fell through to LogUnknownPacket.
+
+				case GameCharAgentMethods.CloseBank: // 0x201C - no arguments
+				{
+					// The bank's other half. There is no server-side bank SESSION to tear down - the bank is opened by
+					// a BankIIR and its contents are the character's own container rows - so this records the close
+					// and does not invent state to clear. It stops the client's goodbye reading as an unknown packet,
+					// and it is the hook for whatever the close should do once there is something to do.
+					Logger.LogInformation("Bank: {Char} closed the bank.", client.Session.Character.Name);
+					break;
+				}
+
+				case GameCharAgentMethods.SetSelectedTag: // 0x20A2 - body = [u32 tagId]
+				{
+					// The client telling the server which TAG it has selected. #748 is trying to work out what selects
+					// a tag from the s2c side; this is the client stating it outright. Remembered on the session so a
+					// tag-driven feature can read it - nothing consumes it yet, and it is deliberately not persisted:
+					// a selection is a UI state, and no capture shows it surviving a relog.
+					var tagId = body.ReadUInt32();
+					client.Session.SelectedTagId = tagId;
+					Logger.LogInformation("Tags: {Char} selected tag {Tag}.", client.Session.Character.Name, tagId);
+					break;
+				}
+
+				case GameCharAgentMethods.RequestRecipeInfo: // 0x2090 - the tradeskill recipe query
+				{
+					// ⚠️ Parsed and LOGGED, not answered: no capture carries the reply, so what the server sends back
+					// is unknown and would have to be invented. What the request itself says is worth having - it
+					// carries two 16-byte DecryptionKey_c, so the CLIENT holds catalog keys and hands them over here
+					// (see #877, where the feat-category keys are missing entirely).
+					var request = RecipeInfoRequestCodec.Parse(body.ReadArray((uint)(body.Length - body.Position)));
+					Logger.LogInformation("Tradeskill: {Char} requested recipe info for level {Level}, templates {T1}/{T2} (keys {K1}/{K2}). No reply is captured, so none is sent.",
+						client.Session.Character.Name, request.LevelId, request.TemplateId1, request.TemplateId2,
+						Convert.ToHexString(request.Key1), Convert.ToHexString(request.Key2));
+					break;
+				}
+
 				default:
 				{
 					LogUnknownPacket(packet);
