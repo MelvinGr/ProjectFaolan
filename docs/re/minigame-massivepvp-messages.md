@@ -183,6 +183,62 @@ not recoverable: these readers take the words straight into the struct with no p
 unlike the scalar dispatch bodies above there is nothing in the binary that names them, and no capture to
 correlate against. `[V0: the battlekeep info record's seven columns]`
 
+## ⭐ The minigame ROSTER, from the LDB
+
+The message catalogue above was recovered from the client's method tables; what it could not say is *which
+minigames exist and what each one's objective is*. The LDB says both, in two small enumerable catalogs:
+
+| key | LDB 800 — the minigame | LDB 802 — its objective |
+|---:|---|---|
+| 1 | Annihilation | Annihilate Opposing Team |
+| 2 | Capture the Skull | Conquest |
+| 3 | Bossonian Marches | Drunken Brawling |
+| 4 | Cragsfell | Conquest |
+| 5 | Colosseum | Capture The Skull |
+| 6 | Drunken Brawling | — |
+| 8 | — | Training Annihilate Opposing Team |
+| 9 | — | Training Capture The Skull |
+| 13 | Annihilation | Annihilate Opposing Team |
+
+⚠️ **The two are separate id spaces, not a pair** — key 2 is *"Capture the Skull"* in 800 and *"Conquest"* in
+802 — so 800 reads as the minigame/arena NAME and 802 as the RULE SET, each keyed by its own index. Do not join
+them on the key. The `Training …` variants in 802 are their own entries, which is what a practice queue looks
+like.
+
+⭐ **And one map's whole ruleset is written out.** LDB 10015 carries per-arena rules text; `500200` is Totem
+Torrent (playfield 5002, one of the five RDB 1000512 minigame maps):
+
+> Team annihilation: The goal of the game is kill all members of the opposing force. Join one of two teams, red
+> or blue. Players will resurrect **as long as their totem is not destroyed**. On either side of the map are two
+> **control points** — capture these for your team by standing near them; once captured, these **increase your
+> totem's defense**. There is a **heal-zone** in the middle of the play area that heals all characters. If both
+> teams are alive when the time is up, **the team with the most kills wins**.
+
+So Totem Torrent is a respawn-anchor mode with capture points that harden the anchor, plus a tiebreak on kills —
+a complete, implementable ruleset with no invention. `10015/5201` likewise pins **Blood Ravine** to *Capture the
+Skull*. The other three 1000512 maps have no 10015 entry.
+
+## The per-minigame CAREER is a stat block, and we already carry it
+
+Stat ids `0x290..0x29F` are one contiguous PvP/minigame career, and the client names every member:
+
+| id | stat | | id | stat |
+|---|---|---|---|---|
+| `0x290` | `PvPTotalKills` | | `0x298` | `NPCKills` |
+| `0x291` | `PvPFinishingBlows` | | `0x299` | `NPCDeaths` |
+| `0x292` | `PvPTotalDeaths` | | `0x29A`/`0x29B` | `PvPAnnihilationMatchesWon` / `…Lost` |
+| `0x293`/`0x294` | `PvPMatchesWon` / `…Lost` | | `0x29C`/`0x29D` | `PvPCTFMatchesWon` / `…Lost` (Capture the Skull) |
+| `0x295` | `PvPMatchesPlayed` | | `0x29E`/`0x29F` | `PvPSiegeMatchesWon` / `…Lost` |
+| `0x296`/`0x297` | `PvPFlagsCaptured` / `PvPFlagsReturned` | | | |
+
+⭐ Every one of the win/loss pairs is **already in the player spawn scaffold's word list**
+(`SpawnPreIir.WordStatIds`), so the career counters ride the wire on every player spawn today — at zero, because
+nothing moves them. The two immediately after the block, `0x2A0 GuildWarID` and `0x2A1 DefendingGuildWarID`, are
+the siege side's pairing (#147).
+
+⚠️ `NPCKills`/`NPCDeaths` are the only two ids of the run that retail does **not** populate, and they are
+deliberately not sent — see `Character`'s remark and `SnapshotStatSheet`.
+
 ## What blocks implementing these
 
 Not the wire. All three message sets are enumerated and the scalar bodies are exact. What is missing is
