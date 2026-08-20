@@ -228,9 +228,12 @@ unknown1 -> +0x38    unknown2 -> +0x3C
   markers — a marker-display modifier shape. Open work tracked in Gitea #464.
 
 **Exhausted anchors, so don't repeat them:** the vtable (3 slots, none of them a getter), the reader's callers,
-a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), and the
-module's strings. What is left is the semantic route: follow a parsed record from `FUN_0091f5c0` into the
-journal UI and find the code that formats these words for display.
+a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), the
+CO-OCCURRENCE refinement of that scan (`tools/ghidra/DumpCoOffsetReaders.java`, `OFFS=24,38 NEAR=12` — a
+function reading the goal's markerX at `+0x24` AND `unknown1` at `+0x38` within 12 instructions: **3,322 of
+139,441 functions match**, so the pair is no more distinctive than either offset alone — both are generic
+struct/stack displacements), and the module's strings. What is left is the semantic route: follow a parsed
+record from `FUN_0091f5c0` into the journal UI and find the code that formats these words for display.
 
 ## What the unnamed fields ARE (2026-08-01, from the client's quest catalog)
 
