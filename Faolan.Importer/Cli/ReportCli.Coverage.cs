@@ -49,6 +49,20 @@ namespace Faolan.Importer.Cli
 			// dialogue node NOR a shop was imported for it (it falls to the "no dialogue or shop imported" bubble).
 			var greetedTalkers = greeted.Where(n => !shopImported.Contains(n)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var convGaps = greetedTalkers.Where(n => !convImported.Contains(n)).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+
+			// ⚠️ "Greeted" means the client CLICKED the NPC (a UseCharacter BCC), which is not the same as dialogue
+			// having followed. So a name in convGaps is one of two very different things, and they want opposite work
+			// (#878): either the capture carries a conversation the importer dropped - a real gap - or the click
+			// produced no dialogue at all, in which case the NPC is not a dialogue NPC and is only deflating the
+			// figure. Splitting them needs the second population: which gap names the EXTRACTOR finds a walk for.
+			var walkedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var c in captures)
+				foreach (var walk in ConversationExtractor.Extract(c.Packets))
+					if (!string.IsNullOrEmpty(walk.NpcName))
+						walkedNames.Add(walk.NpcName);
+
+			var droppedByImporter = convGaps.Where(walkedNames.Contains).ToList();
+			var noDialogueAtAll = convGaps.Where(n => !walkedNames.Contains(n)).ToList();
 			var shopGaps = vendorsSeen.Where(v => !shopImported.Contains(v)).OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList();
 			var convHave = greetedTalkers.Count - convGaps.Count;
 			var shopHave = vendorsSeen.Count - shopGaps.Count;
@@ -56,6 +70,9 @@ namespace Faolan.Importer.Cli
 			var block = new StringBuilder();
 			block.AppendLine($"- **NPC conversations** — {convHave}/{greetedTalkers.Count} greeted dialogue NPCs imported ({Pct(convHave, greetedTalkers.Count)})");
 			block.AppendLine($"- **Vendor shops** — {shopHave}/{vendorsSeen.Count} captured vendors imported ({Pct(shopHave, vendorsSeen.Count)})");
+			if (convGaps.Count > 0)
+				block.AppendLine($"  - of the {convGaps.Count} conversation gap(s): **{droppedByImporter.Count} carry a conversation in the corpus** (a real import gap), "
+				                 + $"{noDialogueAtAll.Count} were clicked but produced no dialogue (not a dialogue NPC)");
 
 			// RDB item/feat/ability template decryption (optional - needs the client RDB). The whole catalog (type
 			// 1000020) is TEA-encrypted; we can only decrypt an entry whose key we've harvested from a capture (item
@@ -109,7 +126,13 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("Content coverage (capture-relative: of the NPCs/vendors seen in dumps, how many are imported)\n");
 			Console.Write(block.ToString());
 			if (convGaps.Count > 0)
-				Console.WriteLine($"\nconversation gaps ({convGaps.Count}) - greeted in a dump, no dialogue imported:\n  {string.Join(", ", convGaps)}");
+			{
+				Console.WriteLine($"\nconversation gaps ({convGaps.Count}) - greeted in a dump, no dialogue imported:");
+				Console.WriteLine($"  IMPORT GAP ({droppedByImporter.Count}) - the corpus carries a conversation walk for these and nothing was imported:");
+				Console.WriteLine($"    {(droppedByImporter.Count == 0 ? "(none)" : string.Join(", ", droppedByImporter))}");
+				Console.WriteLine($"  NOT A DIALOGUE NPC ({noDialogueAtAll.Count}) - clicked, but no conversation followed in any capture:");
+				Console.WriteLine($"    {(noDialogueAtAll.Count == 0 ? "(none)" : string.Join(", ", noDialogueAtAll))}");
+			}
 			if (shopGaps.Count > 0)
 				Console.WriteLine($"\nshop gaps ({shopGaps.Count}) - a vendor window is in a dump, no Shop row:\n  {string.Join(", ", shopGaps)}");
 
