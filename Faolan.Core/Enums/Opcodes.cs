@@ -336,6 +336,11 @@ namespace Faolan.Core.Enums
 		DispatchPvPMatchMakingSearchResult = 0x7E,
 		DispatchPvPMatchMakingStartClicked = 0x7F,
 		DispatchPvPMatchMakingYouAreInMatchMaking = 0x80,
+		// #882: the answer to `PvPMatchMakingRemoveFromMatchMaking`. Empty body, and 4 sends for the capture's 4
+		// removals - the player leaves matchmaking and this lands ~200 ms later, right where the annotation says
+		// "left matchmaking". Named by BEHAVIOUR only: it is a no-arg slot, so the client's string catalog has no
+		// name to recover (see the block comment above), and its position beside 0x80
+		// `DispatchPvPMatchMakingYouAreInMatchMaking` is what the pairing says it is.
 		Reserved0x81 = 0x81,
 		Reserved0x82 = 0x82,
 		DispatchPvPMatchMakingMatchSay = 0x83,
