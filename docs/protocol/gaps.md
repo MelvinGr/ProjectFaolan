@@ -691,3 +691,21 @@ set: retail is only ever observed telling the client that regeneration is no lon
 The clears cluster just after a sprint ends — 514 of them follow an `isSprinting = 0`, median 820 ms later — which
 is why `TrackSprintEnergy` sends the clear there and sends nothing else. Whatever holds regen (a fight, a cast, the
 sprint itself) is not visible from a message that never carries the flag it would set.
+
+## Which token pool `DispatchUpdateTokenAmount`'s `tokenID` names
+
+**Tracked: Gitea #870.** [V0: which currency DispatchUpdateTokenAmount carries] The 18-byte body is decoded —
+`[u8 tokenId][u64 gained][u64 spent][u8 includeBonus]`, the client's own four field names, with the widths forced
+by the corpus (the only bytes that ever vary are offset 0 and offset 8, and a big-endian field's varying byte is
+its last). `UpdateTokenAmountCodec` builds and parses it byte-exact.
+
+What the id SELECTS is the open half. The send is event-driven, one frame per capture, and the corpus carries four
+different ids: **1** at character creation, at first world entry right after `N3TeleportIIR`, with `gained`/`spent`
+both 0; **4** on a Destiny quest completion, running to 1 and then 2 for the *same* character across two sessions;
+**32** in a group-finder session; **50** beside a login-reward claim. So `gained` is a lifetime TOTAL rather than a
+delta, and the id is the pool the event credited — but nothing in the corpus or the client's string catalog maps an
+id to a pool. The client's own vocabulary has several (*"unspent PvP tokens"*, *"unspent PvE tokens"*, Esteem
+tokens, Conquest Trophies), and an observed id of 50 says the enum is wider than any of those lists.
+
+`spent` and `includeBonus` are 0 in all ten captured frames, so their offsets are held by the codec's own
+round-trip, not by retail.
