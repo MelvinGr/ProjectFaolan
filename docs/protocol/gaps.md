@@ -164,6 +164,19 @@ bound — it cannot tell a missing respawn from a client that was out of range w
 `Brutal Pirate 0xaa88` back at 150.0 s also holds a 334 s window in which it "never returned".
 `[V0: what governs a creature's respawn interval — creature vs playfield are confounded in the corpus]`
 
+⭐ **The client says the answer is PER-ENTITY, which makes a single interval the wrong shape of question.** Stat
+**146** is named `RespawnTimeInSeconds` — the client carries a per-entity respawn delay, in seconds, as an
+ordinary stat (`docs/re/aoc-client-stat-names.tsv`; LDB category 615 labels the same id *"Respawn Time"*, so the
+naming is corroborated from two sources). So retail does not pick between "120 s" and "150 s" globally: each
+creature carries its own value, and the two candidate figures this gap weighs are two creatures' values rather
+than two hypotheses about one constant.
+
+⛔ **And it is never sent.** Stat 146 has **zero** occurrences across all 134 captures
+(`--report stat-series --report-arg 146`), which is what a server-side scheduling field looks like — the client
+is told a creature spawned, never when it will. That closes the "read it off the wire" route as firmly as the
+measurement above closes the "infer it from timings" one, and leaves the ticket's own conclusion intact: it needs
+a deliberate stationary capture, per creature.
+
 ---
 
 ## Minigames / Massive PvP
