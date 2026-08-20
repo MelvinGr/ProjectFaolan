@@ -661,6 +661,36 @@ through the client's divisor and unit suffix, and an accounting line saying how 
 corpus. See [`../rdb/spell-tooltip.md`](../rdb/spell-tooltip.md), #775), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
+### The protocol-gap reports (2026-08-20)
+
+Eight added while working the "what does the corpus carry that we do not handle?" backlog. The first two are the
+pair the rest were built on:
+
+- **`method-census`** — every RPC method the corpus carries, with frames and captures, *and the other half*: the
+  methods with **zero** frames. That second list is what decides whether a ticket is "decode it" or "capture it".
+  Diff it against every `*Methods` member our code names and the remainder is **captured and unhandled**, sorted
+  by frames — which IS the priority order, because frame count is how hard retail leans on a message.
+- **`method-bodies --report-arg <NameSubstring>`** — the bodies behind a named method, with endpoints and a
+  per-offset stability census. The companion to the census: it answers "what is IN it?".
+  ⚠️ A frame whose header will not parse is **counted and still shown** (endpoints as `0x0`), never dropped — a
+  silent skip there reads as "the corpus does not carry this message", which is the one conclusion this report
+  exists to make reliable.
+- **`frame-health`** — how many captured frames our own strict `Rpc.Parse` refuses. It should read **100%**; it
+  read 96.5% until #881, and the 18,882 refusals were our capture reader truncating the method varint.
+  `RpcHeaderTests` could not see that class of defect (its slice is `PassBlob`-only, method 0), so this is the
+  whole-corpus counterpart to it.
+- **`entity-classes`** — which object-class word each dynel-family IIR actually carries, read off the corpus.
+  The `EntityClass` registry's evidence; it named `TombStone` (51323).
+- **`travel-trips`** — every local-travel trip the captures yield, with the capture that yielded it. Exists
+  because the wiring module prints a COUNT, and a count cannot tell a fixed attribution from a lost trip — which
+  is exactly the question when a guard changes the harvest (#839).
+- **`sprint`** — the sprint/regen family: bodies, the receiver-instance census that decides reply-vs-broadcast,
+  and the c2s→s2c pairing (#867).
+- **`feat-keys`** — do feat records need a TEA key? (No: all 19,777 are plaintext, #877.) It gives #251's
+  `FeatKeyScanner` a trigger; the scanner had been wired to nothing.
+- **`feat-procs`** — `FeatProcs`' shape, and the controlled test that `Amount` is a percent chance (#697).
+- **`particle-effects`** — RDB 1010207 named by the texture paths inside its payload (#880).
+
 ## Decisions
 
 1. **RDB modules are opt-in.** Not in the default set / `--all`; only run when named via `--only` (and they
