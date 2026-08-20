@@ -1069,6 +1069,23 @@ namespace Faolan.GameServer
 		// class curve, so ClassBasePools is null - the max ids fall back to our ceiling, which is not the quantity
 		// that slot holds. Neither blanket is right; the split above is.
 
+		// ---- MAP MARKERS (#868) ----
+		//
+		// `DispatchAddWayPoint` / `DispatchRemoveWayPoint` on GameCharInterface. The endpoint pair is the ordinary
+		// GameCharAgent -> GameCharInterface one every other per-character dispatch uses; the captured sender
+		// instances (0x57 / 0x59 / 0x5A) are the per-session conversation ids, not a distinct conversation.
+		private static Task SendAddWayPoint(INetworkClient client, uint tombstoneInstance, uint playfieldId, float x, float y, float z)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchAddWayPoint, WayPointCodec.Build(tombstoneInstance, playfieldId, x, y, z)));
+		}
+
+		private static Task SendRemoveWayPoint(INetworkClient client, EntityId id, uint playfieldId)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchRemoveWayPoint, RemoveWayPointCodec.Build(id, playfieldId)));
+		}
+
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
 		private static Task SendWorldChat(INetworkClient client, string xml)

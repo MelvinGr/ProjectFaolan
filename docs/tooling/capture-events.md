@@ -79,6 +79,41 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
   (`Faolan.Core.Network/Codecs/Combat/ValidResurrectionSpotsCodec.cs`) + golden test
   (`Faolan.Tests/DispatchValidResurrectionSpotsTests.cs`) shipped; see Gitea #214/#215.
 
+### NecroL80 — the TOMBSTONE and its map pin (#868)
+
+`NecroL80_mage-necromancer_login_gameplay_chat-annotated-4`, plus five more captures that carry the add without the
+remove. `--report method-bodies --report-arg WayPoint` and `--report entity-classes --report-arg TombStone` are the
+oracles.
+
+**The pin is planted on RESPAWN, not on death.** The whole sequence sits inside 0.7 s, in this order:
+
+| t | | |
+|---|---|---|
+| 1223.2 | c2s | `RespawnMe` — the player picks a resurrection spot |
+| 1223.4 | s2c | `BehaviorControlCenterIIR` — the player, `Revive` |
+| 1223.9 | s2c | `TombStoneFullUpdateIIR` — spawns handle `0x58` **at the place they died** (200.2, 53.7, 47.3) |
+| 1223.9 | s2c | `DispatchAddWayPoint` — a pin on that same handle, same position, playfield 1092 |
+| 1223.9 | s2c | `MagicBuffIIR` — `Shield of the Risen` |
+| 1223.9 | s2c | `IntendedTeleportIIR` + `N3TeleportIIR` — away to the resurrection point |
+| 1223.9 | s2c | `StatUpdateIIR` — vitals restored |
+
+So the corpse stays where you fell and the pin is how you find it again — which is exactly what the pin's own LDB
+tooltip says: *"Locate your Tombstone to reduce death penalty!"*.
+
+**What a tombstone record carries**: `EntityClass.TombStone` (51323), a name of literally `"Tombstone"` — except
+one record that carries the dead character's own gear mesh name
+(`NPC_Global_halfplate_heavy_bronze_head_tattered_(A1182/A1188)`), so the corpse can render as the body — a
+`remoteformat` nameplate in category 50200, and a tail ending `0000C350 <ownerHandle>`: the **owner's** character id
+under `EntityClass.Character`.
+
+⚠️ **The one captured `DispatchRemoveWayPoint` is a ZONE CHANGE, not a recovery.** Twenty seconds after the pin goes
+up, the player uses a zone-line dynel, answers *"Do you wish to leave? You will be unable to return to this
+instance."*, teleports to playfield 1090 and is redirected to another game server — and the pin for playfield 1092
+comes down 0.6 s later. That is why `i_nPlayfieldID` is in the remove body at all: **the pin is per-playfield**, and
+leaving the playfield drops it.
+
+⚠️ **No capture performs a tombstone RECOVERY**, so what the pickup sends is not known. Open work: Gitea #868.
+
 ### Blablabla — create, combat, levelup, questcomplete
 `...create-random-actions-combat-levelup-questcomplete.json`
 - **Quest dialogue tree** (the beach Casilda/combat NPC): `4A3D899A` 12493→12490→20018→20019→20020→19919→

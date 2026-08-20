@@ -14,6 +14,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -400,7 +401,8 @@ namespace Faolan.GameServer
 				["weaponset"] = WeaponSetCommand,
 				["time"] = TimeCommand,
 				["tradeskill"] = TradeskillCommand,
-				["setstat"] = SetStatCommand
+				["setstat"] = SetStatCommand,
+				["waypoint"] = WayPointCommand
 			};
 		}
 
@@ -571,6 +573,36 @@ namespace Faolan.GameServer
 
 		// .position  - print the caller's current map + live position (the in-world entity transform when
 		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
+		// .waypoint [off]  - plant a map marker at the player's current position, or take it down (#868).
+		//
+		// The retail trigger is a DEATH: every captured `DispatchAddWayPoint` is a TOMBSTONE pin, labelled
+		// *"Tombstone"* / *"Locate your Tombstone to reduce death penalty!"* and addressed at an `EntityClass.TombStone`
+		// id. We have no tombstone entity to point at yet - that rides with the death-penalty work (#497) - so this is
+		// the standard GM bootstrap for a decoded message whose retail trigger is not wired.
+		//
+		// The marker id is the player's own handle under the tombstone class. That is a stand-in for the corpse's id,
+		// and it is honest about being one: what matters for the in-client check is that the pin appears on the map at
+		// the right place with the right label, and that the remove takes it down again.
+		private async Task WayPointCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var entity = _simulation.PlayerWorldEntity(client);
+			var mapId = entity?.MapId ?? character.MapId;
+			var pos = entity?.Position ?? character.Position;
+
+			if ((arguments ?? "").Trim().Equals("off", StringComparison.OrdinalIgnoreCase))
+			{
+				await SendRemoveWayPoint(client, new EntityId(EntityClass.TombStone, character.Id), mapId);
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "Waypoint removed.");
+				return;
+			}
+
+			await SendAddWayPoint(client, character.Id, mapId, pos.X, pos.Y, pos.Z);
+			await _agentServerDispatcher.SendSystemMessage(character.Id,
+				$"Waypoint planted on map {mapId} at {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} "
+				+ $"{pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}. Use .waypoint off to remove it.");
+		}
+
 		private Task PositionCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;

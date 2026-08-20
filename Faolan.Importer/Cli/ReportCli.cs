@@ -414,6 +414,20 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				// #868: which object-class word each dynel-family IIR carries - the EntityClass registry's holes.
+				case "entity-classes":
+				{
+					EntityClasses(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
+				// The body dump behind every "decode this message" ticket - the companion to method-census.
+				case "method-bodies":
+				{
+					MethodBodies(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				// #867: the sprint/regen family - what retail answers a sprint key with, and who it is addressed to.
 				case "sprint":
 				{
