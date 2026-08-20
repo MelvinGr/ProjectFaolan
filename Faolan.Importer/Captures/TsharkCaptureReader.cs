@@ -90,7 +90,8 @@ namespace Faolan.Importer.Captures
 						? timestamp.UtcTicks
 						: seq;
 
-					var full = Rebuild(p, body, opcode) ?? (includeAllProtocols ? Synthesise(body) : null);
+					var methodInstance = ParseHex(p, "MethodId");
+					var full = Rebuild(p, body, opcode, methodInstance) ?? (includeAllProtocols ? Synthesise(body) : null);
 					if (full == null)
 						continue;
 
@@ -99,7 +100,7 @@ namespace Faolan.Importer.Captures
 						: "";
 					list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full,
 						p.TryGetProperty("Frame", out var fr) && fr.TryGetInt32(out var frame) ? frame : 0,
-						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass"), ParseHex(p, "MethodId"),
+						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass"), methodInstance,
 						// The TCP stream, i.e. WHICH CONNECTION carried this. Kept because it is the only thing that can
 						// tell a broadcast from a private reply: with two clients on the wire, a record reaching both
 						// streams IS a broadcast (#272, `--report broadcast-check`). `Port` cannot answer that - it is
@@ -136,7 +137,7 @@ namespace Faolan.Importer.Captures
 		// internal so FixtureArchiveWriter can store the FULL rebuilt packet, not just the body: the extractors
 		// (QuestDefinitionExtractor, SnapshotJournalReader, ...) take CapturedPacket and strip the framing
 		// themselves, so an extract holding only bodies cannot feed them.
-		internal static byte[]? Rebuild(JsonElement p, byte[] body, uint opcode)
+		internal static byte[]? Rebuild(JsonElement p, byte[] body, uint opcode, uint methodInstance = 0)
 		{
 			if (!TryEndpoint(p, "SenderClass", "SenderInstance", out var sender))
 				return null;
@@ -152,11 +153,28 @@ namespace Faolan.Importer.Captures
 			header.Add(0x12);
 			header.AddRange(Varint((ulong)receiver.Length));
 			header.AddRange(receiver);
-			// The opcode is the u16 Rpc.Parse reads right after the receiver (header.ReadUInt16). The previous code
-			// hardcoded 0x2000 here, so EVERY rebuilt packet reported opcode 0x2000 and consumers that key on the real
-			// opcode (e.g. the 0x2052 ability-grant importer) saw nothing. Write the dump's actual opcode (big-endian).
-			header.Add((byte)(opcode >> 8));
-			header.Add((byte)(opcode & 0xFF));
+			// `method_instance` is field 4: the tag 0x20 followed by a VARINT. ⚠️ It is NOT a u16.
+			//
+			// This used to write the dump's two-byte "Opcode" verbatim, and that is a LOSSY rendering - the tag plus
+			// the varint's FIRST GROUP only (see CapturedPacket.WireOpcode). Whenever a method's constant needs more
+			// than seven bits, the rebuilt header therefore ended on a byte with the continuation bit set and nothing
+			// after it, so `Rpc.Parse` rejected the frame with "RpcHeader ended mid-field" - 18,882 of 544,386
+			// captured frames, including every Ping and Pong and the whole hash-registered login tier (#881).
+			//
+			// The dump records the FULL constant as `MethodId` (0x9cb2cb03 for an Authenticate whose opcode renders as
+			// 0x2083 - note 0x03 is its low seven bits), so the varint can be written properly. `HeaderExtraHex` looks
+			// like it should have carried the missing bytes and never does: it is null on all 125,646 packets.
+			header.Add(0x20);
+			if (methodInstance != 0)
+			{
+				header.AddRange(Varint(methodInstance));
+			}
+			else
+			{
+				// No MethodId in this dump - keep the old single-group write rather than inventing a constant. A frame
+				// that still cannot parse shows up in `--report frame-health`, which is where it should show up.
+				header.Add((byte)(opcode & 0xFF));
+			}
 			var headerBytes = header.ToArray();
 
 			// payload = [u32 headerLen][header][body]; crc32 covers it; totalLen = crc + payload.

@@ -190,6 +190,19 @@ namespace Faolan.Tests
 		// is a placeholder (TsharkCaptureReader.Rebuild); the header and body are the captured bytes, and the header is
 		// what this change touches.
 		[Fact]
+		// ⚠️ **"Every captured frame" means every frame IN THE ARCHIVE SLICE, and that slice cannot see one whole
+		// class of defect.** `CorpusExtract` carries IIR-carrier bodies only - MoveTaskIIR, SimpleCharFullUpdateIIR,
+		// MagicBuffIIR and the rest - and every one of those rides `PassBlob`, whose `method_instance` is **0**. A
+		// zero needs one varint group, so a bug in how the header's method VARINT is written is structurally
+		// invisible here.
+		//
+		// It was invisible: the importer's capture reader rebuilt that field from the dump's two-byte "Opcode",
+		// which is the tag plus the varint's FIRST GROUP only, and 18,882 of 544,386 captured frames - every Ping
+		// and Pong, the whole hash-registered login tier - therefore ended mid-varint and were refused by this very
+		// parser. This test passed throughout (#881).
+		//
+		// The whole-corpus counterpart is `--report frame-health`, which parses every frame in the real dumps rather
+		// than the slice. Keep both: this one guards the round-trip, that one guards the population.
 		public void EveryCapturedFrame_ParsesStrictlyAndReSerializes()
 		{
 			var frames = 0;
