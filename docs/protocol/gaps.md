@@ -347,7 +347,7 @@ trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay)
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
 
 ### The friend/guild state stamp's ONLINE value
-**Tracked: Gitea #796.** [V0: the friend state's online stamp] The chat-tier friend state
+**Tracked: Gitea #888** (refiled from #796, which was closed with this gap still live). [V0: the friend state's online stamp] The chat-tier friend state
 (`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 whose OFFLINE meaning is solved — a unix last-seen,
 identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
 value's id SPACE is not.
@@ -626,7 +626,7 @@ more harvested fields, not a decode: `--report gem-slots` already prints them (a
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
 ### The two daily kill counters, and which one really tracks kills
-**Tracked: Gitea #656.** [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The client's
+**Tracked: Gitea #887** (refiled from #656, which was closed with this gap still live). [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The client's
 stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
 entirely PvE — beach, Tortage, Ymir's Pass. Yet over the captured `StatIIR` stream (`--report stat-series
 --report-arg 106,1000069,1000070`) it is the **PvP-named** one that moves 118 times against the PvE-named one's
