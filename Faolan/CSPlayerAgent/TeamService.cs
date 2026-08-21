@@ -467,8 +467,11 @@ namespace Faolan.CSPlayerAgent
 				.Where(x => playfields.Count == 0 || x.Roster!.Members.Any(m => playfields.Contains(m.MapId)))
 				.ToList();
 
-			var page = matches.Skip((int)skipResults).Take(MaxTeamSearchResults).Select(x => new TeamSearchResultRow(x.Roster!, x.Team.LookingForMembersMessage)).ToList();
-			var moreHits = matches.Count > skipResults + (uint)page.Count;
+			// The skip is the CLIENT's number, so it is clamped rather than cast: an out-of-range one would wrap
+			// negative and Skip(-1) silently skips nothing, which would answer a page request with the whole list.
+			var skip = (int)Math.Min(skipResults, int.MaxValue);
+			var page = matches.Skip(skip).Take(MaxTeamSearchResults).Select(x => new TeamSearchResultRow(x.Roster!, x.Team.LookingForMembersMessage)).ToList();
+			var moreHits = matches.Count > (long)skip + page.Count;
 
 			_logger.LogDebug("SearchForTeam by {Character:X8}: {Live} live team(s), {Advertised} looking for members, {Matches} matching, sending {Page} from {Skip}{More}.", searcherId, _teams.Count, advertised.Count,
 				matches.Count, page.Count, skipResults, moreHits ? " (more to come)" : "");

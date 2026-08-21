@@ -162,6 +162,11 @@ namespace Faolan.Tests
 			Assert.Empty(Search(teams, skip: 1).Rows);
 			Assert.False(Search(teams, skip: 1).MoreHits);
 			Assert.False(Search(teams).MoreHits); // one match, one page - nothing left behind
+
+			// The skip is a client-supplied u32: an out-of-range one must page PAST the end, not wrap negative and
+			// hand back everything.
+			Assert.Empty(Search(teams, skip: uint.MaxValue).Rows);
+			Assert.False(Search(teams, skip: uint.MaxValue).MoreHits);
 		}
 
 		[Fact]
