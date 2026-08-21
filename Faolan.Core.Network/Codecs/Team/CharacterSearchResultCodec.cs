@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// Byte-exact codec for the 0x2010 DispatchCharacterSearchResult body - the "who" window's result list, the answer
 	// to 0x200A CharacterSearch. Decoded from the five captured bodies (CharacterSearchResultTests):
 	//
-	//   [u32 (count+1)*0x3F1]  { count x entry }  [u8 0x00]
+	//   [u32 (count+1)*0x3F1]  { count x entry }  [u8 i_bMoreHits]
 	//   entry = [TeamMemberRecord][u16 0][u8 0x04]
 	//
 	// It lives beside TeamMemberRecordCodec rather than in a search folder because that record IS the payload: the
@@ -16,8 +16,11 @@ namespace Faolan.Core.Network.Codecs.Team
 	// that out is what identified the record's LEVEL field - see TeamMemberRecord's comment - because these bodies
 	// carry several characters at once where the team captures only ever carried two, both level 5.
 	//
-	// The trailing [u8 0x00] closes the list, the same end-marker DispatchTeamSearchResult carries. It must be emitted
-	// even for an empty result or the client reads the empty frame and runs off the end (#408).
+	// The trailing byte is `i_bMoreHits` - the paging flag, not a list terminator. It reads as one because it is 0 in
+	// every captured body, and because a search that fits in one page has nothing more to report; the client's own
+	// dispatcher settles it, asserting "stream bad after 'i_cResult'" and then "after 'i_bMoreHits'" as it reads the
+	// vector and then one byte (#889, found on the DispatchTeamSearchResult twin, whose reply is the same pair). It
+	// must be emitted even for an empty result or the client reads the empty frame and runs off the end (#408).
 	public static class CharacterSearchResultCodec
 	{
 		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchCharacterSearchResult;
@@ -26,9 +29,6 @@ namespace Faolan.Core.Network.Codecs.Team
 		// of their entries, so it is carried rather than named. [V0]
 		private const ushort EntryPad = 0x0000;
 		private const byte EntryTrailer = 0x04;
-
-		// Closes the record list.
-		private const byte ListTrailer = 0x00;
 
 		public static byte[] Build(CharacterSearchResult value)
 		{
@@ -40,7 +40,7 @@ namespace Faolan.Core.Network.Codecs.Team
 				s.WriteUInt16(EntryPad).WriteByte(EntryTrailer);
 			}
 
-			return s.WriteByte(ListTrailer).ToArray();
+			return s.WriteByte(value.MoreHits).ToArray();
 		}
 
 		public static CharacterSearchResult Parse(in ReadOnlySpan<byte> data)
@@ -55,12 +55,15 @@ namespace Faolan.Core.Network.Codecs.Team
 				r.ReadU8(); // EntryTrailer
 			}
 
-			r.ReadU8(); // ListTrailer
+			var moreHits = r.ReadU8() != 0;
 			r.EnsureAtEnd();
 
-			return new CharacterSearchResult(characters);
+			return new CharacterSearchResult(characters, moreHits);
 		}
 	}
 
-	public sealed record CharacterSearchResult(IReadOnlyList<TeamMemberRecord> Characters);
+	// `MoreHits` answers the request's i_nSkipResults: false in every captured body, because every captured search
+	// fitted in one page. Sending false while dropping results at the page cap would tell the client it had seen
+	// everything, so the page and the flag are set together.
+	public sealed record CharacterSearchResult(IReadOnlyList<TeamMemberRecord> Characters, bool MoreHits = false);
 }

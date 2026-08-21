@@ -69,6 +69,21 @@ namespace Faolan.Tests
 			Assert.Equal(captured, CharacterSearchResultCodec.Build(CharacterSearchResultCodec.Parse(captured)));
 		}
 
+		// The trailing byte is i_bMoreHits, not a terminator (#889). It is 0 in every captured body - each captured
+		// search fitted in one page - so the two readings agree on the corpus and only differ on a truncated page,
+		// which is exactly the case the flag exists for.
+		[Fact]
+		public void TheTrailingByte_IsTheMoreHitsFlag()
+		{
+			Assert.False(CharacterSearchResultCodec.Parse(Captured()).MoreHits);
+
+			var truncated = CharacterSearchResultCodec.Build(CharacterSearchResultCodec.Parse(Captured()) with { MoreHits = true });
+
+			Assert.Equal((byte)0x01, truncated[^1]);
+			Assert.True(CharacterSearchResultCodec.Parse(truncated).MoreHits);
+			Assert.Equal(3, CharacterSearchResultCodec.Parse(truncated).Characters.Count); // and nothing else moved
+		}
+
 		// An empty result still carries the frame AND the trailer - dropping the trailer is the #408 failure mode that
 		// made the client run off the end of the body and drop the whole CSPlayerAgent route.
 		[Fact]

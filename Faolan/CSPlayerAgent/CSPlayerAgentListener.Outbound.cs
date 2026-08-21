@@ -97,13 +97,20 @@ namespace Faolan.CSPlayerAgent
 				.Where(m => playfields.Count == 0 || playfields.Contains(m.MapId))
 				.OrderBy(m => m.Character.Name, StringComparer.OrdinalIgnoreCase)
 				.Skip((int)Math.Min(skipResults, int.MaxValue))
-				.Take(MaxCharacterSearchResults)
+				.Take(MaxCharacterSearchResults + 1) // one past the page, so the page knows whether it is the last
 				.Select(m => TeamMemberRecord.FromCharacter(m.Character, m.MapId))
 				.ToList();
 
-			Logger.LogDebug("CharacterSearch: {Count} online character(s) matched.", matches.Count);
+			// i_bMoreHits, which used to go out as a hardcoded 0 because the trailing byte was read as a list
+			// terminator (#889): the page caps at MaxCharacterSearchResults, so a search that matched more than that
+			// was told there was nothing more and would never page for the rest.
+			var moreHits = matches.Count > MaxCharacterSearchResults;
+			var page = moreHits ? matches[..MaxCharacterSearchResults] : matches;
 
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResultCodec.Method, CharacterSearchResultCodec.Build(new CharacterSearchResult(matches))));
+			Logger.LogDebug("CharacterSearch: {Count} online character(s) matched{More}.", page.Count, moreHits ? " (more to come)" : "");
+
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResultCodec.Method,
+				CharacterSearchResultCodec.Build(new CharacterSearchResult(page, moreHits))));
 		}
 
 		// One page of "who" results. The client's own request carries i_nSkipResults, so it pages, and the reply method
