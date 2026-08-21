@@ -266,6 +266,22 @@ namespace Faolan.Core.Database.Tables
 		// in zero updates across all 59 necromancer captures - so this triple is the only place the server ever
 		// states a cost, and it used to state a constant 2 for every pet. See `PetBindings.CombatKind`.
 		public uint? SummonPetBuff { get; set; }
+
+		// A SELF-RESURRECTION spell this one ARMS, and how much of the character it restores (#890). Both come from
+		// the client's own effect: `53183 AddSelfResurrectionSpell` carries `88` = the spell to cast on resurrect,
+		// `188` = the restore percentage, and `67` = a flag that is 1 wherever the effect appears.
+		//
+		// The mechanic is stated by the item that carries it - the Self-Resurrection Potion's tooltip reads "an option
+		// to resurrect themselves at the location of their death, with 100% of their Health, Stamina and Mana
+		// restored... must be consumed before the death occurs... will persist until it is used". So a spell with
+		// these set is not a resurrect; it is an OFFER the server makes at cast time (DispatchResurrectRequest), which
+		// the client holds and answers with ResurrectMe when the player dies.
+		//
+		// Null on every spell that is not one of the four in the family (Self Resurrection + the three Elixirs of
+		// Resurgence).
+		public uint? SelfResurrectionSpell { get; set; }
+		public uint? SelfResurrectionPercent { get; set; }
+
 		public uint? SummonPointCost { get; set; }
 
 		// Backfilled from the RDB spell-data record (type 1040005) by RdbSpellImporter (#236):

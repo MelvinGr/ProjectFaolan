@@ -140,6 +140,10 @@ namespace Faolan.Importer.Rdb
 		// the on-use spell (`ItemTemplateStatModifiers.ParseRejected`'s remarks, #762).
 		private const uint CastNanoKind = 53051;
 
+		// #890: the effect that ARMS a self-resurrection - `53183 AddSelfResurrectionSpell`, whose two useful slots are
+		// the spell to cast on resurrect and the restore percentage.
+		private const uint AddSelfResurrectionSpellKind = 53183;
+
 		// 499 - the QUALITY/rarity tier, the same field (and the same 0-indexed ItemQuality ladder) an item template
 		// carries; on a mount record it is the ONLY field separating "Swift <horse>" from "<horse>". Read into
 		// Mount.Quality - NOT as a speed, see Mount.Quality's remarks.
@@ -330,6 +334,8 @@ namespace Faolan.Importer.Rdb
 				var criticalChanceHundredths = fields.GetValueOrDefault(SpellCriticalChanceField);
 				var criticalDamageHundredths = fields.GetValueOrDefault(SpellCriticalDamageField);
 				var areaRadius = 0u; // metres, filled from the area-targeting elements below (#349)
+				var selfResurrectionSpell = 0u; // #890, filled from the AddSelfResurrectionSpell element below
+				var selfResurrectionPercent = 0u;
 				var areaEffectSpell = 0u; // the spell that area applies - the element's KeySpell, see the loop below
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
@@ -408,6 +414,16 @@ namespace Faolan.Importer.Rdb
 					// the mount above: a column read off a record this loop already has open.
 					if (element.Kind == StartServerSideScryScriptWithParamsKind && SummonParams.TryParse(element.Text(GameActionTypes.KeyEventString), out var petSummon))
 						summons[entry.Id] = petSummon;
+
+					// #890: a SELF-RESURRECTION offer. `53183 AddSelfResurrectionSpell` names the spell to cast on
+					// resurrect (the shared KeySpell slot) and the percentage of the character it restores, and the
+					// four spells that carry it are the family the potion and the three Elixirs of Resurgence apply.
+					// Lifted here for the same reason as the summon above: two columns off a record already open.
+					if (element.Kind == AddSelfResurrectionSpellKind)
+					{
+						selfResurrectionSpell = element.Value(GameActionTypes.KeySpell) ?? 0;
+						selfResurrectionPercent = element.Value(GameActionTypes.KeySelfResurrectionPercent) ?? 0;
+					}
 
 					// #349: the AoE blast radius. It is an area-TARGETING element's Radius key, not a property field -
 					// which is why the field run has none. Largest wins on a record carrying several (a cone plus a
@@ -645,6 +661,12 @@ namespace Faolan.Importer.Rdb
 				spell.SummonIsCompanion = summon?.Companion ?? false;
 				spell.SummonPetBuff = summon?.PetBuff;
 				spell.SummonPointCost = summon?.PointCost;
+
+				// #890: set unconditionally for the same reason as the summon fields - the RDB is the only source, and
+				// a spell with no AddSelfResurrectionSpell element genuinely arms no resurrection. NULL rather than 0
+				// so "arms one" is a question the column answers by itself.
+				spell.SelfResurrectionSpell = selfResurrectionSpell == 0 ? null : selfResurrectionSpell;
+				spell.SelfResurrectionPercent = selfResurrectionSpell == 0 ? null : selfResurrectionPercent;
 			}
 
 			var ladderLevelsSet = RankLadderFromEffectBands(byId, statEffects, logger);

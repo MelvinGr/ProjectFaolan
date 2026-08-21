@@ -294,6 +294,75 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
+		// --- Self-resurrection offers (#890) ------------------------------------------------------------------
+		//
+		// An offer is ARMED while the player is alive - using a Self-Resurrection Potion or an Elixir of Resurgence
+		// sends DispatchResurrectRequest there and then - and answered when they die, with ResurrectMe carrying the
+		// same spell id back. The item's own tooltip is the specification: "an option to resurrect themselves at the
+		// location of their death... The potion must be consumed before the death occurs to have an effect. The option
+		// to self-resurrect will persist until it is used."
+		//
+		// So it is per-character live state that must outlive a DEATH, and it is keyed by character id rather than by
+		// connection on purpose: a zone change tears the world connection down (ClientDisconnected -> RemovePlayer), and
+		// an offer that died with the connection would be lost by walking through a door - which the tooltip's "will
+		// persist until it is used" plainly rules out. It is not persisted, so it does not survive a SERVER restart;
+		// that is the one narrowing, and the same one the consumable cooldowns next door have (#764).
+		private readonly ConcurrentDictionary<uint, SelfResurrectionOffer> _selfResurrection = [];
+
+		public void ArmSelfResurrection(uint characterId, uint spellId, uint restorePercent)
+		{
+			_selfResurrection[characterId] = new SelfResurrectionOffer(spellId, restorePercent);
+			_logger.LogInformation("Combat: {Character:X8} armed a self-resurrection (spell {Spell}, {Percent}%).", characterId, spellId, restorePercent);
+		}
+
+		// c2s CancelResurrectionRequest(resurrectRequesterID, resurrectSpellID) - the player declined the offer. The
+		// spell must match, or a decline of somebody ELSE's offer would drop the potion the player paid for.
+		public bool CancelSelfResurrection(uint characterId, uint spellId)
+		{
+			return _selfResurrection.TryGetValue(characterId, out var offer) && offer.SpellId == spellId && _selfResurrection.TryRemove(characterId, out _);
+		}
+
+		public bool HasSelfResurrection(uint characterId, uint spellId)
+		{
+			return _selfResurrection.TryGetValue(characterId, out var offer) && offer.SpellId == spellId;
+		}
+
+		// c2s ResurrectMe(resurrectSpellID) - the player took the offer. Revives IN PLACE, at the position they died
+		// in, restoring the offer's percentage of all three pools; the percentage is the spell's own
+		// (`AddSelfResurrectionSpell`'s field 188), which is why a Potion restores 100 and a Minor Elixir 25.
+		//
+		// Returns false when there is no matching offer or the player is not dead - both of which are ordinary, since
+		// this method is also how a PLAYER-cast resurrect would arrive and we model none of those yet.
+		public async Task<bool> ResurrectFromOffer(INetworkClient client, uint spellId)
+		{
+			if (client.Session.Character is not { } character || !_selfResurrection.TryGetValue(character.Id, out var offer) || offer.SpellId != spellId)
+				return false;
+
+			if (!Players.TryGetValue(client, out var entity) || entity.Vitals is not { IsDead: true } vitals)
+				return false;
+
+			_selfResurrection.TryRemove(character.Id, out _);
+			_playerRespawnRemaining.TryRemove(client, out _);
+
+			vitals.ReviveTo(offer.RestorePercent);
+			if (character.IsDead)
+			{
+				character.IsDead = false;
+				await _database.SaveCharacterDeadState(character.Id, false);
+			}
+
+			// The same in-place revive the release screen takes (#214): a BccIIR flipping bcc_state 29 -> 1 closes the
+			// dead window, then the vitals go out. No respawn point and no teleport - resurrecting where you fell is
+			// the whole point of the item, and it is the one revive that genuinely needs no destination.
+			await _output.SendRevive(client, entity.Handle, 0);
+			await _output.PushVitals(client, vitals);
+
+			_logger.LogInformation("Combat: {Player} self-resurrected on the spot (spell {Spell}, {Percent}% restored).", character.Name, spellId, offer.RestorePercent);
+			return true;
+		}
+
+		private sealed record SelfResurrectionOffer(uint SpellId, uint RestorePercent);
+
 		// The player clicked a spot on the release screen: RespawnMe(spawnPointId) (c2s 0x2024). spawnPointId is the
 		// RespawnPoint.Id we sent in DispatchValidResurrectionSpots, echoed back. Revive at that point; if the id
 		// doesn't resolve, fall back to the closest-known logic (RespawnPlayer). No-op if the player isn't dead.

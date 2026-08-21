@@ -1044,6 +1044,23 @@ namespace Faolan.GameServer
 		}
 
 		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
+		// 0x2014 DispatchResurrectRequest: "somebody is offering to resurrect you" - for now always YOURSELF, from a
+		// self-resurrection consumable (#890). The client holds the offer and answers on the GameCharAgent tier with
+		// ResurrectMe(spellId) or CancelResurrectionRequest(who, spellId), so the spell id is a token that comes back
+		// rather than something the client has to resolve.
+		//
+		// `castSpellOnResurrect` is true: the captured request carries 1, and the effect that arms the offer carries 1
+		// in the matching field. A player-to-player resurrect would send the CASTER as the resurrector; nothing sends
+		// one yet.
+		private static Task SendResurrectRequest(INetworkClient client, uint characterId, uint resurrectSpell)
+		{
+			// Same server endpoint as the release screen next door - the capture addresses both identically
+			// (GameCharAgent instance 0x57 there, 0x59 in the beach capture: an arbitrary server handle, not session
+			// data), and the receiver is the player's own GameCharInterface instance.
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				ResurrectRequestCodec.Method, ResurrectRequestCodec.Build(characterId, resurrectSpell)));
+		}
+
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),

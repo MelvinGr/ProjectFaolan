@@ -184,6 +184,42 @@ commit 763aeb0). Trail: agent memory `protocol_death_resurrect`.
 (The corpse object `TombStoneFullUpdateIIR_c` 0x0D80E7C9 is decoded but not used — the corpse lingers as the dying
 creature, then a separate loot bag spawns, #246.)
 
+**Self-resurrection — the OFFER pair (`DispatchResurrectRequest`, s2c 0x2018), #890.** A resurrection is not
+pushed onto a player: it is OFFERED and answered. The server sends
+
+```
+DispatchResurrectRequest [ID32 resurrector][u32 spellTemplate][u8 castSpellOnResurrect]   (ResurrectRequestCodec)
+```
+
+and the client replies on the GameCharAgent tier with `ResurrectMe(resurrectSpellID)` to accept or
+`CancelResurrectionRequest(resurrectRequesterID, resurrectSpellID)` to decline. The spell id is a **token that comes
+back** — which is why it need not resolve in any catalog for the exchange to work, and the one in the capture
+(4841463) resolves in neither our tables nor this client's RDB.
+
+The three field names are the client's own: its dispatcher (`FUN_004c0160`) reads them in order and asserts "stream
+bad after `'i_cResurrectorID'` / `'i_nSpellTemplate'` / `'i_castSpellOnResurrect'`", then dispatches through vtable
+slot `0x64` == `(0x18 + 1) * 4`.
+
+⚠️ **The offer is armed while the player is ALIVE.** The corpus's single request is sent the instant a
+Self-Resurrection Potion is used, by a player at full health who never died in that session — because that is what
+the item does. Its tooltip is the specification: *"an option to resurrect themselves at the location of their death,
+with 100% of their Health, Stamina and Mana restored. The potion must be consumed before the death occurs to have an
+effect… The option to self-resurrect will persist until it is used."* So there is **no prompt at use time** (checked
+in-client), and the death side of the exchange is not captured at all.
+
+⭐ **The spell says how much it restores, and that is a whole content family.** `53183 AddSelfResurrectionSpell`
+carries the spell to cast (field 88) and the restore percentage (field 188), lifted into
+`Spells.SelfResurrectionSpell` / `SelfResurrectionPercent` by `RdbSpellImporter`. Sixteen spells carry it, and the
+percentages are exactly the item tiers: the Potion 100, and Minor / Major / Exceptional 25 / 50 / 75 for both the
+Elixirs of Resurgence and the Phoenix Bloods — plus the class abilities `Cheat The Reaper` (25),
+`Undying Glory of Xotli` (25) and `Set's Life Spark` (100).
+
+`WorldSimulation` holds the armed offer keyed by CHARACTER, not by connection, so it survives the zone change that
+tears the world connection down — an option lost by walking through a door would contradict "persist until it is
+used". It is not persisted, so it does not survive a server restart, the same narrowing the consumable cooldowns
+have (#764). Taking it revives **in place**, at the position the player fell, restoring the offer's percentage of
+all three pools.
+
 **Resurrection spots (`DispatchValidResurrectionSpots`, s2c 0x2024) — body fully decoded, #372.** The body is a
 reference position + a **list** of the points a player may revive at, built by `ValidResurrectionSpotsCodec`:
 

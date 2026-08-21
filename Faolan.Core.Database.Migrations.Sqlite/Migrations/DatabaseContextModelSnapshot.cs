@@ -3705,6 +3705,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ScalingAttribute")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("SelfResurrectionPercent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SelfResurrectionSpell")
+                        .HasColumnType("INTEGER");
+
                     b.Property<float>("SplashDamage")
                         .HasColumnType("REAL");
 

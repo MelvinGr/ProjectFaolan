@@ -1406,6 +1406,47 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// The two answers to DispatchResurrectRequest (#890). The client holds the offer from the moment the
+				// consumable is used and replies here when the player dies - which is why neither appears in the
+				// corpus: the one captured session used its potion and never died.
+
+				// 0x2022 ResurrectMe(uint32 resurrectSpellID): the offer is taken. The spell id is the token we sent,
+				// echoed back, and it MUST match - it is what distinguishes this offer from another one.
+				case GameCharAgentMethods.ResurrectMe:
+				{
+					var resurrectSpell = body.Length >= sizeof(uint)
+						? body.ReadUInt32()
+						: 0;
+
+					if (await _simulation.ResurrectFromOffer(client, resurrectSpell))
+						Logger.LogInformation("ResurrectMe (spell {Spell}): self-resurrection taken.", resurrectSpell);
+					else
+						// Not an error: a resurrect offered by another PLAYER arrives the same way and we make none,
+						// and a client that answers twice sends the second after the offer is gone.
+						Logger.LogInformation("ResurrectMe (spell {Spell}) with no matching armed offer, or the player is not dead; ignored.", resurrectSpell);
+
+					break;
+				}
+
+				// 0x2023 CancelResurrectionRequest(const ID32& resurrectRequesterID, uint32 resurrectSpellID): the
+				// offer is declined. Both fields are echoes of what we sent; the SPELL is what the drop keys on, so a
+				// decline cannot take away an offer it does not name.
+				case GameCharAgentMethods.CancelResurrectionRequest:
+				{
+					var requester = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
+					var declinedSpell = body.Length >= sizeof(uint)
+						? body.ReadUInt32()
+						: 0;
+
+					if (_simulation.CancelSelfResurrection(client.Session.Character.Id, declinedSpell))
+						Logger.LogInformation("CancelResurrectionRequest: {Character} declined the resurrection from {Requester:X8} (spell {Spell}).", client.Session.Character.Name, requester.Id,
+							declinedSpell);
+					else
+						Logger.LogInformation("CancelResurrectionRequest (spell {Spell}) with no matching armed offer; ignored.", declinedSpell);
+
+					break;
+				}
+
 				case GameCharAgentMethods.RespawnMe: // the player's release/resurrect click; body = [u32 token]
 				{
 					var token = body.Length >= sizeof(uint)

@@ -183,6 +183,11 @@ namespace Faolan.Core.Rdb
 
 		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
 		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.
+		// `53183 AddSelfResurrectionSpell`'s own slots (#890): the spell the offer casts on resurrect (the shared
+		// KeySpell slot 88) and the percentage of Health/Stamina/Mana it restores. 100 in all four spells of the
+		// family, which is exactly what the Self-Resurrection Potion's tooltip promises.
+		public const int KeySelfResurrectionPercent = 188;
+
 		public const int KeyEventString = 209;
 		public const int KeyEventString2 = 210;
 

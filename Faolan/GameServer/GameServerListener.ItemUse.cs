@@ -44,6 +44,16 @@ namespace Faolan.GameServer
 			var durationCs = spell.DurationMs / 10;
 			await _buffs.SendMagicBuffIir(client, self, self, wireSpellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, BuffService.CasterLevel(client), casterIsPlayer: true));
 
+			// #890: a consumable that ARMS a self-resurrection says so on the wire immediately, while the player is
+			// alive - retail's own order is the buff above, then this, then the item leaving the bag (annotated_9
+			// f6467, all in one instant). It is an OFFER: the client holds it and answers with ResurrectMe when the
+			// player dies, echoing the spell id back.
+			if (spell.SelfResurrectionSpell is { } resurrectSpell && resurrectSpell != 0)
+			{
+				await SendResurrectRequest(client, self, resurrectSpell);
+				_simulation.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
+			}
+
 			// #702: and the pool the consumable actually MOVES. A health potion's whole point is the instant heal -
 			// `Daggamalt` -> `Health Potion Effect 10` carries +40500 (405 HP) - and this path used to apply the buff,
 			// consume the item and leave the bar exactly where it was.
