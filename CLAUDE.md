@@ -78,6 +78,10 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # --connection override (#456): Global.ConfigPath now searches UP from the CWD (then up from the exe dir) for
 # faolan.json, and a relative SQLite `Data Source` resolves against the DIRECTORY that file was found in - so
 # both commands work from anywhere in the tree with no overrides. FAOLAN_CONFIG still wins if you set it.
+# ⚠️ The two --project flags below are still REQUIRED. `.config/dotnet-ef.json` carries them as defaults, but that
+# config file is an EF **11** tooling feature and the pinned tool here is `dotnet ef` 10.0.10, which ignores the file
+# (verified: `dotnet ef migrations list` from the repo root still answers "No project was found"). It is committed so
+# the defaults are already right the day the tool goes to 11 - at which point both commands shorten to their bare form.
 dotnet ef migrations add <Name> \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
 # `database update` likewise (or just start the server - it migrates, loads faolan.sql into a database with no
