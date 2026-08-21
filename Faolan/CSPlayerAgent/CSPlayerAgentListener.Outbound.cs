@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.GroupFinder;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Pvp;
 using Faolan.Core.Network.Codecs.Team;
@@ -80,7 +81,7 @@ namespace Faolan.CSPlayerAgent
 		//
 		// The empty result still carries the frame AND the trailing 0x00, or the client reads the empty frame then runs
 		// off the end - the #408 dropped-trailer failure that took the whole CSPlayerAgent route down.
-		private Task SendCharacterSearchResult(INetworkClient client, Rpc packet, uint minLevel, uint maxLevel, List<uint> playfields, List<uint> classes, List<uint> races, uint skipResults,
+		private Task SendCharacterSearchResult(INetworkClient client, Rpc packet, uint minLevel, uint maxLevel, List<uint> playfields, List<ConanClass> classes, List<Race> races, uint skipResults,
 			string nameSearch)
 		{
 			var realmId = client.Session.Character?.RealmId ?? 0;
@@ -89,8 +90,8 @@ namespace Faolan.CSPlayerAgent
 				.Select(s => s.Character)
 				.Where(c => c != null && c.RealmId == realmId)
 				.Where(c => Within((int)c.Level, minLevel, maxLevel))
-				.Where(c => classes.Count == 0 || classes.Contains((uint)c.Class))
-				.Where(c => races.Count == 0 || races.Contains((uint)c.Race))
+				.Where(c => classes.Count == 0 || classes.Contains(c.Class))
+				.Where(c => races.Count == 0 || races.Contains(c.Race))
 				.Where(c => nameSearch.Length == 0 || (c.Name ?? "").Contains(nameSearch, StringComparison.OrdinalIgnoreCase))
 				.Select(c => (Character: c, MapId: _gameServerDispatcher.GetCharacterLiveState(c.Id)?.MapId ?? c.MapId))
 				.Where(m => playfields.Count == 0 || playfields.Contains(m.MapId))
@@ -137,14 +138,26 @@ namespace Faolan.CSPlayerAgent
 		// shows that body is the EMPTY BOARD rather than the message's shape: the real one is a three-level map that
 		// moves with every signup. It is built by `PvpMatchMakingService` / `PvpMatchMakingInfoCodec` now.
 
-		// 0x200F DispatchTeamSearchResult: the LFG team-search result (answer to 0x200B SearchForTeam). Body is a
-		// 0x3F1-framed list + a trailing byte; retail's own "no results" body is [0x3F1][0x00] (byte-exact from the
-		// login capture, where Hoxxling's search returned nothing).
-		private static Task SendTeamSearchResult(INetworkClient client, Rpc packet)
+		// 0x200F DispatchTeamSearchResult: the LFG team-search result (answer to 0x200B SearchForTeam) - one page of
+		// the teams that are looking for members, each as a whole roster plus its advert.
+		//
+		// This used to write a hardcoded `[0x3F1][0x00]` - which IS retail's answer, but only to a search that matched
+		// nothing, and it was the only answer we could give with no LFG registry to answer from. The registry lives on
+		// TeamService (SetLookingForMemberStatus) and applies the criteria; TeamSearchResultCodec owns the grammar,
+		// including the trailing byte, which the client's reader names i_bMoreHits rather than a list trailer (#889).
+		// The empty page still goes out as those same five bytes, gated byte-exact by TeamSearchResultCodecTests.
+		private Task SendTeamSearchResult(INetworkClient client, Rpc packet, List<uint> playfields, uint minLevel, uint maxLevel, uint memberCountMin, uint memberCountMax, uint skipResults)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchTeamSearchResult, b => b
-				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
-				.WriteByte(0x00))); // list trailer
+			var result = _teams.SearchTeams(client.Session.Character?.Id ?? 0, playfields, minLevel, maxLevel, memberCountMin, memberCountMax, skipResults);
+
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, TeamSearchResultCodec.Method, TeamSearchResultCodec.Build(result)));
+		}
+
+		// The LFG status echo, for all four of the Set/Get pairs the client can ask: one flag and one message, and
+		// WHICH subject it is about is carried by the method rather than the body (LookingForGroupStatusCodec).
+		private static Task SendLookingForGroupStatus(INetworkClient client, Rpc packet, CSPlayerInterfaceMethods method, LookingForGroupStatus status)
+		{
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, (uint)method, LookingForGroupStatusCodec.Build(status)));
 		}
 	}
 }

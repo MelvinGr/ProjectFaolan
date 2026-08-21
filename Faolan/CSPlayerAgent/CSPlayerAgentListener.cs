@@ -85,13 +85,18 @@ namespace Faolan.CSPlayerAgent
 
 		// The matchmaking board is LIVE state (#882): a signup counted for a character who has logged off is a row
 		// the next poller reads as a queued player. Retail's board only ever shows who is there, so the signup goes
-		// when the connection does. The group-finder pending signup rides along for the same reason.
+		// when the connection does. The group-finder pending signup and the LFG advert ride along for the same reason.
 		protected override async Task ClientDisconnected(INetworkClient client)
 		{
 			if (client.Session.Character is { } character)
 			{
 				_pvpMatchMaking.Forget(character.Id);
 				_groupFinder.Forget(character.Id);
+
+				// Same rule for the LFG advert (#889): the team search answers from live sessions, so a flag left
+				// behind by a logged-off character is a row on somebody else's wire for a player who is not there.
+				// The TEAM's own advert needs no cleanup - the team dissolves with its last member.
+				_teams.ForgetLookingForTeam(character.Id);
 			}
 
 			await base.ClientDisconnected(client);
@@ -239,6 +244,67 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentMethods.DeclineTeamInvite:
 				{
 					_teams.Decline(client.Session.Character.Id);
+					break;
+				}
+
+				// --- Looking for group (#889) -------------------------------------------------------------------
+				// The four c2s methods that feed the team search, and the apply button on one of its rows. None of
+				// them appears in the corpus - no traced session opened the LFG window - so each body below is the
+				// client's own signature (docs/re/aoc-client-rpc-methods.json) and its reader. [V0]
+
+				// 0x2005 TeamApply(const ID32& i_cTeamID): "apply" on a team-search row. The applicant does not join;
+				// the LEADER is told, and invites them through the ordinary invite flow.
+				case CSPlayerAgentMethods.TeamApply:
+				{
+					var applyTo = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
+
+					await _teams.Apply(client.Session.Character.Id, applyTo.Id);
+					break;
+				}
+
+				// 0x2012 SetLookingForTeamStatus(bool i_bLookingForTeam, const std::string& i_cMessage) /
+				// 0x2014 GetLookingForTeamStatus(): the CHARACTER's own LFG flag. Both answer with
+				// DispatchCharacterLookingForTeamStatus, which is the flag echoed back - the group finder already
+				// sends that message when it clears the flag.
+				case CSPlayerAgentMethods.SetLookingForTeamStatus:
+				{
+					var wanted = LookingForGroupStatusCodec.Parse(body.ReadRemainingArray());
+
+					await SendLookingForGroupStatus(client, packet, CSPlayerInterfaceMethods.DispatchCharacterLookingForTeamStatus,
+						_teams.SetLookingForTeam(client.Session.Character.Id, wanted.Looking, wanted.Message));
+					break;
+				}
+
+				case CSPlayerAgentMethods.GetLookingForTeamStatus:
+				{
+					await SendLookingForGroupStatus(client, packet, CSPlayerInterfaceMethods.DispatchCharacterLookingForTeamStatus,
+						_teams.LookingForTeamStatusOf(client.Session.Character.Id));
+					break;
+				}
+
+				// 0x2013 SetLookingForMemberStatus(bool i_bLookingForMember, const std::string& i_cMessage) /
+				// 0x2015 GetLookingForMemberStatus(): the TEAM's advert - the flag that puts it in everyone else's
+				// SearchForTeam results, and the message its result row carries. Only the leader may set it; a
+				// non-leader (or a player in no team) is told nothing, which is what the null says.
+				//
+				// The SET echoes to the WHOLE team rather than just the leader: every member's window shows the
+				// advert, and the team is the message's subject. Retail's own fan-out is unknown - the message is
+				// uncaptured - so this is the reading, not an observation. [V0]
+				case CSPlayerAgentMethods.SetLookingForMemberStatus:
+				{
+					var advert = LookingForGroupStatusCodec.Parse(body.ReadRemainingArray());
+
+					if (_teams.SetLookingForMembers(client.Session.Character.Id, advert.Looking, advert.Message) is { } set)
+						await _teams.BroadcastToTeam(client.Session.Character.Id, CSPlayerInterfaceMethods.DispatchTeamLookingForMemberStatus, LookingForGroupStatusCodec.Build(set));
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.GetLookingForMemberStatus:
+				{
+					if (_teams.LookingForMemberStatusOf(client.Session.Character.Id) is { } status)
+						await SendLookingForGroupStatus(client, packet, CSPlayerInterfaceMethods.DispatchTeamLookingForMemberStatus, status);
+
 					break;
 				}
 
@@ -601,8 +667,8 @@ namespace Faolan.CSPlayerAgent
 					var playfields = ReadListFrameOfUInt32(body, "CharacterSearch.playfields");
 					var minLevel = body.ReadUInt32();
 					var maxLevel = body.ReadUInt32();
-					var classes = ReadListFrameOfUInt32(body, "CharacterSearch.classes");
-					var races = ReadListFrameOfUInt32(body, "CharacterSearch.races");
+					var classes = ReadListFrameOfUInt32<ConanClass>(body, "CharacterSearch.classes");
+					var races = ReadListFrameOfUInt32<Race>(body, "CharacterSearch.races");
 					var skipResults = body.ReadUInt32();
 					var nameSearch = body.ReadString();
 
@@ -618,7 +684,7 @@ namespace Faolan.CSPlayerAgent
 				{
 					// SearchForTeam(const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel, int i_nMaxLevel,
 					// int memberCountMin, int memberCountMax, uint32 i_nSkipResults) - LFG team search
-					// (0x200B -> 0x200F). Captured 24-byte body matches exactly. Empty result (#460).
+					// (0x200B -> 0x200F). Captured 24-byte body matches exactly.
 					var playfields = ReadListFrameOfUInt32(body, "SearchForTeam.playfields");
 					var minLevel = body.ReadUInt32();
 					var maxLevel = body.ReadUInt32();
@@ -626,12 +692,13 @@ namespace Faolan.CSPlayerAgent
 					var memberCountMax = body.ReadUInt32();
 					var skipResults = body.ReadUInt32();
 
-					// Still an EMPTY result, and filters are not the reason: we run no LFG registry, so there is nothing to
-					// filter. That is a missing subsystem, not a missing WHERE clause (#460).
-					Logger.LogDebug("SearchForTeam level {MinLevel}..{MaxLevel}, members {MinMembers}..{MaxMembers}, {Playfields} playfields, skip {Skip} - no LFG registry, empty result.", minLevel, maxLevel,
+					// Answered from the LFG registry (#889): the live teams whose leader flagged them with
+					// SetLookingForMemberStatus, narrowed by every criterion the client sent. It was a hardcoded empty
+					// body until there was a registry to answer from.
+					Logger.LogDebug("SearchForTeam level {MinLevel}..{MaxLevel}, members {MinMembers}..{MaxMembers}, {Playfields} playfields, skip {Skip}.", minLevel, maxLevel,
 						memberCountMin, memberCountMax, playfields.Count, skipResults);
 
-					await SendTeamSearchResult(client, packet);
+					await SendTeamSearchResult(client, packet, playfields, minLevel, maxLevel, memberCountMin, memberCountMax, skipResults);
 
 					break;
 				}
@@ -736,6 +803,22 @@ namespace Faolan.CSPlayerAgent
 			var values = new List<uint>(count);
 			for (var i = 0; i < count; i++)
 				values.Add(body.ReadUInt32());
+
+			return values;
+		}
+
+		private List<T> ReadListFrameOfUInt32<T>(FaolanStream body, string what) where T: Enum
+		{
+			var word = body.ReadUInt32();
+			if (!ListFrame.TryCountOf(word, out var count))
+			{
+				Logger.LogWarning("{What}: 0x{Word:X} is not a count-framed list word; ignoring the entries.", what, word);
+				return [];
+			}
+
+			var values = new List<T>(count);
+			for (var i = 0; i < count; i++)
+				values.Add(body.ReadUInt32<T>());
 
 			return values;
 		}

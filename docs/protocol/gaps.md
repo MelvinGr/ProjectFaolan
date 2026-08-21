@@ -329,6 +329,17 @@ derive from anything we send, and there is no basis for computing it. We carry i
 byte-exact) and send zero for our own members until an in-client check says what breaks. A capture where the same
 character appears in two sessions would settle whether it is per-character or per-session.
 
+### The team-search row's trailing string
+**Tracked: Gitea #889.** [V0: the team-search row's trailing string is the looking-for-members message] A
+`DispatchTeamSearchResult` row is a whole `cTeam` followed by a string - that much is the client's own reader
+(`FUN_0134e9c0` calls the `cTeam` reader `FUN_00557960` then the string read `FUN_0048f840` per element). WHAT the
+string says is not, because all six captured replies are the empty result: no traced session had a team flagged as
+looking for members, so no row exists to read. It is sent as the team's looking-for-members advert, on the grounds
+that this is the only per-team string the LFG feature set has - `SetLookingForMemberStatus(bool, i_cMessage)` and
+`DispatchTeamLookingForMemberStatus(i_bLookingForMember, i_cMessage)` carry it for the same team - but a single
+in-client search against a flagged team settles it, and would also settle whether retail lists unflagged teams at
+all.
+
 ### The team settings block's master-looter slot and second flag
 **Tracked: Gitea #669.** [V0: the team settings block's master-looter slot and second flag] The 18 bytes that close
 a `cTeam` are five fields, not one blob: `[u32 lootMode][u8 useNeedGreed][u8 flag][ProtoID32 masterLooter]

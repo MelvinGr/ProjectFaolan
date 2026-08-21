@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		private const string SignupSuccessBody = "00000fc400000000000000200000000000";
 		private const string ReadyCheckBody = "0000002600000000";
 		private const string ReadyCheckStatusBody = "000000010000000000000001";
-		private const string LookingForTeamStatusBody = "000000";
+		private const string LookingForGroupStatusBody = "000000";
 		// #882: the rotating-activity pair. Byte-identical in all five captured exchanges across two captures, which
 		// is why the field split comes from the client's own recovered field list rather than from variance.
 		private const string RotatingActivityRequestBody = "00000001";
@@ -173,11 +173,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void LookingForTeamStatus_CapturedBody_RoundTrips()
 		{
-			var value = LookingForTeamStatusCodec.Parse(Bytes(LookingForTeamStatusBody));
+			var value = LookingForGroupStatusCodec.Parse(Bytes(LookingForGroupStatusBody));
 
-			Assert.False(value.LookingForTeam);
-			Assert.Equal("", value.Comment);
-			Assert.Equal(Bytes(LookingForTeamStatusBody), LookingForTeamStatusCodec.Build(value));
+			Assert.False(value.Looking);
+			Assert.Equal("", value.Message);
+			Assert.Equal(Bytes(LookingForGroupStatusBody), LookingForGroupStatusCodec.Build(value));
 		}
 
 		// --- The service: the captured decision ------------------------------------------------------------------
@@ -211,7 +211,7 @@ namespace Faolan.Tests
 
 			await h.Service.HandleReady(h.Client, ready: true, isTimeout: false);
 			Assert.Contains(ReadyCheckStatusBody, h.Client.SentHex());
-			Assert.Contains(LookingForTeamStatusBody, h.Client.SentHex());
+			Assert.Contains(LookingForGroupStatusBody, h.Client.SentHex());
 
 			// The private team formed (#512: the entered instance is keyed to this id) and the world tier was told
 			// to enter the captured activity's playfield at the captured arrival.

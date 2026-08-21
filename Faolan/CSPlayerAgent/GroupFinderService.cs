@@ -132,7 +132,7 @@ namespace Faolan.CSPlayerAgent
 
 			// The finder clears the LFT flag as the team forms.
 			await Send(client, CSPlayerInterfaceMethods.DispatchCharacterLookingForTeamStatus,
-				LookingForTeamStatusCodec.Build(new CharacterLookingForTeamStatus(false, "")));
+				LookingForGroupStatusCodec.Build(new LookingForGroupStatus(false, "")));
 
 			// The private team (#512): retail's DispatchYouJoinedTeam here carries a ONE-member roster, and the
 			// instance entered three seconds later names that team as its owner. A queuer already in a team takes

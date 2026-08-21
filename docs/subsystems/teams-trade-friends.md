@@ -109,6 +109,46 @@ Team ids are minted sequentially by the CS tier under class `0x0000DEA9`: the ca
 game tier; `0x2009` is `KickFromTeam` on the game tier. That is how 16-bit method indices work — per interface — so
 they must not be unified.
 
+### Looking for group, and the team search (#889)
+
+```
+c2s 0x2012 SetLookingForTeamStatus      [u8 looking][str message]      the CHARACTER's own flag
+c2s 0x2014 GetLookingForTeamStatus      (empty)
+c2s 0x2013 SetLookingForMemberStatus    [u8 looking][str message]      the TEAM's advert (leader only)
+c2s 0x2015 GetLookingForMemberStatus    (empty)
+s2c 0x2026 DispatchCharacterLookingForTeamStatus  [u8 looking][str message]
+s2c 0x2027 DispatchTeamLookingForMemberStatus     [u8 looking][str message]
+c2s 0x200B SearchForTeam                [ListFrame playfields][u32 min][u32 max][u32 memberMin][u32 memberMax][u32 skip]
+s2c 0x200F DispatchTeamSearchResult     [ListFrame(n)][row × n][u8 moreHits]
+                                        row = [ cTeam ][ str message ]
+c2s 0x2005 TeamApply                    [ProtoID32 team]
+s2c 0x2004 DispatchTeamCharacterApplied [member]
+```
+
+A row is a **whole `cTeam`** — the same record `DispatchYouJoinedTeam` carries, leader first — followed by the
+advert its leader set. The trailing byte is `i_bMoreHits`, the paging flag that answers the request's
+`i_nSkipResults`; it is *not* a list trailer, which is what it was read as for as long as the only bodies
+available were empty ones.
+
+⚠️ **Every captured `DispatchTeamSearchResult` is the empty body `000003f1 00`** — six of them, across six
+sessions — because no traced session ever had a team flagged as looking for members. The row grammar above is
+therefore the **client's own reader**, not a decode: `CSPlayerInterfaceDispatch_t::DispatchTeamSearchResult()`
+(`FUN_0133de00`, found by its "stream bad after `i_cResult` / `i_bMoreHits`" asserts) reads the vector through
+`FUN_0134e9c0` and then one byte; `FUN_0134e9c0` is the ordinary count-framed list reader and calls, per element,
+`FUN_00557960` (the `cTeam` reader) then `FUN_0048f840` (the string read — the same call the member record makes
+for a NAME). The client's own name for the element is `TeamSearchResultRow_c`, taken from the RTTI of the GUI
+slot that consumes the vector, `Slot2<…, const vector<TeamSearchResultRow_c>&, bool>` bound to
+`TeamAndGuildSearchView_c` — the window that hosts both the team and the guild search tab.
+`[V0: the team-search row's trailing string is the looking-for-members message]`
+
+The two status messages share one body and so share one codec (`LookingForGroupStatusCodec`, `HandledMethods`):
+which side is advertising is the METHOD's job to say, not the body's. The team one is uncaptured too, and its
+reader `FUN_01340110` reads the same bool-then-string pair in the same order.
+
+`DispatchTeamCharacterApplied` carries a bare member record — its dispatcher `FUN_0133ccf0` calls the member
+reader `FUN_005574d0` — so applying to a team from a search row tells the LEADER who applied, and the leader
+invites them through the ordinary invite flow. Applying does not join.
+
 ### Group membership on the world connection
 
 A join *also* pushes an IIR to every member's world connection, and a leave pushes its complement
@@ -339,6 +379,15 @@ connections via `IGameServerDispatcher.SendGroupMembership`), and a listener onl
 
 A logout leaves the team too, or the roster keeps a member nobody can reach and the next broadcast pushes at a dead
 connection.
+
+The **LFG registry** lives on the same service: a per-character "looking for team" flag and, on each live team, its
+leader's "looking for members" advert. Both are live state and neither is persisted, for the roster's own reason - a
+team does not outlive the session, and an advert for a connection that has ended is worse than no advert, so a
+disconnect drops the character's flag alongside its matchmaking and group-finder signups. `SearchForTeam` is answered
+from that registry: only advertised teams, narrowed by every criterion the client sent (playfields, level range,
+member-count range) and paged by `i_nSkipResults`, with `i_bMoreHits` set when the page did not exhaust the matches.
+`TeamSearchServiceTests` gates which teams come back and which criteria bite; `TeamSearchResultCodecTests` gates the
+bytes, including that an empty result is still retail's exact five.
 
 `TeamServiceTests` gates the roster transitions (accept/leave/kick/promote/dissolve, and that an accept with no
 pending invite does nothing — the inviter is taken from the server's pending-invite table, not the client's body).

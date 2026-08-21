@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.GroupFinder;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -362,6 +363,155 @@ namespace Faolan.CSPlayerAgent
 			return true;
 		}
 
+		// --- Looking for group: the registry the team search reads (#889) --------------------------------------
+		//
+		// The client splits LFG in two, and so does this - they are different subjects, not two spellings of one flag:
+		//   c2s SetLookingForMemberStatus(bool, message) - a LEADER advertises the TEAM     -> the team-search rows
+		//   c2s SetLookingForTeamStatus(bool, message)   - a CHARACTER advertises themself  -> their own LFG status
+		// Both are live CS-tier state and neither is persisted, for the same reason the roster is not: a team does not
+		// survive a logout, and an advert for a session that has ended is worse than no advert.
+
+		// The page a single DispatchTeamSearchResult carries. The client pages the request itself (SearchForTeam's
+		// i_nSkipResults) and is told whether anything was left behind (i_bMoreHits), so the size is ours to pick; no
+		// captured reply is non-empty, so retail's own page size is unknown. Matches MaxCharacterSearchResults. [V0]
+		private const int MaxTeamSearchResults = 50;
+
+		private readonly ConcurrentDictionary<uint, LookingForGroupStatus> _lookingForTeam = [];
+
+		// c2s SetLookingForTeamStatus (0x2012) / GetLookingForTeamStatus (0x2014): the character's own LFG flag and
+		// comment. Held per character and dropped when they disconnect (Forget).
+		public LookingForGroupStatus SetLookingForTeam(uint characterId, bool lookingForTeam, string message)
+		{
+			var status = new LookingForGroupStatus(lookingForTeam, message);
+			_lookingForTeam[characterId] = status;
+
+			_logger.LogInformation("LFG: {Character:X8} is {State} looking for a team ('{Message}').", characterId, lookingForTeam ? "" : "no longer", message);
+			return status;
+		}
+
+		public LookingForGroupStatus LookingForTeamStatusOf(uint characterId)
+		{
+			return _lookingForTeam.TryGetValue(characterId, out var status)
+				? status
+				: new LookingForGroupStatus(false, "");
+		}
+
+		// c2s SetLookingForMemberStatus (0x2013) / GetLookingForMemberStatus (0x2015): the TEAM's advert - the flag that
+		// puts it in everyone else's SearchForTeam results, and the message the result row carries. Only the leader may
+		// set it, the same rule the loot options follow. Null when the caller leads no team, so the caller can stay quiet
+		// rather than echo a status for a team that does not exist.
+		public LookingForGroupStatus? SetLookingForMembers(uint leaderId, bool lookingForMembers, string message)
+		{
+			if (TeamOf(leaderId) is not { } teamId || !_teams.TryGetValue(teamId, out var team))
+			{
+				_logger.LogInformation("SetLookingForMemberStatus from {Character:X8}, who is not in a team; ignored.", leaderId);
+				return null;
+			}
+
+			if (team.LeaderId != leaderId)
+			{
+				_logger.LogWarning("SetLookingForMemberStatus from {Character:X8}, who is not the leader of team 0x{Team:X8}; ignored.", leaderId, team.Id);
+				return null;
+			}
+
+			team.LookingForMembers = lookingForMembers;
+			team.LookingForMembersMessage = message;
+
+			_logger.LogInformation("Team 0x{Team:X8} is {State} looking for members ('{Message}').", team.Id, lookingForMembers ? "" : "no longer", message);
+			return new LookingForGroupStatus(lookingForMembers, message);
+		}
+
+		public LookingForGroupStatus? LookingForMemberStatusOf(uint characterId)
+		{
+			return TeamOf(characterId) is { } teamId && _teams.TryGetValue(teamId, out var team)
+				? new LookingForGroupStatus(team.LookingForMembers, team.LookingForMembersMessage)
+				: null;
+		}
+
+		// The team's own members, so the leader's advert echoes to everyone in it.
+		public Task BroadcastToTeam(uint characterId, CSPlayerInterfaceMethods opcode, byte[] body)
+		{
+			return TeamOf(characterId) is { } teamId && _teams.TryGetValue(teamId, out var team)
+				? Broadcast(team, opcode, body)
+				: Task.CompletedTask;
+		}
+
+		// c2s SearchForTeam (0x200B) -> s2c DispatchTeamSearchResult (0x200F): the LFG window's result page.
+		//
+		// Only teams whose leader has FLAGGED them appear. That is the subsystem's own shape rather than a filter we
+		// invented: the client has a c2s method whose entire job is to advertise a team (SetLookingForMemberStatus), and
+		// the result ROW carries that advert's message, so a team that never set one has nothing to put in the row. A
+		// search that returns every live team would also be a privacy change, not just a laxer WHERE clause.
+		//
+		// Every criterion the client sends is APPLIED, and each is a reading of a request field the corpus shows but
+		// never varies enough to prove [V0]:
+		//   playfields    - kept if ANY member is in one of them (the client sends the playfields it wants to play in;
+		//                   a team spread across two zones is in both as far as the searcher is concerned)
+		//   level range   - kept if ANY member's level is inside it (the searcher is asking who they could play with,
+		//                   and one in-range member is what makes a team joinable for them)
+		//   member counts - the roster size, inclusive. Both captured requests cap at FIVE, one floor at 2 and one at 1,
+		//                   which is the client's own slider and is applied as sent - so a full six is excluded by the
+		//                   client's default search, not by us.
+		// Results are ordered by team id (mint order) so paging is stable across the client's repeated requests.
+		public TeamSearchResult SearchTeams(uint searcherId, IReadOnlyList<uint> playfields, uint minLevel, uint maxLevel, uint memberCountMin, uint memberCountMax, uint skipResults)
+		{
+			var realmId = CharacterOf(searcherId)?.RealmId ?? 0;
+			var advertised = _teams.Values.Where(t => t.LookingForMembers).OrderBy(t => t.Id).ToList();
+
+			var matches = advertised
+				.Select(t => (Team: t, Roster: RosterOf(t.Id)))
+				.Where(x => x.Roster != null)
+				.Where(x => x.Roster!.Members.Count > 0 && CharacterOf(x.Roster.LeaderId)?.RealmId == realmId)
+				.Where(x => WithinCount(x.Roster!.Members.Count, memberCountMin, memberCountMax))
+				.Where(x => x.Roster!.Members.Any(m => m.Level >= minLevel && m.Level <= maxLevel))
+				.Where(x => playfields.Count == 0 || x.Roster!.Members.Any(m => playfields.Contains(m.MapId)))
+				.ToList();
+
+			var page = matches.Skip((int)skipResults).Take(MaxTeamSearchResults).Select(x => new TeamSearchResultRow(x.Roster!, x.Team.LookingForMembersMessage)).ToList();
+			var moreHits = matches.Count > skipResults + (uint)page.Count;
+
+			_logger.LogDebug("SearchForTeam by {Character:X8}: {Live} live team(s), {Advertised} looking for members, {Matches} matching, sending {Page} from {Skip}{More}.", searcherId, _teams.Count, advertised.Count,
+				matches.Count, page.Count, skipResults, moreHits ? " (more to come)" : "");
+
+			return new TeamSearchResult(page, moreHits);
+		}
+
+		// The client's memberCount range, inclusive. A ZERO maximum is treated as "no ceiling": the field is a count, so
+		// a literal 0 would match nothing at all, and neither captured request sends one.
+		private static bool WithinCount(int count, uint min, uint max)
+		{
+			return count >= min && (max == 0 || count <= max);
+		}
+
+		// c2s TeamApply (0x2005): the "apply" button on a team-search row. The applicant does NOT join - retail tells
+		// the LEADER, with DispatchTeamCharacterApplied(i_cWho) carrying the applicant's own member record, and the
+		// leader then invites them through the ordinary TeamInvite flow. The dispatch reads through the client's
+		// `FUN_005574d0` - the same member-record reader the team and raid single-character messages use (#889) - which
+		// is why TeamMemberRecordCodec handles it rather than a codec of its own.
+		public async Task<bool> Apply(uint applicantId, uint teamId)
+		{
+			if (!_teams.TryGetValue(teamId, out var team))
+			{
+				_logger.LogInformation("TeamApply from {Character:X8} for team 0x{Team:X8}, which does not exist.", applicantId, teamId);
+				return false;
+			}
+
+			if (CharacterOf(applicantId) is not { } applicant)
+				return false;
+
+			await Push(team.LeaderId, CSPlayerInterfaceMethods.DispatchTeamCharacterApplied, TeamMemberRecordCodec.Build(MemberOf(applicant)));
+
+			_logger.LogInformation("Team 0x{Team:X8}: {Character} applied; told the leader {Leader:X8}.", team.Id, applicant.Name, team.LeaderId);
+			return true;
+		}
+
+		// A disconnecting character takes their LFG advert with them - the search answers from live sessions, so a stale
+		// flag would put a row on the wire for somebody who is not there.
+		public void ForgetLookingForTeam(uint characterId)
+		{
+			_lookingForTeam.TryRemove(characterId, out _);
+		}
+
 		private LiveTeam TeamFor(uint characterId)
 		{
 			if (TeamOf(characterId) is { } existing && _teams.TryGetValue(existing, out var team))
@@ -411,6 +561,11 @@ namespace Faolan.CSPlayerAgent
 			// The group's loot settings (TeamSetLootOption), as the roster's own trailing block. Defaults are the ones
 			// every captured roster carries.
 			public TeamSettings Settings { get; set; } = TeamSettings.Default;
+
+			// The leader's looking-for-members advert (SetLookingForMemberStatus). The flag is what puts the team in
+			// everyone else's search results and the message is what the result row carries.
+			public bool LookingForMembers { get; set; }
+			public string LookingForMembersMessage { get; set; } = "";
 			public IReadOnlyList<uint> Members { get; private set; } = [leaderId];
 
 			public void Add(uint characterId)

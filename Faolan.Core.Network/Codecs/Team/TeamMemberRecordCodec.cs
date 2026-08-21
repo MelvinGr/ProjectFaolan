@@ -15,8 +15,8 @@ namespace Faolan.Core.Network.Codecs.Team
 	//
 	//   [u32 0xC350][u32 characterId][u16 len][name LATIN1] then twenty u32 and a u16.
 	//
-	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of ten RPC
-	// methods - the two team ones plus every raid message that names a single character - which is why it declares
+	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of eleven RPC
+	// methods - the three team ones plus every raid message that names a single character - which is why it declares
 	// HandledMethods rather than a single Opcode.
 	//
 	// The client calls it `cCharacter` and its reader is `FUN_005574d0` (#669), which is what turned the three
@@ -27,10 +27,12 @@ namespace Faolan.Core.Network.Codecs.Team
 	{
 		// Every method whose whole body is a bare member record. The two team ones are capture-proven; the eight raid
 		// ones are the client's own reader - `DispatchRaid*(i_cWho)` / `(i_cCharacter)` all call `FUN_005574d0`,
-		// the same reader the team member vector uses (#669).
+		// the same reader the team member vector uses (#669). DispatchTeamCharacterApplied - the LFG "X applied to
+		// your team" the search's apply button raises - is the same read: its dispatcher `FUN_0133ccf0` calls
+		// `FUN_005574d0` and asserts "stream bad after 'i_cWho'" (#889).
 		public static readonly CSPlayerInterfaceMethods[] HandledMethods =
 		[
-			CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam,
+			CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam, CSPlayerInterfaceMethods.DispatchTeamCharacterApplied,
 			CSPlayerInterfaceMethods.DispatchRaidCharacterUpdate, CSPlayerInterfaceMethods.DispatchRaidNewMasterLooter, CSPlayerInterfaceMethods.DispatchRaidTargetIsBusy,
 			CSPlayerInterfaceMethods.DispatchRaidIsAlreadyInRaid, CSPlayerInterfaceMethods.DispatchRaidInvitationTimedOut,
 			CSPlayerInterfaceMethods.DispatchRaidTargetDeclinedRaidInvite, CSPlayerInterfaceMethods.DispatchRaidYouAreNoLongerInvited,
