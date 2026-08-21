@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			}
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var shipped = db.Combos.Where(c => c.Name.StartsWith("combo_npc_generic_")).Select(c => c.Name).OrderBy(n => n).ToList();
+			var shipped = await db.Combos.Where(c => c.Name.StartsWith("combo_npc_generic_")).Select(c => c.Name).OrderBy(n => n).ToListAsync(TestContext.Current.CancellationToken);
 			Assert.Equal(GenericCombos, shipped);
 		}
 
@@ -139,8 +139,8 @@ namespace Faolan.Tests
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 
 			var melee = new[] { NpcWeapon.OneHandEdge, NpcWeapon.TwoHandEdge, NpcWeapon.OneHandBlunt, NpcWeapon.TwoHandBlunt, NpcWeapon.Dagger, NpcWeapon.Polearm };
-			var loadouts = db.NpcSpawnEquipment.Include(e => e.Item).Where(e => e.Pos == NpcWeapon.MainHandPos || e.Pos == NpcWeapon.OffHandPos)
-				.GroupBy(e => e.NpcSpawnId).ToList();
+			var loadouts = await db.NpcSpawnEquipment.Include(e => e.Item).Where(e => e.Pos == NpcWeapon.MainHandPos || e.Pos == NpcWeapon.OffHandPos)
+				.GroupBy(e => e.NpcSpawnId).ToListAsync(TestContext.Current.CancellationToken);
 
 			var armed = 0;
 			foreach (var spawn in loadouts)
@@ -245,7 +245,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(ids);
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var rows = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass }).ToList();
+			var rows = await db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass }).ToListAsync(TestContext.Current.CancellationToken);
 			Assert.All(rows, r => Assert.StartsWith(family, r.Name, System.StringComparison.Ordinal));
 			// ⭐ And the CLIENT agrees with the name on every row that speaks (#675) - the veto never fires here,
 			// which is the point: it exists for the two rows whose name says Conqueror and whose `npcclass` says
@@ -297,7 +297,7 @@ namespace Faolan.Tests
 			Assert.True(atEighty.Length > atOne.Length, "the level-80 set should be strictly wider than the level-1 one");
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			Assert.All(db.Combos.Where(c => atOne.Contains(c.Id)).ToList(), c => Assert.True(c.Level <= 1, $"{c.Name} is level {c.Level}"));
+			Assert.All(await db.Combos.Where(c => atOne.Contains(c.Id)).ToListAsync(TestContext.Current.CancellationToken), c => Assert.True(c.Level <= 1, $"{c.Name} is level {c.Level}"));
 		}
 
 		// ⭐ #675 closed: the archetype is HARVESTED per template (`NpcStatCore.ComboClass`), and with it the three
@@ -318,7 +318,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(ids);
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var rows = db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass, c.Criteria }).ToList();
+			var rows = await db.Combos.Where(c => ids.Contains(c.Id)).Select(c => new { c.Name, c.NpcClass, c.Criteria }).ToListAsync(TestContext.Current.CancellationToken);
 			// Every row is the archetype's, stated by the CLIENT rather than read off the name...
 			Assert.All(rows, r => Assert.Equal((int)@class, r.NpcClass));
 			// ...and the expected weapon family is among them.
@@ -337,12 +337,12 @@ namespace Faolan.Tests
 			var guardian = await Service().NpcClassComboIds(shieldBearer, 80, (int)ConanClass.Guardian);
 
 			using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var barbarianNames = db.Combos.Where(c => barbarian.Contains(c.Id)).Select(c => c.Name).ToList();
+			var barbarianNames = await db.Combos.Where(c => barbarian.Contains(c.Id)).Select(c => c.Name).ToListAsync(TestContext.Current.CancellationToken);
 			Assert.NotEmpty(barbarianNames);
 			Assert.All(barbarianNames, n => Assert.DoesNotContain("guardian", n, System.StringComparison.Ordinal));
 			Assert.Contains(barbarianNames, n => n.StartsWith("combo_npc_heimdall_", System.StringComparison.Ordinal));
 
-			Assert.Contains(db.Combos.Where(c => guardian.Contains(c.Id)).Select(c => c.Name).ToList(),
+			Assert.Contains(await db.Combos.Where(c => guardian.Contains(c.Id)).Select(c => c.Name).ToListAsync(TestContext.Current.CancellationToken),
 				n => n.StartsWith("combo_npc_guardian_shield_", System.StringComparison.Ordinal));
 		}
 

@@ -59,7 +59,7 @@ namespace Faolan.Importer.Modules
 				JsonDocument doc;
 				try
 				{
-					doc = JsonDocument.Parse(File.ReadAllText(file));
+					doc = JsonDocument.Parse(await File.ReadAllTextAsync(file));
 				}
 				catch
 				{

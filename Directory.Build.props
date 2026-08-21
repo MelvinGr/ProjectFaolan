@@ -22,6 +22,21 @@
 		<InternalsVisibleTo Include="Faolan.Tests" />
 	</ItemGroup>
 
+	<!--
+	  Async/await correctness analyzer (AsyncFixer01-05). Analyzer-only: PrivateAssets=all keeps it out of the
+	  produced packages/output, ExcludeAssets=runtime means nothing ships with it.
+
+	  OFF by default - uncomment to re-run it. Its correctness half found NOTHING, and that is not luck: .editorconfig
+	  already carries CS1998 (async without await) and CS4014 (unawaited call) at `error`, which is the same ground
+	  AsyncFixer03/04/05 cover. The last full pass over the solution was AsyncFixer03/04/05 = 0, and the AsyncFixer02
+	  sites (sync File/EF calls inside an async method) are all fixed. What is left if you switch it on is 37x
+	  AsyncFixer01 - `return await X()` that could be `return X()`, which trades one state machine for a lost stack
+	  frame in exception traces and changes no behaviour.
+	-->
+	<!--<ItemGroup>
+		<PackageReference Include="AsyncFixer" Version="1.6.0" PrivateAssets="all" ExcludeAssets="runtime" />
+	</ItemGroup>-->
+
 	<!--<PropertyGroup>
         <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '_').ToLower())</ProjectNameSlug>
 

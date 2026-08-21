@@ -84,7 +84,7 @@ namespace Faolan.Tests
 				    || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
 					continue;
 
-				var text = File.ReadAllText(file);
+				var text = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
 				if (!text.Contains("TestDb.GameDatabase", StringComparison.Ordinal))
 					continue;
 
