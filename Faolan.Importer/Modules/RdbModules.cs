@@ -562,7 +562,7 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Rdb;
 
-		public string Description => "Decrypt keyed item RDB templates (names/categories/values).";
+		public string Description => "Decrypt keyed item RDB templates (names/descriptions/categories/values).";
 		public string Name => "rdb-items";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
@@ -572,7 +572,7 @@ namespace Faolan.Importer.Modules
 				: ctx.DumpTemplatesDir;
 			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump, ctx.RdbProxyBase);
 			return new ImportResult(
-				$"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.QualitiesAdded} qualities, {r.StatsAdded} stat mods.");
+				$"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.DescriptionsAdded} descriptions, {r.CategoriesAdded} categories, {r.ValuesAdded} values, {r.QualitiesAdded} qualities, {r.StatsAdded} stat mods.");
 		}
 	}
 }

@@ -106,37 +106,133 @@ namespace Faolan.Importer.Rdb
 
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
+		// The item-template type that carries NO 12-byte RDB-Id header, and whose body therefore starts at 0.
+		private const uint UnheaderedTemplateType = 1000620;
+
+		// An item template's own TEXT: its display name and, when it has one, its tooltip description (#891).
+		//
+		// The two template types frame it DIFFERENTLY, which is why one reader could never see both:
+		//
+		//   1000020  `[u32 0x21][u16 nameLen][u16 descLen][name][description]` - both lengths up front, the strings
+		//            back to back. `Animated Dagger` carries 0x0F and 0x20 there, then its 15- and 32-byte strings.
+		//            An item with no description carries descLen 0 (`Dusklight Tunic`, `Combatant's Hauberk`).
+		//   1000620  `[u16 nameLen][name][u16 descLen][description]` - NO tag at all, each length in front of its own
+		//            string, and the block ENDS the record. The Self-Resurrection Potion's 24-byte name is followed by
+		//            a 337-byte description that runs to the last byte of the body.
+		//
+		// ⚠️ The `[u16 descLen]` of the tagged form was read as "a flags word (escaping marker) we don't need" for as
+		// long as only the NAME was wanted. It is a length, and reading it is the whole of this decode.
+		//
+		// Asset paths share the record (`armor_..._body`, `*bodymesh_NNN`), so an entry containing `_` is rejected:
+		// no captured item name or description carries one.
+		public static (string? Name, string? Description) ExtractText(ReadOnlySpan<byte> template, bool headered = true)
+		{
+			// A 1000620 record has no RDB-Id header, so its body IS the blob; a 1000020 one starts after the 12 bytes.
+			var body = !headered
+				? template
+				: template.Length > 12
+					? template[12..]
+					: default;
+
+			return TryTagged(body, out var name, out var description) || TryUntagged(body, out name, out description)
+				? (name, description)
+				: (null, null);
+		}
+
 		public static string? ExtractName(ReadOnlySpan<byte> template)
 		{
-			var body = template.Length > 12
-				? template[12..]
-				: default;
+			return ExtractText(template).Name;
+		}
+
+		// `[u32 0x21][u16 nameLen][u16 descLen]` then the two strings, back to back.
+		//
+		// ⚠️ A rejected field is stepped OVER, not scanned through. Fields are not 4-byte aligned - an asset name of
+		// 31 bytes puts the next tag at offset 39 - so a plain `i += 4` sweep walks straight past every field that
+		// follows one, which is exactly how an item whose asset path precedes its name loses its name.
+		private static bool TryTagged(ReadOnlySpan<byte> body, out string? name, out string? description)
+		{
+			name = null;
+			description = null;
 			var i = 0;
 			while (i + 8 <= body.Length)
 			{
 				if (body.ReadU32Le(i) == StringTag)
 				{
-					// length is a u16; body[i+6..i+8] is a flags word (escaping marker) we don't need.
-					var len = body.ReadU16Le(i + 4);
-					if (len is >= 1 and <= 1024 && i + 8 + len <= body.Length)
+					var nameLength = body.ReadU16Le(i + 4);
+					var descriptionLength = body.ReadU16Le(i + 6);
+					if (nameLength is >= 1 and <= 1024 && i + 8 + nameLength + descriptionLength <= body.Length && IsPrintableAscii(body.Slice(i + 8, nameLength)))
 					{
-						var s = body.Slice(i + 8, len);
-						if (IsPrintableAscii(s))
+						if (TryText(body.Slice(i + 8, nameLength), out var candidate))
 						{
-							var text = Unescape(Encoding.ASCII.GetString(s));
-							if (!text.Contains('_'))
-								return text;
+							name = candidate;
+							if (descriptionLength > 0 && TryText(body.Slice(i + 8 + nameLength, descriptionLength), out var text))
+								description = text;
 
-							i += 8 + len;
-							continue;
+							return true;
 						}
+
+						// A printable field we do not want (an asset path): skip the whole thing and keep looking.
+						i += 8 + nameLength + descriptionLength;
+						continue;
 					}
 				}
 
 				i += 4;
 			}
 
-			return null;
+			return false;
+		}
+
+		// `[u16 nameLen][name][u16 descLen][description]`, ENDING the record - which is what makes this readable
+		// without a tag to anchor on: the pair is accepted only when it lands exactly on the last byte, so a property
+		// value that happens to look like a length cannot match.
+		private static bool TryUntagged(ReadOnlySpan<byte> body, out string? name, out string? description)
+		{
+			name = null;
+			description = null;
+			for (var i = 0; i + 2 < body.Length; i++)
+			{
+				var nameLength = body.ReadU16Le(i);
+				if (nameLength is < 1 or > 1024 || i + 2 + nameLength > body.Length)
+					continue;
+
+				if (!TryText(body.Slice(i + 2, nameLength), out var candidate))
+					continue;
+
+				var next = i + 2 + nameLength;
+				if (next == body.Length)
+				{
+					name = candidate;
+					return true;
+				}
+
+				if (next + 2 > body.Length)
+					continue;
+
+				var descriptionLength = body.ReadU16Le(next);
+				if (next + 2 + descriptionLength != body.Length || !TryText(body.Slice(next + 2, descriptionLength), out var text))
+					continue;
+
+				name = candidate;
+				description = text;
+				return true;
+			}
+
+			return false;
+		}
+
+		private static bool TryText(ReadOnlySpan<byte> raw, out string? text)
+		{
+			text = null;
+			if (raw.Length == 0 || !IsPrintableAscii(raw))
+				return false;
+
+			var candidate = Unescape(Encoding.ASCII.GetString(raw));
+			if (candidate.Contains('_'))
+				return false;
+
+			text = candidate;
+			return true;
 		}
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? dumpDir = null, string? cdnBase = null)
@@ -168,6 +264,7 @@ namespace Faolan.Importer.Rdb
 				headerMismatch = 0,
 				decryptFailed = 0,
 				namesAdded = 0,
+				descriptionsAdded = 0,
 				categoriesAdded = 0,
 				valuesAdded = 0,
 				qualitiesAdded = 0,
@@ -216,6 +313,34 @@ namespace Faolan.Importer.Rdb
 				catch
 				{
 					decryptFailed++;
+					continue;
+				}
+
+				// ⚠️ Only the 1000020 records carry the 12-byte RDB-Id header - and this used to validate it on BOTH
+				// types, so every 1000620 template was thrown away as a header mismatch (#891). Their first three
+				// words are data (the Self-Resurrection Potion's read 5 / 30029 / 1), the strings sit at a different
+				// offset, and the property table this loop reads at +12 is not there at all. There are 271 of them
+				// against 98,048 of the other, which is why the loss stayed invisible: it costs a handful of items
+				// their whole row, not a field on many.
+				//
+				// So they take a TEXT-ONLY path: their name and description are recoverable (the string block
+				// self-anchors on the end of the record), and nothing else in this loop applies to their layout.
+				if (matchedType == UnheaderedTemplateType)
+				{
+					decrypted++;
+					var (unheaderedName, unheaderedDescription) = ExtractText(template, headered: false);
+					if (string.IsNullOrWhiteSpace(item.Name) && !string.IsNullOrEmpty(unheaderedName))
+					{
+						item.Name = unheaderedName;
+						namesAdded++;
+					}
+
+					if (string.IsNullOrWhiteSpace(item.Description) && !string.IsNullOrEmpty(unheaderedDescription))
+					{
+						item.Description = unheaderedDescription;
+						descriptionsAdded++;
+					}
+
 					continue;
 				}
 
@@ -441,15 +566,24 @@ namespace Faolan.Importer.Rdb
 					bagsAdded++;
 				}
 
-				// Fill the display name only when we don't already have one (captured names are authoritative).
-				if (string.IsNullOrWhiteSpace(item.Name))
+				// Fill the display name only when we don't already have one (captured names are authoritative). The two
+				// strings are read together because they are ONE decode - the description is simply the entry after
+				// the name - but they are stored independently, since an item can arrive from a capture with a name
+				// and no text.
+				var (templateName, templateDescription) = ExtractText(template);
+				if (string.IsNullOrWhiteSpace(item.Name) && !string.IsNullOrEmpty(templateName))
 				{
-					var name = ExtractName(template);
-					if (!string.IsNullOrEmpty(name))
-					{
-						item.Name = name;
-						namesAdded++;
-					}
+					item.Name = templateName;
+					namesAdded++;
+				}
+
+				// #891: the tooltip text. Most items have none - a plain armour piece carries its name and stops -
+				// so this fills the ones that DO and leaves the rest null rather than inventing prose. Captured text
+				// wins for the same reason the name does.
+				if (string.IsNullOrWhiteSpace(item.Description) && !string.IsNullOrEmpty(templateDescription))
+				{
+					item.Description = templateDescription;
+					descriptionsAdded++;
 				}
 
 				if (dumpDir != null)
@@ -506,7 +640,7 @@ namespace Faolan.Importer.Rdb
 				Console.WriteLine($"  on-use spells (CastNano, kind 53051) set on {onUseAdded} item(s); " +
 					$"{onUseUnknownSpell} named a spell the catalog does not hold and were skipped (#762).");
 
-			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
+			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, descriptionsAdded, categoriesAdded, valuesAdded, qualitiesAdded, statsAdded);
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
@@ -672,6 +806,7 @@ namespace Faolan.Importer.Rdb
 			int HeaderMismatch,
 			int DecryptFailed,
 			int NamesAdded,
+			int DescriptionsAdded,
 			int CategoriesAdded,
 			int ValuesAdded,
 			int QualitiesAdded,
