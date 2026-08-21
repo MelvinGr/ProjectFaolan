@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -131,7 +132,7 @@ namespace Faolan.ChatServer
 					// ...and tell everyone who has US on their list that we are now online. Without this a friend's
 					// status is frozen at whatever it happened to be when the WATCHER logged in: whoever connects first
 					// sees the other as offline forever, because the restore above can only report who is already here.
-					await AnnouncePresenceToWatchers(character.Id, true);
+					await AnnouncePresenceToWatchers(character.Id, SocialStatus.Online);
 
 					break;
 				}
@@ -265,6 +266,25 @@ namespace Faolan.ChatServer
 					break;
 				}
 
+				// 0x002A SetSocialStatus([u32 SocialStatus]): the player's own presence - what a friend's list shows
+				// beside their name (#892). The chat tier owns the friend list, so it is the tier that has to be told,
+				// and the client tells it directly rather than through the game or CS tiers.
+				//
+				// It is the LFG toggle's second half: every captured occurrence fires ~50 microseconds after the CS
+				// tier's SetLookingForTeamStatus, 2 for on and 1 for off. Nothing answers it on the wire - retail sends
+				// no acknowledgement in any capture - so the work is entirely in the fan-out: everyone who has this
+				// character on their friend list gets their row re-sent, which is how the icon changes.
+				case ChatServerOpcodes.SetSocialStatus:
+				{
+					var status = SocialStatusCodec.Parse(body.ReadRemainingArray());
+					_socialStatus[client.Session.Character.Id] = status;
+
+					await AnnouncePresenceToWatchers(client.Session.Character.Id, status);
+
+					Logger.LogInformation("Social: {Character} is now {Status}.", client.Session.Character.Name, status);
+					break;
+				}
+
 				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
@@ -291,7 +311,7 @@ namespace Faolan.ChatServer
 		// inferred: no capture covers a friend logging in or out while someone watches. It is hard to see how a friend
 		// list could work without it - presence would never change - so this is the smallest step that makes the feature
 		// coherent, rather than a new packet invented for it.
-		private async Task AnnouncePresenceToWatchers(uint characterId, bool online)
+		private async Task AnnouncePresenceToWatchers(uint characterId, SocialStatus status)
 		{
 			var self = await Database.GetCharacter(characterId);
 			if (self == null)
@@ -300,8 +320,23 @@ namespace Faolan.ChatServer
 			foreach (var watcherId in await Database.GetFriendWatchers(characterId))
 			{
 				if (ClientForCharacter(watcherId) is { } watcher)
-					await SendFriendEntry(watcher, self, false, online);
+					await SendFriendEntry(watcher, self, false, status);
 			}
+		}
+
+		// The live presence a character has SET (0x002A). Chat-tier live state, like the roster on the CS tier: it is
+		// per-connection by definition, so it is not persisted and it goes when the connection does. A character with a
+		// live chat connection who has never set one is simply Online, which is what every captured record carries.
+		private readonly ConcurrentDictionary<uint, SocialStatus> _socialStatus = [];
+
+		private SocialStatus StatusOf(uint characterId)
+		{
+			if (ClientForCharacter(characterId) == null)
+				return SocialStatus.Offline;
+
+			return _socialStatus.TryGetValue(characterId, out var status)
+				? status
+				: SocialStatus.Online;
 		}
 
 		// Claude as a VIRTUAL friend (#100): an always-online list entry with no character behind it. It works because
@@ -332,7 +367,7 @@ namespace Faolan.ChatServer
 		// and renders NOTHING - no entry and no error - which is exactly how this looked while the other two messages
 		// were already byte-perfect. ONLINE is whether the character has a live chat connection here, the only thing
 		// this tier can actually know.
-		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence, bool? onlineOverride = null)
+		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence, SocialStatus? statusOverride = null)
 		{
 			var name = friend.Name ?? "";
 			if (presence)
@@ -348,12 +383,16 @@ namespace Faolan.ChatServer
 			// dispatcher seam rather than from a column; the captured constant remains the fallback for a friend the
 			// game host does not have in a zone. Same union GuildService's member record already uses.
 			// The logout announce has to say "offline" while the socket is still up, so the caller can override.
-			var online = onlineOverride ?? ClientForCharacter(friend.Id) != null;
+			// The STATUS is what the row renders (online / looking for group / away); ONLINE is the question the stamp
+			// union asks, and all three online statuses answer it the same way. The logout announce has to say offline
+			// while the socket is still up, so the caller can override.
+			var status = statusOverride ?? StatusOf(friend.Id);
+			var online = status != SocialStatus.Offline;
 			var stamp = online
 				? _gameServerDispatcher.GetCharacterLiveState(friend.Id)?.PlayfieldToken ?? FriendStateCodec.OnlineStamp
 				: (uint)friend.LastConnection!.Value.ToUnixTimeSeconds();
 
-			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded, FriendStateCodec.Build(friend.Id, online, (byte)friend.Level, friend.Class, stamp)));
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded, FriendStateCodec.Build(friend.Id, status, (byte)friend.Level, friend.Class, stamp)));
 		}
 
 		// A logout is a presence change for everyone who has this character on their friend list. The chat connection is
@@ -361,7 +400,10 @@ namespace Faolan.ChatServer
 		protected override async Task ClientDisconnected(INetworkClient client)
 		{
 			if (client.Session.Character is { } character)
-				await AnnouncePresenceToWatchers(character.Id, false);
+			{
+				_socialStatus.TryRemove(character.Id, out _);
+				await AnnouncePresenceToWatchers(character.Id, SocialStatus.Offline);
+			}
 
 			await base.ClientDisconnected(client);
 		}

@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// then pinned by `addfriends` + `login-with-friends`, six friends of six different levels and classes, one of
 	// them offline.
 	//
-	//   [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]
+	//   [u32 characterId][u8 status][u8 level][u32 stamp][u8 class]
 	//
 	// ⭐ The CLIENT states that layout, so it is no longer read off the captures alone (#796): the `S2C_ADD_BUDDY`
 	// case of `FUN_00a71e00` unpacks the message with the format string **`"IBBIB"`** - u32, u8, u8, u32, u8, in
@@ -51,14 +51,22 @@ namespace Faolan.Core.Network.Codecs.Text
 	// struct's field. So the client parses the online stamp, files it, and drops it - and no further reading is
 	// recoverable from the client, which is why the playfield-token reading stays [V0].
 	//
-	// ⚠️⚠️ **`online` is NOT a boolean on the client side.** `FriendListNode_c::PresenceCategory` (`FUN_006ca510`)
-	// copies the byte to node `+0x30` and switches on it: **1 -> category 0, 2 -> category 1, 3 -> category 2**, and
-	// anything else falls through to the offline branch (category 3). The social-list row builder `FUN_016bf320`
-	// then routes the row into one of five sub-lists by that category and INCREMENTS its online counter
-	// (`+0x438`) for 0/1/2 while DECREMENTING it for 3 - so all three of 1/2/3 are ONLINE states and only they are.
-	// Retail sends 1 (online) / 0 (offline) in every captured record and we send the same, so nothing is wrong
-	// today; what `2` and `3` mean is simply not in the corpus. Modelled as `bool` because inventing three names
-	// for two unobserved values would be worse than the narrowing.
+	// ⭐⭐ **`online` is NOT a boolean, and 2 and 3 are now NAMED (#892).** `FriendListNode_c::PresenceCategory`
+	// (`FUN_006ca510`) copies the byte to node `+0x30` and switches on it: **1 -> category 0, 2 -> category 1,
+	// 3 -> category 2**, and anything else falls through to the offline branch (category 3). The social-list row
+	// builder `FUN_016bf320` then routes the row into one of five sub-lists by that category and INCREMENTS its
+	// online counter (`+0x438`) for 0/1/2 while DECREMENTING it for 3 - so all three of 1/2/3 are ONLINE states and
+	// only they are.
+	//
+	// This was carried as a `bool` while the corpus only ever showed 1/0, with the note that "what 2 and 3 mean is
+	// simply not in the corpus". They are `SocialStatus.LookingForGroup` and `SocialStatus.Away`: the friends-list
+	// ICON table names the categories in exactly this order (offline, online, lfg, away, ...), and the client's c2s
+	// `SetSocialStatus` sends **2** at the instant its LFG flag goes on and **1** when it goes off. So the field is
+	// the same presence enum in both directions, and it is typed as one here.
+	//
+	// Retail still sends 1/0 in every captured record and so do we for a plain login/logout, which is why widening
+	// the type changed no captured byte - `Online` remains as a bool-shaped overload for the callers that genuinely
+	// only know "is there a connection".
 	//
 	// GuildService's member record already carries the same online/last-seen union off the same column.
 	public static class FriendStateCodec
@@ -74,14 +82,21 @@ namespace Faolan.Core.Network.Codecs.Text
 		{
 			ArgumentNullException.ThrowIfNull(value);
 			using var s = new FaolanStream();
-			s.WriteUInt32(value.CharacterId).WriteByte(value.Online).WriteByte(value.Level).WriteUInt32(value.Stamp).WriteByte(value.Class);
+			s.WriteUInt32(value.CharacterId).WriteByte((byte)value.Status).WriteByte(value.Level).WriteUInt32(value.Stamp).WriteByte(value.Class);
 
 			return s.ToArray();
 		}
 
+		public static byte[] Build(uint characterId, SocialStatus status, byte level, ConanClass classId, uint stamp)
+		{
+			return Build(new FriendState(characterId, status, level, classId, stamp));
+		}
+
+		// For the callers that only know whether a connection exists - a login, a logout, the virtual Claude entry.
+		// Online/Offline is what every captured record carries.
 		public static byte[] Build(uint characterId, bool online, byte level, ConanClass classId, uint stamp)
 		{
-			return Build(new FriendState(characterId, online, level, classId, stamp));
+			return Build(characterId, online ? SocialStatus.Online : SocialStatus.Offline, level, classId, stamp);
 		}
 
 		public static FriendState Parse(in ReadOnlySpan<byte> data)
@@ -90,15 +105,20 @@ namespace Faolan.Core.Network.Codecs.Text
 
 			// Locals because the wire order (stamp before class) is not the record's declaration order.
 			var characterId = r.ReadU32Be();
-			var online = r.ReadU8() != 0;
+			var status = (SocialStatus)r.ReadU8();
 			var level = r.ReadU8();
 			var stamp = r.ReadU32Be();
-			var value = new FriendState(characterId, online, level, (ConanClass)r.ReadU8(), stamp);
+			var value = new FriendState(characterId, status, level, (ConanClass)r.ReadU8(), stamp);
 			r.EnsureAtEnd();
 
 			return value;
 		}
 	}
 
-	public sealed record FriendState(uint CharacterId, bool Online, byte Level, ConanClass Class, uint Stamp);
+	// `Status` is the presence enum (SocialStatus), not a flag - see the class remark. `Online` is the question the
+	// STAMP union asks (last-seen vs playfield token), and all three of the online statuses answer it the same way.
+	public sealed record FriendState(uint CharacterId, SocialStatus Status, byte Level, ConanClass Class, uint Stamp)
+	{
+		public bool Online => Status != SocialStatus.Offline;
+	}
 }

@@ -50,6 +50,23 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
   "say". See the say flow below.
 - **`0x0023` SystemMessage** (out, `ChatSystemMessageCodec`): `[u16 0000][u16-str message][u16 0000]` (message may be `<remoteformat>` XML).
 - **`0x0064` ChatReady** (in): a small chat-init handshake (body `00 01 02`); echoed back verbatim.
+- **`0x002A` SetSocialStatus** (in, `SocialStatusCodec`): `[u32 SocialStatus]` — the player's own presence, which is
+  what a friend's list row draws beside their name (#892). Nothing answers it on the wire; the work is the fan-out,
+  so every watcher's row is re-sent (`AnnouncePresenceToWatchers`) and the icon changes there.
+
+  It is **the LFG toggle's second half**. All three occurrences in the corpus (`NecroL80_..._annotated_9`) fire ~50
+  MICROSECONDS after the CS tier's `SetLookingForTeamStatus`, carrying **2** when that flag goes on and **1** when it
+  goes off — one UI action, two tiers, because the friend list is chat-tier and the CS tier owns team search.
+
+  ⭐ The values are the client's presence enum, and naming them also answered an open question about the FRIEND
+  RECORD: its `online` byte is the same enum, not a flag. `FriendListNode_c::PresenceCategory` switches 1 → 2 → 3
+  into three distinct ONLINE categories, and the friends-list icon table names them in that order —
+  `icon_offline`, `icon_online`, `icon_lfg`, `icon_away`, `icon_other`, `icon_ignored`. So `SocialStatus` is
+  `Offline = 0, Online = 1, LookingForGroup = 2, Away = 3`, with the first three observed and `Away` [V0].
+
+  ⚠️ Chat is **not RPC**, so there is no registration catalog to read a name off — the client has no
+  `ChatProxy_t`/`Dispatch_t` strings at all. A chat opcode can only be named from behaviour plus what consumes it,
+  which is why the pairing above and the icon table are the whole basis for this one.
 
 ## Claude channel (MCP bridge) — added 2026-06-12
 

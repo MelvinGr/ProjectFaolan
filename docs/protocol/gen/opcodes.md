@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test --project Faolan.Tests -- --filter-class '*ProtocolDocsTests'`.
 
-16 enums, 860 entries. The 32-bit IIR sub-opcodes carried inside a PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 861 entries. The 32-bit IIR sub-opcodes carried inside a PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -413,6 +413,7 @@ ChatServer chat — **no RpcHeader** (raw opcode) · C2S
 | `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12) |
 | `0x0028` | `AddFriend` | [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step) |
 | `0x0029` | `RemoveFriend` | [u32 characterId] |
+| `0x002A` | `SetSocialStatus` | [u32 SocialStatus] - the player's own presence, what a friend's list row shows (#892) |
 | `0x0041` | `ChannelChat` | client posts a message to a chat channel: [byte type][u32 channelId][string][0000] |
 | `0x0064` | `ChatReady` | small chat-init handshake the client sends after the channel subscriptions (000102) |
 

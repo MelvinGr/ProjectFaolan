@@ -8,6 +8,16 @@ namespace Faolan.Core.Enums
 		Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12)
 		AddFriend = 0x0028, // [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step)
 		RemoveFriend = 0x0029, // [u32 characterId]
+
+		// The player's own presence, as a u32 SocialStatus - the chat tier owns the friend list, so it is the tier
+		// that has to be told (#892). Sits with the friend messages because that is what it feeds: the friend-list
+		// row's icon.
+		//
+		// Named from behaviour rather than from a catalog, because chat is not RPC and has no registration strings to
+		// read: in `NecroL80_..._annotated_9` all three of its occurrences fire ~50 MICROSECONDS after the client's own
+		// `SetLookingForTeamStatus` on the CS tier, carrying 2 when that flag goes ON and 1 when it goes OFF - one UI
+		// toggle emitting to both tiers. The values are the client's presence enum, see SocialStatus.
+		SetSocialStatus = 0x002A, // [u32 SocialStatus] - the player's own presence, what a friend's list row shows (#892)
 		ChannelChat = 0x0041, // client posts a message to a chat channel: [byte type][u32 channelId][string][0000]
 		ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 	}
