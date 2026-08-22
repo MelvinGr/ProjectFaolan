@@ -140,6 +140,22 @@ check this sheet before deciding a number is missing from the client:
   | `DailyWeeklyCounter` | 1000075 | `WeeklyMetaCap` | 15 |
   | `DailyMonthlyCounter` | 1000076 | `MonthlyMetaCap` | 60 |
 
+  ⚠️ **A cap is paired with its counter by NAME - it does not follow that each cap CLAMPS its counter, and for
+  the PvE one it demonstrably does not (#887).** Time-ordered in `xxx_..._play1_beach-to-enter-tortage_city`, the
+  two behave completely differently:
+
+  * `1000070` rises to **20** at frame 6039 and never moves again, while the capture runs on to frame 11692 and
+    its sibling keeps counting. That is a real clamp, and it is the SERVER's - nothing in the client reads either
+    cap tweak (the only reference to `DailyPvEKillsCap` / `DailyPvPKillsCap` in the whole image is
+    `FUN_010CB540`, the defaults registry itself).
+  * `1000069` passes its stated cap of 5 at frame 3936 and carries on to **13** with no stall.
+
+  Both are fed by ordinary PvE kills in a corpus with no PvP in it, sometimes advancing on the same frame, with
+  `1000070` advancing about half again as often. The id↔name pairing is not the doubtful part - the client's own
+  registration (`FUN_01df7df0`) writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before
+  `DailyPvPKills`, and registers each id again under sub-indices 1/2/5/8 that carry no name at all.
+  `[V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps]`
+
   …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
   (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is
   answered by the client carrying a per-character stamp for it, not only by the name.

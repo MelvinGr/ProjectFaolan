@@ -126,10 +126,22 @@ evidence, not as a citation, until the id is used.
   20 sitting next to the Fresh Kill 20 and is presumably what made the two look complementary in the first
   place. They are not: 106 counts 20→11 while 1000070 counts 0→20 in the same session.
 
-  ⚠️ [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The two names are `DailyPvEKills`
-  (1000069) and `DailyPvPKills` (1000070), and it is the PvP-named one that tracks ordinary beach and Tortage
-  kills three times more often than the PvE-named one. ⛔ The *"name↔id pairing is off"* half of that is now
-  dead — see the cap measurement below — and what survives is a question about `1000069`.
+  ⚠️ [V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps] The two
+  names are `DailyPvEKills` (1000069) and `DailyPvPKills` (1000070), and it is the PvP-named one that tracks
+  ordinary beach and Tortage kills far more often than the PvE-named one.
+
+  ⛔ The *"name↔id pairing is off"* half is dead twice over: the client's stat REGISTRATION (`FUN_01df7df0`)
+  writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before `DailyPvPKills`, so the pairing is the
+  client's own statement, not the name table's arrangement.
+
+  ⛔ And the *"1000069 overruns its cap of 5"* half is dead too (#887): that cap clamps nothing. Nothing in the
+  image reads `DailyPvEKillsCap` or `DailyPvPKillsCap` - their only reference is `FUN_010CB540`, the defaults
+  registry that declares them - and time-ordering the two counters in `…play1` shows `1000070` stopping dead on
+  20 at frame 6039 while the capture runs to 11692 and `1000069` climbs past 5 to 13. One counter is clamped by
+  the SERVER and the other is not clamped at all.
+
+  What survives is narrower: what subset of kills feeds `1000069`, and why the PvP-named counter moves in a PvE
+  corpus at all.
 
   The corpus agrees from the other side too: **every captured character's login snapshot carries `0x06A`**, at `20` for
   Hakotep / DemoL80 / AssassinL23 and at **`17` for NecroL80** — who is exactly the character the live observation caught

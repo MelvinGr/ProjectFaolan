@@ -658,29 +658,35 @@ a stock client cannot send a mismatched pair and the gap only matters against a 
 more harvested fields, not a decode: `--report gem-slots` already prints them (a 4-slot weapon declares
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
-### The two daily kill counters, and which one really tracks kills
-**Tracked: Gitea #887** (refiled from #656, which was closed with this gap still live). [V0: why `DailyPvPKills` moves 118 times in a corpus with no PvP in it.] The client's
+### The two daily kill counters, and which one really tracks kills — the CAP half is answered (#887, 2026-08-22)
+[V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps] The client's
 stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
-entirely PvE — beach, Tortage, Ymir's Pass. Yet over the captured `StatIIR` stream (`--report stat-series
---report-arg 106,1000069,1000070`) it is the **PvP-named** one that moves 118 times against the PvE-named one's
-39, and only `1000070` caps (at exactly 20).
+entirely PvE — beach, Tortage, Ymir's Pass. Yet it is the **PvP-named** one that moves 118 times against the
+PvE-named one's 39 (`--report stat-series --report-arg 106,1000069,1000070`).
 
-⛔ **One of the two alternatives is now dead: the pairing is NOT off by one.** The tuning sheet ships a cap per
-counter — `DailyPvEKillsCap` **5**, `DailyPvPKillsCap` **20** — and `1000070` stops at exactly **20** in three
-independent captures (`xxx_mage-demo…beach-to-enter-tortage`, `xxx_mage-necromancer…play1`,
-`Hoxxling…gameplay`). Under the stated pairing that is its own cap, landed on exactly, three times. Under a
-swapped pairing `1000070` would be `DailyPvEKills` with a cap of **5** and would be overrunning it fourfold. The
-swap makes the fit worse, not better.
+⛔ **The pairing is NOT off by one, and it is no longer inferred from the name table.** The client's stat
+REGISTRATION (`FUN_01df7df0`) writes the id into its record and then names it: `0xF4285` (= 1000069) →
+`DailyPvEKills`, `0xF4286` (= 1000070) → `DailyPvPKills`. Each id is registered again under sub-indices 1, 2, 5
+and 8, which carry no name at all — so a stat id owns a small family of slots and only slot 0 is named.
 
-⭐ **And the two are not one stream under two names.** In a single run — capture `…play1`, handle `0x01317CF8` —
-`1000069` advances **13** times while `1000070` advances **20**. Same session, same kills available, different
-counts, so they count different events.
+⭐ **The old sharpened question — "why does 1000069 run to 13 against its own cap of 5" — is answered: that cap
+clamps nothing.** Two measurements, both from `xxx_..._play1_beach-to-enter-tortage_city`, time-ordered rather
+than aggregated:
 
-⚠️ What is left is therefore neither the pairing nor a missing PvP capture: it is that `1000069` runs to **13**
-against its own cap of **5**. Either the caps bound what counts toward the daily META rather than clamping the
-counter (and then `1000070` stopping dead on 20 needs another explanation), or `DailyPvEKillsCap` is not that
-counter's cap. That is the sharpened question.
+* `1000070` reaches **20** at frame 6039 and never moves again, while the capture runs on to frame 11692 and
+  `1000069` keeps counting (11 at f7148, 12 at f8009, 13 at f10642). The session did not end and kills did not
+  stop, so 20 is a genuine clamp — and since nothing in the client reads either cap, it is the SERVER's.
+* `1000069` passes **5** at frame 3936 and carries on to 13 with no stall of any kind.
 
+⛔ **Nothing in the client consumes either cap.** `DailyPvEKillsCap` / `DailyPvPKillsCap` are referenced by
+exactly one function in the image — `FUN_010CB540`, the tweak-DEFAULTS registry that declares them. There is no
+comparison, no clamp, no "x of y" read. So a cap named for a counter is not evidence that it bounds it, and the
+one-to-one table in [`client-tweak-table.md`](../rdb/client-tweak-table.md) is a NAME pairing.
+
+⚠️ **What is left** is narrower and is about the counters rather than the caps: both are fed by ordinary PvE
+kills, they sometimes advance on the same frame, and `1000070` advances about half again as often (20 against 13
+in that session). What subset of kills feeds `1000069`, and why the PvP-named counter moves at all in PvE, is
+unanswered — and the corpus has no PvP session to contrast against.
 
 ## The daily-challenge reset timestamps are never on the wire
 
