@@ -743,5 +743,12 @@ adds is therefore not vocabulary but **shape** (a polygon with a height, where `
 axis-aligned box) and **coverage**: 47 playfields have territories and no spawn areas at all, carrying 24
 `Name`-category groups we do not hold.
 
+⛔ **The coverage half is answered, and it is NOT an import bug (#886).** The suspicion was that playfields with
+territories and no `NpcSpawnArea` might have a 1010506 record the importer drops. They do have one, and it is
+**empty**: taking every 1000050 record whose id is a real `Maps` row (506 of them), 318 have no spawn-area row of
+ours, 237 of those carry a 1010506 record, and **every one of those 237 records is exactly 8 bytes** — a header
+with no entries. The playfields we do import areas for carry 118 B to 1.3 MB (median 5.7 KB). So the client ships
+territories for a playfield whose spawn LAYOUT is genuinely empty, and there is nothing being dropped.
+
 That makes the consumer for it the ambient-spawn work, which is blocked on the creature catalog rather than on
-placement — so it stays unimported. Tracked in Gitea #885.
+placement — so it stays unimported. Tracked in Gitea #885/#886.
