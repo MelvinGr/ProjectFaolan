@@ -64,6 +64,12 @@ namespace Faolan.Importer.Cli
 		// How far back the receding comparison looks.
 		private const int RecedeWindowPackets = 40;
 
+		// How soon a re-spawn of the same handle means the despawn was a re-stream rather than a range crossing.
+		private const int RestreamWindowPackets = 200;
+
+		// How far apart two spawns of one handle must sit before the entity counts as pool-managed rather than placed.
+		private const float PoolDriftUnits = 5f;
+
 		// ⛔ A handle that DIED is excluded outright, and this is the contaminant that survives every filter above.
 		// A corpse fades on a TIMER, and the shape of a kill is: fight it, loot it, walk on - so the fade lands while
 		// the player is genuinely receding, at whatever distance they have reached by then. It passes isolation, it
@@ -83,11 +89,13 @@ namespace Faolan.Importer.Cli
 		private static int InterestRadius(IReadOnlyList<NamedCapture> captures)
 		{
 			var samples = new List<(string Capture, string Name, float Distance)>();
-			int quitArrivals = 0, quitParsed = 0, noPosition = 0, notIsolated = 0, stale = 0, approaching = 0, corpses = 0;
+			int quitArrivals = 0, quitParsed = 0, noPosition = 0, notIsolated = 0, stale = 0, approaching = 0, corpses = 0, restreamed = 0, staleEntity = 0, pooled = 0;
 
 			foreach (var capture in captures)
 			{
-				var known = new Dictionary<uint, (Vector3 Position, string Name)>();
+				// `At` is when the position was last stated and `Moved` whether the entity has ever moved since it
+				// spawned - together they say whether the position can still be trusted (see the staleness filter).
+				var known = new Dictionary<uint, (Vector3 Position, string Name, int At, bool Moved)>();
 				var player = Vector3.Zero;
 				var playerAt = int.MinValue;
 
@@ -100,13 +108,36 @@ namespace Faolan.Importer.Cli
 				var died = new HashSet<uint>();
 
 				// Pass 1: where every despawn sits in the packet stream, so isolation can be judged without
-				// re-walking. A despawn's own index is included, so a lone one counts 1.
+				// re-walking. A despawn's own index is included, so a lone one counts 1. The same walk records where
+				// every SPAWN of a handle sits, which is what the re-stream filter below needs to look forwards.
 				var quitAt = new List<int>();
+				var spawnAt = new Dictionary<uint, List<int>>();
+				var spawnedAt = new Dictionary<uint, List<Vector3>>();
 				for (var i = 0; i < capture.Packets.Count; i++)
 				{
 					var p = capture.Packets[i];
-					if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: N3ToClientQuitCodec.Opcode })
+					if (p is not { IsDownload: true, IsIirCarrier: true })
+						continue;
+
+					if (p.SubOpcode == N3ToClientQuitCodec.Opcode)
 						quitAt.Add(i);
+					else if (p.SubOpcode == SimpleCharFullUpdateCodec.Opcode && p.Body.Length >= SpawnPacketBuilder.PosZOffset + 4)
+					{
+						var spawned = p.Body.ReadU32Be(SpawnPacketBuilder.HandleOffset);
+						if (!spawnAt.TryGetValue(spawned, out var at))
+							spawnAt[spawned] = at = [];
+
+						at.Add(i);
+
+						// Where each spawn of this handle PUT it. A placed NPC comes back to the same spot every
+						// time; a pool-managed one does not, which is the whole of the test below.
+						var where = new Vector3(p.Body.ReadF32Le(SpawnPacketBuilder.PosXOffset), p.Body.ReadF32Le(SpawnPacketBuilder.PosYOffset),
+							p.Body.ReadF32Le(SpawnPacketBuilder.PosZOffset));
+						if (!spawnedAt.TryGetValue(spawned, out var places))
+							spawnedAt[spawned] = places = [];
+
+						places.Add(where);
+					}
 				}
 
 				for (var i = 0; i < capture.Packets.Count; i++)
@@ -137,7 +168,7 @@ namespace Faolan.Importer.Cli
 					if (p.SubOpcode == CharDCMoveCodec.Opcode && p.TryParse(CharDCMoveCodec.Parse, out var npcMove)
 					    && known.TryGetValue(npcMove.Handle, out var tracked))
 					{
-						known[npcMove.Handle] = (npcMove.Position, tracked.Name);
+						known[npcMove.Handle] = (npcMove.Position, tracked.Name, i, true);
 						continue;
 					}
 
@@ -148,7 +179,7 @@ namespace Faolan.Importer.Cli
 					{
 						var handle = p.Body.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 						known[handle] = (new Vector3(p.Body.ReadF32Le(SpawnPacketBuilder.PosXOffset), p.Body.ReadF32Le(SpawnPacketBuilder.PosYOffset),
-							p.Body.ReadF32Le(SpawnPacketBuilder.PosZOffset)), $"0x{handle:X8}");
+							p.Body.ReadF32Le(SpawnPacketBuilder.PosZOffset)), $"0x{handle:X8}", i, false);
 						continue;
 					}
 
@@ -196,9 +227,50 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
+					// ⛔ AMBIENT population, not interest. The two NPC populations behave differently here: a PLACED
+					// creature returns to its own spawn point every time, while an AMBIENT one is put back wherever
+					// its pool decides. So a handle this capture spawns at two DIFFERENT places is pool-managed, and
+					// its despawns are the pool's decisions rather than a radius the player crossed.
+					//
+					// `Oilskin Scorpion 0x0002DC7B` is the case in point - three spawns at 579.5, 608.1 and 610.3 on
+					// one axis - and it was supplying the tightest sample in the report.
+					if (spawnedAt.TryGetValue(quit.Handle, out var places) && places.Count > 1
+					    && places.Any(a => Flat(a, places[0]) > PoolDriftUnits))
+					{
+						pooled++;
+						continue;
+					}
+
+					// ⛔ The ENTITY's position can be stale too, and the report applied this test only to the player.
+					// A WANDERER walks while the client is not being told - `Oilskin Scorpion 0x0002DC7B` despawns,
+					// and when it comes back 85 s later it stands 29 u from where it was last seen, so the distance
+					// measured at its despawn was against a point it had already left. That is the whole of its
+					// 24.6 u, the tightest sample the report had.
+					//
+					// A creature that has NEVER moved is exempt: its spawn position is as good on the last packet as
+					// on the first, and those are precisely the samples this measurement wants.
+					if (entity.Moved && i - entity.At > MaxStalePackets)
+					{
+						staleEntity++;
+						continue;
+					}
+
 					// HORIZONTAL distance: the interest test the server runs is a radius on the ground, and a tall
 					// city or a cliff would otherwise add height that no radius is measuring.
 					var now = Flat(entity.Position, player);
+
+					// ⛔ A RE-STREAM, not a range crossing. An entity the server hands back almost immediately never
+					// left the client's interest set in any meaningful sense: `Oilskin Scorpion 0x0002DC7B` is
+					// despawned and re-spawned AT THE SAME POSITION 0.4 s later, and no player crosses a radius twice
+					// in 0.4 s. Its 24.6 u was the tightest sample in the whole report and it is not a radius at all.
+					//
+					// The window is in PACKETS for the same reason the others are - it is the stream's own clock -
+					// and it is deliberately short, so a genuine despawn the player walks back into is still counted.
+					if (spawnAt.TryGetValue(quit.Handle, out var spawns) && spawns.Any(at => at > i && at - i <= RestreamWindowPackets))
+					{
+						restreamed++;
+						continue;
+					}
 
 					// ⛔ RECEDING, or this is a lifecycle despawn wearing an interest despawn's clothes.
 					var earlier = track.FindLast(t => i - t.At >= RecedeWindowPackets);
@@ -223,6 +295,9 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"             {noPosition,6} for a handle whose spawn body this capture never carried");
 			Console.WriteLine($"             {corpses,6} for a handle that DIED (a corpse fade is a timer, not a radius)");
 			Console.WriteLine($"             {approaching,6} where the player was NOT moving away (a dismissed pet, a summon, a mount)");
+			Console.WriteLine($"             {restreamed,6} re-streamed - the same handle spawned again within {RestreamWindowPackets} packets");
+			Console.WriteLine($"             {pooled,6} pool-managed - the handle was spawned at more than one PLACE (ambient, not placed)");
+			Console.WriteLine($"             {staleEntity,6} whose own position was stale - a WANDERER last stated over {MaxStalePackets} packets ago");
 			Console.WriteLine($"  usable:    {samples.Count,6}");
 			Console.WriteLine();
 
@@ -260,6 +335,12 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"     these span {sorted[0]:F0}..{sorted[^1]:F0} u - a factor of {spread:F0}. So the sample still holds despawn causes");
 			Console.WriteLine("     these filters do not name, and the honest reading is that the corpus cannot state the radius.");
 			Console.WriteLine("     150 u is neither confirmed nor refuted by it; it is merely near the median, which is not evidence.");
+			Console.WriteLine();
+			Console.WriteLine("  ⭐ The biggest NAMED contaminant is the ambient pool, and naming it halved the smear: the two NPC");
+			Console.WriteLine("     populations behave differently here - a placed creature returns to its own spawn point, an ambient");
+			Console.WriteLine("     one is put back wherever its pool decides - so a handle seen spawning at two PLACES is the pool's");
+			Console.WriteLine("     business and not a radius the player crossed. Removing those (and the re-streams beside them) took");
+			Console.WriteLine("     the spread from 25..850 u to what is printed above. What is left is not yet one radius.");
 			Console.WriteLine();
 			Console.WriteLine("  ⭐ What WOULD settle it, and what this report is here to measure the moment it exists: one capture of a");
 			Console.WriteLine("     player walking slowly AWAY from a known stationary NPC on open ground, no teleports, then back. The");
