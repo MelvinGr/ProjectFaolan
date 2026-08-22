@@ -23,6 +23,12 @@ namespace Faolan.Core.Network.Codecs.Guild
 	public static class GuildMemberRecordCodec
 	{
 		// The two leading bytes every captured record carries: the CoreGuildMember_c streaming version, twice.
+		//
+		// ⭐ The second one is a real VERSION and the client SWITCHES on it (`FUN_00566740`, re-read for #464): case 0
+		// and case 2 read one byte and stop, case 1 reads one byte and raises a flag, and **case 3 is the full form**
+		// - the name, rank, online, playfield, level, class, the u64 time and the counter region below. So the 0x03
+		// is what selects everything this codec writes; a record sent under any other version is a different, shorter
+		// shape. Retail sends 3 in every captured record and so do we.
 		public const byte StreamVersion = 0x03;
 
 		// The trailing counter region. All-zero in every captured record; carried verbatim so a decoded record
