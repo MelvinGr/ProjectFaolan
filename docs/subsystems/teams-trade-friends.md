@@ -344,11 +344,19 @@ client shows it" is the tell. The reverse lookup this needs is a genuinely diffe
 because the list is one-sided. ⚠️ The MESSAGE is the captured one; the TRIGGER is inferred - no capture covers a friend
 logging in or out while someone watches. Verified in-client 2026-07-25.
 
-**The state's stamp is a union on the online flag.** Offline is a unix **last-seen** — the captured offline friend's
-`0x6A64AD51` is 2h06 before that capture was taken — and we send `Character.LastConnection` for it, the same column and
-union `GuildService`'s member record already uses. The online value is **not a time** (`0x01EDA8B2` reads as 1971) and
-not a plain constant either (one online friend carries `0x01EDAF93`); its magnitude sits beside the character ids, so an
-id/handle is the better guess. [V0: the friend state's online stamp]
+**The state's stamp is a union on the online flag** — and both halves are now observed (#888).
+
+*Offline* is a unix **last-seen**: the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken,
+and `NecroL80_..._annotated_9` adds four more decoding to 2011/2016/2021 — dormant friends. We send
+`Character.LastConnection`, the same column and union `GuildService`'s member record already uses.
+
+*Online* is that friend's **playfield-instance token**. Each of `addfriends`' five online friends carries a stamp that
+appears again inside **that same friend's own record** in the who-result, ~72 bytes in, which is where
+`TeamMemberRecord`'s embedded `PlayfieldProxy` keeps its token — four of them `0x01EDA8B2` and `Llewyl`
+`0x01EDAF93`, reproduced friend-for-friend rather than as one shared constant. The player's own `LoginConnectReady`
+ends in a `PlayfieldProxy` carrying that same `0x01EDA8B2` (same instance), and in `xxx_2clients_jumping` two online
+friends carry values found nowhere else in the capture — friends in another instance. A timestamp reading cannot
+produce any of that (`0x01EDA8B2` is 1971). We source it live from the game tier through `IGameServerDispatcher`.
 
 ### Claude is a VIRTUAL friend (#100)
 

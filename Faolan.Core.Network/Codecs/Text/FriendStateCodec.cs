@@ -26,13 +26,13 @@ namespace Faolan.Core.Network.Codecs.Text
 	// Two slots is the client saying "two meanings", which is what turns the union from a reading into a fact:
 	//   OFFLINE -> a unix LAST-SEEN. The captured offline friend's 0x6A64AD51 is 2026-07-25 12:34:25 UTC, 2h06 before
 	//              that capture was taken, which is what identified it. We send Character.LastConnection.
-	//   ONLINE  -> a PLAYFIELD-INSTANCE TOKEN, i.e. which playfield instance the friend is in. Definitely not a
-	//              time (0x01EDA8B2 reads as 1971). The identification comes from TeamMemberRecord, which embeds a
-	//              PlayfieldProxy carrying this exact value in its instance-token slot (Gitea #454), and the
-	//              distribution here agrees: five of the six captured friends share 0x01EDA8B2 and one carries
-	//              0x01EDAF93, 1761 higher - five players in one instance and one in another, which is what a
-	//              token does and what neither a constant nor a per-friend id would. Gitea #796. [V0 - structural,
-	//              not yet checked in-client.]
+	//   ONLINE  -> that friend's PLAYFIELD-INSTANCE TOKEN. Not a time (0x01EDA8B2 reads as 1971), and no longer a
+	//              structural guess (#888): each of the five online friends' stamps appears again inside THAT SAME
+	//              FRIEND's record in the same capture's who-result, ~72 bytes in - where TeamMemberRecord's embedded
+	//              PlayfieldProxy keeps its token. Four carry 0x01EDA8B2 and one 0x01EDAF93, and the who-result
+	//              reproduces the split friend-for-friend, so it is not one session constant seen twice. The player's
+	//              own LoginConnectReady ends in a PlayfieldProxy carrying the same 0x01EDA8B2 (one instance), and
+	//              another capture's two online friends carry values found NOWHERE else in it - friends elsewhere.
 	//
 	// ⚠️ The ONLINE half is NOT what the friend-list node renders. `FriendListNode_c`'s buddy-apply (`FUN_006ca170`)
 	// reads `[8]` (level), `[11]` (online) and `[10]` (the OFFLINE last-seen) and never touches `[12]`. It also does

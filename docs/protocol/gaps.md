@@ -357,11 +357,33 @@ Their ROLE is unambiguous from the capture — `0x206B` acks your own accept, `0
 trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay) — so the flow is implementable; it
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
 
-### The friend/guild state stamp's ONLINE value
-**Tracked: Gitea #888** (refiled from #796, which was closed with this gap still live). [V0: the friend state's online stamp] The chat-tier friend state
-(`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 whose OFFLINE meaning is solved — a unix last-seen,
-identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
-value's id SPACE is not.
+### The friend/guild state stamp's ONLINE value — SOLVED (Gitea #888, closed 2026-08-22)
+The chat-tier friend state (`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 that is a UNION on
+the online flag. Both halves are now observed:
+
+* **OFFLINE — a unix LAST-SEEN.** Identified because the captured offline friend's `0x6A64AD51` is 2h06 before that
+  capture was taken, and confirmed on four more records in `NecroL80_..._annotated_9`, whose stamps decode to dates
+  spread across 2011, 2016 and 2021 — dormant friends, which is what a last-seen looks like.
+* **ONLINE — the friend's PLAYFIELD-INSTANCE TOKEN**, per friend.
+
+⭐ **What settled the online half is a WITHIN-CAPTURE, PER-FRIEND match, not a resemblance.** In `addfriends`, each
+of the five online friends' stamps appears again inside **that same friend's own record** in the who-result
+(`DispatchCharacterSearchResult`), ~72 bytes in — exactly where `TeamMemberRecord`'s embedded `PlayfieldProxy`
+carries its instance token. Four friends carry `0x01EDA8B2` and `Llewyl` carries `0x01EDAF93`, and the who-result
+reproduces that split friend-for-friend, so it is not one shared session constant being seen twice.
+
+Two independent corroborations from the same corpus:
+
+* the player's OWN `LoginConnectReady` handoff ends in a `PlayfieldProxy` (`0x62` version byte, class `0xC79C`,
+  map `0x0FB4`, `0x9C50`, token) whose token is that same `0x01EDA8B2` — the observer and the four friends are in
+  one instance;
+* in `xxx_2clients_jumping` two online friends carry `0x01EDB057` / `0x01EDB082`, values that appear **nowhere
+  else in that capture** — friends in another instance, which is what a per-instance token predicts and what a
+  timestamp (these read as 1971) cannot explain.
+
+The RE trail below stands and is kept: it is what established the union, and its conclusion — that the client
+files the online value and never reads it back — is why the meaning had to come from the wire rather than from a
+consumer.
 
 ⚠️ **This entry used to say the stamp is a key into a global id→string map. That was a MIS-ATTRIBUTION and is
 withdrawn.** The map is real — `FUN_0043ac00`, an rbtree find on the singleton at `DAT_03c03100` — and it is now
