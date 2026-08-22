@@ -50,8 +50,8 @@ it displays.
 | method | interface slot | LDB 100 token | name |
 |---:|---|---|---|
 | `0x45` | `+0x118` | `NonAlphanumericGuildName` | `DispatchGuildNonAlphanumericName` — *already named, the control* |
-| `0x46` | `+0x11C` | `WrongLengthGuildName` | **`DispatchGuildNameWrongLength`** |
-| `0x47` | `+0x120` | `TakenGuildName` | **`DispatchGuildNameTaken`** |
+| `0x46` | `+0x11C` | `WrongLengthGuildName` | **`DispatchGuildWrongLengthName`** |
+| `0x47` | `+0x120` | `TakenGuildName` | **`DispatchGuildTakenName`** |
 | `0x48` | `+0x124` | `BadGuildName` | `DispatchGuildBadName` — *already named, the second control* |
 | `0x49` | — | — | `DispatchGuildNameWaitTime` (carries a body) |
 

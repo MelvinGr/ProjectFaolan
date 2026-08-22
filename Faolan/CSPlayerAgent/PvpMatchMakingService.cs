@@ -91,10 +91,12 @@ namespace Faolan.CSPlayerAgent
 			else
 				logger.LogDebug("PvP matchmaking: {CharacterId:X8} left the queue while holding no signup.", characterId);
 
-			// The ack has no client-recovered name - 0x81 is a no-arg dispatch slot, so the client's string catalog
-			// carries nothing for it (see the Reserved0x81 note in Opcodes.cs). It is 1:1 with the removals in the
-			// capture and empty every time, which is what it is sent as.
-			await Send(client, (uint)CSPlayerInterfaceMethods.Reserved0x81, []);
+			// ⭐ The ack is named now (#876): 0x81's own override raises the feedback token
+			// `YouAreNoLongerInPvPMatchMaking`, which is exactly what this is - the answer to a withdrawal. It was
+			// sent as `Reserved0x81` on the strength of being 1:1 with the removals in the capture and empty every
+			// time; the recovered name says the same thing from the client's side, which is the corroboration that
+			// reading never had.
+			await Send(client, (uint)CSPlayerInterfaceMethods.DispatchPvPMatchMakingRemovedFromMatchMaking, []);
 		}
 
 		/// <summary>c2s 0x2054: the board poll. The reply is the same for every queueType the client asks about.</summary>

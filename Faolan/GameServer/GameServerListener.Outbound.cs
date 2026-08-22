@@ -246,7 +246,7 @@ namespace Faolan.GameServer
 			// #792 named it: its handler is byte for byte DispatchPartnerAcceptedTrade's, on the LOCAL holder instead
 			// of the one the ID32 names - so it is the argument-less YOU half. Which is exactly what the capture
 			// already said: it lands on the accepter's own connection, empty, right after their AcceptTrade.
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchAcceptedTrade, []);
+			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchClientAcceptedTrade, []);
 		}
 
 		Task ITradeOutbound.SendPartnerAccepted(uint recipientId, uint partnerId)
@@ -261,7 +261,7 @@ namespace Faolan.GameServer
 			// accepted byte and both cash slots zeroed, both item lists freed - and it fires the trade-ended signal
 			// with 1 where TradeAbort (0x6A) sends 0. The capture agrees: it lands on BOTH connections, empty, as the
 			// trade commits.
-			await SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchTradeCompleted, []);
+			await SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchCompleteTrade, []);
 			if (ClientForCharacter(recipientId) is { } client)
 				await SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
 		}
@@ -595,7 +595,7 @@ namespace Faolan.GameServer
 			return removed;
 		}
 
-		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchTradeAbort` (GameCharInterface `0x6A`,
+		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchAbortTrade` (GameCharInterface `0x6A`,
 		// zero-length) and we answered nothing at all - so the vendor session was left open on the client's side of
 		// the model.
 		//
@@ -610,7 +610,7 @@ namespace Faolan.GameServer
 		// reason this is not a general "close the window" message.
 		private static Task SendTradeAbort(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeAbort, _ => { }));
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAbortTrade, _ => { }));
 		}
 
 		// #792: the zero-length GameCharInterface `0x1B` retail sends immediately before every `IntendedTeleportIIR` -
@@ -621,7 +621,7 @@ namespace Faolan.GameServer
 		// do not hang behaviour off it, and do not go looking for what it "should" do.
 		private static Task SendTeleportPending(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.Reserved0x1B, _ => { }));
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTeleportStarted, _ => { }));
 		}
 
 		// Closes a craft: retail's last word on the transaction, after the product add and the ingredient removals.

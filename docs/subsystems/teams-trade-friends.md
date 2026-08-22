@@ -254,10 +254,10 @@ all empty), so its override IS the semantics:
 
 | method | vtable | what the client does |
 |---|---|---|
-| `0x6A` `DispatchTradeAbort` | `+0x1AC` | `CoreTradeHolder::TradeAbort()` — the client's own assert string |
-| `0x6B` `DispatchAcceptedTrade` | `+0x1B0` | sets the LOCAL holder's `accepted` byte and refreshes the window — **byte for byte `0x6C`'s body**, on your own holder instead of the one its ID32 names |
-| `0x6D` `DispatchTradeCompleted` | `+0x1B8` | the holder's own reset: in-trade flag cleared, `accepted` and both cash slots zeroed, both item lists freed, then the trade-ended signal with **1** where `TradeAbort` sends **0** |
-| `0x71` `DispatchUnacceptedTrade` | `+0x1C8` | the exact inverse of `0x6B` — `accepted` back to 0. Never sent in the corpus |
+| `0x6A` `DispatchAbortTrade` | `+0x1AC` | `CoreTradeHolder::TradeAbort()` — the client's own assert string |
+| `0x6B` `DispatchClientAcceptedTrade` | `+0x1B0` | sets the LOCAL holder's `accepted` byte and refreshes the window — **byte for byte `0x6C`'s body**, on your own holder instead of the one its ID32 names |
+| `0x6D` `DispatchCompleteTrade` | `+0x1B8` | the holder's own reset: in-trade flag cleared, `accepted` and both cash slots zeroed, both item lists freed, then the trade-ended signal with **1** where `TradeAbort` sends **0** |
+| `0x71` `DispatchClientNoLongerAcceptedTrade` | `+0x1C8` | the exact inverse of `0x6B` — `accepted` back to 0. Never sent in the corpus |
 | `0x72` | `+0x1CC` | fires the trade-window refresh signal and nothing else. Never sent |
 | `0x75` `DispatchDeleteCachedLDBData` | `+0x1D8` | not trade at all — logs *"DeleteCachedLDBData remote method was called."* Never sent |
 

@@ -202,13 +202,42 @@ namespace Faolan.Core.Enums
 
 	// CSPlayerInterface server->client dispatch table (211 methods; +33 inserted no-arg). Guild / team / groupfinder on the CsPlayerAgent connection.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
-	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
-	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
-	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
-	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
-	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
-	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
+	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
+	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
+	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
+	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
+	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	//
+	//   CSPlayerInterface        FUN_01338690   211 entries
+	//   GameCharInterface        FUN_004BABB0   180
+	//   GameInterface            FUN_004919C0    15
+	//   GameCharInterfaceProject FUN_00493800    16
+	//
+	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
+	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
+	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
+	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
+	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
+	// 0x0E; this one is `Kicked`.
+	// ⭐⭐ …and the DISPATCHER hands most of them over for free, because a no-arg method still has to SAY something
+	// (#876, 2026-08-22). The client's own override for one of these raises a FEEDBACK TOKEN, and that token is a
+	// string it pushes by address - so a method with no signature string still owns a string. Twenty-five of the
+	// twenty-eight Reserved slots on this interface named themselves in one pass:
+	//
+	//   `DumpVtableBodies VT=1fa4524` over `CSClientIncoming_c` (slot rule `slot = (id + 1) * 4`, control-checked
+	//   against the four the group-finder work already pinned - 0xC2→+0x78, 0xC3→+0x7c, 0xC4→+0x80, 0xC5→+0x88),
+	//   then read the 0x1FAxxxx pointer each body carries with `DumpStringsAt`.
+	//
+	// Two state the METHOD outright rather than a token - `CSClientIncoming_c::GuildCityReachedTier3` and
+	// `CSPlayerInterface_t::PvPMatchMakingMatchRemoved:` - which is what confirms the reading for the other
+	// twenty-three, and 0x81 corroborates it from our own side: it was already being sent as the matchmaking
+	// withdrawal ack, and its token is `YouAreNoLongerInPvPMatchMaking`. ⚠️ `DispatchItemSoldNotification` keeps
+	// the client's own spelling.
+	//
+	// ⛔ What this does NOT reach: 0x74, 0x90 and 0x91 push no string at all. Their overrides are bare signal emits
+	// (0x74 is one instruction - `MOV ECX,0x29C7954; JMP <emit>`; 0x90 and 0x91 fire +0x44 / +0x48 on the lazily
+	// built singleton at 0x0297D358, whose subscribers sit in the chat/social window cluster around
+	// `ChatWindowController_c`). Those three need the #801 signal-subscriber route, not this one.
 	public enum CSPlayerInterfaceMethods : uint
 	{
 		DispatchAuthenticateAck = 0x00,
@@ -244,7 +273,7 @@ namespace Faolan.Core.Enums
 		DispatchTeamSummonRequestFailedInvalidPF = 0x1E,
 		DispatchTeamSummonRequestFailedAlreadyInSameInstance = 0x1F,
 		DispatchWarningTeamSizeTooLarge = 0x20,
-		Reserved0x21 = 0x21,
+		DispatchTeamIsFull = 0x21, // its override raises the feedback token of the same name (#876)
 		DispatchYouGotKickedFromTeam = 0x22,
 		DispatchVoteKickStarted = 0x23,
 		DispatchVoteKickFailed = 0x24,
@@ -254,9 +283,9 @@ namespace Faolan.Core.Enums
 		DispatchDeleteCanceledMail = 0x28,
 		DispatchDeleteCanceledMailItem = 0x29,
 		DispatchGuildInvite = 0x2A,
-		Reserved0x2B = 0x2B,
-		Reserved0x2C = 0x2C,
-		Reserved0x2D = 0x2D,
+		DispatchGuildKick = 0x2B, // its override raises the feedback token of the same name (#876)
+		DispatchGuildDisbanded = 0x2C, // its override raises the feedback token of the same name (#876)
+		DispatchGuildLeave = 0x2D, // its override raises the feedback token of the same name (#876)
 		DispatchGuildMemberLeft = 0x2E,
 		DispatchGuildMemberJoined = 0x2F,
 		DispatchGuildMemberUpdate = 0x30,
@@ -264,7 +293,7 @@ namespace Faolan.Core.Enums
 		DispatchGuildGMPromoteFeedback = 0x32,
 		DispatchGuildGMDemoteFeedback = 0x33,
 		DispatchGuildInviteNoSuchName = 0x34,
-		Reserved0x35 = 0x35,
+		DispatchGuildInviteTargetOffline = 0x35, // its override raises the feedback token of the same name (#876)
 		DispatchGuildPvPPointInfo = 0x36,
 		DispatchGuildRenownInfo = 0x37,
 		DispatchGuildRankingsUpdate = 0x38,
@@ -293,25 +322,25 @@ namespace Faolan.Core.Enums
 		//   0x48 -> slot +0x124 -> "BadGuildName"                 (already named - the second control)
 		//
 		// Both ends of the block land on their known names, which is what makes the two in the middle trustworthy.
-		DispatchGuildNameWrongLength = 0x46,
-		DispatchGuildNameTaken = 0x47,
+		DispatchGuildWrongLengthName = 0x46,
+		DispatchGuildTakenName = 0x47,
 		DispatchGuildBadName = 0x48,
 		DispatchGuildNameWaitTime = 0x49,
-		Reserved0x4A = 0x4A,
-		Reserved0x4B = 0x4B,
-		Reserved0x4C = 0x4C,
-		Reserved0x4D = 0x4D,
+		DispatchGuildCurrentlyInGuild = 0x4A, // its override raises the feedback token of the same name (#876)
+		DispatchGuildLevelRequirementFailed = 0x4B, // its override raises the feedback token of the same name (#876)
+		DispatchGuildStandingInvitation = 0x4C, // its override raises the feedback token of the same name (#876)
+		DispatchGuildAlreadyGuilded = 0x4D, // its override raises the feedback token of the same name (#876)
 		DispatchGuildOnInviteCooldown = 0x4E,
-		Reserved0x4F = 0x4F,
+		DispatchGuildCantDemote = 0x4F, // its override raises the feedback token of the same name (#876)
 		DispatchGuildTaxError = 0x50,
 		DispatchGuildInvalidGoverningForm = 0x51,
 		DispatchGuildUpdateCash = 0x52,
-		Reserved0x53 = 0x53,
+		DispatchSubscriptionRequirementFailed = 0x53, // its override raises the feedback token of the same name (#876)
 		DispatchGuildTaxChanged = 0x54,
 		DispatchGuildGoverningFormChanged = 0x55,
 		DispatchGuildRecruitmentModeChanged = 0x56,
 		DispatchGuildMessageOfTheDayChanged = 0x57,
-		Reserved0x58 = 0x58,
+		DispatchGuildDescriptionChanged = 0x58, // its override raises the feedback token of the same name (#876)
 		DispatchGuildNameChanged = 0x59,
 		DispatchGMGuildNameChanged = 0x5A,
 		DispatchGuildMemberList = 0x5B,
@@ -326,20 +355,20 @@ namespace Faolan.Core.Enums
 		DispatchRemoveGuildFeat = 0x64,
 		DispatchGuildRankChanged = 0x65,
 		DispatchGuildApplicationRequest = 0x66,
-		Reserved0x67 = 0x67,
+		DispatchGuildNoInvitersOnline = 0x67, // its override raises the feedback token of the same name (#876)
 		DispatchGuildApplicationRejected = 0x68,
 		DispatchGuildMergeRequest = 0x69,
 		DispatchGuildMergeRequestFailed = 0x6A,
 		DispatchGuildCityBooked = 0x6B,
 		DispatchGuildCityBookingFailed = 0x6C,
 		DispatchNewVulnerabilityWindowData = 0x6D,
-		Reserved0x6E = 0x6E,
+		DispatchGuildCityReachedTier3 = 0x6E, // the override's own log string NAMES it (#876)
 		DispatchGuildIsMassivePvPCityOwner = 0x6F,
 		DispatchGuildIsMassivePvPCityAttacker = 0x70,
 		DispatchFeedbackMessage = 0x71,
 		DispatchRequestBattleKeepInformation = 0x72,
 		DispatchGMReplyGuildInfoFromChar = 0x73,
-		Reserved0x74 = 0x74,
+		DispatchGMReplyNoGuildInfoFromChar = 0x74,
 		DispatchPvPMatchMakingWantsToStart = 0x75,
 		DispatchPvPMatchMakingPlayerJoined = 0x76,
 		DispatchPvPMatchMakingPlayerChangedSide = 0x77,
@@ -347,7 +376,7 @@ namespace Faolan.Core.Enums
 		DispatchPvPMatchMakingPlayerKicked = 0x79,
 		DispatchPvPMatchMakingErrorCode = 0x7A,
 		DispatchPvPMatchMakingYouJoinedMatch = 0x7B,
-		Reserved0x7C = 0x7C,
+		DispatchPvPMatchMakingMatchRemoved = 0x7C, // the override's own log string NAMES it (#876)
 		DispatchPvPMatchMakingMatchInfo = 0x7D,
 		DispatchPvPMatchMakingSearchResult = 0x7E,
 		DispatchPvPMatchMakingStartClicked = 0x7F,
@@ -357,23 +386,23 @@ namespace Faolan.Core.Enums
 		// "left matchmaking". Named by BEHAVIOUR only: it is a no-arg slot, so the client's string catalog has no
 		// name to recover (see the block comment above), and its position beside 0x80
 		// `DispatchPvPMatchMakingYouAreInMatchMaking` is what the pairing says it is.
-		Reserved0x81 = 0x81,
-		Reserved0x82 = 0x82,
+		DispatchPvPMatchMakingRemovedFromMatchMaking = 0x81, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingCowardRemovedFromMatchMaking = 0x82, // its override raises the feedback token of the same name (#876)
 		DispatchPvPMatchMakingMatchSay = 0x83,
 		DispatchPvPMatchMakingCollectingMorePlayers = 0x84,
 		DispatchPvPMatchMakingNewMatchLeader = 0x85,
 		DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking = 0x86,
-		Reserved0x87 = 0x87,
-		Reserved0x88 = 0x88,
+		DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier = 0x87, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader = 0x88, // its override raises the feedback token of the same name (#876)
 		DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide = 0x89,
 		DispatchPvPMatchMakingCantLockToSideMustPickASideFirst = 0x8A,
 		DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide = 0x8B,
 		DispatchPvPMatchMakingCharacterNowLockedToSide = 0x8C,
 		DispatchPvPMatchMakingCharacterNoLongerLockedToSide = 0x8D,
-		Reserved0x8E = 0x8E,
-		Reserved0x8F = 0x8F,
-		Reserved0x90 = 0x90,
-		Reserved0x91 = 0x91,
+		DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch = 0x8E, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier = 0x8F, // its override raises the feedback token of the same name (#876)
+		DispatchPvPMatchMakingTeamJoined = 0x90,
+		DispatchPvPMatchMakingRaidJoined = 0x91,
 		DispatchPvPMatchMakingInfoRequestReturn = 0x92,
 		DispatchYouJoinedRaid = 0x93,
 		DispatchRaidTeamJoined = 0x94,
@@ -389,9 +418,9 @@ namespace Faolan.Core.Enums
 		DispatchRaidInvitationTimedOut = 0x9E,
 		DispatchRaidTargetDeclinedRaidInvite = 0x9F,
 		DispatchRaidYouAreNoLongerInvited = 0xA0,
-		Reserved0xA1 = 0xA1,
+		DispatchRaidYouWereKickedFromRaid = 0xA1, // its override raises the feedback token of the same name (#876)
 		DispatchRaidCantInviteInvalidSubscriptionFlags = 0xA2,
-		Reserved0xA3 = 0xA3,
+		DispatchRaidCantJoinInvalidSubscriptionFlags = 0xA3, // its override raises the feedback token of the same name (#876)
 		DispatchRaidCantCreateInvalidMemberSubscriptionFlags = 0xA4,
 		DispatchMassivePvpInfoRequestReturn = 0xA5,
 		DispatchMassivePvPBattleQueueFeedback = 0xA6,
@@ -400,7 +429,7 @@ namespace Faolan.Core.Enums
 		DispatchBattleKeepInfoRequestReturnPhase1And2 = 0xA9,
 		DispatchBattleKeepInfoRequestReturnPhase3And4 = 0xAA,
 		DispatchYouGotMailNotification = 0xAB,
-		Reserved0xAC = 0xAC,
+		DispatchItemSoldNotification = 0xAC, // its override raises the feedback token of the same name (#876)
 		DispatchDebugFullGameServerList = 0xAD,
 		DispatchDebugGameServerConnected = 0xAE,
 		DispatchDebugGameServerDisconnected = 0xAF,
@@ -420,7 +449,7 @@ namespace Faolan.Core.Enums
 		DispatchDebugRemoveIDFromMatchMaking = 0xBD,
 		DispatchItemSalesUpdateBalance = 0xBE,
 		DispatchItemSalesCoupons = 0xBF,
-		Reserved0xC0 = 0xC0,
+		DispatchItemSalesReportNoConnectionToBillingServer = 0xC0, // the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this NAME is ours (#876)
 		DispatchCSFeedback = 0xC1,
 		DispatchGroupFinderSignupFailed = 0xC2,
 		// #801: no-arg, so the string catalog has no name for it - the name is the client's OWN, read off the
@@ -433,7 +462,7 @@ namespace Faolan.Core.Enums
 		// and in the capture it fires exactly there: after a SUCCESSFUL `QueueGroupFinder` (where a refused
 		// attempt got `DispatchGroupFinderSignupFailed` instead) and before `SelectGroupFinderRoles` /
 		// `DispatchGroupFinderSignupSuccess`. The name is ours; the window name is the client's.
-		DispatchGroupFinderRoleSelect = 0xC3,
+		DispatchGroupFinderSelectRoles = 0xC3,
 		DispatchGroupFinderSignupSuccess = 0xC4,
 		DispatchGroupFinderRemoved = 0xC5,
 		DispatchGroupFinderReadyCheck = 0xC6,
@@ -443,13 +472,13 @@ namespace Faolan.Core.Enums
 		// **`VoteRetreatStarted`**. It then arms a timer callback (`FUN_0053ef20(..., FUN_005383b0, ...)`), which is
 		// the vote window. Sweeping every `Reserved*` slot of this interface for the same `PUSH 0x64` + token shape
 		// finds only this one, so the rest genuinely put nothing on screen.
-		DispatchVoteRetreatStarted = 0xC7,
+		DispatchGroupFinderVoteRetreatStarted = 0xC7,
 		// #801: the twin of 0xC3 - vtable +0x324, the signal at `CSIncoming+0x84`, subscribed by the same GUI
 		// block with the handler `FUN_014f07c0`, which sets the "in a group-finder activity" flag
 		// (`DAT_0297d14d`, cleared again by `DispatchGroupFinderRemoved`) and raises the ActionScript signal
 		// whose registered name is `SignalClientStartedGroupFinderActivity`. In the capture it fires
 		// immediately after `DispatchYouJoinedTeam` - the finder has formed the team and the activity is on.
-		DispatchGroupFinderActivityStarted = 0xC8,
+		DispatchGroupFinderStartActivity = 0xC8,
 		DispatchGroupFinderReadyCheckStatus = 0xC9,
 		DispatchGroupFinderReadyCheckRejected = 0xCA,
 		DispatchGroupFinderPlayfieldInfo = 0xCB,
@@ -1005,13 +1034,23 @@ namespace Faolan.Core.Enums
 
 	// GameInterface server->client dispatch table (16 methods; +3 inserted no-arg).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
-	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
-	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
-	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
-	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
-	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
-	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
+	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
+	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
+	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
+	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
+	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	//
+	//   CSPlayerInterface        FUN_01338690   211 entries
+	//   GameCharInterface        FUN_004BABB0   180
+	//   GameInterface            FUN_004919C0    15
+	//   GameCharInterfaceProject FUN_00493800    16
+	//
+	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
+	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
+	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
+	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
+	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
+	// 0x0E; this one is `Kicked`.
 	//
 	// ⭐ #792: a no-arg slot is nameable through the INTERFACE VTABLE, because its dispatch branch is a bare stub -
 	// `slot index = method id + 1` on this interface family, so 0x04 is vtable +0x14, and `GameInterface_t`'s
@@ -1022,7 +1061,7 @@ namespace Faolan.Core.Enums
 		DispatchPassBlob = 0x00,
 		DispatchAckAuthenticate = 0x01,
 		DispatchRedirectToServer = 0x02,
-		Reserved0x03 = 0x03,
+		DispatchOnDisconnectGame = 0x03,
 		DispatchQuitGame = 0x04, // GameInterface_t::OnQuitGame (#792)
 		DispatchPong = 0x05,
 		DispatchPongWithPacketTiming = 0x06,
@@ -1033,24 +1072,34 @@ namespace Faolan.Core.Enums
 		DispatchReportDimesionID = 0x0B,
 		DispatchReportServerID = 0x0C,
 		DispatchDataSink = 0x0D,
-		Reserved0x0E = 0x0E,
+		DispatchKicked = 0x0E, // ⚠️ was DispatchClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked` (#876)
 		DispatchDisplayPlayfieldAccessPopup = 0x0F
 	}
 
 	// GameCharInterfaceProject server->client dispatch table (16 methods; +1 inserted).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
-	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
-	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
-	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
-	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
-	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
-	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
+	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
+	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
+	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
+	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
+	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	//
+	//   CSPlayerInterface        FUN_01338690   211 entries
+	//   GameCharInterface        FUN_004BABB0   180
+	//   GameInterface            FUN_004919C0    15
+	//   GameCharInterfaceProject FUN_00493800    16
+	//
+	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
+	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
+	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
+	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
+	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
+	// 0x0E; this one is `Kicked`.
 	public enum GameCharInterfaceProjectMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,
 		DispatchGuildBankData = 0x01,
-		Reserved0x02 = 0x02,
+		DispatchGuildBankReply = 0x02,
 		DispatchRequestApprentice = 0x03,
 		DispatchAddApprenticeEntry = 0x04,
 		DispatchRemoveApprenticeEntry = 0x05,
@@ -1097,13 +1146,23 @@ namespace Faolan.Core.Enums
 
 	// TradepostInterface server->client dispatch table (8 methods; mail + tradepost search).
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
-	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
-	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
-	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
-	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
-	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
-	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
+	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
+	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
+	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
+	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
+	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	//
+	//   CSPlayerInterface        FUN_01338690   211 entries
+	//   GameCharInterface        FUN_004BABB0   180
+	//   GameInterface            FUN_004919C0    15
+	//   GameCharInterfaceProject FUN_00493800    16
+	//
+	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
+	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
+	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
+	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
+	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
+	// 0x0E; this one is `Kicked`.
 	public enum TradepostInterfaceMethods : uint
 	{
 		DispatchOpenTradepost = 0x00,
@@ -1118,20 +1177,30 @@ namespace Faolan.Core.Enums
 
 	// GameCharInterface server->client dispatch table (181 methods; +24 inserted no-arg). The main world s2c surface: inventory (DispatchAddItem 0x20), shop, loot, quests, trade, spells/feats, formations.
 	// Generated from the Ghidra s2c dispatch tables (docs/re/aoc-rpc-method-opcodes.md) (the method IS the dispatch switch index);
-	// <no-arg> insertion slots have a known index but no recoverable name -> Reserved0xNN. ⛔ The string route is
-	// EXHAUSTED, measured rather than assumed (Gitea #876): the client's only per-method strings are its
-	// `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors, one per ARGUMENT, and
-	// they sit in one index-ORDERED table - so a method with no arguments contributes no string, and every gap in
-	// that table is exactly a Reserved slot. The same 157 GameCharInterface / 178 CSPlayerInterface names appear in
-	// all three shipped binaries (AgeOfConan.exe, its .bak and AgeOfConanDX10.exe), so there is no second build to
-	// diff. Naming one of these needs its DISPATCHER, and only where the function is not empty.
+	// ⭐⭐ EVERY slot is named, including the no-arg ones, and they are the CLIENT'S OWN names (#876, closed
+	// 2026-08-22). The route that was called exhausted - the `<Iface>Dispatch_t::Dispatch<Name>() ... stream bad
+	// after '<arg>'!` assert strings - really is one-per-ARGUMENT and really does skip every no-arg method. It was
+	// simply the wrong table: each interface's DISPATCH CONSTRUCTOR registers `index -> name` for all of them, as a
+	// run of `<slot> = N; …; FUN_0040ec10("<Name>", len)`, and a no-arg method is in it like any other.
+	//
+	//   CSPlayerInterface        FUN_01338690   211 entries
+	//   GameCharInterface        FUN_004BABB0   180
+	//   GameInterface            FUN_004919C0    15
+	//   GameCharInterfaceProject FUN_00493800    16
+	//
+	// The tables are their own control: on the members that already had names, 178 of 183 CSPlayerInterface and 157
+	// of 161 GameCharInterface agree exactly. The handful that differed were ours-by-behaviour and have been
+	// replaced by the client's (`DispatchTradeAbort` -> `DispatchAbortTrade`, `DispatchGuildNameTaken` ->
+	// `DispatchGuildTakenName`, the three group-finder ones #801 named from signal subscribers, …), and one was a
+	// genuine mis-assignment: `GameInterface` 0x0E was carrying `ClearKnownRecipes`, which is GameCharInterface's
+	// 0x0E; this one is `Kicked`.
 	public enum GameCharInterfaceMethods : uint
 	{
 		DispatchUpdateAggroStatus = 0x00,
 		DispatchUpdateName = 0x01,
 		DispatchUpdateBindLocation = 0x02,
 		DispatchGuildNotEnoughCash = 0x03,
-		Reserved0x04 = 0x04,
+		DispatchGuildErrorWithTransfer = 0x04,
 		DispatchUpdateCash = 0x05,
 		DispatchUpdateCashRepository = 0x06,
 		DispatchMoveInventoryItemToOrFromGuildBank = 0x07,
@@ -1139,14 +1208,14 @@ namespace Faolan.Core.Enums
 		DispatchChangeItemStackSize = 0x09,
 		DispatchLearnSpell = 0x0A,
 		DispatchForgetSpell = 0x0B,
-		Reserved0x0C = 0x0C,
+		DispatchSpellInterrupted = 0x0C,
 		DispatchTradeskillComplete = 0x0D,
-		Reserved0x0E = 0x0E,
+		DispatchClearKnownRecipes = 0x0E,
 		DispatchClearRecipe = 0x0F,
 		DispatchRemoveRecipesByGroupClient = 0x10,
 		DispatchUntrainSingleFeat = 0x11,
 		DispatchDisplayItemLootChatMessage = 0x12,
-		Reserved0x13 = 0x13,
+		DispatchItemMovedToOverflowBag = 0x13,
 		DispatchSendNPCAutoTradeCashAmount = 0x14,
 		DispatchSetDialogueCamera = 0x15,
 		DispatchAddTag = 0x16,
@@ -1163,7 +1232,7 @@ namespace Faolan.Core.Enums
 		// `IntendedTeleportIIR` (`0x10D27BC0`) **102 times, with no exceptions** - cross-map handoffs and same-map
 		// revives alike. That is what makes it safe to send unconditionally from the teleport senders, which we now
 		// do (`GameServerListener.SendTeleportPending`) for byte-stream fidelity and nothing else.
-		Reserved0x1B = 0x1B,
+		DispatchTeleportStarted = 0x1B,
 		DispatchSetItemStat = 0x1C,
 		DispatchAddToItemSlot = 0x1D,
 		DispatchRemoveFromItemSlot = 0x1E,
@@ -1173,7 +1242,7 @@ namespace Faolan.Core.Enums
 		DispatchMoveInventoryItemFromGuildBank = 0x22,
 		DispatchCharacterNameReply = 0x23,
 		DispatchValidResurrectionSpots = 0x24,
-		Reserved0x25 = 0x25,
+		DispatchToggleSpellRecharge = 0x25,
 		DispatchReplyPCDebugData = 0x26,
 		DispatchReplyLootForCharacter = 0x27,
 		DispatchReplyLootForCharacterAddHash = 0x28,
@@ -1185,7 +1254,7 @@ namespace Faolan.Core.Enums
 		DispatchFormationClaimPosition = 0x2E,
 		DispatchFormationUpdatePosition = 0x2F,
 		DispatchFormationClearPosition = 0x30,
-		Reserved0x31 = 0x31,
+		DispatchFormationClear = 0x31,
 		DispatchFormationUpdatePosRot = 0x32,
 		DispatchShopData = 0x33,
 		DispatchCloseShop = 0x34,
@@ -1217,7 +1286,7 @@ namespace Faolan.Core.Enums
 		DispatchLockTemplate = 0x4E,
 		DispatchApplyFactionRank = 0x4F,
 		DispatchApplyFactionPoints = 0x50,
-		Reserved0x51 = 0x51,
+		DispatchRequestResetStanding = 0x51,
 		DispatchAddSpecialAbility = 0x52,
 		DispatchRemoveSpecialAbility = 0x53,
 		DispatchPerformSpecialAction = 0x54,
@@ -1225,7 +1294,7 @@ namespace Faolan.Core.Enums
 		DispatchACGTeleportChoice = 0x56,
 		DispatchACGSelfInstanceCleared = 0x57,
 		DispatchACGTeamBindChanged = 0x58,
-		Reserved0x59 = 0x59,
+		DispatchACGTeleportCloseChoice = 0x59,
 		DispatchOverrideJumpHeight = 0x5A,
 		DispatchOverrideJumpSpeed = 0x5B,
 		DispatchVisualSimulateNpc = 0x5C,
@@ -1260,15 +1329,15 @@ namespace Faolan.Core.Enums
 		//   0x71 -> +0x1C8 -> the exact inverse of 0x6B: the accepted byte set back to 0. Never sent in the corpus.
 		DispatchRequestTrade = 0x68,
 		DispatchStartTrade = 0x69,
-		DispatchTradeAbort = 0x6A,
-		DispatchAcceptedTrade = 0x6B,
+		DispatchAbortTrade = 0x6A,
+		DispatchClientAcceptedTrade = 0x6B,
 		DispatchPartnerAcceptedTrade = 0x6C,
-		DispatchTradeCompleted = 0x6D,
+		DispatchCompleteTrade = 0x6D,
 		DispatchPartnerUpdatedCash = 0x6E,
 		DispatchTradePartnerAddedItem = 0x6F,
 		DispatchTradeAddedItem = 0x70,
-		DispatchUnacceptedTrade = 0x71,
-		Reserved0x72 = 0x72, // #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus.
+		DispatchClientNoLongerAcceptedTrade = 0x71,
+		DispatchPartnerNoLongerAcceptedTrade = 0x72, // #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus.
 
 		DispatchTradePartnerRemovedItem = 0x73,
 		DispatchTradeRemovedItem = 0x74,
@@ -1276,9 +1345,9 @@ namespace Faolan.Core.Enums
 		// the LDB cache object and resets it. Never sent in the corpus.
 		DispatchDeleteCachedLDBData = 0x75,
 		DispatchShortcutBarReply = 0x76,
-		Reserved0x77 = 0x77,
-		Reserved0x78 = 0x78,
-		Reserved0x79 = 0x79,
+		DispatchShortcutBarValidate = 0x77,
+		DispatchEnableAutotrain = 0x78,
+		DispatchDisableAutotrain = 0x79,
 		DispatchAddWayPoint = 0x7A,
 		DispatchRemoveWayPoint = 0x7B,
 		DispatchReplyWaveRespawnTimerUpdate = 0x7C,
@@ -1291,10 +1360,10 @@ namespace Faolan.Core.Enums
 		DispatchUpdateTeamMemberPosList = 0x83,
 		DispatchDynamicSpaceDebugInfo = 0x84,
 		DispatchSetGameTweakValue = 0x85,
-		Reserved0x86 = 0x86,
+		DispatchReloadGameTweakValues = 0x86,
 		DispatchMinigameScoreChanged = 0x87,
 		DispatchMinigameFullScore = 0x88,
-		Reserved0x89 = 0x89,
+		DispatchMinigameMatchPrepareStarted = 0x89,
 		DispatchMinigameMatchStarted = 0x8A,
 		DispatchMinigameMatchEnded = 0x8B,
 		DispatchMinigameCaptureZoneUpdate = 0x8C,
@@ -1303,13 +1372,13 @@ namespace Faolan.Core.Enums
 		DispatchForceStopMinigame = 0x8F,
 		DispatchSetMinigameTime = 0x90,
 		DispatchMinigameStartsInXSeconds = 0x91,
-		Reserved0x92 = 0x92,
+		DispatchPreMinigameStartsInXSeconds = 0x92,
 		DispatchMassivePvPFullScoreUpdate = 0x93,
 		DispatchMassivePvPGuildScoreUpdate = 0x94,
 		DispatchMassivePvPPlayerScoreUpdate = 0x95,
 		DispatchMassivePvPScoreNames = 0x96,
-		Reserved0x97 = 0x97,
-		Reserved0x98 = 0x98,
+		DispatchMassivePvPLeftBattleArea = 0x97,
+		DispatchMassivePvPEnteredBattleArea = 0x98,
 		DispatchShowVulnerabilityWindowGui = 0x99,
 		DispatchPassiveAbilityEquip = 0x9A,
 		DispatchPassiveAbilityUnequip = 0x9B,
@@ -1318,7 +1387,7 @@ namespace Faolan.Core.Enums
 		DispatchEnterExitGamingRoom = 0x9E,
 		DispatchReplyTeamInvite = 0x9F,
 		DispatchReplyNewJoinHasHostileInFriends = 0xA0,
-		Reserved0xA1 = 0xA1,
+		DispatchKickedByGM = 0xA1,
 		DispatchReplyItemForCashSaleSetData = 0xA2,
 		DispatchReplyItemForCashSaleUpdateData = 0xA3,
 		DispatchItemSaleResult = 0xA4,

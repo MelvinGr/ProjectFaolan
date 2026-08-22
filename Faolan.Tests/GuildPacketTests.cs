@@ -218,8 +218,8 @@ namespace Faolan.Tests
 		// control: they already carried these names, and the same read reproduces both.
 		[Theory]
 		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNonAlphanumericName, 0x2045)]
-		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNameWrongLength, 0x2046)]
-		[InlineData(CSPlayerInterfaceMethods.DispatchGuildNameTaken, 0x2047)]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildWrongLengthName, 0x2046)]
+		[InlineData(CSPlayerInterfaceMethods.DispatchGuildTakenName, 0x2047)]
 		[InlineData(CSPlayerInterfaceMethods.DispatchGuildBadName, 0x2048)]
 		public void TheGuildNameRefusals_RenderAsTheOpcodesTheCaptureRecorded(CSPlayerInterfaceMethods method, int wire)
 		{

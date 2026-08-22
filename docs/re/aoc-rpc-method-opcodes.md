@@ -97,8 +97,8 @@ So:
 
 | method | signal | handler | what it does | name |
 |---|---|---|---|---|
-| `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderRoleSelect` (ours — the window's, not the catalog's) |
-| `0xC8` | `+0x84` | `FUN_014f07c0` | sets the "in an activity" flag `DAT_0297d14d` and raises `SignalClientStartedGroupFinderActivity` | `DispatchGroupFinderActivityStarted` |
+| `0xC3` | `+0x7c` | `FUN_014ee020` | opens the window `groupFinder_roleSelect` (or re-pushes the chosen role mask) | `DispatchGroupFinderSelectRoles` (ours — the window's, not the catalog's) |
+| `0xC8` | `+0x84` | `FUN_014f07c0` | sets the "in an activity" flag `DAT_0297d14d` and raises `SignalClientStartedGroupFinderActivity` | `DispatchGroupFinderStartActivity` |
 
 ⚠️ **And the third `Reserved` in the same block did NOT need any of this.** `0xC7`'s override is not a signal-only
 stub at all — 400 bytes that fetch an LDB **category-100** token and draw it (`PUSH 0x64; MOV ESI,0x1fa406c` =
@@ -113,7 +113,56 @@ client's `SelectGroupFinderRoles`, `0xC8` immediately after `DispatchYouJoinedTe
 block: `0xC6 DispatchGroupFinderReadyCheck`'s handler `FUN_014ee120` plays `cymbal_of_doom` and opens
 `groupFinder_readyPrompt` — the name it already had, reproduced by the same read.
 
+### ⭐⭐ …and then the DISPATCH CONSTRUCTOR named every one of them (#876, closed 2026-08-22)
+
+**`Opcodes.cs` now carries no `Reserved0xNN` at all.** Every no-arg slot on all four s2c interfaces is named, in
+the client's own words, and the census below turned out to be bounding the wrong route.
+
+The assert-string route really is one-per-ARGUMENT and really does skip a no-arg method — everything the section
+below measures is correct. It was simply **the wrong table**. Each interface's dispatch CONSTRUCTOR registers
+`index -> name` for all of its methods, no-arg ones included, as a run of
+
+```
+<slot field> = N ;  <ctor helper>() ;  FUN_0040ec10("<Name>", <len>)
+```
+
+| interface | constructor | entries |
+|---|---|---:|
+| `CSPlayerInterface` | `FUN_01338690` | 211 |
+| `GameCharInterface` | `FUN_004BABB0` | 180 |
+| `GameInterface` | `FUN_004919C0` | 15 |
+| `GameCharInterfaceProject` | `FUN_00493800` | 16 |
+
+Find one by taking any method name you already have (`DumpStringXrefs STR=ReplyDebugGetSpellProcData`) — the
+constructor is the function that references it that is not the dispatcher.
+
+⭐ **The tables carry their own control.** On the members that already had names, **178 of 183** CSPlayerInterface
+and **157 of 161** GameCharInterface agree exactly with the constructor. The few that differed were ours-by-
+behaviour and have been replaced by the client's — including the three group-finder slots the signal-subscriber
+route named (`DispatchGroupFinderRoleSelect` → `DispatchGroupFinderSelectRoles`, `DispatchVoteRetreatStarted` →
+`DispatchGroupFinderVoteRetreatStarted`, `DispatchGroupFinderActivityStarted` → `DispatchGroupFinderStartActivity`),
+which is the same answer arrived at twice. One was a genuine **mis-assignment**: `GameInterface` 0x0E was carrying
+`ClearKnownRecipes`, which is `GameCharInterface`'s 0x0E; this slot is `Kicked`.
+
+⭐ Two independent corroborations of the recovered names, from opposite directions:
+
+* `GameCharInterface 0x1B` = **`TeleportStarted`**, which is exactly what the corpus said it was without a name —
+  114 frames, each immediately before an `IntendedTeleportIIR`.
+* `CSPlayerInterface 0x81` = **`PvPMatchMakingRemovedFromMatchMaking`**, which is what we were already sending it
+  as: the answer to `PvPMatchMakingRemoveFromMatchMaking`.
+
+⚠️ **A cheaper half-route, worth knowing because it works without the constructor**: a no-arg override still has
+to SAY something, and 25 of the 28 CSPlayerInterface slots push a FEEDBACK TOKEN by address — `DumpVtableBodies
+VT=1fa4524` over `CSClientIncoming_c`, then `DumpStringsAt` on the `0x1FAxxxx` pointer each body carries. 19 of
+those 25 matched the constructor's name exactly; the other 6 were the token the method RAISES rather than the
+method's own name (`0xAC` raises `SomeoneBoughtYouritem` and is called `ItemSoldNotification`). So the token names
+the BEHAVIOUR reliably and the method only usually — use the constructor when you can.
+
 ### Which `Reserved` slots are worth the vtable route — the census, and the route that is exhausted
+
+⛔ **Superseded by the section above** — kept because its measurements are sound and its reasoning about the
+assert-string table is still the reason that table cannot answer this. The counts below predate the naming.
+
 
 `Opcodes.cs` carries **55** `Reserved0xNN` members. Two facts bound the work (Gitea #876, measured 2026-08-21):
 
@@ -131,7 +180,7 @@ The other 53 have **zero** frames, so nothing can be checked against a capture a
 strings are the `<Iface>Dispatch_t::Dispatch<Name>() not possible, stream bad after '<arg>'!` errors — one per
 ARGUMENT, so a no-arg method emits none. They sit in one address-ordered table that runs in registration-index
 order, and dumping the window across a known gap (`DispatchGuildNotEnoughCash` 0x03 → `DispatchUpdateCash` 0x05,
-i.e. across `Reserved0x04`) shows the two neighbours and **nothing between them**. The same 157 GameCharInterface
+i.e. across `DispatchGuildErrorWithTransfer`) shows the two neighbours and **nothing between them**. The same 157 GameCharInterface
 and 178 CSPlayerInterface names appear in `AgeOfConan.exe`, `AgeOfConan.exe.bak` and `AgeOfConanDX10.exe`, so
 there is no second build to diff either. Naming one of these needs its dispatcher case, and only where the
 overriding function is not empty — which for `0x1B`, the one with real traffic, it is.
@@ -314,14 +363,14 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x2067  DispatchBroadcastMessage
 0x2068  DispatchRequestTrade
 0x2069  DispatchStartTrade
-0x206A  DispatchTradeAbort
-0x206B  DispatchAcceptedTrade
+0x206A  DispatchAbortTrade
+0x206B  DispatchClientAcceptedTrade
 0x206C  DispatchPartnerAcceptedTrade
-0x206D  DispatchTradeCompleted
+0x206D  DispatchCompleteTrade
 0x206E  DispatchPartnerUpdatedCash
 0x206F  DispatchTradePartnerAddedItem
 0x2070  DispatchTradeAddedItem
-0x2071  DispatchUnacceptedTrade
+0x2071  DispatchClientNoLongerAcceptedTrade
 0x2072  <no-arg>
 0x2073  DispatchTradePartnerRemovedItem
 0x2074  DispatchTradeRemovedItem
@@ -588,12 +637,12 @@ but its name is not recoverable FROM STRINGS (catalog also missed it) — see th
 0x20C0  <no-arg>
 0x20C1  DispatchCSFeedback
 0x20C2  DispatchGroupFinderSignupFailed
-0x20C3  <no-arg>  (#801: resolved - opens `groupFinder_roleSelect`; `DispatchGroupFinderRoleSelect`)
+0x20C3  <no-arg>  (#801: resolved - opens `groupFinder_roleSelect`; `DispatchGroupFinderSelectRoles`)
 0x20C4  DispatchGroupFinderSignupSuccess
 0x20C5  DispatchGroupFinderRemoved
 0x20C6  DispatchGroupFinderReadyCheck
-0x20C7  <no-arg>  (#801: resolved - its handler puts the LDB-100 token `VoteRetreatStarted` on screen; `DispatchVoteRetreatStarted`)
-0x20C8  <no-arg>  (#801: resolved - raises `SignalClientStartedGroupFinderActivity`; `DispatchGroupFinderActivityStarted`)
+0x20C7  <no-arg>  (#801: resolved - its handler puts the LDB-100 token `VoteRetreatStarted` on screen; `DispatchGroupFinderVoteRetreatStarted`)
+0x20C8  <no-arg>  (#801: resolved - raises `SignalClientStartedGroupFinderActivity`; `DispatchGroupFinderStartActivity`)
 0x20C9  DispatchGroupFinderReadyCheckStatus
 0x20CA  DispatchGroupFinderReadyCheckRejected
 0x20CB  DispatchGroupFinderPlayfieldInfo

@@ -206,7 +206,7 @@ namespace Faolan.CSPlayerAgent
 				// `CreateGuild "Faolan"` answered in the same second by `0x2047` with an EMPTY body and nothing
 				// else. Without it the registrar window just sits there.
 				_logger.LogWarning("CreateGuild failed for {CharacterId:X8}: guild name \"{Name}\" is taken.", character.Id, name);
-				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildNameTaken, _ => { }));
+				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildTakenName, _ => { }));
 				return;
 			}
 

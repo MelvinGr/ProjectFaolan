@@ -17,11 +17,11 @@ namespace Faolan.CSPlayerAgent
 	//
 	//   c RequestNeededRole(activity)      -> s DispatchGroupFinderReceivedNeededRole
 	//   c QueueGroupFinder(bits, _, priv)  -> s DispatchGroupFinderSignupFailed        (quest log at the cap)
-	//                                      -> s DispatchGroupFinderRoleSelect          (accepted; no-arg, #801)
+	//                                      -> s DispatchGroupFinderSelectRoles          (accepted; no-arg, #801)
 	//   c SelectGroupFinderRoles(roles)    -> s DispatchGroupFinderSignupSuccess + DispatchGroupFinderReadyCheck
 	//   c ReadyGroupFinder(true, _)        -> s DispatchGroupFinderReadyCheckStatus + DispatchCharacterLookingForTeamStatus
 	//                                         + DispatchYouJoinedTeam (the team forms - solo = the annotated
-	//                                           "entered as private team") + DispatchGroupFinderActivityStarted
+	//                                           "entered as private team") + DispatchGroupFinderStartActivity
 	//                                      -> the world tier teleports into the activity's playfield, which the
 	//                                         team now OWNS (#512: the proxy's owner pair is (0xDEA9, teamId))
 	//
@@ -91,7 +91,7 @@ namespace Faolan.CSPlayerAgent
 
 			// The accept is the no-arg 0x20C3: the client opens its groupFinder_roleSelect window on it (#801) and
 			// answers with SelectGroupFinderRoles.
-			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderRoleSelect, []);
+			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderSelectRoles, []);
 		}
 
 		public async Task HandleSelectRoles(INetworkClient client, uint roles)
@@ -139,7 +139,7 @@ namespace Faolan.CSPlayerAgent
 			// that team along instead.
 			var teamId = await teams.FormGroupFinderTeam(characterId);
 
-			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderActivityStarted, []);
+			await Send(client, CSPlayerInterfaceMethods.DispatchGroupFinderStartActivity, []);
 
 			var activityId = ActivityOf(signup);
 			if (GroupFinderActivityCatalog.ActivityFor(activityId) is not { } destination)

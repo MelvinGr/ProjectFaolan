@@ -172,7 +172,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void RemoveFromMatchMaking_IsAnsweredByTheEmptyNoArgSlot()
 		{
-			Assert.Equal(0x81, (int)CSPlayerInterfaceMethods.Reserved0x81);
+			Assert.Equal(0x81, (int)CSPlayerInterfaceMethods.DispatchPvPMatchMakingRemovedFromMatchMaking);
 			Assert.Equal(0x53, (int)CSPlayerAgentMethods.PvPMatchMakingRemoveFromMatchMaking);
 		}
 	}

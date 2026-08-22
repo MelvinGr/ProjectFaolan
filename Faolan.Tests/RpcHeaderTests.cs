@@ -93,7 +93,7 @@ namespace Faolan.Tests
 
 		// …and a method below the boundary stays bare, which is the half the trade replies used to get wrong: all seven
 		// are methods 0x68-0x6E (104-110) and every one hand-passed a `0x01` retail's captures do not carry.
-		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.DispatchAcceptedTrade), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
+		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.DispatchClientAcceptedTrade), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
 		 InlineData(GameCharInterfaceMethods.DispatchCharacterNameReply)]
 		public void ALowIndexSend_StaysOneGroup(GameCharInterfaceMethods method)
 		{
@@ -105,9 +105,9 @@ namespace Faolan.Tests
 
 		// #792: the two no-arg GameCharInterface methods the server now SENDS carry a zero-length body and one varint
 		// group. Both were `Reserved0xNN` until the client's own vtable named what they do, and the corpus pinned when
-		// they arrive: `DispatchTradeAbort` answers `CloseShop` (152 of 153 frames) and `0x1B` precedes every
+		// they arrive: `DispatchAbortTrade` answers `CloseShop` (152 of 153 frames) and `0x1B` precedes every
 		// `IntendedTeleportIIR` (102 of 102). A body of any length here would be a different message.
-		[Theory, InlineData(GameCharInterfaceMethods.DispatchTradeAbort, 0x6A), InlineData(GameCharInterfaceMethods.Reserved0x1B, 0x1B)]
+		[Theory, InlineData(GameCharInterfaceMethods.DispatchAbortTrade, 0x6A), InlineData(GameCharInterfaceMethods.DispatchTeleportStarted, 0x1B)]
 		public void ANoArgWorldMethod_SendsAnEmptyBody(GameCharInterfaceMethods method, int expected)
 		{
 			var rpc = new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty);

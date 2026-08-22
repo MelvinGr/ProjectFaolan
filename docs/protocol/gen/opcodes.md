@@ -205,7 +205,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x1E` | `0x201E` | `DispatchTeamSummonRequestFailedInvalidPF` |  |
 | `0x1F` | `0x201F` | `DispatchTeamSummonRequestFailedAlreadyInSameInstance` |  |
 | `0x20` | `0x2020` | `DispatchWarningTeamSizeTooLarge` |  |
-| `0x21` | `0x2021` | `Reserved0x21` |  |
+| `0x21` | `0x2021` | `DispatchTeamIsFull` | its override raises the feedback token of the same name (#876) |
 | `0x22` | `0x2022` | `DispatchYouGotKickedFromTeam` |  |
 | `0x23` | `0x2023` | `DispatchVoteKickStarted` |  |
 | `0x24` | `0x2024` | `DispatchVoteKickFailed` |  |
@@ -215,9 +215,9 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x28` | `0x2028` | `DispatchDeleteCanceledMail` |  |
 | `0x29` | `0x2029` | `DispatchDeleteCanceledMailItem` |  |
 | `0x2A` | `0x202A` | `DispatchGuildInvite` |  |
-| `0x2B` | `0x202B` | `Reserved0x2B` |  |
-| `0x2C` | `0x202C` | `Reserved0x2C` |  |
-| `0x2D` | `0x202D` | `Reserved0x2D` |  |
+| `0x2B` | `0x202B` | `DispatchGuildKick` | its override raises the feedback token of the same name (#876) |
+| `0x2C` | `0x202C` | `DispatchGuildDisbanded` | its override raises the feedback token of the same name (#876) |
+| `0x2D` | `0x202D` | `DispatchGuildLeave` | its override raises the feedback token of the same name (#876) |
 | `0x2E` | `0x202E` | `DispatchGuildMemberLeft` |  |
 | `0x2F` | `0x202F` | `DispatchGuildMemberJoined` |  |
 | `0x30` | `0x2030` | `DispatchGuildMemberUpdate` |  |
@@ -225,7 +225,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x32` | `0x2032` | `DispatchGuildGMPromoteFeedback` |  |
 | `0x33` | `0x2033` | `DispatchGuildGMDemoteFeedback` |  |
 | `0x34` | `0x2034` | `DispatchGuildInviteNoSuchName` |  |
-| `0x35` | `0x2035` | `Reserved0x35` |  |
+| `0x35` | `0x2035` | `DispatchGuildInviteTargetOffline` | its override raises the feedback token of the same name (#876) |
 | `0x36` | `0x2036` | `DispatchGuildPvPPointInfo` |  |
 | `0x37` | `0x2037` | `DispatchGuildRenownInfo` |  |
 | `0x38` | `0x2038` | `DispatchGuildRankingsUpdate` |  |
@@ -242,25 +242,25 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x43` | `0x2043` | `DispatchGuildUpdateOther` |  |
 | `0x44` | `0x2044` | `DispatchGuildCreated` |  |
 | `0x45` | `0x2045` | `DispatchGuildNonAlphanumericName` |  |
-| `0x46` | `0x2046` | `DispatchGuildNameWrongLength` |  |
-| `0x47` | `0x2047` | `DispatchGuildNameTaken` |  |
+| `0x46` | `0x2046` | `DispatchGuildWrongLengthName` |  |
+| `0x47` | `0x2047` | `DispatchGuildTakenName` |  |
 | `0x48` | `0x2048` | `DispatchGuildBadName` |  |
 | `0x49` | `0x2049` | `DispatchGuildNameWaitTime` |  |
-| `0x4A` | `0x204A` | `Reserved0x4A` |  |
-| `0x4B` | `0x204B` | `Reserved0x4B` |  |
-| `0x4C` | `0x204C` | `Reserved0x4C` |  |
-| `0x4D` | `0x204D` | `Reserved0x4D` |  |
+| `0x4A` | `0x204A` | `DispatchGuildCurrentlyInGuild` | its override raises the feedback token of the same name (#876) |
+| `0x4B` | `0x204B` | `DispatchGuildLevelRequirementFailed` | its override raises the feedback token of the same name (#876) |
+| `0x4C` | `0x204C` | `DispatchGuildStandingInvitation` | its override raises the feedback token of the same name (#876) |
+| `0x4D` | `0x204D` | `DispatchGuildAlreadyGuilded` | its override raises the feedback token of the same name (#876) |
 | `0x4E` | `0x204E` | `DispatchGuildOnInviteCooldown` |  |
-| `0x4F` | `0x204F` | `Reserved0x4F` |  |
+| `0x4F` | `0x204F` | `DispatchGuildCantDemote` | its override raises the feedback token of the same name (#876) |
 | `0x50` | `0x2050` | `DispatchGuildTaxError` |  |
 | `0x51` | `0x2051` | `DispatchGuildInvalidGoverningForm` |  |
 | `0x52` | `0x2052` | `DispatchGuildUpdateCash` |  |
-| `0x53` | `0x2053` | `Reserved0x53` |  |
+| `0x53` | `0x2053` | `DispatchSubscriptionRequirementFailed` | its override raises the feedback token of the same name (#876) |
 | `0x54` | `0x2054` | `DispatchGuildTaxChanged` |  |
 | `0x55` | `0x2055` | `DispatchGuildGoverningFormChanged` |  |
 | `0x56` | `0x2056` | `DispatchGuildRecruitmentModeChanged` |  |
 | `0x57` | `0x2057` | `DispatchGuildMessageOfTheDayChanged` |  |
-| `0x58` | `0x2058` | `Reserved0x58` |  |
+| `0x58` | `0x2058` | `DispatchGuildDescriptionChanged` | its override raises the feedback token of the same name (#876) |
 | `0x59` | `0x2059` | `DispatchGuildNameChanged` |  |
 | `0x5A` | `0x205A` | `DispatchGMGuildNameChanged` |  |
 | `0x5B` | `0x205B` | `DispatchGuildMemberList` |  |
@@ -275,20 +275,20 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x64` | `0x2064` | `DispatchRemoveGuildFeat` |  |
 | `0x65` | `0x2065` | `DispatchGuildRankChanged` |  |
 | `0x66` | `0x2066` | `DispatchGuildApplicationRequest` |  |
-| `0x67` | `0x2067` | `Reserved0x67` |  |
+| `0x67` | `0x2067` | `DispatchGuildNoInvitersOnline` | its override raises the feedback token of the same name (#876) |
 | `0x68` | `0x2068` | `DispatchGuildApplicationRejected` |  |
 | `0x69` | `0x2069` | `DispatchGuildMergeRequest` |  |
 | `0x6A` | `0x206A` | `DispatchGuildMergeRequestFailed` |  |
 | `0x6B` | `0x206B` | `DispatchGuildCityBooked` |  |
 | `0x6C` | `0x206C` | `DispatchGuildCityBookingFailed` |  |
 | `0x6D` | `0x206D` | `DispatchNewVulnerabilityWindowData` |  |
-| `0x6E` | `0x206E` | `Reserved0x6E` |  |
+| `0x6E` | `0x206E` | `DispatchGuildCityReachedTier3` | the override's own log string NAMES it (#876) |
 | `0x6F` | `0x206F` | `DispatchGuildIsMassivePvPCityOwner` |  |
 | `0x70` | `0x2070` | `DispatchGuildIsMassivePvPCityAttacker` |  |
 | `0x71` | `0x2071` | `DispatchFeedbackMessage` |  |
 | `0x72` | `0x2072` | `DispatchRequestBattleKeepInformation` |  |
 | `0x73` | `0x2073` | `DispatchGMReplyGuildInfoFromChar` |  |
-| `0x74` | `0x2074` | `Reserved0x74` |  |
+| `0x74` | `0x2074` | `DispatchGMReplyNoGuildInfoFromChar` |  |
 | `0x75` | `0x2075` | `DispatchPvPMatchMakingWantsToStart` |  |
 | `0x76` | `0x2076` | `DispatchPvPMatchMakingPlayerJoined` |  |
 | `0x77` | `0x2077` | `DispatchPvPMatchMakingPlayerChangedSide` |  |
@@ -296,28 +296,28 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x79` | `0x2079` | `DispatchPvPMatchMakingPlayerKicked` |  |
 | `0x7A` | `0x207A` | `DispatchPvPMatchMakingErrorCode` |  |
 | `0x7B` | `0x207B` | `DispatchPvPMatchMakingYouJoinedMatch` |  |
-| `0x7C` | `0x207C` | `Reserved0x7C` |  |
+| `0x7C` | `0x207C` | `DispatchPvPMatchMakingMatchRemoved` | the override's own log string NAMES it (#876) |
 | `0x7D` | `0x207D` | `DispatchPvPMatchMakingMatchInfo` |  |
 | `0x7E` | `0x207E` | `DispatchPvPMatchMakingSearchResult` |  |
 | `0x7F` | `0x207F` | `DispatchPvPMatchMakingStartClicked` |  |
 | `0x80` | `0x2080` | `DispatchPvPMatchMakingYouAreInMatchMaking` |  |
-| `0x81` | `0x2081` | `Reserved0x81` |  |
-| `0x82` | `0x2082` | `Reserved0x82` |  |
+| `0x81` | `0x2081` | `DispatchPvPMatchMakingRemovedFromMatchMaking` | its override raises the feedback token of the same name (#876) |
+| `0x82` | `0x2082` | `DispatchPvPMatchMakingCowardRemovedFromMatchMaking` | its override raises the feedback token of the same name (#876) |
 | `0x83` | `0x2083` | `DispatchPvPMatchMakingMatchSay` |  |
 | `0x84` | `0x2084` | `DispatchPvPMatchMakingCollectingMorePlayers` |  |
 | `0x85` | `0x2085` | `DispatchPvPMatchMakingNewMatchLeader` |  |
 | `0x86` | `0x2086` | `DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking` |  |
-| `0x87` | `0x2087` | `Reserved0x87` |  |
-| `0x88` | `0x2088` | `Reserved0x88` |  |
+| `0x87` | `0x2087` | `DispatchPvPMatchMakingTeamRemovedFromMatchMakingNoLongerSameTier` | its override raises the feedback token of the same name (#876) |
+| `0x88` | `0x2088` | `DispatchPvPMatchMakingCantLeavePvPMatchMakingNotTeamLeader` | its override raises the feedback token of the same name (#876) |
 | `0x89` | `0x2089` | `DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide` |  |
 | `0x8A` | `0x208A` | `DispatchPvPMatchMakingCantLockToSideMustPickASideFirst` |  |
 | `0x8B` | `0x208B` | `DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide` |  |
 | `0x8C` | `0x208C` | `DispatchPvPMatchMakingCharacterNowLockedToSide` |  |
 | `0x8D` | `0x208D` | `DispatchPvPMatchMakingCharacterNoLongerLockedToSide` |  |
-| `0x8E` | `0x208E` | `Reserved0x8E` |  |
-| `0x8F` | `0x208F` | `Reserved0x8F` |  |
-| `0x90` | `0x2090` | `Reserved0x90` |  |
-| `0x91` | `0x2091` | `Reserved0x91` |  |
+| `0x8E` | `0x208E` | `DispatchPvPMatchMakingFeedbackOneTeamMemberAlreadyInMatch` | its override raises the feedback token of the same name (#876) |
+| `0x8F` | `0x208F` | `DispatchPvPMatchMakingFeedbackNotAllMembersInSameTier` | its override raises the feedback token of the same name (#876) |
+| `0x90` | `0x2090` | `DispatchPvPMatchMakingTeamJoined` |  |
+| `0x91` | `0x2091` | `DispatchPvPMatchMakingRaidJoined` |  |
 | `0x92` | `0x2092` | `DispatchPvPMatchMakingInfoRequestReturn` |  |
 | `0x93` | `0x2093` | `DispatchYouJoinedRaid` |  |
 | `0x94` | `0x2094` | `DispatchRaidTeamJoined` |  |
@@ -333,9 +333,9 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0x9E` | `0x209E` | `DispatchRaidInvitationTimedOut` |  |
 | `0x9F` | `0x209F` | `DispatchRaidTargetDeclinedRaidInvite` |  |
 | `0xA0` | `0x20A0` | `DispatchRaidYouAreNoLongerInvited` |  |
-| `0xA1` | `0x20A1` | `Reserved0xA1` |  |
+| `0xA1` | `0x20A1` | `DispatchRaidYouWereKickedFromRaid` | its override raises the feedback token of the same name (#876) |
 | `0xA2` | `0x20A2` | `DispatchRaidCantInviteInvalidSubscriptionFlags` |  |
-| `0xA3` | `0x20A3` | `Reserved0xA3` |  |
+| `0xA3` | `0x20A3` | `DispatchRaidCantJoinInvalidSubscriptionFlags` | its override raises the feedback token of the same name (#876) |
 | `0xA4` | `0x20A4` | `DispatchRaidCantCreateInvalidMemberSubscriptionFlags` |  |
 | `0xA5` | `0x20A5` | `DispatchMassivePvpInfoRequestReturn` |  |
 | `0xA6` | `0x20A6` | `DispatchMassivePvPBattleQueueFeedback` |  |
@@ -344,7 +344,7 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xA9` | `0x20A9` | `DispatchBattleKeepInfoRequestReturnPhase1And2` |  |
 | `0xAA` | `0x20AA` | `DispatchBattleKeepInfoRequestReturnPhase3And4` |  |
 | `0xAB` | `0x20AB` | `DispatchYouGotMailNotification` |  |
-| `0xAC` | `0x20AC` | `Reserved0xAC` |  |
+| `0xAC` | `0x20AC` | `DispatchItemSoldNotification` | its override raises the feedback token of the same name (#876) |
 | `0xAD` | `0x20AD` | `DispatchDebugFullGameServerList` |  |
 | `0xAE` | `0x20AE` | `DispatchDebugGameServerConnected` |  |
 | `0xAF` | `0x20AF` | `DispatchDebugGameServerDisconnected` |  |
@@ -364,15 +364,15 @@ RPC class **CSPlayerInterface** (id `0xBBD560C8`) · S2C (server→client dispat
 | `0xBD` | `0x20BD` | `DispatchDebugRemoveIDFromMatchMaking` |  |
 | `0xBE` | `0x20BE` | `DispatchItemSalesUpdateBalance` |  |
 | `0xBF` | `0x20BF` | `DispatchItemSalesCoupons` |  |
-| `0xC0` | `0x20C0` | `Reserved0xC0` |  |
+| `0xC0` | `0x20C0` | `DispatchItemSalesReportNoConnectionToBillingServer` | the override raises the message "No connection to the billingserver" - a sentence rather than a token, so this NAME is ours (#876) |
 | `0xC1` | `0x20C1` | `DispatchCSFeedback` |  |
 | `0xC2` | `0x20C2` | `DispatchGroupFinderSignupFailed` |  |
-| `0xC3` | `0x20C3` | `DispatchGroupFinderRoleSelect` |  |
+| `0xC3` | `0x20C3` | `DispatchGroupFinderSelectRoles` |  |
 | `0xC4` | `0x20C4` | `DispatchGroupFinderSignupSuccess` |  |
 | `0xC5` | `0x20C5` | `DispatchGroupFinderRemoved` |  |
 | `0xC6` | `0x20C6` | `DispatchGroupFinderReadyCheck` |  |
-| `0xC7` | `0x20C7` | `DispatchVoteRetreatStarted` |  |
-| `0xC8` | `0x20C8` | `DispatchGroupFinderActivityStarted` |  |
+| `0xC7` | `0x20C7` | `DispatchGroupFinderVoteRetreatStarted` |  |
+| `0xC8` | `0x20C8` | `DispatchGroupFinderStartActivity` |  |
 | `0xC9` | `0x20C9` | `DispatchGroupFinderReadyCheckStatus` |  |
 | `0xCA` | `0x20CA` | `DispatchGroupFinderReadyCheckRejected` |  |
 | `0xCB` | `0x20CB` | `DispatchGroupFinderPlayfieldInfo` |  |
@@ -641,7 +641,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x01` | `0x2001` | `DispatchUpdateName` |  |
 | `0x02` | `0x2002` | `DispatchUpdateBindLocation` |  |
 | `0x03` | `0x2003` | `DispatchGuildNotEnoughCash` |  |
-| `0x04` | `0x2004` | `Reserved0x04` |  |
+| `0x04` | `0x2004` | `DispatchGuildErrorWithTransfer` |  |
 | `0x05` | `0x2005` | `DispatchUpdateCash` |  |
 | `0x06` | `0x2006` | `DispatchUpdateCashRepository` |  |
 | `0x07` | `0x2007` | `DispatchMoveInventoryItemToOrFromGuildBank` |  |
@@ -649,14 +649,14 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x09` | `0x2009` | `DispatchChangeItemStackSize` |  |
 | `0x0A` | `0x200A` | `DispatchLearnSpell` |  |
 | `0x0B` | `0x200B` | `DispatchForgetSpell` |  |
-| `0x0C` | `0x200C` | `Reserved0x0C` |  |
+| `0x0C` | `0x200C` | `DispatchSpellInterrupted` |  |
 | `0x0D` | `0x200D` | `DispatchTradeskillComplete` |  |
-| `0x0E` | `0x200E` | `Reserved0x0E` |  |
+| `0x0E` | `0x200E` | `DispatchClearKnownRecipes` |  |
 | `0x0F` | `0x200F` | `DispatchClearRecipe` |  |
 | `0x10` | `0x2010` | `DispatchRemoveRecipesByGroupClient` |  |
 | `0x11` | `0x2011` | `DispatchUntrainSingleFeat` |  |
 | `0x12` | `0x2012` | `DispatchDisplayItemLootChatMessage` |  |
-| `0x13` | `0x2013` | `Reserved0x13` |  |
+| `0x13` | `0x2013` | `DispatchItemMovedToOverflowBag` |  |
 | `0x14` | `0x2014` | `DispatchSendNPCAutoTradeCashAmount` |  |
 | `0x15` | `0x2015` | `DispatchSetDialogueCamera` |  |
 | `0x16` | `0x2016` | `DispatchAddTag` |  |
@@ -664,7 +664,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x18` | `0x2018` | `DispatchResurrectRequest` |  |
 | `0x19` | `0x2019` | `DispatchSetDbDebugCategory` |  |
 | `0x1A` | `0x201A` | `DispatchSetDbDebugLevel` |  |
-| `0x1B` | `0x201B` | `Reserved0x1B` |  |
+| `0x1B` | `0x201B` | `DispatchTeleportStarted` |  |
 | `0x1C` | `0x201C` | `DispatchSetItemStat` |  |
 | `0x1D` | `0x201D` | `DispatchAddToItemSlot` |  |
 | `0x1E` | `0x201E` | `DispatchRemoveFromItemSlot` |  |
@@ -674,7 +674,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x22` | `0x2022` | `DispatchMoveInventoryItemFromGuildBank` |  |
 | `0x23` | `0x2023` | `DispatchCharacterNameReply` |  |
 | `0x24` | `0x2024` | `DispatchValidResurrectionSpots` |  |
-| `0x25` | `0x2025` | `Reserved0x25` |  |
+| `0x25` | `0x2025` | `DispatchToggleSpellRecharge` |  |
 | `0x26` | `0x2026` | `DispatchReplyPCDebugData` |  |
 | `0x27` | `0x2027` | `DispatchReplyLootForCharacter` |  |
 | `0x28` | `0x2028` | `DispatchReplyLootForCharacterAddHash` |  |
@@ -686,7 +686,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x2E` | `0x202E` | `DispatchFormationClaimPosition` |  |
 | `0x2F` | `0x202F` | `DispatchFormationUpdatePosition` |  |
 | `0x30` | `0x2030` | `DispatchFormationClearPosition` |  |
-| `0x31` | `0x2031` | `Reserved0x31` |  |
+| `0x31` | `0x2031` | `DispatchFormationClear` |  |
 | `0x32` | `0x2032` | `DispatchFormationUpdatePosRot` |  |
 | `0x33` | `0x2033` | `DispatchShopData` |  |
 | `0x34` | `0x2034` | `DispatchCloseShop` |  |
@@ -718,7 +718,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x4E` | `0x204E` | `DispatchLockTemplate` |  |
 | `0x4F` | `0x204F` | `DispatchApplyFactionRank` |  |
 | `0x50` | `0x2050` | `DispatchApplyFactionPoints` |  |
-| `0x51` | `0x2051` | `Reserved0x51` |  |
+| `0x51` | `0x2051` | `DispatchRequestResetStanding` |  |
 | `0x52` | `0x2052` | `DispatchAddSpecialAbility` |  |
 | `0x53` | `0x2053` | `DispatchRemoveSpecialAbility` |  |
 | `0x54` | `0x2054` | `DispatchPerformSpecialAction` |  |
@@ -726,7 +726,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x56` | `0x2056` | `DispatchACGTeleportChoice` |  |
 | `0x57` | `0x2057` | `DispatchACGSelfInstanceCleared` |  |
 | `0x58` | `0x2058` | `DispatchACGTeamBindChanged` |  |
-| `0x59` | `0x2059` | `Reserved0x59` |  |
+| `0x59` | `0x2059` | `DispatchACGTeleportCloseChoice` |  |
 | `0x5A` | `0x205A` | `DispatchOverrideJumpHeight` |  |
 | `0x5B` | `0x205B` | `DispatchOverrideJumpSpeed` |  |
 | `0x5C` | `0x205C` | `DispatchVisualSimulateNpc` |  |
@@ -743,22 +743,22 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x67` | `0x2067` | `DispatchBroadcastMessage` |  |
 | `0x68` | `0x2068` | `DispatchRequestTrade` |  |
 | `0x69` | `0x2069` | `DispatchStartTrade` |  |
-| `0x6A` | `0x206A` | `DispatchTradeAbort` |  |
-| `0x6B` | `0x206B` | `DispatchAcceptedTrade` |  |
+| `0x6A` | `0x206A` | `DispatchAbortTrade` |  |
+| `0x6B` | `0x206B` | `DispatchClientAcceptedTrade` |  |
 | `0x6C` | `0x206C` | `DispatchPartnerAcceptedTrade` |  |
-| `0x6D` | `0x206D` | `DispatchTradeCompleted` |  |
+| `0x6D` | `0x206D` | `DispatchCompleteTrade` |  |
 | `0x6E` | `0x206E` | `DispatchPartnerUpdatedCash` |  |
 | `0x6F` | `0x206F` | `DispatchTradePartnerAddedItem` |  |
 | `0x70` | `0x2070` | `DispatchTradeAddedItem` |  |
-| `0x71` | `0x2071` | `DispatchUnacceptedTrade` |  |
-| `0x72` | `0x2072` | `Reserved0x72` | #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus. |
+| `0x71` | `0x2071` | `DispatchClientNoLongerAcceptedTrade` |  |
+| `0x72` | `0x2072` | `DispatchPartnerNoLongerAcceptedTrade` | #792: fires the trade-window refresh signal and nothing else. Never sent in the corpus. |
 | `0x73` | `0x2073` | `DispatchTradePartnerRemovedItem` |  |
 | `0x74` | `0x2074` | `DispatchTradeRemovedItem` |  |
 | `0x75` | `0x2075` | `DispatchDeleteCachedLDBData` |  |
 | `0x76` | `0x2076` | `DispatchShortcutBarReply` |  |
-| `0x77` | `0x2077` | `Reserved0x77` |  |
-| `0x78` | `0x2078` | `Reserved0x78` |  |
-| `0x79` | `0x2079` | `Reserved0x79` |  |
+| `0x77` | `0x2077` | `DispatchShortcutBarValidate` |  |
+| `0x78` | `0x2078` | `DispatchEnableAutotrain` |  |
+| `0x79` | `0x2079` | `DispatchDisableAutotrain` |  |
 | `0x7A` | `0x207A` | `DispatchAddWayPoint` |  |
 | `0x7B` | `0x207B` | `DispatchRemoveWayPoint` |  |
 | `0x7C` | `0x207C` | `DispatchReplyWaveRespawnTimerUpdate` |  |
@@ -771,10 +771,10 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x83` | `0x2083` | `DispatchUpdateTeamMemberPosList` |  |
 | `0x84` | `0x2084` | `DispatchDynamicSpaceDebugInfo` |  |
 | `0x85` | `0x2085` | `DispatchSetGameTweakValue` |  |
-| `0x86` | `0x2086` | `Reserved0x86` |  |
+| `0x86` | `0x2086` | `DispatchReloadGameTweakValues` |  |
 | `0x87` | `0x2087` | `DispatchMinigameScoreChanged` |  |
 | `0x88` | `0x2088` | `DispatchMinigameFullScore` |  |
-| `0x89` | `0x2089` | `Reserved0x89` |  |
+| `0x89` | `0x2089` | `DispatchMinigameMatchPrepareStarted` |  |
 | `0x8A` | `0x208A` | `DispatchMinigameMatchStarted` |  |
 | `0x8B` | `0x208B` | `DispatchMinigameMatchEnded` |  |
 | `0x8C` | `0x208C` | `DispatchMinigameCaptureZoneUpdate` |  |
@@ -783,13 +783,13 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x8F` | `0x208F` | `DispatchForceStopMinigame` |  |
 | `0x90` | `0x2090` | `DispatchSetMinigameTime` |  |
 | `0x91` | `0x2091` | `DispatchMinigameStartsInXSeconds` |  |
-| `0x92` | `0x2092` | `Reserved0x92` |  |
+| `0x92` | `0x2092` | `DispatchPreMinigameStartsInXSeconds` |  |
 | `0x93` | `0x2093` | `DispatchMassivePvPFullScoreUpdate` |  |
 | `0x94` | `0x2094` | `DispatchMassivePvPGuildScoreUpdate` |  |
 | `0x95` | `0x2095` | `DispatchMassivePvPPlayerScoreUpdate` |  |
 | `0x96` | `0x2096` | `DispatchMassivePvPScoreNames` |  |
-| `0x97` | `0x2097` | `Reserved0x97` |  |
-| `0x98` | `0x2098` | `Reserved0x98` |  |
+| `0x97` | `0x2097` | `DispatchMassivePvPLeftBattleArea` |  |
+| `0x98` | `0x2098` | `DispatchMassivePvPEnteredBattleArea` |  |
 | `0x99` | `0x2099` | `DispatchShowVulnerabilityWindowGui` |  |
 | `0x9A` | `0x209A` | `DispatchPassiveAbilityEquip` |  |
 | `0x9B` | `0x209B` | `DispatchPassiveAbilityUnequip` |  |
@@ -798,7 +798,7 @@ RPC class **GameCharInterface** (id `0x8B87F791`) · S2C (server→client dispat
 | `0x9E` | `0x209E` | `DispatchEnterExitGamingRoom` |  |
 | `0x9F` | `0x209F` | `DispatchReplyTeamInvite` |  |
 | `0xA0` | `0x20A0` | `DispatchReplyNewJoinHasHostileInFriends` |  |
-| `0xA1` | `0x20A1` | `Reserved0xA1` |  |
+| `0xA1` | `0x20A1` | `DispatchKickedByGM` |  |
 | `0xA2` | `0x20A2` | `DispatchReplyItemForCashSaleSetData` |  |
 | `0xA3` | `0x20A3` | `DispatchReplyItemForCashSaleUpdateData` |  |
 | `0xA4` | `0x20A4` | `DispatchItemSaleResult` |  |
@@ -827,7 +827,7 @@ RPC class **GameCharInterfaceProject** (id `0x28377648`) · C2S (client→server
 |-----------------|----------|------|------|
 | `0x00` | `0x2000` | `DispatchUpdateAggroStatus` |  |
 | `0x01` | `0x2001` | `DispatchGuildBankData` |  |
-| `0x02` | `0x2002` | `Reserved0x02` |  |
+| `0x02` | `0x2002` | `DispatchGuildBankReply` |  |
 | `0x03` | `0x2003` | `DispatchRequestApprentice` |  |
 | `0x04` | `0x2004` | `DispatchAddApprenticeEntry` |  |
 | `0x05` | `0x2005` | `DispatchRemoveApprenticeEntry` |  |
@@ -851,7 +851,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x00` | `0x2000` | `DispatchPassBlob` |  |
 | `0x01` | `0x2001` | `DispatchAckAuthenticate` |  |
 | `0x02` | `0x2002` | `DispatchRedirectToServer` |  |
-| `0x03` | `0x2003` | `Reserved0x03` |  |
+| `0x03` | `0x2003` | `DispatchOnDisconnectGame` |  |
 | `0x04` | `0x2004` | `DispatchQuitGame` | GameInterface_t::OnQuitGame (#792) |
 | `0x05` | `0x2005` | `DispatchPong` |  |
 | `0x06` | `0x2006` | `DispatchPongWithPacketTiming` |  |
@@ -862,7 +862,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x0B` | `0x200B` | `DispatchReportDimesionID` |  |
 | `0x0C` | `0x200C` | `DispatchReportServerID` |  |
 | `0x0D` | `0x200D` | `DispatchDataSink` |  |
-| `0x0E` | `0x200E` | `Reserved0x0E` |  |
+| `0x0E` | `0x200E` | `DispatchKicked` | ⚠️ was DispatchClearKnownRecipes - that name is GameCharInterface 0x0E; this slot is `Kicked` (#876) |
 | `0x0F` | `0x200F` | `DispatchDisplayPlayfieldAccessPopup` |  |
 
 ## IirTypes

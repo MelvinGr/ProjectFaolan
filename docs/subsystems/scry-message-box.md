@@ -63,7 +63,7 @@ chat-annotated corpus carries a **`2`**, and reading it as a decline would be ex
 
 | time | the player's own `/say` | box | `nAnswer` | what followed |
 |---|---|---|---:|---|
-| 19:56:41 | *"energed normal instance"* | `id=1004` Spider Caverns | `1` | `Reserved0x1B` → `DispatchRedirectToServer :7025` → `Authenticate2` |
+| 19:56:41 | *"energed normal instance"* | `id=1004` Spider Caverns | `1` | `DispatchTeleportStarted` → `DispatchRedirectToServer :7025` → `Authenticate2` |
 | 19:57:15 | *"enered epic instance"* | `id=1004` Spider Caverns | **`2`** | the same three, to the same port |
 
 Same box, same destination, 34 seconds apart, and **both entered the zone**. So a dungeon's difficulty MODE is
