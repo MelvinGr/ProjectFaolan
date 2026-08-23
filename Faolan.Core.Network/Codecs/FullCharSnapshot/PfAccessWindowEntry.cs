@@ -31,7 +31,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// own those expansions), not immutable game data; retail presumably serves 2s to an entitled account.
 		public uint AccessType { get; init; }
 
-		// 0 in all 86 catalog records; a real record field (the client stores it), name unknown (Gitea #464).
+		// 0 in all 86 catalog records; a real record field, name unknown (Gitea #464). STORED-BUT-UNCONSUMED:
+		// the inserter `FUN_0077e9a0` copies it from the source record (its +8) into the node as the pair's third
+		// data word (node +0x18), but the two functions that READ the node - the access checker `FUN_0077e200`
+		// (reads only the AccessType at node +0x14) and the UI opener `FUN_014bd250` (reads the Flag at +0x10 and
+		// the AccessType at +0x14) - never touch +0x18. So no client consumer of it exists on the two known
+		// paths, and it is 0 on every captured record; it is carried so a record round-trips byte-exact.
 		public uint Unknown { get; init; }
 
 		public string InternalName { get; init; } = null!;
