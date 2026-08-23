@@ -46,6 +46,11 @@ namespace Faolan.Importer.Cli
 			// for 67-92, ~8x at +3 levels. Collapsed by level that reads as a sudden cliff at 74/75 and invites a
 			// curve to be fitted through it. `hitsToKill` below already makes this caveat; the melee table did not.
 			var fromNpcByAttacker = new Dictionary<(uint Template, uint Level), List<uint>>();
+			// NPC->player SPELL, keyed by the CASTER (template, level, school). The (level, school) table alone
+			// cannot show that a high-level "NPC" caster is really the necro's own PET nuking an uncaptured mob -
+			// Unholy/Cold ARE the necro's schools - so this names the caster and its per-level sample the way the
+			// melee BY-ATTACKER table does (#479 request 2).
+			var fromNpcSpellByCaster = new Dictionary<(uint Template, uint Level, DamageSchool School), List<uint>>();
 			var attackerHealth = new Dictionary<(uint Template, uint Level), uint>();
 			// level -> every captured spawn health at that level (the `hp/curve` denominator, see below).
 			var healthByLevel = new Dictionary<uint, List<uint>>();
@@ -56,6 +61,13 @@ namespace Faolan.Importer.Cli
 			{
 				// handle -> level, for every NPC this capture spawned.
 				var levels = new Dictionary<uint, uint>();
+				// Handles that received a FullPlayerCharacter snapshot - i.e. genuine players. Used to gate the
+				// SPELL table's NPC->player direction on the target actually BEING the player, rather than on
+				// "not a known NPC" (which an uncaptured mob also satisfies, letting the necro's own AoE leak in).
+				var playerHandles = new HashSet<uint>();
+				foreach (var q in c.Packets)
+					if (q is { IsIirCarrier: true, SubOpcode: FullPlayerCharacterCodec.Opcode } && q.Record.Length >= 12)
+						playerHandles.Add(q.Record.ReadU32Be(8));
 				var spawnHealth = new Dictionary<uint, uint>();
 				var names = new Dictionary<uint, string>();
 				var templates = new Dictionary<uint, uint>();
@@ -224,10 +236,25 @@ namespace Faolan.Importer.Cli
 						var casterIsNpc = levels.TryGetValue(cast.Caster, out var casterLevel);
 						var spellTargetIsNpc = levels.TryGetValue(cast.Handle, out var spellTargetLevel);
 
-						if (casterIsNpc && !spellTargetIsNpc)
+						// ⚠️ TARGET MUST BE A KNOWN PLAYER, not merely "not a known NPC". A necromancer AoEs mobs
+						// that stream in and out of the capture, so many of its Unholy/Cold casts land on a target
+						// whose spawn was never captured - which `!spellTargetIsNpc` waves through as an "NPC->player"
+						// cast by the necro's own pet. Gating on the FullPlayerCharacter handle removes that whole
+						// contaminant, which is what made the level-80 Unholy/Cold rows (the necro's own schools) read
+						// as enemy casters (#479).
+						if (casterIsNpc && playerHandles.Contains(cast.Handle))
 						{
 							fromNpcSpell.TryAdd((casterLevel, cast.School), []);
 							fromNpcSpell[(casterLevel, cast.School)].Add(magnitude);
+
+							if (templates.TryGetValue(cast.Caster, out var casterTemplate))
+							{
+								var ck = (casterTemplate, casterLevel, cast.School);
+								fromNpcSpellByCaster.TryAdd(ck, []);
+								fromNpcSpellByCaster[ck].Add(magnitude);
+								if (names.TryGetValue(cast.Caster, out var casterName))
+									attackerNames[casterTemplate] = casterName;
+							}
 						}
 
 						if (spellTargetIsNpc && !casterIsNpc)
@@ -463,6 +490,20 @@ namespace Faolan.Importer.Cli
 			}
 
 			Report("NPC -> PLAYER, SPELL/DoT damage (StatDamageIIR)", fromNpcSpell, null);
+
+			// By CASTER, so a genuine enemy caster is separable from the necro's own pet leaking through an
+			// uncaptured target (#479 request 2). With the player-target gate above, a pet cannot appear here at all
+			// (it never damages the player), so every row IS an enemy caster - the point is to NAME it and show its
+			// per-level sample, which is what the ticket asks for: "a mob that actually casts, at any level above ~10".
+			Console.WriteLine("\n=== NPC -> PLAYER, SPELL/DoT BY CASTER (target gated to a real player - no pet leakage) ===");
+			Console.WriteLine($"{"level",5} {"tpl",8} {"caster",-26} {"school",-12} {"hits",5} {"min",8} {"median",8} {"max",8}");
+			foreach (var ((template, level, school), mags) in fromNpcSpellByCaster.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.Template).ThenBy(k => (int)k.Key.School))
+			{
+				var sorted = mags.Order().ToList();
+				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 26),-26} {school,-12} {sorted.Count,5} {sorted[0],8} {sorted[sorted.Count / 2],8} {sorted[^1],8}");
+			}
+			if (fromNpcSpellByCaster.Count == 0)
+				Console.WriteLine("  (none - no captured StatDamageIIR from an NPC caster landed on a FullPlayerCharacter target)");
 			Report("PLAYER -> NPC, SPELL/DoT damage (StatDamageIIR)", toNpcSpell, null);
 
 			// The school decides which mitigation BRANCH the client runs (FUN_0113ba00 switches on it): 1/2/3/8 take
