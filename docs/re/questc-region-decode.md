@@ -232,7 +232,10 @@ a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too c
 CO-OCCURRENCE refinement of that scan (`tools/ghidra/DumpCoOffsetReaders.java`, `OFFS=24,38 NEAR=12` — a
 function reading the goal's markerX at `+0x24` AND `unknown1` at `+0x38` within 12 instructions: **3,322 of
 139,441 functions match**, so the pair is no more distinctive than either offset alone — both are generic
-struct/stack displacements), and the module's strings. What is left is the semantic route: follow a parsed
+struct/stack displacements), the intersection of the goal-LIST base with the goal offset
+(`OFFS=10c,38` — a consumer must walk one of `Quest_c`'s two goal lists at `+0x10C`/`+0x110` and then read the
+entry's `+0x38`, but `0x10C` is itself generic: **488 of 139,441 functions match**, no narrower than the
+`+0x24`/`+0x38` pair), and the module's strings. What is left is the semantic route: follow a parsed
 record from `FUN_0091f5c0` into the journal UI and find the code that formats these words for display.
 
 ## What the unnamed fields ARE (2026-08-01, from the client's quest catalog)
