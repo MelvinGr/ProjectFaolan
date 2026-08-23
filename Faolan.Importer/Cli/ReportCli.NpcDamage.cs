@@ -6,6 +6,7 @@ using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.Combat;
@@ -94,6 +95,19 @@ namespace Faolan.Importer.Cli
 				// this line (#671).
 				foreach (var p in c.Packets)
 				{
+					// The session's OWN character: its level is in the login snapshot's stat sheet, and on the beach
+					// that is the only place it is - no StatIIR/StatUpdateIIR carries `Level` for the player there, and
+					// the player's own spawn is this record, not a SimpleCharFullUpdate. Without it every beach row
+					// read `pc lvl -` and sat outside the gap-keyed measurements (#479).
+					if (p is { IsIirCarrier: true, SubOpcode: FullPlayerCharacterCodec.Opcode } && p.Record.Length >= 12)
+					{
+						var sheet = SubClassStatBlock.ExtractFromSnapshot(p.Record);
+						var lvl = sheet?.Find(kv => kv.Id == (uint)CharacterStatId.Level).Value ?? 0;
+						if (lvl is > 0 and <= 80)
+							playerLevels[p.Record.ReadU32Be(8)] = lvl;
+						continue;
+					}
+
 					if (p is not { IsIirCarrier: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
 						continue;
 
@@ -119,12 +133,45 @@ namespace Faolan.Importer.Cli
 					if (!p.IsIirCarrier || p.Body is not { Length: >= 8 })
 						continue;
 
+					// The player's LEVEL rides the single-pair StatIIR stream (the login push's `54=<level>` beside
+					// health and XP, and every ding), and the player's own spawn is a FullPlayerCharacter rather than
+					// the SimpleCharFullUpdate the pass above reads - so without this most beach rows had no victim
+					// level at all (`pc lvl -`) and dropped out of every gap-keyed measurement.
+					// ⚠️ "Is a player" = not a spawned NPC, the same rule the hit loop uses: retail character handles
+					// sit BELOW `CharacterInstanceBase` as often as above it (0x01317CF8 in the beach captures), so
+					// the base is not a player test on retail traffic.
+					if (p.Body.ReadU32Be(4) == StatCodec.Opcode)
+					{
+						StatIIR single;
+						try
+						{
+							single = StatCodec.Parse(p.Body.AsSpan(4));
+						}
+						catch
+						{
+							continue;
+						}
+
+						if (single.StatId == (uint)CharacterStatId.Level && single.Value is > 0 and <= 80 && !levels.ContainsKey(single.Handle))
+							playerLevels[single.Handle] = single.Value;
+
+						continue;
+					}
+
 					if (p.Body.ReadU32Be(4) == StatUpdateCodec.Opcode && p.Body.Length >= 29)
 					{
 						var handle = p.Body.ReadU32Be(12);
 						var count = p.Body[20];
 						for (var k = 0; k < count && 21 + k * 8 + 8 <= p.Body.Length; k++)
 						{
+							if (p.Body.ReadU32Be(21 + k * 8) == (uint)CharacterStatId.Level && !levels.ContainsKey(handle))
+							{
+								var lvl = p.Body.ReadU32Be(21 + k * 8 + 4);
+								if (lvl is > 0 and <= 80)
+									playerLevels[handle] = lvl;
+								continue;
+							}
+
 							if (p.Body.ReadU32Be(21 + k * 8) != (uint)CharacterStatId.HealthCurrent)
 								continue;
 
