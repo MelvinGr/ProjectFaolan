@@ -191,6 +191,17 @@ by capturing a board with more variety, or by finding the client's consumer of t
 Gitea #146.
 `[V0: the Massive-PvP board's otherName / tail columns]`
 
+### The battlekeep-info reply's timestamp and state words
+`DispatchBattleKeepInfoRequestReturnPhase3And4` (0x20AA) is decoded byte-exact (`BattleKeepInfoCodec`,
+`docs/subsystems/guild-cities-and-sieges.md`), and its `owningGuildId` is cross-corroborated three ways. Two of
+its words are read but not confirmed: the `timestampUnix` is a plain unix time later than the guild's last-battle
+time on the Massive-PvP board — consistent with the keep's next-vulnerable time but not proven to BE the
+vulnerability window — and the trailing `state` word is `2` on every captured keep, so its enumeration is unknown
+(the `Phase1And2` twin, 0x20A9, has a different single-sample shape and is not decoded). Close it by capturing a
+keep in more than one state, or by finding the client's reader. Tracked in Gitea #147.
+`[V0: that this timestamp is the vulnerability window]`
+`[V0: the state/phase meaning]`
+
 ### `PvPMatchRules_c` column layout
 The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
 `MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its reader is recovered

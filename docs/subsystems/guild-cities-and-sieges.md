@@ -1,13 +1,41 @@
 # Guild cities, Battlekeeps and sieges
 
-No siege or city message is sent, and none can be: not one occurs anywhere in the capture corpus. What this page
-records is the **ruleset** — and the reason that is worth writing down is that retail states almost all of it
-**in its own words**, in ordinary user-facing LDB text: the preconditions, the timers, the party sizes and the
-win condition. The decision layer built from it is in [What is implemented](#what-is-implemented) below.
+The corpus is almost silent on this subsystem — no city build, no siege lifecycle, no scoring — so what this page
+mostly records is the **ruleset**, which retail states almost entirely **in its own words**, in ordinary
+user-facing LDB text: the preconditions, the timers, the party sizes and the win condition. The decision layer
+built from it is in [What is implemented](#what-is-implemented) below.
 
-Six sweeps of this subsystem before this one all searched the **wire** and the **RDB data tables**, and correctly
-concluded that the corpus contains zero siege traffic and the tables carry no ownership or build state. The LDB
-was the source none of them had read, and it is where the specification lives.
+⚠️ **One siege message IS captured, though**, correcting the older "not one occurs anywhere in the corpus":
+`NecroL80_..._gameplay_annotated_9` carries the Border Kingdoms **battlekeep-info query** — c2s
+`RequestBattleKeepInformation` (0x2042) and its s2c reply `DispatchBattleKeepInfoRequestReturnPhase3And4` (0x20AA),
+four pairs, each reply followed by the owning guild's name. It is decoded and byte-exact
+([Battlekeep-info query](#battlekeep-info-query) below). What is still absent is everything with *state* — building,
+capturing, scoring — so the ruleset stands as the record for those.
+
+Earlier sweeps of this subsystem searched the **wire** and the **RDB data tables** and concluded the corpus
+contains zero siege traffic; the battlekeep-info pair above shows that was slightly too strong (it is on the
+CSPlayerInterface, beside the guild-ranking board), but the conclusion holds for the build/siege lifecycle. The
+LDB is where the *ruleset* lives, and it is the source those sweeps had not read.
+
+## Battlekeep-info query
+
+The client opens the Border Kingdoms siege panel and queries one keep at a time. Byte-exact against all four
+captured replies (`BattleKeepInfoCodec`, `BattleKeepInfoCodecTests`):
+
+```
+c2s RequestBattleKeepInformation (0x2042)   [u32 (count+1)*0x3F1] { u32 keepId }
+s2c ...ReturnPhase3And4          (0x20AA)   [u32 (count+1)*0x3F1]
+      { [u32 keepId][u32 zoneWord][u32 owningGuildId][u32 0][u32 0][u32 timestampUnix][u32 state] }
+```
+
+* `owningGuildId` is **cross-corroborated three ways**: keep 4's `0x7B726` is *Vendetta*'s guild id and keep 2's
+  `0x7C6A6` is *Hand of Stygia*'s, both matching the `guildId` column of the same session's Massive-PvP board and
+  the guild NAME in the `DispatchGuildRankingsUpdate` (0x2041) that follows each reply.
+* `zoneWord` is `0xDEB7` on every keep — a per-zone constant (the Border Kingdoms battlekeep zone).
+* `timestampUnix` is a plain unix time later than the board's last-battle time for the same guild — consistent
+  with the keep's next-vulnerable time (`[V0: that this timestamp is the vulnerability window]`).
+* `state` is `2` on every captured keep (`[V0: the state/phase meaning]`). The `Phase1And2` twin (0x20A9) has a
+  different single-sample shape and is not decoded. Open work tracked in Gitea #147.
 
 ⚠️ **This is text, not protocol.** Every rule below is retail describing its own game to a player. It pins what
 the server must *decide*; it says nothing about which bytes carry the decision, and no capture in the corpus
@@ -110,8 +138,9 @@ through minigames like Annihilation"* (50020/691) — which is the link to the m
 
 ## What is implemented
 
-⚠️ **The decision layer only, and nothing that touches the wire.** Not one siege or city message occurs in the
-corpus, so every body that would carry these outcomes is unknown and none is sent. What is encoded is what the
+⚠️ **The decision layer only, and nothing that touches the wire.** Apart from the battlekeep-info query above,
+no siege or city message occurs in the corpus, so every body that would carry a build/capture/score outcome is
+unknown and none is sent. What is encoded is what the
 server has to *decide*:
 
 * **`GuildCityRules`** — the precondition chain (`CanBookCitySpot`, `CanBuild`, `CanApplyForBattlekeep`), the
