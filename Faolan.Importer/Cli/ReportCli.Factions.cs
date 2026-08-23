@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.Importer.Cli

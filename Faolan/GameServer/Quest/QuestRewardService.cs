@@ -6,8 +6,8 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.GameServer.Economy;
 using Microsoft.Extensions.Logging;
 

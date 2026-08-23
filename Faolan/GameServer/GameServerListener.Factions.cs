@@ -3,7 +3,6 @@ using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Faction;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 
 namespace Faolan.GameServer

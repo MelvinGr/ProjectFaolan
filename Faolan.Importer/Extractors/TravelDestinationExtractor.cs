@@ -1,7 +1,7 @@
-using Faolan.Core.Constants;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Constants
 {

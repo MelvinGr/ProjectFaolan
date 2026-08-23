@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
-using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Text
 {

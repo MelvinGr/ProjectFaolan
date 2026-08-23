@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors

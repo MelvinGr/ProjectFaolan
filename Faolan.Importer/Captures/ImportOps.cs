@@ -17,7 +17,6 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
-using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures

@@ -1,8 +1,8 @@
 using System;
 using System.IO;
+using Faolan.Core.Cli;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
-using Faolan.Core.Cli;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

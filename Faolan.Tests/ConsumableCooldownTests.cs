@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
-using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Progression;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli

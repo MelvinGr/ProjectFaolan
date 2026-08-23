@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli

@@ -3,12 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Faolan.Core.Cli;
-using Faolan.Core.Constants;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
-using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 

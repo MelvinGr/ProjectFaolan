@@ -8,12 +8,12 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
-using Faolan.GameServer.Progression;
 
 namespace Faolan.Tests
 {

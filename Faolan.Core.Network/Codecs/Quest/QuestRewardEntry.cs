@@ -1,5 +1,3 @@
-using System;
-
 namespace Faolan.Core.Network.Codecs.Quest
 {
 	// One selectable reward as it appears in the QuestRewardNotifyIIR offer list. Decoded byte-exact from

@@ -1,5 +1,5 @@
-using Faolan.Core.Constants;
 using System;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;

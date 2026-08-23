@@ -1,7 +1,5 @@
-using Faolan.Core.Constants;
-using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Crypt;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;

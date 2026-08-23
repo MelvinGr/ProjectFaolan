@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Progression;
 using Xunit;
 
 namespace Faolan.Tests

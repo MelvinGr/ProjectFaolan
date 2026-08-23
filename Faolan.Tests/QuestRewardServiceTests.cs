@@ -7,7 +7,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Quest;
-using Faolan.GameServer.Economy;
 using Faolan.GameServer.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;

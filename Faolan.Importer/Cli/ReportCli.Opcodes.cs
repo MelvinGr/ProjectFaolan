@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core;
-using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Captures;

@@ -4,7 +4,6 @@ using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
-using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Cli

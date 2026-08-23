@@ -9,7 +9,6 @@ using System.Threading;
 using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
-using Microsoft.Extensions.Configuration;
 
 namespace Faolan.ClientLauncher
 {

@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Rdb;
-using Faolan.Importer.Rdb;
 using System.Threading.Tasks;
+using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli

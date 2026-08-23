@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Captures;
 

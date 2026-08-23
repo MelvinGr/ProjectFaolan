@@ -9,7 +9,6 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.GameServer.Quest;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
-using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {

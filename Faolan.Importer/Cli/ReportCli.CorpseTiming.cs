@@ -4,10 +4,10 @@ using System.Linq;
 using System.Numerics;
 using Faolan.Core.Constants;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 

@@ -5,16 +5,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Faolan.Core.Cli;
-using Faolan.Core.Constants;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
-using Faolan.Core.Protobuf;
-using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
-using Keys = Faolan.Core.Cli.FaolanSettings.Keys;
 
 namespace Faolan.Importer.Cli
 {

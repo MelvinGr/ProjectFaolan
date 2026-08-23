@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;

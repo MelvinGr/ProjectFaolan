@@ -1,6 +1,6 @@
-using Faolan.Core.Constants;
 using System.Threading.Tasks;
 using Faolan.Core.Cli;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;

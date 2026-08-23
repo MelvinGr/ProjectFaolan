@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
-using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
-using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
 {

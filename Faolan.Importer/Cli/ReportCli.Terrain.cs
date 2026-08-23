@@ -6,11 +6,9 @@ using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Faolan.Core.Cli;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 

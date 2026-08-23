@@ -29,9 +29,9 @@ using Faolan.GameServer.Feats;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
+using Faolan.GameServer.Scripting;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
-using Faolan.GameServer.Scripting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

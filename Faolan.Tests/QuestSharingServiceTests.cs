@@ -4,17 +4,17 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
-using Faolan.GameServer.Progression;
 
 namespace Faolan.Tests
 {

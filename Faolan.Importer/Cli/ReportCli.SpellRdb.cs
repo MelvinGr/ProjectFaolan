@@ -2,14 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core.Cli;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Rdb;
-using Faolan.GameServer.Combat;
-using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Cli

@@ -1,6 +1,6 @@
+using Faolan.Core.Cli;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
-using Faolan.Core.Cli;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 

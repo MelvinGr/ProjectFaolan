@@ -1,5 +1,4 @@
 using System;
-using Faolan.GameServer.Quest;
 using Faolan.GameServer.Scripting;
 using Xunit;
 

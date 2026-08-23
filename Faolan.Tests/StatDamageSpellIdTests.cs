@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Faolan.GameServer.Combat;
 using Faolan.Tests.Support;
 using Xunit;

@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Quest;
-using Faolan.GameServer.World;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

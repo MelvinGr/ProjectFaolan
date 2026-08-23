@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Faolan.Core.Network.Constants;
-using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;

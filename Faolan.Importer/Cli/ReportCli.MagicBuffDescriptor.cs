@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;

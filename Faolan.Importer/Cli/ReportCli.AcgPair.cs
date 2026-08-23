@@ -5,7 +5,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;

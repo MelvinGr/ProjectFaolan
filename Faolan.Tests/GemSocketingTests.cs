@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
@@ -12,7 +11,6 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Economy;
 using Faolan.Tests.Support;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

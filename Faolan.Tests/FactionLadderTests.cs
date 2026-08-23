@@ -1,11 +1,9 @@
+using System.Linq;
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Faction;
 using Faolan.Core.Progression;
-using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
 using Xunit;
 
 namespace Faolan.Tests

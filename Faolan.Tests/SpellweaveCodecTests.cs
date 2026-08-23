@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
 using Faolan.Core.Enums;
-using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Progression;
 using Xunit;
 
 namespace Faolan.Tests

@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Xunit;

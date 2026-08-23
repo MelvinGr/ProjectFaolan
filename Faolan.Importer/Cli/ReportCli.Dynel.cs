@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text.RegularExpressions;
-using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -12,8 +10,6 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
-using Faolan.Core.Rdb;
-using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 
