@@ -26,6 +26,7 @@ namespace Faolan.Core.Database
 		DbSet<FeatIdMap> FeatIdMaps { get; }
 		DbSet<FeatPrereq> FeatPrereqs { get; }
 		DbSet<FeatClassEntry> FeatClassEntries { get; }
+		DbSet<FeatPerkCost> FeatPerkCosts { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
 		DbSet<Achievement> Achievements { get; }
@@ -147,6 +148,7 @@ namespace Faolan.Core.Database
 		public DbSet<FeatIdMap> FeatIdMaps { get; set; }
 		public DbSet<FeatPrereq> FeatPrereqs { get; set; }
 		public DbSet<FeatClassEntry> FeatClassEntries { get; set; }
+		public DbSet<FeatPerkCost> FeatPerkCosts { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
 		public DbSet<Achievement> Achievements { get; set; }
@@ -362,6 +364,10 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<SpellAreaEffect>().HasMany<SpellAreaEffectCriterion>().WithOne(c => c.Effect).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellAreaEffect>().WithOne(a => a.Spell).OnDelete(DeleteBehavior.Cascade); // #772
 			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
+
+			// #150: an AA perk's price belongs to the featclass ROW it prices, so a re-harvest of the client's
+			// featclass table takes its cost rows with it rather than orphaning them.
+			modelBuilder.Entity<FeatClassEntry>().HasMany<FeatPerkCost>().WithOne(c => c.Entry).OnDelete(DeleteBehavior.Cascade);
 
 			// A mount's key IS its summon spell's id (#627), so the row goes with the spell.
 			modelBuilder.Entity<Spell>().HasMany<Mount>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade);

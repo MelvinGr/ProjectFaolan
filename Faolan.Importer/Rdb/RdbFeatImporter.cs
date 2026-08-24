@@ -54,6 +54,13 @@ namespace Faolan.Importer.Rdb
 		private const int ClassEntryLength = 40;
 		private const int ClassEntryWords = 10;
 
+		// The client's feat POINT COST table (#150): the same `FeatClassTable_c` cluster, loaded beside the one
+		// above and reported as "Could not load feat point cost info." when it fails. Twelve-byte records, and the
+		// count is the FIFTH word - see ParsePerkCosts.
+		private const uint PerkCostType = 1000099;
+		private const uint PerkCostTableId = 1;
+		private const int PerkCostEntryLength = 12;
+
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
@@ -64,6 +71,7 @@ namespace Faolan.Importer.Rdb
 			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
 			var mappedTemplates = map.Select(m => m.Template).ToHashSet();
 			var classEntries = ReadClassEntries(rdb);
+			var perkCosts = ReadPerkCosts(rdb);
 
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
@@ -174,8 +182,13 @@ namespace Faolan.Importer.Rdb
 			// RDB resource, and it is keyed by the client's own row id so a re-import renumbers nothing. No FK to
 			// FeatIdMap, so it needs no ordering against the block above.
 			var classRows = 0;
+			var perkCostRows = 0;
 			if (classEntries.Count > 0)
 			{
+				// The cost rows go first and EXPLICITLY: they hang off the featclass row ids, and EF issues the
+				// parent deletes without knowing about children it has not loaded (the cascade is the database's,
+				// not the tracker's) - so leaving them to it deletes the parents out from under a live FK.
+				db.FeatPerkCosts.RemoveRange(await db.FeatPerkCosts.ToListAsync());
 				db.FeatClassEntries.RemoveRange(await db.FeatClassEntries.ToListAsync());
 				await db.SaveChangesAsync();
 				foreach (var entry in classEntries)
@@ -183,6 +196,20 @@ namespace Faolan.Importer.Rdb
 					db.FeatClassEntries.Add(entry);
 					classRows++;
 				}
+
+				// #150: the AA perk prices, keyed by the row ids just inserted. A cost naming a row the featclass
+				// table does not carry is DROPPED rather than imported without its placement - on the shipped data
+				// there are none, and a silent orphan would be a worse answer than a smaller count.
+				var known = classEntries.Select(e => e.Id).ToHashSet();
+				foreach (var cost in perkCosts.Where(c => known.Contains(c.FeatClassEntryId)))
+				{
+					db.FeatPerkCosts.Add(cost);
+					perkCostRows++;
+				}
+
+				if (perkCostRows < perkCosts.Count)
+					logger?.LogWarning("RdbFeatImporter: {Dropped} of {Total} feat point-cost rows name a featclass row the table does not carry - dropped (Gitea #150).",
+						perkCosts.Count - perkCostRows, perkCosts.Count);
 			}
 
 			var existing = await db.Feats.ToDictionaryAsync(f => f.Id);
@@ -387,10 +414,10 @@ namespace Faolan.Importer.Rdb
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs, {ClassRows} featclass rows, {GrantLevels} class-spell grant levels.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, grantLevels);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {ComboAttackMods} combo-attack modifiers, {Procs} procs, {ClassRows} featclass rows, {PerkCostRows} AA perk costs, {GrantLevels} class-spell grant levels.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, perkCostRows, grantLevels);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, grantLevels);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, comboAttackModRows, procRows, classRows, perkCostRows, grantLevels);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -624,6 +651,72 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return entries;
+		}
+
+		// The client's feat POINT COST table (RDB 1000099 id 1) - the price of one AA perk rank (#150). Read here
+		// beside the featclass table because it is keyed by that table's row ids and comes off the same RdbReader.
+		private static List<FeatPerkCost> ReadPerkCosts(RdbReader rdb)
+		{
+			var matches = rdb.EntriesOfType(PerkCostType).Where(e => e.Id == PerkCostTableId).ToList();
+			if (matches.Count == 0)
+				return [];
+
+			try
+			{
+				return ParsePerkCosts(rdb.ReadDecompressed(matches[0]));
+			}
+			catch
+			{
+				return [];
+			}
+		}
+
+		/// <summary>
+		///     Parses the feat point-cost table's body. Split out from the RDB read for the same reason as
+		///     <see cref="ParseClassEntries" /> - so it can be tested against bytes without the client install.
+		/// </summary>
+		/// <remarks>
+		///     `[u32 type][u32 id][u32 version][u32 ?][u32 count]` - the count is the FIFTH word here, unlike the two
+		///     20-byte-header tables above - then `count` twelve-byte records of
+		///     <c>[featclassRowId][pointType][cost]</c>.
+		///     <para>
+		///         The client's own parse callback (<c>FUN_0078e560</c>) rejects any version but 1 and requires
+		///         `length &gt;= count * 0xC`; its per-record tail is a plain <c>vector&lt;12-byte&gt;::push_back</c>,
+		///         so nothing is dropped or scaled. <c>GetPointCost</c> (<c>FUN_01506700</c>) then reads word 1 at
+		///         <c>+4</c> and word 2 at <c>+8</c> - see <see cref="FeatPerkCost" /> for what word 1 means.
+		///     </para>
+		///     <para>
+		///         ⚠️ A row whose point type is not one the client switches on is DROPPED rather than stored: the
+		///         column is an enum the client enumerates exhaustively (2 / 3 / 4), so an unknown value is a
+		///         mis-read of the table rather than a pool we have yet to name. The shipped table has none.
+		///     </para>
+		/// </remarks>
+		public static List<FeatPerkCost> ParsePerkCosts(byte[] body)
+		{
+			var costs = new List<FeatPerkCost>();
+			if (body.Length < MapHeaderLength || Word(body, 0) != PerkCostType)
+				return costs;
+
+			var count = (int)Word(body, 16);
+			if (count <= 0 || MapHeaderLength + ((long)count * PerkCostEntryLength) > body.Length)
+				return costs;
+
+			for (var i = 0; i < count; i++)
+			{
+				var at = MapHeaderLength + (i * PerkCostEntryLength);
+				var pool = Word(body, at + 4);
+				if (pool is not ((uint)TokenPool.AltAdvancementPvPToken or (uint)TokenPool.AltAdvancementPvEToken or (uint)TokenPool.AltAdvancementGeneralToken))
+					continue;
+
+				costs.Add(new FeatPerkCost
+				{
+					FeatClassEntryId = Word(body, at),
+					PointType = (TokenPool)pool,
+					Cost = Word(body, at + 8)
+				});
+			}
+
+			return costs;
 		}
 
 		/// <summary>
@@ -1101,6 +1194,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs, int ClassRows, int GrantLevels);
+			int SpellGrants, int ComboModifiers, int ComboAttackModifiers, int Procs, int ClassRows, int PerkCostRows, int GrantLevels);
 	}
 }

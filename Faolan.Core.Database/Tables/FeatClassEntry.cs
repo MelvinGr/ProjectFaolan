@@ -69,9 +69,12 @@ namespace Faolan.Core.Database.Tables
 		public bool Autotrain { get; set; }
 
 		// The feat TREE this row belongs to (word 5): 1000001..1000190 for a real tree, 900 for the innate feats
-		// that belong to none (`Basic Riding`, the Equip: rows) and 9000 for the class PROGRESSION track. The
-		// fourteen trees 1000177..1000190 are the level-20/80 mastery trees, and they are the only ones with a
-		// per-feat point cost (RDB 1000099, "feat point cost info") - see FeatRules.PointCost.
+		// that belong to none (`Basic Riding`, the Equip: rows) and 9000 for the class PROGRESSION track.
+		//
+		// ⭐ The twelve trees 1000177..1000190 (the range is not dense - 1000185 and 1000187 do not exist) are the
+		// ALTERNATE-ADVANCEMENT perk trees, one per playable class, gated at levels 20..80 (#150). They are the only
+		// ones with a per-placement point cost - see FeatPerkCost, off RDB 1000099 - because an ordinary feat costs
+		// one point per rank (FeatRules.PointCost).
 		public uint TreeId { get; set; }
 
 		// The feat's COLUMN within its tier row in the tree UI (word 6), 0..8.
@@ -87,7 +90,7 @@ namespace Faolan.Core.Database.Tables
 		public uint Tier { get; set; }
 
 		// How many points must already be spent IN THIS TREE before the feat unlocks (word 9). On the ordinary trees
-		// this is `(Tier - 1) * 5` on all but 57 of 3,197 rows; on the fourteen mastery trees the schedule is flatter
+		// this is `(Tier - 1) * 5` on all but 57 of 3,197 rows; on the twelve AA perk trees the schedule is flatter
 		// (tiers 1-3 free, 4-6 at 5, 7-9 at 10). Kept as the client's own value rather than derived from Tier,
 		// because those exceptions are real data.
 		public uint TreePointsRequired { get; set; }

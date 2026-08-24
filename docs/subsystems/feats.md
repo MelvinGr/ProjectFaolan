@@ -758,10 +758,12 @@ wrong cost survived so long (the same trap `PointBudget` itself fell into).
 
 ⚠️ **There is no per-feat cost table for an ordinary feat, and that is a finding rather than a gap.** RDB
 **1000099** *does* exist — the client calls it "feat point cost info" and it is a flat vector of
-`(featclassRowId, kind, value)` triples — but all **2,880** of its rows belong to the fourteen level-20/80
-mastery trees (`TreeId` 1000177..1000190), whose values run to 30 and could not be point costs under a budget of
-79. Not one feat any captured character holds has a row in it. Kinds 2 and 3 appear 1,548 times each.
-`--report feat-autotrain-check` is the standing measurement for both halves of this section.
+`(featclassRowId, pointType, cost)` triples — but all **2,880** of the placements it prices belong to the twelve
+level-20/80 ALTERNATE-ADVANCEMENT perk trees (`TreeId` 1000177..1000190), and those are paid for in AA tokens,
+not in feat points: `pointType` is the client's `AAFeatPlannerPointType` (2 = PvP, 3 = PvE, 1,548 rows each),
+which is why the costs run past a level-80 feat budget of 79 without contradicting it. Not one feat any captured
+character holds has a row in it. Imported as `FeatPerkCost` (#150); `--report feat-autotrain-check` is the
+standing measurement for both halves of this section.
 
 The client's other feat resources, found the same way (`FUN_0078de40` loads all four before building the
 auto-train map): **1000506** id 1 "classmembership info" and **1065101** id 0 "featspecializedtrees info" — both

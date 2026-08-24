@@ -613,9 +613,10 @@ each, recovered here from nothing but which line ids two trees have in common.
 Resolving word 3 through `FeatIdMap` names **all 2,880** AA rows (268 distinct perks), and words 8/9 place each
 one in its tree: `Electric Wards`, `Fire Wards` and `Pressing Strikes` sit at tier 1 columns 2/3/4 of the
 Necromancer's `1000184`, five ranks each. RDB **1000099** ("feat point cost info") then gives each of those rows
-its point cost — 2,880 rows, two kinds, values 1..30 — and it covers the AA trees and *nothing else*. So #150 has
-the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the AA UI or
-of a perk being bought.
+its point cost — 2,880 placements, priced in the two AA point pools at 1..50 — and it covers the AA trees and
+*nothing else*. All of that is imported: `FeatClassEntry` for the placement, `FeatPerkCost` for the price. So
+#150 has the tree structure, the names, the tier gates and the costs; what it does not have is a capture of the
+AA UI or of a perk being bought.
 
 ### ⭐ And the AA CURRENCY is named too — by the tuning sheet
 
@@ -1077,9 +1078,34 @@ Measured over the shipped 3,096 records:
 | `kind` | `2` or `3`, exactly 1,548 of each |
 | `cost` | 1–50, 26 distinct values |
 
-216 keys appear **twice**, once under each `kind`, and both rows carry the **same cost** — so `kind` is not a
-currency (a currency would give every feat both rows) and not the 1000505 class tier (which is 1 or 3 in this
-build, never 2).
+### ⭐ `kind` is the AA POINT POOL, and the client names it
+
+The consumer settles it. `GetPointCost` — the `com.GameInterface.FeatWindows.AAFeatTree` API, `FUN_01506700`
+— walks this exact vector (`for (p = begin; p != end; p += 0xC)`), reads the **cost at `+8`** and switches on
+the **`kind` at `+4`** into three GUI keys:
+
+| `kind` | `GetPointCost` writes | `AAFeatPlannerPointType` | `TokenPool` (RDB 1000520) |
+|---:|---|---|---|
+| 2 | `PvPPoints` | `e_PvP = 2` | `AltAdvancementPvPToken` |
+| 3 | `PvEPoints` | `e_PvE = 3` | `AltAdvancementPvEToken` |
+| 4 | `GeneralPoints` | `e_Generic = 4` | `AltAdvancementGeneralToken` |
+
+The middle column is the client's own enum, registered by the same GameInterface (`FUN_01504bf0`) with those
+literal values — so the three ids are the AA half of the token table, not a coincidence of small numbers.
+
+⚠️ **This corrects an earlier reading here.** The 216 keys that appear **twice**, once under each `kind` and
+at the **same cost**, were taken as proof that *"`kind` is not a currency — a currency would give every feat both
+rows"*. That premise is wrong: a perk priced in one pool only is a perk that pool's players alone may buy, which
+is exactly what the split looks like. Of the 22 perks every class carries, the crowd-control resistances
+(`Root` / `Snare` / `Stun` / `Fear` / `Stagger Resistance`, `Quick Steps`, `Precise Strikes`, `Field of War`) are
+priced in **PvP** points and the elemental wards (`Fire` / `Frost` / `Electric` / `Unholy` / `Holy Wards`,
+`Pressing` / `Decisive Strikes`, `Immeasurable Empowerment`) in **PvE** ones. The dual rows are the handful
+either side may buy, and their equal cost means the pool is a restriction on the buyer, never a discount.
+
+⚠️ The shipped table never uses `kind` 4, though the client handles it — no perk is priced in the generic
+token, which is consistent with `AlternateAdvancement_GenericTokensAwarded` being 1 against 3 specific.
+
+Imported as `FeatPerkCost` (#150), keyed `(FeatClassEntryId, PointType)` and gated by `AaPerkCostTests`.
 
 ⭐ **The key is 1000043's ROW ID** (#862) — its word 0, the column that section used to read as a feat id. All
 3,096 rows resolve, and joining through it names every one: the key is a `(class, level, feat, tree, tier)` row,
@@ -1087,7 +1113,8 @@ so a cost is attached to a feat's PLACEMENT in a tree rather than to the feat. I
 because the search was for a feat id, and word 0 is not one.
 
 ⭐ **And what it covers is the answer to "where does a feat's point cost come from?"** — every one of the 2,880
-rows it names sits in the fourteen level-20/80 mastery trees (`treeId` 1000177–1000190), and no ordinary tree
+rows it names sits in the twelve level-20/80 ALTERNATE-ADVANCEMENT trees (`treeId` 1000177–1000190 — the
+range is not dense; 1000185 and 1000187 do not exist), and no ordinary tree
 feat has a row at all. Ordinary feats have no cost table because they do not need one: they cost **one point per
 rank**, which reproduces all three captured characters' point budgets exactly (see
 [feats.md](../subsystems/feats.md)). Costs of 1–30 could not be per-feat point costs anyway under a level-80

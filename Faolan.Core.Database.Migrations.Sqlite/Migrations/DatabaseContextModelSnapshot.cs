@@ -1518,6 +1518,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("FeatIdMaps");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPerkCost", b =>
+                {
+                    b.Property<uint>("FeatClassEntryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("PointType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Cost")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FeatClassEntryId", "PointType");
+
+                    b.ToTable("FeatPerkCosts", t =>
+                        {
+                            t.HasCheckConstraint("CK_FeatPerkCost_PointType", "PointType IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 30, 31, 32, 33, 34, 35, 36, 50, 60, 61, 62)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPrereq", b =>
                 {
                     b.Property<uint>("WireFeatId")
@@ -4835,6 +4854,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPerkCost", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.FeatClassEntry", "Entry")
+                        .WithMany()
+                        .HasForeignKey("FeatClassEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Entry");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPrereq", b =>

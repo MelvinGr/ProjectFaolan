@@ -106,9 +106,10 @@ namespace Faolan.Core.Progression
 		///     Three characters at two different levels, each spending its budget to the last point. The previous
 		///     model - <c>max(1, rank)</c>, which charged nothing for the step from rank 0 to rank 1 - left all three
 		///     with points unspent (60/79, 61/79, 13/16), and no client table holds a per-feat cost that would
-		///     explain the difference: RDB <b>1000099</b> ("feat point cost info") exists but covers only the
-		///     fourteen level-20/80 MASTERY trees (all 2,880 of its rows, none of them a feat any captured character
-		///     holds), and the ordinary trees have no cost row at all.
+		///     explain the difference: RDB <b>1000099</b> ("feat point cost info") exists but covers only the twelve
+		///     level-20/80 ALTERNATE-ADVANCEMENT perk trees (all 2,880 of the placements it prices, none of them a
+		///     feat any captured character holds - see <c>FeatPerkCost</c>), and the ordinary trees have no cost row
+		///     at all.
 		///     <para />
 		///     ⚠️ Ranks run 0..9 - the client's own bound (<c>FeatIdMap.MaxRank</c>, from <c>FUN_007850c0</c>'s
 		///     <c>base*100 + 10</c> ceiling). Above it the low digits index a family rather than naming a rank
