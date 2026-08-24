@@ -203,12 +203,71 @@ Scalar bodies, complete:
 `const ID32&` is two words (`[u32 class][u32 instance]`), per
 [`../protocol/02-rpc.md`](../protocol/02-rpc.md).
 
+### ⭐ `i_cMatch` — the whole-match payload, recovered field-by-field from the client
+
 The three messages carrying a whole match — `YouJoinedMatch` / `MatchInfo` (`i_cMatch`) and `SearchResult`
-(`i_cMatches`) — have zero captured instances even now that queueing is captured, because no captured queue ever
-filled. They read a `PvPMatchRules_c` element (`FUN_0055bdb0` → `FUN_00558b70`, three u32 and a string
-group, then `FUN_0053b020`). Its column layout is not pinned here: with zero captured instances there is nothing
-to check a field split against, and the element reader is shared with the search filter.
-`[V0: the PvPMatchRules_c element layout]`
+(`i_cMatches`) — still have **zero captured instances**, because no captured queue ever filled. Their layout is
+nevertheless pinned, because the client contains all three halves of it and they agree:
+
+| what | function | what it establishes |
+|---|---|---|
+| the s2c **reader** | `FUN_01346ef0` (`YouJoinedMatch`), `FUN_013470d0` (`MatchInfo`) | field order + widths off the stream |
+| the c2s **writer** | `FUN_00558880`, reached from `CSPlayerAgentProxy_t::PvPMatchMakingCreateMatch` | the same order, written — so the split is not a reading of one side only |
+| the local **copy** | `FUN_00547070`, which stores the joined match on `CSClientIncoming_c` | the struct's own size and where its non-wire tail starts |
+
+```
+i_cMatch  =  [ListFrame(n)] { n × cCharacter }      # the member roster - FUN_0055bdb0, 0x7c stride
+             [ListFrame(m)] { m × u32 }             # an id list - FUN_004d4ef0
+             PvPMatchRules_c                        # below
+             [u32 tail0]
+             if (rules.FlagB == 0)  [u32 tail1] [u32 tail2]
+
+PvPMatchRules_c  =  [u32 A]  [u32 B]  [u32 C]  [u32 D]  [u32 E]     # struct +0x00 .. +0x10
+                    [u16 len][latin1]                               # +0x14, a std::string
+                    [u32 F]  [u32 G]  [u32 H]                       # +0x30 +0x34 +0x38
+                    [u8 FlagA] [u8 FlagB]                           # +0x3C +0x3D
+                    [u32 I]                                         # +0x40
+```
+
+⭐ **The roster entries are `cCharacter` — the SAME record the team subsystem carries.** `FUN_0055bdb0` walks a
+0x7c-stride vector calling `FUN_005574d0`, which is the reader
+[`TeamMemberRecordCodec`](../../Faolan.Core.Network/Codecs/Team/TeamMemberRecordCodec.cs) was decoded against
+(#669). So the match's player list needs no new record type; it is a `TeamMemberRecord` vector.
+
+Three independent checks that the split above is right rather than a plausible carve:
+
+* The element is **0x44 wire bytes**, and the reader's next field lands at struct `+0x64` = `0x20 + 0x44` in the
+  `SearchResult` list reader (`FUN_0134f360`), whose stride is **0x70** — exactly
+  `0x20` (roster + id list) + `0x44` (element) + three trailing words.
+* `FUN_00547070` copies precisely those three trailing words (`+0x64/+0x68/+0x6c`) into the stored match, so the
+  0x70 struct and the wire record are the same shape.
+* The conditional pair is gated on the byte at element `+0x3D` — i.e. `FlagB` — in **both** the single-match
+  reader and the list reader.
+
+**What the field NAMES are is still open**, and the binary does not say: unlike the scalar dispatch bodies on this
+interface, this reader takes the words straight into the struct with no per-field bail-out string. The one place
+that puts values in them is a client **debug command** (`FUN_006b5f30`, registered in the debug-command table at
+`FUN_006bae70`), which builds a `PvPMatchRules_c` from its arguments and defaults every one it is not given:
+
+| element field | argument | default when omitted |
+|---|---|---|
+| `+0x04` (B) | arg 2 | `5807` |
+| `+0x00` (A) | arg 3 | `2` |
+| `+0x08` (C) | arg 4 | `2` |
+| `+0x0C` (D) | arg 5 | `3` |
+| `+0x10` (E) | arg 6 | `6` |
+| `+0x30` (F) | arg 7 | `900` |
+| the string, and `FlagA` | set together once the command is given a 7th argument | empty / 0 |
+
+`900` is the shape of a match time limit in seconds (15 minutes) and `5807` the shape of a playfield id — but
+neither is stated anywhere, and `5807` is not one of the five arenas RDB 1000512 declares, so both are left
+unnamed here. ⚠️ The same 7th argument feeds both `+0x10` and the string in the decompiled command; that is what
+the code says, and it may be an artefact of the decompiler losing the string's `this`.
+`[V0: the PvPMatchRules_c column meanings]`
+
+⛔ **The search filter is NOT this element.** `PvPMatchMakingSearchForMatches(const PvPMatchMakingSearchFilter_c&)`
+has a writer of its own — `FUN_00558f50`, reached from `FUN_013647b0` — and it writes just
+**`[u32][u8]`**. (An earlier note here said the element reader was shared with the filter; it is not.)
 
 ## Client-recovered: guild cities + battlekeeps (Gitea #147)
 

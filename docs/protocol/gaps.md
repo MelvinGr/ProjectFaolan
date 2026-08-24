@@ -202,15 +202,19 @@ keep in more than one state, or by finding the client's reader. Tracked in Gitea
 `[V0: that this timestamp is the vulnerability window]`
 `[V0: the state/phase meaning]`
 
-### `PvPMatchRules_c` column layout
+### `PvPMatchRules_c` column meanings
 The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
-`MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its reader is recovered
-(`FUN_0055bdb0` → `FUN_00558b70`, three u32 plus a string group, then `FUN_0053b020`) but the field split is not
-pinned: **no capture contains a single instance**, so there is nothing to check a split against. Queueing IS
-captured now (Gitea #882 — see the minigame-queue section of `docs/re/minigame-massivepvp-messages.md`), but no
-captured queue ever filled, so nothing carrying a whole match was ever sent. Close it by decompiling the element
-reader field-by-field the way the scalar dispatch bodies were done, or by filling a queue. Tracked in Gitea #146.
-`[V0: the PvPMatchRules_c element layout]`
+`MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its **layout is no longer a gap** — it is
+recovered field-by-field from the client and cross-checked three ways (the s2c reader, the c2s writer, and the
+0x70 struct the joined match is stored in), in the `i_cMatch` section of
+`docs/re/minigame-massivepvp-messages.md`. What is still unknown is what the twelve fields MEAN. Unlike the scalar
+dispatch bodies on this interface, the reader takes the words straight into the struct with no per-field bail-out
+string, so the binary never names them, and **no capture contains a single instance** — no captured queue ever
+filled, so nothing carrying a whole match was ever sent. The only values the client itself ever puts in them come
+from a debug command's defaults (`5807 / 2 / 2 / 3 / 6 / 900`), which suggest a playfield and a time limit without
+stating either. Close it by filling a queue in a capture, or by an in-client run of the create-match window with
+known values typed into it. Tracked in Gitea #146.
+`[V0: the PvPMatchRules_c column meanings]`
 
 ### The matchmaking board's innermost map key
 `DispatchPvPMatchMakingInfoRequestReturn` (0x2092) is a three-level count-framed map that round-trips all 43
