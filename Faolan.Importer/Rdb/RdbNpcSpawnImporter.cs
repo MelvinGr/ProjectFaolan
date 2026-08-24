@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -42,7 +43,22 @@ namespace Faolan.Importer.Rdb
 			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
 
 			int maps = 0, areas = 0, points = 0, emptyMaps = 0, unreadable = 0;
-			foreach (var e in rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(e => rdb.CanRead(e) && ourMaps.Contains(e.Id)))
+
+			// ⚠️ COUNTED, not silent (#886). A layout whose playfield is not in `Maps` is skipped - the areas carry an
+			// FK to it - and that skip used to happen inside the `Where` where nothing could see it. #886 asked
+			// whether 47 playfields with territories and no spawn areas were a MISSING RECORD or a DROPPED one; the
+			// only way that question ever gets a straight answer is if the drop has a number beside it.
+			var layouts = rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(rdb.CanRead).ToList();
+			//
+			// ⭐ And the count SPLITS, which is the whole answer: the great majority of the skipped entries carry an
+			// id with bit 30 set (>= 0x4000_0000), which is not a playfield id in any other resource - a separate id
+			// space inside the same RDB type, not a playfield we are missing. What is genuinely absent from `Maps` is
+			// the small remainder, and those are the ones a coverage question is about.
+			var skipped = layouts.Where(e => !ourMaps.Contains(e.Id)).Select(e => e.Id).ToList();
+			var unknownMap = skipped.Count(id => id < HighIdSpace);
+			var highIdSpace = skipped.Count - unknownMap;
+
+			foreach (var e in layouts.Where(e => ourMaps.Contains(e.Id)))
 			{
 				byte[] dec;
 				try
@@ -141,9 +157,12 @@ namespace Faolan.Importer.Rdb
 			// the group's own declared race where that race has exactly one candidate template (#518).
 			var resolved = await SpawnAreaResolver.ResolveAsync(db, roamPaths, SpawnAreaResolver.LoadRaceNames(rdb));
 
-			return new Result(maps, areas, points, emptyMaps, unreadable, resolved);
+			return new Result(maps, areas, points, emptyMaps, unreadable, unknownMap, highIdSpace, resolved);
 		}
 
-		public readonly record struct Result(int Maps, int Areas, int Points, int EmptyMaps, int Unreadable, ResolveStats Resolved);
+		// Bit 30. Every id at or above it is a second id space inside RDB 1010506 - see the skip split above.
+		private const uint HighIdSpace = 0x4000_0000;
+
+		public readonly record struct Result(int Maps, int Areas, int Points, int EmptyMaps, int Unreadable, int UnknownMap, int HighIdSpace, ResolveStats Resolved);
 	}
 }

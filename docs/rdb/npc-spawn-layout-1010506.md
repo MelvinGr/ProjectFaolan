@@ -111,6 +111,28 @@ groups, where it carries the creature identity directly. For every other categor
 be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` string plus a parsed `CommunityId`
 (the numeric value, or null for `Name` / `no category`).
 
+## ⭐ The record ID SPACE splits, and it is not 47 missing playfields (#886)
+
+`--only rdb-npc-spawns` imports a layout only when its `id` is a playfield already in `Maps` - the areas carry an
+FK to it - and that skip used to happen inside a LINQ `Where` with no counter beside it. #886 asked whether the
+playfields with territories and no spawn areas were a missing RECORD or a DROPPED one; the importer now says:
+
+```
+188 playfields imported, 237 empty, 0 unreadable,
+  8 for a playfield not in Maps,
+384 in the >= 0x40000000 id space
+```
+
+* **384** of the skipped entries carry an id with **bit 30 set** (`>= 0x4000_0000`). That is not a playfield id
+  anywhere else in the client - it is a second id space inside this same RDB type, so those records are not
+  playfields we are missing.
+* **8** are ordinary playfield ids we genuinely do not hold: **741, 966, 6101, 6105, 6303, 6315, 6405, 50873** -
+  and their neighbours are in `Maps` (6100 and 6103 are, 6101 and 6105 are not), so these are gaps in the map
+  import rather than in this type.
+
+So the coverage question is eight playfields wide, not forty-seven, and the 384 are a decode question about what
+the high id space means rather than an import gap. Open work tracked in Gitea #886.
+
 ## Limits (why this doesn't fix every missing NPC)
 
 - **Empty for scripted/instanced playfields.** The Castle of King Conan (map 2040) and the Tortage interiors are

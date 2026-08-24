@@ -544,7 +544,7 @@ namespace Faolan.Importer.Modules
 		{
 			var r = await RdbNpcSpawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
 			var res = r.Resolved;
-			return new ImportResult($"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable); " +
+			return new ImportResult($"{r.Areas} spawn areas ({r.Points} points) across {r.Maps} playfields ({r.EmptyMaps} empty, {r.Unreadable} unreadable, {r.UnknownMap} for a playfield not in Maps, {r.HighIdSpace} in the >= 0x40000000 id space); " +
 			                        $"resolved {res.Total}/{res.Areas} areas (name {res.Name}, containment {res.Containment}, id-prop {res.IdProp}, race-unique {res.RaceUnique}); linked {res.Linked} captured spawns.");
 		}
 	}
