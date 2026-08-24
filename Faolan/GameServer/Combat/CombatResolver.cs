@@ -510,9 +510,13 @@ namespace Faolan.GameServer.Combat
 		// 6x on two hits would be inventing, and the failure mode - a mob a few levels up one-shotting a player -
 		// is the expensive direction to get wrong.
 		//
-		// ⚠️ Elite/boss attackers sit far ABOVE this table (`Black Ring Assassin` 4.94 at gap 17, `Wild Boar` 2.15 at
-		// gap 55) and ranged mobs far below it (`Poacher Marksman` 0.17 at gap 0). Both are per-ARCHETYPE and
-		// independent of the gap; neither is modelled here, and neither is evidence against the gap curve.
+		// ⚠️ Elite/boss attackers sit far ABOVE this table (`Black Ring Assassin`, and the level-80 `Eerika of the
+		// Maidens` / `Boros` / `Ravenous Crocodile Follower` cluster at ~3x) and ranged mobs far below it
+		// (`Poacher Marksman` 0.17 at gap 0). Both are per-ARCHETYPE and independent of the gap; neither is modelled
+		// here, and neither is evidence against the gap curve.
+		//
+		// ⛔ `Wild Boar` used to be cited here as a 2.15x elite outlier at gap 55. It is not one: its nine hits were
+		// mob-on-mob damage that the report counted as NPC->player, and the row is gone (#479 - see combat.md).
 		public static uint LevelGapPercent(uint npcLevel, uint targetLevel)
 		{
 			var gap = (long)targetLevel - Math.Max(1u, npcLevel);

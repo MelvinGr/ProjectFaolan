@@ -1786,6 +1786,28 @@ Both ordinary. The "bimodal within one template" reading of `Vanir Sentinel` goe
 mode at 4191 with a single stray 127, not two mechanics (`--report npc-damage` now splits an attacker's hits at
 their largest ratio gap, so that question is answered by the report rather than by eye).
 
+#### ⛔ …and then BOTH rows turned out not to be NPC→player damage at all (#479)
+
+A second measurement fault, one layer under the first. The NPC→player direction was gated on the target being
+**not a known NPC** — and an *uncaptured* entity satisfies that as easily as the player does. It is the same
+defect the SPELL table carried until `b1b6b6be`, left in the melee half.
+
+Gated instead on the target being a **real player** (a handle that received a `FullPlayerCharacter` snapshot):
+
+| attacker | hits before | hits after |
+|---|---:|---:|
+| `Wild Boar` L25, median 5385 | 9 | **0** |
+| `Vanir Sentinel` L26, median 4191 | 25 | **1** |
+| `Tortage Pirate` L5 / L6 | 4 / 19 | **0 / 0** |
+| `Brutal Pirate` L5 | 128 | 83 (`x model` 0.95 → **1.04**) |
+
+⚠️ **The bimodal sentence above is exactly inverted.** `Vanir Sentinel`'s "single stray 127" is the ONE hit that
+was aimed at the player; the 24 at ~4191 were never in this direction. The same fix removes two player→NPC rows
+built the same way (L25 13 hits, L26 32 hits) and a level-11 pair reading 84,653.
+
+So neither template is elite, ordinary, or bimodal — they are not evidence about NPC→player damage in either
+direction, and `Wild Boar` should not be cited as an elite outlier anywhere.
+
 ⚠️ **And the whole `x model` column had been 100× wrong since #572.** That change moved
 `ResolveNpcAttackDamage`'s return to display units while captured damage is a WIRE number, so a level-1
 `Pillager` read as "139× the model" instead of 1.39×. `CombatResolver.NpcAttackDamageWire` is the wire-unit
@@ -1811,9 +1833,10 @@ is Gitea #508's column.
 
 **Health was tested as an alternative BASE and rejected.** An elite's pool is what makes it an elite, so
 `damage = k × the attacker's own max health` would explain "elites hit harder" with no archetype column at all.
-Over the 10 rows with ≥ 8 hits at |gap| ≤ 2 the two predictors are near-equivalent — the level model spreads
-0.77–3.41 (4.4×), health 1.22–4.76 % (3.9×, median 2.98 %) — which is not enough to move the base of the damage
-model. `--report npc-damage` prints the head-to-head so a wider corpus can re-decide it.
+Over the rows with ≥ 8 hits at |gap| ≤ 2 the two predictors are near-equivalent, which is not enough to move the
+base of the damage model. ⚠️ The exact figures move as the corpus grows and as the direction gate above tightens
+(the health spread now reads 0.54–5.37 % over 25 rows, median 2.06 %), so read them off a run rather than from
+here. `--report npc-damage` prints the head-to-head so a wider corpus can re-decide it.
 
 ### A mob that SHOOTS deals a fifth of one that swings (#671)
 

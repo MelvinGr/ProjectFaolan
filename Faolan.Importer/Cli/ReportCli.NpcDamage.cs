@@ -288,11 +288,20 @@ namespace Faolan.Importer.Cli
 					// spawned - which includes the player's own PETS - so testing only the attacker counted a mob
 					// hitting the necro's pet as "NPC -> PLAYER", and testing only the target counted the PET's hits
 					// as "PLAYER -> NPC". It showed: `Parasitic Soul` (a necro summon) sat in the NPC->player table
-					// as a level-80 attacker dealing 8556. An entity that is not a known spawn is the player.
+					// as a level-80 attacker dealing 8556.
+					//
+					// ⛔ **And "not a known spawn" is NOT "the player"** - the same defect the SPELL table carried
+					// until b1b6b6be. An UNCAPTURED entity satisfies it too: a mob that streamed in without its spawn
+					// packet, another player's pet, a passing guard. So both directions are gated on the PLAYER end
+					// being a real player - a handle that received a `FullPlayerCharacter` snapshot - exactly as the
+					// spell table is. Without it the high-level rows mixed mob-on-mob damage into "NPC -> player" and
+					// produced medians two orders of magnitude apart inside one level band.
 					var attackerIsNpc = levels.TryGetValue(hit.Attacker, out var attackerLevel);
 					var targetIsNpc = levels.TryGetValue(hit.Target, out var targetLevel);
+					var attackerIsPlayer = playerHandles.Contains(hit.Attacker);
+					var targetIsPlayer = playerHandles.Contains(hit.Target);
 
-					if (attackerIsNpc && !targetIsNpc)
+					if (attackerIsNpc && targetIsPlayer)
 					{
 						fromNpc.TryAdd((attackerLevel, hit.School), []);
 						fromNpc[(attackerLevel, hit.School)].Add(hit.Damage);
@@ -322,7 +331,7 @@ namespace Faolan.Importer.Cli
 					if (targetIsNpc)
 						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
 
-					if (targetIsNpc && !attackerIsNpc)
+					if (targetIsNpc && attackerIsPlayer)
 					{
 						toNpc.TryAdd((targetLevel, hit.School), []);
 						toNpc[(targetLevel, hit.School)].Add(hit.Damage);
