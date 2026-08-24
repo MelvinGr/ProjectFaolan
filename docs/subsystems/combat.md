@@ -586,7 +586,7 @@ obvious win. `--report dynel-cycle` prints all of the above.
 Every interest pass was driven by the PLAYER — `BroadcastPlayerMove` (they moved), `BroadcastPlayerEntry` (they
 arrived), `RefreshQuestVisibility` (their quests changed). Nothing was driven by the **subject** moving, and
 `BroadcastNpcMove` only sends to viewers who already hold the handle. So for a player standing still, an NPC
-that walked out of the 150 u range kept its last-rendered position for ever (no `n3ToClientQuit`), and one that
+that walked out of the interest range kept its last-rendered position for ever (no `n3ToClientQuit`), and one that
 walked in was invisible until they next moved.
 
 ⚠️ **It cannot hang off the NPC's own move effect**, which is the obvious fix. A ROUTE walker emits no per-step

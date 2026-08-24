@@ -28,8 +28,32 @@ namespace Faolan.GameServer.World
 	// architecture roadmap's later decomposition increments).
 	public sealed class WorldSimulation
 	{
-		// How far a player perceives other players (world-entity interest radius; wider than say range).
-		public const float PlayerInterestRange = 150f;
+		/// <summary>
+		///     The world-entity interest radius - how far a player is streamed spawns and despawns of everything
+		///     else. Every viewer-set decision in <c>WorldBroadcaster</c> and <c>InterestManager</c> turns on it.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ <b>MEASURED, not invented</b> (#856, <c>--report interest-radius</c>). It was <b>150 u</b>, which
+		///     nothing measured and the corpus now REFUTES: of the ~750 despawns that survive the report's filters,
+		///     <b>76% arrive inside 150 u</b>, and an interest despawn cannot fire inside the boundary.
+		///     <para>
+		///         The distribution is a radius rather than a smear - zero samples below 20 u, a mode at 45-55 u and a
+		///         decaying tail - and the player's SPEED separates its two halves: the median rises from 68 u at
+		///         2-4 u/s to 391 u at 12-20 u/s while the p10 does not move, which is what "boundary plus a variable
+		///         sweep overshoot" predicts. Read off the slow buckets, where the overshoot is a few units, the
+		///         boundary lands at ~60 u.
+		///     </para>
+		///     <para>
+		///         ⚠️ This is the DESPAWN radius. Retail may run hysteresis (spawn nearer than it despawns), and only
+		///         the despawn side is measurable - nothing bulk-despawns at login, which is what makes it clean.
+		///         Using one constant for both means we stream a little more eagerly than retail on the way in, which
+		///         is the safe direction.
+		///     </para>
+		///     <para>
+		///         ⚠️ Not yet checked in-client, and it is a 6x cut in streamed AREA - see #856.
+		///     </para>
+		/// </remarks>
+		public const float PlayerInterestRange = 60f;
 
 		// NPC auto-attack. The hostile-NPC swing now plays the decoded attack-ANIMATION ack (the "second BccAck" with
 		// actor = NPC handle - ApplyNpcAttack -> IWorldOutbound.SendNpcAttackAnimation, docs/subsystems/combat.md) and then the

@@ -411,13 +411,19 @@ means one "first" and one "repeat" per event. ⚠️ Adjacency is required rathe
 frequently-sent stat would dominate the count) ·
 `interest-radius` (#856: how far from the player does retail DESPAWN an entity? Measures the DESPAWN side
 because it is immune to the contaminant that defeated the spawn-side attempt - nothing bulk-despawns at login,
-so there is no burst to exclude. Four named filters: a despawn arriving in a burst is a ZONE CHANGE (21,736 of
-23,765), a stale player position is a teleport gap, a handle that DIED is a corpse timer, and a despawn where the
-player was not RECEDING is a lifecycle event - a dismissed pet, a summon, a mount. ⚠️ Receding rather than
-distance on purpose: filtering by distance would assume the answer in order to decide what counts as evidence
-for it. ⛔ **Verdict is negative and stays that way**: the 69 survivors span 25..850 u, a factor of 35, where a
-hard radius predicts a floor with a tight cluster above it. So the corpus cannot state the radius, and 150 u is
-neither confirmed nor refuted - it merely sits near the median, which is not evidence) ·
+so there is no burst to exclude. Named filters: a despawn near a **MapChange** is a ZONE CHANGE, a stale player
+position is a teleport gap, a handle that DIED is a corpse timer, a re-stream is not a crossing, a pool-managed
+handle is the ambient population, and a despawn where the player was not RECEDING is a lifecycle event - a
+dismissed pet, a summon, a mount. ⚠️ Receding rather than distance on purpose: filtering by distance would assume
+the answer in order to decide what counts as evidence for it. ⭐⭐ **Answer: ~60 u, and 150 u is REFUTED** - 76%
+of the ~750 survivors arrive inside 150, which a 150 u boundary forbids. The distribution is a radius and not a
+smear: zero samples below 20 u, a mode at 45-55 u, a decaying tail - and the player's SPEED separates its two
+halves, the median rising 68 -> 391 u from 2-4 u/s to 12-20 u/s while the p10 does not move, exactly what
+"boundary plus a variable sweep overshoot" predicts. ⛔ **It used to conclude the opposite**, and the FILTER was
+why: "a despawn in a burst of >3 is a zone change" also describes walking away from a camp, so it kept 19 of
+23,971 despawns and 19 samples cannot show a distribution. Naming the zone change from the wire - the client is
+TOLD, by `PlayfieldFIIR` - keeps ~750. A filter that infers a cause from a symptom's COUNT discards the signal
+whenever the signal shares the symptom) ·
 `npc-aggression` (#822: which hostile-COLOURED templates the armed-or-not-humanoid rule leaves passive. Retail
 colours civilians red without them ever fighting, so the name colour and the aggro decision are separate facts.
 Currently **10 of 352**, and every name in the list should read as a civilian - a mob appearing there means a
