@@ -493,6 +493,11 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "quest-rewards":
+				{
+					return await QuestRewards(NamedCapture.LoadAll(capturesDir), RdbDir());
+				}
+
 				case "npc-pose-check":
 				{
 					return await NpcPoseCheck(NamedCapture.LoadAll(capturesDir));

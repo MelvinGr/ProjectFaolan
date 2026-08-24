@@ -22,7 +22,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public static class QuestcRecordCodec
 	{
 		public const uint RecordVersion = 1;
-		private const int ObjRecWords = 16;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(QuestcRecord value)
@@ -68,12 +67,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var money = r.ReadU64Be();
 			var field28 = r.ReadU32Be();
 
-			var obj1 = ReadObjList(ref r);
-			var obj2 = ReadObjList(ref r);
+			var obj1 = ReadRewardList(ref r);
+			var obj2 = ReadRewardList(ref r);
 			var fieldF0 = r.ReadU32Be();
 			var fieldF8 = r.ReadU64Be();
-			var obj3 = ReadObjList(ref r);
-			var obj4 = ReadObjList(ref r);
+			var obj3 = ReadRewardList(ref r);
+			var obj4 = ReadRewardList(ref r);
 
 			return new QuestcRecord
 			{
@@ -127,12 +126,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt64(v.MoneyReward);
 			s.WriteUInt32(v.XpReward);
 
-			WriteObjList(s, v.Obj1);
-			WriteObjList(s, v.Obj2);
+			WriteRewardList(s, v.Obj1);
+			WriteRewardList(s, v.Obj2);
 			s.WriteUInt32(v.FieldF0);
 			s.WriteUInt64(v.FieldF8);
-			WriteObjList(s, v.Obj3);
-			WriteObjList(s, v.Obj4);
+			WriteRewardList(s, v.Obj3);
+			WriteRewardList(s, v.Obj4);
 
 			// NULL means "this record's objective region is composed by the caller", which is how the beach goldens
 			// slice the journal at @609 and compare the objective region separately. A record READ off the wire always
@@ -141,27 +140,23 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestObjectiveRegionCodec.Write(s, v.Objectives);
 		}
 
-		private static List<uint[]> ReadObjList(ref SpanReader r)
+		// ⚠️ A PLAIN count, not a ListFrame - the client reads it with a bare u32 and clamps it to 100
+		// (`FUN_0091df50`), so the `(count + 1) * 0x3F1` rule does not apply here.
+		private static List<QuestRewardItem> ReadRewardList(ref SpanReader r)
 		{
 			var count = r.ReadU32Be();
-			var list = new List<uint[]>((int)count);
+			var list = new List<QuestRewardItem>((int)count);
 			for (var i = 0; i < count; i++)
-			{
-				var rec = new uint[ObjRecWords];
-				for (var j = 0; j < ObjRecWords; j++)
-					rec[j] = r.ReadU32Be();
-				list.Add(rec);
-			}
+				list.Add(QuestRewardItemCodec.Read(ref r));
 
 			return list;
 		}
 
-		private static void WriteObjList(FaolanStream s, List<uint[]> list)
+		private static void WriteRewardList(FaolanStream s, List<QuestRewardItem> list)
 		{
 			s.WriteUInt32(list.Count);
-			foreach (var rec in list)
-			foreach (var word in rec)
-				s.WriteUInt32(word);
+			foreach (var entry in list)
+				QuestRewardItemCodec.Write(s, entry);
 		}
 	}
 
@@ -171,12 +166,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint QuestLineId { get; init; } // @+0xcc (matches the Area string's id)
 		public uint QuestId { get; init; }
 
-		// The four objective lists. Each entry is one ObjRec carried as 16 raw u32s (unvalidated; empty for
-		// the beach starter, so this is exercised only by round-trip of progressed captures).
-		public List<uint[]> Obj1 { get; init; } = [];
-		public List<uint[]> Obj2 { get; init; } = [];
-		public List<uint[]> Obj3 { get; init; } = [];
-		public List<uint[]> Obj4 { get; init; } = [];
+		// The quest's four REWARD lists (#464). Each entry is one reward ITEM - see QuestRewardItem, whose key
+		// half is proven by decrypting the template it names. They are EMPTY for the beach starter, which is why
+		// they went unread for so long: the golden template is the one record that carries none. Over the dumps
+		// 7,347 elements are populated across 3,741 journal records (`--report quest-rewards`).
+		//
+		// ⚠️ What the four lists MEAN relative to each other - guaranteed vs choice vs class-specific - is not
+		// decoded; the wire order is `[obj1][obj2][fieldF0][fieldF8][obj3][obj4]` and nothing in the corpus
+		// separates them. They are carried under their positional names rather than guessed at.
+		public List<QuestRewardItem> Obj1 { get; init; } = [];
+		public List<QuestRewardItem> Obj2 { get; init; } = [];
+		public List<QuestRewardItem> Obj3 { get; init; } = [];
+		public List<QuestRewardItem> Obj4 { get; init; } = [];
 
 		// The quest's @609 OBJECTIVE region, which on the wire follows this record's obj4 - the journal record and its
 		// objective region are INTERLEAVED per quest, not two separate top-level regions (#384). Null only for a record

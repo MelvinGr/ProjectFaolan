@@ -298,6 +298,14 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
+`quest-rewards` (#464: the four reward lists inside every captured `Quest_c` journal record - what the codec
+carried as *"16 raw u32s, unvalidated"* until the whole corpus was swept, because the beach starter is the one
+record that carries NONE of them. Each 16-word element is one reward ITEM: `[instance][questId]` then the ACG
+`template1`/`template2` pair, each as `[1000620][templateId][key x4]`, then `[level][quantity]`. ⭐⭐ The proof is
+DECRYPTION with a CONTROL - all 101 distinct templates open with the key the wire states beside them and all 101
+fail with a bogus key, so it is not a plausible-looking alignment. ⭐ It also reports the CONTENT gap: 67 of the
+101 templates are not in `Items`, and each arrives with the key that would admit it. Needs `--Content:RdbDir` for
+the decryption half; without it the shape half still runs) ·
 `snapshot-eligibility` (#389: which quests can ride the LOGIN SNAPSHOT, and which arm stops the rest. A held quest
 that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live restore path any
 more - so this is a gameplay bound. ⭐ It exists because the ticket's long-standing blame on the `@609` objective

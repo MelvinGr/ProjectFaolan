@@ -87,9 +87,45 @@ objlist obj3, obj4
 progress-sublist                       # <-- the piece the beach template never exercises
 ```
 
-`ObjRec` = **16 u32** on the wire (reader scrambles them into an 18-word struct: 2 words, then `Read4×U32`,
-2 words, `Read4×U32`, 2 words). Reading them as 16 raw u32 in wire order (what `QuestcRecordCodec` does) IS
-byte-exact.
+## ⭐ Decoded: the four `objlist`s are the quest's REWARD ITEMS (#464)
+
+`ObjRec` = **16 u32** on the wire, and they were carried as *"16 raw u32s, unvalidated"* for months for one
+reason: the beach starter — the only journal record a golden covers — carries **none of them**. Over the whole
+corpus they are populated on **7,347** elements across 3,741 records (`--report quest-rewards`), and the element
+is one **reward item**:
+
+```
+[u32 instance][u32 questId]
+[u32 1000620][u32 templateId][u32 key1..key4]     # ACG template1 + its per-template TEA key
+[u32 1000620][u32 templateId][u32 key1..key4]     # ACG template2 + its key
+[u32 level][u32 quantity]
+```
+
+Four independent things pin it, and no two of them share an assumption:
+
+1. ⭐⭐ **Decryption, with a control.** All **101 of 101** distinct templates open with the key the wire states
+   beside them — each decrypting to a body that declares one of the catalog types and its own id — and all
+   **101 of 101** FAIL with a bogus key. The same test that pinned `keyN ↔ templateN` for `ProtoAcgItem` (#752).
+2. **The client's own field grouping.** The reader does not store the sixteen words in order: it reads
+   `w2, w3` and stores them at `[7], [6]`, then `Read4×U32` into `[2..5]` — i.e. it assembles `(type, id, key)`
+   into ONE six-word reference object, twice. The "scramble" the note below used to describe IS the carve.
+3. **The echo.** `w1` equals the owning record's own `questId` on 7,347 of 7,347.
+4. **`1000620`** is the client's item-template catalog (the RDBH variant of 1000020, `rdb-type-catalog.md`), and
+   it is the type word on both halves of every element.
+
+The two trailing words are named from what they are **attached to**, not from their values: `level` is constant
+per TEMPLATE (101/101), so it belongs to the item; `quantity` is constant per (quest, template) (161/161) but not
+per template, so it belongs to the reward.
+
+⚠️ What the four lists mean **relative to each other** — guaranteed vs choice vs class-specific — is *not*
+decoded. The wire order is `[obj1][obj2][fieldF0][fieldF8][obj3][obj4]` and nothing in the corpus separates them,
+so `QuestcRecord` keeps their positional names.
+
+⭐ They are also a CONTENT source: 67 of the 101 templates are **not** in our `Items`, and each arrives with the
+key that would admit it (an item enters the catalog when a capture yields its `Data1..4`). Open work tracked in
+Gitea.
+
+Reading them as 16 raw u32 in wire order was byte-exact and still is; `QuestRewardItem` is the typed form.
 
 ## ~~progress-sublist (per record, after obj4) — the real blocker~~ — RESOLVED 2026-07-20 (#384)
 
