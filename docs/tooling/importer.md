@@ -298,6 +298,15 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
+`snapshot-eligibility` (#389: which quests can ride the LOGIN SNAPSHOT, and which arm stops the rest. A held quest
+that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live restore path any
+more - so this is a gameplay bound. ⭐ It exists because the ticket's long-standing blame on the `@609` objective
+region is wrong: the region gate and the record scalars sit DOWNSTREAM of the quest's five header text refs, and
+the scarcest of those is the SUMMARY (slot 1, LDB category 50302) at 114 of 5,049. ⭐⭐ Its second table is the one
+that settles the ticket - *how many quests fail exactly one arm* - and every row is **zero**: the capture-only
+inputs (the summary's per-string LDB key, the `Quest_c` record's `Level` word, every goal's wire KIND tag) are all
+known for the SAME 114 quests, because one captured journal carries all three at once. So no arm can be relaxed to
+widen coverage. ⚠️ DATABASE-only, so it runs from a plain clone; a report and not a test for the #729 reason) ·
 `spell-level-ladder` (`--report-arg <family substring>` for the per-rank detail: which spell FAMILIES ship a per-rank level ladder and which ship one level for several ranks,
 so that a single ding teaches two, three or six ranks of the same spell at once. `Spells.Level` comes from RDB field
 125, which states the ladder for 103 of the 122 learnable rank families and states none at all for a few — every

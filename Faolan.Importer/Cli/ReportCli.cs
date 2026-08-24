@@ -176,6 +176,11 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// DATABASE only, no corpus and no RDB: which quests can ride the login snapshot and which arm stops the
+			// rest (#389). It reads only what we SHIP, so it runs from a plain clone.
+			if (report == "snapshot-eligibility")
+				return await SnapshotEligibility();
+
 			// One encrypted string, from a key pasted out of a capture: --report-arg <category>:<id>:<wire key>.
 			if (report == "ldb-decrypt")
 			{

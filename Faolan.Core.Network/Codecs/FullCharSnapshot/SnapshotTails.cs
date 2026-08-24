@@ -181,6 +181,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// the WHOLE login down (statlist.cpp:134), and the completed journal rides along with the active one. What
 			// keeps that away is the flag - so widen what gets flagged only behind a byte-exact regeneration gate, and
 			// never by flipping a quest's flag by hand.
+			//
+			// ⭐ **The region is NOT where the ceiling is** (#389, measured by `--report snapshot-eligibility`). 114 of
+			// 5,049 quests pass this gate, and the region arm is one of five that all sit at exactly 114 - so is the
+			// `Level` word, and so are the `Quest_c` record scalars, and so is the SUMMARY header ref below. The
+			// report's second table asks how many quests fail exactly ONE arm and the answer is ZERO on every arm: a
+			// captured journal carries the summary key, the level and each goal's kind tag together, so the
+			// capture-only inputs are all known for the same quests. Relaxing any single arm therefore widens nothing.
+			// And the scarcest input cannot be derived at all: the summary's category (50302) and RefId (the quest's
+			// own id) are mechanical, but its per-string 128-bit LDB key is uniformly random, absent from the client
+			// and not a function of (RefId, Category) - see Faolan.Core/Crypt/LdbKey.cs. Without it the client cannot
+			// decrypt the text.
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);
 		}
