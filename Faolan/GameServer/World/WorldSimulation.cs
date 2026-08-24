@@ -72,10 +72,19 @@ namespace Faolan.GameServer.World
 		// a number of its own. It was 15 s alongside the old 15 s respawn; leaving it there while placed spawns moved to
 		// the measured 150 s would have made the ambient population the fast-respawning one, which is the complaint that
 		// started this.
+		//
+		// ⚠️ **The corpus is not settled on that** (#855). Splitting `--report respawn-interval`'s 23 matches by
+		// whether the creature HAS a placement separates them cleanly: the placed ones cluster (Brutal Pirate
+		// 149.9-150.2 across three captures, Wild Cow/Wild Pig 119.5-120.0), while the eleven with NO placement -
+		// ambient or summoned - run a 3.4 s to 99.6 s continuum (eight Hatchlings 3.4-15.4, three Panthers
+		// 20.4/60.2/99.6). So retail's ambient population may well come back far faster than its placed one. It is
+		// NOT changed here because a continuum is not a timer's signature - a real interval piles up at one value,
+		// which is exactly what distinguishes the two clusters above - and a nest spawning ADDS during a fight
+		// produces the same shape. Recording the tension rather than acting on it.
 		private const double AmbientMaintainIntervalSeconds = WorldEntity.DefaultRespawnDelaySeconds;
 
 		// #778: how often a standing player's interest is re-resolved so entities that moved THEMSELVES stream in and
-		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 150 u range, so a second's granularity is two
+		// out. Slow on purpose - the subjects walk at ~2.2 u/s against a 60 u range, so a second's granularity is two
 		// units of travel, and the pass costs one distance check per entity in the player's zone.
 		private const double InterestSweepIntervalSeconds = 1.0;
 
