@@ -145,16 +145,38 @@ check this sheet before deciding a number is missing from the client:
   two behave completely differently:
 
   * `1000070` rises to **20** at frame 6039 and never moves again, while the capture runs on to frame 11692 and
-    its sibling keeps counting. That is a real clamp, and it is the SERVER's - nothing in the client reads either
-    cap tweak (the only reference to `DailyPvEKillsCap` / `DailyPvPKillsCap` in the whole image is
-    `FUN_010CB540`, the defaults registry itself).
+    its sibling keeps counting. That is a real clamp, and it is the SERVER's.
   * `1000069` passes its stated cap of 5 at frame 3936 and carries on to **13** with no stall.
 
   Both are fed by ordinary PvE kills in a corpus with no PvP in it, sometimes advancing on the same frame, with
   `1000070` advancing about half again as often. The id↔name pairing is not the doubtful part - the client's own
   registration (`FUN_01df7df0`) writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before
   `DailyPvPKills`, and registers each id again under sub-indices 1/2/5/8 that carry no name at all.
-  `[V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps]`
+
+  ### ⭐ `1000070` is a witnessed-NPC-death counter, clamped at 20 (`--report daily-kills`)
+
+  Counting each capture's INCREMENTS against the NPC deaths in the same capture separates two facts the frame
+  read above could state only qualitatively:
+
+  * **what it counts** - where a capture's deaths stay under 20, `1000070`'s increments EQUAL the death count
+    exactly (9=9, 10=10, 11=11, … on 7 of 15 captures);
+  * **where it stops** - four captures run **29 / 34 / 37 / 39** deaths and the counter stops dead on **20** in
+    every one.
+
+  So it advances once per NPC death the client is told about, under a PvP name, in a corpus with no PvP. And
+  `1000069` advances **0.16-0.36** of the deaths per capture - about a third - with no clamp anywhere near its
+  stated 5.
+
+  ⚠️ **Correction to the note above**: the defaults registry `FUN_010CB540` is *not* the only reference. The
+  client also builds a global tweak accessor for `DailyPvPKillsCap` - a `SignalTarget` at `0x02D243D8`,
+  constructed at `0x01DF61A0` inside the PvP-XP economy run of static initializers
+  (`PvPXPFromPvPCapMultiplier`, `MinigamePvEXPMultiplier`, `PvEXPFromPvPGroupPenalty`, `TWK_MinLevelForPvPXP`) -
+  and builds **none** for `DailyPvEKillsCap`. ⛔ That is not a second consumer: nothing reads the global but its
+  own ctor and its atexit, so any consumer reaches it through the signal and the address route ends there. What
+  it does establish is that the two caps are not interchangeable in the client, which is the shape the clamp
+  asymmetry has.
+
+  `[V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5]`
 
   …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
   (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is

@@ -126,9 +126,14 @@ evidence, not as a citation, until the id is used.
   20 sitting next to the Fresh Kill 20 and is presumably what made the two look complementary in the first
   place. They are not: 106 counts 20→11 while 1000070 counts 0→20 in the same session.
 
-  ⚠️ [V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps] The two
-  names are `DailyPvEKills` (1000069) and `DailyPvPKills` (1000070), and it is the PvP-named one that tracks
-  ordinary beach and Tortage kills far more often than the PvE-named one.
+  ⭐ **`1000070` advances once per NPC DEATH the client is told about** (`--report daily-kills`, #887): where a
+  capture's deaths stay under 20 its increments equal the death count exactly (9=9, 10=10, 11=11, … on 7 of 15),
+  and four captures running 29 / 34 / 37 / 39 deaths all stop dead on 20. So the cap is real and so is what it
+  counts — under a PvP name, in a corpus with no PvP.
+
+  ⚠️ [V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5]
+  `1000069` advances 0.16–0.36 of a capture's deaths — about a third — and passes its stated cap of 5 without
+  stalling, reaching 13. What selects that third is the residue.
 
   ⛔ The *"name↔id pairing is off"* half is dead twice over: the client's stat REGISTRATION (`FUN_01df7df0`)
   writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before `DailyPvPKills`, so the pairing is the

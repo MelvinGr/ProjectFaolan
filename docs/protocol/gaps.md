@@ -674,7 +674,7 @@ more harvested fields, not a decode: `--report gem-slots` already prints them (a
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
 ### The two daily kill counters, and which one really tracks kills — the CAP half is answered (#887, 2026-08-22)
-[V0: what distinguishes the two daily kill counters - both are fed by PvE kills and only one clamps] The client's
+[V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5] The client's
 stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
 entirely PvE — beach, Tortage, Ymir's Pass. Yet it is the **PvP-named** one that moves 118 times against the
 PvE-named one's 39 (`--report stat-series --report-arg 106,1000069,1000070`).
@@ -693,10 +693,22 @@ than aggregated:
   stop, so 20 is a genuine clamp — and since nothing in the client reads either cap, it is the SERVER's.
 * `1000069` passes **5** at frame 3936 and carries on to 13 with no stall of any kind.
 
-⛔ **Nothing in the client consumes either cap.** `DailyPvEKillsCap` / `DailyPvPKillsCap` are referenced by
-exactly one function in the image — `FUN_010CB540`, the tweak-DEFAULTS registry that declares them. There is no
-comparison, no clamp, no "x of y" read. So a cap named for a counter is not evidence that it bounds it, and the
-one-to-one table in [`client-tweak-table.md`](../rdb/client-tweak-table.md) is a NAME pairing.
+⛔ **Nothing in the client consumes either cap.** There is no comparison, no clamp, no "x of y" read. So a cap
+named for a counter is not evidence that it bounds it, and the one-to-one table in
+[`client-tweak-table.md`](../rdb/client-tweak-table.md) is a NAME pairing.
+
+⚠️ It is not quite "exactly one function" though, and the difference is the interesting part: besides the
+tweak-DEFAULTS registry `FUN_010CB540`, the client builds a **global tweak accessor for `DailyPvPKillsCap`** — a
+`SignalTarget` at `0x02D243D8`, constructed at `0x01DF61A0` inside the PvP-XP economy run of static initializers
+— and builds **none** for `DailyPvEKillsCap`. Nothing READS that global except its own ctor and its atexit, so it
+is not a consumer and the address route ends there; what it establishes is that the two caps are not
+interchangeable in the client, which is the shape the clamp asymmetry has.
+
+⭐ **And `1000070` is now identified**, by counting each capture's INCREMENTS against its NPC deaths
+(`--report daily-kills`): where a capture's deaths stay under 20 the increments EQUAL the death count exactly
+(9=9, 10=10, 11=11, … on 7 of 15), and four captures running **29 / 34 / 37 / 39** deaths all stop dead on
+**20**. So it advances once per NPC death the client is told about, under a PvP name. `1000069` advances
+**0.16–0.36** of the deaths per capture — about a third — which is the residue this gap now names.
 
 ⚠️ **What is left** is narrower and is about the counters rather than the caps: both are fed by ordinary PvE
 kills, they sometimes advance on the same frame, and `1000070` advances about half again as often (20 against 13
