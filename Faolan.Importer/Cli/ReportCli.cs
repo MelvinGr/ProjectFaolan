@@ -188,6 +188,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// Rewrites the fixture archive in the current container format, content unchanged. Reads no captures for
+			// the same reason `fixture-set` does not: the archive's content cannot be re-derived here (#555).
+			if (report == "fixture-repack")
+			{
+				FixtureArchiveWriter.Repack(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+				return 0;
+			}
+
 			// Adds or replaces ONE named fixture in the archive. Reads no captures, so it sits above the corpus check:
 			// the hand-carved fixtures cannot be re-derived from the corpus, which is exactly why this exists.
 			if (report == "fixture-set")

@@ -375,7 +375,7 @@ The 349 MB of retail traces, the Ghidra project and the baked terrain live in a 
 `Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--Content:RdbDir` likewise).
 
 **The test suite does NOT need it.** Every test runs from a plain clone, off ONE committed file —
-`Faolan.Tests/Assets/fixtures.bin` (15 MB, `FixtureArchive`), which holds every byte of capture-derived data the
+`Faolan.Tests/Assets/fixtures.bin` (2.8 MB, `FixtureArchive`), which holds every byte of capture-derived data the
 suite reads. It has two halves, and the difference decides which one a new gate belongs in:
 
 - **Named fixtures** (`assets/recipe-book-reply.bin`, `assets/mount-spawns.bin`, `assets/casilda-quest-*.bin`,

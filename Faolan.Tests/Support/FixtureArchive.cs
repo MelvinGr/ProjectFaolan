@@ -22,7 +22,11 @@ namespace Faolan.Tests.Support
 	//   TestPaths     - named inputs, as bytes or as a materialized path
 	internal static class FixtureArchive
 	{
-		public const string Magic = "FCX2";
+		public const string Magic = "FCX3";
+
+		// The DEFLATE-era magic, still read so a checkout with the older archive opens rather than failing on the
+		// magic. `--report fixture-repack` converts one; nothing writes it.
+		public const string LegacyDeflateMagic = "FCX2";
 
 		private static readonly Lazy<Archive> Loaded = new Lazy<Archive>(Load);
 		private static readonly Lazy<Dictionary<string, string>> Materialized = new Lazy<Dictionary<string, string>>(Materialize);
@@ -95,12 +99,14 @@ namespace Faolan.Tests.Support
 			}
 
 			var raw = File.ReadAllBytes(Path);
-			if (Encoding.ASCII.GetString(raw, 0, 4) != Magic)
+			var magic = Encoding.ASCII.GetString(raw, 0, 4);
+			if (magic != Magic && magic != LegacyDeflateMagic)
 				throw new InvalidDataException($"{Path} is not a fixture archive (bad magic).");
 
+			var brotli = magic == Magic;
 			var manifestLength = (int)raw.ReadU32Le(4);
-			var manifest = Inflate(raw, 8, manifestLength);
-			var payload = Inflate(raw, 8 + manifestLength, raw.Length - 8 - manifestLength);
+			var manifest = Inflate(raw, 8, manifestLength, brotli);
+			var payload = Inflate(raw, 8 + manifestLength, raw.Length - 8 - manifestLength, brotli);
 
 			using var doc = JsonDocument.Parse(manifest);
 			var offset = 0;
@@ -130,12 +136,15 @@ namespace Faolan.Tests.Support
 			return new Archive(corpus.OrderBy(e => e.Source, StringComparer.Ordinal).ThenBy(e => e.Index).ToList(), named);
 		}
 
-		private static byte[] Inflate(byte[] raw, int offset, int length)
+		// ⭐ BROTLI since #555 - the container change that took the file from 15.5 MB to 3.0 MB with no content
+		// change at all. Deflate's 32 KB window could not see across 45k near-duplicate bodies; a 16 MB one can.
+		// Decoding needs no window hint, so this is one call either way.
+		private static byte[] Inflate(byte[] raw, int offset, int length, bool brotli)
 		{
 			using var source = new MemoryStream(raw, offset, length);
 			using var inflated = new MemoryStream();
-			using (var deflate = new DeflateStream(source, CompressionMode.Decompress))
-				deflate.CopyTo(inflated);
+			using (Stream decoder = brotli ? new BrotliStream(source, CompressionMode.Decompress) : new DeflateStream(source, CompressionMode.Decompress))
+				decoder.CopyTo(inflated);
 
 			return inflated.ToArray();
 		}

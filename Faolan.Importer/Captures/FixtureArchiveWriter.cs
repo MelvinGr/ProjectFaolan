@@ -51,7 +51,11 @@ namespace Faolan.Importer.Captures
 	//     snapshot" depend on that order.
 	public static class FixtureArchiveWriter
 	{
-		public const string Magic = "FCX2";
+		public const string Magic = "FCX3";
+
+		// The DEFLATE-era magic. Still READ so an archive from before the container change opens (and so
+		// `--report fixture-repack` can convert one), never written.
+		public const string LegacyDeflateMagic = "FCX2";
 
 		// The IIR types the test suite reads. Adding a test that needs another type means adding it here and
 		// regenerating - the archive deliberately freezes the set rather than guessing.
@@ -151,6 +155,19 @@ namespace Faolan.Importer.Captures
 				Console.WriteLine($"    {counts.GetValueOrDefault($"0x{iir:x8}"),6}  0x{iir:X8}  {name}");
 		}
 
+		// Rewrites the archive in the CURRENT container format, byte-for-byte identical in content. The corpus half
+		// is derived from the captures and the named half cannot be re-derived at all, so a container change must not
+		// require a re-harvest: this converts what is committed instead (#555, FCX2 deflate -> FCX3 brotli).
+		public static void Repack(string archivePath)
+		{
+			var before = new FileInfo(archivePath).Length;
+			var (counts, corpus, named) = Read(archivePath);
+			WriteArchive(archivePath, corpus, counts, named);
+			var after = new FileInfo(archivePath).Length;
+			Console.WriteLine($"repacked {archivePath}: {before / 1048576.0:F1} MB -> {after / 1048576.0:F1} MB "
+			                  + $"({(before > 0 ? (double)before / after : 0):F1}x), {corpus.Count} corpus entries + {named.Count} named fixtures unchanged");
+		}
+
 		// Adds or replaces ONE named fixture, leaving the corpus untouched. This is the only way a hand-carved fixture
 		// enters the archive after the loose .bin files are gone - there is nothing to re-derive it from.
 		public static void SetNamed(string archivePath, string key, string sourceFile)
@@ -211,24 +228,64 @@ namespace Faolan.Importer.Captures
 			using var output = File.Create(outputPath);
 			output.Write(Encoding.ASCII.GetBytes(Magic));
 
-			using var manifestDeflated = new MemoryStream();
-			using (var deflate = new DeflateStream(manifestDeflated, CompressionLevel.SmallestSize, true))
-				deflate.Write(manifest);
+			var compressedManifest = Compress(manifest);
 
 			Span<byte> len = stackalloc byte[4];
-			BinaryPrimitives.WriteUInt32LittleEndian(len, (uint)manifestDeflated.Length);
+			BinaryPrimitives.WriteUInt32LittleEndian(len, (uint)compressedManifest.Length);
 			output.Write(len);
-			manifestDeflated.Position = 0;
-			manifestDeflated.CopyTo(output);
+			output.Write(compressedManifest);
 
-			using (var deflate = new DeflateStream(output, CompressionLevel.SmallestSize, true))
-			{
-				foreach (var e in ordered)
-					deflate.Write(e.Full);
-				foreach (var body in named.Values)
-					deflate.Write(body);
-			}
+			using var payload = new MemoryStream();
+			foreach (var e in ordered)
+				payload.Write(e.Full);
+			foreach (var body in named.Values)
+				payload.Write(body);
+
+			output.Write(Compress(payload.GetBuffer().AsSpan(0, (int)payload.Length)));
 		}
+
+		/// <summary>
+		///     Compresses one container section. BROTLI, quality 11, window <b>24</b> - and the window is the whole
+		///     point (Gitea #555).
+		/// </summary>
+		/// <remarks>
+		///     ⭐ The archive is 45k packet bodies laid out by (IIR, length), i.e. near-duplicates spread over 81 MB.
+		///     DEFLATE can only look 32 KB back, so it compressed each body against its immediate neighbours and got
+		///     15.1 MB; a 16 MB window sees the whole class at once and gets <b>2.6 MB</b> for the same bytes. The
+		///     manifest halves too (404 KB -&gt; 221 KB). Nothing is dropped and no gate changes - this is the
+		///     container, not the content.
+		///     <para>
+		///         ⚠️ It also DECOMPRESSES faster (0.04 s against deflate's 0.14 s), so the suite pays nothing for it.
+		///     </para>
+		///     <para>
+		///         ⛔ <c>BrotliStream</c> is deliberately not used to WRITE: it fixes the window at 22 bits, which
+		///         costs 158 KB here. <c>BrotliEncoder.TryCompress</c> takes the window explicitly. Reading is a
+		///         stream either way - a decoder handles any window the encoder chose.
+		///     </para>
+		/// </remarks>
+		private static byte[] Compress(ReadOnlySpan<byte> plain)
+		{
+			// TryCompress needs the destination up front, and brotli can expand incompressible input slightly.
+			var destination = new byte[plain.Length + 1024];
+			if (!BrotliEncoder.TryCompress(plain, destination, out var written, BrotliQuality, BrotliWindow))
+				throw new InvalidDataException($"brotli refused to compress {plain.Length} bytes into {destination.Length}.");
+
+			return destination[..written];
+		}
+
+		private static byte[] Decompress(ReadOnlySpan<byte> compressed, bool brotli)
+		{
+			using var source = new MemoryStream(compressed.ToArray());
+			using var plain = new MemoryStream();
+			using (Stream decoder = brotli ? new BrotliStream(source, CompressionMode.Decompress) : new DeflateStream(source, CompressionMode.Decompress))
+				decoder.CopyTo(plain);
+
+			return plain.ToArray();
+		}
+
+		// Brotli's maximum quality, and a 16 MB window - see Compress.
+		private const int BrotliQuality = 11;
+		private const int BrotliWindow = 24;
 
 		// The named half of an existing archive, or - on the FIRST pack, when there is no archive yet - the loose
 		// Assets/*.bin + Golden/*.bin files beside it. Seeding this way is what lets the loose files be deleted in the
@@ -286,22 +343,14 @@ namespace Faolan.Importer.Captures
 		private static (Dictionary<string, int> Counts, List<CorpusEntry> Corpus, SortedDictionary<string, byte[]> Named) Read(string archivePath)
 		{
 			var raw = File.ReadAllBytes(archivePath);
-			if (Encoding.ASCII.GetString(raw, 0, 4) != Magic)
+			var magic = Encoding.ASCII.GetString(raw, 0, 4);
+			if (magic != Magic && magic != LegacyDeflateMagic)
 				throw new InvalidDataException($"{archivePath} is not a fixture archive (bad magic).");
 
+			var brotli = magic == Magic;
 			var manifestLength = (int)BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(4, 4));
-			using var manifestStream = new MemoryStream(raw, 8, manifestLength);
-			using var manifestInflated = new MemoryStream();
-			using (var deflate = new DeflateStream(manifestStream, CompressionMode.Decompress))
-				deflate.CopyTo(manifestInflated);
-
-			using var doc = JsonDocument.Parse(manifestInflated.ToArray());
-			using var payloadStream = new MemoryStream(raw, 8 + manifestLength, raw.Length - 8 - manifestLength);
-			using var payload = new MemoryStream();
-			using (var deflate = new DeflateStream(payloadStream, CompressionMode.Decompress))
-				deflate.CopyTo(payload);
-
-			var bytes = payload.ToArray();
+			using var doc = JsonDocument.Parse(Decompress(raw.AsSpan(8, manifestLength), brotli));
+			var bytes = Decompress(raw.AsSpan(8 + manifestLength), brotli);
 			var offset = 0;
 			var counts = new Dictionary<string, int>();
 			foreach (var c in doc.RootElement.GetProperty("counts").EnumerateObject())

@@ -306,6 +306,14 @@ DECRYPTION with a CONTROL - all 101 distinct templates open with the key the wir
 fail with a bogus key, so it is not a plausible-looking alignment. ⭐ It also reports the CONTENT gap: 67 of the
 101 templates are not in `Items`, and each arrives with the key that would admit it. Needs `--Content:RdbDir` for
 the decryption half; without it the shape half still runs) ·
+`fixture-repack` (#555: rewrites `fixtures.bin` in the CURRENT container format, content byte-for-byte
+unchanged. A container change must not require a re-harvest - the corpus half needs the capture repo and the
+named half cannot be re-derived at all - so this converts what is committed. ⭐ It is what took the archive from
+15.5 MB to **2.8 MB** with no content change and no gate change: the container went from DEFLATE to BROTLI at
+quality 11 / window 24. Deflate's 32 KB window could only compress a body against its immediate neighbours; the
+archive is 45k near-duplicate packet bodies laid out by (IIR, length) over 81 MB of payload, and a 16 MB window
+sees the whole class at once. It also DECODES faster - 0.04 s against deflate's 0.14 s - so the suite pays
+nothing. Reads no captures) ·
 `snapshot-eligibility` (#389: which quests can ride the LOGIN SNAPSHOT, and which arm stops the rest. A held quest
 that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live restore path any
 more - so this is a gameplay bound. ⭐ It exists because the ticket's long-standing blame on the `@609` objective
