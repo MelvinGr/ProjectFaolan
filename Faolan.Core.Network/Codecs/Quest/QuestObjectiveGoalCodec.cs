@@ -12,31 +12,42 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   [reserved ×7][subId][mapId][markerX][markerY][unknown1][unknown2]
 	//   [u32 len][objective <remoteformat 50304>]  [u16 len][text record <remoteformat 51200>/<localized 51000>]
 	//
-	// ⭐ The LIVE reader is pinned (#464): `QuestFullUpdateIIR::ReadSubClass` (FUN_00917e20) allocates a `Quest_c`
-	// and `FUN_0091df50` reads the goal list - per goal the record's last 16 u32 into an 18-word struct
-	// (n->+0x00, goalIdRepeat->+0x04, requiredCount->+0x18, reserved r0->+0x1C, r1..r4->+0x08..+0x14,
-	// r5->+0x30, r6->+0x34, subId/mapId/markerX/markerY->+0x20..+0x2C, unknown1->+0x38, unknown2->+0x3C).
-	// Two payoffs:
-	//   - reserved[5]/[6] are the goal list's SORT KEYS - the client std::sorts the goals with a comparator
-	//     (FUN_0091ce70) on +0x30 then +0x34, so the pair is the display order;
-	//   - unknown1/unknown2 now have OBJECT OFFSETS for a consumer hunt. Data leads (not yet client-named):
-	//     unknown1 > 0 implies a marker on 24 of 24 shipped goals, round map-unit values 3..170 on
-	//     ReachArea/hunt-area goals - a marker RADIUS shape; unknown2's 17 shipped carriers are all
-	//     dungeon-objective goals, several with degenerate (1,1) markers - a marker-display modifier shape.
+	// ⛔ **CORRECTED (#464).** This block used to say: *"the LIVE reader is pinned - `QuestFullUpdateIIR::ReadSubClass`
+	// (FUN_00917e20) allocates a `Quest_c` and `FUN_0091df50` reads the goal list - per goal the record's last 16 u32
+	// into an 18-word struct (n->+0x00, goalIdRepeat->+0x04, requiredCount->+0x18, r0->+0x1C, r1..r4->+0x08..+0x14,
+	// r5->+0x30, r6->+0x34, subId/mapId/markerX/markerY->+0x20..+0x2C, unknown1->+0x38, unknown2->+0x3C)"*, and drew
+	// two conclusions from it: that `reserved[5]`/`[6]` are the goal list's SORT KEYS, and that `unknown1`/`unknown2`
+	// have object offsets `+0x38`/`+0x3C` for a consumer hunt.
 	//
-	// ⚠️ **Where that consumer hunt stands, so it is not restarted from zero** (#464, 2026-08-21):
-	//   - The two fields are the record's LAST two words from BOTH directions - the reader stores `puVar15[0xe]`
-	//     and `[0xf]` (= +0x38/+0x3C) last, and the writer `FUN_0091d260` emits `[0]`, `[1]`, block `[2..7]`,
-	//     block `[8..0xd]`, `[0xe]`, `[0xf]` in that order. So the carve is confirmed twice over.
-	//   - A `Quest_c` holds **two** goal lists, at `+0x10C` and `+0x110`, each read by the same loop and each
-	//     capped at 100 entries by the reader. A consumer hunt has to cover both.
-	//   - ⛔ The goal is a plain **0x48-byte POD** (`FUN_00c9cce0(0x48,4,0)`, every word zeroed, no vtable stored),
-	//     so there is no class to sweep by RTTI and no virtual to xref. That is WHY offsets are the only handle,
-	//     and why they are a bad one: `+0x24`+`+0x38` co-occur in 4,862 of the binary's 139,441 functions.
-	//   - ⛔ **The obvious hit is a false one.** `FUN_0091df50` itself ends with
-	//     `if (*(uint *)(obj + 0x3c) < *(uint *)(obj + 0x38)) FUN_0091f760();`, which reads exactly like
-	//     "unknown2 vs unknown1". It is not: that loop walks `+0xAC..+0xB0`, a list of REFCOUNTED objects (the
-	//     `+0x10 == 2000000000` / `LOCK INC` idiom, and a vtable at `+0x08`), not the POD goals at `+0x10C`.
+	// **That 16-word struct is not this record.** It is the `Quest_c` journal record's OBJLIST element - the quest's
+	// reward item, now decoded as `QuestRewardItem`, whose last two words are the item's level and the reward's
+	// quantity. Three things separate the two, none of them subtle:
+	//
+	//   * the objlist is framed by a PLAIN u32 count the client clamps to 100; this region is ListFramed as
+	//     `(goals + 1) * 0x3F1`;
+	//   * an objlist element is 16 words and carries no text; this record is 21 words PLUS two text records;
+	//   * `FUN_0091df50` reads the four objlists as part of the `Quest_c` record, and this region follows it.
+	//
+	// So four rounds of offset scans over `+0x38`/`+0x3C` (single-offset, `+0x24`/`+0x38`, `+0x10c`/`+0x38`,
+	// co-occurrence with NEAR) were hunting a consumer for the wrong struct's fields. Do not restart them on those
+	// offsets.
+	//
+	// ⭐ What IS pinned, and is the honest starting point for the next attempt:
+	//   * `Quest_c` holds FOUR POD vectors (+0x100/+0x104/+0x10C/+0x110), one per objlist, and TWO vectors of
+	//     refcounted `QuestGoal_c*` at +0xAC..+0xB0 and +0xBC..+0xC0.
+	//   * The `QuestGoal_c` objects EXIST BEFORE the record is read - `FUN_0091df50` only post-processes them
+	//     (`QuestGoal_c::SetParent` = `FUN_009260c0`, then a `std::sort` with comparator `FUN_0091ce70`) - so they
+	//     come from the client's own quest template, and it is THEY that the sort orders, not anything from this
+	//     region.
+	//   * The waypoint UI reads those objects too, never the wire PODs: `WaypointQuestGoal` (`FUN_013a26c0`,
+	//     `GUI\MapWaypointHandler.cpp`, keyed `m_cWaypoints.find(goalID)`) walks +0xAC..+0xB0 and reads +0x38/+0x3C
+	//     (required vs solved, the pair `CoreQuestHolder::QuestGoalEvent` names), +0x5c playfield, +0x60/+0x64/+0x68
+	//     position, +0x6c flag, +0x20 parent, +0x80 name.
+	//
+	// The DATA leads for this record's two unknowns are unchanged and remain the best handle: `unknown1 > 0` implies
+	// a marker on 24 of 24 shipped goals, with round map-unit values 3..170 on ReachArea/hunt-area goals - a marker
+	// RADIUS shape; `unknown2`'s 17 carriers are all dungeon-objective goals, several with degenerate (1,1) markers -
+	// a marker-display-modifier shape. Open work tracked in Gitea #464.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.

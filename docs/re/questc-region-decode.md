@@ -243,27 +243,50 @@ The snapshot-side note above ("pinning the exact reader needs a dynamic trace") 
 It allocates a `Quest_c` (0x120 bytes, ctor `FUN_0091cf10`) and hands the stream to **`FUN_0091df50`** — so the
 live full-update body IS one `Quest_c` record, goals included, and the goal grammar can be read statically.
 
-Per goal the reader fills an 18-word (0x48-byte) struct from the record's last 16 u32, in this wire→offset map
-(`QuestObjectiveGoalCodec`'s field names):
+⛔ **CORRECTED (#464, 2026-08-25).** This section used to continue:
 
-```
-n -> +0x00      goalIdRepeat -> +0x04    requiredCount -> +0x18
-r0 -> +0x1C     r1..r4 -> +0x08..+0x14   r5 -> +0x30    r6 -> +0x34
-subId/mapId/markerX/markerY -> +0x20..+0x2C
-unknown1 -> +0x38    unknown2 -> +0x3C
-```
+> Per goal the reader fills an 18-word (0x48-byte) struct from the record's last 16 u32, in this wire→offset map
+> (`QuestObjectiveGoalCodec`'s field names): `n -> +0x00`, `goalIdRepeat -> +0x04`, `requiredCount -> +0x18`,
+> `r0 -> +0x1C`, `r1..r4 -> +0x08..+0x14`, `r5 -> +0x30`, `r6 -> +0x34`,
+> `subId/mapId/markerX/markerY -> +0x20..+0x2C`, `unknown1 -> +0x38`, `unknown2 -> +0x3C`
+>
+> — and concluded that `reserved[5]`/`[6]` are the goal list's SORT KEYS (the client `std::sort`s on `+0x30`
+> then `+0x34`), and that `unknown1`/`unknown2` now had object offsets for a consumer hunt.
 
-* ⭐ **`reserved[5]`/`reserved[6]` are the goal list's SORT KEYS.** After the list is read, the client
-  `std::sort`s it (`FUN_009202d0`) with comparator `FUN_0091ce70`, which orders on `+0x30` then `+0x34` — the
-  pair is the journal's display order, which is why it is per-goal data that never reads as anything else.
-* **`unknown1` (+0x38) / `unknown2` (+0x3C)** now have object offsets for the consumer hunt. Data leads, not
-  client-named: `unknown1 > 0` implies a marker on **24 of 24** shipped goals (base rate 140/7,318), with round
-  map-unit values 3..170 on ReachArea and roaming-hunt goals — a marker RADIUS shape (NB our ReachArea marker
-  fallback invents 40 u where these goals state a value); `unknown2`'s **17** shipped carriers are all
-  dungeon-objective goals (Xibaluku, Abyss of Kun Whu, Kang Pagoda, …), several with degenerate `(1,1)`
-  markers — a marker-display modifier shape. Open work tracked in Gitea #464.
+**That 16-word struct is not the @609 goal record.** It is the `Quest_c` record's **objlist** element — the
+quest's reward item, decoded above as `QuestRewardItem`, whose last two words are the item's `level` and the
+reward's `quantity`. Three things separate the two:
 
-**Exhausted anchors, so don't repeat them:** the vtable (3 slots, none of them a getter), the reader's callers,
+* the objlist is framed by a **plain u32 count** the client clamps to 100; the @609 region is ListFramed as
+  `(goals + 1) * 0x3F1`;
+* an objlist element is 16 words carrying **no text**; the @609 goal record is 21 words **plus two text records**;
+* `FUN_0091df50` reads the four objlists as part of the `Quest_c` record, and the @609 region *follows* it.
+
+So the four rounds of offset scans below were hunting a consumer for the wrong struct's fields, and the sort at
+the end of the reader orders the `QuestGoal_c` objects at `+0xAC`/`+0xBC` — not anything from this region.
+
+⭐ What is pinned, and is the honest starting point for the next attempt:
+
+* `Quest_c` allocates **four** POD vectors (`+0x100`, `+0x104`, `+0x10C`, `+0x110`), one per objlist, plus **two**
+  vectors of refcounted `QuestGoal_c*` at `+0xAC..+0xB0` and `+0xBC..+0xC0`.
+* The `QuestGoal_c` objects **exist before the record is read** — `FUN_0091df50` only post-processes them
+  (`QuestGoal_c::SetParent` = `FUN_009260c0`, then `std::sort` with comparator `FUN_0091ce70`) — so they are built
+  from the client's own quest template, not from the wire.
+* ⭐ **The waypoint UI reads those objects, never the wire PODs.** `WaypointQuestGoal` (`FUN_013a26c0`,
+  `GUI\MapWaypointHandler.cpp`, keyed `m_cWaypoints.find( goalID )`) walks `+0xAC..+0xB0` and reads `+0x38`/`+0x3C`
+  (required vs solved — the pair `CoreQuestHolder::QuestGoalEvent` names), `+0x5c` playfield, `+0x60/+0x64/+0x68`
+  position, `+0x6c` flag, `+0x20` parent, `+0x80` name. Its waypoint types come from
+  `Gui/Default/Waypoints/PF%u.xml` (`ParseWPType`, `FUN_0139e6f0`).
+
+The DATA leads for `unknown1`/`unknown2` are unchanged and remain the best handle: `unknown1 > 0` implies a marker
+on **24 of 24** shipped goals (base rate 140/7,318), round map-unit values 3..170 on ReachArea and roaming-hunt
+goals — a marker RADIUS shape (NB our ReachArea marker fallback invents 40 u where these goals state a value);
+`unknown2`'s **17** carriers are all dungeon-objective goals (Xibaluku, Abyss of Kun Whu, Kang Pagoda, …), several
+with degenerate `(1,1)` markers — a marker-display modifier shape. Open work tracked in Gitea #464.
+
+**Exhausted anchors, so don't repeat them** — ⚠️ and note they were all run against the WRONG struct's offsets
+per the correction above, so their conclusion is "these offsets are not distinctive", not "this field has no
+consumer": the vtable (3 slots, none of them a getter), the reader's callers,
 a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), the
 CO-OCCURRENCE refinement of that scan (`tools/ghidra/DumpCoOffsetReaders.java`, `OFFS=24,38 NEAR=12` — a
 function reading the goal's markerX at `+0x24` AND `unknown1` at `+0x38` within 12 instructions: **3,322 of
