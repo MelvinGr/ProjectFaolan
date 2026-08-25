@@ -36,6 +36,9 @@ namespace Faolan.Tests.Support
 		// The corpus entries, in CAPTURE order - the order the gates that walk a session (e.g. "the spell book is
 		// absent only in the session's FIRST snapshot") depend on. The container stores them grouped by shape instead,
 		// purely so they compress; restoring the order here is what keeps that a container concern.
+		//
+		// "Capture order" is WITHIN a capture (by packet index); BETWEEN captures the order is by capture id, which is
+		// deterministic but arbitrary - no gate may rely on which capture comes first (#465).
 		public static IReadOnlyList<CorpusRecord> Corpus => Loaded.Value.Corpus;
 
 		public static byte[] Named(string key)
@@ -150,6 +153,12 @@ namespace Faolan.Tests.Support
 		}
 
 		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
+		//
+		// `Source` is the capture's OPAQUE ID - 8 lower-case hex digits, the head of the SHA-256 of the dump's file
+		// name - never the name itself (#465: the dumps are named after the characters played, and a manifest of 50k
+		// entries shipped those names ~39,000 times). It is stable across re-harvests and enough to tell captures
+		// apart in a failure message; mapping one back to its dump needs the private capture repo
+		// (`dotnet run --project Faolan.Importer -- --report fixture-source --report-arg <id> --captures <dir>`).
 		public sealed record CorpusRecord(string Source, int Index, int Frame, uint Opcode, uint Iir, byte[] Full);
 
 		private sealed record Archive(IReadOnlyList<CorpusRecord> Corpus, Dictionary<string, byte[]> Named);

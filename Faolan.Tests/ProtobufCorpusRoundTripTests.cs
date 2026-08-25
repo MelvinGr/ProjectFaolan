@@ -111,7 +111,7 @@ namespace Faolan.Tests
 		private static IEnumerable<(string Source, byte[] Body)> CapturedBodies(uint iirType)
 		{
 			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
-			// Bodies are byte-identical to the corpus' BodyHex and keep their "<file>#<index>" provenance.
+			// Bodies are byte-identical to the corpus' BodyHex and keep their "<capture id>#<index>" provenance.
 			foreach (var (source, body) in CorpusExtract.OfType(iirType))
 			{
 				// BodyHex is the body WITH its leading u32 length; callers want everything after it.

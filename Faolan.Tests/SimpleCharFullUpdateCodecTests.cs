@@ -16,7 +16,7 @@ namespace Faolan.Tests
 	//   SpawnDikketestLogin     - fresh char at world entry (the fresh-character generation reference)
 	//   SpawnNecroKingsCastle  - geared char, 339-byte pre frame (one feat spec carrying 25 feats), end pairs
 	//   SpawnDemoRandomActions- both ending pair lists non-empty
-	//   SpawnHoxxlingBuffed     - active buffs (two 60-byte buff records)
+	//   SpawnHeraldBuffed       - active buffs (two 60-byte buff records)
 	//
 	// ⚠️ The goldens are whole captured BODIES; the codec builds the RECORD, because the leading u32 length belongs
 	// to the framing sender (#530 rule 2). So every comparison here is against `body[4..]`, and the four bytes it
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			Assert.Equal(s.Post.Slot.Appearance.Count, back.Post.Slot.Appearance.Count);
 		}
 
-		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroKingsCastle"), InlineData("SpawnDemoRandomActions"), InlineData("SpawnHoxxlingBuffed")]
+		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroKingsCastle"), InlineData("SpawnDemoRandomActions"), InlineData("SpawnHeraldBuffed")]
 		public void ParseThenBuild_IsByteIdentical(string name)
 		{
 			var record = Record(name);
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_BuffedSpawn_LiftsBuffRecords()
 		{
-			var s = SimpleCharFullUpdateCodec.Parse(Record("SpawnHoxxlingBuffed"));
+			var s = SimpleCharFullUpdateCodec.Parse(Record("SpawnHeraldBuffed"));
 
 			Assert.Equal(2, s.Post.BuffRecords.Count);
 

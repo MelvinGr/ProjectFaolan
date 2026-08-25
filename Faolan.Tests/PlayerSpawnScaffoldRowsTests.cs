@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			// Hoxxling is a Herald of Xotli; his buffed capture regenerates WITHOUT the buff records (transient) and
 			// with the frame reconstructed from his class - i.e. its constructed form. He is also the widest appearance
 			// case in the corpus: 6 weighted refs + 27 morph sliders, all of which have to survive the derivation.
-			var body = Golden("SpawnHoxxlingBuffed");
+			var body = Golden("SpawnHeraldBuffed");
 			Assert.Equal(Convert.ToHexString(ConstructedForm(body, ConanClass.HeraldOfXotli)), Convert.ToHexString(RoundTripThroughRows(body, ConanClass.HeraldOfXotli)));
 		}
 
@@ -85,7 +85,7 @@ namespace Faolan.Tests
 		// grant handed every dinged character the captured L80's entry, and a level-2 Necromancer holding 85279 came
 		// back from its first relog rendering a level-80 one - Str 71 / Int 231 / Con 61, health max 984. It is
 		// derived per character now (ClassProgressionIdFor), and this pins the read side that proves the derivation.
-		[Theory, InlineData("SpawnDikketestLogin", 1, 124400u), InlineData("SpawnStrieTemplate", 1, 160000u), InlineData("SpawnHoxxlingBuffed", 5, 114804u),
+		[Theory, InlineData("SpawnDikketestLogin", 1, 124400u), InlineData("SpawnStrieTemplate", 1, 160000u), InlineData("SpawnHeraldBuffed", 5, 114804u),
 		 InlineData("SpawnNecroKingsCastle", 80, 85279u), InlineData("SpawnDemoRandomActions", 80, 104579u)]
 		public void ClassProgressionEntry_IsTheCharactersLevel(string name, int level, uint expectedId)
 		{

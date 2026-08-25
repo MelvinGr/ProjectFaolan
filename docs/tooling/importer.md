@@ -313,7 +313,17 @@ named half cannot be re-derived at all - so this converts what is committed. ⭐
 quality 11 / window 24. Deflate's 32 KB window could only compress a body against its immediate neighbours; the
 archive is 45k near-duplicate packet bodies laid out by (IIR, length) over 81 MB of payload, and a 16 MB window
 sees the whole class at once. It also DECODES faster - 0.04 s against deflate's 0.14 s - so the suite pays
-nothing. Reads no captures) ·
+nothing. Reads no captures. ⭐ Since #465 it also prints the archive's CONTENT digests before and after and refuses
+a repack that changed them, and it converts a manifest that still stores capture NAMES to capture ids: the
+manifest's per-entry `s` is the first 8 hex digits of the SHA-256 of the dump's file name, never the name - the
+dumps are named after the characters played, and 50k entries carried those names ~39,000 times. The digests
+cover every body with its index/frame/opcode and every named fixture, and deliberately NOT the id or the layout
+order, which are what a repack may change) ·
+`fixture-source` (#465: the way back from a failure's `<id>#<index>` provenance to the dump it came from - hashes
+every `*.tshark.json` name under `--captures` and prints the name(s) each requested id resolves to;
+`--report-arg <id>[,<id>…]`, or every archived id when none is given. Exit 1 when an id resolves to no dump - a
+dump renamed or removed since the harvest. Needs the capture repo, which is the point: the id is meaningless
+without it) ·
 `daily-kills` (#887: what do stats 1000069 / 1000070 actually COUNT? The client names them `DailyPvEKills` /
 `DailyPvPKills` and the puzzle was that the PvP-named one moves in a corpus with no PvP. ⭐⭐ Counting each
 capture's INCREMENTS against its NPC deaths answers it: **1000070 is a witnessed-NPC-death counter with a hard

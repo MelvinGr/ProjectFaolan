@@ -419,7 +419,10 @@ The archive carries **no capture file-name index**. It used to, so `ProtocolCita
 `DocReferenceTests` could resolve `[V2:]` citations and `Captures/…` paths without the data - which meant every
 checkout shipped a listing of the private corpus. `V2Citations_AreWellFormed` now checks the citation's FORM
 instead, and `Captures/…` paths in docs are not linted at all. Don't reintroduce the list. (Each corpus entry does
-still name the capture it came from, for failure provenance.)
+still carry a failure-provenance `s`, but as an **opaque capture id** — the first 8 hex digits of the SHA-256 of the
+dump's file name — never the name (#465: the dumps are named after the characters played, and the manifest carried
+those names ~39,000 times). `--report fixture-source --report-arg <id> --captures <data-repo>/Captures` maps an id
+back to its dump; `FixtureArchiveTests` keeps a re-harvest from putting names back.)
 
 You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `Content:TerrainDir` key in `faolan.json`; if it is missing the server logs

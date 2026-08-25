@@ -60,7 +60,7 @@ re-barbered character carries gaps and appends its re-chosen resources after its
 spawns with `1..n` and renders. So those two captures round-trip to the same `(tag, value)` multiset with a
 canonical index run rather than byte-identically — pinned by
 `EditedAppearance_RoundTripsExceptItsRetailSlots`, while `SpawnStrieTemplate` / `SpawnDikketestLogin` /
-`SpawnHoxxlingBuffed` stay byte-exact through the derivation.
+`SpawnHeraldBuffed` stay byte-exact through the derivation.
 
 Buff/timer records (see grammar) are transient session state and are deliberately NOT stored: a buffed
 captured spawn extracts to the same rows as its unbuffed form (locked by

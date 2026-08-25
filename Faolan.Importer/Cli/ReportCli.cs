@@ -189,7 +189,8 @@ namespace Faolan.Importer.Cli
 			}
 
 			// Rewrites the fixture archive in the current container format, content unchanged. Reads no captures for
-			// the same reason `fixture-set` does not: the archive's content cannot be re-derived here (#555).
+			// the same reason `fixture-set` does not: the archive's content cannot be re-derived here (#555). It also
+			// replaces any capture NAME still stored as an entry's source by its opaque capture id (#465).
 			if (report == "fixture-repack")
 			{
 				FixtureArchiveWriter.Repack(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
@@ -242,6 +243,15 @@ namespace Faolan.Importer.Cli
 					var target = arg ?? Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
 					FixtureArchiveWriter.Write(capturesDir, target);
 					return 0;
+				}
+
+				case "fixture-source":
+				{
+					// The archive names a capture only by an opaque id (#465); this is the way back from a failure's
+					// "<id>#<index>" to the dump, by hashing every dump's name. Comma-separated ids, or every archived
+					// id when none is given.
+					var ids = (arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+					return FixtureArchiveWriter.ResolveCaptureIds(capturesDir, Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), ids);
 				}
 
 				case "conversation-states":

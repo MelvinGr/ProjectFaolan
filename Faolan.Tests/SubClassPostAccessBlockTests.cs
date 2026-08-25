@@ -85,7 +85,7 @@ namespace Faolan.Tests
 				if (parsed == null)
 					continue;
 
-				// `source` is "<capture>.tshark.json#<packet>".
+				// `source` is "<capture id>#<packet>" (the opaque id, #465 - only the split on `#` matters here).
 				var hash = source.LastIndexOf('#');
 				var capture = source[..hash];
 				var packet = int.Parse(source[(hash + 1)..]);

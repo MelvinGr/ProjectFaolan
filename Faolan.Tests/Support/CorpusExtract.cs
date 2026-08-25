@@ -11,9 +11,10 @@ namespace Faolan.Tests.Support
 	// capture repo so the suite runs from a plain clone. It is the corpus half of `Faolan.Tests/Assets/fixtures.bin`
 	// (FixtureArchive); the named fixtures in the same file are reached through Golden / TestPaths instead.
 	//
-	// Bodies are byte-identical to the corpus' `BodyHex`, and each carries its provenance as "<capture file>#<packet
-	// index>" - the same string the gates printed when they read the JSON directly, so a byte-exact failure is still
-	// traceable to one packet in one capture.
+	// Bodies are byte-identical to the corpus' `BodyHex`, and each carries its provenance as "<capture id>#<packet
+	// index>" - the capture id being the opaque 8-hex-digit id `FixtureArchive.CorpusRecord.Source` describes, not
+	// the dump's file name (#465) - so a byte-exact failure is still traceable to one packet in one capture, by
+	// whoever holds the capture repo.
 	//
 	// ⚠️ The extract is DERIVED, so a regeneration that silently drops packets would quietly WEAKEN every gate while
 	// they all still pass - the exact failure mode these gates exist to catch. The reader therefore ratchets on the

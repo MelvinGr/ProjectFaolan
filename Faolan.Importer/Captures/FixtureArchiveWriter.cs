@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Faolan.Core.Network.Codecs.Combat;
@@ -38,7 +39,7 @@ namespace Faolan.Importer.Captures
 	//   u32 manifestDeflatedLength
 	//   deflate                    manifest, UTF-8 JSON:
 	//                                { counts: {iir: n},
-	//                                  corpus: [{ s: source, i: packetIndex, n: bytes, f: frame, o: opcode }],
+	//                                  corpus: [{ s: captureId, i: packetIndex, n: bytes, f: frame, o: opcode }],
 	//                                  named:  [{ k: key, n: bytes }] }
 	//   deflate                    the payload: corpus entries then named entries, in manifest order
 	//
@@ -47,8 +48,14 @@ namespace Faolan.Importer.Captures
 	//     0.27 MB deflated at 45k entries).
 	//   * Corpus entries are laid out by (IIR, length), not capture order, so same-shaped bodies sit next to each other
 	//     and the compressor sees the redundancy (17.4 MB -> 14.9 MB). Capture order is NOT lost - each entry carries
-	//     its source and packet index, and the READER sorts back to it, because gates like "the session's first
+	//     its capture id and packet index, and the READER sorts back to it, because gates like "the session's first
 	//     snapshot" depend on that order.
+	//
+	// ⭐ `s` is an OPAQUE CAPTURE ID, not the capture's file name (#465). The dumps are named after the characters that
+	// were played, so a manifest of 50k entries carried the maintainer's personal character names ~39,000 times; the
+	// id is CaptureId(name) - the first 8 hex digits of SHA-256 over the dump's file name - which keeps the provenance
+	// (one id per capture, stable across re-harvests, the same "<id>#<index>" a failure prints) without shipping the
+	// name. Resolving an id back to its dump needs the private capture repo: `--report fixture-source`.
 	public static class FixtureArchiveWriter
 	{
 		public const string Magic = "FCX3";
@@ -56,6 +63,36 @@ namespace Faolan.Importer.Captures
 		// The DEFLATE-era magic. Still READ so an archive from before the container change opens (and so
 		// `--report fixture-repack` can convert one), never written.
 		public const string LegacyDeflateMagic = "FCX2";
+
+		// The width of a capture id: 8 hex digits = 32 bits of SHA-256, which is 116 captures with no collision and
+		// room for many more before one is plausible (a collision would show up as one id claiming two dumps'
+		// packet indexes, which `--report fixture-source` prints).
+		private const int CaptureIdLength = 8;
+
+		/// <summary>
+		///     The opaque id a capture is known by inside the archive: the first 8 lower-case hex digits of the SHA-256
+		///     of its dump's file name (<c>&lt;name&gt;.tshark.json</c>, no directory), the string the harvest sees.
+		/// </summary>
+		/// <remarks>
+		///     One function, used by the harvest, by the repack of an archive that still stores names, and by the
+		///     resolver that maps an id back to a dump - so all three agree by construction (#465).
+		/// </remarks>
+		public static string CaptureId(string captureFileName)
+		{
+			ArgumentNullException.ThrowIfNull(captureFileName);
+			return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(captureFileName)))[..CaptureIdLength];
+		}
+
+		/// <summary>Whether a manifest <c>s</c> value is already a capture id rather than a dump's file name.</summary>
+		/// <remarks>
+		///     Not a heuristic: a harvested name is always <c>&lt;name&gt;.tshark.json</c>, which can never be 8 hex
+		///     digits, so the two forms are disjoint and an archive from before #465 converts on read.
+		/// </remarks>
+		public static bool IsCaptureId(string source)
+		{
+			ArgumentNullException.ThrowIfNull(source);
+			return source.Length == CaptureIdLength && source.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+		}
 
 		// The IIR types the test suite reads. Adding a test that needs another type means adding it here and
 		// regenerating - the archive deliberately freezes the set rather than guessing.
@@ -95,12 +132,14 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				sources++;
-				var name = Path.GetFileName(json);
+
+				// The archive knows the capture by its opaque id, never by name (#465) - see CaptureId.
+				var name = CaptureId(Path.GetFileName(json));
 				var index = 0;
 				foreach (var p in packets.EnumerateArray())
 				{
 					// The packet INDEX must count every packet, not just kept ones: tests report provenance as
-					// "<file>#<index>" and that index has to keep meaning the same thing.
+					// "<capture id>#<index>" and that index has to keep meaning the same thing.
 					var i = index++;
 					if (!p.TryGetProperty("BodyHex", out var hexEl))
 						continue;
@@ -157,15 +196,119 @@ namespace Faolan.Importer.Captures
 
 		// Rewrites the archive in the CURRENT container format, byte-for-byte identical in content. The corpus half
 		// is derived from the captures and the named half cannot be re-derived at all, so a container change must not
-		// require a re-harvest: this converts what is committed instead (#555, FCX2 deflate -> FCX3 brotli).
+		// require a re-harvest: this converts what is committed instead (#555, FCX2 deflate -> FCX3 brotli; #465,
+		// capture NAMES -> capture ids, which Read applies on the way in).
+		//
+		// The content digests are printed before and after and compared, so "content unchanged" is a checked claim
+		// rather than a comment: they cover every corpus body with its index/frame/opcode and every named fixture,
+		// and deliberately NOT the capture id or the layout order, both of which a repack is allowed to change.
 		public static void Repack(string archivePath)
 		{
 			var before = new FileInfo(archivePath).Length;
 			var (counts, corpus, named) = Read(archivePath);
+			var (corpusDigest, namedDigest) = ContentDigest(corpus, named);
 			WriteArchive(archivePath, corpus, counts, named);
 			var after = new FileInfo(archivePath).Length;
+
+			var reread = Read(archivePath);
+			var (corpusAfter, namedAfter) = ContentDigest(reread.Corpus, reread.Named);
 			Console.WriteLine($"repacked {archivePath}: {before / 1048576.0:F1} MB -> {after / 1048576.0:F1} MB "
 			                  + $"({(before > 0 ? (double)before / after : 0):F1}x), {corpus.Count} corpus entries + {named.Count} named fixtures unchanged");
+			Console.WriteLine($"  corpus content digest: {corpusDigest} -> {corpusAfter}");
+			Console.WriteLine($"  named  content digest: {namedDigest} -> {namedAfter}");
+			if (corpusDigest != corpusAfter || namedDigest != namedAfter)
+				throw new InvalidDataException($"repack of {archivePath} changed its content - the digests above differ.");
+		}
+
+		/// <summary>
+		///     A digest of the archive's CONTENT, independent of the layout order and of the capture ids: the corpus
+		///     bodies (each with its packet index, frame and opcode) in a canonical order, and the named fixtures by
+		///     key. Two archives that hold the same packets and fixtures digest the same however they were written.
+		/// </summary>
+		/// <remarks>
+		///     Recipe, so an outside tool can reproduce it: corpus entries sorted by (full packet bytes, index, frame,
+		///     opcode), each hashed as <c>i32 index, i32 frame, u32 opcode</c> (little-endian) then the full packet;
+		///     named entries in key order, each as the UTF-8 key then the bytes. SHA-256, lower-case hex.
+		/// </remarks>
+		private static (string Corpus, string Named) ContentDigest(List<CorpusEntry> corpus, SortedDictionary<string, byte[]> named)
+		{
+			var canonical = corpus.ToList();
+			canonical.Sort((a, b) =>
+			{
+				var byBytes = a.Full.AsSpan().SequenceCompareTo(b.Full);
+				if (byBytes != 0)
+					return byBytes;
+
+				var byIndex = a.Index.CompareTo(b.Index);
+				if (byIndex != 0)
+					return byIndex;
+
+				var byFrame = a.Frame.CompareTo(b.Frame);
+				return byFrame != 0 ? byFrame : a.Opcode.CompareTo(b.Opcode);
+			});
+
+			using var corpusHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+			Span<byte> head = stackalloc byte[12];
+			foreach (var e in canonical)
+			{
+				BinaryPrimitives.WriteInt32LittleEndian(head, e.Index);
+				BinaryPrimitives.WriteInt32LittleEndian(head[4..], e.Frame);
+				BinaryPrimitives.WriteUInt32LittleEndian(head[8..], e.Opcode);
+				corpusHash.AppendData(head);
+				corpusHash.AppendData(e.Full);
+			}
+
+			using var namedHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+			foreach (var (key, body) in named)
+			{
+				namedHash.AppendData(Encoding.UTF8.GetBytes(key));
+				namedHash.AppendData(body);
+			}
+
+			return (Convert.ToHexStringLower(corpusHash.GetHashAndReset()), Convert.ToHexStringLower(namedHash.GetHashAndReset()));
+		}
+
+		/// <summary>
+		///     Maps capture ids back to the dumps they were hashed from, by hashing every dump's file name in the
+		///     capture repo - the only way to read a "<c>&lt;id&gt;#&lt;index&gt;</c>" provenance once the archive no
+		///     longer stores names (#465). Prints one line per requested id; an id no dump hashes to is reported as
+		///     such (a dump renamed or removed since the harvest), and every archived id is listed when none is asked
+		///     for.
+		/// </summary>
+		public static int ResolveCaptureIds(string capturesDir, string archivePath, IReadOnlyCollection<string> ids)
+		{
+			ArgumentNullException.ThrowIfNull(capturesDir);
+
+			var byId = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+			foreach (var json in Directory.EnumerateFiles(capturesDir, "*.tshark.json").OrderBy(f => f, StringComparer.Ordinal))
+			{
+				var name = Path.GetFileName(json);
+				if (!byId.TryGetValue(CaptureId(name), out var names))
+					byId[CaptureId(name)] = names = [];
+
+				names.Add(name);
+			}
+
+			var wanted = ids.Count > 0
+				? ids
+				: Read(archivePath).Corpus.Select(e => e.Source).Distinct(StringComparer.Ordinal).OrderBy(s => s, StringComparer.Ordinal).ToList();
+
+			var unresolved = 0;
+			foreach (var id in wanted)
+			{
+				if (byId.TryGetValue(id, out var names))
+				{
+					// Two names hashing to one id is the collision the 8-digit width makes improbable - shown, not hidden.
+					Console.WriteLine($"{id}  {string.Join("  |  ", names)}{(names.Count > 1 ? "   ⚠️ COLLISION" : "")}");
+				}
+				else
+				{
+					unresolved++;
+					Console.WriteLine($"{id}  (no dump in {capturesDir} hashes to this id)");
+				}
+			}
+
+			return unresolved == 0 ? 0 : 1;
 		}
 
 		// Adds or replaces ONE named fixture, leaving the corpus untouched. This is the only way a hand-carved fixture
@@ -365,7 +508,14 @@ namespace Faolan.Importer.Captures
 
 				var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
 				var iir = BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(12 + headerLength + 4, 4));
-				corpus.Add(new CorpusEntry(e.GetProperty("s").GetString()!, e.GetProperty("i").GetInt32(), e.GetProperty("f").GetInt32(), e.GetProperty("o").GetUInt32(), iir, full));
+
+				// An archive from before #465 stores the dump's file NAME here; hash it to the id on the way in, so a
+				// repack writes ids and nothing downstream ever sees a name. An id passes through unchanged.
+				var source = e.GetProperty("s").GetString()!;
+				if (!IsCaptureId(source))
+					source = CaptureId(source);
+
+				corpus.Add(new CorpusEntry(source, e.GetProperty("i").GetInt32(), e.GetProperty("f").GetInt32(), e.GetProperty("o").GetUInt32(), iir, full));
 			}
 
 			var named = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
@@ -382,6 +532,7 @@ namespace Faolan.Importer.Captures
 			return (counts, corpus, named);
 		}
 
+		// `Source` is the capture id (CaptureId), never a dump's name - Read converts, Write hashes.
 		private sealed record CorpusEntry(string Source, int Index, int Frame, uint Opcode, uint Iir, byte[] Full);
 	}
 }
