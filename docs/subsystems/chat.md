@@ -79,18 +79,6 @@ sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`)
 sender `0xC1A0DE05`/"Claude" via the standard `0x0014`+`0x0041` relay pair. Log is not persisted across
 restarts. In-client render of the channel is not yet verified (needs a live client).
 
-**The Claude mailbox (#281, 2026-08-25).** The same identity has an in-game MAILBOX: a mail composed to the
-recipient name `Claude` is accepted by the ordinary Tradepost `SendMail` path (`TradepostService.HandleSendMail`,
-`ClaudeMailbox`) and written as a normal `Mail` row under that name - no character stands behind it, and none is
-needed, because `Mail` keys its recipient by name + realm. Its arrival notification is an entry on the SAME
-`ClaudeChannel` log the bridge polls, in whisper mode (`[mail 0x<id>] <body> (+<tin> tin attached)
-(+<n>x item <template> attached)`), so it reaches Claude exactly like a `/tell`; the MCP tool `read_claude_mail`
-reads the rows back (newest first, across realms, with the sender's character id) and can mark them read, and the
-answer goes out through the existing `send_mail` (sender name "Claude") or a whisper. Gated like the channel: the
-mailbox exists only while the MCP bridge runs (`Mcp:Enabled`) - otherwise a mail to `Claude` is refused as an
-unknown recipient, so it can never sit unread. An attached item is escrowed in the sender's bank exactly as for any
-player mail (the sender's cancel recalls it).
-
 ## Local "say" flow + proximity
 
 1. Player types → **GameServer `ChatCommand` (0x2002)**: `[u32][u32][u32][u32][u16-str text]`. (A leading `.` from a

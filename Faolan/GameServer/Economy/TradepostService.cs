@@ -11,7 +11,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Microsoft.Extensions.Logging;
 
@@ -42,10 +41,6 @@ namespace Faolan.GameServer.Economy
 		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
 
-		// The Claude mailbox's log (#281): null when the MCP bridge is off, in which case a mail to "Claude" is refused
-		// like any unknown recipient - without a reader it would sit unread for ever, and the refusal tells the player.
-		private readonly ClaudeChannel? _claudeMailbox;
-
 		// The NPC TEMPLATES that operate an auction house (#647). Talking to one opens the Tradepost -
 		// GameServerListener.Inbound's TalkToNpc auctioneer branch.
 		//
@@ -62,13 +57,12 @@ namespace Faolan.GameServer.Economy
 		// listener, like every other cross-listener action.
 		private readonly ICsPlayerAgentProvider _csPlayerAgent;
 
-		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, ICsPlayerAgentProvider csPlayerAgent, ClaudeChannel? claudeMailbox = null)
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, ICsPlayerAgentProvider csPlayerAgent)
 		{
 			_database = database;
 			_logger = logger;
 			_outbound = outbound;
 			_csPlayerAgent = csPlayerAgent;
-			_claudeMailbox = claudeMailbox;
 		}
 
 		public async Task<bool> IsAuctioneerTemplate(uint npcTemplateId)
@@ -544,14 +538,8 @@ namespace Faolan.GameServer.Economy
 					_logger.LogWarning("Tradepost mail: {Char} sent {Count} attachments; only the first is escrowed (#378).", character.Name, attachmentCount);
 			}
 
-			// The "Claude" mailbox (#281): the one recipient that is a name with no character behind it. Everything else
-			// about the mail - the row, the escrow, the wallet refresh - is the ordinary player-mail path; only the
-			// existence check and the arrival notification differ.
-			var toClaude = _claudeMailbox != null && ClaudeMailbox.IsClaude(recipientName);
-			var recipient = toClaude
-				? null
-				: await _database.GetCharacterByName(recipientName, character.RealmId);
-			if (!toClaude && recipient == null)
+			var recipient = await _database.GetCharacterByName(recipientName, character.RealmId);
+			if (recipient == null)
 			{
 				_logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
 				await TradepostResponses.SendMailSendResult(client, false, packet.Sender.Instance);
@@ -563,11 +551,9 @@ namespace Faolan.GameServer.Economy
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
-				RealmId = character.RealmId, // #324: no cross-realm mail (the recipient was resolved inside the sender's realm)
+				RealmId = recipient.RealmId, // #324: no cross-realm mail (recipient's realm)
 				RecipientClass = MailConstants.EndpointClass,
-				RecipientName = toClaude
-					? ClaudeMailbox.Name
-					: recipient!.Name!,
+				RecipientName = recipient.Name!,
 				SenderClass = MailConstants.EndpointClass,
 				SenderName = character.Name!, // a player mail, NOT a system mail (sender name is set)
 				BodyXml = bodyText,
@@ -612,10 +598,7 @@ namespace Faolan.GameServer.Economy
 			// Tell the RECIPIENT (#871). Retail's notification rides CSPlayerInterface, so it reaches them wherever
 			// they are rather than only when they next open a mailbox. False simply means they are not connected to
 			// this realm's CS tier right now, which is not an error - the mail is already written either way.
-			// Claude's "notification" is the chat bridge's log: the same entry a /tell to him makes (#281).
-			if (toClaude)
-				_claudeMailbox!.Append(character.Id, character.Name!, ClaudeMailbox.Describe(mail), false, true);
-			else if (!await _csPlayerAgent.NotifyMailReceived(recipient!.Id, mail.MailId))
+			if (!await _csPlayerAgent.NotifyMailReceived(recipient.Id, mail.MailId))
 				_logger.LogDebug("Tradepost mail: {Recipient} is not on the CS tier, no arrival notification sent.", recipient.Name);
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
@@ -627,7 +610,7 @@ namespace Faolan.GameServer.Economy
 			// the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
-			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, mail.RecipientName, bodyText,
+			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText,
 				money, attached != null);
 		}
 

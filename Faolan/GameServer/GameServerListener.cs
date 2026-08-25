@@ -304,7 +304,7 @@ namespace Faolan.GameServer
 		private CancellationTokenSource _loopCts = null!;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher, ClaudeChannel? claudeChannel = null)
+			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
 			: base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
@@ -350,7 +350,7 @@ namespace Faolan.GameServer
 			_equipment = new EquipmentService(database, logger);
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
-			_tradepost = new TradepostService(database, logger, this, csPlayerAgentDispatcher, claudeChannel); // the Claude mailbox rides the chat bridge's log (#281)
+			_tradepost = new TradepostService(database, logger, this, csPlayerAgentDispatcher);
 			_guildBank = new GuildBankService(database, this, logger);
 			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
