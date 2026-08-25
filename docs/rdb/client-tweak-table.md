@@ -163,9 +163,13 @@ check this sheet before deciding a number is missing from the client:
   * **where it stops** - four captures run **29 / 34 / 37 / 39** deaths and the counter stops dead on **20** in
     every one.
 
-  So it advances once per NPC death the client is told about, under a PvP name, in a corpus with no PvP. And
-  `1000069` advances **0.16-0.36** of the deaths per capture - about a third - with no clamp anywhere near its
-  stated 5.
+  So it advances once per NPC death the client is told about, under a PvP name, in a corpus with no PvP.
+
+  ⭐⭐ **And `1000069` is the FATALITY count.** The same report pairs each of its bumps directly with the two
+  Fatality self-buffs the server applies to the killer (5070797 + 791221): 49 of 49 bumps within twelve packets
+  after a fatality apply on the player, 49 of 49 applies followed by a bump, with the lifetime `1379
+  PvEFatalities` pushed in the same burst. "About a third" was the fatality roll, and a mob counted one time and
+  not the next was a fatality one time and not the next.
 
   ⚠️ **Correction to the note above**: the defaults registry `FUN_010CB540` is *not* the only reference. The
   client also builds a global tweak accessor for `DailyPvPKillsCap` - a `SignalTarget` at `0x02D243D8`,
@@ -176,7 +180,7 @@ check this sheet before deciding a number is missing from the client:
   it does establish is that the two caps are not interchangeable in the client, which is the shape the clamp
   asymmetry has.
 
-  `[V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5]`
+  `[V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count]`
 
   …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
   (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is

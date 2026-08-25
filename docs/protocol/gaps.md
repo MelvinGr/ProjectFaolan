@@ -664,8 +664,8 @@ a stock client cannot send a mismatched pair and the gap only matters against a 
 more harvested fields, not a decode: `--report gem-slots` already prints them (a 4-slot weapon declares
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
-### The two daily kill counters, and which one really tracks kills — the CAP half is answered (#887, 2026-08-22)
-[V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5] The client's
+### The two daily kill counters: 1000070 counts every kill, 1000069 counts the FATALITIES (#887)
+[V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count] The client's
 stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
 entirely PvE — beach, Tortage, Ymir's Pass. Yet it is the **PvP-named** one that moves 118 times against the
 PvE-named one's 39 (`--report stat-series --report-arg 106,1000069,1000070`).
@@ -701,10 +701,15 @@ interchangeable in the client, which is the shape the clamp asymmetry has.
 **20**. So it advances once per NPC death the client is told about, under a PvP name. `1000069` advances
 **0.16–0.36** of the deaths per capture — about a third — which is the residue this gap now names.
 
-⚠️ **What is left** is narrower and is about the counters rather than the caps: both are fed by ordinary PvE
-kills, they sometimes advance on the same frame, and `1000070` advances about half again as often (20 against 13
-in that session). What subset of kills feeds `1000069`, and why the PvP-named counter moves at all in PvE, is
-unanswered — and the corpus has no PvP session to contrast against.
+⭐⭐ **And the subset is named (2026-08-25): `1000069` moves once per FATALITY.** `--report daily-kills` pairs
+each of its bumps directly with the two Fatality self-buffs the server applies to the killer (5070797 + 791221,
+`FatalityService.FatalityBuffA/B`): **49 of 49** bumps arrive within twelve packets after a fatality apply on the
+player, and **49 of 49** applies are followed by a bump — a bijection over every capture — with the lifetime
+`1379 PvEFatalities` pushed in the same burst. That is why it read as "about a third" (the client's fatality
+chance is level-tiered 5%..30%) and why the same mob was counted one time and not the next. So both counters
+wear a misleading name: `DailyPvPKills` counts every witnessed kill, `DailyPvEKills` the fatalities among them.
+What `DailyPvEKillsCap` = 5 caps is the residue: nothing in the client reads it, and 13 fatalities in one session
+passed it without a stall — a reward cap rather than a counter clamp is the reading its siblings suggest.
 
 ## The daily-challenge reset timestamps are never on the wire
 

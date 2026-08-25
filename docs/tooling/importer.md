@@ -318,8 +318,9 @@ nothing. Reads no captures) ·
 `DailyPvPKills` and the puzzle was that the PvP-named one moves in a corpus with no PvP. ⭐⭐ Counting each
 capture's INCREMENTS against its NPC deaths answers it: **1000070 is a witnessed-NPC-death counter with a hard
 clamp at 20** - where deaths stay under 20 its increments equal them exactly (7 of 15), and four captures with
-29 / 34 / 37 / 39 deaths all stop dead on 20. So the id pairing is right and the NAME is what is off. ⚠️ 1000069
-counts a subset - ~a third of deaths - and does NOT clamp at its stated cap of 5, and the client's layout says
+29 / 34 / 37 / 39 deaths all stop dead on 20. So the id pairing is right and the NAME is what is off. ⭐⭐ 1000069
+is the daily FATALITY count - the report pairs 49 of 49 of its bumps directly with the Fatality self-buffs on the
+player, both ways - and it does NOT clamp at its stated cap of 5; the client's layout says
 why the two are not interchangeable: the client builds a global tweak accessor for `DailyPvPKillsCap` inside its
 PvP-XP economy initializers and builds none for `DailyPvEKillsCap`. ⛔ Not a second CONSUMER - nothing reads that
 global but its ctor and its atexit) ·

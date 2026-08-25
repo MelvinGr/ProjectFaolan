@@ -131,9 +131,10 @@ evidence, not as a citation, until the id is used.
   and four captures running 29 / 34 / 37 / 39 deaths all stop dead on 20. So the cap is real and so is what it
   counts — under a PvP name, in a corpus with no PvP.
 
-  ⚠️ [V0: what SUBSET of kills 1000069 counts - about a third of witnessed NPC deaths, and it does not clamp at its stated cap of 5]
-  `1000069` advances 0.16–0.36 of a capture's deaths — about a third — and passes its stated cap of 5 without
-  stalling, reaching 13. What selects that third is the residue.
+  ⭐⭐ `1000069` is the daily FATALITY count: `--report daily-kills` pairs 49 of 49 of its bumps with the Fatality
+  self-buffs landing on the player (and 49 of 49 applies with a bump), the lifetime `1379 PvEFatalities` riding
+  the same burst. "About a third" was the fatality roll. It passes its stated cap of 5 without stalling,
+  reaching 13, so [V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count]
 
   ⛔ The *"name↔id pairing is off"* half is dead twice over: the client's stat REGISTRATION (`FUN_01df7df0`)
   writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before `DailyPvPKills`, so the pairing is the
