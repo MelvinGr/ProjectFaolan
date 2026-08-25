@@ -47,5 +47,19 @@ namespace Faolan.Core.Database.Tables
 		// The client has a `QuestRewardSelectionIIR_c` that is presumably the popup these drive, though that id
 		// appears in no capture, so the pairing is unverified.
 		public bool Optional { get; set; }
+
+		// How many of the item the line pays - the `quantity` word of the journal record's obj3/obj4 element (#893).
+		// NULL = no capture has carried this line's reward list; the catalog itself states no quantity. It is constant
+		// per (line, template) on 125 of 125 captured pairs and per TEMPLATE on 86 of 89 - the three that vary are
+		// currency tokens (Imperial Insignia, Esteem Token, Mark of Acclaim) whose amount differs per line, which is
+		// why this sits here rather than on Items. A builder reading a NULL uses 1, the value 61% of captured elements
+		// carry and the only one a non-token item has ever carried.
+		public uint? Quantity { get; set; }
+
+		// The reward's position in the journal record's obj3/obj4 list AS THE WIRE ORDERS IT (#893). NULL = never
+		// captured. The catalog's `Pos` is the client's serialization order and the wire's is retail's own row order;
+		// they agree on neither a reversal nor an id/type/name sort (12 captured lines, 5 counterexamples to each),
+		// so the order is harvested rather than derived. A builder orders by `WirePos ?? Pos`.
+		public uint? WirePos { get; set; }
 	}
 }

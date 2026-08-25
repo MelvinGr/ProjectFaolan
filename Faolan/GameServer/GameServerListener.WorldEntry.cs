@@ -625,6 +625,9 @@ namespace Faolan.GameServer
 			// The quest INDEX needs, per active quest, its LINE's 4CC and that line's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
+			// The journal records' reward lists (#893) carry each rewarded item's TEA key, read off its Item row.
+			var rewardItems = await Database.GetItemsByTemplate(snapshotQuests.SelectMany(q => q.Rewards.Select(r => r.ItemTemplateId))
+				.Concat(indexLines.Values.SelectMany(l => l.Rewards.Select(r => r.ItemTemplateId))).ToArray());
 			var instance = client.Session.Character.Id;
 			// Every item renders: the token is harvested when a capture carried one and minted otherwise
 			// (AcgHash.ForWire, #723), so a `Hash: not 0` gate here would drop exactly the claim/AH items this is
@@ -635,7 +638,7 @@ namespace Faolan.GameServer
 			// after it carries - so the sheet does not flick from one max to the other on entry (#580).
 			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
-				indexLines, lineCatalog, solvedTimesOf);
+				indexLines, lineCatalog, solvedTimesOf, id => rewardItems.GetValueOrDefault(id));
 			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them

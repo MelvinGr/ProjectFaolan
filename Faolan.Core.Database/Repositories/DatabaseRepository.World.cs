@@ -26,6 +26,8 @@ namespace Faolan.Core.Database.Repositories
 		// The pick-one-of-N reward list `questId`'s completion offers - harvested capture rows first, the quest line's
 		// optional set as a fallback on the line's final quest. Empty when the quest offers no choice.
 		Task<QuestRewardOption[]> GetQuestRewardOptions(uint questId);
+		Task<QuestRewardOption[]> GetQuestGuaranteedRewards(uint questId);
+		Task<Dictionary<uint, Item>> GetItemsByTemplate(IReadOnlyCollection<uint> templateIds);
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
 		Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
@@ -151,7 +153,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<QuestLine[]> GetQuestLines()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestLines.OrderBy(a => a.QuestLineId).ToArrayAsync();
+			return await ctx.QuestLines.Include(l => l.Rewards).OrderBy(a => a.QuestLineId).ToArrayAsync();
 		}
 
 		// The pick-one-of-N reward list a quest's completion offers (#815), resolved CAPTURE-FIRST.
@@ -163,10 +165,12 @@ namespace Faolan.Core.Database.Repositories
 		// disagree the capture wins, so the harvested set is taken whole and the catalog is not consulted.
 		//
 		// The catalog fallback covers the 615 lines that carry a genuine multi-item optional set and that no capture
-		// has ever watched complete. It fires only on the line's FINAL quest (the one with no successor), because a
-		// line reward is the payoff for finishing the line - offering it on every step would hand it out once per stage.
-		// ⚠️ That timing is a DECISION, not an observation: no capture shows a line-sourced offer, so nothing here is
-		// evidence for when retail sends one.
+		// has ever watched complete. It fires only on the line's FINAL quest - the client's own test, the last entry of
+		// the line's list - because a line reward is the payoff for finishing the line.
+		// ⭐ That timing was written as a decision and is an observation now (#893): 574 captured last-step journal
+		// records carry their line's catalog lists as the quest's own obj1/obj2, and every mid step carries them as the
+		// obj3/obj4 preview instead. The disagreement quoted above (10928 vs its line) is the two halves of that - the
+		// quest's own set and the line's - not a capture contradicting the catalog.
 		public async Task<QuestRewardOption[]> GetQuestRewardOptions(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -202,15 +206,65 @@ namespace Faolan.Core.Database.Repositories
 				.ToArray();
 		}
 
+		// The items a quest's completion GRANTS outright - the record's obj1 (#893): the harvested own set's
+		// non-optional rows, or on the line's last step with nothing harvested, the line's catalog `reward` list.
+		public async Task<QuestRewardOption[]> GetQuestGuaranteedRewards(uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var harvested = await ctx.QuestRewardOptions.AsNoTracking()
+				.Where(o => o.QuestId == questId)
+				.OrderBy(o => o.Pos)
+				.ToArrayAsync();
+			if (harvested.Length > 0)
+				return harvested.Where(o => !o.Optional).ToArray();
+
+			var quest = await ctx.QuestDefinitions.AsNoTracking().Include(q => q.Line).FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null || quest.Line.LastQuestId != questId)
+				return [];
+
+			return (await ctx.QuestLineRewards.AsNoTracking()
+					.Where(r => r.QuestLineId == quest.QuestLineId && !r.Optional)
+					.OrderBy(r => r.Pos)
+					.ToArrayAsync())
+				.Select((r, i) => new QuestRewardOption
+				{
+					QuestId = questId,
+					Pos = (uint)i,
+					ItemTemplateId = r.ItemTemplateId,
+					Level = 0,
+					Optional = false,
+					Quantity = r.Quantity ?? 1
+				})
+				.ToArray();
+		}
+
+		// Item rows by template id, for the reward-list builder's key/level lookup. Templates we do not hold are
+		// simply absent from the result - the builder leaves those elements out rather than sending a zero key.
+		public async Task<Dictionary<uint, Item>> GetItemsByTemplate(IReadOnlyCollection<uint> templateIds)
+		{
+			if (templateIds.Count == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var ids = templateIds.Distinct().ToArray();
+			return await ctx.Items.AsNoTracking().Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+		}
+
 		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Goals bring their ReachArea region + ring (#521); same reason as GetRespawnPoints - lazy loading is off,
 			// so an un-Included navigation is silently null/empty rather than loaded on touch.
+			// Rewards (this quest's own set) and Line.Rewards (the line's, from the catalog) feed the journal record's
+			// four reward lists (#893); the Item rows behind them come through GetItems, keyed by template.
 			return await ctx
 				.QuestDefinitions.Include(q => q.TextRefs)
 				.Include(q => q.Goals)
 				.ThenInclude(g => g.Region!.Vertices)
+				.Include(q => q.Rewards)
+				.Include(q => q.Line.Rewards)
+				.AsSplitQuery()
 				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
@@ -235,6 +289,8 @@ namespace Faolan.Core.Database.Repositories
 					.QuestDefinitions.Include(q => q.TextRefs)
 					.Include(q => q.Goals)
 					.ThenInclude(g => g.Region!.Vertices)
+					.Include(q => q.Rewards)
+					.Include(q => q.Line.Rewards)
 					.Where(q => chunk.Contains(q.QuestId))
 					.AsSplitQuery()
 					.ToArrayAsync());

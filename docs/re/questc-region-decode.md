@@ -127,6 +127,70 @@ Gitea.
 
 Reading them as 16 raw u32 in wire order was byte-exact and still is; `QuestRewardItem` is the typed form.
 
+### ⭐⭐ What the FOUR lists mean, and the journal's own rule for showing them (#893)
+
+Two sources that share no assumption settle it:
+
+**The client's journal renderer.** `FUN_01617260` (the QuestJournal view) fills ONE reward panel from a
+`Quest_c`, and which pair it reads is a branch on a single test:
+
+```
+line   = MainQuest_c for quest->lineId  (FUN_008107d0)
+bVar9  = line.entries[last].questId == quest->questId      // +0x1c..+0x20: (sequence, questId) pairs
+if (bVar9)  show XP @+0x28, money @+0x20, obj1 -> reward view, obj2 -> OPTIONAL reward view
+else        show XP @+0xf0, money @+0xf8, obj3 -> reward view, obj4 -> OPTIONAL reward view
+```
+
+`FUN_016181f0` does the filling: the first list it is handed goes to the reward view, the second to the
+*optional* view, and the `RewardPlusOne` marker shows iff that second list is non-empty (`MainQuestRewardView` /
+`MainQuestOptionalRewardView` / `MainQuestRewardPlusOne`, plus the `MoreThan3Dock` layout switch). So within each
+pair the first list is **guaranteed** and the second is **choose-one**.
+
+⚠️ `bVar9`'s list is the **server-sent** area list — `MainQuest_c::WriteToStream` (`FUN_00921db0`) serialises its
+`+0x1c` vector as 8-byte `(sequence, questId)` pairs, i.e. the index region's per-area block — and that list
+equals the line's whole catalog on 3,300 of 3,741 captured blocks (never shorter). So in practice "last entry" is
+the line's last step.
+
+**The client's quest catalog.** RDB 1000104's `MainQuest.reward` / `optional_reward` (imported as
+`QuestLineReward`) are the LINE's reward, and its own test lines are named *"Three NonOptional rewards"* / *"1
+NonOptional + 2 Optional rewards"*. Over the corpus:
+
+| | records | |
+|---|---:|---|
+| `obj3`/`obj4` populated | 1,811 | **1,553 equal the line's catalog lists exactly, 0 differ**, 258 on a line the catalog holds no items for |
+| `obj1`/`obj2` populated, last step | 891 | 574 equal the catalog lists (the line reward **folds** into the last step's own set), 317 differ |
+| which set a quest populates × last step | 68 quests | set A ⇔ last 11/0, set B ⇔ mid 0/55, both on 2 mid steps (10928, 17403) |
+
+And the one captured completion (quest 10928, #815): retail **offered exactly its obj2** and granted the pick,
+while its obj3 — the line's Exponent's Gloves — was not granted, because the line was not finished.
+
+So:
+
+* **`obj1` / `obj2` = THIS quest's own reward** — granted / choose-one — paid at its completion. Server-side data
+  the catalog never states (the `Quest` record has no reward field), harvested per quest into
+  `QuestRewardOptions` (`Optional` = which list).
+* **`obj3` / `obj4` = the LINE's reward**, previewed on every step but the last, and it is the client catalog's
+  own list — buildable for all 1,410 catalog lines. Two words the catalog lacks are harvested per (line,
+  template): the **quantity** (constant per pair on 125/125; the three templates that vary across lines are
+  currency tokens) and the **wire order** (`WirePos` — mostly the catalog's reversed, but 5 of 12 lines break
+  that and no id/type/name sort fits, so it is retail's row order). The element's `level` is the item's own
+  (`Items.Level`, 5,248/5,248).
+* **No list is class-specific**: 16 quests captured under more than one class carry identical lists.
+
+Built by `QuestRewardLists.ForQuest` and gated by `QuestRewardListsCorpusTests` — every captured record's four
+lists rebuild **element-exact** from the seed (1,791 records). Residue, in `--report quest-reward-lists`: 17732 /
+17733 are last steps whose obj2 is EMPTY against a 4–5-item catalog optional list (a class filter does not
+explain it — 3238's list holds cloth for a necromancer), and line 3780's list is on the wire and not in the
+catalog (its rows are inserted from the wire).
+
+⛔ **Correction to #802.** *"Three functions in the whole image touch `Quest_c+0xf0`/`+0xf8` — the constructor,
+the reader and the writer"* is wrong: `FUN_01617260` reads both, as the XP/money the journal shows on a
+non-last step. #802's in-client sweep (8888 / 999999 changed no label) was run on a last-step quest, where that
+branch never renders. The XP words follow the same split as the item lists: `+0x28`/`+0x20` are the quest's
+own on the last step, `+0xf0`/`+0xf8` the line's on the others — and they are level-scaled on the wire (line
+386's catalog XP is 715; 10830's records carry 715 in `+0x28` and 630 in `+0xf0`).
+
+
 ## ~~progress-sublist (per record, after obj4) — the real blocker~~ — RESOLVED 2026-07-20 (#384)
 
 > **This section's conclusion was wrong.** What follows below is kept for the record; read this first.

@@ -62,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static FullCharSnapshotSubClass FromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, CharacterMaxStats maxVitals, uint instance, uint? playfieldToken = null,
 			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null,
 			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
-			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null, Func<uint, Item?>? rewardItemOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			// `primary` may be null IFF the character holds no snapshot quests (the empty-region create case); when
@@ -70,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// `solvedTimesOf` is the character's per-goal PROGRESS (#550) - see QuestPortion. Null builds an unstarted
 			// journal, which is correct for the create path and for the goldens.
-			var (journal, completed, index) = QuestRegions(quests, primary, instance, completedQuests, areas, areaCatalog, solvedTimesOf);
+			var (journal, completed, index) = QuestRegions(quests, primary, instance, completedQuests, areas, areaCatalog, solvedTimesOf, rewardItemOf);
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellLists.FromSpellIds(knownSpellIds);
@@ -235,9 +235,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// "3 of 7" rather than resetting to zero on every login.
 		public static byte[] QuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance,
 			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
-			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null,
+			Func<uint, Item?>? rewardItemOf = null)
 		{
-			var (journal, completedRegion, index) = QuestRegions(quests, primary, instance, completed, areas, areaCatalog, solvedTimesOf);
+			var (journal, completedRegion, index) = QuestRegions(quests, primary, instance, completed, areas, areaCatalog, solvedTimesOf, rewardItemOf);
 			return [.. QuestcRegionCodec.Build(journal), .. CompletedQuestJournalRegionCodec.Build(completedRegion), .. QuestIndexRegionCodec.Build(index)];
 		}
 
@@ -249,7 +250,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		private static (QuestcRegion Journal, CompletedQuestJournalRegion Completed, QuestIndexRegion Index) QuestRegions(IReadOnlyList<QuestDefinition> quests,
 			QuestDefinition primary, uint instance, IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed,
 			IReadOnlyDictionary<uint, QuestLine>? areas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog,
-			Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
+			Func<QuestGoalDefinition, uint>? solvedTimesOf = null, Func<uint, Item?>? rewardItemOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 
@@ -275,7 +276,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			{
 				// The objective region is part of the RECORD (interleaved per quest), so it rides on the record and
 				// QuestcRecordCodec.Write emits it - keeping the writer symmetric with QuestcRegionCodec.Read (#384).
-				var record = QuestcRecords.ForQuest(q, q.Level);
+				// The four reward lists (#893): the quest's own set from its rows, the line's from the catalog. Built
+				// only when the caller can resolve items - the key each element carries comes off the Item row.
+				var rewards = rewardItemOf == null
+					? null
+					: QuestRewardLists.ForQuest(q, areas?.GetValueOrDefault(q.QuestLineId) ?? q.Line, instance, rewardItemOf);
+				var record = QuestcRecords.ForQuest(q, q.Level, rewards);
 				record.Objectives = QuestObjectiveRegions.ForQuest(q, instance, solvedTimesOf);
 				journal.Records.Add(record);
 			}

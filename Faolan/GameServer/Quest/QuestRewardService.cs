@@ -83,7 +83,19 @@ namespace Faolan.GameServer.Quest
 				return;
 
 			var def = await _database.GetQuestDefinition(questId);
-			if (def == null || (def.XpReward == 0 && def.MoneyReward == 0))
+			if (def == null)
+				return;
+
+			// The GUARANTEED items - the journal record's obj1 (#893): this quest's own harvested set, or on the line's
+			// last step with nothing harvested, the line's catalog reward. Granted through the same live add every
+			// other item grant uses; an item we hold no row for is logged and skipped rather than invented.
+			foreach (var reward in await _database.GetQuestGuaranteedRewards(questId))
+			{
+				if (await _economy.GrantItemToBackpack(client, reward.ItemTemplateId, Math.Max(1u, reward.Quantity)) == null)
+					_logger.LogWarning("Quest {Quest}: guaranteed reward {Item} x{Count} could not be granted to {Char}.", questId, reward.ItemTemplateId, reward.Quantity, character.Name);
+			}
+
+			if (def.XpReward == 0 && def.MoneyReward == 0)
 				return;
 
 			if (def.MoneyReward > 0)

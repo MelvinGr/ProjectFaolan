@@ -3386,7 +3386,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("Optional")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("Quantity")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("RewardType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("WirePos")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("QuestLineId", "Pos");
@@ -3406,6 +3412,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<ulong>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Optional")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Quantity")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("QuestId", "Pos");
@@ -5768,7 +5780,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "Quest")
-                        .WithMany()
+                        .WithMany("Rewards")
                         .HasForeignKey("QuestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -6241,6 +6253,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
                 {
                     b.Navigation("Goals");
+
+                    b.Navigation("Rewards");
 
                     b.Navigation("TextRefs");
                 });

@@ -159,21 +159,47 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			// ---- line item rewards: a clean rebuild, the set is fully derived from the fixed client RDB ----
+			//
+			// ...except for two things the WIRE states and the catalog does not (#893), which a rebuild must carry
+			// across or a catalog re-import silently undoes the capture harvest: the per-reward Quantity/WirePos words,
+			// and the rows of a line the catalog does not hold at all (3780 in the corpus). Same shape as the spawn
+			// importer carrying Manual resolutions across its own clean rebuild.
+			var harvested = await db.QuestLineRewards.AsNoTracking().Where(r => r.Quantity != null || r.WirePos != null).ToListAsync();
+			var harvestedWords = harvested.ToDictionary(r => (r.QuestLineId, r.ItemTemplateId, r.Optional), r => (r.Quantity, r.WirePos));
+			var wireOnlyLines = harvested.Where(r => !lines.ContainsKey(r.QuestLineId)).ToList();
+
 			await db.QuestLineRewards.ExecuteDeleteAsync();
 			var rewards = new List<QuestLineReward>();
 			foreach (var (id, m) in lines)
 			{
 				uint pos = 0;
 				foreach (var (r, optional) in m.Rewards.Select(r => (r, false)).Concat(m.OptionalRewards.Select(r => (r, true))))
+				{
+					var words = harvestedWords.GetValueOrDefault((id, r.TemplateId, optional));
 					rewards.Add(new QuestLineReward
 					{
 						QuestLineId = id,
 						Pos = pos++,
 						ItemTemplateId = r.TemplateId,
 						RewardType = r.Type,
-						Optional = optional
+						Optional = optional,
+						Quantity = words.Quantity,
+						WirePos = words.WirePos
 					});
+				}
 			}
+
+			foreach (var r in wireOnlyLines)
+				rewards.Add(new QuestLineReward
+				{
+					QuestLineId = r.QuestLineId,
+					Pos = r.Pos,
+					ItemTemplateId = r.ItemTemplateId,
+					RewardType = r.RewardType,
+					Optional = r.Optional,
+					Quantity = r.Quantity,
+					WirePos = r.WirePos
+				});
 
 			db.QuestLineRewards.AddRange(rewards);
 			await db.SaveChangesAsync();

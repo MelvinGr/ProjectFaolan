@@ -319,16 +319,21 @@ namespace Faolan.GameServer.World
 		//
 		// Nothing per-character rides along: what used to be passed here as an "accept time" is the goal record's
 		// reserved (marker, 4CC-tag) pair, which is quest DATA and now comes off the goal row (#537).
-		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null)
+		public async Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null)
 		{
 			// The per-quest level is a constant harvested into the definition (#352); fall back to the captured default
 			// only when this quest had no full-update in the captures (Level == 0).
 			var levelValue = level ?? (def.Level != 0
 				? def.Level
 				: QuestFullUpdateCodec.DefaultQuestLevel);
-			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue));
+			// The record's four reward lists (#893): the quest's own harvested set and the line's catalog reward, each
+			// element carrying its item's TEA key - so the Item rows are loaded here, keyed by template.
+			var templates = def.Rewards.Select(r => r.ItemTemplateId).Concat(def.Line?.Rewards.Select(r => r.ItemTemplateId) ?? []).ToArray();
+			var items = await _database.GetItemsByTemplate(templates);
+			var rewards = QuestRewardLists.ForQuest(def, def.Line, client.Session.Character.Id, id => items.GetValueOrDefault(id));
+			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue, rewards));
 
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
 

@@ -781,7 +781,9 @@ namespace Faolan.Importer.Captures
 						QuestId = o.QuestId,
 						Pos = o.Pos,
 						ItemTemplateId = o.ItemTemplateId,
-						Level = o.Level
+						Level = o.Level,
+						Optional = o.Optional,
+						Quantity = o.Quantity
 					});
 					written++;
 				}
@@ -789,6 +791,74 @@ namespace Faolan.Importer.Captures
 
 			await db.SaveChangesAsync();
 			return (written, skippedQuest, skippedItem);
+		}
+
+		// Fills QuestLineRewards.Quantity and .WirePos from the journal records' obj3/obj4 elements (#893). The
+		// template lists themselves are the catalog's and are NOT rewritten - they matched it on 1,553 of 1,553
+		// captured records. The one exception is a LINE the catalog does not hold at all (3780 in the corpus): there
+		// the wire is the only statement of the line's reward and its rows are inserted, with the reward type taken
+		// from the item's own SearchCategory - which is what the catalog's `type` word is (QuestLineReward.RewardType).
+		//
+		// A wire element naming a template the catalog does NOT put on a line it does hold is counted and left alone:
+		// that would be a real disagreement between client data and wire, and none has been seen.
+		public static async Task<(int Updated, int Inserted, int Unmatched)> ImportQuestLineRewardQuantities(DatabaseContext db, List<QuestLineRewardQuantity> quantities)
+		{
+			ArgumentNullException.ThrowIfNull(quantities);
+			var rows = await db.QuestLineRewards.ToListAsync();
+			var byLine = rows.GroupBy(r => r.QuestLineId).ToDictionary(g => g.Key, g => g.ToList());
+			var lines = (await db.QuestLines.Select(l => l.QuestLineId).ToListAsync()).ToHashSet();
+			var categories = await db.Items.ToDictionaryAsync(i => i.Id, i => i.SearchCategory);
+			int updated = 0, inserted = 0, unmatched = 0;
+
+			foreach (var lineGroup in quantities.DistinctBy(q => (q.QuestLineId, q.ItemTemplateId, q.Optional)).GroupBy(q => q.QuestLineId))
+			{
+				if (!lines.Contains(lineGroup.Key))
+				{
+					unmatched += lineGroup.Count();
+					continue;
+				}
+
+				if (!byLine.TryGetValue(lineGroup.Key, out var lineRows))
+				{
+					// The catalog holds nothing for this line: the wire's list becomes the line's rows, in wire order.
+					foreach (var q in lineGroup.OrderBy(q => q.WirePos))
+					{
+						db.QuestLineRewards.Add(new QuestLineReward
+						{
+							QuestLineId = q.QuestLineId,
+							Pos = q.WirePos,
+							ItemTemplateId = q.ItemTemplateId,
+							RewardType = categories.GetValueOrDefault(q.ItemTemplateId),
+							Optional = q.Optional,
+							Quantity = q.Quantity,
+							WirePos = q.WirePos
+						});
+						inserted++;
+					}
+
+					continue;
+				}
+
+				foreach (var q in lineGroup)
+				{
+					var match = lineRows.Where(r => r.ItemTemplateId == q.ItemTemplateId && r.Optional == q.Optional).ToList();
+					if (match.Count == 0)
+					{
+						unmatched++;
+						continue;
+					}
+
+					foreach (var row in match.Where(r => r.Quantity != q.Quantity || r.WirePos != q.WirePos))
+					{
+						row.Quantity = q.Quantity;
+						row.WirePos = q.WirePos;
+						updated++;
+					}
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return (updated, inserted, unmatched);
 		}
 
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
@@ -1225,6 +1295,29 @@ namespace Faolan.Importer.Captures
 				// it was emitted as a constant 0 for years under the name `Accept`, so every value was discarded.
 				if (def.MoneyReward != 0)
 					existing.MoneyReward = def.MoneyReward;
+
+				// ⛔ And the XP and the second slot pair (#893, found while measuring #859). These three were left to the
+				// "lands only when the row is first added" rule above, and it cost a finding: quest 10830 is captured
+				// twice with XpReward 715 / FieldF0 630 / FieldF8 60 on the wire and shipped 0 / 0 / 0, because its row
+				// had been added by the completed-journal harvest first. #820 and #859 then measured "XpReward is zero
+				// on every quest of the captured chain" against a database that had never received it. Same rule as
+				// the money: only when the harvest has one, so a capture that carries none cannot zero another's.
+				if (def.XpReward != 0)
+					existing.XpReward = def.XpReward;
+				if (def.FieldF0 != 0)
+					existing.FieldF0 = def.FieldF0;
+				if (def.FieldF8 != 0)
+					existing.FieldF8 = def.FieldF8;
+				// The record's presence and its structural words travel together: a row that now has a captured Quest_c
+				// record is snapshot-eligible, and the flag/level words are the record's.
+				if (def.HasSnapshotRecord)
+				{
+					existing.HasSnapshotRecord = true;
+					existing.QuestLineFlags = def.QuestLineFlags;
+					existing.Field118 = def.Field118;
+					existing.FieldEc = def.FieldEc;
+				}
+
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
 

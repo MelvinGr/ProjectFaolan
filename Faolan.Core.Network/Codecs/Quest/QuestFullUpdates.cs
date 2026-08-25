@@ -64,7 +64,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		//
 		// The goal's OTHER structural words stay synthesized below: this is the live-grant shape, and reading the whole
 		// row here is QuestObjectiveRegions.ForGoal's job (the snapshot path), not a rename.
-		public static QuestFullUpdateIIR ForQuest(uint playerHandle, QuestDefinition def, uint level)
+		// `rewards` is the record's four reward lists (QuestRewardLists.ForQuest, #893) - the same lists the snapshot's
+		// journal record carries, since the live full-update IS one Quest_c record.
+		public static QuestFullUpdateIIR ForQuest(uint playerHandle, QuestDefinition def, uint level, QuestRewardLists? rewards = null)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
@@ -96,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					]
 				};
 
-				return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, region));
+				return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, region, rewards));
 			}
 
 			var row = def.Goals.FirstOrDefault(g => g.GoalId == def.GoalId);
@@ -127,7 +129,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				TextRecord = QuestTextTokens.Record(def, QuestTextSlot.ObjectiveLocalized)
 			};
 
-			return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, new QuestObjectiveRegion
+			return new QuestFullUpdateIIR(playerHandle, LiveRecord(def, level, rewards: rewards, objectives: new QuestObjectiveRegion
 			{
 				Goals = [goal]
 			}));
@@ -170,8 +172,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		// The live-grant QuestcRecord around a goal list - the scalars the Casilda golden pins, shared by the
 		// full-list and the synthesized-single-goal paths above.
-		private static QuestcRecord LiveRecord(QuestDefinition def, uint level, QuestObjectiveRegion objectives)
+		private static QuestcRecord LiveRecord(QuestDefinition def, uint level, QuestObjectiveRegion objectives, QuestRewardLists? rewards = null)
 		{
+			rewards ??= QuestRewardLists.Empty;
 			return new QuestcRecord
 			{
 				QuestId = def.QuestId,
@@ -192,6 +195,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 				XpReward = LiveField28,
 				FieldF0 = LiveFieldF0,
 				FieldF8 = 0,
+				Obj1 = rewards.Obj1,
+				Obj2 = rewards.Obj2,
+				Obj3 = rewards.Obj3,
+				Obj4 = rewards.Obj4,
 				Objectives = objectives
 			};
 		}

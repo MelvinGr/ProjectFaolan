@@ -171,9 +171,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// they went unread for so long: the golden template is the one record that carries none. Over the dumps
 		// 7,347 elements are populated across 3,741 journal records (`--report quest-rewards`).
 		//
-		// ⚠️ What the four lists MEAN relative to each other - guaranteed vs choice vs class-specific - is not
-		// decoded; the wire order is `[obj1][obj2][fieldF0][fieldF8][obj3][obj4]` and nothing in the corpus
-		// separates them. They are carried under their positional names rather than guessed at.
+		// ⭐ What the four lists MEAN is settled (#893, from the client's journal renderer + its quest catalog, see
+		// QuestRewardLists): obj1/obj2 are THIS quest's own granted / choose-one items, obj3/obj4 the LINE's, previewed
+		// on every step but the line's last. The wire order `[obj1][obj2][fieldF0][fieldF8][obj3][obj4]` pairs each
+		// list pair with its XP/money words the same way. The positional names stay on the record so it reads like
+		// the wire; the meaning lives with the factory.
 		public List<QuestRewardItem> Obj1 { get; init; } = [];
 		public List<QuestRewardItem> Obj2 { get; init; } = [];
 		public List<QuestRewardItem> Obj3 { get; init; } = [];

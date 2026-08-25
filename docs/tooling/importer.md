@@ -323,6 +323,16 @@ counts a subset - ~a third of deaths - and does NOT clamp at its stated cap of 5
 why the two are not interchangeable: the client builds a global tweak accessor for `DailyPvPKillsCap` inside its
 PvP-XP economy initializers and builds none for `DailyPvEKillsCap`. ⛔ Not a second CONSUMER - nothing reads that
 global but its ctor and its atexit) ·
+**Module `quest-rewards`** (#815/#893): a quest's OWN reward set - granted and choose-one - harvested from every
+captured journal record (the login snapshot's and the live full-update's) and from the `QuestRewardNotifyIIR`
+offers, into `QuestRewardOptions` with `Optional` saying which list; plus the LINE half's two words the catalog
+lacks, `Quantity` and `WirePos`, into `QuestLineRewards` - and the rows of a line the catalog does not hold at
+all (3780), inserted from the wire. ⚠️ `rdb-quest-catalog`'s clean rebuild carries all of that across, or a
+catalog re-import would silently undo the harvest. ⛔ It also fixed a merge that had been dropping harvested
+XP for years: an existing `QuestDefinitions` row refreshed its `MoneyReward` but never its `XpReward` /
+`FieldF0` / `FieldF8`, so quest 10830 shipped 0/0/0 against a wire record of 715/630/60 - which is the data
+#820 and #859 measured "zero on the whole captured chain" against.
+
 **Module `quest-reward-items`** (#893, off #464): item identities + TEA keys from the QUEST REWARD lists inside
 every captured `Quest_c` journal record - a FOURTH key source beside the inventory snapshot, `DispatchAddItem`
 and the `itemref://` chat links. ⭐ Its breadth is of a different kind again: every other source reads an item the
@@ -333,6 +343,11 @@ modifiers). ⚠️ It reads them through the CODEC (`QuestcRecord.Obj1..Obj4` ->
 `ItemHashHarvester` scans for the shapes an INVENTORY entry takes and does not see these - which is why `items`
 harvests the same packet and misses them.
 
+`quest-reward-lists` (#893: what the four reward lists of a `Quest_c` record MEAN, checked against what retail
+handed out - the pick-one offer, the completion grants, the catalog, class variance, and the client's own
+"last entry of the line" test evaluated per record on the list the server sent. ⭐⭐ Its verdict is settled and
+built: `obj1`/`obj2` are the quest's OWN granted/choose-one set, `obj3`/`obj4` the LINE's catalog reward
+previewed on every non-last step - 1,553 of 1,553 equal the catalog, 0 differ. Prints the residue by quest) ·
 `snapshot-eligibility` (#389: which quests can ride the LOGIN SNAPSHOT, and which arm stops the rest. A held quest
 that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live restore path any
 more - so this is a gameplay bound. ⭐ It exists because the ticket's long-standing blame on the `@609` objective

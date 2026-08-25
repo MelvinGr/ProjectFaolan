@@ -13,9 +13,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// One journal record from a QuestDefinition: its 5 header text refs + areaId, plus the per-quest scalars that
 		// are carried from the capture rather than derived (the Snapshot* columns). The numeric objective lists are
 		// left empty - the objective TEXT rides in the strings; see docs/re/fullplayer-snapshot-reader.md.
-		public static QuestcRecord ForQuest(QuestDefinition def, uint level)
+		// `rewards` is the record's four reward lists (QuestRewardLists.ForQuest, #893); null builds a record with all
+		// four empty, which is what a quest with no reward data of either kind carries.
+		public static QuestcRecord ForQuest(QuestDefinition def, uint level, QuestRewardLists? rewards = null)
 		{
 			ArgumentNullException.ThrowIfNull(def);
+			rewards ??= QuestRewardLists.Empty;
 
 			return new QuestcRecord
 			{
@@ -47,7 +50,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MoneyReward = def.MoneyReward,
 				XpReward = def.XpReward,
 				FieldF0 = def.FieldF0,
-				FieldF8 = def.FieldF8
+				FieldF8 = def.FieldF8,
+				Obj1 = rewards.Obj1,
+				Obj2 = rewards.Obj2,
+				Obj3 = rewards.Obj3,
+				Obj4 = rewards.Obj4
 			};
 
 			string Slot(QuestTextSlot slot)

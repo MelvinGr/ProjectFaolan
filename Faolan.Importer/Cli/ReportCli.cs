@@ -501,6 +501,11 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "quest-reward-lists":
+				{
+					return await QuestRewardLists(NamedCapture.LoadAll(capturesDir));
+				}
+
 				case "quest-rewards":
 				{
 					return await QuestRewards(NamedCapture.LoadAll(capturesDir), RdbDir());
