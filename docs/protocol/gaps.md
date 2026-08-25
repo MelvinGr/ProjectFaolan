@@ -191,16 +191,17 @@ by capturing a board with more variety, or by finding the client's consumer of t
 Gitea #146.
 `[V0: the Massive-PvP board's otherName / tail columns]`
 
-### The battlekeep-info reply's timestamp and state words
+### The `Phase1And2` battlekeep record's highlighted ID32
 `DispatchBattleKeepInfoRequestReturnPhase3And4` (0x20AA) is decoded byte-exact (`BattleKeepInfoCodec`,
-`docs/subsystems/guild-cities-and-sieges.md`), and its `owningGuildId` is cross-corroborated three ways. Two of
-its words are read but not confirmed: the `timestampUnix` is a plain unix time later than the guild's last-battle
-time on the Massive-PvP board — consistent with the keep's next-vulnerable time but not proven to BE the
-vulnerability window — and the trailing `state` word is `2` on every captured keep, so its enumeration is unknown
-(the `Phase1And2` twin, 0x20A9, has a different single-sample shape and is not decoded). Close it by capturing a
-keep in more than one state, or by finding the client's reader. Tracked in Gitea #147.
-`[V0: that this timestamp is the vulnerability window]`
-`[V0: the state/phase meaning]`
+`docs/subsystems/guild-cities-and-sieges.md`) and every column is named from the client's keep window: owner and
+attacker are guild ID32s, the time is the NEXT phase's start, and the phase is LDB category 10032 (War Declaration
+/ Skirmish / Silence before the storm / War / Aftermath). Its `Phase1And2` twin (0x20A9) is recovered from the
+client reader — the keep record plus a nested attacker-ranking list of `[ID32 guild][kills][total]` — but has NO
+captured body (the frame once taken for one is a GameCharInterface loot reply with the same lossy wire rendering),
+and one of its words stays unnamed: the ID32 at struct `+0x20` that the window hands to the attacker list as the
+row to highlight. Whether that is the leading applicant or the viewer's own guild needs a body in phase 0 or 1.
+Tracked in Gitea #147.
+`[V0: the Phase1And2 record's highlighted ID32]`
 
 ### `PvPMatchRules_c` C/D/E/H columns
 The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
@@ -231,16 +232,6 @@ that caused them. So the corpus shows only one side of both flags. The server se
 members a `bringTeam` signup drags along, which is the field's evident purpose but is not something a capture has
 confirmed. Close it by queueing as a team. Tracked in Gitea #882.
 `[V0: i_AsTeamMember with a team]`
-
-### The battlekeep info record's columns
-`DispatchBattleKeepInfoRequestReturnPhase1And2` / `Phase3And4` (0x20A9 / 0x20AA) are framed exactly — a
-0x3F1-list of a 7-word keep record, with a nested 4-word sub-list in the phase-1/2 form
-(`docs/re/minigame-massivepvp-messages.md`). What the seven words MEAN is open. Unlike the scalar dispatch
-bodies on the same interface, these readers take the words straight into the struct with no per-field bail-out
-string, so the binary does not name them, and **no capture contains a single instance** — no session opened the
-battlekeep UI. Close it by capturing the battlekeep window, or by finding the client's UI consumer of the
-struct. Tracked in Gitea #147.
-`[V0: the battlekeep info record's seven columns]`
 
 ---
 

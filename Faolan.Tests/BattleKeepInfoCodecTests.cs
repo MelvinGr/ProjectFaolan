@@ -34,12 +34,11 @@ namespace Faolan.Tests
 			var keep = BattleKeepInfoCodec.Parse(Convert.FromHexString(Keep4)).Keeps[0];
 
 			Assert.Equal(4u, keep.KeepId);
-			Assert.Equal(0xDEB7u, keep.ZoneWord);
 			Assert.Equal(0x7B726u, keep.OwningGuildId); // Vendetta - matches the MassivePvp board + the following 0x2041
-			Assert.Equal(0u, keep.Word3);
-			Assert.Equal(0u, keep.Word4);
-			Assert.Equal(0x6A88AE40u, keep.TimestampUnix);
-			Assert.Equal(2u, keep.State);
+			Assert.Equal(0u, keep.AttackingGuildClass); // the null ID32: no war declared on any captured keep
+			Assert.Equal(0u, keep.AttackingGuildId);
+			Assert.Equal(0x6A88AE40u, keep.NextPhaseUnix);
+			Assert.Equal(BattleKeepPhase.SilenceBeforeTheStorm, keep.Phase);
 		}
 
 		[Fact]
@@ -49,6 +48,16 @@ namespace Faolan.Tests
 			Assert.Equal(0x7B726u, BattleKeepInfoCodec.Parse(Convert.FromHexString(Keep4)).Keeps[0].OwningGuildId);
 			Assert.Equal(0x7C6A6u, BattleKeepInfoCodec.Parse(Convert.FromHexString(Keep2)).Keeps[0].OwningGuildId);
 			Assert.Equal(0x7DFCAu, BattleKeepInfoCodec.Parse(Convert.FromHexString(Keep3)).Keeps[0].OwningGuildId);
+		}
+
+		[Fact]
+		public void TheOwnerIsAGuildId32_SoAnotherClassWordIsRefused()
+		{
+			// The word after keepId is the owning guild's ID32 CLASS (EntityClass.Guild), which the client's keep
+			// window reads as one ID32 with the id that follows - a reply carrying any other class there is not a
+			// keep record, and Parse says so rather than carrying it as a "zone word".
+			var body = Convert.FromHexString(Keep4.Replace("0000deb7", "0000c350"));
+			Assert.Throws<Faolan.Core.Extensions.CodecParseException>(() => BattleKeepInfoCodec.Parse(body));
 		}
 	}
 }

@@ -317,21 +317,22 @@ session ever opened the guild-city or battlekeep UI.
 | s2c | CSPlayerInterface `0xA9` | `DispatchBattleKeepInfoRequestReturnPhase1And2` | keep list, below |
 | s2c | CSPlayerInterface `0xAA` | `DispatchBattleKeepInfoRequestReturnPhase3And4` | keep list, below |
 
-The two `BattleKeepInfoRequestReturn` replies carry the **same 7-word keep record**, and phases 1+2 add a
-nested per-keep list. Both list frames cap at 30000 elements (`count - 1 < 0x7531`), which is the client's own
-sanity bound rather than a real limit.
+The two `BattleKeepInfoRequestReturn` replies carry the **same keep record**, and phases 1+2 add a nested
+per-keep list. Both list frames cap at 30000 elements (`count - 1 < 0x7531`), which is the client's own sanity
+bound rather than a real limit.
 
 ```
-Phase3And4:  [u32 (n + 1) * 0x3F1]  { n × [u32 × 7] }              # 28-byte stride, FUN_0134f280
-Phase1And2:  [u32 (n + 1) * 0x3F1]  { n × keep }                   # FUN_0134f1f0 -> FUN_013b1680
-keep      =  [u32]  [u32 (m + 1) * 0x3F1] { m × [u32 × 4] }  [u32 × 6]
+Phase3And4:  [u32 (n + 1) * 0x3F1]  { n × [keepId][ID32 owner][ID32 attacker][nextPhaseUnix][phase] }   # 28 B, FUN_0134f280
+Phase1And2:  [u32 (n + 1) * 0x3F1]  { n × keep }                                                       # FUN_0134f1f0 -> FUN_013b1680
+keep      =  [keepId]  [u32 (m + 1) * 0x3F1] { m × [ID32 guild][kills][total] }  [ID32 a][ID32 owner][nextPhaseUnix][phase]
 ```
 
-The two readers scatter the seven words into the same struct in the same order (slots 0, 1, 2, 5, 6, 4, 3), so
-the record is one type read two ways — a per-phase view of one keep, not two record types. Field meanings are
-not recoverable: these readers take the words straight into the struct with no per-field bail-out string, so
-unlike the scalar dispatch bodies above there is nothing in the binary that names them, and no capture to
-correlate against. `[V0: the battlekeep info record's seven columns]`
+⭐ The columns are named from the keep window's filler (`FUN_01315130`, `MassivePvPBattleKeepView.xml`), which
+reads the struct both readers fill — the whole derivation, the LDB 10032 phase names (War Declaration / Skirmish /
+Silence before the storm / War / Aftermath) and the attacker-ranking columns (kills, total, minigame = total −
+kills) are in [`../subsystems/guild-cities-and-sieges.md`](../subsystems/guild-cities-and-sieges.md). Phase3And4
+is captured (four replies, `BattleKeepInfoCodec`); Phase1And2 is not — the frame once taken for its single sample
+is a GameCharInterface loot reply wearing the same lossy `0x20A9` wire rendering.
 
 ## ⭐ The minigame ROSTER, from the LDB
 

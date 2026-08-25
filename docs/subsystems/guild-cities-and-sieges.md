@@ -25,17 +25,47 @@ captured replies (`BattleKeepInfoCodec`, `BattleKeepInfoCodecTests`):
 ```
 c2s RequestBattleKeepInformation (0x2042)   [u32 (count+1)*0x3F1] { u32 keepId }
 s2c ...ReturnPhase3And4          (0x20AA)   [u32 (count+1)*0x3F1]
-      { [u32 keepId][u32 zoneWord][u32 owningGuildId][u32 0][u32 0][u32 timestampUnix][u32 state] }
+      { [u32 keepId][ID32 owningGuild][ID32 attackingGuild][u32 nextPhaseUnix][u32 phase] }
+      ID32 = [u32 class][u32 instance]; class = 0xDEB7 (EntityClass.Guild), or [0][0] for the null ID32
 ```
 
-* `owningGuildId` is **cross-corroborated three ways**: keep 4's `0x7B726` is *Vendetta*'s guild id and keep 2's
-  `0x7C6A6` is *Hand of Stygia*'s, both matching the `guildId` column of the same session's Massive-PvP board and
-  the guild NAME in the `DispatchGuildRankingsUpdate` (0x2041) that follows each reply.
-* `zoneWord` is `0xDEB7` on every keep — a per-zone constant (the Border Kingdoms battlekeep zone).
-* `timestampUnix` is a plain unix time later than the board's last-battle time for the same guild — consistent
-  with the keep's next-vulnerable time (`[V0: that this timestamp is the vulnerability window]`).
-* `state` is `2` on every captured keep (`[V0: the state/phase meaning]`). The `Phase1And2` twin (0x20A9) has a
-  different single-sample shape and is not decoded. Open work tracked in Gitea #147.
+⭐ **Every column is named from the client's own keep window, not from the values.** The reader `FUN_0134f280`
+scatters the seven words into a 0x1c struct (slot order `[0][1][2][5][6][4][3]`) and the window's filler
+`FUN_01315130` (`Views/MassivePvP/MassivePvPBattleKeepView.xml`, `FUN_01313f70`) reads that struct field by field:
+
+| wire | struct | name | how the view uses it |
+|---|---|---|---|
+| word 1 | `[0]` | **keep id** | compared against the window's `AreaID` config before anything is drawn |
+| words 2–3 | `[1],[2]` | **owning guild ID32** | passed as ONE ID32 to the guild-name lookup, rendered under `MassivePvP_BattleKeepView_DefendingGuild`. The `0xDEB7` this page used to call a "zone word" is the guild ID32's class word — the same pair `GuildRankingsCodec` writes |
+| words 4–5 | `[5],[6]` | **attacking guild ID32** | compared against the null ID32 (`FUN_00453280`) and, when set, rendered as `MassivePvP_BattleKeepView_AttackingGuild` / `..._UnknownGuildName`. `[0][0]` on every captured keep — no war declared |
+| word 6 | `[4]` | **next-phase time** (unix) | `localtime` → weekday + `hh:mm` under `MassivePvP_BattleKeepView_NextPhase`; in phase War it drives the `TimeDisplay` countdown instead |
+| word 7 | `[3]` | **phase** | named from LDB category 10032 (`FUN_0060f190(0x2730, phase, 0)`) under `MassivePvP_BattleKeepView_Phase` |
+
+The phase enumeration (LDB 10032, `--report ldb-search --report-arg 10032:<letter>`): **0 War Declaration, 1
+Skirmish, 2 Silence before the storm, 3 War, 4 Aftermath**. Every captured keep is in phase 2, and the owning
+guild is cross-corroborated three ways: keep 4's `0x7B726` is *Vendetta*'s guild id and keep 2's `0x7C6A6` is
+*Hand of Stygia*'s, both matching the `guildId` column of the same session's Massive-PvP board and the guild NAME
+in the `DispatchGuildRankingsUpdate` (0x2041) that follows each reply.
+
+**The `Phase1And2` twin (0x20A9) is recovered from the client but has no captured body.** (An earlier version of
+this page called a frame in `Strie_rogue-assassin_login` its single sample; that frame is GameCharInterface
+`0x29`, `DispatchReplyLootForCharacterTemplateClusterOk`, on the GameServer stream — `0x20A9` is only the lossy
+wire rendering.) Its reader `FUN_0134f1f0` → `FUN_013b1680` fills a 0x28 struct:
+
+```
+s2c ...ReturnPhase1And2 (0x20A9)   [u32 (count+1)*0x3F1]
+      { [u32 keepId]
+        [u32 (m+1)*0x3F1] { m × [ID32 guild][u32 kills][u32 total] }     the attacker RANKING
+        [ID32 a][ID32 owningGuild][u32 nextPhaseUnix][u32 phase] }
+```
+
+The nested list is what the window's `AttackerList` shows below phase 2: `FUN_013b18b0` reads each element as
+an ID32 plus two words, and the row constructor `FUN_01313b40` (`MPvPListViewItem`) renders the columns
+`MassivePvP_BattleKeepView_Guild` / `Kills` / `Minigame` / `Total` as *name*, `kills`, `total − kills`, `total`
+— so the two words are **kills** and **total score**, with the minigame contribution derived. That is the
+PvP-earned queue for the right to attack that the ruleset below describes. The ID32 `a` (struct `+0x20`) is
+passed to the list filler as the row to highlight; whether it is the leading applicant or the viewer's own guild
+is not decidable without a body. `[V0: the Phase1And2 record's highlighted ID32]`
 
 ⚠️ **This is text, not protocol.** Every rule below is retail describing its own game to a player. It pins what
 the server must *decide*; it says nothing about which bytes carry the decision, and no capture in the corpus

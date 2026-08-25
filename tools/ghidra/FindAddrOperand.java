@@ -1,4 +1,4 @@
-// Find every place a 32-bit ADDRESS appears as raw little-endian bytes (ADDR env, hex) and report the instruction
+// Find every place a 32-bit ADDRESS appears as raw little-endian bytes (ADDR env, hex, comma-separated) and report the instruction
 // + containing function. Use when Ghidra's own reference table is incomplete - a global that `getReferencesTo`
 // reports as never-read is often read through instructions the analyzer never disassembled or resolved.
 //   ADDR=2d246fc [DECOMP=1] /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe \
@@ -17,19 +17,19 @@ public class FindAddrOperand extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        long target = Long.parseLong(System.getenv("ADDR").trim(), 16);
         boolean decomp = System.getenv("DECOMP") != null;
-        byte[] pattern = new byte[] { (byte) target, (byte) (target >> 8), (byte) (target >> 16), (byte) (target >> 24) };
-
         DecompInterface di = null;
         if (decomp) {
             di = new DecompInterface();
             di.setOptions(new DecompileOptions());
             di.openProgram(currentProgram);
         }
-
         PrintWriter out = new PrintWriter(OUT + "addr_operand.txt");
-        out.println("occurrences of " + Long.toHexString(target) + " as LE bytes:");
+        for (String ts : System.getenv("ADDR").split(",")) {
+        long target = Long.parseLong(ts.trim(), 16);
+        byte[] pattern = new byte[] { (byte) target, (byte) (target >> 8), (byte) (target >> 16), (byte) (target >> 24) };
+
+        out.println("\n==== occurrences of " + Long.toHexString(target) + " as LE bytes:");
         Address at = currentProgram.getMinAddress();
         Set<Long> fns = new LinkedHashSet<>();
         int hits = 0;
@@ -52,7 +52,7 @@ public class FindAddrOperand extends GhidraScript {
         }
 
         out.println("\n" + hits + " occurrence(s), " + fns.size() + " distinct function(s)");
-        println(hits + " occurrence(s), " + fns.size() + " distinct function(s)");
+        println(Long.toHexString(target) + ": " + hits + " occurrence(s), " + fns.size() + " distinct function(s)");
         if (di != null) {
             for (Long off : fns) {
                 Function f = getFunctionAt(toAddr(off));
@@ -62,6 +62,7 @@ public class FindAddrOperand extends GhidraScript {
             }
         }
 
+        }
         out.flush();
         out.close();
         println("WROTE " + OUT + "addr_operand.txt");
