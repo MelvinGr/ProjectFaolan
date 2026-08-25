@@ -8,20 +8,108 @@ way: melee combos MATCH a fixed catalog sequence, while spellweaving is FREE-FOR
 | Structure | a FIXED sequence from the catalog (`Combos.Actions`) | FREE-FORM: the player composes the weave live |
 | Input kind | directional swing key (Upper-Left/Right, Lower-Left/Right, Up, Head, Thrust) | adding a spell "component"; each contributes **extra stats / an effect** to a blended result |
 | Timing | rapid succession (chain the keys) | paced adds while in a trance |
-| Outcome | the specific combo's finisher (damage / effect) | the ACCUMULATED blend, fired on deactivate |
-| Risk | — | **backlash**: chance of ill-effects scaling with the weave's power |
+| Outcome | the specific combo's finisher (damage / effect) | the rung buff the weave leaves running — there is no fire |
+| Risk | — | **backlash**: one roll per rung, and the escape band shrinks to zero by rung 6 |
 | Who | the 8 combo archetypes (soldiers, rogues, Bear Shaman, Herald of Xotli) | the pure casters (Necromancer, Demonologist, Priest of Mitra, Tempest of Set) |
 
 A class does **one or the other**. That is why `ClassCombo` (melee) leaves the 4 pure casters empty — they
 weave instead. (Bear Shaman & Herald of Xotli are melee/hybrid, so they have `Combos`.)
 
-**Spellweaving mechanic** (https://aoc.fandom.com/wiki/Spellweaving — fetch via the fandom API, the page is
-Cloudflare-gated for curl/WebFetch: `api.php?action=parse&page=Spellweaving&prop=wikitext&format=json`):
-activate the spellweave ability → enter a **trance** (immobilised, can ONLY add components) → add up to a
-level-capped number of spells (max 20), each blending its stats/effect into the result → **deactivate** to
-fire the accumulated weave at the target and leave the trance. Because it is player-composed there is no
-fixed catalog to match (unlike melee) — the server accumulates the added components' contributions and
-resolves the blend + a backlash roll on deactivate.
+**Spellweaving mechanic:** activate the spellweave ability → enter a **trance** (immobilised, can ONLY add
+components) → add spell "components" one at a time, each advancing the weave one rung and rolling for a
+backlash → **deactivate** to leave the trance. Because it is player-composed there is no fixed catalog to
+match (unlike melee).
+
+⚠️ **There is no separate FIRE payload.** The weave's whole reward is the `Spellweaving (N)` rung buff it
+leaves running, and that buff's DURATION is the reward window — 12 s at rung 1, rising to 32 s at rung 5.
+Deactivating ends the trance and lets the rung tick down; it does not launch anything. #141 spent two months
+looking for the packet that fires the weave, and the answer is that retail sends none.
+
+### ⭐ The per-class ruleset, from the CLIENT (#141)
+
+`--report spellweave` re-derives everything below in one command; `SpellweaveCatalog` is the shipped
+transcription and `SpellweaveCodecTests` gates its invariants.
+
+The table was never capture-borne. The client declares it as the argument list of a **`StartSpellWeavingMode`
+(53190)** GameAction element on every rung buff, whose five keys are `NanoTemplate, Arg1..Arg4`
+([`../re/gameaction-keylists.tsv`](../re/gameaction-keylists.tsv)). It stayed invisible for as long as it did
+because nothing could SEARCH for it — a value search needs an id you already have, and the ids were the
+unknown. `--report spell-refs --report-arg kind:53190` searches by element **kind** instead and finds all 24
+carriers at once.
+
+**The elements.** Five per class, and the `componentIndex` on a `CombatReactiveIIR` add indexes this list in
+order. The first two are universal; only the last three are class-specific.
+
+| class | spell line | elements 0–1 | elements 2–4 |
+|---|---|---|---|
+| Necromancer | `41xxx` | Arcane Renewal, Arcane Surge | Parasite Host, Death God, Death |
+| Demonologist | `44xxx` | " | Hell, Hand of Doom, Howl of Armageddon |
+| Tempest of Set | `28xxx` | " | Set, Power Surge, Vengeful Idol of Set |
+| Priest of Mitra | `24xxx` | " | Mitra's Grace, Mitra, Benevolence of Mitra |
+
+⭐ The **Necromancer row is the control**: it is element-for-element and index-for-index what the NecroL80
+capture wove (componentIndex 0/1/3 → Arcane Renewal / Arcane Surge / Death God), so the other three rows come
+off a table already proven right where we can check it. And the class is stated **mechanically**, not read
+off the names — each rung's `SpellLineStatModifier` elements name the class's own spell lines, and a line is
+`ConanClass * 1000 + index`. ⚠️ Not every leading block is a class: the Demonologist ladder also carries a
+`50000` line that resolves to none, the same trap the archetype-shared combos set with their `20` block.
+
+**The ladder.** Six buffs, `Spellweaving (1)..(6)`. Adding a component advances one rung. Each rung grants
+`Modify BaseSpellDamage` of `rung × step` (250 for the Necromancer, 100 for the other three), a
+`Modify NaturalEnergyRegeneration` of **−15000**, and a splash package on the class's spell lines
+(`SplashDamageAOESize` / `SplashDamagePercentage` / `SplashDamageMaxTargets`). Rung 6 is the top BUFF but not
+the top of the ramp — its record carries the whole `BaseSpellDamage` continuation for rungs 6..25 in one
+list, so a longer weave keeps scaling without a further buff id.
+
+⚠️ **The stack is an ordered LADDER, not a base plus an offset.** The captured necro stack walks
+`0x37E5A8 → A9 → AA`, which reads as "the same buff re-applied at an incremented id" and was modelled that
+way for months. Those three ids are `Spellweaving (1)`, `(2)` and `(3)` — the stack LEVEL advancing. It only
+looked like arithmetic because the necromancer's six rungs happen to be contiguous; the Demonologist's run
+DESCENDING and the Priest of Mitra's are interleaved with unrelated records, so `base + n` walks those two
+straight into other spells.
+
+Advancing is the ordinary rank-table walk (#813): every rung casts a shared **dispatcher** (`Spellweaving`,
+duration 0), whose own record is a descending `CastNano` chain gated on
+`MustHavePassiveAbilityRunning <the rung below>`.
+
+**The backlash — ONE roll, partitioned six ways.** Each rung's `Detrimental Effect` record is a run of six
+`CastNano` elements. The FIRST reads stat 520 `Rnd`, which draws the number; every later one compares stat
+522 `LastRnd`, the value that draw left behind, against a band of it. So at most one backlash can land per
+rung. Reading them as six independent chances would apply several at once.
+
+| rung | own critical | own signature | Soul Wrack | Arcane Drought | Frailty | Ether Drain | escape |
+|---:|---|---|---|---|---|---|---:|
+| 1 | 0–5 | 6–17 | 18–25 | 26–37 | 38–56 | 57–75 | 24% |
+| 2 | 0–5 | 6–18 | 19–27 | 28–40 | 41–60 | 61–80 | 19% |
+| 3 | 0–5 | 6–19 | 20–29 | 30–43 | 44–64 | 65–85 | 14% |
+| 4 | 0–5 | 6–20 | 21–31 | 32–46 | 47–68 | 69–90 | 9% |
+| 5 | 0–5 | 6–21 | 22–33 | 34–49 | 50–72 | 73–95 | 4% |
+| 6 | 0–5 | 6–22 | 23–35 | 36–52 | 53–76 | 77–99 | **0%** |
+
+The bands are identical across all four classes; only the first two outcomes differ (Necromancer
+Rebellious Spirit / Infestation, Demonologist Flesh to Dust / Demon, Tempest of Set Deadly Feedback /
+Twisted Rune of Set, Priest of Mitra Shunned by Mitra / Flesheater). `Soul Wrack` tiers with the rung — a
+stronger copy every two rungs. By the sixth component a backlash is certain, which is the escalating risk
+the mechanic is built on.
+
+⭐ **This is what the capture's "third trance buff" was.** NecroL80's activate carries three buffs, and the
+third is Arcane Drought — which sits in band 26–37 of rung 1. It was hardcoded as a fixed trance buff, so
+every weave opened with the same debuff and the other five outcomes were impossible. The trance opens with
+**two** buffs (the `Spellweaving` trance and `Spellweaving (1)`); the third is a roll.
+
+⚠️ **`Spellweave Gone Bad: Weak/Moderate/Strong/Maximum` (196612–196615) is NOT the backlash.** Those four
+sit beside `TEST Spellweave: Fire 1` in a low id band and are referenced by **zero** of the 21,502 spell
+records. Dead test content — the name is the only thing about them that fits.
+
+⚠️ There is a **fifth** `Spellweaving (1)..(6)` band and it is SUPERSEDED: 3364577 + 3364671–3364675, on
+Demonologist line 44000. No `StartSpellWeavingMode`, no damage ramp, no backlash; flat 12,000 ms durations
+instead of the live 12/17/22/27/32 ladder; it chains FORWARD instead of through a dispatcher; and its top
+rung modifies NECROMANCER spell lines from inside a Demonologist ladder. The old design, left in the data.
+
+**Two more rules the trance record states**, neither of them wired yet: the trance buff casts
+`Spellweaving Remover` (4079805) when `CombatMode != 39`, so leaving the weaving stance cancels the weave;
+and every `Knockback` spell in the catalog casts that same remover, so **being knocked back ends your weave**
+(rides #496).
 
 ## Which class gets which combo
 
@@ -474,14 +562,14 @@ misread: the ids are the client's own `AttackRating` / `MagicRating` / `DefenseR
 31,700 is that **level-80 necromancer's own rating**. Swept across the corpus the four appear in **2,100 records
 over 31 captures**, and **20 of those captures contain no spellweaving at all** — including a Herald of Xotli,
 which cannot weave. They are the level-scaled rating quad ([`combat.md`](combat.md)), and the weave capture is
-simply where one landed. The emit is gone; a weave pushes nothing here, and its real effect (the
-`componentIndex -> effect` blend) is still open on #141.
+simply where one landed. The emit is gone, and a weave pushes nothing here — the search for a fire payload it
+prompted ended in there not being one (see the ruleset above).
 - `0x2085` (~2s heartbeat) and food/potion `UseItem` (BCC `BehaviorId` 0x0e) are NOT part of the weave.
 
-## Implementation (spellweaving, Necromancer)
+## Implementation (spellweaving)
 
-The Necromancer weave is built end-to-end and byte-exact (golden tests `SpellweaveCodecTests` +
-`BehaviorAnimationsTests`). Code map:
+All four weaving classes have a profile; the wire is byte-exact against the one capture we have (golden tests
+`SpellweaveCodecTests` + `BehaviorAnimationsTests`). Code map:
 
 - `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the weave FSM + the trance-meter /
   energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
@@ -495,9 +583,10 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   and buff-data builders.
 - `BehaviorAnimations` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimations.cs`) — the trance /
   component / EXIT BCC animations (BCC `0x642CD3D6` is the generic behaviour channel, shared with combat).
-- `SpellweaveCatalog` (`Faolan.Core.Network/Constants/SpellweaveCatalog.cs`) — the per-class `SpellweaveProfile`
-  (Necromancer only) + `EnergyMaxForClass`. Its `FireStages` / `CapturedFireRating` are **gone** — see the
-  rating-quad note above.
+- `SpellweaveCatalog` (`Faolan.Core.Network/Constants/SpellweaveCatalog.cs`) — the four `SpellweaveProfile`
+  rows (elements, stack ladder, trance buff, damage step, the class's own two backlash outcomes), the shared
+  backlash partition (`RollBacklash`) and `EnergyMaxForClass`. Its `FireStages` / `CapturedFireRating` are
+  **gone** — see the rating-quad note above.
 - `GameServerListener.Buffs.cs` — `SendSprintBar` (`0x200E`) + the persistent energy loop (`RunEnergyMirror`:
   drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain itself is client-side, the server
   mirrors it). The loop also pushes `CharacterStatId.Energy` on the retail cadence and owns the sprint-path
@@ -769,6 +858,13 @@ harvested archetype resolving the three the weapon cannot, the shield-bearing Ba
 the ack moving.
 
 Open work — spellweaving polish — is tracked on **Gitea #141**.
+
+⚠️ **The rung's own stat payload is not applied yet.** The ladder's `Modify BaseSpellDamage`, its
+`Modify NaturalEnergyRegeneration -15000` and the `SpellLineStatModifier` splash package are ordinary
+GameAction elements on the rung's own record, so they land when the generic engine walks a `CastNano` chain
+and evaluates criteria (**#784** / **#791**) — not through anything bespoke in `SpellweaveService`. The same
+`-15000` regen is also the mechanism behind the energy bar draining: retail does not stream the drain, it
+sets the regen rate negative and lets the client simulate.
 
 ## Every path that mints an NPC has to stamp its combat kit (#837)
 

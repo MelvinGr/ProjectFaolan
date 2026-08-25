@@ -111,6 +111,144 @@ namespace Faolan.Tests
 			Assert.False(StartingData.SpellweaveToggleAction.ContainsKey(ConanClass.TempestOfSet));
 		}
 
+		// ⭐ The per-class weave table, recovered from the CLIENT for #141 (`--report spellweave`). This is the
+		// gate on the shape, not on the ids: the ids themselves are re-derivable in one command and a test in a
+		// plain clone has no RDB to check them against, so what is asserted here is every invariant the recovery
+		// established - which is exactly what a transcription error would break.
+		[Fact]
+		public void EveryWeavingClass_HasAProfile()
+		{
+			ConanClass[] weavers = [ConanClass.Necromancer, ConanClass.Demonologist, ConanClass.TempestOfSet, ConanClass.PriestOfMitra];
+			foreach (var weaver in weavers)
+				Assert.NotNull(SpellweaveCatalog.ForClass(weaver));
+
+			// The four PURE casters weave and nobody else does - a class that weaves melee-combos instead must not
+			// pick up a profile, or its toggle opens a trance it has no elements for.
+			ConanClass[] nonWeavers = [ConanClass.HeraldOfXotli, ConanClass.BearShaman, ConanClass.Assassin, ConanClass.Guardian];
+			foreach (var nonWeaver in nonWeavers)
+				Assert.Null(SpellweaveCatalog.ForClass(nonWeaver));
+		}
+
+		// The two UNIVERSAL elements. Every class's list opens with Arcane Renewal then Arcane Surge and differs
+		// only in the last three, which is the regularity the four rows were read off - a transcription that
+		// broke it would be reading the wrong record.
+		[Theory]
+		[InlineData(ConanClass.Necromancer)]
+		[InlineData(ConanClass.Demonologist)]
+		[InlineData(ConanClass.TempestOfSet)]
+		[InlineData(ConanClass.PriestOfMitra)]
+		public void EveryProfile_HasFiveElementsAndSixRungs(ConanClass characterClass)
+		{
+			var profile = SpellweaveCatalog.ForClass(characterClass)!;
+
+			Assert.Equal(5, profile.WeaveElements.Length);
+			Assert.Equal(3762921u, profile.WeaveElements[0]); // Arcane Renewal
+			Assert.Equal(3762648u, profile.WeaveElements[1]); // Arcane Surge
+			Assert.Equal(SpellweaveCatalog.MaxRung, profile.StackLadder.Length);
+
+			// A rung repeated is a copy-paste; a rung shared with another class is the same mistake across rows.
+			Assert.Equal(profile.StackLadder.Length, profile.StackLadder.Distinct().Count());
+			Assert.Equal(profile.WeaveElements.Length, profile.WeaveElements.Distinct().Count());
+		}
+
+		// ⚠️ The stack is a LADDER, not a base plus an offset. Only the necromancer's six rungs are contiguous,
+		// which is why the arithmetic model survived as long as it did; asserting the other three are NOT
+		// contiguous is what stops anyone collapsing it back to `base + n`.
+		[Fact]
+		public void TheStackLadder_IsNotArithmetic()
+		{
+			var necro = SpellweaveCatalog.ForClass(ConanClass.Necromancer)!.StackLadder;
+			Assert.Equal([3663272u, 3663273u, 3663274u, 3663275u, 3663276u, 3663277u], necro);
+
+			// The captured stack walk 0x37E5A8 -> A9 -> AA IS rungs 1, 2 and 3 of that ladder.
+			Assert.Equal(0x37E5A8u, SpellweaveCatalog.RungBuff(SpellweaveCatalog.ForClass(ConanClass.Necromancer)!, 0));
+			Assert.Equal(0x37E5AAu, SpellweaveCatalog.RungBuff(SpellweaveCatalog.ForClass(ConanClass.Necromancer)!, 2));
+
+			var demonologist = SpellweaveCatalog.ForClass(ConanClass.Demonologist)!.StackLadder;
+			Assert.True(demonologist[0] > demonologist[^1], "the Demonologist ladder runs DESCENDING");
+
+			var mitra = SpellweaveCatalog.ForClass(ConanClass.PriestOfMitra)!.StackLadder;
+			Assert.NotEqual(mitra[0] + 1, mitra[1]);
+		}
+
+		// A weave longer than the ladder saturates on the top rung rather than walking off the end - rung 6's
+		// own record carries the damage ramp for everything above it, so there is no seventh buff to reach for.
+		[Fact]
+		public void RungBuff_SaturatesAtTheTop()
+		{
+			var profile = SpellweaveCatalog.ForClass(ConanClass.TempestOfSet)!;
+			var top = profile.StackLadder[^1];
+
+			Assert.Equal(top, SpellweaveCatalog.RungBuff(profile, SpellweaveCatalog.MaxRung - 1));
+			Assert.Equal(top, SpellweaveCatalog.RungBuff(profile, 25));
+			Assert.Equal(profile.StackLadder[0], SpellweaveCatalog.RungBuff(profile, -1));
+		}
+
+		// ⭐ The backlash is ONE roll partitioned six ways, so every draw must land on at most one outcome. Read
+		// as six independent chances it would stack several backlashes on a single component.
+		[Theory]
+		[InlineData(ConanClass.Necromancer)]
+		[InlineData(ConanClass.Demonologist)]
+		[InlineData(ConanClass.TempestOfSet)]
+		[InlineData(ConanClass.PriestOfMitra)]
+		public void TheBacklashPartition_CoversEachRollOnce(ConanClass characterClass)
+		{
+			var profile = SpellweaveCatalog.ForClass(characterClass)!;
+
+			// The escape band SHRINKS every rung: 24% at rung 1 down to nothing at rung 6, which is the
+			// escalating risk the whole mechanic is built on. A partition that did not shrink would make a long
+			// weave free.
+			int[] expectedEscapes = [24, 19, 14, 9, 4, 0];
+			for (var rung = 0; rung < SpellweaveCatalog.MaxRung; rung++)
+			{
+				var escapes = Enumerable.Range(0, 100).Count(roll => SpellweaveCatalog.RollBacklash(profile, rung, roll) == null);
+				Assert.Equal(expectedEscapes[rung], escapes);
+			}
+
+			// The class's own two outcomes must be the class's own - sharing one across classes is the failure a
+			// copy-pasted row produces, and it would read as working.
+			Assert.NotEqual(profile.BacklashCritical, profile.BacklashSignature);
+			Assert.Equal(profile.BacklashCritical, SpellweaveCatalog.RollBacklash(profile, 0, 0));
+			Assert.Equal(profile.BacklashCritical, SpellweaveCatalog.RollBacklash(profile, 0, 5));
+			Assert.Equal(profile.BacklashSignature, SpellweaveCatalog.RollBacklash(profile, 0, 6));
+		}
+
+		// The capture's third "trance buff" is a backlash ROLL OUTCOME, and this is the roll that produces it.
+		// Arcane Drought sits in band 26-37 of rung 1, which is why NecroL80's activate carried it - and why
+		// hardcoding it made every weave open with the same debuff and the other five impossible.
+		[Fact]
+		public void ArcaneDrought_IsARungOneBacklashOutcome_NotATranceBuff()
+		{
+			var necro = SpellweaveCatalog.ForClass(ConanClass.Necromancer)!;
+
+			Assert.Equal(3762640u, SpellweaveCatalog.RollBacklash(necro, 0, 26));
+			Assert.Equal(3762640u, SpellweaveCatalog.RollBacklash(necro, 0, 37));
+			Assert.NotEqual(3762640u, SpellweaveCatalog.RollBacklash(necro, 0, 38));
+
+			// It is still weave state and must not survive a relog (#690) - see IsTranceBuff.
+			Assert.True(SpellweaveCatalog.IsTranceBuff(3762640u << 8));
+			Assert.NotEqual(necro.TranceBuff, 3762640u);
+		}
+
+		// Every class's element list must round-trip through the reactive-list codec that carries it to the
+		// client - the same builder the captured necro list is byte-exact against, asked of all four.
+		[Theory]
+		[InlineData(ConanClass.Necromancer)]
+		[InlineData(ConanClass.Demonologist)]
+		[InlineData(ConanClass.TempestOfSet)]
+		[InlineData(ConanClass.PriestOfMitra)]
+		public void BuildReactiveList_ForEveryWeavingClass_Builds(ConanClass characterClass)
+		{
+			var elements = SpellweaveCatalog.ForClass(characterClass)!.WeaveElements;
+			var bytes = CombatReactiveCodec.Build(0x0802E5D4, elements);
+
+			// The captured necro activate-response list, whose length the element COUNT sets - so every class
+			// building to the same width is the check that all four lists really are five elements of the same
+			// shape, and not e.g. one carrying an id too wide for its slot.
+			var captured = Convert.FromHexString("54c020890000c3500802e5d4000000000100396ae9003969d80037e6d900396a2200396a3d");
+			Assert.Equal(captured.Length, bytes.Length);
+		}
+
 		[Fact]
 		public void BuildStatGauge_Stamina_MatchesCapture()
 		{

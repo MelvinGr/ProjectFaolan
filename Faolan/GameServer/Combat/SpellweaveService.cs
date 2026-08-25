@@ -18,12 +18,19 @@ namespace Faolan.GameServer.Combat
 	//   - fire                = s2c 0xF98E10B3 burst on deactivate; the 0xE9F24184 meter drains during the trance.
 	//
 	// On ACTIVATE the server must answer with the trance-open burst or the client never enters the interactive
-	// trance (it stalls at "started" and never sends the adds): 3 trance buffs (ApplySpell) + the reactive element
+	// trance (it stalls at "started" and never sends the adds): the trance buffs (ApplySpell) + the reactive element
 	// LIST (which declares the addable weave elements the componentIndex indexes into). This service emits that burst
-	// via ISpellweaveOutbound, the port the listener implements. The per-add element re-send (with the used element
-	// zeroed) + the meter drain-stream + the componentIndex -> stat/effect contribution table are not built yet (see
-	// docs/subsystems/combos.md + Gitea #141). The trance immobilisation IS wired (the CharDCMove handler
-	// pins the caster's position while IsSpellweaving).
+	// via ISpellweaveOutbound, the port the listener implements. The trance immobilisation IS wired (the CharDCMove
+	// handler pins the caster's position while IsSpellweaving).
+	//
+	// ⭐ The per-class TABLE this runs on is the client's own, recovered for #141 - see SpellweaveCatalog. All four
+	// weaving classes have a profile now, the stack is a ladder of six distinct buffs rather than a base plus an
+	// offset, and each rung rolls a backlash off a six-way partition of one draw. What is still NOT modelled is the
+	// rung's own stat payload: the ladder's `Modify BaseSpellDamage` step (250 per rung for the necromancer, 100 for
+	// the other three), its `Modify NaturalEnergyRegeneration -15000`, and the `SpellLineStatModifier` splash it
+	// grants the class's spell lines. Those are ordinary GameAction elements on the rung's own record, so they land
+	// when the generic element engine walks a CastNano chain and evaluates criteria (Gitea #784 / #791) rather than
+	// through anything bespoke here.
 	public sealed class SpellweaveService
 	{
 		private const int DotDrainPerTick = 31_705;
@@ -104,12 +111,17 @@ namespace Faolan.GameServer.Combat
 					if (session.Account == null || !session.IsSpellweaving)
 						return;
 
-					// Refresh the Spellweaving buff at the NEXT stack level (a new buff id that overlaps the previous
-					// one still ticking down -> the brief x2 the user sees), then bring the picker back.
-					{
-						session.SpellweaveBuffStack++;
-						await _out.ApplyBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
-					}
+					// Advance the weave one RUNG - `Spellweaving (1)` -> `(2)` -> ... The new buff overlaps the
+					// previous one still ticking down, which is the brief x2 the user sees. Each rung is a
+					// distinct buff off the class ladder, NOT the same buff at an incremented id: only the
+					// necromancer's six happen to be contiguous, and two of the four classes would walk into
+					// unrelated spells under arithmetic (see SpellweaveCatalog.StackLadder).
+					session.SpellweaveBuffStack++;
+					await _out.ApplyBuff(client, caster, caster, SpellweaveCatalog.RungBuff(profile, session.SpellweaveBuffStack) << 8);
+
+					// ... and roll THIS rung's backlash. The bands widen as the stack climbs, so the sixth
+					// component cannot escape one.
+					await RollBacklash(client, profile, caster, session.SpellweaveBuffStack);
 
 					await WorldIir.Send(client, CombatReactiveCodec.Build(caster, profile.WeaveElements));
 				}, _logger);
@@ -140,8 +152,29 @@ namespace Faolan.GameServer.Combat
 			return _out.SendFeedback(client, message);
 		}
 
-		// Deactivate: fire the accumulated weave and close the trance. Emits the s2c fire burst (0xF98E10B3); the
-		// componentIndex -> effect table + backlash roll await the weave-element contribution table.
+		// Roll the rung's backlash and apply the outcome, or nothing when the roll escapes.
+		//
+		// The table is the client's own (SpellweaveCatalog.RollBacklash): ONE draw of 0..99 partitioned six ways,
+		// so at most one backlash can land per rung. The randomness lives here rather than in the catalog so the
+		// partition itself stays a pure function a test can walk end to end.
+		private async Task RollBacklash(INetworkClient client, SpellweaveProfile profile, uint caster, int rung)
+		{
+			var roll = Random.Shared.Next(100);
+			var backlash = SpellweaveCatalog.RollBacklash(profile, rung, roll);
+			if (backlash == null)
+			{
+				_logger.LogInformation("Spellweave backlash escaped at rung {Rung} (roll {Roll}).", rung + 1, roll);
+				return;
+			}
+
+			_logger.LogInformation("Spellweave BACKLASH at rung {Rung} (roll {Roll}): spell {Spell}.", rung + 1, roll, backlash);
+			await _out.ApplyBuff(client, caster, caster, backlash.Value << 8);
+		}
+
+		// Deactivate: close the trance. There is no separate FIRE payload to send, which is the other half of what
+		// #141 was waiting on: the weave's whole reward is the `Spellweaving (N)` rung buff it leaves running, and
+		// that buff's duration is the reward window (12s at rung 1, rising to 32s at rung 5). Deactivating simply
+		// ends the trance and lets the rung tick down.
 		//
 		// ⚠️ **The "fire burst" is four COMBAT-RATING stat sets, and replaying it is almost certainly wrong** (#678).
 		// The four ids are `AttackRating` / `MagicRating` / `DefenseRating` / `ResistRating` and the value is the
@@ -176,16 +209,19 @@ namespace Faolan.GameServer.Combat
 			// client stays in the trance visually even though the server considers the weave done (#the cancel bug).
 			if (profile != null)
 			{
-				await _out.RemoveBuff(client, caster, caster, 0x37F29800); // Spellweaving (main)
-				await _out.RemoveBuff(client, caster, caster, 0x3969D000); // Arcane Drought
-				await _out.RemoveBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8); // current Spellweaving(1) stack
+				await _out.RemoveBuff(client, caster, caster, profile.TranceBuff << 8);
+				await _out.RemoveBuff(client, caster, caster, SpellweaveCatalog.RungBuff(profile, session.SpellweaveBuffStack) << 8);
+
+				// ⚠️ TWO removals, not three. This used to also remove Arcane Drought, on the reading that it was
+				// a trance buff; it is a backlash ROLL OUTCOME with a 10s duration of its own, and the capture's
+				// cancel press removes exactly 0x37F298 and the current rung. Ending a backlash early because the
+				// player cancelled is the opposite of what the mechanic is for.
 			}
 
 			await Feedback(client, $"Spellweave fired with {session.WeaveComponents.Count} components.");
 
-			// Remaining (#141): resolve the blended effect from the accumulated components (componentIndex -> effect) +
-			// roll backlash - awaits the per-class weave-element contribution table (captures). The trance root is
-			// already released: IsSpellweaving was cleared above, so the move handler stops pinning the caster.
+			// The trance root is already released: IsSpellweaving was cleared above, so the move handler stops
+			// pinning the caster.
 			session.WeaveComponents.Clear();
 			session.SpellweaveBuffStack = 0;
 		}
@@ -291,12 +327,19 @@ namespace Faolan.GameServer.Combat
 			_out.EnsureEnergyLoop(client);
 			_logger.LogInformation("Spellweave START for '{Name}' (class={Class}, param=0x{Param:X}).", session.Character.Name, session.Character.Class, param);
 
-			// The three trance buffs (ApplySpell): open the trance state client-side. Their real durations are stamped
-			// from Spells.DurationMs by the ApplySpell helper (matches the capture byte-for-byte).
-			{
-				foreach (var buff in profile.TranceBuffs)
-					await _out.ApplyBuff(client, caster, caster, buff);
-			}
+			// The trance-open burst (ApplySpell). Their real durations are stamped from Spells.DurationMs by the
+			// ApplySpell helper, which is what makes this byte-exact against the capture.
+			//
+			// ⭐ The capture's THIRD buff is not a third trance buff (#141). The NecroL80 activate carries
+			// 0x37F29800, 0x37E5A800 and 0x3969D000, and the first two are the trance and `Spellweaving (1)`.
+			// The third is Arcane Drought, which the client's own data shows is one of SIX outcomes of the rung-1
+			// backlash roll - it sits in band 26-37 of that rung's partition. It was hardcoded here as a fixed
+			// trance buff, which made every weave open with the same debuff and none of the other five ever
+			// possible. Rolling it is what retail does; landing on Arcane Drought is what that capture happened
+			// to see.
+			await _out.ApplyBuff(client, caster, caster, profile.TranceBuff << 8);
+			await _out.ApplyBuff(client, caster, caster, SpellweaveCatalog.RungBuff(profile, 0) << 8);
+			await RollBacklash(client, profile, caster, 0);
 
 			// The trance-pose animation (BCC): make the character play the spellweaving stance (without it the buffs
 			// render but the body stays idle).
