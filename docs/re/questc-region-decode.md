@@ -380,10 +380,20 @@ register was hunting, already listed above as "`+0x5c` playfield, `+0x60/+0x64/+
 
 The register carried this as `Unknown1` with "radius" as a *reading* of its values. It is the client's own name,
 and it did not need the slot's reader at all — which is why four rounds of offset scans over the waypoint module
-never reached it. **Two independent namings, from opposite directions, and they agree:**
+never reached it.
 
-1. **`DispatchAddWayPoint`'s argument list.** Its reader `FUN_004c9860` validates field by field and NAMES each
-   field in its own failure string (`"…stream bad after 'i_vRadius'!"`). Read in order:
+⚠️ **And the name was already in this repo.** `DispatchAddWayPoint`'s field list is row-for-row in
+[`aoc-client-rpc-methods.json`](aoc-client-rpc-methods.md) — `i_cID, i_nPlayfieldID, i_cPos, i_vRadius,
+i_nLabel, i_nToolTip` — harvested with the other 400 s2c dispatch methods long before this. What was missing was
+not the name but the LINK: that the quest goal's `+0x68` scalar and that message's `i_vRadius` are the same field,
+which only the shared object layout shows. **Grep the JSON for a field-shaped guess before opening Ghidra.**
+
+What the Ghidra read did add is the one thing the catalog cannot carry: `i_v` is documented there as "a vector /
+vec3 — sometimes a scalar component; check size", and the reader settles it. **Two independent namings, and they
+agree:**
+
+1. **`DispatchAddWayPoint`'s argument list, with SIZES.** Its reader `FUN_004c9860` validates field by field and
+   names each field in its own failure string (`"…stream bad after 'i_vRadius'!"`). Read in order:
 
    | field | words | note |
    |---|---:|---|
@@ -408,8 +418,14 @@ with it. Everything the values already looked like fits: it appears only on Coll
 whose target ROAMS — as 3, 10, 20, 25, 40, 50, 60, 80, 90, 100, 105, 130, 150, 170 world units, and 0 (a plain
 pin with no extent) everywhere else.
 
-⚠️ The lesson worth keeping: the scans were looking for a *consumer* of the field. The name was in a **sibling
-producer** — a different message that carries the same value into the same object and labels it on the way past.
+⚠️ Two lessons worth keeping, and the second is the cheaper one:
+
+* the scans were looking for a *consumer* of the field. The name was in a **sibling producer** — a different
+  message that carries the same value into the same object and labels it on the way past. Ask "what else FILLS
+  this struct?" before "what reads this field?";
+* **the sibling producer's field names were already harvested.** All 401 s2c dispatch methods are in
+  `aoc-client-rpc-methods.json` with their fields in wire order. A `grep -i radius` over it costs nothing and
+  would have pointed here two sessions earlier.
 
 What is still open on this record: the two zero tail fields (`+0x6d`, `+0x70`), which have no non-zero sample.
 Open work tracked in Gitea #464.

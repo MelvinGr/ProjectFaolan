@@ -317,11 +317,12 @@ namespace Faolan.Core.Database.Tables
 		// waypoint as a scalar of its own, beside the (MarkerX, 0, MarkerY) position. Two independent client-side
 		// namings settle what that scalar is, and they agree:
 		//
-		//   * `DispatchAddWayPoint`'s own ARGUMENT LIST. Its reader (`FUN_004c9860`) validates field by field and
-		//     names each one in its own error string: `i_cID` (2 words), `i_nPlayfieldID`, `i_cPos` (3 words),
-		//     **`i_vRadius`** (ONE word), `i_nLabel`, `i_nToolTip`. That is the same layout the waypoint object
-		//     carries - id at [4..5], position at [6..8], the scalar at [10] - so the word after the position IS
-		//     the radius;
+		//   * `DispatchAddWayPoint`'s own ARGUMENT LIST - already committed in
+		//     docs/re/aoc-client-rpc-methods.json, with the other 400 s2c dispatch methods. The name was never the
+		//     missing part; the LINK was. Its reader (`FUN_004c9860`) settles the one thing the catalog cannot
+		//     carry - `i_vRadius` is ONE word, where the `i_v` prefix would read as a vec3 - and the field order
+		//     `i_cID` (2 words), `i_nPlayfieldID`, `i_cPos` (3 words), `i_vRadius`, `i_nLabel`, `i_nToolTip` is
+		//     the waypoint object's own layout: id at [4..5], position at [6..8], the scalar at [10];
 		//   * the `addmapmarker` CONSOLE COMMAND, whose handler (`FUN_00a12680`) calls the very function that
 		//     writes +0x28 (`FUN_0139f520`). Its four parameters are registered with the descriptions
 		//     "Type of marker (destination, pvp, custom)", "Name of marker", "Position of marker",

@@ -55,10 +55,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// So `HideMapMarker` is named from the client, and so is the scalar - it is the marker's RADIUS (#464,
 	// 2026-08-25). Two independent namings agree, neither of them a reading of the values:
 	//
-	//   * `DispatchAddWayPoint`'s reader (`FUN_004c9860`) validates field by field and NAMES each field in its own
-	//     error string - `i_cID` (2 words), `i_nPlayfieldID`, `i_cPos` (3 words), **`i_vRadius`** (one word),
-	//     `i_nLabel`, `i_nToolTip` - and that is the waypoint object's own layout: id [4..5], position [6..8],
-	//     scalar [10]. The word after the position is the radius;
+	//   * `DispatchAddWayPoint`'s FIELD LIST, which was already in the repo - docs/re/aoc-client-rpc-methods.json
+	//     carries it with the other 400 s2c dispatch methods (`i_cID, i_nPlayfieldID, i_cPos, i_vRadius, i_nLabel,
+	//     i_nToolTip`). What was missing was the LINK, not the name: its reader (`FUN_004c9860`) shows `i_vRadius`
+	//     is ONE word - the `i_v` prefix reads as a vec3 and the catalog says to check the size - and that is the
+	//     waypoint object's own layout: id [4..5], position [6..8], scalar [10]. The word after the position;
 	//   * the `addmapmarker` console command registers four parameters as "Type of marker (destination, pvp,
 	//     custom)", "Name of marker", "Position of marker", **"Radius of marker"**, and its handler
 	//     (`FUN_00a12680`) calls `FUN_0139f520` - the same function that writes +0x28.
