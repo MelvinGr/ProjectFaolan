@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
@@ -8,6 +9,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Server.ChatServer;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.Server;
 
@@ -116,6 +118,55 @@ namespace Faolan.Mcp.Tools
 						ItemInstanceId = "0x" + a.ItemInstanceId.ToString("X16")
 					})
 				})
+			}, JsonOptions);
+		}
+
+		[McpServerTool(Name = "read_claude_mail"),
+		 Description(
+			 "Read the in-game mail players addressed to \"Claude\" - the Claude mailbox - from faolan.db, newest first, across realms: the sender (with their character id, for a send_mail / whisper reply), realm, body, attached money and item attachments. A mail's arrival is also pushed on the Claude chat channel as a whisper-mode entry, so this is the read-back. Optionally only unread mails, and optionally mark the returned ones read.")]
+		public async Task<string> ReadClaudeMail([Description("Only mails not yet marked read (default true)")] bool unreadOnly = true,
+			[Description("Mark the returned mails as read (default false)")] bool markRead = false, [Description("Max results (default 25)")] int limit = 25)
+		{
+			var rows = await _db.Query(ctx => ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item)
+				.Where(m => m.RecipientName == ClaudeChannel.SenderName && (!unreadOnly || !m.IsRead)).Take(1000).ToListAsync());
+
+			// Newest first by send time, like the in-game inbox (the wire id is random, not an ordering proxy - #368).
+			var mails = rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).Take(Math.Max(1, limit)).ToList();
+			var result = new List<object>(mails.Count);
+			foreach (var m in mails)
+			{
+				var sender = string.IsNullOrEmpty(m.SenderName)
+					? null
+					: await _db.GetCharacterByName(m.SenderName, m.RealmId);
+				result.Add(new
+				{
+					MailId = "0x" + m.MailId.ToString("X16"),
+					From = string.IsNullOrEmpty(m.SenderName)
+						? "(system)"
+						: m.SenderName,
+					SenderCharacterId = sender?.Id,
+					m.RealmId,
+					m.IsRead,
+					SentUnix = m.Timestamp1,
+					MoneyTin = m.Money,
+					Body = m.BodyXml,
+					Attachments = m.Attachments.Select(a => new
+					{
+						a.Template,
+						ItemName = a.Item?.Name,
+						a.Quantity
+					})
+				});
+				if (markRead && !m.IsRead)
+					await _db.SetMailRead(m.MailId, true);
+			}
+
+			return JsonSerializer.Serialize(new
+			{
+				Mailbox = ClaudeChannel.SenderName,
+				Unread = rows.Count(m => !m.IsRead),
+				mails.Count,
+				Mails = result
 			}, JsonOptions);
 		}
 

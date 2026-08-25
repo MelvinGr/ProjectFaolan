@@ -190,8 +190,12 @@ namespace Faolan
 					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
+					// The Claude mailbox (#281) is handed over only while the MCP bridge reads the channel log it posts to;
+					// without a reader a mail to "Claude" is refused like any unknown recipient.
 					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm!.Id}"), configuration, dataRepository, hostRealm!,
-						agentServerDispatcher, gameServerDispatcher, provider.GetRequiredService<ICsPlayerAgentDispatcher>());
+						agentServerDispatcher, gameServerDispatcher, provider.GetRequiredService<ICsPlayerAgentDispatcher>(), runMcp
+							? provider.GetRequiredService<ClaudeChannel>()
+							: null);
 				});
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
