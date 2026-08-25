@@ -147,13 +147,23 @@ namespace Faolan.Importer.Cli
 			{
 				var match = true;
 				for (var j = 0; j < pattern.Length && match; j++)
-					match = haystack[i + j] == pattern[j];
+					match = Fold(haystack[i + j]) == Fold(pattern[j]);
 
 				if (match)
 					return i;
 			}
 
 			return -1;
+		}
+
+		// ⚠️ The match is CASE-INSENSITIVE, and it has to be. The blocked list `.githooks/personal-names.py`
+		// enforces is kept lower-case - it is a substring rule over source text, where casing is arbitrary -
+		// while the wire carries the name capitalised, as the player typed it. A case-sensitive scan therefore
+		// answers CLEAN against the very list the commit hook blocks on, which is the most misleading possible
+		// answer; the archive holds 102 of them.
+		private static byte Fold(byte b)
+		{
+			return b >= (byte)'A' && b <= (byte)'Z' ? (byte)(b + 32) : b;
 		}
 
 		private static string Printable(byte[] bytes)
@@ -178,7 +188,7 @@ namespace Faolan.Importer.Cli
 			{
 				var match = true;
 				for (var j = 0; j < pattern.Length && match; j++)
-					match = haystack[i + j] == pattern[j];
+					match = Fold(haystack[i + j]) == Fold(pattern[j]);
 
 				if (!match)
 					continue;
