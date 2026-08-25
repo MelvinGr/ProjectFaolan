@@ -39,7 +39,7 @@ namespace Faolan.Core.Crypt
 		// Bump this if AcgHashTests.MintedTokens_NeverCollideWithAHarvestedOne ever fails: it re-rolls every
 		// minted token. A collision is not a correctness bug (the client resolves nothing through the token) but
 		// two templates sharing an identity is a property retail maintains, so we maintain it too.
-		private const uint Salt = 0x5F31A7C3;
+		private const uint Salt = 0x14D6F0A9;
 
 		// The token to put on the wire for a template: the HARVESTED one when a capture ever showed this template
 		// entering an inventory, otherwise a minted one.

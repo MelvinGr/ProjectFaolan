@@ -323,6 +323,16 @@ counts a subset - ~a third of deaths - and does NOT clamp at its stated cap of 5
 why the two are not interchangeable: the client builds a global tweak accessor for `DailyPvPKillsCap` inside its
 PvP-XP economy initializers and builds none for `DailyPvEKillsCap`. ⛔ Not a second CONSUMER - nothing reads that
 global but its ctor and its atexit) ·
+**Module `quest-reward-items`** (#893, off #464): item identities + TEA keys from the QUEST REWARD lists inside
+every captured `Quest_c` journal record - a FOURTH key source beside the inventory snapshot, `DispatchAddItem`
+and the `itemref://` chat links. ⭐ Its breadth is of a different kind again: every other source reads an item the
+character HELD or browsed, while a reward list describes what a quest WILL pay, so it reaches items nobody in the
+corpus ever received. 7,347 elements over 101 templates, **67 of them new**, and all 67 then decrypt through
+`rdb-items` into full rows (67 names, 24 descriptions, 67 categories, 55 values, 67 qualities, 158 stat
+modifiers). ⚠️ It reads them through the CODEC (`QuestcRecord.Obj1..Obj4` -> `QuestRewardItem`), because
+`ItemHashHarvester` scans for the shapes an INVENTORY entry takes and does not see these - which is why `items`
+harvests the same packet and misses them.
+
 `snapshot-eligibility` (#389: which quests can ride the LOGIN SNAPSHOT, and which arm stops the rest. A held quest
 that fails `SnapshotTails.IsSnapshotEligible` is simply ABSENT from the journal - there is no live restore path any
 more - so this is a gameplay bound. ⭐ It exists because the ticket's long-standing blame on the `@609` objective
