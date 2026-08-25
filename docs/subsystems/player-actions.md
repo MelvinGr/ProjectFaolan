@@ -23,11 +23,27 @@ protobuf: f1 = behaviourId, [f2], f3 = phase, [f4], f5, f6
 `f3` is a per-session monotonic phase counter, so it differs on every send and is never part of a selector's
 identity. `form`, `slot` and `f1` are.
 
-## The selector IS the ability's grant slot
+## The selector IS the ability's own ID
 
 A selector names itself. `Ability.Slot` — the leading `u32` of that ability's `0x2052` `AddSpecialAbility`
 grant — **is** the word the client sends back in `PerformSpecialAction`. Every selector in the catalog below
 resolves against the `Abilities` table by that column, with no exception and no near-miss:
+
+⚠️ **"Slot" is our name for it and it is a mild misnomer.** The client calls that leading word
+**`i_nAbilityID`** ([`../re/aoc-client-rpc-methods.json`](../re/aoc-client-rpc-methods.md):
+`DispatchAddSpecialAbility(i_nAbilityID, i_cItem, i_nType, i_nResourceID, i_bDoFeedback)`), so it is retail's
+own compact id per ability RECORD rather than a position. That is why the two `Spellweaving` abilities carry
+different ones — necromancer 252 (`0xFC`, record 3663271), demonologist 268 (`0x10C`, record 3364576): they are
+two different records, not one ability with a per-class slot.
+
+⚠️ And the c2s parameter is named **`i_nActionPos`**, which on its name alone would read as a position on the
+action bar — per-session and unpredictable. The corpus says otherwise: `0xFC` and `0x10C` are stable across
+every capture of their class and equal the `i_nAbilityID` those characters were granted. So the equality of the
+two number spaces is an OBSERVATION, not something either name promises.
+
+⛔ The number is assigned by retail's server and the client only ever learns it from the grant — there is no
+static table to dump and nothing derives it from the ability record id. That is what keeps an unwitnessed
+class's selector out of reach (Gitea #895).
 
 ```
 0x064 = 100  Search           0x103 = 259  Switch Weapons     0x4E1 = 1249  Path of Asura
