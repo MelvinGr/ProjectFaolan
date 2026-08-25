@@ -344,6 +344,37 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"{key} REMOVED ({dropped.Length} bytes); archive now {named.Count} named fixtures, {corpus.Count} corpus entries");
 		}
 
+		// Re-KEYS one named fixture, byte-for-byte. The bytes are the evidence and never change; only the name they
+		// are filed under does - which is the whole operation #465 needs, because a fixture KEY is as much a place a
+		// character name rides along as a doc or a comment is (`golden/SpawnHoxxlingBuffed.bin`).
+		//
+		// It exists because that rename had to be done by hand the first time: extract, SetNamed, RemoveNamed, and
+		// hope nothing was dropped in between. Doing it in one operation means the archive is never in a state where
+		// the fixture is under both keys or neither.
+		public static void RenameNamed(string archivePath, string fromKey, string toKey)
+		{
+			ArgumentNullException.ThrowIfNull(fromKey);
+			ArgumentNullException.ThrowIfNull(toKey);
+
+			var (counts, corpus, named) = Read(archivePath);
+			if (!named.TryGetValue(fromKey, out var bytes))
+			{
+				Console.WriteLine($"{fromKey}: not in the archive; nothing renamed ({named.Count} named fixtures)");
+				return;
+			}
+
+			if (named.ContainsKey(toKey))
+			{
+				Console.Error.WriteLine($"{toKey} already exists; refusing to overwrite it. Remove it first if that is really the intent.");
+				return;
+			}
+
+			named.Remove(fromKey);
+			named[toKey] = bytes;
+			WriteArchive(archivePath, corpus, counts, named);
+			Console.WriteLine($"{fromKey} -> {toKey} ({bytes.Length} bytes, unchanged); archive now {named.Count} named fixtures, {corpus.Count} corpus entries");
+		}
+
 		private static void WriteArchive(string outputPath, List<CorpusEntry> corpus, Dictionary<string, int> counts, SortedDictionary<string, byte[]> named)
 		{
 			// Lay the corpus out by (IIR, length) so same-shaped bodies compress against each other. The reader sorts
@@ -474,6 +505,23 @@ namespace Faolan.Importer.Captures
 		///     hands the gates - because the framing head carries a length and a CRC that differ on every packet and
 		///     would make every body look distinct.
 		/// </remarks>
+		/// <summary>
+		///     Both halves of the archive as raw PACKET bytes, for <c>--report fixture-names</c> (Gitea #465).
+		/// </summary>
+		/// <remarks>
+		///     Unlike <see cref="ReadCorpusForStats" /> this keeps the FULL packet, framing head included: a name
+		///     scan is looking for bytes anywhere in what is committed, and excluding the head would hide a hit that
+		///     is really there.
+		/// </remarks>
+		public static (IReadOnlyList<ScannedPacket> Corpus, IReadOnlyDictionary<string, byte[]> Named) ReadBodiesForNameScan(string archivePath)
+		{
+			var (_, corpus, named) = Read(archivePath);
+			return (corpus.Select(e => new ScannedPacket(e.Iir, e.Full)).ToList(), named);
+		}
+
+		/// <summary>One archive packet reduced to what a name scan needs: its IIR and its whole bytes.</summary>
+		public readonly record struct ScannedPacket(uint Iir, byte[] Full);
+
 		public static IReadOnlyList<CorpusBody> ReadCorpusForStats(string archivePath)
 		{
 			return Read(archivePath).Corpus.Select(e =>

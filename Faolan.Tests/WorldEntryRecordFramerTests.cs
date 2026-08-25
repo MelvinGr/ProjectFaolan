@@ -19,7 +19,7 @@ namespace Faolan.Tests
 	public class WorldEntryRecordFramerTests
 	{
 		private const uint StriePlayerInstance = 0x02165EFF;
-		private static readonly string PlayerSpawnCap = TestPaths.Asset("strie-login-playerspawn.bin");
+		private static readonly string PlayerSpawnCap = TestPaths.Asset("assassin-login-playerspawn.bin");
 		private static readonly string SnapshotCap = TestPaths.Asset("strie-login-inventory.bin");
 		private static readonly string WorldObjectCap = TestPaths.Asset("strie-login-worldobject.bin");
 

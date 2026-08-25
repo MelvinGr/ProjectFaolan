@@ -16,7 +16,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TemplateCharacterMessage_ReEncodesByteIdentical()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnAssassinTemplate");
 			Assert.True(SpawnBodyReader.TryReadCharacterMessage(template, out var read));
 
 			// Re-encoding the typed ProtoCoreCharacterIIR (which contains CharacterStats) reproduces the captured
@@ -41,7 +41,7 @@ namespace Faolan.Tests
 		// typed CharacterStats sub-message.
 		private static ProtoCoreCharacterIIR.CharacterStats TemplateCharacterStats()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnAssassinTemplate");
 			Assert.True(SpawnBodyReader.TryReadCharacterMessage(template, out var read));
 			Assert.NotNull(read.Message.Stats);
 			return read.Message.Stats;

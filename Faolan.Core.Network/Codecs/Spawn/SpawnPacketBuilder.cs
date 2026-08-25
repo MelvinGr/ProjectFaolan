@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	public static class SpawnPacketBuilder
 	{
 		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and
-		// the SpawnStrieTemplate test golden; other characters' spawns shift with name/equipment length - use
+		// the SpawnAssassinTemplate test golden; other characters' spawns shift with name/equipment length - use
 		// SpawnBodyReader / PlayerSpawnScaffoldCodec for those).
 		public const int HandleOffset = 12; // uint32 big-endian
 		public const int NameInnerLengthOffset = 304; // 4-byte BE length prefix of the ProtoCoreCharacterIIR (@304 = 469)
@@ -56,7 +56,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// by SetCharacterMessage / the rows-generated frame). The header's subop/ack/fieldA and the body length
 		// are carried over from the base; only the handle and the transform are parameterized. Byte-identical to
 		// the captured body when fed the captured handle/position/rotation (SpawnPacketBuilderTests, against the
-		// SpawnStrieTemplate golden).
+		// SpawnAssassinTemplate golden).
 		public static byte[] BuildSpawnBody(byte[] template, uint handle, ProtoVec3 position, ProtoQuat rotation)
 		{
 			var bodyLength = template.ReadU32Be(0);

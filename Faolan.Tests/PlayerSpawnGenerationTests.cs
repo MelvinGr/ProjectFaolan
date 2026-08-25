@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	// generic_stats / inventory) that decodes and RE-ENCODES byte-identically through the client schema, so the
 	// spawn's identity/stats/equipment is built from a typed object populated from the character. The scaffold
 	// frame around it is covered by PlayerSpawnScaffoldCodecTests/RowsTests. The Strie bytes used here are a
-	// golden test oracle only (SpawnStrieTemplate.bin) - the server embeds no captured spawn. See
+	// golden test oracle only (SpawnAssassinTemplate.bin) - the server embeds no captured spawn. See
 	// docs/re/player-spawn-generation.md.
 	public class PlayerSpawnGenerationTests
 	{
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_DecodesExpectedIdentity()
 		{
-			var decoded = CharacterMessage(Golden.Bytes("SpawnStrieTemplate")).FromProtobuf<ProtoCoreCharacterIIR>();
+			var decoded = CharacterMessage(Golden.Bytes("SpawnAssassinTemplate")).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			Assert.Equal("Strie", decoded.Name);
 			Assert.NotNull(decoded.Stats);
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_RoundTripsByteIdentically()
 		{
-			var message = CharacterMessage(Golden.Bytes("SpawnStrieTemplate"));
+			var message = CharacterMessage(Golden.Bytes("SpawnAssassinTemplate"));
 
 			var decoded = message.FromProtobuf<ProtoCoreCharacterIIR>();
 			var reencoded = decoded.ToProtobuf();
@@ -241,7 +241,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnReader_LocatesCharacterMessage_OnTemplate()
 		{
-			var body = Golden.Bytes("SpawnStrieTemplate");
+			var body = Golden.Bytes("SpawnAssassinTemplate");
 			var innerLen = (int)body.ReadU32Be(SpawnPacketBuilder.NameInnerLengthOffset);
 
 			Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var result));
@@ -255,7 +255,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetCharacterMessage_ChangingName_ResizesAndStaysConsistent()
 		{
-			var body = Golden.Bytes("SpawnStrieTemplate");
+			var body = Golden.Bytes("SpawnAssassinTemplate");
 			var message = CharacterMessage(body).FromProtobuf<ProtoCoreCharacterIIR>();
 			message.Name = "Tester"; // 6 chars vs "Strie" (5)
 
@@ -272,7 +272,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
 		{
-			var body = Golden.Bytes("SpawnStrieTemplate");
+			var body = Golden.Bytes("SpawnAssassinTemplate");
 			var message = CharacterMessage(body).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);

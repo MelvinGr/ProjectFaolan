@@ -11,7 +11,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 > **STATUS: COMPLETE.** The spawn's `ProtoCoreCharacterIIR` (identity/stats/equipment) AND its scaffold frame
 > are generated from the character's DB rows. `spawn-player-template.bin` and its successor, the
 > `PlayerSpawnTemplate` C# constant, are both gone; Strie's captured bytes survive only as a test oracle
-> (the `golden/SpawnStrieTemplate.bin` entry of `Faolan.Tests/Assets/fixtures.bin`).
+> (the `golden/SpawnAssassinTemplate.bin` entry of `Faolan.Tests/Assets/fixtures.bin`).
 > Verified: the wire grammar parses + regenerates **all captured player-own spawns byte-exact (37/37, incl. captures added after the codec was written)**
 > (`tools/capture/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
 > `SimpleCharFullUpdateCodecTests`/`PlayerSpawnScaffoldRowsTests`; a local smoke-test script, 16/16 with the
@@ -59,7 +59,7 @@ re-barbered character carries gaps and appends its re-chosen resources after its
 2..15, `DemoL80` runs 4..13 then 24,23). Nothing derives them and nothing needs to: every character we build
 spawns with `1..n` and renders. So those two captures round-trip to the same `(tag, value)` multiset with a
 canonical index run rather than byte-identically — pinned by
-`EditedAppearance_RoundTripsExceptItsRetailSlots`, while `SpawnStrieTemplate` / `SpawnDikketestLogin` /
+`EditedAppearance_RoundTripsExceptItsRetailSlots`, while `SpawnAssassinTemplate` / `SpawnDikketestLogin` /
 `SpawnHeraldBuffed` stay byte-exact through the derivation.
 
 Buff/timer records (see grammar) are transient session state and are deliberately NOT stored: a buffed

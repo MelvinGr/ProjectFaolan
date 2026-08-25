@@ -12,7 +12,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildSpawnBody_WithNewValues_OnlyChangesMappedFields()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnAssassinTemplate");
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, 0x02000001u, new Vector3(100f, 50f, 200f), Quaternion.Identity);
 
 			Assert.Equal(template.Length, built.Length);
@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildSpawnBody_WithTemplateValues_IsByteIdentical()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnAssassinTemplate");
 
 			var handle = template.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 			var position = new Vector3(template.ReadF32Le(SpawnPacketBuilder.PosXOffset), template.ReadF32Le(SpawnPacketBuilder.PosYOffset), template.ReadF32Le(SpawnPacketBuilder.PosZOffset));

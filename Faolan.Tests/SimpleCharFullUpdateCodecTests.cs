@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		public void Build_AfterCharacterIirSwap_StaysParseable()
 		{
 			var s = SimpleCharFullUpdateCodec.Parse(Record("SpawnDikketestLogin"));
-			var donor = Golden.Bytes("SpawnStrieTemplate");
+			var donor = Golden.Bytes("SpawnAssassinTemplate");
 			Assert.True(SpawnBodyReader.TryReadCharacterMessage(donor, out var strie));
 
 			s.Character = strie.Message; // a different character, and a different serialised length than Dikketest's
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ParseThenBuild_Template_IsByteIdentical()
 		{
-			var record = Golden.Bytes("SpawnStrieTemplate")[4..];
+			var record = Golden.Bytes("SpawnAssassinTemplate")[4..];
 
 			Assert.Equal(Convert.ToHexString(record), Convert.ToHexString(SimpleCharFullUpdateCodec.Build(SimpleCharFullUpdateCodec.Parse(record))));
 		}
@@ -110,7 +110,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_Template_LiftsTheDocumentedScaffold()
 		{
-			var s = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnStrieTemplate")[4..]);
+			var s = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnAssassinTemplate")[4..]);
 
 			Assert.Equal(0x02165EFFu, s.Handle);
 			Assert.Equal(5235752UL, s.Playfield);

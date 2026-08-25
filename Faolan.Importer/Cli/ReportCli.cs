@@ -197,6 +197,22 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// Re-keys ONE named fixture without touching its bytes (#465). Above the corpus check for the same
+			// reason fixture-set is: it reads no captures.
+			if (report == "fixture-rename")
+			{
+				var split = (arg ?? "").IndexOf('=');
+				if (split <= 0)
+				{
+					await Console.Error.WriteLineAsync("usage: --report fixture-rename --report-arg <oldKey>=<newKey>");
+					await Console.Error.WriteLineAsync("       e.g. golden/SpawnAssassinTemplate.bin=golden/SpawnAssassinTemplate.bin");
+					return 1;
+				}
+
+				FixtureArchiveWriter.RenameNamed(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), arg![..split], arg[(split + 1)..]);
+				return 0;
+			}
+
 			// Adds or replaces ONE named fixture in the archive. Reads no captures, so it sits above the corpus check:
 			// the hand-carved fixtures cannot be re-derived from the corpus, which is exactly why this exists.
 			if (report == "fixture-set")
@@ -560,6 +576,11 @@ namespace Faolan.Importer.Cli
 				case "fixture-stats":
 				{
 					return FixtureStats(arg ?? System.IO.Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"));
+				}
+
+				case "fixture-names":
+				{
+					return FixtureNames(System.IO.Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), arg);
 				}
 
 				case "rank-tables":

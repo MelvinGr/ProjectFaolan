@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		// The character-carried content (appearance / feat id-list / pair lists) + IIR still regenerate byte-exact; only
 		// the pre-IIR frame is the constructed canonical form (FreshPreFrame(class)). Dikketest's captured frame already
 		// equals FreshPreFrame(Barbarian), so his case is still byte-identical to the raw capture.
-		[Theory, InlineData("SpawnDikketestLogin", ConanClass.Barbarian), InlineData("SpawnStrieTemplate", ConanClass.Assassin)]
+		[Theory, InlineData("SpawnDikketestLogin", ConanClass.Barbarian), InlineData("SpawnAssassinTemplate", ConanClass.Assassin)]
 		public void ExtractThenApply_RegeneratesTheConstructedForm(string name, ConanClass @class)
 		{
 			var body = Golden(name);
@@ -85,7 +85,7 @@ namespace Faolan.Tests
 		// grant handed every dinged character the captured L80's entry, and a level-2 Necromancer holding 85279 came
 		// back from its first relog rendering a level-80 one - Str 71 / Int 231 / Con 61, health max 984. It is
 		// derived per character now (ClassProgressionIdFor), and this pins the read side that proves the derivation.
-		[Theory, InlineData("SpawnDikketestLogin", 1, 124400u), InlineData("SpawnStrieTemplate", 1, 160000u), InlineData("SpawnHeraldBuffed", 5, 114804u),
+		[Theory, InlineData("SpawnDikketestLogin", 1, 124400u), InlineData("SpawnAssassinTemplate", 1, 160000u), InlineData("SpawnHeraldBuffed", 5, 114804u),
 		 InlineData("SpawnNecroKingsCastle", 80, 85279u), InlineData("SpawnDemoRandomActions", 80, 104579u)]
 		public void ClassProgressionEntry_IsTheCharactersLevel(string name, int level, uint expectedId)
 		{

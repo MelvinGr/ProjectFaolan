@@ -10,7 +10,7 @@ namespace Faolan.Tests
 {
 	// Locks the from-scratch player-spawn BODY builder (#210, the player analog of #185): assembled entirely from a
 	// typed SimpleCharFullUpdateIIR (session/transform fields + the DB scaffold rows + the CharacterIIR), with NO captured
-	// template. Proven by decomposing SpawnStrieTemplate.bin into its parts (transform, CharacterIIR, scaffold rows)
+	// template. Proven by decomposing SpawnAssassinTemplate.bin into its parts (transform, CharacterIIR, scaffold rows)
 	// and rebuilding it byte-for-byte - so the fresh-char constants (FieldA=0, no Scale, the transform encoding) and
 	// the rows->wire assembly reproduce the capture.
 	public class PlayerSpawnBuilderTests
@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromScratch_NoScaffoldRows_Throws()
 		{
-			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnStrieTemplate").AsSpan(4));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnAssassinTemplate").AsSpan(4));
 
 			// A character with no scaffold rows cannot be described, and there is no longer a captured-splice path to
 			// fall back to: the rows are seeded at character creation, so their absence is corruption and it throws.
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromScratch_ReproducesStrieTemplate()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate").AsSpan(4).ToArray();
+			var template = Golden.Bytes("SpawnAssassinTemplate").AsSpan(4).ToArray();
 			var scaffold = SimpleCharFullUpdateCodec.Parse(template);
 
 			// Decompose the captured scaffold into the from-scratch builder's inputs.
@@ -71,7 +71,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromScratch_WithOverriddenIdentity_ParsesBackWithNewName()
 		{
-			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnStrieTemplate").AsSpan(4));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnAssassinTemplate").AsSpan(4));
 
 			var character = new Character
 			{

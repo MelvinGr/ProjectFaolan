@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//     ProtoCoreCharacterIIR path - the same boundary the live splice path has).
 	// The fresh-character constants below were confirmed by a sweep of every committed player-spawn golden (Strie,
 	// Dikketest, Hoxxling all carry FieldA=0, no Scale, the face-paint element first (0xB7), empty pair lists; pair lists + buffs are
-	// runtime/level state, 0 on a fresh spawn). Byte-identical to SpawnStrieTemplate.bin when fed Strie's decomposed
+	// runtime/level state, 0 on a fresh spawn). Byte-identical to SpawnAssassinTemplate.bin when fed Strie's decomposed
 	// parts (PlayerSpawnBuilderTests). Wrap the result with GameServerListener.BuildWorldEntrySpawn for the wire packet.
 	public static class PlayerSpawnBuilder
 	{

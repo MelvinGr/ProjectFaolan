@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	//
 	// Both messages already had a round-trip test, and both were pinned on LEVEL-1 STRIE fixtures:
 	// FullCharIirRoundTripTests skips *.tshark.json outright, and PlayerCharacterMessage_RoundTripsByteIdentically
-	// asserts on the single SpawnStrieTemplate golden. A level-1 beach character carries no character_tag and no
+	// asserts on the single SpawnAssassinTemplate golden. A level-1 beach character carries no character_tag and no
 	// generic_stats, so the one field whose PACKING we had wrong was absent from every fixture either test could
 	// see, and "round-trips byte-identically" held while the live wire form did not.
 	//

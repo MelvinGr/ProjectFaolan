@@ -39,22 +39,26 @@
 # is added - SqlSeedWriter walks the model for it.
 set -e
 
-# The PERSONAL-NAME guard, chained in from a local script (#692).
+# The PERSONAL-NAME guard (#692), now a TRACKED script with an untracked identity list (#465).
 #
-# ⚠️ It is not committed and cannot be: a check that blocks a set of strings has to spell those strings out, and
-# spelling them out in a public repo is the thing it exists to prevent. So it lives in `.git/hooks/` per clone.
+# ⚠️ The whole implementation used to live in `.git/hooks/personal-names.py`, on the argument that a check
+# which blocks a set of strings has to spell those strings out. Only the STRINGS have to: 157 lines of
+# matching rules, exemptions and guidance were untracked with them, unreviewed and one re-clone from gone.
+# `.githooks/personal-names.py` is that logic, committed; the identities live in an untracked JSON config it
+# reads (`.git/hooks/personal-names.json`, or $FAOLAN_PERSONAL_NAMES).
 #
-# ⛔ And that made it INERT. Git reads exactly ONE hook directory, this repo sets `core.hooksPath=.githooks`
-# (CLAUDE.md requires it, or faolan.sql silently goes stale), and a `.git/hooks/pre-commit` is therefore never
-# run. Both hooks wanted to be "the" pre-commit and the seed one won, so the name guard has been installed and
-# not executing. Chaining is what lets both exist under one hooks path.
+# ⛔ Git reads exactly ONE hook directory, this repo sets `core.hooksPath=.githooks` (CLAUDE.md requires it, or
+# faolan.sql silently goes stale), and a `.git/hooks/pre-commit` is therefore never run. Chaining is what lets
+# the seed hook and the name guard both exist under one hooks path.
 #
-# A clone without the script simply skips it - stated, not silent, because "no output" is exactly how the
-# previous arrangement looked while doing nothing.
-if [ -f .git/hooks/personal-names.py ]; then
+# A clone with no identity config skips the guard - stated by the script, not silent, because "no output" is
+# exactly how an inert guard looks. The legacy per-clone script is still honoured if it is the only one there.
+if [ -f .githooks/personal-names.py ]; then
+	python3 .githooks/personal-names.py || exit 1
+elif [ -f .git/hooks/personal-names.py ]; then
 	python3 .git/hooks/personal-names.py || exit 1
 else
-	echo "pre-commit: no .git/hooks/personal-names.py - the personal-name guard is NOT running in this clone." >&2
+	echo "pre-commit: no personal-names.py anywhere - the personal-name guard is NOT running in this clone." >&2
 fi
 
 git diff --cached --name-only | grep -qx 'faolan.db' || exit 0
