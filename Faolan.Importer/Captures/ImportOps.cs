@@ -944,7 +944,7 @@ namespace Faolan.Importer.Captures
 						? null
 						: g.MarkerY;
 					row.RequiredCount = g.RequiredCount;
-					row.Unknown1 = g.Unknown1;
+					row.MarkerRadius = g.MarkerRadius;
 					row.HideMapMarker = g.HideMapMarker;
 					row.GoalIdEcho = g.GoalIdEcho;
 					// reserved[0] is NOT harvested: it is the captured character's SolvedTimes, not quest data (#550).
@@ -992,7 +992,7 @@ namespace Faolan.Importer.Captures
 					MarkerY = mapId == null
 						? null
 						: g.MarkerY,
-					Unknown1 = g.Unknown1,
+					MarkerRadius = g.MarkerRadius,
 					HideMapMarker = g.HideMapMarker,
 					GoalIdEcho = g.GoalIdEcho,
 					// reserved[0] is NOT harvested - see the refresh path above (#550).
@@ -1374,8 +1374,8 @@ namespace Faolan.Importer.Captures
 						g.GoalIdEcho = hg.GoalIdEcho;
 					if (hg.SubId != 0)
 						g.SubId = hg.SubId;
-					if (hg.Unknown1 != 0)
-						g.Unknown1 = hg.Unknown1;
+					if (hg.MarkerRadius != 0)
+						g.MarkerRadius = hg.MarkerRadius;
 					if (hg.HideMapMarker)
 						g.HideMapMarker = true;
 

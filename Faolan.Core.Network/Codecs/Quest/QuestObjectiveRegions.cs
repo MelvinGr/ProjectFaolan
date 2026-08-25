@@ -71,7 +71,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MapId = g.MapId ?? 0,
 				MarkerX = g.MarkerX ?? 0,
 				MarkerY = g.MarkerY ?? 0,
-				Unknown1 = g.Unknown1,
+				MarkerRadius = g.MarkerRadius,
 				HideMapMarker = g.HideMapMarker,
 				Objective = ObjectiveToken(g),
 				TextRecord = TrailingToken(g)

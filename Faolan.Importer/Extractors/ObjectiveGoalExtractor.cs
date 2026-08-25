@@ -74,7 +74,7 @@ namespace Faolan.Importer.Extractors
 						if (objective == null)
 							continue;
 
-						byGoal[g.GoalId] = new Goal(record.QuestId, g.GoalId, g.N, (uint)gi, g.K, g.SubId, g.MapId, g.MarkerX, g.MarkerY, g.Unknown1, g.HideMapMarker, g.GoalIdRepeat, g.Reserved.Length > 1
+						byGoal[g.GoalId] = new Goal(record.QuestId, g.GoalId, g.N, (uint)gi, g.K, g.SubId, g.MapId, g.MarkerX, g.MarkerY, g.MarkerRadius, g.HideMapMarker, g.GoalIdRepeat, g.Reserved.Length > 1
 							? g.Reserved[1]
 							: 0, g.Reserved.Length > 2
 							? g.Reserved[2]
@@ -104,7 +104,7 @@ namespace Faolan.Importer.Extractors
 			uint MapId,
 			uint MarkerX,
 			uint MarkerY,
-			uint Unknown1,
+			uint MarkerRadius,
 			bool HideMapMarker,
 			uint GoalIdEcho,
 			uint Extra1,

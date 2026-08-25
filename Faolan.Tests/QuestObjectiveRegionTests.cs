@@ -61,8 +61,8 @@ namespace Faolan.Tests
 			var goals = CapturedGoals().ToList();
 			Assert.NotEmpty(goals);
 
-			// Unknown1: the client writes ONE byte, so the word never exceeds 255.
-			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
+			// MarkerRadius: the client writes ONE byte, so the word never exceeds 255 (max 170 shipped).
+			Assert.All(goals, g => Assert.InRange(g.MarkerRadius, 0u, 255u));
 
 			// The tail after it is [u8 hideMapMarker][u8][u32] and the last two are 0 on every captured goal - a body
 			// that fills them is the first the corpus has seen, and worth looking at rather than carrying silently.

@@ -3212,6 +3212,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("MapId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("MarkerRadius")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("MarkerX")
                         .HasColumnType("INTEGER");
 
@@ -3301,9 +3304,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<string>("TrailingToken")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
-
-                    b.Property<uint>("Unknown1")
-                        .HasColumnType("INTEGER");
 
                     b.HasKey("GoalId");
 

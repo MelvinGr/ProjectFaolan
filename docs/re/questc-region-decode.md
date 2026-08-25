@@ -370,16 +370,49 @@ register was hunting, already listed above as "`+0x5c` playfield, `+0x60/+0x64/+
 * if that is the current playfield **and the byte at `+0x6c` is 0**, it places the marker at the vector
   `((float)+0x60, 0, (float)+0x64)` — markerX/markerY on the ground plane — and hands `(float)+0x68` to the
   waypoint object as a **separate scalar** (`CustomWP_c` slot `[10]`, set in `FUN_0139f520` beside the position
-  at `[6..8]`), so `unknown1` is marker GEOMETRY, not a coordinate;
+  at `[6..8]`) — the marker's **radius**, see below;
 * if the byte at `+0x6c` is **set**, it places nothing for a same-playfield goal — the **"no map marker"** flag,
   which is what its 17 carriers (dungeon objectives with degenerate `(1,1)` markers) always looked like;
 * if the goal is on ANOTHER playfield it asks `FUN_0146a9f0(currentPlayfield, goalPlayfield)` where that
   playfield is reachable from here and marks that, whatever the flag says.
 
-What is still open on this record: what the waypoint does with slot `[10]` — its reader was not found in the
-`0139e000..013ab000` waypoint module by string, so `Unknown1` keeps its name with "radius" as the reading its
-round 3..170 map-unit values, marker-only presence and Collect/Kill-only kinds support — and the two zero tail
-fields (`+0x6d`, `+0x70`), which have no non-zero sample. Open work tracked in Gitea #464.
+### ⭐ Slot `[10]` is the marker's RADIUS — named by the client, twice (2026-08-25)
+
+The register carried this as `Unknown1` with "radius" as a *reading* of its values. It is the client's own name,
+and it did not need the slot's reader at all — which is why four rounds of offset scans over the waypoint module
+never reached it. **Two independent namings, from opposite directions, and they agree:**
+
+1. **`DispatchAddWayPoint`'s argument list.** Its reader `FUN_004c9860` validates field by field and NAMES each
+   field in its own failure string (`"…stream bad after 'i_vRadius'!"`). Read in order:
+
+   | field | words | note |
+   |---|---:|---|
+   | `i_cID` | 2 | an ID32 (class + id) |
+   | `i_nPlayfieldID` | 1 | |
+   | `i_cPos` | 3 | the position vector |
+   | **`i_vRadius`** | **1** | |
+   | `i_nLabel` | 1 | |
+   | `i_nToolTip` | 1 | |
+
+   then dispatched to vtable slot `+0x1ec` as `(&id, playfieldId, &pos, radius, label, tooltip)`. That is
+   *exactly* the waypoint object's layout — id at `[4..5]`, position at `[6..8]`, the scalar at `[10]` — so the
+   one word after the position is the radius.
+
+2. **The `addmapmarker` console command.** Its handler `FUN_00a12680` calls `FUN_0139f520`, the very function
+   that writes `+0x28`. The command registers four parameters, in order:
+   `"Type of marker (destination, pvp, custom)"`, `"Name of marker"`, `"Position of marker"`,
+   **`"Radius of marker"`**.
+
+So `QuestGoalDefinition.Unknown1` → **`MarkerRadius`** (migration `QuestGoalMarkerRadius`), and the codec field
+with it. Everything the values already looked like fits: it appears only on Collect and Kill goals — the kinds
+whose target ROAMS — as 3, 10, 20, 25, 40, 50, 60, 80, 90, 100, 105, 130, 150, 170 world units, and 0 (a plain
+pin with no extent) everywhere else.
+
+⚠️ The lesson worth keeping: the scans were looking for a *consumer* of the field. The name was in a **sibling
+producer** — a different message that carries the same value into the same object and labels it on the way past.
+
+What is still open on this record: the two zero tail fields (`+0x6d`, `+0x70`), which have no non-zero sample.
+Open work tracked in Gitea #464.
 
 **Exhausted anchors, so don't repeat them** — all four were run against the WRONG struct's offsets per the
 correction above (the vtable, the reader's callers, `[reg + 0xf0]` at 778 functions, `OFFS=24,38 NEAR=12` at

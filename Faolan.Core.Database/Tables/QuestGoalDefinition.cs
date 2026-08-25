@@ -312,18 +312,28 @@ namespace Faolan.Core.Database.Tables
 		// captured goals. Stable per goal across every capture, so it is quest data. (The two comment blocks that used
 		// to sit above this one described the Extra* words; they are now on those properties.)
 		//
-		// ⭐ The CLIENT pins what kind of thing it is (#464): `QuestGoal_c`'s reader lands it at +0x68 and the map
-		// waypoint code (`FUN_013a26c0`) hands `(float)+0x68` to the goal's waypoint as a scalar of its own, beside
-		// the (MarkerX, 0, MarkerY) position - marker GEOMETRY, not a coordinate and not a drop rate. Measured over
-		// the 171 goals that carry a `Separator`, it only ever appears on Collect (14 of 44) and Kill (10 of 30)
-		// goals - the kinds whose target ROAMS, which is what a marker with an extent looks like - with the values
-		// 3, 10, 20, 25, 40, 50 (x11), 60, 80, 90, 100, 105, 130, 150, 170; it does NOT track RequiredCount (count 64
-		// and count 1 both carry 50). A radius is the reading all of that supports; what the waypoint does with the
-		// scalar is not read yet, so the name stays.
-		// [V0: what QuestGoalDefinition.Unknown1 scales on a Collect/Kill goal]
-		public uint Unknown1 { get; set; }
+		// ⭐ The goal's map-marker RADIUS, in world units - NAMED BY THE CLIENT (#464, 2026-08-25). `QuestGoal_c`'s
+		// reader lands it at +0x68 and the map waypoint code (`FUN_013a26c0`) hands `(float)+0x68` to the goal's
+		// waypoint as a scalar of its own, beside the (MarkerX, 0, MarkerY) position. Two independent client-side
+		// namings settle what that scalar is, and they agree:
+		//
+		//   * `DispatchAddWayPoint`'s own ARGUMENT LIST. Its reader (`FUN_004c9860`) validates field by field and
+		//     names each one in its own error string: `i_cID` (2 words), `i_nPlayfieldID`, `i_cPos` (3 words),
+		//     **`i_vRadius`** (ONE word), `i_nLabel`, `i_nToolTip`. That is the same layout the waypoint object
+		//     carries - id at [4..5], position at [6..8], the scalar at [10] - so the word after the position IS
+		//     the radius;
+		//   * the `addmapmarker` CONSOLE COMMAND, whose handler (`FUN_00a12680`) calls the very function that
+		//     writes +0x28 (`FUN_0139f520`). Its four parameters are registered with the descriptions
+		//     "Type of marker (destination, pvp, custom)", "Name of marker", "Position of marker",
+		//     **"Radius of marker"** - in that order.
+		//
+		// Which is exactly what the shipped values already looked like: over the 171 goals that carry a
+		// `Separator` it appears only on Collect (14 of 44) and Kill (10 of 30) goals - the kinds whose target
+		// ROAMS - as 3, 10, 20, 25, 40, 50 (x11), 60, 80, 90, 100, 105, 130, 150, 170, and it does NOT track
+		// RequiredCount (count 64 and count 1 both carry 50). 0 means no extent: a plain pin.
+		public uint MarkerRadius { get; set; }
 
-		// The byte after Unknown1 on the wire (QuestGoal_c +0x6c), named from its consumer: when set, the map
+		// The byte after MarkerRadius on the wire (QuestGoal_c +0x6c), named from its consumer: when set, the map
 		// waypoint code places NO marker for a goal on the current playfield (`FUN_013a26c0`). Its 17 carriers are
 		// the dungeon objectives on quests 15378-17774 (Xibaluku, the Jade Artifact, Kian Lai, Lao-che, Kun Whu,
 		// Po-Sha, Zhu-la, Balbet-Zhun, Blood Ravine, ...), several with degenerate (1,1) markers - exactly the goals

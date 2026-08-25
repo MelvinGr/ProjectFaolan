@@ -52,10 +52,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//     which is what its 17 carriers (dungeon objectives with degenerate (1,1) markers) always looked like;
 	//   * if the goal is on ANOTHER playfield, asks `FUN_0146a9f0` where that playfield is reachable from here and
 	//     marks that instead, whatever the flag says.
-	// So `HideMapMarker` is named from the client; `Unknown1` is pinned as the waypoint's own scalar beside the
-	// position (a radius is the reading its round 3..170 map-unit values and its marker-only presence support, but
-	// the slot's reader is not found yet, so the name stays); +0x6d and +0x70 are stored and 0 on every captured goal.
-	// Open work tracked in Gitea #464.
+	// So `HideMapMarker` is named from the client, and so is the scalar - it is the marker's RADIUS (#464,
+	// 2026-08-25). Two independent namings agree, neither of them a reading of the values:
+	//
+	//   * `DispatchAddWayPoint`'s reader (`FUN_004c9860`) validates field by field and NAMES each field in its own
+	//     error string - `i_cID` (2 words), `i_nPlayfieldID`, `i_cPos` (3 words), **`i_vRadius`** (one word),
+	//     `i_nLabel`, `i_nToolTip` - and that is the waypoint object's own layout: id [4..5], position [6..8],
+	//     scalar [10]. The word after the position is the radius;
+	//   * the `addmapmarker` console command registers four parameters as "Type of marker (destination, pvp,
+	//     custom)", "Name of marker", "Position of marker", **"Radius of marker"**, and its handler
+	//     (`FUN_00a12680`) calls `FUN_0139f520` - the same function that writes +0x28.
+	//
+	// +0x6d and +0x70 are stored and 0 on every captured goal. Open work tracked in Gitea #464.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.
@@ -98,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var mapId = r.ReadU32Be();
 			var markerX = r.ReadU32Be();
 			var markerY = r.ReadU32Be();
-			var unknown1 = r.ReadU32Be();
+			var markerRadius = r.ReadU32Be();
 			var hideMapMarker = r.ReadU8() != 0;
 			var tailFlag = r.ReadU8();
 			var tailWord = r.ReadU32Be();
@@ -127,7 +135,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MapId = mapId,
 				MarkerX = markerX,
 				MarkerY = markerY,
-				Unknown1 = unknown1,
+				MarkerRadius = markerRadius,
 				HideMapMarker = hideMapMarker,
 				TailFlag = tailFlag,
 				TailWord = tailWord,
@@ -153,7 +161,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(v.MapId);
 			s.WriteUInt32(v.MarkerX);
 			s.WriteUInt32(v.MarkerY);
-			s.WriteUInt32(v.Unknown1);
+			s.WriteUInt32(v.MarkerRadius);
 			s.WriteByte(v.HideMapMarker ? (byte)1 : (byte)0);
 			s.WriteByte(v.TailFlag);
 			s.WriteUInt32(v.TailWord);
@@ -184,14 +192,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		public uint RequiredCount { get; init; } // the goal's required amount (kills/collects/etc.); 1/3/4/8/12/64 seen on the wire (decode 2026-06-19, #47)
 
-		// NOT always zero, despite the name it carried until 2026-07-20: nonzero on 24 of the 158 goals in the corpus
-		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
-		// not progress. BYTE-RANGED: max 170 over the whole corpus, only 15 distinct round values.
-		//
-		// The client lands it at QuestGoal_c +0x68 and the waypoint code hands `(float)+0x68` to the map waypoint as
-		// its own scalar, beside the (markerX, 0, markerY) position - so it is marker GEOMETRY, not a coordinate and
-		// not a drop rate. What the waypoint does with the scalar is not read yet, hence the name. See the header.
-		public uint Unknown1 { get; init; }
+		// The goal marker's RADIUS in world units, named by the client (#464) - see the header. Nonzero on 24 of the
+		// 158 goals in the corpus (quest 12411 goal 3555 holds 60), stable per goal across every capture, so it is
+		// quest data to be stored and not progress. BYTE-RANGED: max 170, 15 distinct round values, and 0 - a plain
+		// pin with no extent - on everything else.
+		public uint MarkerRadius { get; init; }
 
 		// The byte at QuestGoal_c +0x6c: set, the waypoint code places no map marker for a goal on the current
 		// playfield (`FUN_013a26c0`) - its 17 captured carriers are dungeon objectives. Used to be read here as the

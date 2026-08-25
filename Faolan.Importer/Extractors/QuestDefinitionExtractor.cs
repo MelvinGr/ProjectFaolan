@@ -338,8 +338,8 @@ namespace Faolan.Importer.Extractors
 				goal.GoalIdEcho = record.GoalIdRepeat;
 			if (record.SubId != 0)
 				goal.SubId = record.SubId;
-			if (record.Unknown1 != 0)
-				goal.Unknown1 = record.Unknown1;
+			if (record.MarkerRadius != 0)
+				goal.MarkerRadius = record.MarkerRadius;
 			if (record.HideMapMarker)
 				goal.HideMapMarker = true;
 
