@@ -392,6 +392,10 @@ suite reads. It has two halves, and the difference decides which one a new gate 
   empty source (`<key>=`) - which is how retail bytes leave the archive once a gate's expectation has become a
   SHA-256 pin (#555; `EditorAvatarSnapshotTests` / `GuildPacketTests` are the pattern). A digest only substitutes
   for a golden the gate never READS: a parse input or a partial-span compare still needs the bytes.
+  **Re-KEY one with `--report fixture-rename --report-arg <oldKey>=<newKey>`** - the bytes are the evidence and
+  never change, only the name they are filed under (a fixture key is as much a place a character name rides along
+  as a comment is, #465). Do it in that one operation, not as set+remove, so the archive is never left holding the
+  fixture under both keys or neither.
 - **The corpus slice** (45k packet bodies), read via `CorpusExtract`. Reserved for gates whose assertion IS
   breadth: the snapshot round-trips (#384/#390/#391), the protobuf re-encode oracle (#385), the world-object
   column lift. These would go vacuous on a fixture, which is exactly why they read the corpus. Rebuild it with
@@ -428,6 +432,11 @@ still carry a failure-provenance `s`, but as an **opaque capture id** — the fi
 dump's file name — never the name (#465: the dumps are named after the characters played, and the manifest carried
 those names ~39,000 times). `--report fixture-source --report-arg <id> --captures <data-repo>/Captures` maps an id
 back to its dump; `FixtureArchiveTests` keeps a re-harvest from putting names back.)
+**`--report fixture-names --report-arg <name>[,<name>]` says what is still in the packet BYTES** - which fixtures,
+which IIRs, and the framing around each hit. ⚠️ Feed it the same list the commit hook blocks on
+(`.git/hooks/personal-names.json`), and note that the residue is protobuf length-delimited fields, not the
+`[u16 len][latin1]` wire strings #465 first assumed - so an equal-length substitution would ripple nowhere.
+Rewriting those retail bytes is an open decision, not a chore.
 
 You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `Content:TerrainDir` key in `faolan.json`; if it is missing the server logs
