@@ -79,7 +79,7 @@ namespace Faolan.Tests
 		}
 
 		// One cooked-mesh actor: [NXS\x01MESH][20 header bytes][u32 nVerts][u32 nTris][verts vec3 f32][tris u8 (nVerts<=256)].
-		private static byte[] Actor(Vector3[] verts, (int, int, int)[] tris)
+		internal static byte[] Actor(Vector3[] verts, (int, int, int)[] tris)
 		{
 			var b = new List<byte>();
 			b.AddRange([0x4E, 0x58, 0x53, 0x01, 0x4D, 0x45, 0x53, 0x48]); // NXS\x01 + MESH

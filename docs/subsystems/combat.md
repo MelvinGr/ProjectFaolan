@@ -2194,3 +2194,57 @@ vertical gates do, and terrain is no longer the thing to look at. That is the in
 
 ⚠️ Not an in-client observation. This measures the grid the gate reads, over real spawn positions; it does not
 watch a mob acquire.
+
+### What the gate does now (#577)
+
+`TerrainService.Trace` answers in the order `NearestPlayerInRange` asks: the **terrain half** first, then the
+**collision half**, each failing OPEN when its asset is missing.
+
+- **Terrain half** — 24 ground samples along the sightline, both ends lifted by `EyeHeight` (1.5 u); a sample
+  occludes when it rises more than `OcclusionMargin` (1.5 u) above the eye-line, i.e. a hump ≥ 3 u above the
+  straight ground line between the two. **An endpoint whose eye is under the heightmap's surface takes the terrain
+  half out of the test**: the grid does not describe a cave, a cellar or a floor beneath a roof the bake kept, and
+  from such a point every sample reads as rock overhead — which occluded at *every* range including point-blank and
+  was the melee-only aggro for the 7 of 122 City of Tortage (4020) spawns that sit 1.5–60 u under their grid. The
+  endpoint is read with the loot drop's neighbourhood sample (`HeightNear`, 2 u), so a creature beside a rock whose
+  nearest cell is the rock's top is not mistaken for a buried one. The collision mesh, which does model the cave
+  wall and the building, still gates such a ray.
+- **Collision half** — three parallel rays, not one: eye to eye, plus one `ShoulderHalfWidth` (0.5 u) to either
+  side in the ground plane, applied to both ends; occluded only when **all three** are. A single ray was defeated
+  by anything narrower than a body — a fifth of 4020's collision actors are posts, barrels and pillars — and a
+  post between a mob and a player is a thing it sees past, not cover. The centre ray decides the common (clear)
+  case at the cost of one cast; the shoulder rays are only cast when it hit something.
+  [V3: TerrainServiceTests.A_Post_Between_Them_Is_Seen_Past] [V3: TerrainServiceTests.A_Wall_Wider_Than_The_Shoulders_Blocks_ByCollision]
+  [V3: TerrainServiceTests.An_Npc_Under_The_Surface_Is_Not_Blocked_By_The_Roof_Over_It]
+
+⭐ **The heightmap half was not mis-sampling.** The "29% at 10 u / 55% at 20 u on a beach" figures on the ticket
+were measured on the pre-#832 per-playfield bake (the phantom canopy above); on the envelope bake
+`--report terrain-los --report-arg 4010:20:profile` dumps every terrain-blocked ray's ground profile, and each one
+is a real 3–4 u dune or rock hump above *both* eye-lines (4010), or a terrace ledge with the target 4–6 u below on
+the next terrace (4020) — geometrically occluded, with the 1.5 u margin already lenient. Two things had inflated
+the column instead: rays whose target sits outside `NpcAggroVerticalRange` (6 u), which the tier-1 vertical gate
+culls *before* line-of-sight is asked — 23 of 74 terrain-blocked rays at 20 u on 4010, 89 of 142 on 4020 — and the
+under-surface spawns. The report now tabulates the vertical gate as its own column so the terrain/collision columns
+only count rays the game would actually LOS-test.
+
+Measured on the same bake, gate before → after (`--report terrain-los`, ground-to-ground rays; "vertical" is the
+tier-1 band, not line-of-sight):
+
+| map | range | clear | terrain | collision | vertical |
+|---|---|---|---|---|---|
+| 4010 (95 spawns) | 10 u | 92.9% → **93.4%** | 0.0% → 0.0% | 3.3% → **2.8%** | 3.8% |
+| 4010 | 15 u | 78.0% → **78.6%** | 1.8% → 1.8% | 5.0% → **4.5%** | 15.1% |
+| 4010 | 20 u | 62.4% → **63.2%** | 6.7% → 6.7% | 6.2% → **5.4%** | 24.7% |
+| 4020 on-datum (77 of 122) | 10 u | 79.7% → **80.0%** | 1.9% → 1.9% | 4.4% → **4.1%** | 14.0% |
+| 4020 on-datum | 15 u | 66.6% → **66.9%** | 5.2% → 5.2% | 5.0% → **4.7%** | 23.2% |
+| 4020 on-datum | 20 u | 55.0% → **55.7%** | 8.6% → 8.6% | 3.6% → **2.9%** | 32.8% |
+| 4020 all spawns | 20 u | 41.5% → **44.3%** | 9.5% → **7.2%** | 2.3% → 1.8% | 46.7% |
+
+Of the rays inside the vertical band, the gate clears 97% at 10 u and 84% at 20 u on 4010. The three-ray test
+removes 13% of the collision blocks at 0.5 u (24% at 1.0 u, measured and not taken — past a half-shoulder the
+outer rays look *around* something wider than the target); the rest is huts and rock faces. The under-surface rule
+shows only in the all-spawns 4020 row (terrain 9.5% → 7.2%): a spawn a few units under the grid whose targets are
+still inside the band. The dominant column on both maps is now the vertical band, and on this report that is mostly
+the sampling — a 20 u circle around a beach spawn reaches sea-stack tops and cliff faces no player can stand on.
+
+⚠️ Still not an in-client observation.

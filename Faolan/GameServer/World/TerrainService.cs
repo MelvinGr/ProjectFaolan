@@ -26,18 +26,26 @@ namespace Faolan.GameServer.World
 	// known ground positions matches the players' Y to <0.5u.
 	public sealed class TerrainService
 	{
-		private const float EyeHeight = 1.5f; // lift both endpoints off the ground so you can see over small bumps
+		public const float EyeHeight = 1.5f; // lift both endpoints off the ground so you can see over small bumps
 
 		// How far around a point GroundHeightNear may look for the surface the entity was standing on. 2 m is the width
 		// of the thing that steals the sample (a rock/wall/trunk footprint is a cell or two) and stays well inside the
 		// distance over which the beach itself moves - the Tortage sand runs ~0.1 m per metre, so a 2 m reach costs at
 		// most ~0.2 m of slope error, against the 50 m it recovers.
 		private const float GroundSampleRadius = 2f;
-		private const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
+		public const float OcclusionMargin = 1.5f; // terrain must exceed the eye-line by this to occlude
 
 		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
 		// the eye-line to actually block (a little slack so a gentle slope or a 1u bump doesn't read as a wall).
-		private const int LineOfSightSamples = 24;
+		public const int LineOfSightSamples = 24;
+
+		// The collision half casts THREE parallel rays - eye to eye, and one a shoulder to either side - and only
+		// calls the sightline occluded when all three are. A single ray is defeated by anything thinner than a body:
+		// on City of Tortage (4020) a fifth of the collision actors are posts, barrels and pillars, and one of those
+		// between an NPC and a player is not cover, it is a thing you see past. Half a unit is a human half-shoulder,
+		// so the two outer rays bracket the silhouette a mob would actually be looking at; a wall, a hut or a rock
+		// face is wider than the 1 u the three rays span and still blocks all of them (#577).
+		public const float ShoulderHalfWidth = 0.5f;
 		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = [];
 
 		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
@@ -89,7 +97,10 @@ namespace Faolan.GameServer.World
 		// (a hill / ridge / the far side of a drop) NOR the collision geometry (a building wall). Both endpoints are
 		// lifted to eye height so you can see over small bumps / low sills. Fails OPEN (returns true) whenever the
 		// relevant asset is unavailable, so aggro still works without the baked terrain - this only ever REMOVES aggros
-		// that the range + tier-1 vertical gate would have wrongly allowed.
+		// that the range + tier-1 vertical gate would have wrongly allowed. Two things it deliberately does NOT block
+		// on (#577): a post/barrel/pillar narrower than a body (the collision half casts three rays, see
+		// HasCollisionLineOfSight) and the roof over an endpoint the heightmap does not describe (a cave or a cellar;
+		// see HasTerrainLineOfSight). `--report terrain-los` measures what it culls over real spawn positions.
 		public bool HasLineOfSight(uint mapId, Vector3 from, Vector3 to)
 		{
 			return Trace(mapId, from, to) == LineOfSightBlocker.None;
@@ -166,20 +177,31 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private bool HasCollisionLineOfSight(uint mapId, Vector3 fromm, Vector3 to)
+		private bool HasCollisionLineOfSight(uint mapId, Vector3 from, Vector3 to)
 		{
 			if (!_collision.TryGetValue(mapId, out var col))
 				return true;
 
-			var eyeFrom = fromm with
-			{
-				Y = fromm.Y + EyeHeight
-			};
+			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z); // (`from with {…}` parses as a query)
 			var eyeTo = to with
 			{
 				Y = to.Y + EyeHeight
 			};
-			return !col.SegmentBlocked(eyeFrom, eyeTo);
+
+			// The centre ray decides the common case at the cost of one cast; the two shoulder rays are only paid
+			// when it hit something, to ask whether that something is wide enough to hide a body.
+			if (!col.SegmentBlocked(eyeFrom, eyeTo))
+				return true;
+
+			var dx = to.X - from.X;
+			var dz = to.Z - from.Z;
+			var horizontal = MathF.Sqrt(dx * dx + dz * dz);
+			if (horizontal < 1e-3f)
+				return false; // straight up/down: there is no "beside", the centre ray is the whole answer
+
+			// Perpendicular to the sightline in the ground plane, applied to BOTH ends so the three rays run parallel.
+			var side = new Vector3(-dz / horizontal, 0, dx / horizontal) * ShoulderHalfWidth;
+			return !col.SegmentBlocked(eyeFrom + side, eyeTo + side) || !col.SegmentBlocked(eyeFrom - side, eyeTo - side);
 		}
 
 		private bool HasTerrainLineOfSight(uint mapId, Vector3 from, Vector3 to)
@@ -189,6 +211,20 @@ namespace Faolan.GameServer.World
 
 			var eyeFrom = from.Y + EyeHeight;
 			var eyeTo = to.Y + EyeHeight;
+
+			// An endpoint whose eye is UNDER the surface is somewhere the heightmap does not describe - a cave, a
+			// cellar, a floor beneath a roof the bake kept - and from there every sample along the ray reads as rock
+			// overhead, so the terrain half occludes at every range including point-blank. That is the melee-only
+			// aggro of #577 for exactly those NPCs (7 of the 122 City of Tortage spawns sit 1.5-60 u under the grid).
+			// The grid has nothing to say about such a ray, so the terrain half stands aside and the collision mesh,
+			// which does model the cave wall and the building, is the gate. Sampled with the same neighbourhood
+			// search the loot drop uses, so a creature standing BESIDE a rock (whose nearest cell is the rock's top)
+			// is still read as on the ground next to it, not as buried.
+			if (hm.HeightNear(from.X, from.Z, from.Y, GroundSampleRadius, EyeHeight) is { } groundFrom && groundFrom > eyeFrom)
+				return true;
+			if (hm.HeightNear(to.X, to.Z, to.Y, GroundSampleRadius, EyeHeight) is { } groundTo && groundTo > eyeTo)
+				return true;
+
 			for (var i = 1; i < LineOfSightSamples; i++)
 			{
 				var t = (float)i / LineOfSightSamples;

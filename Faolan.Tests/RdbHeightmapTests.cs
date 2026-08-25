@@ -181,7 +181,7 @@ namespace Faolan.Tests
 			Assert.False(RdbHeightmap.TryLowerEnvelope([only, Build(8, 8, (_, _) => 1f)], out _));
 		}
 
-		private static byte[] Build(int w, int h, Func<int, int, float> height, uint levels = 1)
+		internal static byte[] Build(int w, int h, Func<int, int, float> height, uint levels = 1)
 		{
 			var bytes = new List<byte>();
 			bytes.AddRange(BitConverter.GetBytes(levels));
