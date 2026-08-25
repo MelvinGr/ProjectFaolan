@@ -104,8 +104,8 @@ namespace Faolan.Tests
 							Bump(fieldDiffs, "RequiredCount");
 						if (c.Unknown1 != b.Unknown1)
 							Bump(fieldDiffs, "Unknown1");
-						if (c.Unknown2 != b.Unknown2)
-							Bump(fieldDiffs, "Zero2");
+						if (c.HideMapMarker != b.HideMapMarker)
+							Bump(fieldDiffs, "HideMapMarker");
 						if (c.Lead != b.Lead)
 							Bump(fieldDiffs, "Lead");
 						if (c.GoalIdRepeat != b.GoalIdRepeat)
@@ -138,8 +138,8 @@ namespace Faolan.Tests
 						o.WriteLine($"    goal{gi} id cap={cg.GoalId} got={bg.GoalId} | n cap={cg.N} got={bg.N} | k cap={cg.K} got={bg.K} | " +
 						            $"sub cap={cg.SubId} got={bg.SubId} | map cap={cg.MapId} got={bg.MapId} | req cap={cg.RequiredCount} got={bg.RequiredCount} | " +
 						            $"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
-						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Unknown2} res=[{string.Join(",", cg.Reserved)}]");
-						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Unknown2} res=[{string.Join(",", bg.Reserved)}]");
+						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} hide={cg.HideMapMarker} res=[{string.Join(",", cg.Reserved)}]");
+						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} hide={bg.HideMapMarker} res=[{string.Join(",", bg.Reserved)}]");
 						if (cg.Objective != bg.Objective)
 							o.WriteLine($"      OBJ cap={cg.Objective}\n      OBJ got={bg.Objective}");
 						if (cg.TextRecord != bg.TextRecord)
@@ -182,7 +182,7 @@ namespace Faolan.Tests
 
 				foreach (var g3 in o3.Goals)
 				{
-					var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{g3.TextRecord}";
+					var sig = $"{g3.Unknown1}|{g3.HideMapMarker}|{string.Join(",", g3.Reserved)}|{g3.TextRecord}";
 					(tagVals.TryGetValue(g3.GoalId, out var set)
 						? set
 						: tagVals[g3.GoalId] = []).Add(sig);
@@ -233,10 +233,10 @@ namespace Faolan.Tests
 					{
 						rptOther++;
 						if (rptSamples.Count < 6)
-							rptSamples.Add($"quest {rec5.QuestId} goal {g5.GoalId}: repeat={g5.GoalIdRepeat} n={g5.N} k={g5.K} req={g5.RequiredCount} z2={g5.Unknown2}");
+							rptSamples.Add($"quest {rec5.QuestId} goal {g5.GoalId}: repeat={g5.GoalIdRepeat} n={g5.N} k={g5.K} req={g5.RequiredCount} hide={g5.HideMapMarker}");
 					}
 
-					if (g5.Unknown2 != 0)
+					if (g5.HideMapMarker)
 						z2NonZero++;
 					(stableRpt.TryGetValue(g5.GoalId, out var st5)
 						? st5
@@ -250,11 +250,10 @@ namespace Faolan.Tests
 			foreach (var x in rptSamples)
 				o.WriteLine($"    {x}");
 
-			// Are Unknown1/Unknown2 really u32s, or a byte pair the client writes separately?
-			uint u1max = 0, u2max = 0;
-			int u1over = 0, u2over = 0, seenG = 0;
+			// Unknown1 is a byte-ranged word; the tail after it is [u8 hideMapMarker][u8][u32] (#464).
+			uint u1max = 0;
+			int u1over = 0, seenG = 0, hidden = 0;
 			var u1vals = new HashSet<uint>();
-			var u2vals = new HashSet<uint>();
 			foreach (var (_, sub6, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			foreach (var rec6 in sub6.Quests.Records)
 			{
@@ -265,18 +264,15 @@ namespace Faolan.Tests
 				{
 					seenG++;
 					u1max = Math.Max(u1max, g6.Unknown1);
-					u2max = Math.Max(u2max, g6.Unknown2);
 					if (g6.Unknown1 > 0xFF)
 						u1over++;
-					if (g6.Unknown2 > 0xFF)
-						u2over++;
+					if (g6.HideMapMarker)
+						hidden++;
 					u1vals.Add(g6.Unknown1);
-					u2vals.Add(g6.Unknown2);
 				}
 			}
 
-			o.WriteLine($"BYTES? goals={seenG} Unknown1 max={u1max} over255={u1over} distinct={u1vals.Count} [{string.Join(",", u1vals.OrderBy(v => v).Take(10))}]");
-			o.WriteLine($"BYTES? Unknown2 max={u2max} over255={u2over} distinct={u2vals.Count} [{string.Join(",", u2vals.OrderBy(v => v).Take(10))}]");
+			o.WriteLine($"BYTES? goals={seenG} Unknown1 max={u1max} over255={u1over} distinct={u1vals.Count} [{string.Join(",", u1vals.OrderBy(v => v).Take(10))}] hideMapMarker={hidden}");
 
 			foreach (var kv in fieldDiffs.OrderByDescending(k => k.Value))
 				o.WriteLine($"    DIFF {kv.Key,-18} {kv.Value}");

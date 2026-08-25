@@ -340,8 +340,8 @@ namespace Faolan.Importer.Extractors
 				goal.SubId = record.SubId;
 			if (record.Unknown1 != 0)
 				goal.Unknown1 = record.Unknown1;
-			if (record.Unknown2 != 0)
-				goal.Unknown2 = record.Unknown2;
+			if (record.HideMapMarker)
+				goal.HideMapMarker = true;
 
 			// ...and its TRAILING text record, without which the goal cannot be rebuilt at all (a row missing it
 			// builds an `id=0 key=!!!!` record). ⚠️ Fill-if-unset, deliberately: a snapshot-harvested row stores the

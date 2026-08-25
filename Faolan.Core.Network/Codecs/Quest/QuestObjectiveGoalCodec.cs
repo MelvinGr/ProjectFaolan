@@ -7,10 +7,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// QuestObjectiveRegionCodec (the snapshot tails) and, one record deep, by QuestFullUpdateCodec: the live
 	// full-update's "stat/objective run" is this exact 21-word record, which it used to hand-roll (#530 wave 5).
 	//
-	// Wire (21 u32 then two text records):
+	// Wire (19 u32, a 6-byte tail, then two u16-framed text records):
 	//   [1 lead][k][instance][questId][goalId][n][goalIdRepeat][requiredCount]
-	//   [reserved ×7][subId][mapId][markerX][markerY][unknown1][unknown2]
-	//   [u32 len][objective <remoteformat 50304>]  [u16 len][text record <remoteformat 51200>/<localized 51000>]
+	//   [reserved ×7][subId][mapId][markerX][markerY][unknown1]
+	//   [u8 hideMapMarker][u8 tailFlag][u32 tailWord]
+	//   [u16 len][objective <remoteformat 50304>]  [u16 len][text record <remoteformat 51200>/<localized 51000>]
+	//
+	// ⭐ The tail is carved the way `QuestGoal_c`'s stream reader (`FUN_00925dd0`) reads it, and it used to be a
+	// SHIFTED carve here: `[u32 unknown2][u32 objectiveLen]`. Those eight bytes are `[u8][u8][u32][u16 len]` - the
+	// reader takes two bools (`FUN_0048f6d0`, into +0x6c/+0x6d), a u32 (+0x70), then the ordinary u16-framed
+	// `ReadString` twice. The old carve round-tripped every captured body only because the u32 is always 0 and no
+	// objective is 64 KiB long; the "flag word 0x01000000" was the first bool. #464's register had predicted exactly
+	// this shape ("two adjacent BYTES with zero padding either side") from the corpus alone.
 	//
 	// ⛔ **CORRECTED (#464).** This block used to say: *"the LIVE reader is pinned - `QuestFullUpdateIIR::ReadSubClass`
 	// (FUN_00917e20) allocates a `Quest_c` and `FUN_0091df50` reads the goal list - per goal the record's last 16 u32
@@ -32,29 +40,26 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// co-occurrence with NEAR) were hunting a consumer for the wrong struct's fields. Do not restart them on those
 	// offsets.
 	//
-	// ⭐ What IS pinned, and is the honest starting point for the next attempt:
-	//   * `Quest_c` holds FOUR POD vectors (+0x100/+0x104/+0x10C/+0x110), one per objlist, and TWO vectors of
-	//     refcounted `QuestGoal_c*` at +0xAC..+0xB0 and +0xBC..+0xC0.
-	//   * The `QuestGoal_c` objects EXIST BEFORE the record is read - `FUN_0091df50` only post-processes them
-	//     (`QuestGoal_c::SetParent` = `FUN_009260c0`, then a `std::sort` with comparator `FUN_0091ce70`) - so they
-	//     come from the client's own quest template, and it is THEY that the sort orders, not anything from this
-	//     region.
-	//   * The waypoint UI reads those objects too, never the wire PODs: `WaypointQuestGoal` (`FUN_013a26c0`,
-	//     `GUI\MapWaypointHandler.cpp`, keyed `m_cWaypoints.find(goalID)`) walks +0xAC..+0xB0 and reads +0x38/+0x3C
-	//     (required vs solved, the pair `CoreQuestHolder::QuestGoalEvent` names), +0x5c playfield, +0x60/+0x64/+0x68
-	//     position, +0x6c flag, +0x20 parent, +0x80 name.
-	//
-	// The DATA leads for this record's two unknowns are unchanged and remain the best handle: `unknown1 > 0` implies
-	// a marker on 24 of 24 shipped goals, with round map-unit values 3..170 on ReachArea/hunt-area goals - a marker
-	// RADIUS shape; `unknown2`'s 17 carriers are all dungeon-objective goals, several with degenerate (1,1) markers -
-	// a marker-display-modifier shape. Open work tracked in Gitea #464.
+	// ⭐ And the tail's CONSUMER is the map waypoint code, which names two of its three fields (#464, 2026-08-25).
+	// `FUN_00925dd0` lands the 21 words on the object from +0x24 upward in wire order (requiredCount +0x38,
+	// solvedTimes +0x3c, ..., subId +0x58, mapId +0x5c, markerX +0x60, markerY +0x64, unknown1 +0x68) and the tail
+	// as +0x6c/+0x6d/+0x70. `WaypointQuestGoal` (`FUN_013a26c0`, `GUI\MapWaypointHandler.cpp`) then, for every goal
+	// whose solved != required, reads +0x5c as the goal's playfield and:
+	//   * if that is the current playfield AND the byte at +0x6c is 0, places the marker at the vector
+	//     `((float)+0x60, 0, (float)+0x64)` - markerX/markerY on the ground plane - and hands `(float)+0x68` to the
+	//     waypoint as a SEPARATE scalar (`CustomWP_c` slot [10], `FUN_0139f520`), not as a coordinate;
+	//   * if the byte at +0x6c is set, places NOTHING for a same-playfield goal - so it is the "no map marker" flag,
+	//     which is what its 17 carriers (dungeon objectives with degenerate (1,1) markers) always looked like;
+	//   * if the goal is on ANOTHER playfield, asks `FUN_0146a9f0` where that playfield is reachable from here and
+	//     marks that instead, whatever the flag says.
+	// So `HideMapMarker` is named from the client; `Unknown1` is pinned as the waypoint's own scalar beside the
+	// position (a radius is the reading its round 3..170 map-unit values and its marker-only presence support, but
+	// the slot's reader is not found yet, so the name stays); +0x6d and +0x70 are stored and 0 on every captured goal.
+	// Open work tracked in Gitea #464.
 	public static class QuestObjectiveGoalCodec
 	{
 		// Every goal record opens with this word - it is what tells a goal from the region that follows the list.
 		public const uint GoalLead = 1;
-
-		// The wire word for the Unknown2 flag: the client writes the byte 0x01 followed by three zero bytes.
-		public const uint FlagSet = 0x01000000;
 
 		private const int ReservedWords = 7;
 
@@ -94,9 +99,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var markerX = r.ReadU32Be();
 			var markerY = r.ReadU32Be();
 			var unknown1 = r.ReadU32Be();
-			var unknown2 = r.ReadU32Be();
+			var hideMapMarker = r.ReadU8() != 0;
+			var tailFlag = r.ReadU8();
+			var tailWord = r.ReadU32Be();
 
-			var objective = r.ReadStringU32Length();
+			var objective = r.ReadStringU16Length();
 
 			// The trailing text record is a u16-length-prefixed string, NOT [0x00][u8 len]. Those are the same bytes
 			// below 256 - the "lead 0x00" is the length's high byte - and the longest captured record is 119 B, so the
@@ -121,7 +128,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				MarkerX = markerX,
 				MarkerY = markerY,
 				Unknown1 = unknown1,
-				Unknown2 = unknown2,
+				HideMapMarker = hideMapMarker,
+				TailFlag = tailFlag,
+				TailWord = tailWord,
 				Objective = objective,
 				TextRecord = text
 			};
@@ -145,8 +154,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(v.MarkerX);
 			s.WriteUInt32(v.MarkerY);
 			s.WriteUInt32(v.Unknown1);
-			s.WriteUInt32(v.Unknown2);
-			s.WriteStringUInt32Length(v.Objective);
+			s.WriteByte(v.HideMapMarker ? (byte)1 : (byte)0);
+			s.WriteByte(v.TailFlag);
+			s.WriteUInt32(v.TailWord);
+			s.WriteString(v.Objective); // u16-framed, like the trailing record - see the header
 			s.WriteString(v.TextRecord); // u16-framed - see Read (#388)
 		}
 	}
@@ -175,17 +186,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 		// NOT always zero, despite the name it carried until 2026-07-20: nonzero on 24 of the 158 goals in the corpus
 		// (quest 12411 goal 3555 holds 60). Stable per goal across every capture, so it is quest data to be stored,
-		// not progress.
+		// not progress. BYTE-RANGED: max 170 over the whole corpus, only 15 distinct round values.
 		//
-		// BYTE-RANGED: max 170 over the whole corpus, never above 255, and only 15 distinct values
-		// (0,3,10,20,25,40,50,60,80,90,...). The round numbers suggest a percentage or threshold; the client writes a
-		// single byte here in QuestGoal_c::WriteToStream. Meaning still unknown - named for its position.
+		// The client lands it at QuestGoal_c +0x68 and the waypoint code hands `(float)+0x68` to the map waypoint as
+		// its own scalar, beside the (markerX, 0, markerY) position - so it is marker GEOMETRY, not a coordinate and
+		// not a drop rate. What the waypoint does with the scalar is not read yet, hence the name. See the header.
 		public uint Unknown1 { get; init; }
 
-		// A BOOLEAN, not a number. It takes exactly two values across all 2850 captured goals: 0 and 0x01000000 -
-		// which is the client's own `local_c[0] = 1` byte-swapped to `0x1000000` in QuestGoal_c::WriteToStream, i.e.
-		// the flag byte lands FIRST and the remaining three are padding. Set on 318 goals. Meaning still unknown.
-		public uint Unknown2 { get; init; }
+		// The byte at QuestGoal_c +0x6c: set, the waypoint code places no map marker for a goal on the current
+		// playfield (`FUN_013a26c0`) - its 17 captured carriers are dungeon objectives. Used to be read here as the
+		// u32 0x01000000 ("Unknown2"), which was this byte followed by TailFlag and half of TailWord.
+		public bool HideMapMarker { get; init; }
+
+		// The byte at +0x6d and the u32 at +0x70 - read by the client, stored, 0 on every captured goal.
+		public byte TailFlag { get; init; }
+		public uint TailWord { get; init; }
 
 		// The 7 "reserved" words are a lead word plus THREE optional (marker, token) SLOTS - [1..2], [3..4], [5..6] -
 		// each a marker word next to a RANDOM 4-character tag (0x36314C56 "61LV", 0x30474454 "0GDT", ...). Measured

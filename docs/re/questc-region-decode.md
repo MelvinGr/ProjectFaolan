@@ -342,24 +342,48 @@ the end of the reader orders the `QuestGoal_c` objects at `+0xAC`/`+0xBC` — no
   position, `+0x6c` flag, `+0x20` parent, `+0x80` name. Its waypoint types come from
   `Gui/Default/Waypoints/PF%u.xml` (`ParseWPType`, `FUN_0139e6f0`).
 
-The DATA leads for `unknown1`/`unknown2` are unchanged and remain the best handle: `unknown1 > 0` implies a marker
-on **24 of 24** shipped goals (base rate 140/7,318), round map-unit values 3..170 on ReachArea and roaming-hunt
-goals — a marker RADIUS shape (NB our ReachArea marker fallback invents 40 u where these goals state a value);
-`unknown2`'s **17** carriers are all dungeon-objective goals (Xibaluku, Abyss of Kun Whu, Kang Pagoda, …), several
-with degenerate `(1,1)` markers — a marker-display modifier shape. Open work tracked in Gitea #464.
+## ⭐ The @609 goal record's reader and its tail's consumer (#464, 2026-08-25)
 
-**Exhausted anchors, so don't repeat them** — ⚠️ and note they were all run against the WRONG struct's offsets
-per the correction above, so their conclusion is "these offsets are not distinctive", not "this field has no
-consumer": the vtable (3 slots, none of them a getter), the reader's callers,
-a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), the
-CO-OCCURRENCE refinement of that scan (`tools/ghidra/DumpCoOffsetReaders.java`, `OFFS=24,38 NEAR=12` — a
-function reading the goal's markerX at `+0x24` AND `unknown1` at `+0x38` within 12 instructions: **3,322 of
-139,441 functions match**, so the pair is no more distinctive than either offset alone — both are generic
-struct/stack displacements), the intersection of the goal-LIST base with the goal offset
-(`OFFS=10c,38` — a consumer must walk one of `Quest_c`'s two goal lists at `+0x10C`/`+0x110` and then read the
-entry's `+0x38`, but `0x10C` is itself generic: **488 of 139,441 functions match**, no narrower than the
-`+0x24`/`+0x38` pair), and the module's strings. What is left is the semantic route: follow a parsed
-record from `FUN_0091f5c0` into the journal UI and find the code that formats these words for display.
+The route the last paragraph pointed at — the semantic one — is the one that paid, and it needed no scan:
+`QuestGoal_c`'s own stream reader **`FUN_00925dd0`** (already named above, but never read for its OFFSETS) lands
+the 21 words on the object **from `+0x24` upward in wire order**: `instance +0x24`, `questId +0x28`,
+`goalId +0x2c`, `n +0x30`, `goalIdRepeat +0x34`, `requiredCount +0x38`, `solvedTimes +0x3c`, the six reserved
+words `+0x40..+0x54`, `subId +0x58`, `mapId +0x5c`, `markerX +0x60`, `markerY +0x64`, `unknown1 +0x68`. Then
+it reads the TAIL — and the tail is not what the codec had:
+
+```
+was:   [u32 unknown2][u32 objectiveLen][objective][u16 len][text]
+is:    [u8 -> +0x6c][u8 -> +0x6d][u32 -> +0x70][u16 len][objective][u16 len][text]
+```
+
+Two bools (`FUN_0048f6d0`), a u32, then the ordinary u16-framed `ReadString` twice. The old carve round-tripped
+every captured body only because the u32 is 0 on all of them and no objective is 64 KiB long; the "flag word
+`0x01000000`" was the first bool — exactly the "two adjacent BYTES with zero padding" the corpus had predicted.
+`QuestObjectiveGoalCodec` now reads `[u8 hideMapMarker][u8 tailFlag][u32 tailWord]` and the objective as a
+u16-framed string; `QuestGoalDefinition.Unknown2` became `HideMapMarker` (migration `QuestGoalHideMapMarker`,
+which squashes the stored words to the bool).
+
+⭐ **And the offsets are exactly what `WaypointQuestGoal` (`FUN_013a26c0`) reads** — it is the consumer the
+register was hunting, already listed above as "`+0x5c` playfield, `+0x60/+0x64/+0x68` position, `+0x6c` flag":
+
+* for every goal whose `+0x3c` (solved) ≠ `+0x38` (required) it takes `+0x5c` as the goal's playfield;
+* if that is the current playfield **and the byte at `+0x6c` is 0**, it places the marker at the vector
+  `((float)+0x60, 0, (float)+0x64)` — markerX/markerY on the ground plane — and hands `(float)+0x68` to the
+  waypoint object as a **separate scalar** (`CustomWP_c` slot `[10]`, set in `FUN_0139f520` beside the position
+  at `[6..8]`), so `unknown1` is marker GEOMETRY, not a coordinate;
+* if the byte at `+0x6c` is **set**, it places nothing for a same-playfield goal — the **"no map marker"** flag,
+  which is what its 17 carriers (dungeon objectives with degenerate `(1,1)` markers) always looked like;
+* if the goal is on ANOTHER playfield it asks `FUN_0146a9f0(currentPlayfield, goalPlayfield)` where that
+  playfield is reachable from here and marks that, whatever the flag says.
+
+What is still open on this record: what the waypoint does with slot `[10]` — its reader was not found in the
+`0139e000..013ab000` waypoint module by string, so `Unknown1` keeps its name with "radius" as the reading its
+round 3..170 map-unit values, marker-only presence and Collect/Kill-only kinds support — and the two zero tail
+fields (`+0x6d`, `+0x70`), which have no non-zero sample. Open work tracked in Gitea #464.
+
+**Exhausted anchors, so don't repeat them** — all four were run against the WRONG struct's offsets per the
+correction above (the vtable, the reader's callers, `[reg + 0xf0]` at 778 functions, `OFFS=24,38 NEAR=12` at
+3,322 of 139,441 functions, `OFFS=10c,38` at 488), and the semantic route above superseded them.
 
 ## What the unnamed fields ARE (2026-08-01, from the client's quest catalog)
 

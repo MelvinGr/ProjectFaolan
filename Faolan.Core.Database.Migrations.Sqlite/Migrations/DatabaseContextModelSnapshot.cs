@@ -3206,6 +3206,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("GoalType")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("HideMapMarker")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("MapId")
                         .HasColumnType("INTEGER");
 
@@ -3300,9 +3303,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<uint>("Unknown1")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Unknown2")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("GoalId");

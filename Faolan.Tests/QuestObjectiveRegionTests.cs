@@ -64,8 +64,10 @@ namespace Faolan.Tests
 			// Unknown1: the client writes ONE byte, so the word never exceeds 255.
 			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
 
-			// Unknown2: a flag, never an arbitrary number - 0 or the byte 0x01 followed by three zero bytes.
-			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoalCodec.FlagSet, $"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
+			// The tail after it is [u8 hideMapMarker][u8][u32] and the last two are 0 on every captured goal - a body
+			// that fills them is the first the corpus has seen, and worth looking at rather than carrying silently.
+			Assert.All(goals, g => Assert.True(g.TailFlag == 0 && g.TailWord == 0, $"goal {g.GoalId} carries tail {g.TailFlag}/0x{g.TailWord:X8}"));
+			Assert.Contains(goals, g => g.HideMapMarker);
 		}
 
 		[Fact]

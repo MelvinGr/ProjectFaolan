@@ -945,7 +945,7 @@ namespace Faolan.Importer.Captures
 						: g.MarkerY;
 					row.RequiredCount = g.RequiredCount;
 					row.Unknown1 = g.Unknown1;
-					row.Unknown2 = g.Unknown2;
+					row.HideMapMarker = g.HideMapMarker;
 					row.GoalIdEcho = g.GoalIdEcho;
 					// reserved[0] is NOT harvested: it is the captured character's SolvedTimes, not quest data (#550).
 					row.Extra1 = g.Extra1;
@@ -993,7 +993,7 @@ namespace Faolan.Importer.Captures
 						? null
 						: g.MarkerY,
 					Unknown1 = g.Unknown1,
-					Unknown2 = g.Unknown2,
+					HideMapMarker = g.HideMapMarker,
 					GoalIdEcho = g.GoalIdEcho,
 					// reserved[0] is NOT harvested - see the refresh path above (#550).
 					Extra1 = g.Extra1,
@@ -1376,8 +1376,8 @@ namespace Faolan.Importer.Captures
 						g.SubId = hg.SubId;
 					if (hg.Unknown1 != 0)
 						g.Unknown1 = hg.Unknown1;
-					if (hg.Unknown2 != 0)
-						g.Unknown2 = hg.Unknown2;
+					if (hg.HideMapMarker)
+						g.HideMapMarker = true;
 
 					// The TRAILING text record - fill-if-unset, for the same variant-spelling reason the extractor
 					// documents (a snapshot row stores its own F0 variant's spelling; the byte-exact region
