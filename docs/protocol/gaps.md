@@ -212,9 +212,11 @@ limit, `G` score limit, `I` queue type, the trailing match id, the `FlagB` fifo/
 `i_cMatch` section of `docs/re/minigame-massivepvp-messages.md`. What is left is `C`, `D`, `E`, the string,
 `FlagA` and `H`, which are only INFERRED from column types and the debug command's defaults (`2`, `3`–`6`,
 password + has-password): the one view that would name them, the PvP search-result list, is dead code in this
-build (no call site constructs its row item), and **no capture contains a single instance** of the element.
-Close it by filling a queue in a capture, or by an in-client run of the create-match window with known values
-typed into it. Tracked in Gitea #146.
+build — no call site constructs its row item, the page it sits on is never opened, and the client never sends
+`PvPMatchMakingSearchForMatches` (its only sender has no caller), so a `SearchResult` body cannot be captured by
+playing (Gitea #894) — and **no capture contains a single instance** of the element. Close it by filling a queue
+in a capture (`YouJoinedMatch` / `MatchInfo` carry the same element), or by an in-client run of the create-match
+window with known values typed into it. Tracked in Gitea #146.
 `[V0: the PvPMatchRules_c C/D/E/H columns]`
 
 ### The matchmaking board's innermost map key

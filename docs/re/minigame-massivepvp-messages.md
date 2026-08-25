@@ -276,11 +276,42 @@ the one view that would have named them — `Views/TeamGUI/PvPSearchResultView.x
 `FUN_01733610`) — declares ten columns, **Leader / Match / Region / NumTeams / TeamSize / BCoins / Tier / Pwd /
 Time / Applied**, and its row class `PvPSearchResultItem_c` has typed setters for them (`NumTeams` = `"%d(%d)"`,
 `TeamSize` = `"%d-%d"` — a RANGE — `BCoins` = one integer, `Pwd` = a **bool** that opens the `PasswordPrompt`
-before `JoinMatch`, `Time` = seconds as `mm:ss`, `Applied` = a 64-bit `time_t`). But **nothing constructs an
-item**: a raw scan of every initialized byte in the image (`tools/ghidra/ScanRelCalls.java`, `ALL=1`, E8 and E9)
-finds zero calls or jumps to the item's constructor or to any setter, so the search-result list is dead code in
-this build — there is no filler mapping record offsets onto those columns. What the column TYPES and the debug
-command's defaults support, without a consumer to prove it:
+before `JoinMatch`, `Time` = seconds as `mm:ss`, `Applied` = a 64-bit `time_t`). **The whole search feature is
+dead in this build, on both ends of the wire** (Gitea #894, where the scans are listed):
+
+* **No row is ever built.** Raw scans over every initialized byte of the image (`tools/ghidra/ScanRelCalls.java`
+  `ALL=1`, E8 + E9; `tools/ghidra/FindAddrOperand.java`, absolute addresses) find no call, jump, immediate or
+  pointer to the item's constructor `FUN_0174df40` or to any setter, and the item's vtable `020b261c` is referenced
+  by that constructor alone — so there is no inlined copy either. The consumers are all present: the Apply button
+  handler `FUN_01734020` dynamic_casts the selected row to `PvPSearchResultItem_c` (`FUN_017345b0`) and, when the
+  row's `+0xac` (`Pwd`) byte is set, opens the password prompt. They simply never see an item.
+* **The page is never opened.** The view is page 1 of the four-page PvP window whose page switch is
+  `FUN_016652c0` (0 `PVPMatchmaking.xml`, 1 this view, 2 `PvPMatchBuildupView.xml`, 3 `PVPMatchStatusView.xml`).
+  Pages 0, 2 and 3 are built by the window's live init `FUN_01664da0` (called from `FUN_0158cce0`) and by the
+  slots it connects (`FUN_01665500`, `FUN_016656a0`, `FUN_01665a00`); page 1 is built only by `FUN_016655d0` and
+  by the generic switch, and nothing in the image calls, jumps to or takes the address of either. ⚠️ A zero-caller
+  count is not the proof on its own — two LIVE pages also have zero-caller `Show*` methods (`FUN_01665430`,
+  `FUN_016658b0`); the proof is that page 1 has no live route at all.
+* **The client cannot even ask.** `CSPlayerAgentProxy_t::PvPMatchMakingSearchForMatches` (`FUN_013647b0`, method
+  `0x4f`) is virtual — slot 82 (`+0x148`) of the proxy vtable at `02072334` — so no direct-call scan can see its
+  callers. Of every function in the image that invokes a `+0x148` slot (33, plus three sites outside any defined
+  function), the only one acting on that proxy is the `GameClient` wrapper `FUN_00546180` (`s_pcClient` →
+  `+0x288` → `FUN_0133c670`), and that wrapper has no caller of any kind. No client of this build ever sends the
+  request — which is why `PvPMatchMakingSearchForMatches` appears in no capture, and why a `SearchResult` body
+  cannot be captured by playing.
+* **Nothing outside the exe fills it.** The GUI ships as XML; the client's `Data/Gui/PythonModules` directory is
+  EMPTY; the view's XML declares only the `MultiColListView` and its two buttons, and none of the 41 shipped SWFs
+  belongs to it. The embedded Lua (luabind 0.9.1, Funcom fork) registers exactly twelve classes — Vector,
+  Quaternion, ID32, Engine, Playfield, Dynel, Character, Item, Spell, Camera, Callback and a resource-dependency
+  namespace — none of them PvP; the Flash bridge (`com.GameInterface.PvPMinigame`, `FUN_00b64c30` / `FUN_00b64930`)
+  exposes the minigame getters and signals and no search entry. The DX10 executable is the same `branch_v5.01.0`
+  build.
+
+The linker kept the class because the refresh slot the view connects, `FUN_017341d0` — itself a vestigial loop that
+dynamic_casts each row and does nothing with the result — references its RTTI. So there is no filler mapping record
+offsets onto those columns, and the remaining route to `C`/`D`/`E`/`H` is the element's OTHER carriers,
+`YouJoinedMatch` / `MatchInfo`: a capture in which a queue fills. What the column TYPES and the debug command's
+defaults support, without a consumer to prove it:
 
 | field | struct | reading | evidence |
 |---|---|---|---|
