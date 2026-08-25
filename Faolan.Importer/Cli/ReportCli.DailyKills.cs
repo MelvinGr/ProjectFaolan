@@ -5,7 +5,9 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.Combat;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
@@ -247,11 +249,11 @@ namespace Faolan.Importer.Cli
 						if (!deaths.Any(d => d.Actor == bcc.Actor && i - d.Index < 50))
 							deaths.Add((i, bcc.Actor));
 					}
-					else if (p is { IsDownload: true, SubOpcode: (uint)IirTypes.LootBagFullUpdateIIR })
+					else if (p is { IsDownload: true, SubOpcode: WorldObjectClasses.LootBag })
 					{
 						lootBags.Add(i);
 					}
-					else if (p is { IsDownload: true, SubOpcode: (uint)IirTypes.QuestGoalIIR })
+					else if (p is { IsDownload: true, SubOpcode: QuestGoalCodec.Opcode })
 					{
 						questTicks.Add(i);
 					}
