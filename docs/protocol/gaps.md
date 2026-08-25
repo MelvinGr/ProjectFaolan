@@ -198,9 +198,11 @@ attacker are guild ID32s, the time is the NEXT phase's start, and the phase is L
 / Skirmish / Silence before the storm / War / Aftermath). Its `Phase1And2` twin (0x20A9) is recovered from the
 client reader — the keep record plus a nested attacker-ranking list of `[ID32 guild][kills][total]` — but has NO
 captured body (the frame once taken for one is a GameCharInterface loot reply with the same lossy wire rendering),
-and one of its words stays unnamed: the ID32 at struct `+0x20` that the window hands to the attacker list as the
-row to highlight. Whether that is the leading applicant or the viewer's own guild needs a body in phase 0 or 1.
-Tracked in Gitea #147.
+and one of its words stays unnamed: the ID32 at struct `+0x20` that the window renders as the ONE yellow row of
+the attacker list. The client does not use it to find the viewer's own guild (the Withdraw/DeclareWar predicate
+walks the list for that), and retail's battle-queue feedback names a designated *Top Guild* per keep
+(`TopGuildInQueue` / `NoLongerTopGuildInQueue` / `WinnerOfQueue`), so the reading is the queue's Top Guild; a body
+in phase 0 or 1 showing the highlighted row is the top-ranked one would close it. Tracked in Gitea #147.
 `[V0: the Phase1And2 record's highlighted ID32]`
 
 ### `PvPMatchRules_c` C/D/E/H columns

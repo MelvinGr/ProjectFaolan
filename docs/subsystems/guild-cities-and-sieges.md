@@ -35,7 +35,7 @@ scatters the seven words into a 0x1c struct (slot order `[0][1][2][5][6][4][3]`)
 
 | wire | struct | name | how the view uses it |
 |---|---|---|---|
-| word 1 | `[0]` | **keep id** | compared against the window's `AreaID` config before anything is drawn |
+| word 1 | `[0]` | **keep id** | compared against the window's `AreaID` config before anything is drawn. It is the `pvp_area` id that LDB **50100** (`city_name`) names: 1 Fort Bane · 2 Stonehammer · 3 Caelnach · 4 Burnheim · 5 Sturmgarde · 6 Oakenhome · 7 Amut'Anun · 8 Gardak — so the captured keeps 2 and 4 are Stonehammer and Burnheim. The same category resolves `i_nFeedbackValue` in the battle-queue feedback below |
 | words 2–3 | `[1],[2]` | **owning guild ID32** | passed as ONE ID32 to the guild-name lookup, rendered under `MassivePvP_BattleKeepView_DefendingGuild`. The `0xDEB7` this page used to call a "zone word" is the guild ID32's class word — the same pair `GuildRankingsCodec` writes |
 | words 4–5 | `[5],[6]` | **attacking guild ID32** | compared against the null ID32 (`FUN_00453280`) and, when set, rendered as `MassivePvP_BattleKeepView_AttackingGuild` / `..._UnknownGuildName`. `[0][0]` on every captured keep — no war declared |
 | word 6 | `[4]` | **next-phase time** (unix) | `localtime` → weekday + `hh:mm` under `MassivePvP_BattleKeepView_NextPhase`; in phase War it drives the `TimeDisplay` countdown instead |
@@ -64,8 +64,46 @@ an ID32 plus two words, and the row constructor `FUN_01313b40` (`MPvPListViewIte
 `MassivePvP_BattleKeepView_Guild` / `Kills` / `Minigame` / `Total` as *name*, `kills`, `total − kills`, `total`
 — so the two words are **kills** and **total score**, with the minigame contribution derived. That is the
 PvP-earned queue for the right to attack that the ruleset below describes. The ID32 `a` (struct `+0x20`) is
-passed to the list filler as the row to highlight; whether it is the leading applicant or the viewer's own guild
-is not decidable without a body. `[V0: the Phase1And2 record's highlighted ID32]`
+the ONE attacker row the list filler `FUN_01315020` renders in yellow (`<font color="yellow">`, the row
+constructor's last argument). Two things narrow it without a body: the Withdraw-vs-DeclareWar choice
+(`FUN_013153e0` → `FUN_01315540`) is made by walking the list for the viewer's own guild, never by reading `a` —
+so the client needs no wire word to find itself — and the battle-queue feedback below shows retail keeps a
+designated **Top Guild** per keep while the queue is open (*"Your guild is the Top Guild for %s"*, *"…is not
+longer the Top Guild in queue for %s"*, *"…has won the right to attack %s"*). The reading is therefore the queue's
+Top Guild; it stays a gap until a phase-0/1 body shows the highlighted row is the top-ranked one.
+`[V0: the Phase1And2 record's highlighted ID32]`
+
+## The battle-queue feedback (0x20A6), decoded from the client
+
+`DispatchMassivePvPBattleQueueFeedback` is `[u32 i_nFeedbackType][u32 i_nFeedbackValue]`, uncaptured. Its handler
+`FUN_00562240` is an 18-way jump table (`0x5624f0`) whose cases load the LDB-100 token by address, so the enum
+and its wording are the client's own (`--report ldb-resolve` on the token names):
+
+| type | token (`MassivePvPBattleQueueFeedback_…`) | English text |
+|---:|---|---|
+| 0 | `NotEnoughRank` | Your guild rank is not high enough to perform this action. |
+| 1 | `NoLongerMemberOfGuild` | You are no longer a member of the guild you have applied with. |
+| 2 | `NeedGuild` | You need to be in a guild to perform this action. |
+| 3 | `NeedCity` | Your guild needs a PvE city before you can perform this action. |
+| 4 | `NeedTier3City` | Your PvE guild city needs to be Tier 3 before you can perform this action. |
+| 5 | `AlreadyOwnsCity` | Your guild already owns a battlekeep. You may not fight for another one. |
+| 6 | `AreAttackers` | Your guild may not enter a Battle Queue until the current confrontation is finished. |
+| 7 | `QueueLocked` | You may not apply for this Battle Queue until the current confrontation is finished. |
+| 8 | `AlreadyInQueue` | Your guild is already subscribed into this Battle Queue. |
+| 9 | `AlreadyInAnotherQueue` | You are already subscribed to another Battle Queue. |
+| 10 | `TopGuildInQueue` | Your guild is the Top Guild for %s. |
+| 11 | `WinnerOfQueue` | Your guild has won the right to attack %s. |
+| 12 | `LoserOfQueue` | Your guild did not win the right to attack %s. |
+| 13 | `NoLongerTopGuildInQueue` | Your guild is not longer the Top Guild in queue for %s. |
+| 14 | `WithdrewFromQueue` | Your guild withdrew from the queue for %s. |
+| 15 | (LDB 100 id 113710151 — no English entry) | `%s` keep warning, wording not shipped |
+| 16 | (LDB 100 id 110230855) | %s will be vulnerable for attack in 1 hour. |
+| 17 | (LDB 100 id 14452) | %s will be vulnerable for attack in 15 minutes. |
+
+For types 0–9 `i_nFeedbackValue` is unused; for 10–17 it is the **keep id**, resolved through LDB 50100
+(`FUN_0060ebb0(0xc3b4, value)`) into the `%s`. Types 3–5 and 7 are the wire form of the precondition chain
+below (city → Tier 3 → one keep per guild → the vulnerability window), and 10/11/13 are how the queue tells a
+guild it leads, has won, or has been overtaken.
 
 ⚠️ **This is text, not protocol.** Every rule below is retail describing its own game to a player. It pins what
 the server must *decide*; it says nothing about which bytes carry the decision, and no capture in the corpus

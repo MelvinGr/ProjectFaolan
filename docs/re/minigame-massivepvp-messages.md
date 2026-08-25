@@ -196,7 +196,7 @@ Scalar bodies, complete:
 | s2c | `0x8C` | `…CharacterNowLockedToSide` | `[ID32 i_cCharID][u32 i_nSide]` |
 | s2c | `0x8D` | `…CharacterNoLongerLockedToSide` | `[ID32 i_cCharID]` |
 | s2c | `0x92` | `DispatchPvPMatchMakingInfoRequestReturn` | `[list i_cList][u32 i_nNumberOfAnyApplies]` — captured empty |
-| s2c | `0xA6` | `DispatchMassivePvPBattleQueueFeedback` | `[u32 i_nFeedbackType][u32 i_nFeedbackValue]` |
+| s2c | `0xA6` | `DispatchMassivePvPBattleQueueFeedback` | `[u32 i_nFeedbackType][u32 i_nFeedbackValue]` — the 18 types and their texts are tabled in `docs/subsystems/guild-cities-and-sieges.md` |
 | s2c | `0xA7` | `DispatchMassivePvpStartCountDown` | `[u32 i_cEndTime]` |
 | s2c | `0xA8` | `DispatchMassivePvpBattleQueueStatusUpdate` | `[u32 i_nArea][u8 i_inQueue]` |
 
