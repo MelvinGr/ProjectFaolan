@@ -244,26 +244,53 @@ Three independent checks that the split above is right rather than a plausible c
 * The conditional pair is gated on the byte at element `+0x3D` — i.e. `FlagB` — in **both** the single-match
   reader and the list reader.
 
-**What the field NAMES are is still open**, and the binary does not say: unlike the scalar dispatch bodies on this
-interface, this reader takes the words straight into the struct with no per-field bail-out string. The one place
-that puts values in them is a client **debug command** (`FUN_006b5f30`, registered in the debug-command table at
-`FUN_006bae70`), which builds a `PvPMatchRules_c` from its arguments and defaults every one it is not given:
+⭐ **Eight of the twelve fields are NAMED from the client — not from a capture (there is still none), but from the
+code that DISPLAYS a match.** The reader takes the words straight into the struct with no per-field bail-out
+string, so a search for names on the wire path finds nothing; the names are on the *consumer* side, in three
+places that agree:
 
-| element field | argument | default when omitted |
-|---|---|---|
-| `+0x04` (B) | arg 2 | `5807` |
-| `+0x00` (A) | arg 3 | `2` |
-| `+0x08` (C) | arg 4 | `2` |
-| `+0x0C` (D) | arg 5 | `3` |
-| `+0x10` (E) | arg 6 | `6` |
-| `+0x30` (F) | arg 7 | `900` |
-| the string, and `FlagA` | set together once the command is given a 7th argument | empty / 0 |
+| field | struct | name | how it is pinned |
+|---|---|---|---|
+| `A` | `+0x00` | **match type** (the LDB 802 objective id, same space as `PutIntoMatchMaking`'s `i_nType`) | the Flash API `PvPMinigame.GetMatchType` (thunk `00b65600`) returns `PvPMatchMaking_c+0x98`, which is where `FUN_00547070` stores the joined match's element (`+0x98 = +0x78 roster + 0x20`); the score view `FUN_017393e0` branches on `+0x98 == 4` (Conquest) to make one side's kills reduce the other's score; the community-server debug view labels the same word **Ruleset** |
+| `B` | `+0x04` | **map** (playfield id) | the debug view's **Map** column reads record `+0x24`; the debug default `5807` has the shape |
+| `F` | `+0x30` | **time limit, seconds** | `GetTimeLeft` (`00b658b0`) and `PvPMinigameEndsInSeconds` (`FUN_01716cc0`) both compute `(matchStart@+0x1b8 − now) + this` off `+0xc8`; the match-status view formats it `%02d:%02d:%02d`; debug default `900` = 15 min |
+| `G` | `+0x34` | **score limit** | `GetScoreLimit` (`00b65950`) returns `+0xcc` |
+| `I` | `+0x40` | **queue type** | the debug view's **QueueType** column reads record `+0x60` |
+| `tail0` | `+0x64` | **match id** | the debug view's **ID** column and its `"Match %d created."` line both print record `+0x64`; `PvPMatchMaking_c` compares its `+0xdc` against the empty match's id to know whether one is joined (`FUN_00545cc0`) |
+| `FlagB` | `+0x3D` | *behaviour, not a name*: when **0**, the client announces the match with fifo text (`PvPMatchMakingYouCreatedMatch` / `YouJoinedMatch` in `FUN_00547070`, `PvPMatchMakingPlayerJoined` in `FUN_005471b0`) and the record carries the two extra tail words; when 1 it stays silent | the same byte gates both, in the wire reader and in the copier |
+| roster count | — | **Players** | the debug view's second column is `(roster.end − roster.begin) / 0x7c` |
 
-`900` is the shape of a match time limit in seconds (15 minutes) and `5807` the shape of a playfield id — but
-neither is stated anywhere, and `5807` is not one of the five arenas RDB 1000512 declares, so both are left
-unnamed here. ⚠️ The same 7th argument feeds both `+0x10` and the string in the decompiled command; that is what
-the code says, and it may be an artefact of the decompiler losing the string's `this`.
-`[V0: the PvPMatchRules_c column meanings]`
+Sources, so the next reader does not re-find them: the **community-server debug view**
+`Views/CommunityServerDebugGUI/pvpmatchmaking.xml` (`FUN_016b6020`; its match-list row filler `FUN_016b6bd0`
+takes the 0x70 record and labels the columns ID / Players / Map / Ruleset / QueueType / Server), the **Flash API**
+`com.GameInterface.PvPMinigame` (`FUN_00b64c30` registers `GetMatchType` / `GetSideScore` / `GetTotalCharacterScore`
+/ `InMatchPlayfield` / `GetMinigameStatus` / `GetWinningSide` / `GetCaptureZoneName` / `GetTimeLeft` /
+`GetToGameTimeLeft` / `GetScoreLimit` / `PlantCTFFlags`, each a one-line thunk off the `PvPMatchMaking_c` singleton
+at `DAT_0297d358`), and the **match views** under `Views/TeamGUI/` (`PVPMatchStatusView.xml`,
+`PvPMatchBuildupView.xml` with its `MatchTypeView` / `TimeLimitView` / `ScoreLimitView`). `tools/ghidra/DecompileXrefsTo.java`
+(every function that touches the singleton) and `DecompileRange.java` (a whole GUI band) are the two scripts the
+hunt needed.
+
+⚠️ **The other four words and the string are still only INFERRED**, and the reason is a negative worth recording:
+the one view that would have named them — `Views/TeamGUI/PvPSearchResultView.xml` (`PvPSearchResultView_c`,
+`FUN_01733610`) — declares ten columns, **Leader / Match / Region / NumTeams / TeamSize / BCoins / Tier / Pwd /
+Time / Applied**, and its row class `PvPSearchResultItem_c` has typed setters for them (`NumTeams` = `"%d(%d)"`,
+`TeamSize` = `"%d-%d"` — a RANGE — `BCoins` = one integer, `Pwd` = a **bool** that opens the `PasswordPrompt`
+before `JoinMatch`, `Time` = seconds as `mm:ss`, `Applied` = a 64-bit `time_t`). But **nothing constructs an
+item**: a raw scan of every initialized byte in the image (`tools/ghidra/ScanRelCalls.java`, `ALL=1`, E8 and E9)
+finds zero calls or jumps to the item's constructor or to any setter, so the search-result list is dead code in
+this build — there is no filler mapping record offsets onto those columns. What the column TYPES and the debug
+command's defaults support, without a consumer to prove it:
+
+| field | struct | reading | evidence |
+|---|---|---|---|
+| `C` | `+0x08` | number of teams (`2`) | `NumTeams` is a column; the debug default is `2`; sides are only ever 1 or 2 (`"Invalid match making side (%d)"`) |
+| `D`, `E` | `+0x0C`, `+0x10` | team size min / max (`3`–`6`) | `TeamSize` is rendered `"%d-%d"`, a range; the debug defaults are `3` and `6` |
+| the string, `FlagA` | `+0x14`, `+0x3C` | password, has-password | the debug command sets both together from its one optional string argument; `Pwd` is a bool column and gates the password prompt |
+| `H` | `+0x38` | unnamed | never set by the debug command, read by nothing found |
+| `tail1`/`tail2` | `+0x68`, `+0x6C` | possibly the `Applied` time (a `time_t` is the one 64-bit column) | shape only |
+
+`[V0: the PvPMatchRules_c C/D/E/H columns]`
 
 ⛔ **The search filter is NOT this element.** `PvPMatchMakingSearchForMatches(const PvPMatchMakingSearchFilter_c&)`
 has a writer of its own — `FUN_00558f50`, reached from `FUN_013647b0` — and it writes just

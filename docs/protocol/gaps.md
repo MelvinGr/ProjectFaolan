@@ -202,19 +202,19 @@ keep in more than one state, or by finding the client's reader. Tracked in Gitea
 `[V0: that this timestamp is the vulnerability window]`
 `[V0: the state/phase meaning]`
 
-### `PvPMatchRules_c` column meanings
+### `PvPMatchRules_c` C/D/E/H columns
 The element the matchmaking messages carry a whole match in (`DispatchPvPMatchMakingYouJoinedMatch` /
-`MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its **layout is no longer a gap** — it is
-recovered field-by-field from the client and cross-checked three ways (the s2c reader, the c2s writer, and the
-0x70 struct the joined match is stored in), in the `i_cMatch` section of
-`docs/re/minigame-massivepvp-messages.md`. What is still unknown is what the twelve fields MEAN. Unlike the scalar
-dispatch bodies on this interface, the reader takes the words straight into the struct with no per-field bail-out
-string, so the binary never names them, and **no capture contains a single instance** — no captured queue ever
-filled, so nothing carrying a whole match was ever sent. The only values the client itself ever puts in them come
-from a debug command's defaults (`5807 / 2 / 2 / 3 / 6 / 900`), which suggest a playfield and a time limit without
-stating either. Close it by filling a queue in a capture, or by an in-client run of the create-match window with
-known values typed into it. Tracked in Gitea #146.
-`[V0: the PvPMatchRules_c column meanings]`
+`MatchInfo` / `SearchResult`, and the c2s `PvPMatchMakingCreateMatch`). Its layout is recovered field-by-field
+from the client, and **eight of its twelve fields are now named from the client's own consumers** — the
+community-server debug view, the `PvPMinigame` Flash API and the match views (`A` match type, `B` map, `F` time
+limit, `G` score limit, `I` queue type, the trailing match id, the `FlagB` fifo/extra-words gate) — in the
+`i_cMatch` section of `docs/re/minigame-massivepvp-messages.md`. What is left is `C`, `D`, `E`, the string,
+`FlagA` and `H`, which are only INFERRED from column types and the debug command's defaults (`2`, `3`–`6`,
+password + has-password): the one view that would name them, the PvP search-result list, is dead code in this
+build (no call site constructs its row item), and **no capture contains a single instance** of the element.
+Close it by filling a queue in a capture, or by an in-client run of the create-match window with known values
+typed into it. Tracked in Gitea #146.
+`[V0: the PvPMatchRules_c C/D/E/H columns]`
 
 ### The matchmaking board's innermost map key
 `DispatchPvPMatchMakingInfoRequestReturn` (0x2092) is a three-level count-framed map that round-trips all 43
