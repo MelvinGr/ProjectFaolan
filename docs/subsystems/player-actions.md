@@ -38,8 +38,13 @@ two different records, not one ability with a per-class slot.
 
 ⚠️ And the c2s parameter is named **`i_nActionPos`**, which on its name alone would read as a position on the
 action bar — per-session and unpredictable. The corpus says otherwise: `0xFC` and `0x10C` are stable across
-every capture of their class and equal the `i_nAbilityID` those characters were granted. So the equality of the
-two number spaces is an OBSERVATION, not something either name promises.
+every capture of their class and equal the `i_nAbilityID` those characters were granted. That equality is not
+merely observed — it is **structural in the client**: the `AddSpecialAbility` grant handler
+(`FUN_0075d0c0`, log `"Adding special action %d"`) stores the ability in a registry keyed by `i_nAbilityID`, and
+the `PerformSpecialAction` handler (`FUN_0075d7b0` / `FUN_0145d7e0`) looks the incoming `i_nActionPos` up in the
+**same registry** (`FUN_0075e360`) before asserting the behaviour. So a granted id *is* the selector by
+construction; `i_nActionPos` is a registry key, not a bar position, which is exactly why it is neither
+per-session nor a layout offset.
 
 ⛔ The number is assigned by retail's server and the client only ever learns it from the grant — there is no
 static table to dump and nothing derives it from the ability record id. That is what keeps an unwitnessed
