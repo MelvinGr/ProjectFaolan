@@ -335,6 +335,18 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("PvpKills")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("PvpReturnMapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("PvpReturnX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PvpReturnY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PvpReturnZ")
+                        .HasColumnType("REAL");
+
                     b.Property<byte>("Race")
                         .HasColumnType("INTEGER");
 

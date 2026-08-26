@@ -506,6 +506,28 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
+			// #146: a character whose last save was INSIDE a PvP match that no longer runs enters at the match's
+			// RETURN location, not on the minigame map - a relog mid-match (or across a server restart) must not
+			// strand them there. The redirect fires only when the persisted map IS a minigame map and no started
+			// match of theirs runs on it; a stale return on any other map (they moved on since, e.g. a GM teleport)
+			// is simply cleared. Nothing has been sent for this entry yet, so changing the map here is safe - a
+			// LOGIN client learns its map from the packets this method builds.
+			if (character.PvpReturnMapId is { } pvpReturnMap)
+			{
+				if (StartingData.MinigameQueueCapacity.ContainsKey(mapId) && _csPlayerAgentDispatcher.PvpMatchEntryOf(character.Id, mapId) == null)
+				{
+					character.MapId = pvpReturnMap;
+					character.Position = new Vector3(character.PvpReturnX, character.PvpReturnY, character.PvpReturnZ);
+					await Database.SaveCharacterTransform(character.Id, character.Position, character.Rotation, pvpReturnMap);
+					Logger.LogInformation("World entry: '{Name}' last saved inside a PvP match that is gone - redirected from map {MinigameMap} to map {ReturnMap} at {Pos}.",
+						character.Name, mapId, pvpReturnMap, character.Position);
+					mapId = pvpReturnMap;
+				}
+
+				character.PvpReturnMapId = null;
+				await Database.SaveCharacterPvpReturn(character.Id, null, default);
+			}
+
 			// Nothing has been handed to the client for THIS entry yet - so the tick's interest sweep must stay off
 			// them until the burst below is flushed (see INetworkClientSession.WorldEntryDelivered). Cleared here
 			// rather than only initialised, because a re-entry (create-world -> world) reuses the connection.

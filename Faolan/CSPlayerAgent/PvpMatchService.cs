@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core;
 using Faolan.Core.Extensions;
@@ -37,7 +38,8 @@ namespace Faolan.CSPlayerAgent
 	// Sides are the client's own values, stored and re-broadcast, never interpreted: the GUI produces them and the
 	// GUI consumes them, and nothing server-side needs to know which number is which team yet (scoring is #146's
 	// next slice). "Has a side" means the member has picked one at least once.
-	public sealed class PvpMatchService(ILogger logger, TeamService teams, Func<uint, INetworkClient?> clientForCharacter, IGameServerDispatcher gameServer)
+	public sealed class PvpMatchService(ILogger logger, TeamService teams, Func<uint, INetworkClient?> clientForCharacter, IGameServerDispatcher gameServer,
+		IDatabaseRepository database)
 	{
 		// A member's side before they pick one. The client's own GUI starts a fresh member sideless (the
 		// CantStartMatch refusal exists exactly because of that state); 0 is what PlayerJoined announces for one.
@@ -345,9 +347,15 @@ namespace Faolan.CSPlayerAgent
 					foreach (var member in match.Sides.Keys)
 					{
 						// Where to put them back when they leave: their live transform the moment the match takes
-						// them, so LeaveMatch is a round trip and not a one-way move.
+						// them, so LeaveMatch is a round trip and not a one-way move. PERSISTED too (#146): a
+						// mid-match disconnect or server restart loses this dict, and the world entry then reads the
+						// persisted copy to keep a relog off the minigame map.
 						if (gameServer.GetCharacterLiveState(member) is { } from && from.MapId != match.Rules.MapId)
-							match.ReturnTo[member] = (from.MapId, new System.Numerics.Vector3(from.X, from.Y, from.Z));
+						{
+							var back = new System.Numerics.Vector3(from.X, from.Y, from.Z);
+							match.ReturnTo[member] = (from.MapId, back);
+							await database.SaveCharacterPvpReturn(member, from.MapId, back);
+						}
 
 						if (!await gameServer.TeleportCharacter(member, match.Rules.MapId))
 							logger.LogWarning("PvP match {MatchId}: the world tier could not move {CharacterId:X8} to map {MapId}.", match.Id, member, match.Rules.MapId);
@@ -459,7 +467,9 @@ namespace Faolan.CSPlayerAgent
 			if (match.ReturnTo.TryRemove(characterId, out var back)
 			    && gameServer.GetCharacterLiveState(characterId) is { } live && live.MapId == match.Rules.MapId)
 			{
-				if (!await gameServer.TeleportCharacter(characterId, back.MapId, back.Position))
+				if (await gameServer.TeleportCharacter(characterId, back.MapId, back.Position))
+					await database.SaveCharacterPvpReturn(characterId, null, default); // returned live - nothing left to consume at login
+				else
 					logger.LogWarning("PvP match {MatchId}: could not return {CharacterId:X8} to map {MapId}.", match.Id, characterId, back.MapId);
 			}
 

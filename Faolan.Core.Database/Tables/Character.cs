@@ -37,6 +37,18 @@ namespace Faolan.Core.Database.Tables
 		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
 		public uint MapId { get; set; } = Map.TortageBeachId;
 
+		// #146: where a PvP-minigame teleport took this character FROM. Written when the match countdown moves them
+		// in, cleared by the live leave's teleport-back and by the login redirect that consumes it. Non-null at login
+		// means the character last saved INSIDE a match that no longer runs (a mid-match disconnect, a server
+		// restart) - the world entry then goes here instead of stranding them on the minigame map.
+		public uint? PvpReturnMapId { get; set; }
+
+		public float PvpReturnX { get; set; }
+
+		public float PvpReturnY { get; set; }
+
+		public float PvpReturnZ { get; set; }
+
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 

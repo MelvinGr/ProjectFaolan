@@ -78,7 +78,7 @@ namespace Faolan.CSPlayerAgent
 
 			_groupFinder = new GroupFinderService(logger, database, _teams, gameServerDispatcher);
 			_pvpMatchMaking = new PvpMatchMakingService(logger, _teams, ClientForCharacter);
-			_pvpMatches = new PvpMatchService(logger, _teams, ClientForCharacter, gameServerDispatcher);
+			_pvpMatches = new PvpMatchService(logger, _teams, ClientForCharacter, gameServerDispatcher, database);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

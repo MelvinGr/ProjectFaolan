@@ -179,6 +179,12 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterMount(uint characterId, uint? mountId);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
+
+		/// <summary>
+		///     Persist (or with a null <paramref name="mapId" /> clear) the character's PvP-match RETURN location -
+		///     where the minigame teleport took them from (#146). Consumed by the world entry when the match is gone.
+		/// </summary>
+		Task SaveCharacterPvpReturn(uint characterId, uint? mapId, Vector3 position);
 		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
 		/// <summary>
@@ -1228,6 +1234,18 @@ namespace Faolan.Core.Database.Repositories
 					.SetProperty(c => c.RotationZ, rotation.Z)
 					.SetProperty(c => c.RotationW, rotation.W)
 					.SetProperty(c => c.MapId, mapId));
+		}
+
+		public async Task SaveCharacterPvpReturn(uint characterId, uint? mapId, Vector3 position)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx
+				.Characters.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.PvpReturnMapId, mapId)
+					.SetProperty(c => c.PvpReturnX, position.X)
+					.SetProperty(c => c.PvpReturnY, position.Y)
+					.SetProperty(c => c.PvpReturnZ, position.Z));
 		}
 
 		// #400: persist the character's drawn weapon SET after a SwitchWeaponsButton toggle, so the active loadout (and
