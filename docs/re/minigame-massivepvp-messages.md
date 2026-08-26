@@ -425,12 +425,20 @@ deliberately not sent — see `Character`'s remark and `SnapshotStatSheet`.
 
 ## What is built, and what still blocks the rest
 
-The **custom-match lifecycle is built** (2026-08-26, uncaptured end to end — it carries #146's needs-testing):
-`PvpMatchRulesCodec` / `PvpMatchCodec` build the element and the `i_cMatch` payload above, `PvpMatchService`
-runs create/join/side/say/kick/ban/force-side/start, and a started match owns ONE playfield instance both
-sides land in (`WorldState.ResolveEntryInstance`, the minigame twin of #512's team instance), entered through
-the ordinary change-map handoff when each member's client sends `PvPMatchMakingTeleportToMinigame`; the entry
-answers with `DispatchMinigameMatchStarted` so a late zoner sees the running clock.
+The **match loop is built and verified in-client** (2026-08-26, two live clients, four minigame maps) — the
+implementation is [`../subsystems/pvp-minigames.md`](../subsystems/pvp-minigames.md); this page stays the wire
+reference. In one line: queue → capacity-gated formation → locked sides → server-driven countdown teleport →
+one match-owned playfield instance → leave/relog round trips. Three wire facts the live runs settled belong
+here rather than there:
+
+* **the countdown move is SERVER-initiated** — after `StartClicked` the client displays *"Entering minigame in
+  about 10 seconds"* and sends nothing; the c2s `PvPMatchMakingTeleportToMinigame` is the manual rejoin, not
+  the countdown's completion;
+* **`DispatchPvPMatchMakingMatchRemoved` (0x207C, empty body) resets the client's match state** — pressing the
+  stale buildup view's Start button after a server restart sends `StartMatch`, and answering it with 0x207C
+  visibly cleared the window (the no-arg feedback-override reading, confirmed live);
+* the `PlayerJoined`/`PlayerLeft`/`PlayerKicked` record-vs-ID32 corrections in the table above were found by
+  the same runs (a 12-byte ID32 form is silently discarded as stream-bad).
 
 What still blocks the REST is content and systems, not the wire: the sensor-volume capture zones (#513) and
 scoring for a playable minigame, the battlekeep areas behind `areaId`, and — for guild cities — a
