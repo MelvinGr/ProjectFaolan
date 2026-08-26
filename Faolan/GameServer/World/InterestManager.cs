@@ -210,13 +210,23 @@ namespace Faolan.GameServer.World
 			var events = new List<InterestEvent>();
 			foreach (var viewer in zone.Entities)
 			{
+				if (!viewer.IsPlayer || viewer.Handle == leaver.Handle || !viewer.Known.Remove(leaver.Handle))
+					continue;
+
 				// #322: the SAME #245 gate ResolveMove applies (:95) - never send an n3ToClientQuit for a handle the
 				// viewer's client hasn't CONFIRMED building (polled via 0x2020). A viewer still loading when the leaver
 				// disconnects has the leaver in Known but not Confirmed; despawning that unbuilt handle crashes it
-				// (pcDynel == null). Drop it from Known silently instead (Known.Remove runs; the despawn is gated on
-				// Confirmed.Remove). Repro: A in zone, B connects + is sent A's spawn (Known) but hasn't polled yet, A
+				// (pcDynel == null). Repro: A in zone, B connects + is sent A's spawn (Known) but hasn't polled yet, A
 				// disconnects -> without this gate B gets a despawn for A's unbuilt handle.
-				if (viewer.IsPlayer && viewer.Handle != leaver.Handle && viewer.Known.Remove(leaver.Handle) && viewer.Confirmed.Remove(leaver.Handle))
+				//
+				// ⚠️ For a PLAYER leaver the poll gate cannot be the test: the client renders another player's spawn
+				// WITHOUT ever polling 0x2020 (measured live 2026-08-26 - zero polls for the other member's handle
+				// across a whole PvP match, model visibly rendered), so Confirmed never holds a player handle and the
+				// gate left a PHANTOM standing in the minigame after its owner left. What #322 actually needs is
+				// "the viewer is not mid-load", which is the session's own WorldEntered flag - so a player despawn
+				// goes to every loaded viewer that knew the handle, and the still-loading case stays protected.
+				var confirmed = viewer.Confirmed.Remove(leaver.Handle);
+				if (confirmed || (leaver.IsPlayer && viewer.Client?.Session.WorldEntered == true))
 					events.Add(new InterestEvent(viewer, leaver, InterestEventType.Despawn));
 			}
 

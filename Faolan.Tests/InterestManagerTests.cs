@@ -172,6 +172,31 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Remove_PlayerLeaver_DespawnsForALoadedViewer_EvenUnconfirmed()
+		{
+			// The client renders another PLAYER's spawn without ever polling 0x2020 (measured live 2026-08-26:
+			// zero polls for the other member's handle across a whole PvP match, model visibly rendered), so
+			// Confirmed never holds a player handle and the #322 poll gate left a phantom player standing after
+			// its owner teleported out. For a player leaver the gate is the viewer's own load state instead: a
+			// WorldEntered viewer that knew the handle gets the despawn.
+			var zone = new Zone(2040);
+			var a = Player(1, 0, 0);
+			var b = new WorldEntity(2, 2040, true, "P2", new Support.RecordingNetworkClient(2))
+			{
+				Position = new Vector3(10, 0, 0)
+			};
+			b.Client!.Session.WorldEntered = true;
+			zone.Add(a);
+			zone.Add(b);
+			InterestManager.ResolveMove(zone, a, Range); // mutually Known; B never polls (players are not polled)
+
+			var events = new WorldEvents(InterestManager.ResolveRemove(zone, a));
+
+			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // the phantom is removed
+			Assert.DoesNotContain(1u, b.Known);
+		}
+
+		[Fact]
 		public void UnconfirmedHandleLeavingRange_DoesNotDespawn()
 		{
 			// #245: an entity spawned to a still-loading client (Known) but not yet CONFIRMED (no 0x2020 poll) must NOT
