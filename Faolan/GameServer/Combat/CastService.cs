@@ -36,6 +36,11 @@ namespace Faolan.GameServer.Combat
 		private const ushort CastStateCancel = 2;
 
 		private readonly BuffService _buffs;
+
+		// #48's cast half: the begin BCC is relayed to viewers by the listener, but the COMPLETE (and the interrupt
+		// abort) are server-timed and sent from here - without relaying them too, an observer's client holds the
+		// cast pose forever (found live 2026-08-26: "the animation never ends on the other client").
+		private readonly World.WorldBroadcaster _broadcaster;
 		private readonly CombatService _combat;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -51,7 +56,7 @@ namespace Faolan.GameServer.Combat
 		private readonly SpellModifierService _spellModifiers;
 
 		public CastService(IDatabaseRepository database, WorldSimulation sim, CombatService combat, BuffService buffs,
-			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ILogger logger)
+			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ILogger logger, WorldBroadcaster broadcaster)
 		{
 			_database = database;
 			_sim = sim;
@@ -61,6 +66,7 @@ namespace Faolan.GameServer.Combat
 			_spellModifiers = spellModifiers;
 			_spellAreas = spellAreas;
 			_logger = logger;
+			_broadcaster = broadcaster;
 		}
 
 		public async Task HandleCast(INetworkClient client, byte[] rawPayload, CommandMessage args, ushort behaviorType, uint target, byte[] actionTrailer)
@@ -242,6 +248,10 @@ namespace Faolan.GameServer.Combat
 				// (phase 0x09 ends at the seq word) and, once the codec turned strict, THREW here inside the deferred
 				// resolve. That threw away the complete-ack entirely and left the bar at 100%. The form is stated now.
 				await CombatService.SendBehaviorChannelCompleteAck(client, rawPayload, 3);
+				// The observers got the relayed cast BEGIN (the listener's #48 relay); without the complete they hold
+				// the cast pose forever. Retail's cross-player channel is the same BCC replication, so the identical
+				// complete body goes to every viewer who already sees the caster.
+				await _broadcaster.BroadcastBehaviorToViewers(client, BehaviorControlCenterCodec.Build(BehaviorAcks.ChannelCompleteAck(rawPayload, client.Session.Character.Id, 3)));
 
 				// #439/#307: a cast whose effect is something the SERVER does - today a PET SUMMON (creature +
 				// PetIIR owner-assign + follow) - resolves as that instead of applying a target effect. This
@@ -325,7 +335,12 @@ namespace Faolan.GameServer.Combat
 			if (beginArgs != null && client.Session.PendingCastMode == 0)
 				await CombatService.SendServerCastInterruptAbort(client, beginArgs, rawPayload, args.CommandqueueClientId);
 			else if (beginArgs != null)
+			{
 				await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
+				// Same reason as the complete relay: a cancelled cast must end the pose on the OBSERVERS' clients too.
+				await _broadcaster.BroadcastBehaviorToViewers(client,
+					BehaviorControlCenterCodec.Build(BehaviorAcks.CastInterruptAbort(beginArgs, rawPayload, client.Session.Character.Id, client.Session.PendingCastMode)));
+			}
 			else
 				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 

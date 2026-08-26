@@ -337,7 +337,7 @@ namespace Faolan.GameServer
 			_factions = new FactionService(database, logger, SendFactionStanding);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, _broadcaster, configuration.ContentKillStreaks);
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
-			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger);
+			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
