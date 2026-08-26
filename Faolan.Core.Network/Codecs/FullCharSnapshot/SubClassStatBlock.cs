@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -35,6 +36,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static int StatList1Size => StatList1.Length;
 		public static int StatList2Size => StatList2Half.Length;
 
+
 		// The block is TWO 0x3F1-framed StatList_t (StatPair_t = [statId, value]; docs/re/fullplayer-snapshot-reader.md
 		// regions 9-10). StatList#1 = the 17 DISPLAYED stats (its count word IS the BlockType field, (17+1)*0x3F1 =
 		// 0x46F2). StatList#2 = the full sheet: 74 UNIQUE pairs written TWICE (base + current copy = 148 pairs, the old
@@ -69,6 +71,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.AnnihilationLosses, 0x0), (CharacterStatId.PvPAnnihilationMatchesWonSeasonal, 0x0), (CharacterStatId.AnnihilationWins, 0x0), (CharacterStatId.PvPFatalitiesSeasonal, 0x0), (CharacterStatId.Fatalities, 0x0),
 			(CharacterStatId.PvPTotalDeathsSeasonal, 0x0), (CharacterStatId.PvPTotalDeaths, 0x0), (CharacterStatId.PvPTotalKillsSeasonal, 0x0), (CharacterStatId.PvPTotalKills, 0x0)
 		];
+
+		// The SHEET's own stat ids - what a login snapshot carries and nothing else. CharacterStats can legitimately
+		// hold MORE than the sheet (the daily-challenge counters land there, ids 1000066+, and retail pushes those on
+		// the live StatUpdate channel rather than in the snapshot - every captured sheet is exactly these 91), so a
+		// sheet loader filters the table to this set rather than assuming the table IS the sheet.
+		// ⚠️ Declared AFTER the two arrays it reads: static fields initialize in declaration order, and above them
+		// this ran on nulls (TypeInitializationException across the whole suite).
+		public static readonly IReadOnlySet<uint> SheetStatIds =
+			StatList1.Concat(StatList2Half).Select(p => (uint)p.Id).ToHashSet();
 
 		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes
 		// used to be carried here as six opaque words plus a spare byte - which is what a 17-byte record looks like

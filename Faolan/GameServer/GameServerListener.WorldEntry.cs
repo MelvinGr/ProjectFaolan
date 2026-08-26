@@ -662,7 +662,14 @@ namespace Faolan.GameServer
 			var knownSpellIds = (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
 			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
 			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
-			var statSheet = (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray();
+			// ⚠️ Filtered to the SHEET's own 91 ids: CharacterStats also holds stats that are NOT part of the login
+			// snapshot - the daily-challenge counters (ids 1000066+) land there the first time a quest completes, and
+			// feeding them through made the sheet 95 pairs and the guard below kill the entry (found live 2026-08-26,
+			// "talk to Kalanthes" completing on a parked character). Retail pushes those on the live StatUpdate
+			// channel; every captured login sheet is exactly the 91.
+			var statSheet = (await Database.GetCharacterStats(character.Id))
+				.Where(s => SubClassStatBlock.SheetStatIds.Contains((uint)s.StatId))
+				.Select(s => (s.StatId, s.Value)).ToArray();
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
 			var completedJournal = isCreateEntry
 				? []
