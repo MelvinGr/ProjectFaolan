@@ -39,6 +39,24 @@ namespace Faolan.Core.Network.Constants
 			[ConanClass.Demonologist] = 0x10C
 		}.ToImmutableDictionary();
 
+		// The PvP minigame QUEUE CAPACITY per playfield (#146) - the total the queue fills before a match forms.
+		// The values are the CLIENT's own: its minigame window labels every queue "0/24" or "0/12" (read live
+		// 2026-08-26 - Conquest on The Call of Jhebbal Sag at 24, the three Capture The Skull maps and Annihilate
+		// Opposing Team on Totem Torrent at 12), so 12v12 and 6v6. Where the client keeps the number is not yet
+		// recovered; until it is, this records what its window displays.
+		public static readonly ImmutableDictionary<uint, int> MinigameQueueCapacity = new Dictionary<uint, int>
+		{
+			[5006] = 24, // The Call of Jhebbal Sag - Conquest
+			[5201] = 12, // Blood Ravine - Capture The Skull
+			[5012] = 12, // Lost Temple - Capture The Skull
+			[5005] = 12, // Hallowed Vaults - Capture The Skull
+			[5002] = 12 // Totem Torrent - Annihilate Opposing Team
+		}.ToImmutableDictionary();
+
+		// A minigame map the table above does not list (a future import) queues at the common size rather than
+		// forming degenerately small.
+		public const int DefaultMinigameQueueCapacity = 12;
+
 		// The SEARCH stance's animation action, per class (#505). Retail answers `PerformSpecialAction` 0x064 with a
 		// player `BehaviorControlCenterIIR` at slot `BehaviorId.Search`, and its action id is the character's own -
 		// 42013 on the necromancer, 53091 on the Herald of Xotli - while everything ELSE about the record is shared

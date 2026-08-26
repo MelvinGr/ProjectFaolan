@@ -34,7 +34,11 @@ namespace Faolan.CSPlayerAgent
 	{
 		// characterId -> the one signup it holds. Removed by RemoveFromMatchMaking and by the disconnect hook, so a
 		// logged-off queuer stops being counted (retail's board is live state, and a stale row is a visible lie).
-		private readonly ConcurrentDictionary<uint, PvpMatchMakingSignup> _signups = [];
+		// The sequence makes Queued() FIFO: a ConcurrentDictionary enumerates in ARBITRARY order, and the match
+		// formation's anchor (and so the formed match's leader) is meant to be the longest-queued signup.
+		private readonly ConcurrentDictionary<uint, (long Seq, PvpMatchMakingSignup Signup)> _signups = [];
+
+		private long _nextSeq;
 
 		// Every (type, map, queueType) anyone has signed up for since this process started. Retail keeps listing a
 		// queue at 0 once it has appeared - the capture's board still carries `The Call of Jhebbal Sag` at zero long
@@ -115,7 +119,7 @@ namespace Faolan.CSPlayerAgent
 		/// <summary>The live board: the sticky queue registry, counted against the signups held right now.</summary>
 		public PvpMatchMakingInfo Board()
 		{
-			var held = _signups.Values.ToList();
+			var held = _signups.Values.Select(v => v.Signup).ToList();
 
 			return PvpMatchMakingBoard.From(
 				_knownQueues.Keys,
@@ -129,7 +133,7 @@ namespace Faolan.CSPlayerAgent
 		/// </summary>
 		public IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> Queued()
 		{
-			return _signups.Select(kv => (kv.Key, kv.Value)).ToList();
+			return _signups.OrderBy(kv => kv.Value.Seq).Select(kv => (kv.Key, kv.Value.Signup)).ToList();
 		}
 
 		/// <summary>
@@ -144,7 +148,7 @@ namespace Faolan.CSPlayerAgent
 
 		private void Record(uint characterId, PvpMatchMakingSignup signup)
 		{
-			_signups[characterId] = signup;
+			_signups[characterId] = (System.Threading.Interlocked.Increment(ref _nextSeq), signup);
 
 			// A "join first available" signup is counted in the board's NumberOfAnyApplies, not listed as a queue -
 			// the capture never grows a type-0 group when the player checks that box.

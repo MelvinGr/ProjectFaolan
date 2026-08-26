@@ -181,16 +181,16 @@ Scalar bodies, complete:
 | c2s | `0x59` | `PvPMatchMakingForceSide` | `[ID32 character][u32 side]` |
 | c2s | `0x46` / `0x47` | `Apply/WithdrawFromMassivePVPBattleQueue` | `[ID32 character][ID32 guild][u32 area]` |
 | s2c | `0x75` | `DispatchPvPMatchMakingWantsToStart` | `[u32 i_nKickedInSeconds]` |
-| s2c | `0x76` | `DispatchPvPMatchMakingPlayerJoined` | `[ID32 i_cPlayer][u32 i_nSide]` |
-| s2c | `0x77` | `DispatchPvPMatchMakingPlayerChangedSide` | `[ID32 i_cPlayer][u32 i_nNewSide]` |
-| s2c | `0x78` | `DispatchPvPMatchMakingPlayerLeft` | `[ID32 i_cCharacterID]` |
-| s2c | `0x79` | `DispatchPvPMatchMakingPlayerKicked` | `[ID32 i_cCharacterID][str i_cMessage]` |
+| s2c | `0x76` | `DispatchPvPMatchMakingPlayerJoined` | ⚠️ `[cCharacter i_cPlayer][u32 i_nSide]` — the WHOLE member record (its reader `FUN_01346780` calls the roster's own `FUN_005574d0`), not the ID32 this table first carved; a 12-byte form is discarded as stream-bad (found live, 2026-08-26) |
+| s2c | `0x77` | `DispatchPvPMatchMakingPlayerChangedSide` | `[ID32 i_cPlayer][u32 i_nNewSide]` (reader `FUN_01346920`: three scalar words) |
+| s2c | `0x78` | `DispatchPvPMatchMakingPlayerLeft` | ⚠️ `[cCharacter i_cCharacterID]` — the whole record (`FUN_01346aa0`) |
+| s2c | `0x79` | `DispatchPvPMatchMakingPlayerKicked` | ⚠️ `[cCharacter i_cCharacterID][str i_cMessage]` — the whole record (`FUN_01346be0`) |
 | s2c | `0x7A` | `DispatchPvPMatchMakingErrorCode` | `[u32 i_nErrorCode]` |
 | s2c | `0x7F` | `DispatchPvPMatchMakingStartClicked` | `[u32 i_nTeleportInSeconds]` |
 | s2c | `0x80` | `DispatchPvPMatchMakingYouAreInMatchMaking` | `[u32 i_nMap][u32 i_nType][u8 i_ShowFifo][u8 i_AsTeamMember][u32 i_queueType]` |
 | s2c | `0x83` | `DispatchPvPMatchMakingMatchSay` | `[str i_cFrom][str i_cMessage][u8 i_bFifo]` |
 | s2c | `0x84` | `DispatchPvPMatchMakingCollectingMorePlayers` | `[u32 i_nSecondsUntilForcedStart]` |
-| s2c | `0x85` | `DispatchPvPMatchMakingNewMatchLeader` | `[ID32 i_cNewMatchLeader]` |
+| s2c | `0x85` | `DispatchPvPMatchMakingNewMatchLeader` | `[ID32 i_cNewMatchLeader]` (reader `FUN_01347b50`: two words — an `i_c` name does NOT decide record-vs-ID32; check each reader) |
 | s2c | `0x86` | `…TeamLeaderSignedUpForMatchMaking` | `[u32 i_nMap][u32 i_nType]` |
 | s2c | `0x8B` | `…CantChangeSideYouHaveBeenLockedToSide` | `[u32 i_nSide]` |
 | s2c | `0x8C` | `…CharacterNowLockedToSide` | `[ID32 i_cCharID][u32 i_nSide]` |

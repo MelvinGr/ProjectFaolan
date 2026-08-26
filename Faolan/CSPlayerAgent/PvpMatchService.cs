@@ -75,15 +75,15 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		/// <summary>
-		///     The queue's match-formation pass (#146), run after each new signup: pair the first two COMPATIBLE
-		///     signups into a started 1v1 match, sides locked, and hand both clients the join + start sequence.
-		///     ⚠️ The formation POLICY is ours - retail's queue rules (team sizes, tiers, timers) are unrecovered -
-		///     so this forms at TWO so a two-client session can walk the whole flow; the wire it sends is only the
-		///     recovered message set the custom-match path already uses. Assumptions noted on #146.
+		///     The queue's match-formation pass (#146), run after each new signup: a match forms when the resolved
+		///     minigame's queue is FULL - the capacities the client's own window displays (24 for Conquest, 12 for
+		///     the rest; StartingData.MinigameQueueCapacity) - with sides locked alternating in queue order.
+		///     Under capacity nothing pops; the GM `.matchstart` is the force-with-fewer override.
 		/// </summary>
-		public Task TryFormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue)
+		public async Task TryFormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue)
 		{
-			return FormFromQueue(queued, dequeue, minMembers: 2);
+			var outcome = await FormFromQueue(queued, dequeue, force: false);
+			logger.LogDebug("PvP matchmaking formation pass: {Outcome}", outcome);
 		}
 
 		/// <summary>
@@ -93,28 +93,36 @@ namespace Faolan.CSPlayerAgent
 		/// </summary>
 		public Task<string> ForceFormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue)
 		{
-			return FormFromQueue(queued, dequeue, minMembers: 1);
+			return FormFromQueue(queued, dequeue, force: true);
 		}
 
-		private async Task<string> FormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue, int minMembers)
+		private async Task<string> FormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue, bool force)
 		{
 			// Whoever is already in a match keeps their signup out of the pairing (stale rows are dequeued).
 			var eligible = queued.Where(q => !_memberships.ContainsKey(q.CharacterId)).ToList();
-			if (eligible.Count < minMembers)
-				return $"nothing formed - {eligible.Count} eligible signup(s) in the queue, need {minMembers}.";
+			if (eligible.Count < 1)
+				return "nothing formed - the queue holds no eligible signup.";
 
 			// The anchor is the longest-queued signup; everyone compatible with it joins the match. A concrete
 			// signup among them names the minigame; all "join first available" falls back to the pair the captured
 			// signups used most - Conquest (type 4) on The Call of Jhebbal Sag (5006).
 			var anchor = eligible[0];
 			var members = eligible.Where(q => Compatible(anchor.Signup, q.Signup)).ToList();
-			if (members.Count < minMembers)
-				return $"nothing formed - only {members.Count} signup(s) compatible with the longest-queued one.";
 
 			var pick = members.FirstOrDefault(m => !m.Signup.IsAnyAvailable).Signup ?? anchor.Signup;
 			var (mapId, matchType, queueType) = pick.IsAnyAvailable
 				? (5006u, 4u, 0u)
 				: (pick.MapId, pick.MinigameType, pick.QueueType);
+
+			// The match forms when the minigame's queue is FULL - the per-map capacity the client's own window
+			// shows (0/24, 0/12). `.matchstart` overrides with whatever is there; either way no match takes more
+			// than the capacity.
+			var capacity = StartingData.MinigameQueueCapacity.GetValueOrDefault(mapId, StartingData.DefaultMinigameQueueCapacity);
+			if (!force && members.Count < capacity)
+				return $"queue at {members.Count}/{capacity} for map {mapId} - forming at capacity (`.matchstart` forces).";
+
+			if (members.Count > capacity)
+				members = members.Take(capacity).ToList();
 
 			// The ruleset states THIS match truthfully: two sides of however many the queue held. Time limit 900 s
 			// is the client's own debug default; the score limit is a placeholder the client only displays.
@@ -142,6 +150,14 @@ namespace Faolan.CSPlayerAgent
 			var payload = PvpMatchCodec.Build(Payload(match));
 			foreach (var member in members)
 				await Push(member.CharacterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouJoinedMatch, payload);
+
+			// Announce every member to every member as a PlayerJoined - [cCharacter record][u32 side], the reader's
+			// own shape. The client DEDUPS against its roster by id (FUN_005471b0 walks the 0x7c-stride vector
+			// before appending), so a member already listed just drives the side/refresh path - and that refresh is
+			// what fills the buildup view, which stayed blank when the roster arrived only inside i_cMatch.
+			foreach (var member in members)
+				if (PlayerJoinedBody(member.CharacterId, match) is { } joined)
+					await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerJoined, joined);
 
 			// A matchmade match's sides are the queue's, not the player's pick - the lock messages are how the
 			// client learns both facts.
@@ -328,6 +344,11 @@ namespace Faolan.CSPlayerAgent
 					await Task.Delay(TimeSpan.FromSeconds(TeleportInSeconds));
 					foreach (var member in match.Sides.Keys)
 					{
+						// Where to put them back when they leave: their live transform the moment the match takes
+						// them, so LeaveMatch is a round trip and not a one-way move.
+						if (gameServer.GetCharacterLiveState(member) is { } from && from.MapId != match.Rules.MapId)
+							match.ReturnTo[member] = (from.MapId, new System.Numerics.Vector3(from.X, from.Y, from.Z));
+
 						if (!await gameServer.TeleportCharacter(member, match.Rules.MapId))
 							logger.LogWarning("PvP match {MatchId}: the world tier could not move {CharacterId:X8} to map {MapId}.", match.Id, member, match.Rules.MapId);
 					}
@@ -386,8 +407,12 @@ namespace Faolan.CSPlayerAgent
 
 			// Everyone already in hears the join first, then the joiner gets the whole match - so the payload the
 			// joiner receives already lists them, and the broadcast does not name them to themselves twice.
-			foreach (var member in match.Sides.Keys.Where(m => m != characterId))
-				await Push(member, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerJoined, Id32AndU32(characterId, NoSide));
+			// ⚠️ PlayerJoined carries the WHOLE cCharacter record plus the side, not a bare ID32 - its dispatch
+			// reader (FUN_01346780) calls the same FUN_005574d0 the roster uses. A 12-byte ID32 form is silently
+			// discarded as stream-bad, which is how the buildup view stayed empty on the first live run.
+			if (PlayerJoinedBody(characterId, match) is { } joined)
+				foreach (var member in match.Sides.Keys.Where(m => m != characterId))
+					await Push(member, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerJoined, joined);
 
 			await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouJoinedMatch, PvpMatchCodec.Build(Payload(match)));
 			logger.LogInformation("PvP match {MatchId}: {CharacterId:X8} joined ({Members} member(s)).", match.Id, characterId, match.Sides.Count);
@@ -403,18 +428,39 @@ namespace Faolan.CSPlayerAgent
 			if (banned)
 				match.Banned.TryAdd(characterId, 0);
 
+			// PlayerLeft/PlayerKicked carry the WHOLE cCharacter record (their readers call the same FUN_005574d0
+			// the roster uses; Kicked appends the message string) - a bare ID32 is discarded as stream-bad.
+			var record = teams.MemberRecordOf(characterId);
 			if (kickedBy != null)
 			{
-				// The kicked player hears it too - that message is how their client learns it is out of the match.
 				using var s = new FaolanStream();
-				s.WriteUInt32(EntityClass.Character).WriteUInt32(characterId).WriteString(message);
+				if (record != null)
+				{
+					var rec = TeamMemberRecordCodec.Build(record);
+					s.Write(rec, 0, rec.Length);
+				}
+
+				s.WriteString(message);
 				var body = s.ToArray();
-				await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerKicked, body);
-				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerKicked, body);
+				// The kicked player hears it too - that message is how their client learns it is out of the match.
+				if (record != null)
+				{
+					await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerKicked, body);
+					await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerKicked, body);
+				}
 			}
-			else
+			else if (record != null)
 			{
-				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerLeft, Id32(characterId));
+				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerLeft, TeamMemberRecordCodec.Build(record));
+			}
+
+			// Leaving the match while standing IN its minigame returns the member to where they were before the
+			// countdown teleport took them (recorded at teleport time). Leaving from anywhere else moves nobody.
+			if (match.ReturnTo.TryRemove(characterId, out var back)
+			    && gameServer.GetCharacterLiveState(characterId) is { } live && live.MapId == match.Rules.MapId)
+			{
+				if (!await gameServer.TeleportCharacter(characterId, back.MapId, back.Position))
+					logger.LogWarning("PvP match {MatchId}: could not return {CharacterId:X8} to map {MapId}.", match.Id, characterId, back.MapId);
 			}
 
 			// The removed member's own window resets on MatchRemoved (0x207C - the no-arg feedback override the
@@ -430,9 +476,26 @@ namespace Faolan.CSPlayerAgent
 
 			if (match.LeaderId == characterId)
 			{
-				// The lead passes to the longest-standing remaining member. ⚠️ An ASSUMPTION - nothing recovered
-				// states retail's succession rule - but some member must lead, and the client renders whoever
-				// NewMatchLeader names. Noted on #146.
+				// The buildup view's "Cancel Match" IS a leader leave - there is no separate cancel method on the
+				// wire - so a leader leaving a match that has NOT started cancels it for everyone: MatchRemoved to
+				// every remaining member, match gone. A leader leaving a STARTED match instead passes the lead
+				// (NewMatchLeader exists for exactly that). ⚠️ The started/unstarted split is an ASSUMPTION -
+				// nothing recovered states retail's rule - noted on #146.
+				if (!match.Started)
+				{
+					await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
+					foreach (var member in match.Sides.Keys)
+					{
+						match.Sides.TryRemove(member, out _);
+						_memberships.TryRemove(member, out _);
+					}
+
+					_matches.TryRemove(match.Id, out _);
+					logger.LogInformation("PvP match {MatchId}: CANCELLED by its leader before start; every member released.", match.Id);
+					return;
+				}
+
+				// The lead passes to the longest-standing remaining member. ⚠️ An ASSUMPTION too, same note.
 				match.LeaderId = match.Sides.Keys.First();
 				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingNewMatchLeader, Id32(match.LeaderId));
 			}
@@ -470,6 +533,20 @@ namespace Faolan.CSPlayerAgent
 				: Task.CompletedTask;
 		}
 
+		// [cCharacter record][u32 side] - DispatchPvPMatchMakingPlayerJoined's body per its own reader. Null when
+		// the member's record cannot be resolved (no live session), in which case nothing is sent.
+		private byte[]? PlayerJoinedBody(uint characterId, LiveMatch match)
+		{
+			if (teams.MemberRecordOf(characterId) is not { } record)
+				return null;
+
+			using var s = new FaolanStream();
+			var rec = TeamMemberRecordCodec.Build(record);
+			s.Write(rec, 0, rec.Length);
+			s.WriteUInt32(match.Sides.TryGetValue(characterId, out var side) && side is { } v ? v : NoSide);
+			return s.ToArray();
+		}
+
 		private static byte[] U32(uint value)
 		{
 			using var s = new FaolanStream();
@@ -502,6 +579,10 @@ namespace Faolan.CSPlayerAgent
 			public ConcurrentDictionary<uint, uint?> Sides { get; } = [];
 			public ConcurrentDictionary<uint, uint> LockedSides { get; } = [];
 			public ConcurrentDictionary<uint, byte> Banned { get; } = [];
+
+			// Each member's pre-match transform, recorded when the countdown teleport takes them - what LeaveMatch
+			// restores. Absent for a member who was already on the minigame map when the match formed.
+			public ConcurrentDictionary<uint, (uint MapId, System.Numerics.Vector3 Position)> ReturnTo { get; } = [];
 		}
 	}
 }

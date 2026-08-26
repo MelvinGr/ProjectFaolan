@@ -1191,14 +1191,17 @@ namespace Faolan.GameServer
 				}
 
 				// 0x2092 RequestNewJoinHasHostileInFriends(const GroupElement_c& i_cWho): before a team join, the
-				// client asks whether the joiner has a HOSTILE on their friends list. `GroupElement_c` is the same
-				// 102-byte member record RequestTeamInvite carries (which is that record plus a trailing u16), so it
-				// parses with TeamMemberRecord. The reply DispatchReplyNewJoinHasHostileInFriends carries only the
-				// subject and no boolean, i.e. sending it IS the "yes" - so answering nothing is the correct "no",
-				// which is also the only answer we can give: we model no hostility between players.
+				// client asks whether the joiner has a HOSTILE on their friends list. `GroupElement_c` is the bare
+				// member record and NOTHING ELSE - the client's own signature carries no message, unlike
+				// RequestTeamInvite's `(i_cWho, i_cMessage)`. This used to parse with TeamInviteCodec (record +
+				// message), which threw on the first live invite ever made in a minigame instance (2026-08-26: a
+				// 98-byte record consumed the whole body and the codec demanded a message that was never there),
+				// and the parse exception dropped the connection. The reply DispatchReplyNewJoinHasHostileInFriends
+				// carries only the subject and no boolean, i.e. sending it IS the "yes" - so answering nothing is
+				// the correct "no", which is also the only answer we can give: we model no hostility between players.
 				case GameCharAgentMethods.RequestNewJoinHasHostileInFriends:
 				{
-					var who = TeamInviteCodec.Parse(body.ReadRemainingArray()).Member;
+					var who = TeamMemberRecordCodec.Parse(body.ReadRemainingArray());
 
 					Logger.LogDebug("RequestNewJoinHasHostileInFriends for {Name} ({CharacterId:X8}) - no hostility modelled, so no reply.", who.Name, who.CharacterId);
 
