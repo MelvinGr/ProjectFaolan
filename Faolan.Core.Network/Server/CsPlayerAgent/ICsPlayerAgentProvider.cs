@@ -46,6 +46,15 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		uint? TeamIdOf(uint characterId);
 
 		/// <summary>
+		///     The STARTED custom PvP match holding <paramref name="characterId" /> whose minigame map is
+		///     <paramref name="mapId" />, or null (#146). The world entry asks this the same way it asks
+		///     <see cref="TeamIdOf" />: the match's id keys the match-owned playfield instance (both sides land in ONE
+		///     copy - the minigame twin of #512's team instance), and the seconds tell the entering client the match
+		///     clock (<c>DispatchMinigameMatchStarted</c>).
+		/// </summary>
+		PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId);
+
+		/// <summary>
 		///     Tell <paramref name="recipientId" /> that mail has arrived (<c>DispatchYouGotMailNotification</c>, #871).
 		///     Returns false when the recipient is not connected to this realm's CS tier, so the caller can tell "not
 		///     notified" from "notified".
@@ -72,4 +81,7 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		/// </summary>
 		Task<bool> DepositToGuildBank(uint characterId, ulong amountTin);
 	}
+
+	/// <summary>A started match's identity as the world entry needs it: the instance key and the running clock.</summary>
+	public readonly record struct PvpMatchWorldEntry(uint MatchId, uint SecondsSinceStarted);
 }

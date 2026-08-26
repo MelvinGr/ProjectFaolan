@@ -50,6 +50,10 @@ namespace Faolan.CSPlayerAgent
 		// minigame window polls. Built on the team service too, because `i_bBringTeam` queues a whole team.
 		private readonly PvpMatchMakingService _pvpMatchMaking;
 
+		// Composed collaborator: CUSTOM PvP matches (#146) - the create/join/side/start lifecycle on top of the
+		// queue, and the seam the world entry asks for the match-owned playfield instance.
+		private readonly PvpMatchService _pvpMatches;
+
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
@@ -74,6 +78,7 @@ namespace Faolan.CSPlayerAgent
 
 			_groupFinder = new GroupFinderService(logger, database, _teams, gameServerDispatcher);
 			_pvpMatchMaking = new PvpMatchMakingService(logger, _teams, ClientForCharacter);
+			_pvpMatches = new PvpMatchService(logger, _teams, ClientForCharacter, gameServerDispatcher);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -91,6 +96,7 @@ namespace Faolan.CSPlayerAgent
 			if (client.Session.Character is { } character)
 			{
 				_pvpMatchMaking.Forget(character.Id);
+				_pvpMatches.Forget(character.Id);
 				_groupFinder.Forget(character.Id);
 
 				// Same rule for the LFG advert (#889): the team search answers from live sessions, so a flag left
@@ -130,6 +136,13 @@ namespace Faolan.CSPlayerAgent
 		public uint? TeamIdOf(uint characterId)
 		{
 			return _teams.TeamOf(characterId);
+		}
+
+		// The started custom match holding this character on this map (#146) - what routes a minigame entry to the
+		// MATCH-OWNED instance and tells the entering client the match clock.
+		public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId)
+		{
+			return _pvpMatches.PvpMatchEntryOf(characterId, mapId);
 		}
 
 		// The guild bank's deposit half (#654) - the world tier has already taken the money out of the wallet.
@@ -735,6 +748,97 @@ namespace Faolan.CSPlayerAgent
 					// where the player WAS queued, which is what says the silence is the answer and not a gap. The
 					// client learns its own state from the 0x2092 board it polls anyway. Consumed so it isn't logged
 					// as unhandled.
+					break;
+				}
+
+				// --- Custom PvP matches (#146) ------------------------------------------------------------------
+				// The create/join/side/start lifecycle - the message set recovered from the client, ⚠️ uncaptured
+				// end to end (no captured session ever creates a match): see PvpMatchService. The c2s bodies below
+				// are the client's own parameter lists (docs/re/aoc-client-rpc-methods.json); an `ID32::InstanceType`
+				// is one u32 (the instance word alone), a `const ID32&` two.
+
+				// 0x204A PvPMatchMakingCreateMatch(const PvPMatchRules_c&): the whole body is the ruleset element.
+				case CSPlayerAgentMethods.PvPMatchMakingCreateMatch:
+				{
+					await _pvpMatches.HandleCreateMatch(client, PvpMatchRulesCodec.Parse(body.ReadRemainingArray()));
+					break;
+				}
+
+				// 0x204B PvPMatchMakingJoinMatch(ID32::InstanceType i_nMatchID, bool i_bBringTeam, string i_cPassword).
+				case CSPlayerAgentMethods.PvPMatchMakingJoinMatch:
+				{
+					var matchId = body.ReadUInt32();
+					var bringTeam = body.ReadByte() != 0;
+					await _pvpMatches.HandleJoinMatch(client, matchId, bringTeam, body.ReadString());
+					break;
+				}
+
+				// 0x204C PvPMatchMakingSetSide(int i_nSide).
+				case CSPlayerAgentMethods.PvPMatchMakingSetSide:
+				{
+					await _pvpMatches.HandleSetSide(client, body.ReadUInt32());
+					break;
+				}
+
+				// 0x204D PvPMatchMakingMatchSay(string i_cMessage).
+				case CSPlayerAgentMethods.PvPMatchMakingMatchSay:
+				{
+					await _pvpMatches.HandleMatchSay(client, body.ReadString());
+					break;
+				}
+
+				// 0x204E PvPMatchMakingLeaveMatch().
+				case CSPlayerAgentMethods.PvPMatchMakingLeaveMatch:
+				{
+					await _pvpMatches.HandleLeaveMatch(client);
+					break;
+				}
+
+				// 0x2050 PvPMatchMakingGetMatchInfo(ID32::InstanceType i_nMatchID).
+				case CSPlayerAgentMethods.PvPMatchMakingGetMatchInfo:
+				{
+					await _pvpMatches.HandleGetMatchInfo(client, body.ReadUInt32());
+					break;
+				}
+
+				// 0x2051 PvPMatchMakingTeleportToMinigame(): the member asks to be moved into the minigame.
+				case CSPlayerAgentMethods.PvPMatchMakingTeleportToMinigame:
+				{
+					await _pvpMatches.HandleTeleportToMinigame(client);
+					break;
+				}
+
+				// 0x2056 PvPMatchMakingKickPlayer(const ID32&, string) / 0x2057 ...BanPlayer(const ID32&, string).
+				case CSPlayerAgentMethods.PvPMatchMakingKickPlayer:
+				case CSPlayerAgentMethods.PvPMatchMakingBanPlayer:
+				{
+					body.ReadUInt32(); // the ID32's entity-class word
+					var targetId = body.ReadUInt32();
+					await _pvpMatches.HandleKickPlayer(client, targetId, body.ReadString(), packet.Method == (uint)CSPlayerAgentMethods.PvPMatchMakingBanPlayer);
+					break;
+				}
+
+				// 0x2058 PvPMatchMakingMakePlayerMatchOwner(const ID32&).
+				case CSPlayerAgentMethods.PvPMatchMakingMakePlayerMatchOwner:
+				{
+					body.ReadUInt32(); // entity class
+					await _pvpMatches.HandleMakePlayerMatchOwner(client, body.ReadUInt32());
+					break;
+				}
+
+				// 0x2059 PvPMatchMakingForceSide(const ID32&, int i_nSide).
+				case CSPlayerAgentMethods.PvPMatchMakingForceSide:
+				{
+					body.ReadUInt32(); // entity class
+					var forcedId = body.ReadUInt32();
+					await _pvpMatches.HandleForceSide(client, forcedId, body.ReadUInt32());
+					break;
+				}
+
+				// 0x205A PvPMatchMakingStartMatch().
+				case CSPlayerAgentMethods.PvPMatchMakingStartMatch:
+				{
+					await _pvpMatches.HandleStartMatch(client);
 					break;
 				}
 

@@ -219,8 +219,8 @@ nevertheless pinned, because the client contains all three halves of it and they
 i_cMatch  =  [ListFrame(n)] { n × cCharacter }      # the member roster - FUN_0055bdb0, 0x7c stride
              [ListFrame(m)] { m × u32 }             # an id list - FUN_004d4ef0
              PvPMatchRules_c                        # below
-             [u32 tail0]
-             if (rules.FlagB == 0)  [u32 tail1] [u32 tail2]
+             [u32 matchId]                          # tail0
+             if (rules.FlagB == 0)  [ID32 leader]   # two words
 
 PvPMatchRules_c  =  [u32 A]  [u32 B]  [u32 C]  [u32 D]  [u32 E]     # struct +0x00 .. +0x10
                     [u16 len][latin1]                               # +0x14, a std::string
@@ -319,7 +319,7 @@ defaults support, without a consumer to prove it:
 | `D`, `E` | `+0x0C`, `+0x10` | team size min / max (`3`–`6`) | `TeamSize` is rendered `"%d-%d"`, a range; the debug defaults are `3` and `6` |
 | the string, `FlagA` | `+0x14`, `+0x3C` | password, has-password | the debug command sets both together from its one optional string argument; `Pwd` is a bool column and gates the password prompt |
 | `H` | `+0x38` | unnamed | never set by the debug command, read by nothing found |
-| `tail1`/`tail2` | `+0x68`, `+0x6C` | possibly the `Applied` time (a `time_t` is the one 64-bit column) | shape only |
+| ~~`tail1`/`tail2`~~ | `+0x68`, `+0x6C` | **the match LEADER's ID32** — named 2026-08-26 by the copier's fifo chooser (`00547117..2f`): the stored pair is compared against the LOCAL PLAYER's ID32, a match raising `PvPMatchMakingYouCreatedMatch` and a mismatch `PvPMatchMakingYouJoinedMatch`. Not the `Applied` time this row first guessed. | the chooser reads both words as one identity and the two fifo tokens are its two outcomes |
 
 `[V0: the PvPMatchRules_c C/D/E/H columns]`
 
@@ -421,10 +421,17 @@ the siege side's pairing (#147).
 ⚠️ `NPCKills`/`NPCDeaths` are the only two ids of the run that retail does **not** populate, and they are
 deliberately not sent — see `Character`'s remark and `SnapshotStatSheet`.
 
-## What blocks implementing these
+## What is built, and what still blocks the rest
 
-Not the wire. All three message sets are enumerated and the scalar bodies are exact. What is missing is
-**content and systems**: the minigame playfields and their sensor-volume capture zones, the battlekeep areas
-behind `areaId`, the scoring rules, and — for guild cities — a building/object-persistence model and the
-Architect tradeskill that feeds it. Open work tracked in Gitea #146 (minigames / Massive PvP) and #147 (sieges /
-battlekeeps / guild cities); #498 covers the city plots the captures DO carry, as destructibles.
+The **custom-match lifecycle is built** (2026-08-26, uncaptured end to end — it carries #146's needs-testing):
+`PvpMatchRulesCodec` / `PvpMatchCodec` build the element and the `i_cMatch` payload above, `PvpMatchService`
+runs create/join/side/say/kick/ban/force-side/start, and a started match owns ONE playfield instance both
+sides land in (`WorldState.ResolveEntryInstance`, the minigame twin of #512's team instance), entered through
+the ordinary change-map handoff when each member's client sends `PvPMatchMakingTeleportToMinigame`; the entry
+answers with `DispatchMinigameMatchStarted` so a late zoner sees the running clock.
+
+What still blocks the REST is content and systems, not the wire: the sensor-volume capture zones (#513) and
+scoring for a playable minigame, the battlekeep areas behind `areaId`, and — for guild cities — a
+building/object-persistence model and the Architect tradeskill that feeds it. Open work tracked in Gitea #146
+(minigames / Massive PvP) and #147 (sieges / battlekeeps / guild cities); #498 covers the city plots the
+captures DO carry, as destructibles.

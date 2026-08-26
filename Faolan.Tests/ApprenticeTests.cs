@@ -179,6 +179,8 @@ namespace Faolan.Tests
 			}
 
 			// One fixed team, so its id is a constant - this fake exists for the roster, not for #512's routing.
+			public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId) => null;
+
 			public uint? TeamIdOf(uint characterId)
 			{
 				return members.Contains(characterId) ? 1u : null;

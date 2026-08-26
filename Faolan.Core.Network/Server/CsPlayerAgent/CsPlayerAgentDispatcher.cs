@@ -48,5 +48,10 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		{
 			return Provider?.TeamIdOf(characterId);
 		}
+
+		public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId)
+		{
+			return Provider?.PvpMatchEntryOf(characterId, mapId);
+		}
 	}
 }

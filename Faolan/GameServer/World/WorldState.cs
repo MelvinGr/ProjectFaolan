@@ -212,6 +212,10 @@ namespace Faolan.GameServer.World
 		// TeamInstance for why the entry is validated against the live zone rather than cleaned up on leave.
 		private readonly ConcurrentDictionary<(uint TeamId, uint MapId, bool Epic), uint> _teamInstances = new ConcurrentDictionary<(uint TeamId, uint MapId, bool Epic), uint>();
 
+		// #146: which copy of a minigame map a custom PvP MATCH owns - both sides of the match land in it. Same
+		// live-zone validation as the team dict above (MatchInstance).
+		private readonly ConcurrentDictionary<(uint MatchId, uint MapId), uint> _matchInstances = new ConcurrentDictionary<(uint MatchId, uint MapId), uint>();
+
 		// Server-side terrain (RDB heightmap), for the tier-2 aggro line-of-sight below (#284). Null = terrain
 		// unavailable (no client RDB); the line-of-sight check then fails open, leaving the tier-1 vertical gate.
 		private readonly TerrainService? _terrain;
@@ -277,8 +281,14 @@ namespace Faolan.GameServer.World
 		// binding is dropped once the copy is EMPTY, so a party that all leaves cannot come back to that copy. It
 		// does NOT stop a single member who stepped out from rejoining while the others are still inside, which
 		// retail refuses; that needs the leave-side message box we do not send yet.
-		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode, uint? teamId = null, bool epic = false)
+		public uint ResolveEntryInstance(WorldEntity? existing, uint mapId, MapInstanceMode mode, uint? teamId = null, bool epic = false, uint? pvpMatchId = null)
 		{
+			// #146: a STARTED custom PvP match owns ONE copy of its minigame map, and every member - both sides -
+			// lands in it, whatever the map's own mode says. Checked before the stay-in rule so a member already on
+			// the map (a re-entry) still converges on the match's copy rather than keeping a pre-match one.
+			if (pvpMatchId is { } match)
+				return MatchInstance(match, mapId);
+
 			// The stay-in rule only holds when the copy's DIFFICULTY matches the entry's (#309): retail's captured
 			// epic re-entry to the same map minted a fresh instance (consecutive playfield tokens), it did not reuse
 			// the normal copy the player had just left.
@@ -306,6 +316,20 @@ namespace Faolan.GameServer.World
 		// mints a fresh instance instead. That is the "empty = gone" lifetime the ticket asks for, expressed as a
 		// lookup rather than as a cleanup pass - a zone with no players in it is indistinguishable from one that was
 		// never created, so there is nothing to tear down and no timer to get wrong.
+		// The copy of `mapId` owned by custom PvP match `matchId` (#146) - the minigame twin of TeamInstance,
+		// with the same empty-means-gone lifetime: an entry whose remembered zone has emptied mints a fresh copy.
+		private uint MatchInstance(uint matchId, uint mapId)
+		{
+			if (_matchInstances.TryGetValue((matchId, mapId), out var existing)
+			    && _zones.TryGetValue((mapId, existing), out var zone)
+			    && zone.Entities.Any(e => e.IsPlayer))
+				return existing;
+
+			var minted = NextPlayfieldToken();
+			_matchInstances[(matchId, mapId)] = minted;
+			return minted;
+		}
+
 		private uint TeamInstance(uint teamId, uint mapId, bool epic = false)
 		{
 			// The binding is per-DIFFICULTY (#309): a team's epic copy and its normal copy of one map are two

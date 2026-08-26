@@ -563,8 +563,11 @@ namespace Faolan.GameServer
 			var epicEntry = PendingEpicEntry.TryRemove(character.Id, out _);
 			// #512: a GROUP map is one copy per TEAM, so the entry needs the team's id - which the CS tier owns, and
 			// which this listener reaches through the same seam LeaveTeam/KickFromTeam already use.
+			// #146: and a STARTED custom PvP match owns one copy of its minigame map - both sides land in it - so the
+			// entry asks the CS tier for the match the same way it asks for the team.
+			var pvpMatch = _csPlayerAgentDispatcher.PvpMatchEntryOf(client.Session.Character.Id, map.Id);
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling, comboBonuses,
-				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry);
+				_csPlayerAgentDispatcher.TeamIdOf(client.Session.Character.Id), epicEntry, pvpMatch?.MatchId);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 
 			// #305: the playfield-instance token is sourced PER-MAP (Map.PlayfieldToken), falling back to the beach
@@ -723,6 +726,18 @@ namespace Faolan.GameServer
 			// live here delivered every quest under a single area header, which filled the Completed tab with one bogus
 			// group and left Active empty.
 			await _broadcaster.BroadcastPlayerEntry(client);
+
+			// #146: entering a started custom match's minigame map - tell the client the match clock. The Flash API's
+			// GetTimeLeft/GetMinigameStatus compute off the match start this sets (i_nSecondsSinceStarted, so a member
+			// zoning in late sees the running clock, not a fresh one). ⚠️ Client-recovered, uncaptured - like the whole
+			// match lifecycle (PvpMatchService).
+			if (pvpMatch is { } startedMatch)
+			{
+				await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchStarted,
+					s => s.WriteUInt32(startedMatch.SecondsSinceStarted)));
+				Logger.LogInformation("World entry: '{Name}' entered PvP match {MatchId}'s minigame map (clock at {Seconds}s).", character.Name, startedMatch.MatchId,
+					startedMatch.SecondsSinceStarted);
+			}
 
 			// On a CREATE-world entry the snapshot carried no quests (empty region above), so deliver the starter quest
 			// LIVE exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
