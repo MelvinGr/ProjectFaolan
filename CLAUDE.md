@@ -436,7 +436,10 @@ back to its dump; `FixtureArchiveTests` keeps a re-harvest from putting names ba
 which IIRs, and the framing around each hit. ⚠️ Feed it the same list the commit hook blocks on
 (`.git/hooks/personal-names.json`), and note that the residue is protobuf length-delimited fields, not the
 `[u16 len][latin1]` wire strings #465 first assumed - so an equal-length substitution would ripple nowhere.
-Rewriting those retail bytes is an open decision, not a chore.
+The substitution itself is `--report fixture-substitute --report-arg "<old>=<new>[,...]" [--dry-run]` (equal
+length ENFORCED, framed occurrences only, verifies the old names are gone) - but Rewriting those retail bytes is
+an open decision, not a chore: it needs the equal-length pseudonyms and the three golden test literals
+(`GuildPacketTests`/`MailMessageCodecTests`/`TradepostMailBodyTests`) move in the same change.
 
 You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `Content:TerrainDir` key in `faolan.json`; if it is missing the server logs

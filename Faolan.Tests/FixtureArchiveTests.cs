@@ -48,4 +48,77 @@ namespace Faolan.Tests
 			Assert.False(FixtureArchiveWriter.IsCaptureId("7140784")); // nor a short one
 		}
 	}
+
+	// #465 option B - the tool that substitutes personal names inside the packet BYTES by an equal-length pseudonym.
+	// These gate the substitution PRIMITIVE on synthetic bytes (never a real name in test source): framed-only,
+	// equal-length, prefix-safe, case-insensitive. The archive round-trip is covered by the equal-length guarantee
+	// the primitive enforces - a same-length overwrite moves no offset, so a byte-exact golden reading the archive
+	// stays byte-exact by construction.
+	public class FixtureSubstituteTests
+	{
+		private static byte[] Framed(byte tag, string name)
+		{
+			var n = System.Text.Encoding.Latin1.GetBytes(name);
+			var b = new byte[2 + n.Length];
+			b[0] = tag;                 // wiretype-2 tag (low 3 bits == 2)
+			b[1] = (byte)n.Length;      // single-byte length varint
+			n.CopyTo(b, 2);
+			return b;
+		}
+
+		[Fact]
+		public void ReplacesAFramedName_InPlace_PreservingLengthAndSurroundings()
+		{
+			// [0x0a=field1,wt2][len=6]"Aaaaaa" wrapped in unrelated bytes on both sides
+			var body = new byte[] { 0xde, 0xad }.Concat(Framed(0x0a, "Aaaaaa")).Concat(new byte[] { 0xbe, 0xef }).ToArray();
+			var before = (byte[])body.Clone();
+
+			var changed = FixtureArchiveWriter.ReplaceFramed(body,
+				System.Text.Encoding.Latin1.GetBytes("Aaaaaa"), System.Text.Encoding.Latin1.GetBytes("Bbbbbb"));
+
+			Assert.Equal(1, changed);
+			Assert.Equal(before.Length, body.Length);            // length unchanged
+			Assert.Equal(before[..4], body[..4]);                // tag+len+prefix bytes untouched
+			Assert.Equal(before[^2..], body[^2..]);              // trailing bytes untouched
+			Assert.Equal("Bbbbbb", System.Text.Encoding.Latin1.GetString(body, 4, 6));
+			Assert.Equal(0, FixtureArchiveWriter.CountFramed(body, System.Text.Encoding.Latin1.GetBytes("Aaaaaa")));
+		}
+
+		[Fact]
+		public void LeavesAnUnframedByteCoincidence_Alone()
+		{
+			// The name bytes appear, but not preceded by [wt2 tag][len] - a coincidence, not a wire string.
+			var name = System.Text.Encoding.Latin1.GetBytes("Aaaaaa");
+			var body = new byte[] { 0x00, 0x05 }.Concat(name).ToArray(); // len byte is 5, not 6
+
+			var changed = FixtureArchiveWriter.ReplaceFramed(body, name, System.Text.Encoding.Latin1.GetBytes("Bbbbbb"));
+			Assert.Equal(0, changed);
+			Assert.Equal("Aaaaaa", System.Text.Encoding.Latin1.GetString(body, 2, 6));
+		}
+
+		[Fact]
+		public void DoesNotSubstituteAShorterNameInsideAFramedLongerOne()
+		{
+			// The 6-char "Aaaaaa" is the prefix of the framed 7-char "Aaaaaab"; the len byte there is 7, so the
+			// framed check for the 6-char name fails and the longer field is left intact. This is the prefix trap.
+			var body = Framed(0x0a, "Aaaaaab");
+			var changed = FixtureArchiveWriter.ReplaceFramed(body,
+				System.Text.Encoding.Latin1.GetBytes("Aaaaaa"), System.Text.Encoding.Latin1.GetBytes("Bbbbbb"));
+
+			Assert.Equal(0, changed);
+			Assert.Equal("Aaaaaab", System.Text.Encoding.Latin1.GetString(body, 2, 7));
+		}
+
+		[Fact]
+		public void MatchesCaseInsensitively_LikeTheScanner()
+		{
+			// The wire carries the name as typed (capitalised); the block list is lower-case.
+			var body = Framed(0x0a, "aaaaaa");
+			var changed = FixtureArchiveWriter.ReplaceFramed(body,
+				System.Text.Encoding.Latin1.GetBytes("AAAAAA"), System.Text.Encoding.Latin1.GetBytes("bbbbbb"));
+
+			Assert.Equal(1, changed);
+			Assert.Equal("bbbbbb", System.Text.Encoding.Latin1.GetString(body, 2, 6));
+		}
+	}
 }

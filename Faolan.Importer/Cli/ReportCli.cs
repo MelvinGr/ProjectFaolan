@@ -213,6 +213,36 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// Substitutes personal character names inside the archive's packet bytes by EQUAL-LENGTH pseudonyms
+			// (#465 option B). Reads no captures - it edits the committed archive in place, verifying the old names
+			// are gone. `--dry-run` reports what it would change and writes nothing. The pseudonyms are the caller's
+			// call and must match the real name's byte length; the three golden test literals move in the same change
+			// (see FixtureArchiveWriter.Substitute).
+			if (report == "fixture-substitute")
+			{
+				var pairs = new List<(string Old, string New)>();
+				foreach (var token in (arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+				{
+					var eq = token.IndexOf('=');
+					if (eq <= 0 || eq == token.Length - 1)
+					{
+						await Console.Error.WriteLineAsync("usage: --report fixture-substitute --report-arg <old>=<new>[,<old2>=<new2>...] [--dry-run]");
+						await Console.Error.WriteLineAsync("       each <new> MUST have the same byte length as its <old> (e.g. OldName=NewNam1).");
+						return 1;
+					}
+
+					pairs.Add((token[..eq], token[(eq + 1)..]));
+				}
+
+				if (pairs.Count == 0)
+				{
+					await Console.Error.WriteLineAsync("usage: --report fixture-substitute --report-arg <old>=<new>[,...] [--dry-run]");
+					return 1;
+				}
+
+				return FixtureArchiveWriter.Substitute(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), pairs, options.DryRun);
+			}
+
 			// Adds or replaces ONE named fixture in the archive. Reads no captures, so it sits above the corpus check:
 			// the hand-carved fixtures cannot be re-derived from the corpus, which is exactly why this exists.
 			if (report == "fixture-set")

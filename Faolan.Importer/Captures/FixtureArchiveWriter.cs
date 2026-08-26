@@ -375,6 +375,152 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"{fromKey} -> {toKey} ({bytes.Length} bytes, unchanged); archive now {named.Count} named fixtures, {corpus.Count} corpus entries");
 		}
 
+		// Substitutes personal character names inside the packet BYTES themselves - the last half of #465 the text
+		// sweep and the manifest re-key could not reach. Each name rides the wire as a PROTOBUF length-delimited
+		// field (`[tag wiretype 2][len varint][latin1]`, `--report fixture-names`), so an EQUAL-LENGTH pseudonym
+		// overwrites exactly the name's own bytes: the single-byte length does not move and nothing after it
+		// shifts, which is why every byte-exact golden that reads the archive stays byte-exact.
+		//
+		// ⛔ Only FRAMED occurrences are touched - a hit whose preceding byte is the field's length AND whose byte
+		// before that is a wiretype-2 tag. That is what makes it safe against the prefix trap: a 6-char name that is
+		// the start of a 7-char one carries the 7's length byte at that position, so its framed check fails there and
+		// the shorter name is not substituted inside the longer. Unframed byte coincidences are left untouched.
+		//
+		// EQUAL LENGTH IS ENFORCED, not assumed: a pair whose two names differ in byte length is refused before
+		// anything is written, because a differing length WOULD shift every following field and break the goldens.
+		//
+		// ⚠️ The golden TEST LITERALS that assert a name physically present in these bytes (`GuildPacketTests`,
+		// `MailMessageCodecTests`, `TradepostMailBodyTests`) must move to the same pseudonym in the same change -
+		// they compare a freshly BUILT packet, whose name comes from the test's own input, against the substituted
+		// golden. This tool does the archive half; those three literals are the coordinated other half.
+		public static int Substitute(string archivePath, IReadOnlyList<(string Old, string New)> pairs, bool dryRun)
+		{
+			ArgumentNullException.ThrowIfNull(pairs);
+
+			foreach (var (oldName, newName) in pairs)
+			{
+				var oldLen = Encoding.Latin1.GetByteCount(oldName);
+				var newLen = Encoding.Latin1.GetByteCount(newName);
+				if (oldLen != newLen)
+				{
+					Console.Error.WriteLine($"fixture-substitute: '{oldName}' ({oldLen} B) -> '{newName}' ({newLen} B) is NOT equal length; refusing. "
+					                        + "A differing length shifts every following field and breaks the byte-exact goldens.");
+					return 1;
+				}
+			}
+
+			// Longest old name first, so a name that is the prefix of another is only ever considered after the
+			// longer one - belt and braces on top of the framed-length guard, which already separates them.
+			var ordered = pairs.OrderByDescending(p => Encoding.Latin1.GetByteCount(p.Old)).ToList();
+
+			var (counts, corpus, named) = Read(archivePath);
+			var (corpusBefore, namedBefore) = ContentDigest(corpus, named);
+
+			var perPair = new Dictionary<string, (int Corpus, int Named)>(StringComparer.Ordinal);
+			foreach (var (oldName, newName) in ordered)
+			{
+				var oldPat = Encoding.Latin1.GetBytes(oldName);
+				var newPat = Encoding.Latin1.GetBytes(newName);
+
+				var inCorpus = corpus.Sum(e => ReplaceFramed(e.Full, oldPat, newPat));
+				var inNamed = named.Values.Sum(b => ReplaceFramed(b, oldPat, newPat));
+				perPair[oldName] = (inCorpus, inNamed);
+			}
+
+			Console.WriteLine($"fixture-substitute: {archivePath} ({corpus.Count} corpus + {named.Count} named), {(dryRun ? "DRY RUN" : "writing")}");
+			var total = 0;
+			foreach (var (oldName, newName) in ordered)
+			{
+				var (c, n) = perPair[oldName];
+				total += c + n;
+				Console.WriteLine($"  '{oldName}' -> '{newName}': {c} corpus + {n} named framed occurrence(s)");
+			}
+
+			if (total == 0)
+			{
+				Console.WriteLine("  nothing framed to substitute; archive untouched.");
+				return 0;
+			}
+
+			if (dryRun)
+			{
+				Console.WriteLine($"  DRY RUN: {total} occurrence(s) would change; nothing written. Re-run without --dry-run to apply.");
+				return 0;
+			}
+
+			WriteArchive(archivePath, corpus, counts, named);
+
+			// The old names must be GONE from the framed positions, and every body must keep its length (equal-length
+			// substitution). Both are re-checked from disk, so "done" is a verified claim.
+			var reread = Read(archivePath);
+			var residue = ordered.Sum(p =>
+			{
+				var pat = Encoding.Latin1.GetBytes(p.Old);
+				return reread.Corpus.Sum(e => CountFramed(e.Full, pat)) + reread.Named.Values.Sum(b => CountFramed(b, pat));
+			});
+			var (corpusAfter, namedAfter) = ContentDigest(reread.Corpus, reread.Named);
+			Console.WriteLine($"  {total} occurrence(s) substituted; {reread.Corpus.Count} corpus + {reread.Named.Count} named preserved");
+			Console.WriteLine($"  corpus content digest: {corpusBefore} -> {corpusAfter}");
+			Console.WriteLine($"  named  content digest: {namedBefore} -> {namedAfter}");
+			if (residue != 0)
+				throw new InvalidDataException($"fixture-substitute left {residue} framed occurrence(s) of an old name behind - the write did not take.");
+
+			Console.WriteLine("  verified: zero framed occurrences of any old name remain.");
+			return 0;
+		}
+
+		// Overwrites, in place, every PROTOBUF-FRAMED occurrence of oldPat with newPat (which MUST be the same
+		// length), and returns how many it changed. Framed = preceded by a length byte equal to the field length and
+		// a wiretype-2 tag before that. Case-insensitive match on the name bytes (the wire carries the name as typed,
+		// the block list is lower-case; see the FixtureNames scanner).
+		internal static int ReplaceFramed(byte[] body, byte[] oldPat, byte[] newPat)
+		{
+			var changed = 0;
+			for (var i = 2; i + oldPat.Length <= body.Length; i++)
+			{
+				if (body[i - 1] != oldPat.Length || (body[i - 2] & 0x07) != 2)
+					continue;
+
+				var match = true;
+				for (var j = 0; j < oldPat.Length && match; j++)
+					match = FoldByte(body[i + j]) == FoldByte(oldPat[j]);
+
+				if (!match)
+					continue;
+
+				newPat.CopyTo(body, i);
+				changed++;
+				i += oldPat.Length - 1;
+			}
+
+			return changed;
+		}
+
+		// Counts framed occurrences without changing anything - the post-write verification.
+		internal static int CountFramed(byte[] body, byte[] pat)
+		{
+			var count = 0;
+			for (var i = 2; i + pat.Length <= body.Length; i++)
+			{
+				if (body[i - 1] != pat.Length || (body[i - 2] & 0x07) != 2)
+					continue;
+
+				var match = true;
+				for (var j = 0; j < pat.Length && match; j++)
+					match = FoldByte(body[i + j]) == FoldByte(pat[j]);
+
+				if (match)
+					count++;
+			}
+
+			return count;
+		}
+
+		private static byte FoldByte(byte b)
+		{
+			return b >= (byte)'A' && b <= (byte)'Z' ? (byte)(b + 32) : b;
+		}
+
 		private static void WriteArchive(string outputPath, List<CorpusEntry> corpus, Dictionary<string, int> counts, SortedDictionary<string, byte[]> named)
 		{
 			// Lay the corpus out by (IIR, length) so same-shaped bodies compress against each other. The reader sorts
