@@ -506,24 +506,45 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			// #146: a character whose last save was INSIDE a PvP match that no longer runs enters at the match's
-			// RETURN location, not on the minigame map - a relog mid-match (or across a server restart) must not
-			// strand them there. The redirect fires only when the persisted map IS a minigame map and no started
-			// match of theirs runs on it; a stale return on any other map (they moved on since, e.g. a GM teleport)
-			// is simply cleared. Nothing has been sent for this entry yet, so changing the map here is safe - a
-			// LOGIN client learns its map from the packets this method builds.
-			if (character.PvpReturnMapId is { } pvpReturnMap)
+			// #146: a character entering a MINIGAME map with no started match of theirs on it does not belong there -
+			// a relog mid-match (or across a server restart) must not strand them on the PvP map. The entry goes to
+			// the match's persisted RETURN location; a character with none (they were ALREADY standing on the
+			// minigame map when the match formed, so there was nothing to save - the degenerate case the first live
+			// test hit) falls back to their BOUND respawn point, else the beach default. Nothing has been sent for
+			// this entry yet, so changing the map here is safe - a LOGIN client learns its map from the packets this
+			// method builds. A reconnect into a LIVE match is untouched (the match check gates all of it).
+			if (StartingData.MinigameQueueCapacity.ContainsKey(mapId) && _csPlayerAgentDispatcher.PvpMatchEntryOf(character.Id, mapId) == null)
 			{
-				if (StartingData.MinigameQueueCapacity.ContainsKey(mapId) && _csPlayerAgentDispatcher.PvpMatchEntryOf(character.Id, mapId) == null)
+				uint destinationMap;
+				Vector3 destination;
+				if (character.PvpReturnMapId is { } pvpReturnMap)
 				{
-					character.MapId = pvpReturnMap;
-					character.Position = new Vector3(character.PvpReturnX, character.PvpReturnY, character.PvpReturnZ);
-					await Database.SaveCharacterTransform(character.Id, character.Position, character.Rotation, pvpReturnMap);
-					Logger.LogInformation("World entry: '{Name}' last saved inside a PvP match that is gone - redirected from map {MinigameMap} to map {ReturnMap} at {Pos}.",
-						character.Name, mapId, pvpReturnMap, character.Position);
-					mapId = pvpReturnMap;
+					destinationMap = pvpReturnMap;
+					destination = new Vector3(character.PvpReturnX, character.PvpReturnY, character.PvpReturnZ);
+				}
+				else if (character.BindRespawnPointId is { } bindPoint && await Database.GetRespawnPoint(bindPoint) is { } bound)
+				{
+					destinationMap = bound.MapId;
+					destination = bound.Position;
+				}
+				else
+				{
+					destinationMap = Map.TortageBeachId;
+					destination = Map.NewPlayerSpawnSpawnPoint.Position;
 				}
 
+				character.MapId = destinationMap;
+				character.Position = destination;
+				await Database.SaveCharacterTransform(character.Id, character.Position, character.Rotation, destinationMap);
+				Logger.LogInformation("World entry: '{Name}' entered minigame map {MinigameMap} with no running match - redirected to map {ReturnMap} at {Pos}.",
+					character.Name, mapId, destinationMap, character.Position);
+				mapId = destinationMap;
+			}
+
+			// A consumed or stale return never survives an entry - the live leave path clears its own, so a value
+			// still set here has either just been used above or describes a match the character long since left.
+			if (character.PvpReturnMapId != null)
+			{
 				character.PvpReturnMapId = null;
 				await Database.SaveCharacterPvpReturn(character.Id, null, default);
 			}

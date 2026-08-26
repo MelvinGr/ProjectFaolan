@@ -321,6 +321,8 @@ defaults support, without a consumer to prove it:
 | `H` | `+0x38` | unnamed | never set by the debug command, read by nothing found |
 | ~~`tail1`/`tail2`~~ | `+0x68`, `+0x6C` | **the match LEADER's ID32** — named 2026-08-26 by the copier's fifo chooser (`00547117..2f`): the stored pair is compared against the LOCAL PLAYER's ID32, a match raising `PvPMatchMakingYouCreatedMatch` and a mismatch `PvPMatchMakingYouJoinedMatch`. Not the `Applied` time this row first guessed. | the chooser reads both words as one identity and the two fifo tokens are its two outcomes |
 
+⚠️ **The chooser's "local player" is the client's OWN CHARACTER world ID32, so two clients on ONE account both read "You created a match".** The identity is `n3EngineClient` singleton slot `+0x28` (`FUN_00596160` = `*(engineClient+0xb0)+0x1b8`, the local player dynel's ID32) — per-character. The server broadcasts ONE `YouJoinedMatch` naming a single leader (byte-identical to every member), so exactly ONE client should match; two clients dual-boxed under one account resolve the same local identity and both show "created". A same-account CLIENT artifact, not a wire fault — the leader we send is correct and singular (verified in-client 2026-08-26; confirm with a second account).
+
 `[V0: the PvPMatchRules_c C/D/E/H columns]`
 
 ⛔ **The search filter is NOT this element.** `PvPMatchMakingSearchForMatches(const PvPMatchMakingSearchFilter_c&)`
