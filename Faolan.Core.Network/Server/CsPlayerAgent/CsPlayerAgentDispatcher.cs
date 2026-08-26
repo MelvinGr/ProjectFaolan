@@ -53,5 +53,11 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		{
 			return Provider?.PvpMatchEntryOf(characterId, mapId);
 		}
+
+		public async Task<string> ForcePvpMatchStart()
+		{
+			var provider = Provider;
+			return provider == null ? "no CS tier is registered on this process." : await provider.ForcePvpMatchStart();
+		}
 	}
 }

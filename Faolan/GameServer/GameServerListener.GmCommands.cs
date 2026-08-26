@@ -250,6 +250,12 @@ namespace Faolan.GameServer
 			await SendWorldHandoff(client);
 		}
 
+		private async Task MatchStartCommand(INetworkClient client)
+		{
+			var outcome = await _csPlayerAgentDispatcher.ForcePvpMatchStart();
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"matchstart: {outcome}");
+		}
+
 		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
 		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
 		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
@@ -402,7 +408,11 @@ namespace Faolan.GameServer
 				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand,
 				["waypoint"] = WayPointCommand,
-				["resist"] = ResistCommand
+				["resist"] = ResistCommand,
+				// #146: force-form a PvP match from the minigame queue as it stands, however few are queued (down
+				// to one member - a solo walk of the teleport + match-instance flow). The queue lives on the CS
+				// tier, so this crosses the same seam the team ops do.
+				["matchstart"] = (client, _) => MatchStartCommand(client)
 			};
 		}
 

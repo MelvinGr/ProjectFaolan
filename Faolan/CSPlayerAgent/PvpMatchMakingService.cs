@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
@@ -122,11 +123,23 @@ namespace Faolan.CSPlayerAgent
 				(uint)held.Count(s => s.IsAnyAvailable));
 		}
 
-		/// <summary>Drop a character's signup - the disconnect hook, so the board stops counting someone who left.</summary>
+		/// <summary>
+		///     The live signups, for the match-formation pass (#146): PvpMatchService pairs compatible ones after
+		///     each new signup. Snapshot semantics - formation dequeues through <see cref="Forget" />.
+		/// </summary>
+		public IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> Queued()
+		{
+			return _signups.Select(kv => (kv.Key, kv.Value)).ToList();
+		}
+
+		/// <summary>
+		///     Drop a character's signup: the disconnect hook, and the dequeue when a formed match consumes it - the
+		///     board stops counting someone who is gone either way.
+		/// </summary>
 		public void Forget(uint characterId)
 		{
 			if (_signups.TryRemove(characterId, out _))
-				logger.LogDebug("PvP matchmaking: dropped {CharacterId:X8}'s signup on disconnect.", characterId);
+				logger.LogDebug("PvP matchmaking: dropped {CharacterId:X8}'s signup (disconnect or match formation).", characterId);
 		}
 
 		private void Record(uint characterId, PvpMatchMakingSignup signup)

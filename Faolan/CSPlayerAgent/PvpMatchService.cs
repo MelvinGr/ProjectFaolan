@@ -74,6 +74,92 @@ namespace Faolan.CSPlayerAgent
 			await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouJoinedMatch, PvpMatchCodec.Build(Payload(match)));
 		}
 
+		/// <summary>
+		///     The queue's match-formation pass (#146), run after each new signup: pair the first two COMPATIBLE
+		///     signups into a started 1v1 match, sides locked, and hand both clients the join + start sequence.
+		///     ⚠️ The formation POLICY is ours - retail's queue rules (team sizes, tiers, timers) are unrecovered -
+		///     so this forms at TWO so a two-client session can walk the whole flow; the wire it sends is only the
+		///     recovered message set the custom-match path already uses. Assumptions noted on #146.
+		/// </summary>
+		public Task TryFormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue)
+		{
+			return FormFromQueue(queued, dequeue, minMembers: 2);
+		}
+
+		/// <summary>
+		///     The GM `.matchstart` override: form a match from whoever is compatibly queued RIGHT NOW, however few -
+		///     down to a single member, which is what lets one client walk the teleport + match-instance flow alone.
+		///     Returns what happened, for the GM's chat line.
+		/// </summary>
+		public Task<string> ForceFormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue)
+		{
+			return FormFromQueue(queued, dequeue, minMembers: 1);
+		}
+
+		private async Task<string> FormFromQueue(IReadOnlyList<(uint CharacterId, PvpMatchMakingSignup Signup)> queued, Action<uint> dequeue, int minMembers)
+		{
+			// Whoever is already in a match keeps their signup out of the pairing (stale rows are dequeued).
+			var eligible = queued.Where(q => !_memberships.ContainsKey(q.CharacterId)).ToList();
+			if (eligible.Count < minMembers)
+				return $"nothing formed - {eligible.Count} eligible signup(s) in the queue, need {minMembers}.";
+
+			// The anchor is the longest-queued signup; everyone compatible with it joins the match. A concrete
+			// signup among them names the minigame; all "join first available" falls back to the pair the captured
+			// signups used most - Conquest (type 4) on The Call of Jhebbal Sag (5006).
+			var anchor = eligible[0];
+			var members = eligible.Where(q => Compatible(anchor.Signup, q.Signup)).ToList();
+			if (members.Count < minMembers)
+				return $"nothing formed - only {members.Count} signup(s) compatible with the longest-queued one.";
+
+			var pick = members.FirstOrDefault(m => !m.Signup.IsAnyAvailable).Signup ?? anchor.Signup;
+			var (mapId, matchType, queueType) = pick.IsAnyAvailable
+				? (5006u, 4u, 0u)
+				: (pick.MapId, pick.MinigameType, pick.QueueType);
+
+			// The ruleset states THIS match truthfully: two sides of however many the queue held. Time limit 900 s
+			// is the client's own debug default; the score limit is a placeholder the client only displays.
+			// Non-silent, so every client announces the join with its own fifo text.
+			var perSide = (uint)Math.Max(1, (members.Count + 1) / 2);
+			var rules = new PvpMatchRules(matchType, mapId, NumberOfTeams: 2, TeamSizeMin: 1, TeamSizeMax: perSide, Password: "", TimeLimitSeconds: 900, ScoreLimit: 100,
+				FieldH: 0, HasPassword: false, Silent: false, QueueType: queueType);
+
+			var match = new LiveMatch(Interlocked.Increment(ref _nextMatchId), rules, anchor.CharacterId) { Started = true, StartedAtUtc = DateTime.UtcNow };
+			for (var i = 0; i < members.Count; i++)
+			{
+				var side = (uint)(i % 2) + 1; // alternate 1/2 in queue order
+				var id = members[i].CharacterId;
+				match.Sides[id] = side;
+				match.LockedSides[id] = side;
+				_memberships[id] = match.Id;
+				dequeue(id);
+			}
+
+			_matches[match.Id] = match;
+
+			logger.LogInformation("PvP match {MatchId}: FORMED from the queue - {Members} member(s) on map {MapId} (type {Type}); teleport in {Seconds}s.",
+				match.Id, members.Count, mapId, matchType, TeleportInSeconds);
+
+			var payload = PvpMatchCodec.Build(Payload(match));
+			foreach (var member in members)
+				await Push(member.CharacterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingYouJoinedMatch, payload);
+
+			// A matchmade match's sides are the queue's, not the player's pick - the lock messages are how the
+			// client learns both facts.
+			foreach (var member in members)
+				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingCharacterNowLockedToSide, Id32AndU32(member.CharacterId, match.Sides[member.CharacterId]!.Value));
+
+			await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingStartClicked, U32(TeleportInSeconds));
+			ScheduleMatchTeleport(match);
+			return $"match {match.Id} formed: {members.Count} member(s) -> map {mapId} (type {matchType}), teleport in {TeleportInSeconds}s.";
+		}
+
+		// Two signups can share a match when they name the same minigame - or when either took "join first
+		// available", which is compatible with anything.
+		private static bool Compatible(PvpMatchMakingSignup a, PvpMatchMakingSignup b)
+		{
+			return a.IsAnyAvailable || b.IsAnyAvailable || (a.MapId == b.MapId && a.MinigameType == b.MinigameType && a.QueueType == b.QueueType);
+		}
+
 		/// <summary>c2s 0x204B: join an existing match, optionally bringing the whole team.</summary>
 		public async Task HandleJoinMatch(INetworkClient client, uint matchId, bool bringTeam, string? password)
 		{
@@ -132,17 +218,30 @@ namespace Faolan.CSPlayerAgent
 			return Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchSay, s.ToArray());
 		}
 
-		/// <summary>c2s 0x204E: leave. The match dissolves when it empties; the lead moves when the leader goes.</summary>
-		public Task HandleLeaveMatch(INetworkClient client)
+		/// <summary>c2s 0x204E: leave (the buildup view's Cancel Match). The match dissolves when it empties; the
+		/// lead moves when the leader goes. A leaver in NO known match still gets MatchRemoved - that is the stale-
+		/// state recovery: a client that believed itself in a match this process never knew (a server restart, seen
+		/// live 2026-08-26) presses Cancel and its window resets instead of sticking on the buildup page.</summary>
+		public async Task HandleLeaveMatch(INetworkClient client)
 		{
-			return RemoveMember(client.Session.Character.Id, kickedBy: null, banned: false, message: "");
+			var characterId = client.Session.Character.Id;
+			if (MatchOf(characterId) == null)
+			{
+				await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
+				return;
+			}
+
+			await RemoveMember(characterId, kickedBy: null, banned: false, message: "");
 		}
 
-		/// <summary>c2s 0x2050: the match-info poll (the buildup view's refresh).</summary>
+		/// <summary>c2s 0x2050: the match-info poll (the buildup view's refresh). Asking about a match this process
+		/// does not hold answers MatchRemoved - the poller is stale (a pre-restart match) and resets itself.</summary>
 		public async Task HandleGetMatchInfo(INetworkClient client, uint matchId)
 		{
 			if (_matches.TryGetValue(matchId, out var match))
 				await Push(client.Session.Character.Id, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchInfo, PvpMatchCodec.Build(Payload(match)));
+			else
+				await Push(client.Session.Character.Id, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
 		}
 
 		/// <summary>c2s 0x2056 / 0x2057: the leader removes (and with Ban blocks) a member.</summary>
@@ -179,10 +278,18 @@ namespace Faolan.CSPlayerAgent
 			await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingCharacterNowLockedToSide, Id32AndU32(targetId, side));
 		}
 
-		/// <summary>c2s 0x205A: the leader starts the match. Refused while any member is sideless.</summary>
+		/// <summary>c2s 0x205A: the leader starts the match. Refused while any member is sideless. Pressed from a
+		/// match this process does not hold (stale pre-restart state, seen live 2026-08-26: the buildup view
+		/// survives a relog and its Start button sends this), the answer is MatchRemoved so the window resets.</summary>
 		public async Task HandleStartMatch(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
+			if (MatchOf(characterId) == null)
+			{
+				await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
+				return;
+			}
+
 			if (MatchOf(characterId) is not { } match || match.LeaderId != characterId || match.Started)
 				return;
 
@@ -205,11 +312,36 @@ namespace Faolan.CSPlayerAgent
 			logger.LogInformation("PvP match {MatchId}: started by {CharacterId:X8} with {Members} member(s); teleport in {Seconds}s.", match.Id, characterId, match.Sides.Count,
 				TeleportInSeconds);
 			await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingStartClicked, U32(TeleportInSeconds));
+			ScheduleMatchTeleport(match);
+		}
+
+		// ⭐ Verified live (2026-08-26): the client does NOT ask to be moved after StartClicked's countdown - its
+		// own fifo says "Entering minigame in about 10 seconds", passive - so the SERVER initiates the move for
+		// every member when the countdown lapses. The c2s TeleportToMinigame below is the manual path (the PvP
+		// window's own teleport/rejoin button), kept for a member who missed the move or re-enters.
+		private void ScheduleMatchTeleport(LiveMatch match)
+		{
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(TimeSpan.FromSeconds(TeleportInSeconds));
+					foreach (var member in match.Sides.Keys)
+					{
+						if (!await gameServer.TeleportCharacter(member, match.Rules.MapId))
+							logger.LogWarning("PvP match {MatchId}: the world tier could not move {CharacterId:X8} to map {MapId}.", match.Id, member, match.Rules.MapId);
+					}
+				}
+				catch (Exception e)
+				{
+					logger.LogError(e, "PvP match {MatchId}: the scheduled minigame teleport failed.", match.Id);
+				}
+			});
 		}
 
 		/// <summary>
-		///     c2s 0x2051: the member's client asks to be moved into the minigame (it sends this itself after
-		///     StartClicked's countdown). The world tier runs the ordinary change-map handoff; the entry then routes
+		///     c2s 0x2051: the manual teleport/rejoin into the member's started minigame (the countdown's own move is
+		///     server-initiated, above). The world tier runs the ordinary change-map handoff; the entry then routes
 		///     to the match-owned instance via <see cref="PvpMatchEntryOf" />.
 		/// </summary>
 		public async Task HandleTeleportToMinigame(INetworkClient client)
@@ -284,6 +416,10 @@ namespace Faolan.CSPlayerAgent
 			{
 				await Broadcast(match, CSPlayerInterfaceMethods.DispatchPvPMatchMakingPlayerLeft, Id32(characterId));
 			}
+
+			// The removed member's own window resets on MatchRemoved (0x207C - the no-arg feedback override the
+			// client's log string names outright); PlayerLeft/PlayerKicked only tell the OTHERS.
+			await Push(characterId, CSPlayerInterfaceMethods.DispatchPvPMatchMakingMatchRemoved, []);
 
 			if (match.Sides.IsEmpty)
 			{

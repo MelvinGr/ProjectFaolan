@@ -55,6 +55,13 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId);
 
 		/// <summary>
+		///     The GM `.matchstart` override (#146): form a PvP match from whoever is compatibly queued right now,
+		///     however few (down to one member, for a solo walk of the teleport + instance flow). Returns a one-line
+		///     outcome for the GM's chat. The command arrives on the game tier; the queue lives here.
+		/// </summary>
+		Task<string> ForcePvpMatchStart();
+
+		/// <summary>
 		///     Tell <paramref name="recipientId" /> that mail has arrived (<c>DispatchYouGotMailNotification</c>, #871).
 		///     Returns false when the recipient is not connected to this realm's CS tier, so the caller can tell "not
 		///     notified" from "notified".

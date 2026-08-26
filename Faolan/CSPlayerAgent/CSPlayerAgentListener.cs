@@ -145,6 +145,12 @@ namespace Faolan.CSPlayerAgent
 			return _pvpMatches.PvpMatchEntryOf(characterId, mapId);
 		}
 
+		// The GM `.matchstart` override (#146): form a match from the queue as it stands, however few are in it.
+		public Task<string> ForcePvpMatchStart()
+		{
+			return _pvpMatches.ForceFormFromQueue(_pvpMatchMaking.Queued(), _pvpMatchMaking.Forget);
+		}
+
 		// The guild bank's deposit half (#654) - the world tier has already taken the money out of the wallet.
 		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 		{
@@ -724,6 +730,9 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentMethods.PvPMatchMakingPutIntoMatchMaking:
 				{
 					await _pvpMatchMaking.HandlePutIntoMatchMaking(client, PvpMatchMakingSignupCodec.Parse(body.ReadRemainingArray()));
+					// #146: each new signup runs the formation pass - two compatible signups become a started match
+					// (the queue's product IS a match, exactly as the group finder's is a team).
+					await _pvpMatches.TryFormFromQueue(_pvpMatchMaking.Queued(), _pvpMatchMaking.Forget);
 					break;
 				}
 
