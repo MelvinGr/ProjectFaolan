@@ -88,6 +88,7 @@ namespace Faolan.Core.Network.Codecs.Text
 			return payload switch
 			{
 				AreaNameBanner banner => AreaNameBannerCodec.Build(banner),
+				DynamicAreaBanner banner => DynamicAreaBannerCodec.Build(banner),
 				RespawnPointDiscovered point => RespawnPointDiscoveredCodec.Build(point),
 				AttributeChanged attribute => AttributeChangedCodec.Build(attribute),
 				FeatRequired feat => FeatRequiredCodec.Build(feat),

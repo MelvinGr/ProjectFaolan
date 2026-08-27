@@ -14,6 +14,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Team;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -396,6 +397,7 @@ namespace Faolan.GameServer
 				["tag"] = TagCommand,
 				["claim"] = _claims.ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
+				["toast"] = ToastCommand,
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
 				["unban"] = (client, arguments) => BanCommand(client, arguments, false),
@@ -977,6 +979,24 @@ namespace Faolan.GameServer
 		private async Task SysChatCommand(INetworkClient client)
 		{
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "Sent a world/system chat line (ChatTextIIR).");
+		}
+
+		// .toast <text>  - push ARBITRARY literal text to the top-of-screen FIFO banner ("toast"), NOT the chat window
+		// (#664). The GenericDisplayAreaName FIFO template resolves to the format body `{DisplayedText}`, so a literal
+		// type-7 parameter renders verbatim - the same envelope the area-name banner uses, minus the nested <localized>.
+		// The test bootstrap for DynamicAreaBannerCodec; the mechanism the closed-as-impossible #664 said had no path.
+		private async Task ToastCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var text = (arguments ?? "").Trim();
+			if (text.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .toast <text>   (shows the text as a top-of-screen banner)");
+				return;
+			}
+
+			await SendFeedback(client, new DynamicAreaBanner(text));
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Toasted: '{text}'");
 		}
 
 		// .target  - print info about the player's currently SELECTED target (last in-game LookAt/SelectDeselect):
