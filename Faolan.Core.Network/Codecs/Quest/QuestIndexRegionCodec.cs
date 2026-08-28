@@ -153,6 +153,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// for block 1, as the region's "leadAreaId" - the beach's 241 == 0xF1 "sentinel") until #464.
 			public uint AreaId { get; init; }
 
+			// The line's seq-1 quest on every captured block. The client reader (`FUN_00922210`) matches it into the
+			// pair list and stores it at MainQuest_c +0x38 - the line's current-quest slot, the SAME one the
+			// MainQuestUpdateIIR's TrackedQuestId fills on the incremental path (#464).
 			public uint TrailerQuestId { get; init; }
 
 			// The AREA's full quest catalog, ordered by each quest's JournalSequence - NOT this quest's goal ids, which
@@ -169,11 +172,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 			public uint Magic { get; init; } // the area's goal-table name word (W6QT / RRL3 / ...)
 			public uint TableField1 { get; init; }
 			public uint TableField2 { get; init; }
+
+			// MainQuest_c +0x44 - the SAME slot MainQuestUpdateIIR.Unknown1 lands in (the IIR path routes it through
+			// the `FUN_00921980` ctor's third argument; the snapshot filler `FUN_00922210` stores this word there).
+			// Stored, written back out by `MainQuest_c::WriteToStream`, read by nothing; 0 on all 97 captured blocks
+			// and all 46 captured IIR lists (#464).
 			public uint TableField3 { get; init; }
 
-			// The block's trailer words after the catalog: [trailerQuestId][a][b][c]. The beach block has
-			// (a,b,c) == (1,0,0); they vary per quest across the corpus (a up to 8, c 0 or 1) - so they are carried,
-			// not assumed constant (#391).
+			// The block's trailer words after the catalog: [trailerQuestId][a][b][c]. Each is a `MainQuest_c` field
+			// (`FUN_00922210` stores them at +0x38 / +0x48 / +0x4c / +0x50), and the last three are the slots the
+			// incremental MainQuestUpdateIIR fills for the same line - TrailerA == its Unknown0,
+			// TrailerC == its Unknown2 (the IIR carries no TrailerB; the wire ctor parks the area token there).
+			// So the per-field facts live with the IIR record (MainQuestUpdateIIR remarks): TrailerA is the line's
+			// solo(1)/raid(4)/dungeon(8) category, consumed as the quest tracker's sort tiebreaker; TrailerB is 0 on
+			// every captured block; TrailerC is a per-line flag, 1 on 6 of 97 captured lines. Constant per LINE, not
+			// per quest - carried, not assumed (#391/#464).
 			public uint TrailerA { get; init; } = 1;
 			public uint TrailerB { get; init; }
 			public uint TrailerC { get; init; }

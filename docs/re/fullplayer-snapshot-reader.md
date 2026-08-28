@@ -296,9 +296,18 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    objective region, NOT List B — `decode_listb.py` reads garbage strings there.)
 4. **List C** — `FUN_004d4c70`: `0x3F1`-framed; `N-1` plain `u32` values.
 5. **`MainQuest_c` list** — **plain** `u32 count`, then `count` × `MainQuest_c` (`FUN_00922210`). Each:
-   `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 @0x48]
-   [u32 @0x4c][u32 @0x50]` — **all numeric, no strings** (the numeric state/goal tracking; the readable text
-   for these quests is in the `Quest_c` journal list, region 2).
+   `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 tracked]
+   [u32 @0x48][u32 @0x4c][u32 @0x50]` — **all numeric, no strings** (the readable text for these quests is in
+   the `Quest_c` journal list, region 2). This is `QuestIndexRegion.Block`, field for field: `@0x14` AreaId,
+   `@0x18` the ACGHash, `@0x30`/`@0x34` TableField1/2, `@0x44` TableField3, then the pair list, then
+   TrailerQuestId (matched into the pair list and parked in the current-quest slot `@0x38`) and
+   TrailerA/B/C at `@0x48`/`@0x4c`/`@0x50`. ⭐ **`@0x44`/`@0x48`/`@0x50` are the SAME slots the incremental
+   `MainQuestUpdateIIR`'s Unknown1/Unknown0/Unknown2 land in** (`FUN_00810840` + the ctor `FUN_00921980`), so
+   the snapshot block and the IIR trailer are two producers of one struct (#464). The one consumer found:
+   `@0x48` is the quest TRACKER's sort tiebreaker (`FUN_012ce1c0` parks it in `QJQuestNode_c +0x70`;
+   `FUN_012cde80`/`FUN_012cbbb0` compare it) — per line it is 1 on solo, 4 on raid, 8 on group-dungeon
+   content across all 97 captured blocks. `@0x44` and `@0x50` have no reader; see `MainQuestUpdateIIR`'s
+   record remarks for the per-field data.
 6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
    (`FUN_0077db70`): `[u8 flag][u32][u32][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`
    — VARIABLE-WIDTH (the inner count is a PLAIN count, not `0x3F1`-framed).

@@ -49,6 +49,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 
 		// The grant path's form: an Add naming every active quest in order, with the trailer retail sends for one.
+		// Unknown0 = 1 is the SOLO-line value (retail sends 4 on raid lines and 8 on group-dungeon lines - see the
+		// record remarks); every quest this path grants today is a solo line, so the constant is the captured value.
 		public static byte[] Build(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, string areaTitle)
 		{
 			ArgumentNullException.ThrowIfNull(questIds);
@@ -138,10 +140,25 @@ namespace Faolan.Core.Network.Codecs.Quest
 		IReadOnlyList<MainQuestUpdateEntry> Entries,
 		string QuestLineTitle)
 	{
-		// The three trailing words. `Activate()`'s Add case forwards all three into the character's quest holder
-		// (`FUN_00810840` stores two of them at holder+0x48 / +0x50); nothing names or checks them. Across the 46
-		// captured lists: Unknown0 is 1 on every Add but 4 in one (path-of-azura) and 0 on every Remove, Unknown1 is
-		// always 0, and Unknown2 is 0 except in the two post-Tortage captures, where it is 1.
+		// The three trailing words are per-LINE fields of the client's `MainQuest_c` (the object `Activate()`'s Add
+		// case builds via `CoreQuestHolder::UpdateMainQuest` = `FUN_00810840` + the ctor `FUN_00921980`): Unknown0 ->
+		// +0x48, Unknown1 -> +0x44, Unknown2 -> +0x50. Those are the SAME slots the login snapshot's quest index fills
+		// per line (`FUN_00922210`), so each word is one field with two producers:
+		// QuestIndexRegion.Block.TrailerA == Unknown0, .TableField3 == Unknown1, .TrailerC == Unknown2 (#464).
+		//
+		// What the client does with them (the snapshot side carries the variance - 97 distinct captured blocks):
+		//   * Unknown0 (+0x48, ctor default 1): the only consumer is the quest TRACKER's insert-position comparator
+		//     (`FUN_012cde80` / `FUN_012cbbb0` compare two `QJQuestNode_c` +0x70, where `FUN_012ce1c0` parked this) -
+		//     a sort tiebreaker after the level band. Constant per line; only 1, 4 and 8 occur: 1 on every solo
+		//     line (61), 4 on every raid line (BRC / Thoth-Amon's Stronghold / the Kalanthes chain, 6), 8 on every
+		//     group-dungeon line (Atzel's, the Catacombs, Oasis of Zaara [Group], every Khitai dungeon, 30). Not a
+		//     patch-era marker (the Catacombs shipped at launch and carries 8; Khitai solo lines carry 1). 0 on every
+		//     Remove because the Remove path never reads it.
+		//   * Unknown1 (+0x44): stored by both producers, serialized back out by `MainQuest_c::WriteToStream`, and no
+		//     consumer reads it - 0 on all 46 captured lists AND all 97 captured index blocks.
+		//   * Unknown2 (+0x50): no consumer found; per-line flag, 1 on 6 of 97 captured lines - five of them content
+		//     newer than the client's 1000104 catalog, plus [Kheshatta_Kalanthes] The Immortal Hand. Not
+		//     "another line chains from this one" (measured: 85/97 with misses both ways).
 		public uint Unknown0 { get; init; }
 		public uint Unknown1 { get; init; }
 		public uint Unknown2 { get; init; }
