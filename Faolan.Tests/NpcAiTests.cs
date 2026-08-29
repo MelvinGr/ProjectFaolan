@@ -378,6 +378,37 @@ namespace Faolan.Tests
 			Assert.InRange((double)actual / unpenalised, low, high);
 		}
 
+		// #479: the per-level line BREAKS at the top of the range. Pinned to the measurement rather than to the
+		// constant, in the same style as the gap table above: each row is a level and the `x model` band
+		// `--report npc-damage` measures for the attackers at it, scored against the SAME unpenalised curve the
+		// report scores against (`level * 100`), so retuning the model fails this against retail.
+		//
+		// ⭐ The rows at 78-80 include `Wharf Rat Thug` / `Boros` / `Ravenous Crocodile Follower`, all `NpcType = 4`
+		// (no nameplate rank at all) - which is what says the factor is the BAND and not a boss multiplier.
+		[Theory]
+		// Below the knee: the line holds. Level 74-75 measure 0.96-1.35 over 54 hits, four templates.
+		[InlineData(74u, 0.9, 1.4)]
+		[InlineData(75u, 0.9, 1.4)]
+		// ⚠️ 76 and 77 have NO captured hits, so they deliberately keep the old line - the knee is somewhere in
+		// (75, 78] and placing it would be inventing. This row pins that choice, not a measurement.
+		[InlineData(76u, 0.9, 1.4)]
+		[InlineData(77u, 0.9, 1.4)]
+		// The band: 2.72 / 2.74 / 2.80 / 3.00 over 82 untitled hits, and 3.41 / 3.53 for the two MiniBoss rows.
+		[InlineData(78u, 2.5, 3.6)]
+		[InlineData(79u, 2.5, 3.6)]
+		[InlineData(80u, 2.5, 3.6)]
+		public void ANpcAtTheTopOfTheRange_HitsAboutThreeTimesThePerLevelLine(uint npcLevel, double low, double high)
+		{
+			// The line itself, in the report's own terms: level x NpcAttackDamagePerLevel, unpenalised, in display
+			// units so it compares with the resolver's answer.
+			// Compare in WIRE units on both sides, which is the report's own scale - NpcAttackDamageWire is the entry
+			// point it scores against, and taking the display value here would divide one side and not the other.
+			var line = CombatResolver.NpcAttackDamagePerLevel * npcLevel;
+			var actual = CombatResolver.NpcAttackDamageWire(npcLevel, npcLevel);
+
+			Assert.InRange(actual / (double)line, low, high);
+		}
+
 		// #671: a mob that SHOOTS deals about a fifth of what one that swings does, and the factor is independent of
 		// the level gap. Pinned to the three well-sampled bow templates (`Poacher Marksman` 8758 at 0.17 over 31
 		// hits, 13961 at 0.18 over 18, `Bat Pict Archer` 937 at 0.21 over 70 - all at gap 0-1, where the per-level

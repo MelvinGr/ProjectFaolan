@@ -445,9 +445,55 @@ namespace Faolan.GameServer.Combat
 		// missing, because it still looks like evidence.
 		public static uint NpcAttackDamageWire(uint npcLevel, uint targetLevel, bool ranged = false)
 		{
-			var scale = LevelGapPercent(npcLevel, targetLevel) * (ranged ? RangedPercent : 100u) / 100;
+			var scale = LevelGapPercent(npcLevel, targetLevel) * (ranged ? RangedPercent : 100u) / 100 * TopBandPercent(npcLevel) / 100;
 			return Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel * scale / 100;
 		}
+
+		// ⭐ The per-level line BREAKS at the top of the range: a level 78-80 mob hits about 2.8x what
+		// `level * NpcAttackDamagePerLevel` predicts, and a level 75 one hits exactly what it predicts (#479).
+		//
+		// Measured off `--report npc-damage`'s BY ATTACKER rows, and the comparison is clean because BOTH bands sit
+		// at a level gap the penalty leaves alone (gap 0-2 up here, gap 5 at level 75), so nothing but the base
+		// curve is in play:
+		//
+		//     level  attacker                      NpcType  hits  x model
+		//        74  Hired Bodyguard                     4    11     1.01
+		//        75  Zingaran Operative                  4    10     0.96
+		//        75  Hired Bodyguard                     4    19     0.99
+		//        75  Zingaran Stockpiler                 4    14     1.35
+		//        --  ------------------------------  -----  ----  -------
+		//        78  Wharf Rat Thug                      4    18     2.80
+		//        79  Wharf Rat Thug                      4    13     3.00
+		//        80  Ravenous Crocodile Follower         4    32     2.72
+		//        80  Boros                               4    19     2.74
+		//        79  Argus the Thief                     2    20     3.53
+		//        80  Eerika of the Maidens               2    18     3.41
+		//
+		// ⭐⭐ **And this retires the "boss multiplier" reading of those rows.** `docs/subsystems/combat.md` recorded
+		// the 80-level cluster as a ~3x BOSS factor blocked on the client's rank tag; that tag now exists
+		// (`NpcStatCore.NpcType`, solved in #797) and it REFUTES the reading: `Wharf Rat Thug`, `Boros` and
+		// `Ravenous Crocodile Follower` are all `NpcType = 4` - the untitled majority, no nameplate rank at all, no
+		// `Normalset` - and they sit at 2.72-3.00 alongside the two that really are `MiniBoss`. An ordinary mob in
+		// the band hits like the bosses do, so the band is what the factor is about.
+		//
+		// ⚠️ Applied to levels 78-80 ONLY, which is exactly where it was measured. The corpus has NO NPC->player
+		// hits at 76 or 77, so the knee sits somewhere in (75, 78] and placing it would be inventing; those two
+		// levels deliberately keep the old line rather than inherit a boundary nobody measured. That is also the
+		// closing condition for #479's remaining request: two levels, not "high-level combat".
+		//
+		// ⚠️ 2.8 is the UNTITLED median (2.72-3.00), not the median of all six (~2.9) - the MiniBoss pair sits about
+		// 1.25x above the untitled ones and is not modelled, and under-hitting is the cheap direction to be wrong in,
+		// the same bias `LevelGapPercent` states for the mob-above-player case.
+		private static uint TopBandPercent(uint npcLevel)
+		{
+			return npcLevel >= TopBandFirstLevel ? TopBandDamagePercent : 100u;
+		}
+
+		// The first level the measured band covers. 76 and 77 are NOT in it - see TopBandPercent.
+		private const uint TopBandFirstLevel = 78;
+
+		// The band's factor, from the four untitled rows (2.72 / 2.74 / 2.80 / 3.00 over 82 hits).
+		private const uint TopBandDamagePercent = 280;
 
 		// A RANGED mob deals about a fifth of what a melee mob of the same level does - a factor independent of the
 		// level gap, and visible at gap 0-1 where the per-level curve itself is verified (#671).
@@ -510,10 +556,14 @@ namespace Faolan.GameServer.Combat
 		// 6x on two hits would be inventing, and the failure mode - a mob a few levels up one-shotting a player -
 		// is the expensive direction to get wrong.
 		//
-		// ⚠️ Elite/boss attackers sit far ABOVE this table (`Black Ring Assassin`, and the level-80 `Eerika of the
-		// Maidens` / `Boros` / `Ravenous Crocodile Follower` cluster at ~3x) and ranged mobs far below it
-		// (`Poacher Marksman` 0.17 at gap 0). Both are per-ARCHETYPE and independent of the gap; neither is modelled
-		// here, and neither is evidence against the gap curve.
+		// ⚠️ Two archetypes sit off this table and neither is evidence against the gap curve: ranged mobs far below
+		// it (`Poacher Marksman` 0.17 at gap 0, now modelled as `RangedPercent`), and a pair of true outliers far
+		// above it - `Black Ring Assassin` at 45x (`Normalset` 13, 3.15M health) and `Gaud Guardsman` at 24x
+		// (`Normalset` 32, 30.5M health, a city guard). Both outliers carry a large `Normalset` AND a health pool
+		// two orders up, which is the shape a skull-tier creature has; neither is modelled.
+		// ⛔ The level-80 `Eerika of the Maidens` / `Boros` / `Ravenous Crocodile Follower` cluster used to be listed
+		// here as a third "elite" case at ~3x. It is NOT one - it is the LEVEL BAND, see `TopBandPercent` - and the
+		// rank tag is what settled it.
 		//
 		// ⛔ `Wild Boar` used to be cited here as a 2.15x elite outlier at gap 55. It is not one: its nine hits were
 		// mob-on-mob damage that the report counted as NPC->player, and the row is gone (#479 - see combat.md).

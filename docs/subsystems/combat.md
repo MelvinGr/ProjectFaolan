@@ -1768,10 +1768,11 @@ modelled** — see below.
 Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
 Gitea #479.
 
-### The "elite" outliers were mostly a MEASUREMENT FAULT (#671)
+### The "elite" outliers were mostly a MEASUREMENT FAULT (#671), and the rest were the LEVEL BAND (#479)
 
 Four attackers read 5–27× the curve and looked like an elite archetype. Two of them were an artifact of the
-report, and finding that is what the elite question actually turned on.
+report, and finding that is what the elite question actually turned on. The cluster that survived that scrub
+then turned out not to be elite either — see the level-band table below.
 
 `--report npc-damage` took **the capture's MAXIMUM player level** as "the player". A capture is not one player:
 any level-80 stranger who walks past is spawned into it, and the max then stamped `pc lvl 80` onto every mob in
@@ -1816,20 +1817,40 @@ entry point the report scores against; the display value is that ÷ the vitals s
 Of the other two, `Gaud Guardsman` (23.97×) is a **city guard**: 304,944 health and `Normalset = 32`, exactly
 like `Tarantia City Guard`, `Poitain Guard` and every other town guard. It is not an ordinary combat NPC.
 
-**What survives is a boss row**, at gap 0 with the level curve unpenalised:
+**What survives is not a boss row — it is the TOP OF THE LEVEL RANGE** (2026-08-29, #479). This section used to
+end on "a ~3× boss factor, blocked on the client's own rank tag, which is Gitea #508's column". That tag now
+exists (`NpcStatCore.NpcType`, solved in #797) and it **refutes** the boss reading rather than confirming it:
 
-| attacker | level | hits | `x model` |
-|---|---:|---:|---:|
-| `Eerika of the Maidens` | 80 | 18 | 3.41 |
-| `Boros` | 80 | 19 | 2.74 |
-| `Ravenous Crocodile Follower` | 80 | 32 | 2.72 |
+| attacker | level | `NpcType` | `Normalset` | hits | `x model` |
+|---:|---:|---:|---:|---:|---:|
+| `Wharf Rat Thug` | 78 | **4** (no title) | — | 18 | 2.80 |
+| `Wharf Rat Thug` | 79 | **4** (no title) | — | 13 | 3.00 |
+| `Ravenous Crocodile Follower` | 80 | **4** (no title) | — | 32 | 2.72 |
+| `Boros` | 80 | **4** (no title) | — | 19 | 2.74 |
+| `Argus the Thief` | 79 | 2 (`MiniBoss`) | 3 | 20 | 3.53 |
+| `Eerika of the Maidens` | 80 | 2 (`MiniBoss`) | 3 | 18 | 3.41 |
 
-Three templates, 69 hits, clustered — a ~3× boss factor, and the same figure the ticket's first pass called
-"a plausible boss multiplier". It is **not shipped**, because nothing in the data identifies a boss:
-`NpcFlags`, `Normalset`, `NpcType`, `SuperFamily`, `ProfessionType`, `Community`, `Side`, `Disposition` and
-`Health` were all checked and none separates them — `Boros` shares its `NpcFlags` with `Pillager` and its health
-pool (4,605) with an ordinary `Hired Bodyguard`. The multiplier is blocked on the client's own rank tag, which
-is Gitea #508's column.
+⭐ **Four of the six carry no nameplate rank at all**, and `Wharf Rat Thug` is plainly trash. An ordinary mob in
+the band hits like the "bosses" do, so what the factor is about is the BAND. The two that really are `MiniBoss`
+sit about 1.25× above the untitled ones — which is the size an elite premium would be, and is two templates.
+
+And the comparison is clean rather than a gap artifact: **both bands sit where the gap penalty does nothing**
+(gap 0–2 up here, gap 5 at level 75), so only the base curve is in play.
+
+| attacker | level | `NpcType` | hits | `x model` |
+|---:|---:|---:|---:|---:|
+| `Hired Bodyguard` | 74 | 4 | 11 | 1.01 |
+| `Zingaran Operative` | 75 | 4 | 10 | 0.96 |
+| `Hired Bodyguard` | 75 | 4 | 19 | 0.99 |
+| `Zingaran Stockpiler` | 75 | 4 | 14 | 1.35 |
+
+So the per-level line holds to 75 and is 2.8× low from 78. **It is now shipped** as
+`CombatResolver.TopBandPercent` — 280 % on levels **78–80 only**, the untitled median (2.72–3.00 over 82 hits)
+rather than the median of all six, because under-hitting is the cheap direction to be wrong in.
+
+⚠️ **76 and 77 deliberately keep the old line.** The corpus has no NPC→player hit at either, so the knee sits
+somewhere in (75, 78] and placing it would be inventing. That is also what #479's remaining request narrows to:
+**two levels**, not "high-level combat".
 
 **Health was tested as an alternative BASE and rejected.** An elite's pool is what makes it an elite, so
 `damage = k × the attacker's own max health` would explain "elites hit harder" with no archetype column at all.
