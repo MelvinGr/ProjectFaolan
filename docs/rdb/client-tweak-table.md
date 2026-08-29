@@ -32,6 +32,70 @@ Two constants independently confirm the parse, because we decoded them from else
 
 A misaligned or wrongly-typed read could not land on either.
 
+## ⭐ Over HALF the sheet is the SERVER's, and the decisive test is the exe's string table
+
+A tweak the client uses is **registered by name**: a 5-instruction thunk that pushes the name string, binds it to
+a global slot and installs an initialiser (see `tools/ghidra/TweakGlobals.java`). So a key whose NAME does not
+occur in `AgeOfConan.exe` at all is never registered, never bound to a client global, and cannot be named by any
+client code. That is a stronger test than counting references — it needs no Ghidra and cannot produce the
+slot-vs-slot+8 false negative described above:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report rdb-tweaks | grep '^  ' | awk '{print $1}' | sort -u > /tmp/keys
+strings -a -n 4 "<client-dir>/AgeOfConan.exe" | sort -u > /tmp/exe
+comm -23 /tmp/keys /tmp/exe        # the keys no client code can name
+```
+
+**158 of the 294 keys — 54% — are absent.** RDB 1000516 is not "the client's tuning sheet with some server
+numbers in it"; it is the **game's** tuning sheet, shipped inside the client's data, and most of it is knobs the
+client cannot even name. That is the general form of the argument this page already makes for
+`Combat_{PvE,PvP}{0..3}ShieldBonus` and the recast constants, and it settles the question for the whole table at
+once: **when a key is in the absent set, its value is ours to apply.**
+
+What the absent set is, by cluster:
+
+| cluster | n | what it is |
+|---|---:|---|
+| `WorldBoss_*` | 28 | the world-boss spawn CALENDAR (`SpawnDay_Boss_1..12`, `SpawnWeek_Boss_1..12`, `SpawnTimer` 1800, `SpawnTimerRandom` 1800, `RareLootChance` 25) |
+| `PvP_MonthlyFestival_*` | 39 | the festival calendar plus its three game modes (Arena / Juggernaught / KingOfTheHill durations, warmups and kill XP) |
+| `Camera_Path_Normal_*` | 24 | a four-point position/tangent camera spline |
+| `Onslaught_*` | 8 | per-wave HP/damage scalars (1.0185 normal, 1.025 / 1.04 boss) and the bar target (30 + 2 per level) |
+| `Quest_*` | 4 | `MaxGetDistance` 5, `LeaveBoundedAreaTimeout` 10, `TimeToCompleteMultiplier` 60, `CooldownTimeoutMultiplier` 60 |
+| `AIDefaults_*` | 3 | `MaximumChaseRadius` 45, `ChaseDeaggroDelayTime` 5, `IrritationForgetPeriod` 4 |
+| `TWK_Consequence_*` | 3 | `DailyDecayRate` 12, `QuestDecayRate` 12, `XPGainDecayRate` 199 |
+| `Renown*` | 2 | `RenownCacheLimit` 1000, `RenownSaveInterval` 300 — plainly a server cache and its flush period |
+| the rest | 47 | event/season switches (`EventDoubleXP`, `EventHalloween`, `Anniversary2020`, `IsPvPServer`, `IsTestLive`, `EventServer`), account gates (`Account_FreePlayerEffect`, `PvPBundleVendor`, `EnableVeteranVendor`), the AA unused-token caps, `MailTimeout` 30, `HackerTracker_Enabled` 1, and a handful of spell ids (`TWK_Combat_ActiveBlockingBuffID`, `TWK_WeaponSwapBuffClearTemplate`, `TWK_SpellToCastOnCrouchExit`, `TWK_PvPTournamentBuff`) |
+
+⚠️ **"Absent" is not a synonym for "server-side" in every case.** Five `TWK_*CombatText*` display constants
+(velocity, time-to-live, stack distance, max entries, offsets) are in the absent set too, and a floating-number
+renderer is plainly the client's job — so those read as **stale keys** for a consumer that no longer looks them
+up here. What the test supports exactly is *no native client code names this key*; a `TweakPanel_c` /
+`BalanceTweakView` debug panel still iterates the whole table generically, which is how a GM sees them all.
+
+### The PvP family, in full — every one of them ours
+
+Measured with the same test, plus `TweakGlobals` on the ones that ARE in the exe. **Every PvP tuning key is
+either absent from the exe or registered with zero references**, `TWK_PvPCowardBuff` alone excepted (reads=1):
+
+| key | value | what it settles |
+|---|---:|---|
+| `TWK_PvpDamagePercent` | 1 | PvP damage is **100%** of the PvE figure — there is no separate PvP damage scale to apply |
+| `Combat_PvP{0..3}ShieldBonus` | 0.2 / 0 / -0.15 / -0.30 | the shield-rose arcs against a PLAYER defender (already implemented) |
+| `Combat_PvPDamageReductionMainOnSplash` | 1 | a no-op under any reading, as the melee-cleave comment records |
+| `TWK_PvpMaxAbsorbAmount` | 0.2 | the absorb cap in PvP |
+| `PvPLevelExpModifier` | 0.05 | XP for a player kill |
+| `PvPLootChance` / `PvPLootTable` | 0.25 / 1 | a player kill drops loot a quarter of the time |
+| `PvPCashDropValue` / `PvPGenerateCashValue` | 0.05 / 325 | and cash |
+| `DailyPvPKillsCap` | 20 | ⭐ the same 20 the daily-kill counter 1000070 is clamped at, from a second source |
+| `GuildRenown_PVPKillMultiplier` | 0.5 | a player kill feeds guild renown at half rate |
+| `HardcorePvPXPModifier` | 1.5 | |
+| `IsPvPServer` | 0 | the server-type switch — absent from the exe entirely |
+| `TWK_PvPCowardBuff` | 3881658 | the one the client DOES read (reads=1) |
+
+`GuildRenown_LevelingGainBase` 115 and `GuildRenown_LevelingGainMultiplier` 0.05 are the levelling half of the
+same ladder, registered and unreferenced. What none of them states is the FORMULA the base and multiplier go
+into, so nothing computes renown gain yet (Gitea #147).
+
 ## Out-of-combat regen: the attribute modifiers
 
 The regen split we already implement — health and mana halt in combat, stamina does not — **is** this table's
@@ -52,12 +116,12 @@ So a pool's regen is driven by ATTRIBUTES, not by a fraction of its maximum. The
 confirmed against retail's own wire values** — see [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md)
 for the formulas, the per-character verification and how the flat terms were pinned.
 
-⚠️ **`TweakGlobals.java` reports these three as "CLIENT NEVER READS IT", and that verdict is a false negative** —
-the client reads all of them. The script reports references to the registration slot, which holds a POINTER to the
-tweak object; the float lives at **slot + 8**, and that is the address the consuming code names. For
+⚠️ **`TweakGlobals.java` once reported these three as "CLIENT NEVER READS IT", and that verdict was a false
+negative** — the client reads all of them. The script reported references to the registration slot, which holds a
+POINTER to the tweak object; the float lives at **slot + 8**, and that is the address the consuming code names. For
 `TWK_OOCHealthRegenStrModifier` the slot is `0x02D24498` and the regen routine (`FUN_0111a520`) reads `0x02D244A0`,
-which reads 0.15 in the running process. So a "never read" verdict from that script means *check slot+8 before
-concluding anything* — several tweaks that look server-only are not.
+which reads 0.15 in the running process. The script counts **both** addresses now, so its "never read" is sound
+again — but the section below is a test that does not depend on it at all.
 
 The `Natural*` modifiers are the in-combat twins and are NOT yet solved: there is no `TWK_NaturalHealthRegen*` at
 all, matching the sheet showing `Natural Health Regen = 0` for every captured character, but the mana/stamina ones
