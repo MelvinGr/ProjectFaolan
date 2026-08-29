@@ -791,9 +791,23 @@ pair the rest were built on:
     against **every** encrypted record. ⚠️ The tag run is generic (any four-float message matches, so quaternions
     are in the candidate set); that costs one trial decrypt each and nothing else.
     Result over the 138 dumps: **4,918 records opened — 4,873 of the 5,072 we already hold (a 96% implicit
-    control) and 45 NEW.** So the corpus does carry keys for records we cannot currently read, and coverage was
-    not exhausted. The 4% of held keys it does not recover are the carriers with no byte anchor — the `itemref://`
-    text links and the quest-reward lists inside `Quest_c`.
+    control) and 45 NEW**, all 45 surviving a full decrypt + inflate + `[type][id]` check. So the corpus does
+    carry keys for records we cannot currently read, and coverage was not exhausted. The 4% of held keys it does
+    not recover are the carriers with no byte anchor — the `itemref://` text links and the quest-reward lists
+    inside `Quest_c`.
+  - ⭐ **And it names the carrier, which is the actionable half** — a key we do not hold, in a shape we can name,
+    says which harvester is missing rather than merely that one is:
+
+    | carrier | new keys | what it is |
+    |---|---:|---|
+    | `SimpleCharFullUpdateIIR` (`0xFA015807`) | 20 | another entity's SPAWN — their equipped gear |
+    | `DispatchTradepostSearchResults` (`GameCharAgent`→`TradepostInterface`, method 5) | 20 | auction-house search results — items strangers are selling |
+    | `BehaviorControlCenterIIR` (`0x642CD3D6`) | 4 | the action ack's item-identity slot |
+    | `LootBagFullUpdateIIR` (`0xF096251E`) | 1 | a loot bag |
+
+    ⚠️ The tradepost one is why the report names a message by opcode **and receiver class**: `0x2005` alone is the
+    lossy wire rendering, and it is shared with the 12-byte wallet update (`DispatchUpdateCash`) — reading it as
+    that would have been a clean, wrong answer.
   - ⭐⭐ **Every run plants two known-keyed records as a CONTROL and refuses to report a negative unless they come
     back.** This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be
     completely broken while looking exactly like a true negative — there is no failing case to notice. This one

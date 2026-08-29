@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
@@ -101,7 +102,7 @@ namespace Faolan.Importer.Cli
 			// about a draw from it (#897).
 			if (mode.StartsWith("exhaustive", StringComparison.OrdinalIgnoreCase))
 			{
-				await Exhaustive(capturesDir, encrypted, encryptedBlocks, keyed);
+				await Exhaustive(capturesDir, reader, encrypted, encryptedBlocks, keyed);
 				return;
 			}
 
@@ -164,7 +165,7 @@ namespace Faolan.Importer.Cli
 		// Every encrypted record, against every candidate quad the corpus carries. The control is implicit and much
 		// stronger here: the records we ALREADY hold keys for are in the target set, so the run reports how many of
 		// them it recovers - if that number is low the instrument is broken and nothing else in the output counts.
-		private static async Task Exhaustive(string capturesDir, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed)
+		private static async Task Exhaustive(string capturesDir, RdbReader reader, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed)
 		{
 			var files = Directory.GetFiles(capturesDir, "*.tshark.json").OrderBy(f => f).ToList();
 			Console.WriteLine($"  EXHAUSTIVE: harvesting candidate quads from {files.Count} dump(s)...");
@@ -194,10 +195,46 @@ namespace Faolan.Importer.Cli
 			}
 
 			var byId = hits.GroupBy(h => h.TemplateId).ToDictionary(g => g.Key, g => g.First());
-			foreach (var id in brandNew.OrderBy(x => x).Take(50))
-				Console.WriteLine($"    record {id}: key {string.Join(",", byId[id].Key.Select(k => $"0x{k:X8}"))}");
-			if (brandNew.Count > 50)
-				Console.WriteLine($"    ... and {brandNew.Count - 50:N0} more");
+
+			// ⚠️ VALIDATE before believing any of it. The scan's oracle is the first block only - ~45 bits, so a
+			// false positive over ~10^9 trials is ~1e-5 rather than 0. This decrypts the WHOLE record and inflates
+			// it, then checks it opens with its own `[type][id]`: a key that survives that has produced a readable
+			// template, which is the thing we actually want it for.
+			var good = new List<uint>();
+			foreach (var id in brandNew.OrderBy(x => x))
+			{
+				if (!reader.TryGet(1000020, id, out var entry))
+					continue;
+
+				try
+				{
+					var plain = reader.ReadDecrypted(entry, byId[id].Key);
+					if (plain.Length >= 8 && plain.ReadU32Le(0) == 1000020 && plain.ReadU32Le(4) == id)
+						good.Add(id);
+					else
+						Console.WriteLine($"    ⚠️ record {id}: key opens the first block but the inflated record does not parse - REJECTED.");
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine($"    ⚠️ record {id}: decrypt/inflate threw ({e.GetType().Name}) - REJECTED.");
+				}
+			}
+
+			Console.WriteLine($"  validated (full decrypt + inflate + type/id check): {good.Count:N0} of {brandNew.Count:N0}");
+			Console.WriteLine();
+			foreach (var id in good)
+			{
+				var h = byId[id];
+				Console.WriteLine($"    record {id}: key {string.Join(",", h.Key.Select(k => $"0x{k:X8}"))}");
+				Console.WriteLine($"        carried by {h.WordOrder}  in {h.Source} @{h.Offset}");
+			}
+
+			// ⭐ WHICH MESSAGE carries them is the actionable half: a key we do not hold, in a shape we can name,
+			// says which parser is missing rather than merely that one is.
+			Console.WriteLine();
+			Console.WriteLine("  by carrying message:");
+			foreach (var g in good.Select(id => byId[id].WordOrder).GroupBy(m => m).OrderByDescending(g => g.Count()))
+				Console.WriteLine($"    {g.Count(),4}  {g.Key}");
 
 			await Task.CompletedTask;
 		}

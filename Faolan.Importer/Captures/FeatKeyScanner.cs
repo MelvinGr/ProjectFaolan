@@ -71,6 +71,10 @@ namespace Faolan.Importer.Captures
 
 		public readonly record struct Hit(uint TemplateId, uint[] Key, string Source, int Offset, string WordOrder);
 
+		// A candidate quad plus WHERE it was found. The provenance is the point: a key we do not hold, found in a
+		// message we can name, says which parser is missing - which is the actionable half of a hit (#897).
+		public readonly record struct Candidate(uint[] Key, string Source, int Offset, string Carrier, string Message);
+
 		// Scans `captureFiles` for a key that opens any of `targets`. Windows are BYTE-aligned, not word-aligned: a
 		// key need not sit on a 4-byte boundary within a packet body, and assuming it does is the kind of shortcut
 		// that makes a negative result meaningless. THREE candidate layouts are tried per window - the quad as 16
@@ -96,8 +100,9 @@ namespace Faolan.Importer.Captures
 			{
 				var bodies = ReadBodies(path);
 				long windows = 0;
-				Parallel.ForEach(bodies, body =>
+				Parallel.ForEach(bodies, entry =>
 				{
+					var body = entry.Body;
 					if (body.Length < 16)
 						return;
 
@@ -181,13 +186,14 @@ namespace Faolan.Importer.Captures
 		//     set is a candidate list, not a key list. That costs a trial decrypt each and nothing else.
 		//   * **raw fixed-width** - the inventory/snapshot form writes the quad TWICE back to back, so 16 bytes
 		//     repeated immediately is the anchor (`<quad><quad>`), big-endian.
-		public static List<uint[]> HarvestCandidates(IEnumerable<string> captureFiles)
+		public static List<Candidate> HarvestCandidates(IEnumerable<string> captureFiles)
 		{
 			var seen = new HashSet<(uint, uint, uint, uint)>();
-			var list = new List<uint[]>();
+			var list = new List<Candidate>();
 			foreach (var path in captureFiles)
 			{
-				foreach (var body in ReadBodies(path))
+				var file = Path.GetFileName(path);
+				foreach (var (body, message) in ReadBodies(path))
 				{
 					for (var i = 0; i + 20 <= body.Length; i++)
 					{
@@ -195,30 +201,32 @@ namespace Faolan.Importer.Captures
 							continue;
 
 						Add(BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 1)), BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 6)),
-							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 11)), BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 16)));
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 11)), BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 16)),
+							file, i, "protobuf", message);
 					}
 
 					for (var i = 0; i + 32 <= body.Length; i++)
 					{
 						if (body.AsSpan(i, 16).SequenceEqual(body.AsSpan(i + 16, 16)))
 							Add(BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i)), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 4)),
-								BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 8)), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 12)));
+								BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 8)), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 12)),
+								file, i, "raw-doubled", message);
 					}
 				}
 			}
 
 			return list;
 
-			void Add(uint a, uint b, uint c, uint d)
+			void Add(uint a, uint b, uint c, uint d, string file, int offset, string carrier, string message)
 			{
 				if ((a | b | c | d) != 0 && seen.Add((a, b, c, d)))
-					list.Add([a, b, c, d]);
+					list.Add(new Candidate([a, b, c, d], file, offset, carrier, message));
 			}
 		}
 
 		// Tests every candidate against every target. Parallel over candidates; the targets are a flat array of
 		// 8-byte first blocks, so the inner loop is cache-friendly.
-		public static List<Hit> ScanCandidates(IReadOnlyList<uint[]> candidates, IReadOnlyList<Target> targets, Action<string>? log = null)
+		public static List<Hit> ScanCandidates(IReadOnlyList<Candidate> candidates, IReadOnlyList<Target> targets, Action<string>? log = null)
 		{
 			var hits = new ConcurrentBag<Hit>();
 			var done = 0;
@@ -226,12 +234,12 @@ namespace Faolan.Importer.Captures
 			{
 				Span<uint> key = stackalloc uint[4];
 				var c = candidates[ci];
-				key[0] = c[0];
-				key[1] = c[1];
-				key[2] = c[2];
-				key[3] = c[3];
+				key[0] = c.Key[0];
+				key[1] = c.Key[1];
+				key[2] = c.Key[2];
+				key[3] = c.Key[3];
 				foreach (var target in targets)
-					TryKey(key, "candidate", target, "corpus", ci, hits);
+					TryKey(key, $"{c.Carrier}/{c.Message}", target, c.Source, c.Offset, hits);
 
 				var n = System.Threading.Interlocked.Increment(ref done);
 				if (n % 500 == 0)
@@ -243,9 +251,12 @@ namespace Faolan.Importer.Captures
 
 		// Every packet body in a tshark dump, as raw bytes. Deliberately NOT filtered to the Conan protocol: a key
 		// could ride any stream, and filtering is how the previous sweep could have missed it.
-		private static List<byte[]> ReadBodies(string path)
+		// The body plus a short name for the MESSAGE it is - the opcode, and the IIR sub-opcode when it carries one.
+		// Carried so a hit can say which shape the key rode in, which is what turns "there is a key we do not hold"
+		// into "we are not parsing X".
+		private static List<(byte[] Body, string Message)> ReadBodies(string path)
 		{
-			var list = new List<byte[]>();
+			var list = new List<(byte[], string)>();
 			JsonDocument doc;
 			try
 			{
@@ -268,7 +279,19 @@ namespace Faolan.Importer.Captures
 
 					try
 					{
-						list.Add(Convert.FromHexString(hex.GetString()!));
+						var body = Convert.FromHexString(hex.GetString()!);
+						var opcode = p.TryGetProperty("Opcode", out var op) && op.ValueKind == JsonValueKind.String ? op.GetString() : null;
+						var iir = p.TryGetProperty("Iir", out var ir) && ir.ValueKind == JsonValueKind.String ? ir.GetString() : null;
+						var dir = p.TryGetProperty("Direction", out var dr) && dr.ValueKind == JsonValueKind.String ? dr.GetString() : "";
+
+						// ⚠️ The opcode ALONE is not the message. `0x2NNN` is the wire RENDERING of the method
+						// instance and is lossy on the hash-registered interfaces, so two different methods can print
+						// the same number - here `0x2005` was the tradepost search result, not the 12-byte wallet
+						// update that shares the rendering. The RECEIVER class is what disambiguates it, so it is
+						// part of the name.
+						var recv = p.TryGetProperty("ReceiverClass", out var rc) && rc.ValueKind == JsonValueKind.String ? rc.GetString() : null;
+						var name = string.IsNullOrEmpty(iir) ? $"{opcode ?? "?"}->{recv ?? "?"}" : $"{opcode}:{iir}";
+						list.Add((body, $"{dir} {name}".Trim()));
 					}
 					catch
 					{
