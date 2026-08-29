@@ -69,7 +69,7 @@ client, and therefore a list of exactly which questions a perk purchase has to a
 | `GetPointCost` | `FUN_01506700` | **the price**, read straight out of RDB 1000099 — see below |
 | `GetAATokenCount` | `FUN_01505ff0` | the character's balance in one pool |
 | `IsAAFeatTrainable` / `TrainAAFeat` / `HasFeat` | `FUN_015066a0` / `FUN_01506510` / `FUN_01506670` | the purchase, and it goes through the **ordinary `FeatHolder`** — which is why AA adds no messages. `TrainAAFeat` reads stats `0x130` / `0x12E` (the offline-training pair), then either starts the offline system (`FUN_01136730`, training mode `e_TrainUsingOfflineSystem`) or calls the FeatHolder's train virtual (`vtable+0xC`, `(featId, 1)`), which lands in `FeatHolder::TrainClassFeat` (`FUN_011386e0`, log channel `Feats/TrainClassFeat`): the same `FeatWrongLevel` / `FeatCategoryPointsMissing` / `FeatsNoMorePoints` / `FeatDependencyFailed` checks a class feat gets, then the id is queued for the `FeatIIR` state-`0x04` train request. ⚠️ So an AA purchase reaches a server as an ordinary feat train carrying a perk id — ours would charge it against the class feat-point budget (`FeatRules.WithinBudget`) rather than the token pool; what retail answers a token spend with is uncaptured (Gitea #150) |
-| `GetAAXPCap` / `GetAANextGiveAwayCompletionPercentage` | `LAB_01506180` / `FUN_01506130` | the XP pool against `AlternateAdvancement_XPCap` |
+| `GetAAXPCap` / `GetAANextGiveAwayCompletionPercentage` | `LAB_01506180` / `FUN_01506130` | the XP pool against `AlternateAdvancement_XPCap` — the arithmetic is below |
 | `SetTrainingMode` / `GetTrainingMode` / `IsOfflineTrainingAvailable` / `ResetOfflineTraining` | `FUN_01504bc0`, … | the OFFLINE training half (Gitea #143) |
 
 It also registers two enums outright, which is where the numbering below comes from:
@@ -98,8 +98,42 @@ This page used to end on "the work in #150 is content and rules, not decode", wh
   in the tuning sheet (`AlternateAdvancement_XPCap` 1,000,000; 1 generic + 3 specific tokens per full pool;
   100 unspent per pool).
 
-What is genuinely absent is the SERVER's half: what a kill pays into the AA pool, and the purchase being
-exercised. Both need an endgame character, and neither is a decode.
+### ⭐ The pool's DENOMINATOR is stated, and the client does the division
+
+`AlternateAdvancement_XPCap` is the one AA tweak the client actually consumes — `TweakGlobals` counts **6 reads**
+on it, against **0** for `SpecificTokensAwarded`, `GenericTokensAwarded` and `PvPModifier`, which are therefore
+ours. Three of those reads are one function shape, repeated (`FUN_0111a3a0`, `FUN_0111a3f0`, and
+`FUN_0111a440` with the stat id as a parameter), and it is exactly:
+
+```
+percentage = 100.0f * GetStat(pool) / (unsigned)AlternateAdvancement_XPCap
+```
+
+with `pool` the two AA XP stats by id — `0xF4247` = 1000007 `AAPvEXP` and `0xF4246` = 1000006 `AAPvPXP` — the cap
+loaded with the unsigned `FILD` idiom (the `+2^32` fixup at `0x020b5254`) and the `100.0f` at `0x01f24468`. So
+`GetAANextGiveAwayCompletionPercentage` is literally "how far this pool is toward 1,000,000", and the "give-away"
+in its name is the token award at the top.
+
+That makes the AA economy a single unknown rather than an open question:
+
+| known | value | from |
+|---|---:|---|
+| the pool the XP lands in | stats 1000006 / 1000007 | the client's own reads above |
+| the pool's cap | 1,000,000 | `AlternateAdvancement_XPCap`, read by the client |
+| what a full pool pays | 3 specific + 1 generic token | `AlternateAdvancement_{Specific,Generic}TokensAwarded`, ours (0 reads) |
+| the PvP scaling | ×5 | `AlternateAdvancement_PvPModifier`, ours (0 reads) |
+| the unspent ceiling | 100 per pool | the three `UnusedTokensCap` keys, ours (names absent from the exe) |
+| **what a kill pays in** | **unknown** | — |
+
+⚠️ The last row is the whole remaining gap. The two per-character modifier stats `PvEAAXPModifier` (1000021) and
+`PvPAAXPModifier` (1000022) are plainly multipliers ON that grant, which says the grant has a base rate the
+server owns and no client resource states. Nothing here is built, because a base rate is exactly what would have
+to be invented — but the denominator it feeds is no longer a guess, so a single capture of an AA XP push settles
+the whole economy.
+
+The purchase side is likewise only unexercised, not undecoded: it arrives as an ordinary `FeatIIR` train request
+(see above), and what it needs is for `TrainWithinBudget` to charge the perk's `FeatPerkCost` against the token
+pool instead of the class feat-point budget.
 
 ## The rest of the surface, for whoever picks this up
 
