@@ -764,8 +764,20 @@ pair the rest were built on:
   is exactly the question when a guard changes the harvest (#839).
 - **`sprint`** — the sprint/regen family: bodies, the receiver-instance census that decides reply-vs-broadcast,
   and the c2s→s2c pairing (#867).
-- **`feat-keys`** — do feat records need a TEA key? (No: all 19,777 are plaintext, #877.) It gives #251's
+- **`feat-keys`** — hunts a record's per-template TEA key by trial-decrypting it against every 16-byte window of
+  every captured packet body. Three modes: the feat sample (default, or `<n>`), `ids:a,b,c` for named records
+  (#895), and `unkeyed[:n]` for a coverage sample drawn from the encrypted 1000020 records we hold no key for
+  (#897, spread evenly across the catalog because id ranges cluster by content pack). It gives #251's
   `FeatKeyScanner` a trigger; the scanner had been wired to nothing.
+  - Its feat answer is structural rather than a scan result: **all 19,777 feat records are plaintext**, so that
+    half of #251 never needed a key (#877).
+  - ⭐⭐ **Every run plants two known-keyed records as a CONTROL and refuses to report a negative unless they come
+    back.** This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be
+    completely broken while looking exactly like a true negative — there is no failing case to notice. This one
+    was, for two tickets: it rebuilt candidate keys little-endian in a big-endian protocol, and its oracle
+    expected the template's own type word when `RdbReader.ReadDecrypted` decrypts and *then* unwraps, so the
+    plaintext under the cipher is an `IOz1` container. Both fixed; `FeatKeyScannerTests` gates the control
+    synthetically so a plain clone keeps it.
 - **`feat-procs`** — `FeatProcs`' shape, and the controlled test that `Amount` is a percent chance (#697).
 - **`particle-effects`** — RDB 1010207 named, so an effect id can be found by what it IS rather than guessed
   (#880). The RDB name table indexes the type, so 7,779 of the 8,163 have a name; the 189 records that ship the
