@@ -69,11 +69,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 					TrailerQuestId = catalog is { Count: > 0 }
 						? catalog[0].QuestId
 						: q.QuestId,
-					// The beach block's trailer is (1,0,0); the fields vary per quest on the wire but generation is
-					// beach-only today (IsSnapshotEligible is gated off), so the beach values keep it byte-exact.
-					TrailerA = 1,
+					// The two per-LINE trailer words come off the line row when the caller supplied one (#896): TrailerA
+					// is the line's category (1 solo / 4 raid / 8 group dungeon) and TrailerC its flag. Without a row
+					// the SOLO defaults stand, which is what the beach/2-quest golden path uses and why it stays
+					// byte-exact. TrailerB is 0 on every captured block and has no per-line source.
+					TrailerA = areas != null && areas.TryGetValue(q.QuestLineId, out var trailerLine)
+						? trailerLine.TrailerCategory
+						: 1,
 					TrailerB = 0,
-					TrailerC = 0
+					TrailerC = areas != null && areas.TryGetValue(q.QuestLineId, out var flagLine)
+						? flagLine.TrailerFlag
+						: 0
 				});
 			}
 

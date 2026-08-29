@@ -17,6 +17,10 @@ namespace Faolan.Importer.Extractors
 		public static List<QuestLine> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var byArea = new Dictionary<uint, QuestLine>();
+
+			// The per-line trailer pair, and the lines whose blocks disagree about it (#896) - see the second pass.
+			var trailerSeen = new Dictionary<uint, (uint Category, uint Flag)>();
+			var disagreements = new List<string>();
 			if (packets == null)
 				return [];
 
@@ -42,6 +46,9 @@ namespace Faolan.Importer.Extractors
 					{
 						QuestLineId = area.QuestLineId,
 						Magic = area.Magic,
+						// 0 = "no index block has named this line yet" - see the second pass. The completed journal
+						// does not carry the trailer pair, so this source never knows it.
+						TrailerCategory = 0,
 						TableField1 = area.TableField1,
 						TitleRefId = title.RefId,
 						TitleCategory = title.Category,
@@ -59,6 +66,11 @@ namespace Faolan.Importer.Extractors
 			// SECOND source: the quest INDEX blocks carry the same area 4CC (29 of 29 captured blocks match the
 			// completed journal's). An area only reachable through a character's ACTIVE quests never appears in a
 			// completed journal, so this covers areas the first pass cannot.
+			//
+			// It is also the ONLY source of the two per-line trailer words (#896), and those are filled for every
+			// line a block names - including the ones the completed journal already produced above. That is why the
+			// trailer assignment sits OUTSIDE the "first writer wins" guard: the guard is about the header records,
+			// and a line can have those from one source and its trailers from the other.
 			foreach (var p2 in packets)
 			{
 				if (!SnapshotJournalReader.TryRead(p2.Bytes, out _, out var journal, out var index) || index == null)
@@ -70,17 +82,40 @@ namespace Faolan.Importer.Extractors
 						continue;
 
 					var quest = journal.FirstOrDefault(r => r.QuestId == block.TrailerQuestId);
-					if (quest == null || quest.QuestLineId == 0 || byArea.ContainsKey(quest.QuestLineId))
+					if (quest == null || quest.QuestLineId == 0)
 						continue;
 
 					// Only the 4CC is available here - the area's header records are not part of the index.
-					byArea[quest.QuestLineId] = new QuestLine
+					if (!byArea.TryGetValue(quest.QuestLineId, out var line))
+						byArea[quest.QuestLineId] = line = new QuestLine
+						{
+							QuestLineId = quest.QuestLineId,
+							Magic = block.Magic,
+							// 0 = "no block named this line yet", which is what ImportQuestLines reads as "leave the
+							// row's own value alone". The COLUMN's default is 1 (solo); a harvested row says 0 until a
+							// block fills it, and 1/4/8 after.
+							TrailerCategory = 0
+						};
+
+					// ⚠️ First block wins, and a DISAGREEMENT is recorded rather than resolved: the pair is stable
+					// per line on all 97 captured blocks, so two blocks of one line differing would mean the
+					// per-line reading is wrong - a thing to surface, not to average away.
+					if (trailerSeen.TryGetValue(quest.QuestLineId, out var seen))
 					{
-						QuestLineId = quest.QuestLineId,
-						Magic = block.Magic
-					};
+						if (seen != (block.TrailerA, block.TrailerC))
+							disagreements.Add($"line {quest.QuestLineId}: index blocks disagree - ({seen.Category},{seen.Flag}) vs ({block.TrailerA},{block.TrailerC})");
+
+						continue;
+					}
+
+					trailerSeen[quest.QuestLineId] = (block.TrailerA, block.TrailerC);
+					line.TrailerCategory = block.TrailerA;
+					line.TrailerFlag = block.TrailerC;
 				}
 			}
+
+			foreach (var d in disagreements)
+				System.Console.WriteLine($"  ⚠️ QuestLine trailer: {d}");
 
 			return [.. byArea.Values];
 		}

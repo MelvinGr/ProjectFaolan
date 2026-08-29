@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -49,15 +50,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 		}
 
 		// The grant path's form: an Add naming every active quest in order, with the trailer retail sends for one.
-		// Unknown0 = 1 is the SOLO-line value (retail sends 4 on raid lines and 8 on group-dungeon lines - see the
-		// record remarks); every quest this path grants today is a solo line, so the constant is the captured value.
-		public static byte[] Build(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, string areaTitle)
+		//
+		// `line` is the granted line's row and supplies the two per-LINE trailer words - the SAME `MainQuest_c` slots
+		// the login snapshot's index block fills, so the two producers must agree or the client's tracker sorts one
+		// way at login and another after a grant (#896). Null keeps the SOLO values (1, 0), which is what every quest
+		// this path granted before the columns existed carried, and what a line with no captured block still gets.
+		public static byte[] Build(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, string areaTitle, QuestLine? line = null)
 		{
 			ArgumentNullException.ThrowIfNull(questIds);
 			var entries = questIds.Select((id, i) => new MainQuestUpdateEntry((uint)(i + 1), id)).ToList();
 			return Build(new MainQuestUpdateIIR(playerHandle, MainQuestUpdateOp.Add, areaId, trackedQuestId, entries, areaTitle)
 			{
-				Unknown0 = 1
+				Unknown0 = line?.TrailerCategory ?? 1,
+				Unknown2 = line?.TrailerFlag ?? 0
 			});
 		}
 

@@ -2300,7 +2300,13 @@ namespace Faolan.GameServer.World
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
 		public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
-			var body = MainQuestUpdateCodec.Build(client.Session.Character.Id, trackedDef.QuestLineId, trackedDef.QuestId, activeQuestIds, QuestTextTokens.Record(trackedDef, QuestTextSlot.QuestLineTitle));
+			// The line row supplies the two per-LINE trailer words (#896) - the same MainQuest_c slots the login
+			// snapshot's index block fills, so the grant and the snapshot have to agree or the client's quest tracker
+			// sorts one way at login and another after an accept. `Line` is an Included navigation on the paths that
+			// reach here; lazy loading is off, so a null one legitimately means "not loaded" and the codec falls back
+			// to the SOLO values, which is what this path sent before the columns existed.
+			var body = MainQuestUpdateCodec.Build(client.Session.Character.Id, trackedDef.QuestLineId, trackedDef.QuestId, activeQuestIds,
+				QuestTextTokens.Record(trackedDef, QuestTextSlot.QuestLineTitle), trackedDef.Line);
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}

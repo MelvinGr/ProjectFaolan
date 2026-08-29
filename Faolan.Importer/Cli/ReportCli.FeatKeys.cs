@@ -25,6 +25,11 @@ namespace Faolan.Importer.Cli
 	// capped and configurable rather than "every feat". A NEGATIVE result over a sample is still meaningful: the
 	// keys, if they ride at all, are not per-record-rare (an unlock event would carry the key for whatever was
 	// unlocked, and the sample is drawn from the feats a captured character actually has).
+	//
+	// ⭐ `--report-arg ids:<id>[,<id>...]` points the same hunt at NAMED records instead of a feat sample, which is
+	// what makes this a general instrument rather than a feat one. Nothing about the method is feat-specific: any
+	// encrypted 1000020 record opens `[u32 1000020][u32 id]`, so the two-word oracle works for an ABILITY template
+	// as well (#895, where the two unbuildable Spellweaving grants are exactly this shape).
 	public static partial class ReportCli
 	{
 		private static async Task FeatKeys(string capturesDir, string? rdbDir, string? arg)
@@ -38,9 +43,19 @@ namespace Faolan.Importer.Cli
 
 			var targetCount = int.TryParse(arg, out var n) && n > 0 ? n : 12;
 
+			// `ids:a,b,c` hunts those exact records; anything else keeps the feat-sample behaviour.
+			var explicitIds = (arg ?? "").StartsWith("ids:", StringComparison.OrdinalIgnoreCase)
+				? arg![4..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+					.Select(t => uint.TryParse(t, out var v) ? v : 0u).Where(v => v != 0).ToHashSet()
+				: null;
+
 			using var db = OpenDb();
-			var featIds = (await db.Feats.Select(f => f.Id).ToListAsync()).ToHashSet();
-			Console.WriteLine($"feat-keys: {featIds.Count:N0} feat ids in the DB.");
+			var featIds = explicitIds ?? (await db.Feats.Select(f => f.Id).ToListAsync()).ToHashSet();
+			Console.WriteLine(explicitIds != null
+				? $"feat-keys: hunting {explicitIds.Count} NAMED record(s): {string.Join(", ", explicitIds)}"
+				: $"feat-keys: {featIds.Count:N0} feat ids in the DB.");
+			if (explicitIds != null)
+				targetCount = explicitIds.Count;
 
 			using var reader = OpenRdb(rdb);
 			var targets = new List<FeatKeyScanner.Target>();
@@ -79,13 +94,14 @@ namespace Faolan.Importer.Cli
 			// ⚠️ The FIRST thing to establish is whether the question is even well posed: a hunt for the keys of
 			// records that are not there would return "no key found" and be read as evidence about the wire.
 			var featsInCatalog = featIds.Count(catalogIds.Contains);
-			Console.WriteLine($"  catalog (RDB 1000020) holds {catalogEntries:N0} entries; {featsInCatalog:N0} of the {featIds.Count:N0} feat ids appear in it "
+			Console.WriteLine($"  catalog (RDB 1000020) holds {catalogEntries:N0} entries; {featsInCatalog:N0} of the {featIds.Count:N0} target id(s) appear in it "
 			                  + $"({100.0 * featsInCatalog / Math.Max(1, featIds.Count):0.0}%).");
 			Console.WriteLine($"  of those: {encryptedFeats:N0} RDBH-encrypted, {plaintextFeats:N0} plaintext, {unreadable:N0} unreadable.");
 			Console.WriteLine($"  scanning for the first {targets.Count}.");
 			if (targets.Count == 0)
 			{
-				Console.WriteLine("  Nothing to scan - no encrypted feat record found.");
+				Console.WriteLine("  Nothing to scan - no encrypted record found among the targets. ⭐ For a NAMED hunt that is");
+				Console.WriteLine("  the answer rather than a dead end: a target that is PLAINTEXT needs no key at all.");
 				return;
 			}
 
@@ -98,15 +114,15 @@ namespace Faolan.Importer.Cli
 			if (hits.Count == 0)
 			{
 				Console.WriteLine("NO KEY FOUND. Over this sample, no captured packet body contains a 16-byte window that opens");
-				Console.WriteLine("any of these feat records. That is evidence the feat key does NOT ride the wire in the traffic");
-				Console.WriteLine("we hold - not proof it never does, since no capture in the corpus performs a feat UNLOCK, which");
-				Console.WriteLine("is where #251 predicted the key would travel.");
+				Console.WriteLine("any of these records. That is evidence the key does NOT ride the wire in the traffic we hold -");
+				Console.WriteLine("not proof it never does, since no capture in the corpus performs a feat UNLOCK, which is where");
+				Console.WriteLine("#251 predicted the key would travel.");
 				return;
 			}
 
 			Console.WriteLine($"** {hits.Count} HIT(S) **");
 			foreach (var h in hits)
-				Console.WriteLine($"  feat {h.TemplateId}: key {string.Join(",", h.Key.Select(k => $"0x{k:X8}"))} in {h.Source} at offset {h.Offset}");
+				Console.WriteLine($"  record {h.TemplateId}: key {string.Join(",", h.Key.Select(k => $"0x{k:X8}"))} ({h.WordOrder}) in {h.Source} at offset {h.Offset}");
 		}
 	}
 }

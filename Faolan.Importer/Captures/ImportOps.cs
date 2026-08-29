@@ -1186,6 +1186,16 @@ namespace Faolan.Importer.Captures
 					row.RegionRefId = wire.RegionRefId;
 					row.RegionCategory = wire.RegionCategory;
 					row.RegionKey = wire.RegionKey;
+
+					// The two MainQuest_c trailer words (#896) - only when a captured index block actually named this
+					// line. The extractor leaves TrailerCategory at its SOLO default for a line no block covered, and
+					// writing that over a harvested 4 or 8 would silently demote a raid/dungeon line to solo.
+					if (wire.TrailerCategory != 0)
+					{
+						row.TrailerCategory = wire.TrailerCategory;
+						row.TrailerFlag = wire.TrailerFlag;
+					}
+
 					continue;
 				}
 
@@ -1202,7 +1212,10 @@ namespace Faolan.Importer.Captures
 					MapKey = wire?.MapKey ?? new ProtoDecryptionKey(),
 					RegionRefId = wire?.RegionRefId ?? 0,
 					RegionCategory = wire?.RegionCategory ?? 0,
-					RegionKey = wire?.RegionKey ?? new ProtoDecryptionKey()
+					RegionKey = wire?.RegionKey ?? new ProtoDecryptionKey(),
+					// A line no captured index block names keeps the SOLO default (#896), which is the column's own.
+					TrailerCategory = wire is { TrailerCategory: not 0 } ? wire.TrailerCategory : 1,
+					TrailerFlag = wire?.TrailerFlag ?? 0
 				});
 				added++;
 			}

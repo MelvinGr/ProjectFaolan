@@ -61,6 +61,27 @@ namespace Faolan.Core.Database.Tables
 		// the corpus" has repeatedly turned out to mean "the corpus only covers one case" in this protocol.
 		public uint TableField1 { get; set; }
 
+		// --- the two per-LINE MainQuest_c trailer words (#896, decoded in #464) ------------------------------------
+		//
+		// Both are fields of the client's `MainQuest_c` and have TWO producers that write the same slots: the login
+		// snapshot's quest index (`QuestIndexRegion.Block.TrailerA` / `.TrailerC`) and the incremental
+		// `MainQuestUpdateIIR` (`Unknown0` / `Unknown2`). They are per-LINE and stable: identical on every one of the
+		// 97 captured index blocks for the line that carries them, which is what makes them columns here rather than
+		// per-quest fields on QuestDefinition.
+		//
+		// `TrailerCategory` is `MainQuest_c +0x48`, and the only consumer is the quest TRACKER's insert-position
+		// comparator - a sort tiebreaker after the level band. Three values occur: **1 solo** (61 lines), **4 raid**
+		// (6), **8 group dungeon** (30). Not a patch-era marker; the Catacombs shipped at launch and carries 8 while
+		// Khitai's solo lines carry 1. Defaulted to 1 because that is the solo value and solo is the overwhelming
+		// majority - and because a line we have never seen an index block for is far likelier to be solo than not.
+		public uint TrailerCategory { get; set; } = 1;
+
+		// `MainQuest_c +0x50`. No consumer found in the client; a per-line flag, set on 6 of the 97 captured lines
+		// (five of them content newer than the client's own 1000104 catalog, plus [Kheshatta_Kalanthes] The Immortal
+		// Hand). ⛔ It is NOT "another line chains from this one" - that reading was measured and misses both ways on
+		// 85 of 97. Carried so a line reproduces its captured block; 0 is the value 91 of 97 lines have.
+		public uint TrailerFlag { get; set; }
+
 		// --- from the client's quest catalog, RDB 1000104 (`MainQuest`); see docs/rdb/quest-catalog-1000104.md ---
 
 		// The designers' name for the line, in PLAINTEXT - `[Eiglophian_Mountains] Feast of Coltranach`. Unlike the

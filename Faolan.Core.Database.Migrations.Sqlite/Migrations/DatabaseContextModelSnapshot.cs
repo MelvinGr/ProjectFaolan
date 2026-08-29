@@ -3379,6 +3379,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("TitleRefId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("TrailerCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TrailerFlag")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("QuestLineId");
 
                     b.ToTable("QuestLines");
