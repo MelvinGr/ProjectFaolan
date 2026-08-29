@@ -134,8 +134,15 @@ namespace Faolan.Importer.Cli
 			{
 				Console.WriteLine();
 				Console.WriteLine($"NO NEW KEY. None of the {wanted.Count} sampled record(s) is opened by any 16-byte window of any");
-				Console.WriteLine("captured packet body. The keys we hold came from PARSED message shapes (ItemHashHarvester's quads,");
-				Console.WriteLine("the 0x2052 grants); this says there is no unparsed shape carrying keys for records outside that set.");
+				Console.WriteLine("captured packet body.");
+				Console.WriteLine();
+				Console.WriteLine("⚠️ CALIBRATE that before reading it as a strong negative (#897). A key only rides the wire when the");
+				Console.WriteLine("   server SENDS you the thing, so a record nobody in the corpus was sent can never be opened here -");
+				Console.WriteLine("   and an even sample of the catalog is almost entirely such records. Measured against the keys we");
+				Console.WriteLine("   already hold: of 400 keyed Items, only 87 (22%) have their quad present in today's dumps as 16");
+				Console.WriteLine("   contiguous big-endian bytes; 0 in little-endian, and none of the four spot-checked appears as");
+				Console.WriteLine("   protobuf varints either. So ~78% of what we DO hold is not byte-present in the corpus at all,");
+				Console.WriteLine("   which bounds what any window scan over it can ever return.");
 				return;
 			}
 

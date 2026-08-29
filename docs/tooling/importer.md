@@ -771,6 +771,15 @@ pair the rest were built on:
   `FeatKeyScanner` a trigger; the scanner had been wired to nothing.
   - Its feat answer is structural rather than a scan result: **all 19,777 feat records are plaintext**, so that
     half of #251 never needed a key (#877).
+  - ⚠️ **A null from `unkeyed` is WEAK unless calibrated, and the report now says so.** A key only rides the wire
+    when the server SENDS you the thing, so a record nobody in the corpus was sent can never be opened by a scan
+    over it — and an even sample of a 72,559-record catalog is almost entirely such records. Measured against the
+    keys we already hold: of 400 keyed `Items`, only **87 (22%)** have their quad present in today's dumps as 16
+    contiguous big-endian bytes; **0** in little-endian, none of the four spot-checked appears as protobuf
+    varints, and a `(k3,k4,k1,k2)` arrangement adds nothing (80, and those overlap the 87 because `key2 == key1`
+    on everything that is not a level-scaled pair). So ~78% of what we hold is not byte-present in today's corpus
+    at all — the DB is the union over every capture the project has ever processed, the corpus on disk is 138
+    dumps, and that gap bounds what any window scan can return.
   - ⭐⭐ **Every run plants two known-keyed records as a CONTROL and refuses to report a negative unless they come
     back.** This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be
     completely broken while looking exactly like a true negative — there is no failing case to notice. This one
