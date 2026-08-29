@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
@@ -406,17 +407,35 @@ namespace Faolan.Importer.Extractors
 			if (!SpawnBodyReader.TryReadCharacterMessage(packetBytes[bodyStart..], out var read))
 				return;
 
-			foreach (var entry in read.Message.InventoryEntries)
+			// ⭐⭐ The worn item AND its socketed GEMS (#897). `InventoryEntry.gem_slots` (field 3) is a list whose
+			// every element carries its own full `ProtoAcgItem` - template, hash and identity quad - so a socketed
+			// gem is an item the spawn hands us exactly as it hands us the piece it is set into. This used to read
+			// `entry.Item` alone and drop them.
+			//
+			// Measured: an exhaustive key hunt over the corpus (`--report feat-keys --report-arg exhaustive`) found
+			// 20 records whose TEA key rides a `SimpleCharFullUpdateIIR` the importer already parses and did not
+			// hold - and they are not in the entry's own item at all, they are in its gem slots.
+			foreach (var acg in read.Message.InventoryEntries.SelectMany(e => new[] { e.Item }.Concat(e.GemSlots.Select(g => g.Item))))
 			{
-				var acg = entry.Item;
 				if (acg?.Key1 == null)
 					continue;
 
 				var template = acg.Template1;
-				var hash = acg.Hash;
-				if (template == 0 || hash == 0)
-					continue; // need both a template and a real hash to be buildable
+				if (template == 0)
+					continue;
 
+				// ⭐⭐ A hash-0 entry is KEPT (#897). This used to require `hash != 0` too, on the grounds that a
+				// spawn entry is only "buildable" with one - which is true of the equipment RENDERER
+				// (`PlayerSpawnEquipment` is gated on `Hash != 0`) and irrelevant to the thing that matters most
+				// here: the identity QUAD is the item's TEA key, and a template we hold a key for is one
+				// `RdbItemImporter` can decrypt however absent its hash is. The loot-bag source three functions down
+				// already keeps hash-0 entries for exactly this reason; this one silently dropped them.
+				//
+				// Measured: an exhaustive key hunt over the corpus (`--report feat-keys --report-arg exhaustive`)
+				// found 20 records whose key rides a `SimpleCharFullUpdateIIR` we parse and did not hold - every one
+				// of them behind this gate. Nothing regresses: the upsert never downgrades a real hash to 0
+				// (`CaptureItemImporter.UpsertAsync`), and a row the renderer will not draw is strictly better than
+				// no row at all.
 				into[template] = CapturedItem.From(acg);
 			}
 		}
