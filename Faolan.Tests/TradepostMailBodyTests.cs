@@ -12,10 +12,10 @@ namespace Faolan.Tests
 	{
 		// The captured mail body (#1604) - the XML is embedded between the mailId/endpoints header and the footer;
 		// reuse MailMessageCodec.Parse to lift it out (the same oracle MailMessageCodecTests uses).
-		private const string CapturedMail = "20d82b631c0c578f08006f3100074d656c6c69656a08006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
+		private const string CapturedMail = "20d82b631c0c578f08006f3100074173736173323308006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                    "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
 		                                    "785b63604e745d3665512136495d546a5d4c7722206b6e75626f743d22302220203e3c706172616d657465722076616c7565" +
-		                                    "3d22373b4d656c6c69656a22202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
+		                                    "3d22373b4173736173323322202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
 		                                    "3538313322202f3e3c706172616d657465722076616c75653d22373b266c743b72656d6f7465666f726d61742069643d2671" +
 		                                    "756f743b3136333131382671756f743b2063617465676f72793d2671756f743b35303230302671756f743b206b65793d2671" +
 		                                    "756f743b29744363416479625d4c26616d703b616d703b4d6e5d36645b3945562671756f743b206b6e75626f743d2671756f" +
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			var capturedXml = MailMessageCodec.Parse(Convert.FromHexString(CapturedMail)).BodyXml;
 
 			// Recipient = the captured character, because the captured XML this is compared against contains it (#417).
-			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("AssassinL23" /* personal-name-ok: the capture's buyer - must match the golden XML */,
+			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("Assas23" /* the capture's buyer, pseudonymised in the golden XML above (#465) */,
 				7310868733973495813ul, // the mail XML's param-1 item id (decimal, distinct from the saleId)
 				TradepostMailBodyCodec.CapturedItemNameEscaped, "Ponakin", "25"));
 

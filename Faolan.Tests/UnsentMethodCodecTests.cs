@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		// [teamClass][teamId][TeamMemberRecord] the join / leave / new-leader trio uses. A byte-exact round-trip is
 		// what turns that from a guess into the reason the method joins their HandledMethods.
 		private static readonly byte[] CapturedTeamMemberUpdate = Convert.FromHexString(
-			"0000DEA9000F08DB0000C3500802E5D400064D656C6C6965000000290000005000000444000000030000000000000006000000000000016200"
+			"0000DEA9000F08DB0000C3500802E5D400064E6563723830000000290000005000000444000000030000000000000006000000000000016200"
 			+ "00C79C000004440000DEA9000F08DB000000000000000100009C500050B38401000181813BC035EC000000010000000000");
 
 		[Fact]
@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			var parsed = TeamMemberEventCodec.Parse(CapturedTeamMemberUpdate);
 
 			Assert.Equal(0x000F08DBu, parsed.TeamId);
-			Assert.Equal("NecroL80", parsed.Member.Name); // personal-name-ok: the captured member record's own bytes
+			Assert.Equal("Necr80", parsed.Member.Name); // the captured record's own bytes, pseudonymised above (#465)
 			Assert.Equal(CapturedTeamMemberUpdate, TeamMemberEventCodec.Build(parsed));
 
 			Assert.Contains(CSPlayerInterfaceMethods.DispatchTeamMemberUpdate, TeamMemberEventCodec.HandledMethods);

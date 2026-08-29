@@ -11,10 +11,10 @@ namespace Faolan.Tests
 	public class MailMessageCodecTests
 	{
 		// The same mail, with the bought item attached (attachCount=1 + [instanceId][entry][trailer]).
-		private const string AttachmentBody = "20d82b631c0c578f08006f3100074d656c6c69656a08006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
+		private const string AttachmentBody = "20d82b631c0c578f08006f3100074173736173323308006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                      "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
 		                                      "785b63604e745d3665512136495d546a5d4c7722206b6e75626f743d22302220203e3c706172616d657465722076616c7565" +
-		                                      "3d22373b4d656c6c69656a22202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
+		                                      "3d22373b4173736173323322202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
 		                                      "3538313322202f3e3c706172616d657465722076616c75653d22373b266c743b72656d6f7465666f726d61742069643d2671" +
 		                                      "756f743b3136333131382671756f743b2063617465676f72793d2671756f743b35303230302671756f743b206b65793d2671" +
 		                                      "756f743b29744363416479625d4c26616d703b616d703b4d6e5d36645b3945562671756f743b206b6e75626f743d2671756f" +
@@ -30,10 +30,10 @@ namespace Faolan.Tests
 		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to the captured recipient, attachCount=0. The
 		// recipient is the captured character - it is IN these bytes (and in the body XML), so the assertions spell it
 		// out; a pseudonym belongs anywhere the name is free input, not where it is what the dump says (#417).
-		private const string BaseBody = "20d82b631c0c578f08006f3100074d656c6c69656a08006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
+		private const string BaseBody = "20d82b631c0c578f08006f3100074173736173323308006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
 		                                "785b63604e745d3665512136495d546a5d4c7722206b6e75626f743d22302220203e3c706172616d657465722076616c7565" +
-		                                "3d22373b4d656c6c69656a22202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
+		                                "3d22373b4173736173323322202f3e3c706172616d657465722076616c75653d22313b373331303836383733333937333439" +
 		                                "3538313322202f3e3c706172616d657465722076616c75653d22373b266c743b72656d6f7465666f726d61742069643d2671" +
 		                                "756f743b3136333131382671756f743b2063617465676f72793d2671756f743b35303230302671756f743b206b65793d2671" +
 		                                "756f743b29744363416479625d4c26616d703b616d703b4d6e5d36645b3945562671756f743b206b6e75626f743d2671756f" +
@@ -80,7 +80,7 @@ namespace Faolan.Tests
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 
 			Assert.Equal(0x20d82b631c0c578ful, mail.MailId);
-			Assert.Equal("AssassinL23", mail.RecipientName); // personal-name-ok: the capture's recipient - must match the blob
+			Assert.Equal("Assas23", mail.RecipientName); // the capture's recipient, pseudonymised in the blob above (#465)
 			Assert.Equal(0x08006f31u, mail.RecipientClass);
 			Assert.Equal("", mail.SenderName); // system mail - empty sender name
 			Assert.Equal(0ul, mail.Money);

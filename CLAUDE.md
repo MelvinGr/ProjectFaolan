@@ -437,9 +437,20 @@ which IIRs, and the framing around each hit. ⚠️ Feed it the same list the co
 (`.git/hooks/personal-names.json`), and note that the residue is protobuf length-delimited fields, not the
 `[u16 len][latin1]` wire strings #465 first assumed - so an equal-length substitution would ripple nowhere.
 The substitution itself is `--report fixture-substitute --report-arg "<old>=<new>[,...]" [--dry-run]` (equal
-length ENFORCED, framed occurrences only, verifies the old names are gone) - but Rewriting those retail bytes is
-an open decision, not a chore: it needs the equal-length pseudonyms and the three golden test literals
-(`GuildPacketTests`/`MailMessageCodecTests`/`TradepostMailBodyTests`) move in the same change.
+length ENFORCED, framed occurrences only, verifies the old names are gone). **It has been RUN** (#465): the
+archive's 102 framed occurrences now carry equal-length pseudonyms picked to stay readable against the display
+map the source and docs already use - `AssassinL23`/`DemoL80`/`NecroL80` squeezed to the byte length the wire
+fixes, i.e. **`Assas23`**, **`Demo80`**, **`Necr80`** - and `--report fixture-names` reports the archive clean.
+Five tests carry the same names in their OWN inline retail hex (not archive bytes) and moved in the same change:
+`UnsentMethodCodecTests`, `ItemCreatorNameTests`, `MailMessageCodecTests`, `TradepostMailBodyTests` and
+`KnubotCodecTestData`, plus `GuildPacketTests`, whose SHA-256 pin had to be **re-derived** - see its remark for
+why that stays a retail pin instead of becoming self-referential.
+⚠️ Two traps if it is ever re-run: the archive is **Brotli**-compressed, so an equal-length substitution still
+changes the FILE size (626 B here) while every body keeps its length - do not read that as corruption; and the
+writer rewrites the whole file, so killing it part-way leaves a TRUNCATED archive (a 195 KB stub, from a 2.8 MB
+original) - `git checkout` it and re-run rather than trusting a short one.
+⛔ **Capture FILE NAMES in comments and docs are NOT in scope** and must not be swept: `.githooks/personal-names.py
+--tree` is green on them, they are how a dump is found in the data repo, and rewriting them breaks that.
 
 You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `Content:TerrainDir` key in `faolan.json`; if it is missing the server logs

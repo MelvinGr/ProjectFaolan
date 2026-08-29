@@ -31,13 +31,13 @@ namespace Faolan.Tests
 		// The captured DispatchAddItem method body: [container 0x68 Bag][char 0x0802e5d4][pos 28][len 0x81][entry].
 		private const string CraftedBody = "000000680802e5d40000001c0000008108f89fddceb3ec8aec201204080010111204080810001206081710bcd8361204082e10" +
 		                                   "001a530a140de4b8eaf515a728315e1d73ebf3122560dfce2012140de4b8eaf515a728315e1d73ebf3122560dfce201a140d" +
-		                                   "e4b8eaf515a728315e1d73ebf3122560dfce2025c36502002dc3650200382845514c58382a064d656c6c696500000000";
+		                                   "e4b8eaf515a728315e1d73ebf3122560dfce2025c36502002dc3650200382845514c58382a064e656372383000000000";
 
 		// The bare ProtoInventoryGameEntry (i_cEntry) out of that body. Ends with a `2a 06` creator_name field
 		// carrying the crafter's name - creator_name last, after the item block.
 		private const string CraftedEntry = "08f89fddceb3ec8aec201204080010111204080810001206081710bcd8361204082e10001a530a140de4b8eaf515a728315e1d" +
 		                                    "73ebf3122560dfce2012140de4b8eaf515a728315e1d73ebf3122560dfce201a140de4b8eaf515a728315e1d73ebf31225" +
-		                                    "60dfce2025c36502002dc3650200382845514c58382a064d656c6c6965";
+		                                    "60dfce2025c36502002dc3650200382845514c58382a064e6563723830";
 
 		private const uint CharId = 0x0802e5d4;
 		private const uint ItemPos = 28;
@@ -47,10 +47,12 @@ namespace Faolan.Tests
 		private const uint BloodsilverKhopeshId = 157123;
 		private const ulong ItemId = 2366689309355364344;
 		private const ulong RecordId = 896060;
-		// personal-name-ok: this is RETAIL BYTES, not a fixture value. The captured entry above ends
-		// `2a 06 4d 65 6c 6c 69 65`, so the literal has to be the crafter's real six-character name or the length
-		// prefix stops matching and the byte-exact assertion below is asserting a different string.
-		private const string Crafter = "NecroL80"; // personal-name-ok
+		// ⚠️ This is RETAIL BYTES, not a fixture value - the crafter's name is INSIDE the captured hex above, so
+		// the literal has to be whatever that hex spells. Pseudonymised equal-length in #465 (`NecroL80` squeezed to
+		// the six bytes the wire fixes), which is why the hex and the literal moved together. The entry ends
+		// `2a 06 4e 65 63 72 38 30`, so a different literal would stop matching the length prefix and the byte-exact
+		// assertion below would be asserting a different string.
+		private const string Crafter = "Necr80";
 
 		// The shipped template + the captured per-instance state rebuild the retail add byte for byte, creator line
 		// included. Note the crafted add's stat list is its own shape again - 0x00=17, Duration 0, no StackSize,
@@ -113,8 +115,8 @@ namespace Faolan.Tests
 			var entry = SnapshotItems.ListEntry(0, ItemId, RecordId, 1, item, item.Hash, creatorName: Crafter).Item;
 
 			Assert.Equal(Crafter, entry.CreatorName);
-			// personal-name-ok: the expectation IS the captured tail - see the Crafter remark.
-			Assert.EndsWith(Convert.ToHexStringLower("\x2a\x06NecroL80"u8.ToArray()), Convert.ToHexStringLower(entry.ToProtobuf())); // personal-name-ok
+			// The expectation IS the captured tail - see the Crafter remark.
+			Assert.EndsWith(Convert.ToHexStringLower("\x2a\x06Necr80"u8.ToArray()), Convert.ToHexStringLower(entry.ToProtobuf()));
 
 			// The stat triple is untouched - creator_name rides beside it, not instead of it.
 			Assert.Equal([0u, 23u, 26u], entry.StatLists.Select(s => s.Stat));

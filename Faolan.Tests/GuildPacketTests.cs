@@ -26,7 +26,17 @@ namespace Faolan.Tests
 
 		// The DemoL80 create capture's 0x2044 body, byte-for-byte. Verified against Golden/GuildCreated.bin (338
 		// bytes, since deleted) before removal.
-		private const string CapturedGuildCreatedSha256 = "3ca011a4a036200d4a9e1547dc0c3e90ea2604227b66e77f987604a054298a5b";
+		//
+		// ⚠️ RE-DERIVED on 2026-08-29 when the creator's name became a pseudonym (#465), and the derivation is what
+		// keeps this a RETAIL pin rather than a self-referential one. The old pin
+		// `3ca011a4a036200d4a9e1547dc0c3e90ea2604227b66e77f987604a054298a5b` asserted `Build(...) == retail's 338
+		// bytes` and was GREEN immediately before the change - that is the proof that our build IS retail's body.
+		// The name is six latin1 bytes in a fixed-width field, so substituting it changes exactly those six and
+		// nothing else; the new pin is therefore the SHA of *retail's body with those six bytes substituted*, which
+		// is what the archive's own equal-length substitution did to every other copy of the name. It is NOT "the
+		// hash of whatever our builder now emits": had the build drifted in any other byte, the old pin would have
+		// failed BEFORE the rename and the re-derivation could not have been made.
+		private const string CapturedGuildCreatedSha256 = "7c33147e8a3af2b94c57b1bc08c5742ada95797b00dfb35560ed5c78209bbfa9";
 
 		// #306: the 0x2044 DispatchGuildCreated body for a freshly created guild, byte-exact against the capture
 		// (DemoL80 creating "Faolan"): [creator member record][guild header (form byte = request's 0x06)][225-byte
@@ -42,15 +52,14 @@ namespace Faolan.Tests
 				Description = "",
 				MessageOfTheDay = ""
 			};
-			// The creator as the CAPTURE recorded them: this asserts against captured bytes, so the name has to be the
-			// one encoded in Golden/GuildCreated.bin. It is one of the three places a real captured character name is
-			// still spelled out in the tests (#417, with MailMessageCodecTests and TradepostMailBodyTests) -
-			// everywhere else the name is free input and is a pseudonym instead. The `personal-name-ok` marker
-			// below is what tells the pre-commit name check that this one is load-bearing rather than an oversight.
+			// The creator as the capture recorded them, PSEUDONYMISED (#465): the retail name was substituted for an
+			// equal-length one everywhere it rides in committed bytes, and this literal moved with it because the pin
+			// below is over a body that contains it. `Demo80` is `DemoL80` - the display pseudonym this repo already
+			// uses for that character - squeezed to the six bytes the wire fixes.
 			var creator = new Character
 			{
 				Id = 0x110099BD,
-				Name = "DemoL80", // personal-name-ok: the capture's creator name - must match the golden bytes
+				Name = "Demo80", // the pseudonym the pin below was re-derived over - see its remark
 				GuildRank = GuildRank.Leader,
 				Level = 80,
 				Class = (ConanClass)0x2C
