@@ -36,6 +36,22 @@ namespace Faolan.GameServer.Progression
 	// against caps of 3 and 5, so the counter keeps counting past its cap; what the cap decides is when that
 	// category's daily challenge is COMPLETE. (That is the sharpened form of #656's open question, answered here.)
 	//
+	// ⭐ And two arguments that need no corpus at all, so the reading does not rest on the captures we happen to have
+	// (#887):
+	//
+	//   * **Two of the caps are 1** - `DailyMinigameWinsCap` and `DailyUnchainedDungeonsCompletedCap`. As a clamp
+	//     that would mean a player can never win a second minigame or finish a second dungeon in a day, which is
+	//     absurd; as a threshold it is exactly right, and it is the shape a one-shot daily has.
+	//   * **The client's own declaration ORDER groups them with the meta.** All five per-category caps sit in one
+	//     contiguous run of the tweak-declaration table (`FUN_010cb540`, strings at `0x0203c9dc..0x0203ca34`) and the
+	//     run continues straight into `DailyMetaCap` / `WeeklyMetaCap` / `MonthlyMetaCap` at `0x0203ca58`. A
+	//     per-category clamp has no reason to be filed next to the meta's own caps; a per-category CONTRIBUTION does.
+	//
+	// ⚠️ `TweakGlobals` reports "no registration stub found" for `DailyPvEKillsCap` and that is not a finding about
+	// the tweak - the client declares tweakables through TWO mechanisms (the 5-instruction stub table that script
+	// pattern-matches, and this bulk declaration function), and this one only goes through the second. Do not read
+	// that script's silence as "the client does not know the name".
+	//
 	// What is measured on the wire, and therefore what this reproduces:
 	//
 	//   * ⭐ `DailyQuestsCompleted` ticks when a quest LINE ends - not per quest step. 5 of 5 across two captures: a
