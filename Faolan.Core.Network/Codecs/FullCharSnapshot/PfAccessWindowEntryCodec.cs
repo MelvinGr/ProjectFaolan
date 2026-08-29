@@ -70,9 +70,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		internal static PfAccessWindowEntry Read(ref SpanReader r)
 		{
 			var playfieldId = r.ReadU32Be();
-			var flag = r.ReadU8();
+			var requiresToken = r.ReadU8();
 			var accessType = r.ReadU32Be();
-			var unknown = r.ReadU32Be();
+			var secondsRemaining = r.ReadU32Be();
 			var internalName = r.ReadStringU16Length();
 
 			var childCount = r.ReadU32Be();
@@ -96,9 +96,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return new PfAccessWindowEntry
 			{
 				PlayfieldId = playfieldId,
-				Flag = flag,
+				RequiresToken = requiresToken,
 				AccessType = accessType,
-				Unknown = unknown,
+				SecondsRemaining = secondsRemaining,
 				InternalName = internalName,
 				Children = children
 			};
@@ -109,9 +109,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			ArgumentNullException.ThrowIfNull(v);
 
 			s.WriteUInt32(v.PlayfieldId);
-			s.WriteByte(v.Flag);
+			s.WriteByte(v.RequiresToken);
 			s.WriteUInt32(v.AccessType);
-			s.WriteUInt32(v.Unknown);
+			s.WriteUInt32(v.SecondsRemaining);
 			s.WriteString(v.InternalName);
 			s.WriteUInt32((uint)v.Children.Count);
 

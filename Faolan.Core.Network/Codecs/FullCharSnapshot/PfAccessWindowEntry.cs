@@ -14,13 +14,32 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//   - `PfAccessWindowChildDetail.DetailUnknown` + the 3-char "ShortCode" were one big-endian u32 window id;
 	//   - the childMode 1/2/3 "variants", "detail modes" and both lookahead heuristics were artifacts of walking
 	//     a plain `count × child` list through a shifted frame.
-	// What remains genuinely unnamed is exactly ONE field: the head's `Unknown` u32 (zero on all 86 records).
+	// ⭐ And the last two - the head's bool and its u32 - are named as of #464: every field of the record now is.
+	// The in-memory record the holder stores is `{ bool@+0x00, u32@+0x04, u32@+0x08, bool@+0x0c, string@+0x10,
+	// children@+0x2c }` (its inserter `FUN_0077e9a0` copies exactly those), which is this class plus ONE extra
+	// bool at `+0x0c` that is not on the wire: a client-side "already warned" latch, see SecondsRemaining.
 	public sealed class PfAccessWindowEntry
 	{
 		public uint PlayfieldId { get; init; }
 
-		// A BOOLEAN on the client (its reader normalises `!= 0`); meaning undecoded. 0 or 1 on all 86 records.
-		public byte Flag { get; init; }
+		// ⭐ Whether entering this playfield COSTS A TELEPORT COIN (#464). A boolean on the client (its reader
+		// normalises `!= 0`); 0 or 1 on all 86 records.
+		//
+		// Named by the client's own refusal, three ways over: the access window's opener `FUN_014bd250` branches on
+		// this byte (node `+0x10`) and, when it is set, queries token pool **0x32 = 50** - which RDB 1000520 names
+		// `TeleportCoins` (`TokenPool`, recovered independently) - and refuses to open the window when the player
+		// holds none, showing LDB-100 `PlayfieldAccessNoTokens`:
+		//
+		//     "You do not have enough Teleport Coins to travel. Purchase more from the Item Shop."
+		//
+		// and its sibling string in the same GUI table, LDB-520 `RequiresToken`, is the confirmation prompt:
+		//
+		//     "This will cost 1 Teleport Coin."
+		//
+		// So the field IS the client's `RequiresToken`. ⚠️ Retail's catalog carries 1 on every one of the 86
+		// records, which is not the same claim as "every playfield costs a coin" - the window is the fast-travel
+		// list, and this is the flag that puts the price on the entry.
+		public byte RequiresToken { get; init; }
 
 		// ⭐ The ACCESS TYPE - named from the client's own checker (#464): `PlayfieldAccessHolder`'s
 		// `FUN_0077e200` looks the playfield up in this list's map and switches on this word (the stored pair's
@@ -31,13 +50,32 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// own those expansions), not immutable game data; retail presumably serves 2s to an entitled account.
 		public uint AccessType { get; init; }
 
-		// 0 in all 86 catalog records; a real record field, name unknown (Gitea #464). STORED-BUT-UNCONSUMED:
-		// the inserter `FUN_0077e9a0` copies it from the source record (its +8) into the node as the pair's third
-		// data word (node +0x18), but the two functions that READ the node - the access checker `FUN_0077e200`
-		// (reads only the AccessType at node +0x14) and the UI opener `FUN_014bd250` (reads the Flag at +0x10 and
-		// the AccessType at +0x14) - never touch +0x18. So no client consumer of it exists on the two known
-		// paths, and it is 0 on every captured record; it is carried so a record round-trips byte-exact.
-		public uint Unknown { get; init; }
+		// ⭐ How much longer this TIMED access lasts, in SECONDS (#464). 0 in all 86 catalog records - the captured
+		// account held no timed playfield access, which is why the field looked dead.
+		//
+		// It reached the node as the pair's third data word (`+0x18`) and neither the access checker
+		// `FUN_0077e200` nor the UI opener `FUN_014bd250` touches it, which is what made it read as
+		// stored-but-unconsumed. Its consumer is neither: it is the holder's own update slot `FUN_0113a390`
+		// (reached from a callback table, not a direct call), which is exactly
+		//
+		//     if (!warned && remaining <= TWK_PlayfieldAccess_WarningTimer && remaining > 0 && here)
+		//             warn(playfieldId, remaining); warned = true;
+		//     if (warned && remaining > TWK_PlayfieldAccess_WarningTimer) warned = false;   // re-arm
+		//
+		// against `DAT_02d24664`, which is that tweak's own value slot (slot+8 of `0x02d2465c`) and reads **300**.
+		// The warning it fires is LDB-100 `EndOfPlayfieldAccessWarning`, *"You will lose access to %s in %d
+		// minutes"*, and the formatter divides the value by 60 (`0x88888889` / `SHR 5`, the unsigned divide-by-60).
+		// A 300-value warning that prints as 5 minutes settles the UNIT: seconds, not minutes and not hours.
+		//
+		// The `bool warned` the loop latches is the source record's `+0x0c`, and it is client-side state - it is
+		// not on the wire and this class has no field for it.
+		//
+		// The sibling PRODUCER agrees: `DispatchPlayfieldAccessGranted(playfieldId, hours, allCharacters)` is how
+		// retail grants one of these, so a grant states HOURS and the entry counts down in seconds. The same
+		// per-entry record travels alone on `DispatchSendPlayfieldAccessData(playfieldId, accessInfo)` - its
+		// handler `FUN_004cdb10` calls `FUN_0077db70`, the very reader this table's own reader calls per element,
+		// which is what says the snapshot entry and `accessInfo` are one type.
+		public uint SecondsRemaining { get; init; }
 
 		public string InternalName { get; init; } = null!;
 
@@ -49,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				? ""
 				: $" | children: {string.Join(", ", Children.Select(c => c.ToString()))}";
 
-			return $"{PlayfieldId} {InternalName} flag={Flag} accessType={AccessType}{children}";
+			return $"{PlayfieldId} {InternalName} requiresToken={RequiresToken} accessType={AccessType} secondsRemaining={SecondsRemaining}{children}";
 		}
 	}
 

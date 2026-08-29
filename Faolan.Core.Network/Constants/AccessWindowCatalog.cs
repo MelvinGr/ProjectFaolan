@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1000,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Hubs",
 				Children =
@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1010,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1020,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -51,21 +51,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1022,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1024,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1026,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -76,7 +76,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1050,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -88,14 +88,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1052,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1070,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -106,14 +106,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1071,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1080,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -124,7 +124,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1082,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -135,7 +135,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1084,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid",
 				Children =
@@ -146,14 +146,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1085,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1090,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -164,7 +164,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1092,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -175,14 +175,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 1215,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2000,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Hubs",
 				Children =
@@ -194,7 +194,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2010,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -205,7 +205,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2020,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -216,7 +216,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2024,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -227,7 +227,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2025,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -238,42 +238,42 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2026,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2029,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2030,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2032,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2033,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2080,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -284,7 +284,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2085,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -295,7 +295,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2090,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -307,7 +307,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2094,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_SoloDungeon",
 				Children =
@@ -318,7 +318,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2095,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -329,14 +329,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 2205,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3000,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Hubs",
 				Children =
@@ -348,14 +348,14 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3001,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3020,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -367,7 +367,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3024,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -378,7 +378,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3030,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -390,7 +390,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3032,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid",
 				Children =
@@ -401,7 +401,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3033,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -412,7 +412,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3034,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid",
 				Children =
@@ -423,7 +423,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3035,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -434,28 +434,28 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3042,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3044,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3045,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3071,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -467,21 +467,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3077,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 3204,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 4020,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Hubs",
 				Children =
@@ -492,7 +492,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6001,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -503,7 +503,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6004,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_SoloDungeon",
 				Children =
@@ -514,7 +514,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6005,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_SoloDungeon",
 				Children =
@@ -525,21 +525,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6007,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6008,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6100,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -551,7 +551,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6110,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -562,7 +562,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6120,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -573,21 +573,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6121,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6122,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6130,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -598,7 +598,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6200,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -610,7 +610,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6210,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -621,7 +621,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6211,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -632,7 +632,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6212,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -643,7 +643,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6213,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon",
 				Children =
@@ -654,7 +654,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6300,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -667,7 +667,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6310,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -678,21 +678,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6311,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6312,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6320,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -703,7 +703,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6400,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -715,7 +715,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6420,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Raid",
 				Children =
@@ -726,21 +726,21 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6421,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6427,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6432,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -751,7 +751,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 6433,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon",
 				Children =
@@ -762,7 +762,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7000,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -773,42 +773,42 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7011,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7013,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7020,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_SoloDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7030,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_GroupDungeon"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 7040,
-				Flag = 0,
+				RequiresToken = 0,
 				AccessType = 3,
 				InternalName = "PFAccessWindow_Raid"
 			},
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 10800,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_Outdoor",
 				Children =
@@ -819,7 +819,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 11040,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_BorderKingdoms",
 				Children =
@@ -830,7 +830,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 12070,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_BorderKingdoms",
 				Children =
@@ -841,7 +841,7 @@ namespace Faolan.Core.Network.Constants
 			new PfAccessWindowEntry
 			{
 				PlayfieldId = 13050,
-				Flag = 1,
+				RequiresToken = 1,
 				AccessType = 2,
 				InternalName = "PFAccessWindow_BorderKingdoms",
 				Children =

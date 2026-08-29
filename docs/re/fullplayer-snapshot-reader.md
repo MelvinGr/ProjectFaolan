@@ -309,11 +309,18 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    content across all 97 captured blocks. `@0x44` and `@0x50` have no reader; see `MainQuestUpdateIIR`'s
    record remarks for the per-field data.
 6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
-   (`FUN_0077db70`): `[u8 flag][u32][u32][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`
+   (`FUN_0077db70`): `[u8 requiresToken][u32 accessType][u32 secondsRemaining][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]`
    — VARIABLE-WIDTH (the inner count is a PLAIN count, not `0x3F1`-framed).
    ⭐ **This IS the `PFAccessWindow_` access-window table** (#464): the records are `PlayfieldAccessHolder`'s
    playfield-access entries (`CoreCharacter\PlayfieldAccessHolder.cpp`, channel `GameCode/PlayfieldAccess`),
-   86 on every captured subclass. An earlier pass called this list "empty on all 151" — that was the
+   86 on every captured subclass. ⭐ **Every field of the record is named as of 2026-08-29** — the head bool is
+   `RequiresToken` (the opener `FUN_014bd250` queries token pool 50 = `TeleportCoins` when it is set and refuses
+   with LDB-100 `PlayfieldAccessNoTokens`, *"You do not have enough Teleport Coins to travel"*), and the third
+   word is `SecondsRemaining` on a TIMED access (the holder's update slot `FUN_0113a390` warns below
+   `TWK_PlayfieldAccess_WarningTimer` = 300 with `EndOfPlayfieldAccessWarning`, *"You will lose access to %s in
+   %d minutes"*, dividing by 60). ⚠️ The same record travels alone as `DispatchSendPlayfieldAccessData`'s
+   `accessInfo` — that handler calls this very reader — and `DispatchPlayfieldAccessGranted(playfieldId, hours,
+   allCharacters)` is what grants one. See `PfAccessWindowEntry` for the full derivation. An earlier pass called this list "empty on all 151" — that was the
    off-by-one-list alignment the old landmark-carved table forced (see the 2026-08-20 update below).
 7. **List E** — `FUN_0077d5b0`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
    `FUN_0077df00`: `[string][u32][u32][u32][u8][string]` — also VARIABLE-WIDTH.
