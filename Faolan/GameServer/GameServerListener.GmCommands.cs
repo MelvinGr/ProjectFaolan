@@ -257,6 +257,16 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"matchstart: {outcome}");
 		}
 
+		// .matchstop [reason]  - end the caller's started PvP match NOW, without waiting out its clock (#146). The
+		// client's own abort path: every member gets DispatchForceStopMinigame with the reason line, then the match
+		// dissolves and each member is put back where the countdown teleport found them. The test bootstrap for the
+		// end half of the match loop, the way `.matchstart` is for the start half.
+		private async Task MatchStopCommand(INetworkClient client, string arguments)
+		{
+			var outcome = await _csPlayerAgentDispatcher.ForcePvpMatchStop(client.Session.Character.Id, (arguments ?? "").Trim());
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"matchstop: {outcome}");
+		}
+
 		// .graduatenpcgroup <group name>  - GRADUATE a resolved spawn area (#363): delete the CAPTURED NpcSpawn rows
 		// LINKED to it (materialized by the resolver's auto-link + `.setnpcgroup`) so the ambient POOL becomes the sole
 		// source of that population - removing the captured/ambient density overlap. A clean FK delete on the membership
@@ -414,7 +424,9 @@ namespace Faolan.GameServer
 				// #146: force-form a PvP match from the minigame queue as it stands, however few are queued (down
 				// to one member - a solo walk of the teleport + match-instance flow). The queue lives on the CS
 				// tier, so this crosses the same seam the team ops do.
-				["matchstart"] = (client, _) => MatchStartCommand(client)
+				["matchstart"] = (client, _) => MatchStartCommand(client),
+				// #146: the end half - stop the caller's started match now instead of waiting out its time limit.
+				["matchstop"] = MatchStopCommand
 			};
 		}
 

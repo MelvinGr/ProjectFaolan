@@ -10,6 +10,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.Quest;
@@ -70,6 +71,11 @@ namespace Faolan.GameServer.Combat
 
 		private readonly WorldSimulation _sim;
 
+		// #146: the PvP gate and the match scoreboard both live on the CS tier (PvpMatchService owns the match), so a
+		// swing at another PLAYER asks across this seam whether it is allowed before it lands - and tells it about the
+		// kill afterwards. Never a direct reference to that listener: the relationship is mutual.
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgent;
+
 		// #272: world-VISIBLE records (a death, an animation) go to everyone who can see the subject, not just to the
 		// client whose action caused them. See WorldBroadcaster.BroadcastEntityRecords for the measurement behind that.
 		private readonly WorldBroadcaster _outbound;
@@ -77,8 +83,9 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, bool killStreaks)
+			LevelUpService levelUp, FatalityService fatality, FactionService factions, WorldBroadcaster outbound, ICsPlayerAgentDispatcher csPlayerAgent, bool killStreaks)
 		{
+			_csPlayerAgent = csPlayerAgent;
 			_outbound = outbound;
 			_killStreaks = killStreaks;
 			_factions = factions;
@@ -240,7 +247,7 @@ namespace Faolan.GameServer.Combat
 			if (critChanceHundredths > 0 && Random.Shared.Next(SpellCritRollScale) < critChanceHundredths)
 				damage = CombatResolver.ApplySpellCritDamage(damage, spellCritDamage, caster?.CriticalDamageRating ?? 0);
 
-			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
+			await ApplyDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}
 
@@ -351,7 +358,7 @@ namespace Faolan.GameServer.Combat
 
 			// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
 			// lifecycle (despawn + scheduled respawn) on death.
-			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
+			await ApplyDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
 			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
 			await ApplyMeleeCleave(client, instance, targetHandle, damage);
@@ -501,7 +508,7 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var handle in victims)
 			{
-				await ApplyNpcDamage(client, handle, damage, $"area effect {effectSpellId} from 0x{sourceHandle:X8}");
+				await ApplyDamage(client, handle, damage, $"area effect {effectSpellId} from 0x{sourceHandle:X8}");
 				await SendSpellDamageNumber(client, handle, sourceHandle, damage, effectSpellId);
 			}
 
@@ -519,7 +526,7 @@ namespace Faolan.GameServer.Combat
 			if (delta >= 0)
 				return;
 
-			await ApplyNpcDamage(client, npcHandle, -delta, $"DoT from spell {spellId} (0x{casterHandle:X8})",
+			await ApplyDamage(client, npcHandle, -delta, $"DoT from spell {spellId} (0x{casterHandle:X8})",
 				() => SendSpellDamageNumber(client, npcHandle, casterHandle, -delta, spellId));
 		}
 
@@ -554,7 +561,7 @@ namespace Faolan.GameServer.Combat
 
 			foreach (var handle in victims)
 			{
-				await ApplyNpcDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
+				await ApplyDamage(client, handle, tickDamage, $"AoE spell {spellId} from 0x{casterHandle:X8} at {target}");
 				await SendSpellDamageNumber(client, handle, casterHandle, tickDamage, spellId);
 			}
 
@@ -660,6 +667,106 @@ namespace Faolan.GameServer.Combat
 		// ice-strike fatality the victim's StatDamage is idx 542, after the burst (535-538) and before the death pose
 		// (546) and BccIIR (549). Sending it after the corpse was already posed put the killing blow's own number
 		// behind the death.
+		// The damage funnel. A target handle is an NPC or ANOTHER PLAYER, and only the second needs a permission
+		// question, so the split is here rather than repeated in the seven callers (melee, cleave, spell, DoT tick,
+		// ground AoE, area effect, `.kill`).
+		//
+		// ⚠️ A player target that is not a legal PvP opponent is REFUSED here, with its own line. Letting it fall
+		// through to ApplyNpcDamage would refuse it too - the NPC resolver rejects a player entity - but it would
+		// report a targeting/interest bug (#695) for what is really a rules answer, and that is exactly the kind of
+		// mislabelled log the #695 diagnosis was lost to the first time.
+		private async Task ApplyDamage(INetworkClient client, uint targetHandle, int damage, string cause, Func<Task>? onDamaged = null)
+		{
+			if (PlayerTarget(client, targetHandle) is not { } victim)
+			{
+				await ApplyNpcDamage(client, targetHandle, damage, cause, onDamaged);
+				return;
+			}
+
+			if (!_csPlayerAgent.ArePvpMatchOpponents(client.Session.Character.Id, victim.Handle))
+			{
+				_logger.LogInformation("Combat: {Player}'s hit on player '{Victim}' is refused - PvP is only allowed between opponents of one started minigame match (#146).",
+					client.Session.Character?.Name ?? "<no character>", victim.Name);
+
+				return;
+			}
+
+			await ApplyPlayerDamage(client, victim, damage, cause, onDamaged);
+		}
+
+		// The target as a live PLAYER in the attacker's own zone, or null when it is not one. Resolved through
+		// ZoneForEntity like every other target lookup here - TryGetZone(MapId) would answer the DEFAULT instance and
+		// so miss every minigame match, which is the one place this is reached from (#268/#512).
+		private WorldEntity? PlayerTarget(INetworkClient client, uint targetHandle)
+		{
+			var attacker = _sim.PlayerWorldEntity(client);
+			return attacker != null && _sim.World.ZoneForEntity(attacker).TryGet(targetHandle, out var target) && target is { IsPlayer: true }
+				? target
+				: null;
+		}
+
+		// Player-versus-player damage (#146). The shape mirrors the NPC-hits-player path in WorldSimulation rather
+		// than the NPC-damage one, because the VICTIM is a live session with a health bar of its own: they get the
+		// incoming floating number and their own vitals push, while the attacker gets the target's bar move (its
+		// outgoing number was already sent by the caller, like every other hit).
+		//
+		// The DEATH is not finished here on purpose. A dead player's release screen, buff strip and death penalty are
+		// the world tick's (TickPlayerDeaths), which fires off `vitals.IsDead` whatever emptied the bar - so a PvP kill
+		// takes exactly the same route as a mob kill, a fall or lava, and there is no second death sequence to keep in
+		// step. What IS this path's own is the scoreboard: the career counters and the match's kill credit.
+		private async Task ApplyPlayerDamage(INetworkClient attackerClient, WorldEntity victim, int damage, string cause, Func<Task>? onDamaged)
+		{
+			var victimClient = victim.Client;
+			var victimCharacter = victimClient?.Session.Character;
+			if (victimClient == null || victimCharacter == null)
+				return; // not connected to this listener - nothing to move and nobody to tell
+
+			var vitals = victim.Vitals ??= EntityVitals.FromCharacter(victimCharacter, victim.GearBonuses, victim.ClassBase);
+			if (vitals.IsDead)
+				return; // already down; ignore overkill until they release
+
+			if (victim.GodMode)
+				return; // .godmode: the swing lands and animates, the damage does not
+
+			var attacker = _sim.PlayerWorldEntity(attackerClient);
+			var attackerCharacter = attackerClient.Session.Character;
+
+			// Attribute the death to the KILLER, never to the victim: the client's ResurrectView goes into
+			// wave-respawn mode iff the killer resolves to the local player (#214), and a PvP death must release
+			// instantly like every other.
+			victim.LastAttackerHandle = attacker?.Handle ?? victim.LastAttackerHandle;
+			victim.LastCombatAt = DateTimeOffset.UtcNow;
+			vitals.ApplyHealthDelta(-damage);
+
+			if (onDamaged != null)
+				await onDamaged();
+
+			// The victim's screen: the incoming number floating on them, then their own health bar. The second is
+			// exactly what IWorldOutbound.PushVitals does (a currents-only block addressed at their own handle) - it
+			// is spelled out here rather than reached through the listener because this service frames its own combat
+			// packets and does not hold that port.
+			await SendDamageNumber(victimClient, victim.Handle, attacker?.Handle ?? 0, (uint)Math.Max(0, damage), DamageSchool.Crushing);
+			await SendStatUpdate(victimClient, vitals.ToCurrentsBlock(), victim.Handle);
+
+			// And the attacker's: the target's bar moving, the same push a hit on an NPC sends them.
+			await SendStatUpdate(attackerClient, vitals.ToCurrentsBlock(), victim.Handle);
+
+			if (!vitals.IsDead)
+				return;
+
+			_logger.LogInformation("Combat: {Killer} killed player {Victim} ({Cause}).", attackerCharacter.Name, victimCharacter.Name, cause);
+
+			// The PvP CAREER pair the login snapshot carries as stats 0x290 / 0x292 (#808). Persisted per event for
+			// the same reason as the PvE pair: a kill is earned once.
+			attackerCharacter.PvpKills++;
+			victimCharacter.PvpDeaths++;
+			await _database.SetCharacterPvpKillCounts(attackerCharacter.Id, attackerCharacter.PvpKills, attackerCharacter.PvpDeaths);
+			await _database.SetCharacterPvpKillCounts(victimCharacter.Id, victimCharacter.PvpKills, victimCharacter.PvpDeaths);
+
+			// And the match's own scoreboard, which may end it on the score limit.
+			await _csPlayerAgent.CreditPvpMatchKill(attackerCharacter.Id, victimCharacter.Id);
+		}
+
 		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause, Func<Task>? onDamaged = null)
 		{
 			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
@@ -851,7 +958,10 @@ namespace Faolan.GameServer.Combat
 		// the spell's own GameActions with it - the recast setter among them.
 		private Task SendSpellDamageNumber(INetworkClient client, uint npcHandle, uint casterHandle, int damage, uint spellId)
 		{
-			var vitals = ResolveNpcVitals(client, npcHandle, out _);
+			// A PvP target is asked for FIRST, and quietly: ResolveNpcVitals refuses a player entity by design and
+			// reports it as a targeting bug, so going through it for a legal opponent would log an error on every
+			// spell hit of a minigame (#146).
+			var vitals = PlayerTarget(client, npcHandle)?.Vitals ?? ResolveNpcVitals(client, npcHandle, out _);
 
 			// Only ever reached from ApplyNpcDamage's onDamaged, which already resolved the same handle - so a null
 			// here means the target vanished between the hit and its number, and a floating number read off nothing
@@ -867,7 +977,7 @@ namespace Faolan.GameServer.Combat
 		{
 			await SendDamageNumber(client, targetHandle, instance, damage, DamageSchool.Crushing); // player physical melee
 
-			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
+			await ApplyDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
 			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
 			await ApplyMeleeCleave(client, instance, targetHandle, damage);

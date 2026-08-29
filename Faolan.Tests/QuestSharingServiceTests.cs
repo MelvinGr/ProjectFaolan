@@ -278,6 +278,9 @@ namespace Faolan.Tests
 			public uint? TeamIdOf(uint characterId) => members.Contains(characterId) ? 1u : null;
 
 			public PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId) => null;
+			public Task<string> ForcePvpMatchStop(uint characterId, string message) => Task.FromResult("");
+			public bool ArePvpMatchOpponents(uint attackerId, uint victimId) => false;
+			public Task CreditPvpMatchKill(uint killerId, uint victimId) => Task.CompletedTask;
 
 			public Task<string> ForcePvpMatchStart() => Task.FromResult("not in this fake");
 		}

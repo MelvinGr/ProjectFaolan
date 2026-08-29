@@ -55,11 +55,36 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		PvpMatchWorldEntry? PvpMatchEntryOf(uint characterId, uint mapId);
 
 		/// <summary>
+		///     Whether <paramref name="attackerId" /> may damage <paramref name="victimId" /> as PvP opponents (#146):
+		///     true only when both hold membership of the SAME started, unfinished custom PvP match on DIFFERENT sides.
+		///     <para>
+		///         This is the whole PvP gate today, and it lives here because the match does. Retail also allows PvP by
+		///         PLAYFIELD - the client ships that table (RDB 1000509/1000510/1000512, decoded in
+		///         docs/rdb/client-data-tables.md) - but the ruleset COLUMNS are not named, so nothing here reads them
+		///         and open-world PvP (with the murder-point/criminal half, #503) stays refused. A minigame needs no
+		///         such table: the sides are locked and the fight is the point.
+		///     </para>
+		/// </summary>
+		bool ArePvpMatchOpponents(uint attackerId, uint victimId);
+
+		/// <summary>
+		///     Score a PvP-match kill (#146): a point for the killer, a death for the victim, and - when a side reaches
+		///     the ruleset's score limit - the match ends there rather than at its time limit.
+		/// </summary>
+		Task CreditPvpMatchKill(uint killerId, uint victimId);
+
+		/// <summary>
 		///     The GM `.matchstart` override (#146): form a PvP match from whoever is compatibly queued right now,
 		///     however few (down to one member, for a solo walk of the teleport + instance flow). Returns a one-line
 		///     outcome for the GM's chat. The command arrives on the game tier; the queue lives here.
 		/// </summary>
 		Task<string> ForcePvpMatchStart();
+
+		/// <summary>
+		///     The GM `.matchstop` override (#146): end <paramref name="characterId" />'s started match now, telling
+		///     every member through the client's own DispatchForceStopMinigame path. Returns a one-line outcome.
+		/// </summary>
+		Task<string> ForcePvpMatchStop(uint characterId, string message);
 
 		/// <summary>
 		///     Tell <paramref name="recipientId" /> that mail has arrived (<c>DispatchYouGotMailNotification</c>, #871).

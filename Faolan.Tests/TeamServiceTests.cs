@@ -38,6 +38,8 @@ namespace Faolan.Tests
 			public Task<bool> RunGmCommand(uint characterId, string commandText) => Task.FromResult(false);
 			public Task<bool> TeleportCharacter(uint characterId, uint mapId, System.Numerics.Vector3? position = null) => Task.FromResult(false);
 			public Task<bool> SendGuildTag(uint characterId, string guildName) => Task.FromResult(false);
+			public Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult) => Task.FromResult(false);
+			public Task<bool> SendMinigameForceStop(uint characterId, string message) => Task.FromResult(false);
 			public void Register(IGameServerProvider provider) { }
 			public void Unregister(IGameServerProvider provider) { }
 		}

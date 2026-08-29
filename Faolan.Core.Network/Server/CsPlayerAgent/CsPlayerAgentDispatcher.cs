@@ -54,6 +54,22 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 			return Provider?.PvpMatchEntryOf(characterId, mapId);
 		}
 
+		public async Task<string> ForcePvpMatchStop(uint characterId, string message)
+		{
+			var provider = Provider;
+			return provider == null ? "no CS tier is registered on this process." : await provider.ForcePvpMatchStop(characterId, message);
+		}
+
+		public bool ArePvpMatchOpponents(uint attackerId, uint victimId)
+		{
+			return Provider?.ArePvpMatchOpponents(attackerId, victimId) ?? false;
+		}
+
+		public Task CreditPvpMatchKill(uint killerId, uint victimId)
+		{
+			return Provider?.CreditPvpMatchKill(killerId, victimId) ?? Task.CompletedTask;
+		}
+
 		public async Task<string> ForcePvpMatchStart()
 		{
 			var provider = Provider;

@@ -221,6 +221,20 @@ in a capture (`YouJoinedMatch` / `MatchInfo` carry the same element), or by an i
 window with known values typed into it. Tracked in Gitea #146.
 `[V0: the PvPMatchRules_c C/D/E/H columns]`
 
+### `MinigameScore_c`'s six unnamed scalars
+The score record `DispatchMinigameFullScore` (0x2088) carries is carved field-by-field from its reader
+(`FUN_00559940`, in `docs/re/minigame-massivepvp-messages.md`): four u32s, the per-character score map, two more
+u32s, two side maps, one more u32 and a third list into the second side map's container. Its named parts are the
+ones the client's own consumers read back — the score map is what `GetTotalCharacterScore` walks and what the
+status view renders as Kills / Deaths / Score, the two side maps are what `GetSideScore(side, 0|1)` looks a side
+up in, and `+0x4c` lands on the singleton's match-start clock (`+0x1b8`) that `GetTimeLeft` computes from. The
+six scalars at `+0x04`, `+0x08`, `+0x0c`, `+0x10`, `+0x24` and `+0x28`, and the fifth value word of a score
+entry, have no consumer that names them. **No capture contains a single instance** — no captured session ever
+scores in a minigame — so this is why the server ends a match without pushing a score. Close it by capturing a
+minigame with kills in it, or by finding a consumer for those offsets on `PvPMatchMaking_c` (`+0x170`, `+0x174`,
+`+0x178`, `+0x17c`, `+0x190`, `+0x194`). Tracked in Gitea #146.
+`[V0: the MinigameScore_c scalars at +0x04/+0x08/+0x0c/+0x10/+0x24/+0x28 and the entry's fifth value word]`
+
 ### The matchmaking board's innermost map key
 `DispatchPvPMatchMakingInfoRequestReturn` (0x2092) is a three-level count-framed map that round-trips all 43
 captured bodies (`PvpMatchMakingInfoCodec`), but its innermost key is **0 in every one of them**. It is read as

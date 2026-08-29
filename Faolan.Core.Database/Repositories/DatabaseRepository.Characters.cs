@@ -258,6 +258,9 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterNpcKillCounts(uint characterId, uint kills, uint deaths);
 
+		/// <summary>The PvP career counters (snapshot stats 0x290 / 0x292), persisted per kill like the PvE pair.</summary>
+		Task SetCharacterPvpKillCounts(uint characterId, uint kills, uint deaths);
+
 		// The PvP criminal state (#503): when the criminal debuff expires (null = not a criminal) and the murder-point
 		// pool. Persisted immediately, like the kill counters - the debuff has to survive a relog and a zone change,
 		// which is what the annotated capture shows it doing.
@@ -1487,6 +1490,13 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.NpcKills, kills).SetProperty(c => c.NpcDeaths, deaths));
+		}
+
+		// The PvP career pair (0x290/0x292), persisted per event for the same reason as the PvE one above.
+		public async Task SetCharacterPvpKillCounts(uint characterId, uint kills, uint deaths)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.PvpKills, kills).SetProperty(c => c.PvpDeaths, deaths));
 		}
 
 		// See the interface note: the criminal debuff must outlive the session, so it is a persisted expiry rather

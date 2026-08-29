@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.Core.Network.Server.GameServer
@@ -59,6 +60,20 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     the recipient is not connected to this listener.
 		/// </summary>
 		Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined);
+
+		/// <summary>
+		///     Ends a PvP minigame for one member: DispatchMinigameMatchEnded (GameCharInterface 0x8B) on their WORLD
+		///     connection, carrying the winning side and what the match meant for them. The match itself lives on the CS
+		///     tier (PvpMatchService) but the minigame messages travel on this one, which is why the end crosses the seam
+		///     the same way the match-start clock does. Returns false when the member is not connected here.
+		/// </summary>
+		Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult);
+
+		/// <summary>
+		///     Stops a PvP minigame for one member with a reason line: DispatchForceStopMinigame (GameCharInterface 0x8F),
+		///     the client's own abort path. Returns false when the member is not connected here.
+		/// </summary>
+		Task<bool> SendMinigameForceStop(uint characterId, string message);
 
 		/// <summary>
 		///     Teleports a connected character to a map, riding the same retail change-map sequence the travel box

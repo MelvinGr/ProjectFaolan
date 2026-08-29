@@ -151,6 +151,25 @@ namespace Faolan.CSPlayerAgent
 			return _pvpMatches.ForceFormFromQueue(_pvpMatchMaking.Queued(), _pvpMatchMaking.Forget);
 		}
 
+		// The GM `.matchstop` override (#146): end the caller's started match now.
+		public Task<string> ForcePvpMatchStop(uint characterId, string message)
+		{
+			return _pvpMatches.ForceStopMatch(characterId, message);
+		}
+
+		// The PvP gate the world tier asks before letting a swing land on another player (#146). The match is here, so
+		// the answer is.
+		public bool ArePvpMatchOpponents(uint attackerId, uint victimId)
+		{
+			return _pvpMatches.ArePvpMatchOpponents(attackerId, victimId);
+		}
+
+		// And the kill that follows from it: a point for the killer, and possibly the end of the match.
+		public Task CreditPvpMatchKill(uint killerId, uint victimId)
+		{
+			return _pvpMatches.CreditKill(killerId, victimId);
+		}
+
 		// The guild bank's deposit half (#654) - the world tier has already taken the money out of the wallet.
 		public Task<bool> DepositToGuildBank(uint characterId, ulong amountTin)
 		{

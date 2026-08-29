@@ -256,13 +256,15 @@ we've seen_, and names the gaps). Regenerate with
 - ⬜ Sieges — massed guild-vs-guild siege warfare fought over those keeps (#147)
 - 🟡 **PvP minigames** — the whole match LOOP works in-client: queue up (per-map capacity-gated, the client's
   own 12/24 sizes; `.matchstart` force-forms a partial queue), sides are locked, a 10 s countdown teleports both
-  sides into ONE match-owned playfield instance, players see and target each other, and leaving teleports you
-  back to where you stood — a relog out of a dead match does too. What a match still lacks is the GAME: capture
-  zones (#513), scoring, and a match end (#146)
+  sides into ONE match-owned playfield instance, players see, target and now FIGHT each other, and the match
+  ends on its own time or score limit with a won/lost/tie results page before everyone is sent home
+  (`.matchstop` force-ends it). What a match still lacks is capture zones (#513) and the score PUSH — the
+  scoreboard is kept and decides the winner, but the message carrying it has six unnamed columns (#146)
 - ⬜ PvP progression — open-world PvP scoring and the PvP-resource layer that feeds base building (#146)
 - 🟡 **Criminal status** — killing a player makes you a criminal for five minutes; normal vendors and wagoners
-  refuse you, smugglers still serve you. Missing the trigger (PvP combat is not modelled, so it runs off a GM
-  command) and the murder-point ladder (#503)
+  refuse you, smugglers still serve you. Missing the trigger (player-vs-player damage exists only inside a
+  minigame match, where a kill is sanctioned and makes nobody a criminal, so this still runs off a GM command)
+  and the murder-point ladder (#503)
 
 ### Tooling
 

@@ -143,10 +143,10 @@ Widths from the per-field readers; `FUN_004ca…`–`FUN_004cc…`.
 
 | opcode | method | body |
 |---|---|---|
-| `0x87` | `DispatchMinigameScoreChanged` | `i_cUpdatelist` — a list element read (`FUN_004d54c0`), not scalar-decoded |
-| `0x88` | `DispatchMinigameFullScore` | `i_cScore` — one score element (`FUN_00559350`/`FUN_00559940`) |
+| `0x87` | `DispatchMinigameScoreChanged` | `i_cUpdatelist` — the per-character score map, `FUN_004d54c0`; grammar below |
+| `0x88` | `DispatchMinigameFullScore` | `i_cScore` — the whole `MinigameScore_c` (ctor `FUN_00559350`, reader `FUN_00559940`); grammar below |
 | `0x8A` | `DispatchMinigameMatchStarted` | `[u32 i_nSecondsSinceStarted]` |
-| `0x8B` | `DispatchMinigameMatchEnded` | `[u32 i_eWinningSide][u32 i_eYourResult]` |
+| `0x8B` | `DispatchMinigameMatchEnded` | `[u32 i_eWinningSide][u32 i_eYourResult]` — both enums named below |
 | `0x8C` | `DispatchMinigameCaptureZoneUpdate` | `[u32 i_nSensorVolumeID][u32 i_vCaptureState][u32 i_nCurrentOwnerSide][u32 i_nCurrentOwner][u8 i_bInsideCaptureZone]` (17 b) |
 | `0x8D` | `DispatchMinigameCaptureZoneList` | three parallel lists: `i_cSensorVolumeIDs`, `i_cSensorVolumeNames`, `i_cOwnerVec` |
 | `0x8E` | `DispatchMinigameCaptureZoneLeaveEnter` | `[u32 i_nSensorVolumeID][u8 i_bLeave]` |
@@ -163,6 +163,79 @@ capture progress, a match clock, and two score lists (per guild and per player).
 sensor-volume ids — the same trigger-volume family as RDB 1000053 (see
 [`../rdb/bounded-areas-1000053.md`](../rdb/bounded-areas-1000053.md)), which is where a real implementation would have to source
 them.
+
+### ⭐ The match's own STATE, and the two enums the end carries
+
+The minigame messages all land on one singleton, `PvPMatchMaking_c` at `DAT_0297d358`, and the fields they
+write are what the Flash API and the two match views read back. Three of its words are the whole end of a
+match:
+
+| field | written by | read by |
+|---|---|---|
+| `+0x18c` | every lifecycle message | `GetMinigameStatus` → `PvPMinigameStatus_e` |
+| `+0x1b8` | `MatchStarted` (`FUN_00546510`: `gameTime − i_nSecondsSinceStarted`), zeroed by `MatchEnded` | `GetTimeLeft` = `matchStart + timeLimit@+0xc8 − now` |
+| `+0x1d0` / `+0x1d4` | `MatchEnded` (`FUN_005465b0`) | `GetWinningSide` / the results page |
+
+⭐ **`i_eYourResult` is named by the page that renders it.** The status view copies `+0x1d4` onto its own
+`+0x484` (`FUN_01737080` @`01737f2a`, with `+0x1d0` going to `+0x488` right after), and `FUN_01738490`
+branches on it to pick an LDB-100 header token — `TEST EAX,EAX` @`0173880c`, then `CMP EAX,0x1`:
+
+| value | token @ | meaning |
+|---:|---|---|
+| 0 | `0x20b096c` `MatchWon` | your side took it |
+| 1 | `0x20b0978` `MatchLost` | the other side did |
+| 2 (and anything else) | `0x20b0984` `MatchTie` | a draw — the client's default branch |
+| 3 | — | what the singleton's reset `FUN_005457a0` writes: "no result yet". Never sent |
+
+`i_eWinningSide` is a `TeamInfo_c::PvPMatchMakingSide_e` — the RTTI name leaks out of the Flash registration's
+template instantiation (`FUN_00b66430`, `SFStaticFunctionObject<…,TeamInfo_c::PvPMatchMakingSide_e,…>`; the
+status accessor's twin `FUN_00b66320` names `PvPMinigameStatus_e` the same way). Its live values are **1 and
+2**: the score view looks the two side totals up under exactly those keys (`FUN_017393e0`, `local_30 = 1` /
+`local_28 = 2`) and paints them `PvP/team_blue.tga` / red. `0` is the reset's "no side".
+
+**`PvPMinigameStatus_e`**, from the writers of `+0x18c` and the view page each drives (`FUN_01738a80`):
+
+| value | written by | the status view shows |
+|---:|---|---|
+| 0 | the reset | nothing |
+| 1 | `FUN_00546a50`, which also fifos LDB-100 `PleaseEnterMinigameArea` | "waiting" |
+| 2 | — | the countdown page, with a time from `+0x1c0` |
+| 3 | `MatchStarted` (`FUN_00546510`) | the running match |
+| 4 | `MatchEnded` (`FUN_005465b0`) | the **Results** page |
+
+### ⭐ `MinigameScore_c` — the score record, carved from its reader
+
+`FUN_00559940`, field by field (`FUN_0048f900` is the u32 primitive; the two list readers are the ordinary
+`0x3F1`-framed ones):
+
+```
+MinigameScore_c =
+    [u32 → +0x04] [u32 → +0x08] [u32 → +0x0c] [u32 → +0x24]
+    scoreMap                          # FUN_004d54c0 into the container at +0x14
+    [u32 → +0x10] [u32 → +0x28]
+    sideMapA                          # FUN_004d5900 into +0x2c
+    sideMapB                          # FUN_004d5900 into +0x3c
+    [u32 → +0x4c]
+    sideMapB again                    # FUN_004d5900 into +0x3c a SECOND time - same container
+
+scoreMap  = [u32 (count+1) * 0x3F1]  { count × [u32 key0][u32 key1] [u32 side][u32 kills][u32 deaths][u32 score][u32 ?] }
+sideMap   = [u32 (count+1) * 0x3F1]  { count × [u32 key][u32 value] }
+```
+
+⭐ **The record is stored at `PvPMatchMaking_c + 0x16C`, and four independent offsets say so** — the accessors
+read `+0x180` (`= 0x16C + 0x14`, the score map `GetTotalCharacterScore` walks), `+0x198` and `+0x1a8`
+(`= +0x2c` / `+0x3c`, the two maps `GetSideScore(side, 0|1)` looks a side up in), and `+0x1b8` (`= +0x4c`) —
+which is the **match-start clock** `GetTimeLeft` reads. So the score record carries the match start time.
+
+The five value words of a `scoreMap` entry are named by the score view (`FUN_017393e0`) and the row it fills
+(`MPvPListViewItem`, columns Kills / Deaths / Score): it tests `[side] == 1` / `== 2` to pick which side total
+to add `[score]` to, and under match type 4 (Conquest) subtracts the *other* side's `[kills]` — the client's
+own "kills reduce the enemy's score" rule. The two `key` words are an ID32 (the client resolves a name from
+them, `FUN_00bf7ad0`); the fifth value word is the one `GetTotalCharacterScore(side, 1)` sums and is unnamed.
+`[V0: the MinigameScore_c scalars at +0x04/+0x08/+0x0c/+0x10/+0x24/+0x28 and the entry's fifth value word]`
+
+⚠️ **Nothing builds this yet.** The server ends a match on the clock/score limit and sends only
+`DispatchMinigameMatchEnded`; the six unnamed scalars are why the score PUSH is not built (Gitea #146).
 
 ## Client-recovered: matchmaking (`CSPlayerAgent` c2s / `CSPlayerInterface` s2c)
 

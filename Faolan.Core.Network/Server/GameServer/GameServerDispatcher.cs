@@ -59,6 +59,18 @@ namespace Faolan.Core.Network.Server.GameServer
 			return provider != null && await provider.SendGroupMembership(recipientId, memberId, teamId, leaderId, joined);
 		}
 
+		public async Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, Enums.MinigameResult yourResult)
+		{
+			var provider = Provider;
+			return provider != null && await provider.SendMinigameMatchEnded(characterId, winningSide, yourResult);
+		}
+
+		public async Task<bool> SendMinigameForceStop(uint characterId, string message)
+		{
+			var provider = Provider;
+			return provider != null && await provider.SendMinigameForceStop(characterId, message);
+		}
+
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
 			var provider = Provider;

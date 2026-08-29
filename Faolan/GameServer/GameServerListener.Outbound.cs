@@ -190,6 +190,35 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		// IGameServerProvider seam: the two PvP-minigame messages that END a match. The match lives on the CS tier
+		// (PvpMatchService owns the roster, the clock and the return trip) but every Minigame* dispatch is a
+		// GameCharInterface message and so travels on THIS connection - the same split the match-start clock already
+		// crosses in GameServerListener.WorldEntry. ⚠️ Client-recovered, uncaptured: no captured session finishes a
+		// minigame (docs/re/minigame-massivepvp-messages.md).
+		public async Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client?.Session.Account == null)
+				return false;
+
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchMinigameMatchEnded,
+				s => s.WriteUInt32(winningSide).WriteUInt32((uint)yourResult)));
+			Logger.LogInformation("PvP minigame: told {CharacterId:X8} the match ended - winning side {Side}, result {Result}.", characterId, winningSide, yourResult);
+			return true;
+		}
+
+		public async Task<bool> SendMinigameForceStop(uint characterId, string message)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client?.Session.Account == null)
+				return false;
+
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchForceStopMinigame,
+				s => s.WriteString(message)));
+			Logger.LogInformation("PvP minigame: force-stopped for {CharacterId:X8} - \"{Message}\".", characterId, message);
+			return true;
+		}
+
 		// --- ITradeOutbound: the wire side of a player trade. TradeService owns the state machine and reaches the wire
 		// only through this port, addressed by character id because a trade always spans two connections. ---------------
 		Task ITradeOutbound.SendTradeRequest(uint targetId, uint requesterId)

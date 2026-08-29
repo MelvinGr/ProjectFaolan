@@ -49,6 +49,11 @@ namespace Faolan.CSPlayerAgent
 		// to read the announcement, short enough to not stall the match. Noted on #146.
 		private const uint TeleportInSeconds = 10;
 
+		// How long the results page stands before the match is dissolved and any member still on the minigame map is
+		// sent home. ⚠️ An ASSUMPTION, like TeleportInSeconds: the client's results page is dismissed by its own
+		// Quit/Done button and nothing recovered states a server-side deadline. Noted on #146.
+		private const uint ResultsPageSeconds = 60;
+
 		private readonly ConcurrentDictionary<uint, LiveMatch> _matches = [];
 		private readonly ConcurrentDictionary<uint, uint> _memberships = []; // characterId -> matchId
 		private uint _nextMatchId;
@@ -366,6 +371,169 @@ namespace Faolan.CSPlayerAgent
 					logger.LogError(e, "PvP match {MatchId}: the scheduled minigame teleport failed.", match.Id);
 				}
 			});
+
+			ScheduleMatchEnd(match);
+		}
+
+		// A started match runs until its ruleset's time limit is up, measured from the same StartedAtUtc the client's
+		// own clock is seeded with (DispatchMinigameMatchStarted's i_nSecondsSinceStarted at world entry), so the two
+		// clocks agree and the match ends exactly when the client's counter reaches 00:00. The client computes
+		// GetTimeLeft = matchStart + timeLimit - now and then does NOTHING at zero: retail's server owns the end,
+		// which is why a match without this ran for ever with its members stranded on the minigame map.
+		private void ScheduleMatchEnd(LiveMatch match)
+		{
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					var due = match.StartedAtUtc.AddSeconds(match.Rules.TimeLimitSeconds) - DateTime.UtcNow;
+					if (due > TimeSpan.Zero)
+						await Task.Delay(due);
+
+					await EndMatch(match, forcedMessage: null);
+				}
+				catch (Exception e)
+				{
+					logger.LogError(e, "PvP match {MatchId}: the scheduled match end failed.", match.Id);
+				}
+			});
+		}
+
+		/// <summary>
+		///     Ends a started match: DispatchMinigameMatchEnded to every member (or DispatchForceStopMinigame when a
+		///     reason line is given), then the results page stands until a member presses its Quit/Done button - an
+		///     ordinary LeaveMatch, which is what returns them and dissolves the match. Anyone who never presses it is
+		///     swept by <see cref="ScheduleMatchDissolve" />.
+		/// </summary>
+		private async Task EndMatch(LiveMatch match, string? forcedMessage)
+		{
+			if (!match.Started || match.Ended || !_matches.ContainsKey(match.Id))
+				return;
+
+			match.Ended = true;
+			var winningSide = WinningSide(match);
+
+			foreach (var member in match.Sides.Keys.ToList())
+			{
+				if (forcedMessage != null)
+					await gameServer.SendMinigameForceStop(member, forcedMessage);
+				else
+					await gameServer.SendMinigameMatchEnded(member, winningSide, ResultFor(match, member, winningSide));
+			}
+
+			logger.LogInformation("PvP match {MatchId}: ENDED after {Seconds:F0}s - winning side {Side}{Forced}.", match.Id, (DateTime.UtcNow - match.StartedAtUtc).TotalSeconds,
+				winningSide, forcedMessage == null ? "" : $" (force-stopped: \"{forcedMessage}\")");
+
+			ScheduleMatchDissolve(match);
+		}
+
+		/// <summary>
+		///     The PvP gate (#146): may <paramref name="attackerId" /> hit <paramref name="victimId" />? Only inside ONE
+		///     started, unfinished match, and only across the side line - two members of the same side cannot damage each
+		///     other, and neither can anyone outside the match. Sideless members (a custom match started before the
+		///     sides were picked cannot happen, but a forced formation can leave one) are never a legal target.
+		/// </summary>
+		public bool ArePvpMatchOpponents(uint attackerId, uint victimId)
+		{
+			if (attackerId == victimId || MatchOf(attackerId) is not { Started: true, Ended: false } match)
+				return false;
+
+			return match.Sides.TryGetValue(attackerId, out var mine) && mine is { } a
+			       && match.Sides.TryGetValue(victimId, out var theirs) && theirs is { } b
+			       && a != b;
+		}
+
+		/// <summary>
+		///     Score a kill inside a match: a point for the killer, a death for the victim. When a side reaches the
+		///     ruleset's score limit the match ends there and then rather than running out its clock - the client
+		///     displays that limit in its own buildup view (PvPMatchRules_c's score-limit word, the one GetScoreLimit
+		///     returns), so honouring it is the ruleset the player was shown, not a rule of ours.
+		/// </summary>
+		public async Task CreditKill(uint killerId, uint victimId)
+		{
+			if (MatchOf(killerId) is not { Started: true, Ended: false } match || !ArePvpMatchOpponents(killerId, victimId))
+				return;
+
+			var score = match.Scores.AddOrUpdate(killerId, 1u, (_, v) => v + 1);
+			match.Deaths.AddOrUpdate(victimId, 1u, (_, v) => v + 1);
+
+			var side = match.Sides.GetValueOrDefault(killerId) ?? NoSide;
+			var sideTotal = match.Sides.Where(kv => kv.Value == side).Sum(kv => (long)match.Scores.GetValueOrDefault(kv.Key));
+			logger.LogInformation("PvP match {MatchId}: {Killer:X8} killed {Victim:X8} - {Score} kill(s), side {Side} now on {Total}/{Limit}.",
+				match.Id, killerId, victimId, score, side, sideTotal, match.Rules.ScoreLimit);
+
+			if (match.Rules.ScoreLimit > 0 && sideTotal >= match.Rules.ScoreLimit)
+				await EndMatch(match, forcedMessage: null);
+		}
+
+		/// <summary>
+		///     The GM `.matchstop` override: end the caller's started match now, with a reason line the client shows
+		///     through its own DispatchForceStopMinigame path. Returns what happened, for the GM's chat line.
+		/// </summary>
+		public async Task<string> ForceStopMatch(uint characterId, string message)
+		{
+			if (MatchOf(characterId) is not { } match)
+				return "you are in no match.";
+			if (!match.Started)
+				return $"match {match.Id} has not started - nothing to stop.";
+			if (match.Ended)
+				return $"match {match.Id} has already ended.";
+
+			await EndMatch(match, string.IsNullOrWhiteSpace(message) ? "The minigame was stopped." : message);
+			return $"match {match.Id} force-stopped for {match.Sides.Count} member(s).";
+		}
+
+		// Which side took the match. ⚠️ OURS, not retail's: nothing scores yet - a minigame's points come from kills
+		// and capture zones, and neither player-vs-player damage (#503) nor the sensor volumes (#513) is modelled - so
+		// every side sits on zero and the honest answer is a draw. `0` is the value the client's own reset leaves in
+		// the field, i.e. "no side", and it renders as MatchTie for everyone. The moment a score exists this becomes
+		// `the side with the higher total`, which is why it is a method and not a constant.
+		private static uint WinningSide(LiveMatch match)
+		{
+			var totals = match.Sides
+				.Where(kv => kv.Value != null)
+				.GroupBy(kv => kv.Value!.Value)
+				.Select(g => (Side: g.Key, Score: g.Sum(kv => (long)match.Scores.GetValueOrDefault(kv.Key))))
+				.OrderByDescending(t => t.Score)
+				.ToList();
+
+			if (totals.Count == 0 || totals[0].Score == 0)
+				return NoSide;
+
+			return totals.Count > 1 && totals[1].Score == totals[0].Score ? NoSide : totals[0].Side;
+		}
+
+		private static MinigameResult ResultFor(LiveMatch match, uint characterId, uint winningSide)
+		{
+			if (winningSide == NoSide)
+				return MinigameResult.Tie;
+
+			return match.Sides.TryGetValue(characterId, out var side) && side == winningSide
+				? MinigameResult.Won
+				: MinigameResult.Lost;
+		}
+
+		// The results page has no deadline of its own on the wire, so a member who closes the window without pressing
+		// Quit/Done would otherwise stay in a finished match on a minigame map for ever. After a grace period the
+		// match is dissolved and anyone still in it is put back where the countdown found them - the same path the
+		// Done button takes. ⚠️ The grace length is OURS (nothing recovered states retail's).
+		private void ScheduleMatchDissolve(LiveMatch match)
+		{
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(TimeSpan.FromSeconds(ResultsPageSeconds));
+					foreach (var member in match.Sides.Keys.ToList())
+						await RemoveMember(member, kickedBy: null, banned: false, message: "");
+
+					_matches.TryRemove(match.Id, out _);
+				}
+				catch (Exception e)
+				{
+					logger.LogError(e, "PvP match {MatchId}: the post-match dissolve failed.", match.Id);
+				}
+			});
 		}
 
 		/// <summary>
@@ -586,9 +754,24 @@ namespace Faolan.CSPlayerAgent
 			public uint LeaderId { get; set; } = leaderId;
 			public bool Started { get; set; }
 			public DateTime StartedAtUtc { get; set; }
+
+			// Set the moment DispatchMinigameMatchEnded goes out. The match stays REGISTERED after that - the
+			// client's results page owns a Quit/Done button whose press is an ordinary LeaveMatch, and that is what
+			// carries the member home - so the flag is what stops a second end (or a late score) landing on a
+			// finished match.
+			public bool Ended { get; set; }
 			public ConcurrentDictionary<uint, uint?> Sides { get; } = [];
 			public ConcurrentDictionary<uint, uint> LockedSides { get; } = [];
 			public ConcurrentDictionary<uint, byte> Banned { get; } = [];
+
+			// Each member's minigame score. Nothing writes it yet - see WinningSide - but the end reads it, so the
+			// day a score source lands (kills once PvP damage exists, or a captured sensor volume) the winner
+			// follows without touching the end sequence.
+			public ConcurrentDictionary<uint, uint> Scores { get; } = [];
+
+			// The other half of the score row the client's results table renders (its columns are Kills / Deaths /
+			// Score). Kept beside Scores so a future DispatchMinigameFullScore has both without a second source.
+			public ConcurrentDictionary<uint, uint> Deaths { get; } = [];
 
 			// Each member's pre-match transform, recorded when the countdown teleport takes them - what LeaveMatch
 			// restores. Absent for a member who was already on the minigame map when the match formed.

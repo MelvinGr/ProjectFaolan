@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -275,6 +276,8 @@ namespace Faolan.Tests
 			public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId) => [];
 			public Task<bool> RunGmCommand(uint characterId, string commandText) => Task.FromResult(false);
 			public Task<bool> SendGuildTag(uint characterId, string guildName) => Task.FromResult(false);
+			public Task<bool> SendMinigameMatchEnded(uint characterId, uint winningSide, MinigameResult yourResult) => Task.FromResult(false);
+			public Task<bool> SendMinigameForceStop(uint characterId, string message) => Task.FromResult(false);
 			public void Register(IGameServerProvider provider) { }
 			public void Unregister(IGameServerProvider provider) { }
 		}
