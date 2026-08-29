@@ -771,15 +771,29 @@ pair the rest were built on:
   `FeatKeyScanner` a trigger; the scanner had been wired to nothing.
   - Its feat answer is structural rather than a scan result: **all 19,777 feat records are plaintext**, so that
     half of #251 never needed a key (#877).
-  - ⚠️ **A null from `unkeyed` is WEAK unless calibrated, and the report now says so.** A key only rides the wire
-    when the server SENDS you the thing, so a record nobody in the corpus was sent can never be opened by a scan
-    over it — and an even sample of a 72,559-record catalog is almost entirely such records. Measured against the
-    keys we already hold: of 400 keyed `Items`, only **87 (22%)** have their quad present in today's dumps as 16
-    contiguous big-endian bytes; **0** in little-endian, none of the four spot-checked appears as protobuf
-    varints, and a `(k3,k4,k1,k2)` arrangement adds nothing (80, and those overlap the 87 because `key2 == key1`
-    on everything that is not a level-scaled pair). So ~78% of what we hold is not byte-present in today's corpus
-    at all — the DB is the union over every capture the project has ever processed, the corpus on disk is 138
-    dumps, and that gap bounds what any window scan can return.
+  - ⭐⭐ **The quad's dominant carrier is PROTOBUF, and a contiguous-window scan cannot see it.** A `ProtoAcgItem`
+    writes the four words as four `fixed32` fields, so a tag byte sits between each one —
+    `0d <k1 LE> 15 <k2 LE> 1d <k3 LE> 25 <k4 LE>`, 20 bytes for 16 bytes of key. No 16-byte window ever contains
+    it, in any byte order. The minority that a window scan DID find ride the other carrier, the raw fixed-width
+    inventory/snapshot form (`<k1><k2><k3><k4>` big-endian).
+    ⚠️ This was diagnosed the wrong way round first: a 20-item recall check scored 3/20 and was written up as
+    "~78% of the keys we hold are not in today's corpus", i.e. as a fact about the CAPTURES. It was a fact about
+    the scanner. The maintainer's "I don't think I've ever deleted a dump" is what sent it back for a second look
+    — and the byte context around one of the misses showed the protobuf tags immediately. With the layout added,
+    the same 20 items score **20/20** (18 `proto`, 2 `be`).
+  - ⚠️ **A null from `unkeyed` is still weak, but for a different reason.** A key only rides the wire when the
+    server SENDS you the thing, so a record nobody in the corpus was sent can never be opened by a scan over it —
+    and an even sample of a 72,559-record catalog is almost entirely such records. Recall is not the limit; the
+    sample is. Which is why the mode below exists.
+  - ⭐⭐ **`exhaustive` inverts the scan and settles it without sampling.** The two carriers can be located
+    STRUCTURALLY — the protobuf one by its `0d/15/1d/25` tag run, the raw one by the quad being written twice back
+    to back — so the corpus yields ~11.5k candidate quads instead of 127M windows, and each can then be tried
+    against **every** encrypted record. ⚠️ The tag run is generic (any four-float message matches, so quaternions
+    are in the candidate set); that costs one trial decrypt each and nothing else.
+    Result over the 138 dumps: **4,918 records opened — 4,873 of the 5,072 we already hold (a 96% implicit
+    control) and 45 NEW.** So the corpus does carry keys for records we cannot currently read, and coverage was
+    not exhausted. The 4% of held keys it does not recover are the carriers with no byte anchor — the `itemref://`
+    text links and the quest-reward lists inside `Quest_c`.
   - ⭐⭐ **Every run plants two known-keyed records as a CONTROL and refuses to report a negative unless they come
     back.** This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be
     completely broken while looking exactly like a true negative — there is no failing case to notice. This one

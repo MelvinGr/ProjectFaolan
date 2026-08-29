@@ -51,6 +51,21 @@ namespace Faolan.Importer.Captures
 		// (UnwrapIOz1 hands back raw when the magic is absent), so both forms are legitimate hits.
 		private const uint TemplateTypeWord = 1000020;
 
+		// ⭐⭐ **The key quad's DOMINANT carrier is protobuf, where it is not 16 contiguous bytes at all.** A
+		// `ProtoAcgItem` writes the four words as four `fixed32` fields, so a tag byte sits between each one:
+		//
+		//     0d <k1 LE>  15 <k2 LE>  1d <k3 LE>  25 <k4 LE>          (fields 1-4, wire type 5, 20 bytes)
+		//
+		// A contiguous-window scan can NEVER see that, whatever byte order it tries - which is why this scanner
+		// found only the minority of keys that ride the OTHER carrier, the raw fixed-width inventory/snapshot form
+		// (`<k1><k2><k3><k4>` big-endian, 16 bytes). Measured on the corpus: the quads it could not find are all
+		// present in this layout, at 603 / 18 / 6 occurrences for three spot-checked items whose big-endian form
+		// occurs zero times.
+		//
+		// The tag signature is a 4-byte test before any arithmetic, so this costs almost nothing per window and is
+		// far CHEAPER than a trial decrypt - the tags locate the quad structurally instead of guessing it.
+		private const byte Fixed32Field1 = 0x0D, Fixed32Field2 = 0x15, Fixed32Field3 = 0x1D, Fixed32Field4 = 0x25;
+
 		// One target: the encrypted record we are trying to open, and the id its first block must reveal.
 		public readonly record struct Target(uint TemplateId, byte[] FirstBlock);
 
@@ -58,7 +73,8 @@ namespace Faolan.Importer.Captures
 
 		// Scans `captureFiles` for a key that opens any of `targets`. Windows are BYTE-aligned, not word-aligned: a
 		// key need not sit on a 4-byte boundary within a packet body, and assuming it does is the kind of shortcut
-		// that makes a negative result meaningless.
+		// that makes a negative result meaningless. THREE candidate layouts are tried per window - the quad as 16
+		// contiguous bytes in either word order, and the protobuf `fixed32` form where tag bytes separate the words.
 		//
 		// ⚠️⚠️ **Each window is tried in BOTH word orders, and that is not belt-and-braces - it is the bug this
 		// scanner shipped with.** It read every candidate as four LITTLE-endian words, while this protocol is
@@ -109,6 +125,22 @@ namespace Faolan.Importer.Captures
 							TryKey(le, "le", target, path, i, hits);
 							TryKey(be, "be", target, path, i, hits);
 						}
+
+						// The protobuf-carried quad: same four words, tag-separated, so it lives in a 20-byte window
+						// this loop would otherwise walk straight past.
+						if (i + 20 > body.Length || body[i] != Fixed32Field1 || body[i + 5] != Fixed32Field2 || body[i + 10] != Fixed32Field3 || body[i + 15] != Fixed32Field4)
+							continue;
+
+						Span<uint> proto =
+						[
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 1)),
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 6)),
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 11)),
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 16))
+						];
+
+						foreach (var target in targets)
+							TryKey(proto, "proto", target, path, i, hits);
 					}
 
 					System.Threading.Interlocked.Add(ref windows, local);
@@ -135,6 +167,78 @@ namespace Faolan.Importer.Captures
 				return;
 
 			hits.Add(new Hit(target.TemplateId, [key[0], key[1], key[2], key[3]], Path.GetFileName(path), offset, order + (wrapped ? "/IOz1" : "/bare")));
+		}
+
+		// ⭐⭐ The INVERTED scan (#897): instead of "every window against a few targets", harvest the corpus's
+		// CANDIDATE quads structurally and test each against EVERY encrypted record. That is what turns this from a
+		// sampled question into an exhaustive one - ~11.5k candidates against 72.5k records is smaller than one
+		// sampled window scan, and it needs no guess about which records the corpus might carry.
+		//
+		// Two anchors, one per carrier, both of which locate a quad without knowing its value:
+		//
+		//   * **protobuf** - four `fixed32` fields, `0d <k1> 15 <k2> 1d <k3> 25 <k4>`. ⚠️ This tag run is GENERIC:
+		//     any four-float message matches it, so most candidates are quaternions (`0x3F800000` = 1.0f) and the
+		//     set is a candidate list, not a key list. That costs a trial decrypt each and nothing else.
+		//   * **raw fixed-width** - the inventory/snapshot form writes the quad TWICE back to back, so 16 bytes
+		//     repeated immediately is the anchor (`<quad><quad>`), big-endian.
+		public static List<uint[]> HarvestCandidates(IEnumerable<string> captureFiles)
+		{
+			var seen = new HashSet<(uint, uint, uint, uint)>();
+			var list = new List<uint[]>();
+			foreach (var path in captureFiles)
+			{
+				foreach (var body in ReadBodies(path))
+				{
+					for (var i = 0; i + 20 <= body.Length; i++)
+					{
+						if (body[i] != Fixed32Field1 || body[i + 5] != Fixed32Field2 || body[i + 10] != Fixed32Field3 || body[i + 15] != Fixed32Field4)
+							continue;
+
+						Add(BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 1)), BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 6)),
+							BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 11)), BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i + 16)));
+					}
+
+					for (var i = 0; i + 32 <= body.Length; i++)
+					{
+						if (body.AsSpan(i, 16).SequenceEqual(body.AsSpan(i + 16, 16)))
+							Add(BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i)), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 4)),
+								BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 8)), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 12)));
+					}
+				}
+			}
+
+			return list;
+
+			void Add(uint a, uint b, uint c, uint d)
+			{
+				if ((a | b | c | d) != 0 && seen.Add((a, b, c, d)))
+					list.Add([a, b, c, d]);
+			}
+		}
+
+		// Tests every candidate against every target. Parallel over candidates; the targets are a flat array of
+		// 8-byte first blocks, so the inner loop is cache-friendly.
+		public static List<Hit> ScanCandidates(IReadOnlyList<uint[]> candidates, IReadOnlyList<Target> targets, Action<string>? log = null)
+		{
+			var hits = new ConcurrentBag<Hit>();
+			var done = 0;
+			Parallel.For(0, candidates.Count, ci =>
+			{
+				Span<uint> key = stackalloc uint[4];
+				var c = candidates[ci];
+				key[0] = c[0];
+				key[1] = c[1];
+				key[2] = c[2];
+				key[3] = c[3];
+				foreach (var target in targets)
+					TryKey(key, "candidate", target, "corpus", ci, hits);
+
+				var n = System.Threading.Interlocked.Increment(ref done);
+				if (n % 500 == 0)
+					log?.Invoke($"  {n:N0}/{candidates.Count:N0} candidates tested ({hits.Count} hit(s))");
+			});
+
+			return [.. hits];
 		}
 
 		// Every packet body in a tshark dump, as raw bytes. Deliberately NOT filtered to the Conan protocol: a key

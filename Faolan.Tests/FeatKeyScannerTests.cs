@@ -54,6 +54,28 @@ namespace Faolan.Tests
 
 		// The negative half: a capture that does NOT carry the key must not produce a hit, or the control above proves
 		// nothing. 16 bytes of a plausible-looking body, none of them the key.
+		// ⭐⭐ The layout the corpus actually uses for most keys, and the one a contiguous-window scan cannot see: a
+		// `ProtoAcgItem` writes the quad as four protobuf `fixed32` fields, so a tag byte separates each word.
+		// Without this the scan finds only the minority that ride the raw fixed-width form - it scored 3 of 20 on a
+		// real recall check and the miss was very nearly written up as a fact about the captures (#897).
+		[Fact]
+		public void AKeyCarriedAsProtobufFixed32Fields_IsFound()
+		{
+			var dump = WriteDump(ProtobufBodyCarrying(Key));
+			try
+			{
+				var hits = FeatKeyScanner.Scan([dump], [new FeatKeyScanner.Target(TemplateId, EncryptedFirstBlock(Key, IOz1Magic, 412))]);
+
+				var hit = Assert.Single(hits);
+				Assert.Equal(Key, hit.Key);
+				Assert.StartsWith("proto", hit.WordOrder);
+			}
+			finally
+			{
+				File.Delete(dump);
+			}
+		}
+
 		[Fact]
 		public void AKeyThatIsNotInACapture_IsNotFound()
 		{
@@ -105,6 +127,21 @@ namespace Faolan.Tests
 			var body = new byte[3 + 16 + 5];
 			for (var i = 0; i < key.Length; i++)
 				BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(3 + i * 4), key[i]);
+
+			return body;
+		}
+
+		// `0d <k1 LE> 15 <k2 LE> 1d <k3 LE> 25 <k4 LE>` - fields 1..4, wire type 5 - at an unaligned offset, exactly
+		// as it appears inside a captured item message.
+		private static byte[] ProtobufBodyCarrying(uint[] key)
+		{
+			byte[] tags = [0x0D, 0x15, 0x1D, 0x25];
+			var body = new byte[7 + 20 + 5];
+			for (var i = 0; i < 4; i++)
+			{
+				body[7 + i * 5] = tags[i];
+				BinaryPrimitives.WriteUInt32LittleEndian(body.AsSpan(7 + i * 5 + 1), key[i]);
+			}
 
 			return body;
 		}

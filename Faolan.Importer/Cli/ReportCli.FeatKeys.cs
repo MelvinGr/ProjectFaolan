@@ -96,6 +96,15 @@ namespace Faolan.Importer.Cli
 			                  + $"{plaintext:N0} plaintext, {unreadable:N0} unreadable.");
 			Console.WriteLine($"  we already hold a key for {keyed.Count:N0} record(s) ({keyed.Count(encryptedBlocks.ContainsKey):N0} of them encrypted catalog entries).");
 
+			// ⭐⭐ `exhaustive` inverts the scan: harvest the corpus's candidate quads structurally, then test each
+			// against EVERY encrypted record. No sampling at all, so its answer is about the catalog rather than
+			// about a draw from it (#897).
+			if (mode.StartsWith("exhaustive", StringComparison.OrdinalIgnoreCase))
+			{
+				await Exhaustive(capturesDir, encrypted, encryptedBlocks, keyed);
+				return;
+			}
+
 			var wanted = await SelectTargets(db, mode, encrypted, encryptedBlocks, keyed);
 			if (wanted.Count == 0)
 			{
@@ -138,11 +147,11 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine();
 				Console.WriteLine("⚠️ CALIBRATE that before reading it as a strong negative (#897). A key only rides the wire when the");
 				Console.WriteLine("   server SENDS you the thing, so a record nobody in the corpus was sent can never be opened here -");
-				Console.WriteLine("   and an even sample of the catalog is almost entirely such records. Measured against the keys we");
-				Console.WriteLine("   already hold: of 400 keyed Items, only 87 (22%) have their quad present in today's dumps as 16");
-				Console.WriteLine("   contiguous big-endian bytes; 0 in little-endian, and none of the four spot-checked appears as");
-				Console.WriteLine("   protobuf varints either. So ~78% of what we DO hold is not byte-present in the corpus at all,");
-				Console.WriteLine("   which bounds what any window scan over it can ever return.");
+				Console.WriteLine("   and an even sample of the catalog is almost entirely such records.");
+				Console.WriteLine("   Recall itself is NOT the limit: on 20 known-keyed Items the scan now returns 20/20 (18 through");
+				Console.WriteLine("   the protobuf fixed32 layout, 2 through the raw big-endian one). A null here is therefore about");
+				Console.WriteLine("   the SAMPLE, not the instrument - draw targets the corpus plausibly carries if you want it to");
+				Console.WriteLine("   mean more.");
 				return;
 			}
 
@@ -150,6 +159,47 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"** {found.Count} NEW KEY(S) **");
 			foreach (var h in hits.Where(h => found.Contains(h.TemplateId)).GroupBy(h => h.TemplateId).Select(g => g.First()))
 				Console.WriteLine($"  record {h.TemplateId}: key {string.Join(",", h.Key.Select(k => $"0x{k:X8}"))} ({h.WordOrder}) in {h.Source} at offset {h.Offset}");
+		}
+
+		// Every encrypted record, against every candidate quad the corpus carries. The control is implicit and much
+		// stronger here: the records we ALREADY hold keys for are in the target set, so the run reports how many of
+		// them it recovers - if that number is low the instrument is broken and nothing else in the output counts.
+		private static async Task Exhaustive(string capturesDir, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed)
+		{
+			var files = Directory.GetFiles(capturesDir, "*.tshark.json").OrderBy(f => f).ToList();
+			Console.WriteLine($"  EXHAUSTIVE: harvesting candidate quads from {files.Count} dump(s)...");
+			var candidates = FeatKeyScanner.HarvestCandidates(files);
+			Console.WriteLine($"  {candidates.Count:N0} distinct candidate quad(s). ⚠️ Most are NOT keys - the protobuf tag run matches any");
+			Console.WriteLine($"  four-float message, so quaternions are in here too. They cost one trial decrypt each.");
+
+			var targets = encrypted.Select(id => new FeatKeyScanner.Target(id, encryptedBlocks[id])).ToList();
+			Console.WriteLine($"  testing each against ALL {targets.Count:N0} encrypted record(s) - {(long)candidates.Count * targets.Count:N0} trial decrypt(s).");
+
+			var hits = FeatKeyScanner.ScanCandidates(candidates, targets, Console.WriteLine);
+			var opened = hits.Select(h => h.TemplateId).Distinct().ToHashSet();
+			var recovered = opened.Count(keyed.Contains);
+			var brandNew = opened.Except(keyed).ToList();
+
+			Console.WriteLine();
+			Console.WriteLine($"  records opened: {opened.Count:N0}");
+			Console.WriteLine($"  of which already keyed (the CONTROL): {recovered:N0} of the {keyed.Count(encryptedBlocks.ContainsKey):N0} we hold");
+            Console.WriteLine($"  ⭐ NEW: {brandNew.Count:N0}");
+
+			if (brandNew.Count == 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  The corpus carries no key for any record we do not already hold. Coverage is EXHAUSTED against");
+				Console.WriteLine("  these dumps - what raises it is a new capture, not a better search.");
+				return;
+			}
+
+			var byId = hits.GroupBy(h => h.TemplateId).ToDictionary(g => g.Key, g => g.First());
+			foreach (var id in brandNew.OrderBy(x => x).Take(50))
+				Console.WriteLine($"    record {id}: key {string.Join(",", byId[id].Key.Select(k => $"0x{k:X8}"))}");
+			if (brandNew.Count > 50)
+				Console.WriteLine($"    ... and {brandNew.Count - 50:N0} more");
+
+			await Task.CompletedTask;
 		}
 
 		// The target set for each mode. Kept apart from the scan so the selection is readable on its own - it is the
