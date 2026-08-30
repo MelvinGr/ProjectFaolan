@@ -5,7 +5,6 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -360,19 +359,10 @@ namespace Faolan.GameServer
 			body.ReadUInt32(); // type 0xC350
 			var petHandle = body.ReadUInt32();
 			var command = body.ReadUInt32<PetCommand>();
-			var owner = client.Session.Character.Id;
-			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", owner, petHandle, command);
+			Logger.LogInformation("QueuePetCommand from {Owner:X8}: pet 0x{Pet:X8}, command {Command}.", client.Session.Character.Id, petHandle, command);
 
 			if (command is PetCommand.DismissFollower or PetCommand.Dismiss or PetCommand.AllDismiss)
-			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-					b => b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Remove(owner, petHandle)))));
-
-				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
-				Logger.LogInformation(removed != null
-					? "Pet 0x{Pet:X8} dismissed (despawned)."
-					: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);
-			}
+				await _pets.DismissPet(client, petHandle);
 		}
 
 		private void InitGmCommands()

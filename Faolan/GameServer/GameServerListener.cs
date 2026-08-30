@@ -282,6 +282,11 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// A player's summoned PET (#307): summon, the timed variant's extend-or-summon, and the pet bar's dismiss.
+		// Reached from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler. See
+		// Combat/PetService.cs.
+		private readonly PetService _pets;
+
 		// The per-session ENERGY pool + the sprint booleans (the yellow bar sprint drains and spellweaving spends).
 		// Its state is entirely on INetworkClientSession, so it is a plain collaborator over per-connection state -
 		// which is what let the loop leave this class. See Combat/EnergyService.cs.
@@ -370,6 +375,7 @@ namespace Faolan.GameServer
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
 			_energy = new EnergyService(_buffs, logger);
+			_pets = new PetService(database, _simulation, _broadcaster, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
