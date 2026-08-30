@@ -20,12 +20,14 @@ namespace Faolan.GameServer.Quest
 	public sealed class QuestOutbound : IQuestOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly NpcBroadcaster _npcs;
 		private readonly QuestBroadcaster _quests;
 
-		public QuestOutbound(QuestBroadcaster quests, WorldBroadcaster broadcaster)
+		public QuestOutbound(QuestBroadcaster quests, WorldBroadcaster broadcaster, NpcBroadcaster npcs)
 		{
 			_quests = quests;
 			_broadcaster = broadcaster;
+			_npcs = npcs;
 		}
 
 		public Task ApplyQuestWorldEffects(INetworkClient client)
@@ -87,7 +89,7 @@ namespace Faolan.GameServer.Quest
 
 		public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow)
 		{
-			return _broadcaster.SetNpcFollowByTemplate(mapId, templateId, playerHandle, follow);
+			return _npcs.SetNpcFollowByTemplate(mapId, templateId, playerHandle, follow);
 		}
 	}
 }

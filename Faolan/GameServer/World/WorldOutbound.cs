@@ -35,6 +35,7 @@ namespace Faolan.GameServer.World
 	internal sealed class WorldOutbound : IWorldOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly NpcBroadcaster _npcs;
 		private readonly WorldObjectService _worldObjects;
 		private readonly BuffService _buffs;
 		private readonly CombatService _combat;
@@ -45,9 +46,10 @@ namespace Faolan.GameServer.World
 		// codebase already sanctions for exactly this case.
 		private readonly Func<INetworkClient, Task> _sendDismount;
 
-		public WorldOutbound(WorldBroadcaster broadcaster, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
+		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
 		{
 			_broadcaster = broadcaster;
+			_npcs = npcs;
 			_worldObjects = worldObjects;
 			_buffs = buffs;
 			_combat = combat;
@@ -91,44 +93,44 @@ namespace Faolan.GameServer.World
 
 		public Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
 		{
-			return _broadcaster.BroadcastNpcAggro(npc, target);
+			return _npcs.BroadcastNpcAggro(npc, target);
 		}
 
 		public Task BroadcastNpcAmbientAnimation(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastNpcAmbientAnimation(npc);
+			return _npcs.BroadcastNpcAmbientAnimation(npc);
 		}
 
 		public Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
 		{
-			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
+			return _npcs.BroadcastNpcCombatMode(npc, inCombat);
 		}
 
 		public Task BroadcastNpcFollow(WorldEntity npc, WorldEntity leader)
 		{
-			return _broadcaster.BroadcastNpcFollow(npc, leader);
+			return _npcs.BroadcastNpcFollow(npc, leader);
 		}
 
 		public Task BroadcastNpcMove(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastNpcMove(npc);
+			return _npcs.BroadcastNpcMove(npc);
 		}
 
 		public Task BroadcastNpcPatrol(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastNpcPatrol(npc);
+			return _npcs.BroadcastNpcPatrol(npc);
 		}
 
 		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
 		// send + the world-entry replay) -----------------------------------------------------------------------------
 		public Task BroadcastNpcRespawn(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastNpcRespawn(npc);
+			return _npcs.BroadcastNpcRespawn(npc);
 		}
 
 		public Task BroadcastNpcStop(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastNpcStop(npc);
+			return _npcs.BroadcastNpcStop(npc);
 		}
 
 		public Task BroadcastShieldRose(WorldEntity entity)
@@ -148,7 +150,7 @@ namespace Faolan.GameServer.World
 
 		public Task MaintainAmbientPools()
 		{
-			return _broadcaster.MaintainAmbientPools();
+			return _npcs.MaintainAmbientPools();
 		}
 
 		public Task PlayDynelVisualStep(DueDynelVisualStep step)

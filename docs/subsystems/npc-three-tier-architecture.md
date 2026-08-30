@@ -121,7 +121,8 @@ handle, one handle stood on two of them.
 
 Nothing is deleted either way. The redundant rows are the placement's **variant pool** — what differs between them
 is exactly what retail re-rolls per spawn (level, the morph table, all seven equipment slots) — and
-`WorldBroadcaster` stands up ONE entity per pool, drawing which row it renders as at random.
+`AmbientPoolService` stands up ONE entity per pool, drawing which row it renders as at random (streamed by
+`NpcBroadcaster.MaintainAmbientPools`).
 
 ### ⚠️ The class both mechanisms are BLIND to: cross-map duplicates (#728)
 
@@ -284,7 +285,7 @@ and no flagged delivery bounds the window from below. "Cleared once delivered" a
 survive; separating them needs a recipient, and the corpus cannot name one (`CapturedPacket.Port` is the game
 side's port, so re-keying the stickiness test by it is a no-op).
 
-**What we send.** `WorldBroadcaster.BroadcastNpcRespawn` stamps the flag onto the respawn delivery
+**What we send.** `NpcBroadcaster.BroadcastNpcRespawn` stamps the flag onto the respawn delivery
 (`NpcSpawnBuilder.WithSpawnAnimation`, a parse→set→build re-encode rather than a byte patch, since the field sits
 inside the embedded protobuf); no other path sets it. This deliberately **under-sends** — retail also flags the
 ~6-9% of ordinary first-sightings whose creature respawned before the player arrived — because reproducing those

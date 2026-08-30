@@ -165,7 +165,7 @@ the high id space means rather than an import gap. Open work tracked in Gitea #8
   names the shipped English pages do not carry at all.
 
   ⚠️ **What that buys is IDENTITY, not a spawn.** None of the 18 ids (or names) is in `NpcTemplates` today, so a
-  seed would add identity-only rows — and `WorldBroadcaster.LoadAmbientSpawns` already skips any resolved area
+  seed would add identity-only rows — and `AmbientPoolService.LoadAsync` already skips any resolved area
   whose template has no buildable `StatCore.IirHeader`, so nothing would try to spawn a creature it cannot build.
   The stats and the render model still need a capture; the LINK does not.
 

@@ -400,7 +400,7 @@ namespace Faolan.GameServer
 			// this replaces sent one per NPC per second, which is where #716's 119.6 BCC/s came from. Sending it here
 			// rather than from the tick is also what makes the Confirmed gate structural instead of a check.
 			if (viewer != null && _simulation.World.ZoneForEntity(viewer).TryGet(requestId, out var confirmed) && !confirmed.IsPlayer && !confirmed.IsLoot)
-				await _broadcaster.SendNpcIdleAssert(client, confirmed);
+				await _npcs.SendNpcIdleAssert(client, confirmed);
 
 			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
 			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,
@@ -738,7 +738,7 @@ namespace Faolan.GameServer
 			{
 				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
 				{
-					_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
+					_npcs.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
 					break;
 				}
 			}

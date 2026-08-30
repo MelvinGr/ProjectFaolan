@@ -150,7 +150,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var entity = await _broadcaster.DespawnEntityForPlayer(client, handle);
+			var entity = await _npcs.DespawnEntityForPlayer(client, handle);
 			if (entity == null)
 			{
 				// Not a live entity - it may be a static WORLD OBJECT (chest/door/dynel), which lives only in the DB.

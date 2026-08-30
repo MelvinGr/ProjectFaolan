@@ -18,16 +18,16 @@ namespace Faolan.GameServer.Combat
 	// ISpellEffectOutbound (the cast path) and the QueuePetCommand handler (the pet bar).
 	public sealed class PetService
 	{
-		private readonly WorldBroadcaster _broadcaster;
+		private readonly NpcBroadcaster _npcs;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _simulation;
 
-		public PetService(IDatabaseRepository database, WorldSimulation simulation, WorldBroadcaster broadcaster, ILogger logger)
+		public PetService(IDatabaseRepository database, WorldSimulation simulation, NpcBroadcaster npcs, ILogger logger)
 		{
 			_database = database;
 			_simulation = simulation;
-			_broadcaster = broadcaster;
+			_npcs = npcs;
 			_logger = logger;
 		}
 
@@ -42,8 +42,8 @@ namespace Faolan.GameServer.Combat
 			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
 			var npcType = await _database.GetNpcByName(petTemplate);
 			var entity = npcType != null
-				? await _broadcaster.SpawnPetForPlayer(client, npcType)
-				: await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
+				? await _npcs.SpawnPetForPlayer(client, npcType)
+				: await _npcs.SpawnNpcForPlayer(client, petTemplate);
 			if (entity == null)
 				return null;
 
@@ -58,7 +58,7 @@ namespace Faolan.GameServer.Combat
 					? PetBindings.CombatKind(pointCost)
 					: PetBindings.SocialKind)))));
 
-			_broadcaster.SetNpcFollow(client, entity.Handle, true);
+			_npcs.SetNpcFollow(client, entity.Handle, true);
 			return entity;
 		}
 
@@ -111,7 +111,7 @@ namespace Faolan.GameServer.Combat
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Remove(owner, petHandle)))));
 
-			var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
+			var removed = await _npcs.DespawnEntityForPlayer(client, petHandle);
 			_logger.LogInformation(removed != null
 				? "Pet 0x{Pet:X8} dismissed (despawned)."
 				: "Pet dismiss: no entity 0x{Pet:X8} in the player's zone.", petHandle);

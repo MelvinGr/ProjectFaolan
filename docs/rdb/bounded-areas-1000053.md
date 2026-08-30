@@ -220,7 +220,7 @@ Corpse-Waker (7CSI)`) and the remaining 2,490 give a numeric family id (`Race` 9
 That is also where the ceiling is. Only 22 of those 179 explicitly-named groups resolve; the other 157 name a
 creature absent from `NpcTemplate`, which is 1,018 capture-derived rows. Map 1050's 87 groups are all unresolved
 because `Mammoth`, `Cannibal`, `Ice Worm` and `White Hand` are simply not in it. The ambient spawner
-(`LoadAmbientSpawns`) spawns at the 1010506 **points** and needs a resolved `NpcTemplateId`, so more geometry
+(`AmbientPoolService.LoadAsync`) spawns at the 1010506 **points** and needs a resolved `NpcTemplateId`, so more geometry
 cannot populate a single one of them — the blocker is the creature CATALOG (tracked in Gitea #518).
 
 **Nothing from this bucket is imported.** It is checked, and the check is the result.

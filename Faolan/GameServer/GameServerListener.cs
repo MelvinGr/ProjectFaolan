@@ -268,6 +268,15 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// What an NPC DOES, told to everyone who can see it - aggro, combat mode, movement, patrol, follow, respawn,
+		// scripted exit - plus putting a runtime NPC or pet in the world. The broadcaster answers the other half of
+		// the question, who can see what. See World/NpcBroadcaster.cs.
+		private readonly NpcBroadcaster _npcs;
+
+		// Shared between the two broadcasters (see the ctor for why neither can own them).
+		private readonly AmbientPoolService _ambientPools;
+		private readonly RuntimeHandleAllocator _handles;
+
 		// The quest WIRE (journal packets + the overhead '!' / '?' markers) and the marker DECISION behind it. Both
 		// are shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the
 		// IQuestOutbound port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
@@ -357,10 +366,18 @@ namespace Faolan.GameServer
 			// every streamed-in NPC. The dependency runs one way - QuestBroadcaster holds nothing of the world's.
 			_questMarkers = new QuestMarkerResolver(database, logger);
 			_questBroadcaster = new QuestBroadcaster(_simulation, database, _questMarkers, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, _questMarkers, _questBroadcaster);
+			// Both SHARED with NpcBroadcaster below, so built here rather than inside the broadcaster: the handle
+			// allocator because a second counter would hand out colliding entity handles (loot bags are minted on one
+			// side, NPCs / pets / ambient members on the other), and the ambient pools because one side seeds a zone
+			// while the other streams what it stands up.
+			_handles = new RuntimeHandleAllocator();
+			_ambientPools = new AmbientPoolService(_simulation, database, _handles, _combos, logger);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, _questMarkers, _questBroadcaster, _handles, _ambientPools);
+			// What an NPC DOES, as against who can see it. One-way: nothing in the broadcaster calls in here.
+			_npcs = new NpcBroadcaster(_simulation, database, _broadcaster, _ambientPools, _combos, _handles, logger);
 			// The IQuestOutbound port itself: nine wire members off the quest broadcaster, three world members off
 			// the world one. See Quest/QuestOutbound.cs for why the interface is not split instead.
-			_questOutbound = new QuestOutbound(_questBroadcaster, _broadcaster);
+			_questOutbound = new QuestOutbound(_questBroadcaster, _broadcaster, _npcs);
 			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
 			// which reaches the same enter-world handoff pair through it.
 			_worldObjects = new WorldObjectService(_simulation, database, _broadcaster, logger);
@@ -392,7 +409,7 @@ namespace Faolan.GameServer
 			// SpellEffectOutbound -> BuffService -> CombatService -> FatalityService -> SpellEffectOutbound which is
 			// why the listener implemented ISpellEffectOutbound at all.
 			_buffs = new BuffService(database, _simulation, _broadcaster, _spellAreas, _poolEffects, _buffStats, logger);
-			_pets = new PetService(database, _simulation, _broadcaster, logger);
+			_pets = new PetService(database, _simulation, _npcs, logger);
 			_spellEffectOutbound = new SpellEffectOutbound(_buffs, _pets);
 			// The knockback-immunity self-buff the broadcaster applies: bound rather than a ctor arg, because the
 			// broadcaster is built far above (half the graph takes it) and the port that answers it is built here.
@@ -406,7 +423,7 @@ namespace Faolan.GameServer
 			_energy = new EnergyService(_buffs, logger);
 			_spellweave = new SpellweaveService(logger, new SpellweaveOutbound(_simulation, _energy, _buffs, agentServerDispatcher));
 			_travel = new TravelService(database, new TravelOutbound(agentServerDispatcher, _economyOutbound, _teleport, _simulation), logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _questBroadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
+			_conversation = new ConversationService(database, logger, _broadcaster, _npcs, _questBroadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
 			_questShare = new QuestShareOutbound(Connections, _simulation);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
 			_apprenticeOutbound = new ApprenticeOutbound(Connections, agentServerDispatcher);
@@ -431,7 +448,7 @@ namespace Faolan.GameServer
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
 			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
 			// thing that makes the graph acyclic.
-			_worldOutbound = new WorldOutbound(_broadcaster, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
+			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
 
 			InitGmCommands();
 		}

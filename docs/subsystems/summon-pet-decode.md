@@ -25,9 +25,9 @@ Player→pet commands reuse the 16-byte target RPC `[C350][player][C350][target]
 ## MVP — a minion built on existing infra
 
 A minion works on two pieces that already existed:
-- `WorldBroadcaster.SpawnNpcForPlayer` — mid-session spawn that renders a creature next to the player
+- `NpcBroadcaster.SpawnNpcForPlayer` — mid-session spawn that renders a creature next to the player
   (the #23 mid-session-spawn path).
-- `WorldBroadcaster.SetNpcFollow` — companion-follow (#262).
+- `NpcBroadcaster.SetNpcFollow` — companion-follow (#262).
 
 Together they spawn a creature (the SAME `FA015807` spawn retail uses for the pet) and make it follow → a
 rendered, following minion. That was structurally the retail flow minus the class-summon trigger + owner
@@ -131,7 +131,7 @@ pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift)
 - `Npc.StatCore` (the `NpcStatCore` side table, incl. `.Level`): the type-level captured stat core, so a creature can be built standalone (the `Npc.Data` blob is retired — the body builds from typed columns).
 - `NpcSpawnBuilder.TryBuildFromType(Npc, handle, pos, rot)`: builds the `FA015807` from the type + a
   caller transform — no `NpcSpawn` instance.
-- `WorldBroadcaster.SpawnPetForPlayer` + `IDatabaseRepository.GetNpcByName`: the spawn-from-type path.
+- `NpcBroadcaster.SpawnPetForPlayer` + `IDatabaseRepository.GetNpcByName`: the spawn-from-type path.
 - `PetService.SummonPetForPlayer` (`Faolan/GameServer/Combat/PetService.cs`, reached from the CastSpell hook
   through `ISpellEffectOutbound`) resolves the creature TYPE; only falls back to the placement path for a
   world-placed creature whose stat core has not been lifted to its type yet.

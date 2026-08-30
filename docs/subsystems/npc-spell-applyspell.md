@@ -471,7 +471,7 @@ form byte (see above), and the ids pair up as one spell's start and stop rather 
 A spawned caster casts at the player in-client. Repro: spawn a Poacher Marksman (a caster with an `NpcSpells`
 row, spell id `0x316DCB00`), engage it → it follows and applies its debuff via `MagicBuffIIR (0x6B87E316)`,
 applyFrom = the NPC handle, spell `0x316DCB` ("Ripper Volley") — it casts instead of meleeing.
-**Fix that enabled the test:** `WorldBroadcaster.SpawnNpcForPlayer` (the summon/test-spawn path) was
+**Fix that enabled the test:** `NpcBroadcaster.SpawnNpcForPlayer` (the summon/test-spawn path) was
 a minimal spawn that NEVER loaded `entity.Spells` — only the zone-load path did — so a summoned caster could never
 cast regardless of data. It now loads the NPC's `NpcSpells` rows like the zone path, so `IsCaster` lights up.
 Caveat: the applied debuff doesn't expire (no duration honored — #67; "Ripper Volley" shows a 6s tooltip but

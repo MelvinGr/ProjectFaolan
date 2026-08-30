@@ -768,7 +768,7 @@ SendScryEvent "Fight"  →  CarsGroup := 3  →  HateListUpdate  →  the client
 ```
 
 So the restate is the FIRST thing retail sends on the flip, ahead of everything the ordinary aggro burst carries.
-`WorldBroadcaster.BroadcastNpcTurnedHostile` sends it, byte-exact against all three fights
+`NpcBroadcaster.BroadcastNpcTurnedHostile` sends it, byte-exact against all three fights
 (`NpcTurnsHostileTests`). Two details are copied from the capture rather than reasoned out and are marked as such
 in the code: it is a **character** record carrying the **world-object `env` byte** (0x00 — the same "restate the
 dynel-layer copy first" shape `SkillPointTests` pins on Runspeed), and retail sends it **twice**, as two packets
@@ -857,7 +857,7 @@ so while damage did not aggro, any mob attacked from outside 20u reset to full o
 took the most recent hit — in-client that reads as "the first hit is fine, everything following is not" (#695).
 
 Once engaged, `WorldState.Tick` steps the NPC toward
-the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
+the target (horizontal, `NpcMoveSpeed` 7u/s, keeping terrain Y) and `NpcBroadcaster.BroadcastNpcMove`
 sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
 origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
 (`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (45u) from
@@ -933,7 +933,7 @@ non-swinging entity = 1) not fully decoded, but **4 is what every actual melee s
 carry no stat-20 record at all, so **0 = sheathed**.
 
 Implemented as a world-sim state transition: `WorldEntity.InCombat` flips in `WorldState.Tick` when a hostile NPC
-acquires/loses a target (emitting `NpcEnterCombat`/`NpcExitCombat` effects), and `WorldBroadcaster.BroadcastNpcCombatMode`
+acquires/loses a target (emitting `NpcEnterCombat`/`NpcExitCombat` effects), and `NpcBroadcaster.BroadcastNpcCombatMode`
 pushes the stat (4 on enter, 0 on exit) to every viewer in range that already sees the NPC (mirrors `BroadcastNpcMove`).
 Reset on death/respawn so a respawned mob re-draws cleanly. Builder `VitalsPacket.BuildStatBlockBody`, byte-exact
 against frame 6424 (`CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame`); transition

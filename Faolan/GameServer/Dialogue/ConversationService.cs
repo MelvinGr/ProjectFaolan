@@ -60,6 +60,7 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly NpcBroadcaster _npcs;
 		private readonly QuestBroadcaster _questBroadcaster;
 
 		// The live world model - the approach trigger asks it who is standing near the player.
@@ -70,13 +71,14 @@ namespace Faolan.GameServer.Dialogue
 		// does. Reached directly rather than through the progression service, which would only be forwarding.
 		private readonly QuestRewardService _rewards;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestBroadcaster questBroadcaster, WorldSimulation sim,
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, NpcBroadcaster npcs, QuestBroadcaster questBroadcaster, WorldSimulation sim,
 			QuestProgressionService questProgression, TravelService travel, IChatServerDispatcher agents, QuestRewardService rewards)
 		{
 			_database = database;
 			_agents = agents;
 			_logger = logger;
 			_broadcaster = broadcaster;
+			_npcs = npcs;
 			_questBroadcaster = questBroadcaster;
 			_sim = sim;
 			_questProgression = questProgression;
@@ -578,7 +580,7 @@ namespace Faolan.GameServer.Dialogue
 					{
 						npc.Disposition = WorldEntity.DispositionHostile;
 						npc.Hostile = true;
-						await _broadcaster.BroadcastNpcTurnedHostile(npc);
+						await _npcs.BroadcastNpcTurnedHostile(npc);
 						_logger.LogInformation("Script: {Name} fired \"{Event}\" - it turns on {Player}.", node.NpcName, name, client.Session.Character?.Name);
 					}
 					else
@@ -599,7 +601,7 @@ namespace Faolan.GameServer.Dialogue
 					// `TryOpenTriggeredConversation` already uses to find the escortee at all).
 					if (ExitPointFor(client, npcHandle) is { } exit && _sim.World.ZoneForEntity(_sim.PlayerWorldEntity(client)!)?.TryGet(npcHandle, out var leaving) == true && leaving != null)
 					{
-						_broadcaster.ScheduleScriptedExit(leaving, exit);
+						_npcs.ScheduleScriptedExit(leaving, exit);
 						_logger.LogInformation("Script: {Name} fired \"{Event}\" - she heads for the gate and leaves.", node.NpcName, name);
 					}
 					else
