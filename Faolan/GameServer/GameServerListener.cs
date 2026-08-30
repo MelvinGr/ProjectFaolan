@@ -48,19 +48,6 @@ namespace Faolan.GameServer
 		// step, so any genuine step cancels the cast while aiming a ground-target reticle does not.
 		private const float CastMoveCancelEpsilonSq = 0.04f; // (0.2 world units)^2
 
-		private const int EnergyRegenPerTick = 600;
-		private const int EnergyTickMs = 1000;
-
-		// How many energy ticks between two CharacterStatId.Energy mirrors. Retail's own-handle cadence is a push every
-		// ~3-7s while the pool is moving and nothing at all once it is back at the max, so this is the floor of that
-		// range and the "did it change" guard supplies the silence (RunEnergyMirror).
-		private const int EnergyMirrorTicks = 3;
-
-		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
-		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
-		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
-		private const int SprintEnergyDrainPerTick = 900; // ~necro 9000 -> ~10s of continuous sprint.
-
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = WorldState.DefaultPlayfieldToken;
@@ -295,6 +282,11 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// The per-session ENERGY pool + the sprint booleans (the yellow bar sprint drains and spellweaving spends).
+		// Its state is entirely on INetworkClientSession, so it is a plain collaborator over per-connection state -
+		// which is what let the loop leave this class. See Combat/EnergyService.cs.
+		private readonly EnergyService _energy;
+
 		private readonly SpellweaveService _spellweave;
 
 		// The cutscene stock-phrase subtitle channel (Kalanthes's beach lines): answers PlayStockphraseAsSubtitle
@@ -377,6 +369,7 @@ namespace Faolan.GameServer
 			_levelUpOutbound.BindReseed(_combat.ReseedFromMaxStats);
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
+			_energy = new EnergyService(_buffs, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);

@@ -1809,7 +1809,7 @@ namespace Faolan.GameServer
 					// what TrackSprintEnergy now does. The energy pool it drives is what Exhausted fires from at 0
 					// (docs/subsystems/combos.md).
 					var input = SprintInputStateCodec.Parse(body.ReadArray(2));
-					await TrackSprintEnergy(client, input.SprintInput);
+					await _energy.TrackSprintEnergy(client, input.SprintInput);
 					break;
 				}
 
