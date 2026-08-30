@@ -268,6 +268,10 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// Getting ON and OFF a mount (#26 / #142 / #428) - the seat, the persisted mount, and the dismount every
+		// involuntary path shares. See World/MountService.cs.
+		private readonly MountService _mounts;
+
 		// Knockback: resolve the shove, apply retail's immunity buff, put the displacement on the wire.
 		// See Combat/KnockbackService.cs.
 		private readonly KnockbackService _knockback;
@@ -451,14 +455,15 @@ namespace Faolan.GameServer
 			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => _teleport.DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
-			_environmentOutbound = new EnvironmentOutbound(_buffs, SendDismount);
+			_mounts = new MountService(_simulation, database, _buffs, _broadcaster, logger);
+			_environmentOutbound = new EnvironmentOutbound(_buffs, _mounts.Dismount);
 			_environment = new EnvironmentService(database, _environmentOutbound, logger);
 			_comboFinisher = new ComboFinisher(_simulation, _knockback, _combat, _buffs, _combos, _spellModifiers, logger);
 
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
 			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
 			// thing that makes the graph acyclic.
-			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _lootBroadcaster, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
+			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _lootBroadcaster, _worldObjects, _buffs, _combat, _tradeskill, _mounts.Dismount);
 
 			InitGmCommands();
 		}

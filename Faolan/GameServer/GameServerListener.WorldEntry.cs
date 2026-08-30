@@ -471,32 +471,8 @@ namespace Faolan.GameServer
 		// What retail does differ on is WHERE the record sits - see the call site.
 		private async Task RestoreMount(INetworkClient client)
 		{
-			var character = client.Session.Character;
-			if (character?.MountId is not { } mountId)
-				return;
-
-			var map = await Database.GetMap(character.MapId);
-			if (((map?.PlayfieldFlags ?? 0) & MountAllowedFlag) == 0)
-				return;
-
-			var mount = await Database.GetMount(mountId);
-			if (mount == null)
-				return;
-
-			var self = character.Id;
-			await _buffs.SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(BuffService.CasterLevel(client)));
-			await SendStatUpdate(client, new CharacterStatBlock
-			{
-				[CharacterStatId.Mount] = mount.CreatureId,
-				[CharacterStatId.MountSpeed] = MountCatalog.MountSpeed
-			}, self);
-
-			var entity = _simulation.PlayerWorldEntity(client);
-			entity?.IsMounted = true;
-			entity?.MountRideStat = mount.CreatureId;
-			entity?.MountDamageTaken = 0; // #142
-
-			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.Spell.Name, character.Name, character.MapId);
+			if (client.Session.Character?.MountId is { } mountId)
+				await _mounts.RestoreOnWorldEntry(client, mountId, await Database.GetMap(client.Session.Character.MapId), MountAllowedFlag);
 		}
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors

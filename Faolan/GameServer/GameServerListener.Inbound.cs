@@ -2262,7 +2262,7 @@ namespace Faolan.GameServer
 					if (client.Session.Account == null)
 						return;
 
-					await SendDismount(client); // end-twin + StatUpd(Mount=0), frame 1449
+					await _mounts.Dismount(client); // end-twin + StatUpd(Mount=0), frame 1449
 				}, Logger);
 				return;
 			}
@@ -2274,22 +2274,11 @@ namespace Faolan.GameServer
 					return;
 
 				await CombatService.SendBehaviorChannelCompleteAck(client, mountCastPayload, 3); // cast complete: mounts (form 0x0a closes the bar)
-				await _buffs.SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(BuffService.CasterLevel(client))); // seat (#26)
-				var mountStats = new CharacterStatBlock
-				{
-					[CharacterStatId.Mount] = mount.CreatureId,
-					[CharacterStatId.MountSpeed] = MountCatalog.MountSpeed
-				}; // the mount StatUpd (frame 520)
-				await SendStatUpdate(client, mountStats, self);
-				await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
-				playerEntity?.IsMounted = true;
-				playerEntity?.MountRideStat = mount.CreatureId; // so a viewer arriving LATER can be told (#428)
-				playerEntity?.MountDamageTaken = 0; // a fresh mount soaks its own beating before it throws you (#142)
 
-				// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
-				// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.
-				client.Session.Character.MountId = mount.Id;
-				await Database.SaveCharacterMount(client.Session.Character.Id, mount.Id);
+				// The seat itself (#26): the Ride buff + the Mount/MountSpeed pair, broadcast to viewers because the
+				// horse renders from those stats (#428), then persisted so it survives a relog / a no-mount trip.
+				// Cleared only on a voluntary dismount above.
+				await _mounts.SeatAndPersist(client, mount);
 			}, Logger);
 		}
 

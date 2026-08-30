@@ -509,35 +509,6 @@ namespace Faolan.GameServer
 			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
 		}
 
-		// UNSEATS the player: the ride buff's end-twin 0x31EB1501 (empty payload) + StatUpd(Mount=0), broadcast to
-		// viewers so the horse leaves their screens too (#428). It is the one place a mount comes off, because retail
-		// ends every dismount with the same two records whatever caused it (mount capture frame 1449) - the button
-		// press (after DismountChannelMs), a hit that throws the rider, and the respawn after a death all reach it.
-		// The persisted mount is forgotten so world entry does not re-seat one the player no longer has (#142).
-		private async Task SendDismount(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var entity = _simulation.PlayerWorldEntity(client);
-			if (entity?.IsMounted != true && character?.MountId == null)
-				return;
-
-			var self = character.Id;
-			await _buffs.ApplySpell(client, self, self, MountCatalog.DismountSpell);
-			var stats = new CharacterStatBlock
-			{
-				[CharacterStatId.Mount] = 0
-			};
-			await SendStatUpdate(client, stats, self);
-			await _broadcaster.BroadcastStatsToViewers(client, stats);
-
-			entity?.IsMounted = false;
-			entity?.MountRideStat = 0;
-			entity?.MountDamageTaken = 0;
-
-			character.MountId = null;
-			await Database.SaveCharacterMount(self, null);
-		}
-
 		// #637: raises retail's "Do you want to travel to <map>?" box for a zone-line door, and remembers the trip it
 		// is confirming. The (threadCtxId, cookie) pair is retail's script-thread handle; the client only ever echoes
 		// it, so ours are a correlation token rather than a real thread - the character id plus a per-send counter,
