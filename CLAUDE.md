@@ -135,6 +135,19 @@ Domain logic proper lives in composed service folders beside it (`Apprentice/`,
 is organizational only. That suppression is for **partials only** — a non-partial type takes its folder's
 namespace like anything else, and there is currently no exception to that in the tree.
 
+**The GameServer's services are CONTAINER-REGISTERED** (`Faolan/GameServer/GameServerRealmServices.cs`,
+`AddRealmGameServer`), not hand-`new`ed — the listener takes them by constructor injection like anything else.
+Two things to know before adding one:
+- **Register it where its dependencies already are.** MS.DI resolves by type, so the file's order is pure
+  documentation — but it is the only place this graph's LAYERING is legible, so keep it in dependency order.
+- **A missing registration is not a build error.** `GameServerCompositionTests` is the gate: `ValidateOnBuild`
+  walks every ctor and names every unsatisfied dependency at once, without invoking a factory. Run it rather
+  than booting to find a wiring mistake.
+- ⚠️ Every composed service takes a **bare, realm-tagged `ILogger`** (`...GameServerListener-<realmId>`),
+  registered by `AddRealmGameServer` and therefore scoped to a process that hosts a realm. Any OTHER
+  container-resolved type asking for a non-generic `ILogger` would silently inherit that category — the same
+  test fails if a listener starts doing so.
+
 **Prefer composed collaborators over growing the partial.** Domain logic is pulled OUT of the listener into
 folder-namespaced service classes that take their deps by ctor and the client per call:
 `CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` + `PlayerPersistenceService` (World/),
