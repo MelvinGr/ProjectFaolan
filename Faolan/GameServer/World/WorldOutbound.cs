@@ -35,6 +35,7 @@ namespace Faolan.GameServer.World
 	internal sealed class WorldOutbound : IWorldOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly WorldObjectService _worldObjects;
 		private readonly BuffService _buffs;
 		private readonly CombatService _combat;
 		private readonly TradeskillService _tradeskill;
@@ -44,9 +45,10 @@ namespace Faolan.GameServer.World
 		// codebase already sanctions for exactly this case.
 		private readonly Func<INetworkClient, Task> _sendDismount;
 
-		public WorldOutbound(WorldBroadcaster broadcaster, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
+		public WorldOutbound(WorldBroadcaster broadcaster, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
 		{
 			_broadcaster = broadcaster;
+			_worldObjects = worldObjects;
 			_buffs = buffs;
 			_combat = combat;
 			_tradeskill = tradeskill;
@@ -151,7 +153,7 @@ namespace Faolan.GameServer.World
 
 		public Task PlayDynelVisualStep(DueDynelVisualStep step)
 		{
-			return _broadcaster.PlayDynelVisualStep(step);
+			return _worldObjects.PlayDynelVisualStep(step);
 		}
 
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)

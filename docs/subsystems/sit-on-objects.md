@@ -36,10 +36,10 @@ Implemented in `BehaviorAcks`.
 
 - `BehaviorAnimations.PlayerSitOnObject` / `PlayerStandUp` - the two `0x2A` animation records (byte-exact vs
   F2795 / F2840). `BenchSitState` builds the `0x12` hold records.
-- `WorldBroadcaster.TrySitOnObject` runs the sit's two phases; `SeatedHoldConfirmed` is the latch that answers the
+- `WorldObjectService.TrySitOnObject` runs the sit's two phases; `SeatedHoldConfirmed` is the latch that answers the
   client's confirm exactly once.
 - The **standup request** (`bId=0x01` while seated) is handled in `GameServerListener.Inbound`'s BCC branch: ack it,
-  and on the phase-2 confirm call `WorldBroadcaster.StandUp`.
+  and on the phase-2 confirm call `WorldObjectService.StandUp`.
 - `StandUpIfMoved` is a **fallback only**, for a player who leaves the seat without asking (a teleport, or a client
   that skips the request). It measures from the position the client PARKS the character at, not from where the player
   clicked: a bench has several seats (3 on the Old Tarantia ones) so the snap lands up to ~1.3 units away, in

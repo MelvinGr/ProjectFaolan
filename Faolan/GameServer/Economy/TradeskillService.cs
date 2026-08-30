@@ -83,8 +83,9 @@ namespace Faolan.GameServer.Economy
 		public const uint GemSocketCentiseconds = 500;
 
 		// GATHERING's wire side: a swung node restates its health to everyone looking at it, and an exhausted one
-		// despawns. Both are ordinary world-object broadcasts.
-		private readonly WorldBroadcaster _broadcaster;
+		// despawns. Both are ordinary world-object broadcasts - which is the whole of what this service needs from the
+		// world, so it takes the object service rather than the broadcaster (#826).
+		private readonly WorldObjectService _worldObjects;
 
 		// The refusal lines a harvest can produce ("already harvested", "bag full", "not yet harvestable") - said by
 		// the NODE, which is how retail words them, rather than as a system message.
@@ -97,11 +98,11 @@ namespace Faolan.GameServer.Economy
 		// own command QUEUE can hold more than one, and dropping a second craft on the floor would silently eat it.
 		private readonly List<StagedTradeskill> _staged = [];
 
-		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, WorldBroadcaster broadcaster, IChatServerDispatcher chat, ILogger logger)
+		public TradeskillService(IDatabaseRepository database, IEconomyOutbound outbound, WorldObjectService worldObjects, IChatServerDispatcher chat, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
-			_broadcaster = broadcaster;
+			_worldObjects = worldObjects;
 			_chat = chat;
 			_logger = logger;
 		}
@@ -523,7 +524,7 @@ namespace Faolan.GameServer.Economy
 			var after = before - HarvestCatalog.SwingCost;
 			node.Health = after;
 			await SendItemLootChatMessage(client, resourceId, (uint)((await _database.GetItem(resourceId))?.Level ?? 0));
-			await _broadcaster.BroadcastNodeHealth(client, node, after);
+			await _worldObjects.BroadcastNodeHealth(client, node, after);
 
 			// Exhausted only when it can no longer pay for a swing. Until then the node stays in the world with its
 			// health bar down, which is what the player sees in retail.
@@ -535,7 +536,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			node.Health = HarvestCatalog.ExhaustedHealth;
-			await _broadcaster.DespawnHarvestedNode(client, node);
+			await _worldObjects.DespawnHarvestedNode(client, node);
 
 			_logger.LogInformation("Harvest: {Player} took the last {Count}x item {Item} from '{Node}' 0x{Handle:X8}; node exhausted and despawned.",
 				character.Name, count, resourceId, name, node.Handle);

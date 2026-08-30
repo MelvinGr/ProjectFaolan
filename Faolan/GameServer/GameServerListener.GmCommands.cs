@@ -154,7 +154,7 @@ namespace Faolan.GameServer
 			if (entity == null)
 			{
 				// Not a live entity - it may be a static WORLD OBJECT (chest/door/dynel), which lives only in the DB.
-				var obj = await _broadcaster.DeleteWorldObjectForPlayer(client, handle);
+				var obj = await _worldObjects.DeleteWorldObjectForPlayer(client, handle);
 				if (obj != null)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId,

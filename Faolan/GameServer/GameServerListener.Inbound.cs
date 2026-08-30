@@ -139,7 +139,7 @@ namespace Faolan.GameServer
 					// skips the request) still gets stood up - the normal path is the client's own standup request
 					// (behaviour 1, in the BCC branch). Gated on distance, because a seated client streams position
 					// syncs that must not stand it up.
-					await _broadcaster.StandUpIfMoved(client, movePosition);
+					await _worldObjects.StandUpIfMoved(client, movePosition);
 
 					// Trance root (#141): the spellweave trance immobilises the caster, so while IsSpellweaving the
 					// server PINS the position (rejects translation) but still accepts rotation - the move handler is
@@ -2174,7 +2174,7 @@ namespace Faolan.GameServer
 							if (requestSeq == 0x0002)
 							{
 								Logger.LogInformation("Sit: client asked to stand up (behaviour 1 phase 2) - answering and standing.");
-								await _broadcaster.StandUp(client);
+								await _worldObjects.StandUp(client);
 							}
 
 							break;
@@ -2300,7 +2300,7 @@ namespace Faolan.GameServer
 			// rides in `from`). Dispatch on what the object DOES (its InteractAction, data-driven from
 			// the DB): a zone-line teleports to another playfield; everything else (a SimpleDynel door
 			// that opens, a loot bag) is handled by the open/loot path.
-			var interaction = await _broadcaster.ResolveUseObject(client, target);
+			var interaction = await _worldObjects.ResolveUseObject(client, target);
 
 			// #521/#523: using this object ENDS any escort it is the destination of. Retail's order is exactly
 			// this - both beach-to-city captures show the door use, then QuestGoal 12407/3544 1/1 and
@@ -2405,7 +2405,7 @@ namespace Faolan.GameServer
 					// (ResolveCollectPickupItem returns null otherwise, so the brick is inert for a player
 					// without Shipwrecked V). Handled here before the generic open path. The goal is advanced by
 					// the GRANT, not here - GrantItemToBackpack ticks it, so a pickup counts exactly once.
-					if (await _broadcaster.IsQuestPickup(client, target))
+					if (await _worldObjects.IsQuestPickup(client, target))
 					{
 						if (await _questProgression.ResolveCollectPickupItem(client) is { } pickedItem)
 						{
@@ -2416,7 +2416,7 @@ namespace Faolan.GameServer
 							// STANDING: a full backpack means try again after making room, and a template we do not
 							// hold means this node can never pay out and should not pretend to.
 							if (await _economyOutbound.GrantItemToBackpack(client, pickedItem) != null)
-								await _broadcaster.MarkPickupHarvested(client, target);
+								await _worldObjects.MarkPickupHarvested(client, target);
 							else
 								await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "You cannot carry that.");
 						}
@@ -2429,13 +2429,13 @@ namespace Faolan.GameServer
 					// is the same shape - a column-driven object whose use is a whole scripted sequence.
 					// 0x0003 is the client's BEGIN phase, the same one the teleport branch above acts on - a use that
 					// arrives twice must not start two scenes.
-					if (behaviorType == 0x0003 && _broadcaster.VistaAt(client, target) is { } vista && await TryStartAchievementVista(client, vista))
+					if (behaviorType == 0x0003 && _worldObjects.VistaAt(client, target) is { } vista && await TryStartAchievementVista(client, vista))
 						break;
 
 					// A resource NODE (#494) is harvested, not opened: it yields a stack of its matching resource
 					// and must not also play the door open-animation, so it takes the whole interaction.
 					// Handled here, beside the quest-pickup above, because the item grant lives on the listener.
-					if (_broadcaster.HarvestNodeAt(client, target) is { } node)
+					if (_worldObjects.HarvestNodeAt(client, target) is { } node)
 					{
 						await _tradeskill.Harvest(client, node);
 						break;
@@ -2443,9 +2443,9 @@ namespace Faolan.GameServer
 
 					// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
 					// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
-					if (await _broadcaster.TrySitOnObject(client, target))
+					if (await _worldObjects.TrySitOnObject(client, target))
 						break;
-					if (await _broadcaster.OpenWorldObject(client, target))
+					if (await _worldObjects.OpenWorldObject(client, target))
 						break;
 					if (await _broadcaster.OpenLootBag(client, target))
 						break;

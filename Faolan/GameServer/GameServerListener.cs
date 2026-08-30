@@ -268,6 +268,11 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// INTERACTING with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
+		// sequences, the GM delete. Its subject is LiveWorldObject, which is what separates it from the broadcaster's
+		// WorldEntity. See World/WorldObjectService.cs.
+		private readonly WorldObjectService _worldObjects;
+
 		// The CHANGEMAP handoff (GM .teleport, the recalls, the travel box, a zone line, a cross-map trip) plus the
 		// two latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
 		// arrives on a NEW connection. See World/TeleportService.cs.
@@ -343,6 +348,7 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos);
 			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
 			// which reaches the same enter-world handoff pair through it.
+			_worldObjects = new WorldObjectService(_simulation, database, _broadcaster, logger);
 			_teleport = new TeleportService(Connections, database, _broadcaster, agentServerDispatcher, logger);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
 			{
@@ -399,7 +405,7 @@ namespace Faolan.GameServer
 			_bank = new BankService(database, logger, _economyOutbound);
 			_tradepost = new TradepostService(database, logger, _economyOutbound, csPlayerAgentDispatcher);
 			_guildBank = new GuildBankService(database, _economyOutbound, logger);
-			_tradeskill = new TradeskillService(database, _economyOutbound, _broadcaster, agentServerDispatcher, logger);
+			_tradeskill = new TradeskillService(database, _economyOutbound, _worldObjects, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => _teleport.DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
@@ -410,7 +416,7 @@ namespace Faolan.GameServer
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
 			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
 			// thing that makes the graph acyclic.
-			_worldOutbound = new WorldOutbound(_broadcaster, _buffs, _combat, _tradeskill, SendDismount);
+			_worldOutbound = new WorldOutbound(_broadcaster, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
 
 			InitGmCommands();
 		}
