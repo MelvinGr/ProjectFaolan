@@ -129,6 +129,11 @@ namespace Faolan.GameServer.World
 			// ⚠️ Which leaves the gap where it actually is: only 35 of 1,227 NPC templates carry an ability, so most
 			// swings still move no bar. That is a DATA gap (Gitea #903), and filling it is the fix - not zeroing a
 			// field retail always fills.
+			// ⛔ NOT gated on the spell because the client would reject a zero - that was #902's reading and it is
+			// refuted in-client: a record naming `Rend` (3236937), loading with zero `GetMagicSpell` errors, carrying
+			// idx 1, a real statValue and a 39 HP delta, moved the player's bar exactly as little as a zero did.
+			// The guard is here because RETAIL never sends an entity-caused health record without an ability, and
+			// most creatures have none.
 			if (npc.AttackSpellBaseId != 0)
 				await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, npc.AttackSpellBaseId);
 

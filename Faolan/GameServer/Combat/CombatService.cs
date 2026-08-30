@@ -1024,9 +1024,28 @@ namespace Faolan.GameServer.Combat
 		// `school` is the attacker's DamageResult damage school (DamageSchool; NOT a hit result - see CombatEffectBuilder).
 		// Defaults to Piercing, the school of the captured NPC melee hit (fr 6514) - a reasonable stand-in until we model
 		// per-NPC/per-weapon schools; player-melee callers pass Crushing.
-		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage, DamageSchool school = DamageSchool.Piercing)
+		// ⭐⭐ `DamageResultIIR.damage` IS THE PLAYER'S HEALTH DRAIN, and it is on the ×100 WIRE scale (#902).
+		//
+		// Not a floating number that happens to accompany the health move - it IS the move. The client subtracts this
+		// field from its own health, which is why a `StatUpdateIIR` never lowers the player's own bar however correct
+		// it is: the client is authoritative downward and this is what it listens to. Retail's own arithmetic, read
+		// straight off `Hoxxling_..._gameplay` frames 7354-7432 on the player's own handle:
+		//
+		//     fr7354  StatDamage statValue=15531        DamageResults between: 234+53+248+251 = 786
+		//     fr7408  StatDamage statValue=14712        ...+ the -33 DoT tick        = 819  == 15531-14712  ✓
+		//     fr7432  StatDamage statValue=14120        53+254+252 = 559, + 33       = 592  == 14712-14120  ✓
+		//
+		// Exact, twice. So the running health `StatDamage` announces already ACCOUNTS for every DamageResult since the
+		// last one, and both are in the same units as stat 27 - the ×100 wire scale (234 on a 15531 pool is 2.34 HP of
+		// 155). Keyed non-circularly on 1,657 hits across 23 captures, retail sends a health packet on a MINORITY of
+		// them (StatUpdate 24.8%, StatDamage 16.1%) precisely because it does not need one: the damage number carries it.
+		//
+		// ⛔ We passed the DISPLAY number, so the client subtracted 1 wire - one HUNDREDTH of a hit point - per swing.
+		// That is the whole of "damage lands, the character dies, the bar never moves": every other channel we tried
+		// was correct and none of them is the one the client reads.
+		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint displayDamage, DamageSchool school = DamageSchool.Piercing)
 		{
-			return SendWorldPacket(client, DamageResultCodec.Build(targetHandle, attackerHandle, damage, school));
+			return SendWorldPacket(client, DamageResultCodec.Build(targetHandle, attackerHandle, displayDamage * VitalsWireScale, school));
 		}
 
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
