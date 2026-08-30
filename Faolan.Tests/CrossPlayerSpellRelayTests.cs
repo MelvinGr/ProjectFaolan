@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task BroadcastSpellToViewers_ForwardsTheApplySpellVerbatim_ToViewersWhoKnowTheCaster_AndNooneElse()
 		{
-			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);
+			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance, null!);
 			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
 
 			var caster = Place(sim, CasterHandle);
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task BroadcastSpellToViewers_IsANoOp_WhenNoOneSeesTheCaster()
 		{
-			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);
+			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance, null!);
 			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
 
 			var caster = Place(sim, CasterHandle);

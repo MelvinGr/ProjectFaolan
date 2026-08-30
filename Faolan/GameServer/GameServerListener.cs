@@ -322,7 +322,12 @@ namespace Faolan.GameServer
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			var terrain = new TerrainService(configuration.ContentTerrainDir, logger);
-			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
+
+			// Built BEFORE the simulation because the TICK reads it directly (the spell-area / chain-edge lookups used
+			// to go out through IWorldOutbound and come straight back to this field). It is a leaf - nothing but the
+			// database - so it can sit this high with no ordering cost.
+			_spellAreas = new SpellAreaCatalog(database);
+			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, _spellAreas, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
 			{
 				await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
@@ -340,7 +345,6 @@ namespace Faolan.GameServer
 			_dailyChallenges = new DailyChallengeService(database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
 			_spellEffects = new SpellEffectService(database, this, logger);
-			_spellAreas = new SpellAreaCatalog(database);
 			_spellModifiers = new SpellModifierService(database);
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);

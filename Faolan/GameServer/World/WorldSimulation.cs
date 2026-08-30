@@ -150,6 +150,11 @@ namespace Faolan.GameServer.World
 
 		private readonly IWorldOutbound _output;
 
+		// #813/#784/#786: the spell-area + chain-edge CATALOG, read directly rather than through IWorldOutbound.
+		// It is a pure read over the DB (SpellAreaCatalog takes nothing else), so routing four table lookups through
+		// the wire façade only made the port wider and the tick's dependency on the listener look bigger than it is.
+		private readonly SpellAreaCatalog _spellAreas;
+
 		// #272: send what `entity` has walked but not yet had broadcast, and end its move.
 		//
 		// The tick throttles a chase into ~6u segments (`MoveBroadcastSegment`) and flushes the remainder in its own
@@ -188,9 +193,11 @@ namespace Faolan.GameServer.World
 		// the client's dev "Server Framerate" overlay, and by the slow-tick warning below. See TickMetrics.
 		public TickMetrics Metrics { get; } = new TickMetrics(1.0 / BaseTickSeconds);
 
-		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService? terrain = null)
+		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
+			TerrainService? terrain = null)
 		{
 			_output = output;
+			_spellAreas = spellAreas;
 			_database = database;
 			_agents = agents;
 			_logger = logger;
@@ -1476,7 +1483,7 @@ namespace Faolan.GameServer.World
 			foreach (var buff in holder.ActiveBuffs.Values.ToArray())
 			{
 				// The buff id is the WIRE form ((base << 8) | rank); the catalog is keyed by the base.
-				var areas = await _output.AuraAreasFor(buff.BuffId >> 8);
+				var areas = await _spellAreas.AuraAreas(buff.BuffId >> 8);
 				if (areas.Count == 0)
 					continue;
 
@@ -1512,7 +1519,7 @@ namespace Faolan.GameServer.World
 				// which runs ONCE after a delay, and a delay needs a one-shot timer this tick does not have; running
 				// them here would turn a single delayed cast into a permanent cadence, which is the over-apply #784
 				// refused to guess at.
-				foreach (var edge in await _output.RepeatingChainsFor(buff.BuffId >> 8))
+				foreach (var edge in await _spellAreas.RepeatingChains(buff.BuffId >> 8))
 				{
 					var key = (holder.Handle, buff.BuffId, edge.Sequence);
 					if (_auraTicks.TryGetValue(key, out var lastChain) && (now - lastChain).TotalMilliseconds < edge.PeriodCentiseconds * 10)
@@ -1598,11 +1605,11 @@ namespace Faolan.GameServer.World
 			// `Gangrenous Stench`'s 221069 reaching `Physical Wrack` 3963058 is the headline case, and the reason the
 			// spell's tooltip effect did nothing until now. Every edge runs ONCE here; the ones that state a CADENCE
 			// re-run from the aura tick instead (#786, `EmitAuraAreas`).
-			foreach (var link in await _output.ChainedSpellsFor(effectSpellId))
+			foreach (var link in await _spellAreas.ChainedSpells(effectSpellId))
 			{
 				// #813: the target's STACKING LINE is claimed with its id - ten edges into one line is a rank table,
 				// not ten buffs. Same rule as the player-side walk in BuffService.
-				if (!chain.TryEnter(link.EffectSpellId, await _output.StackingLineOf(link.EffectSpellId)))
+				if (!chain.TryEnter(link.EffectSpellId, await _spellAreas.StackingLineOf(link.EffectSpellId)))
 					continue;
 
 				_logger.LogDebug("Effect {Effect} chains {Chained} onto {Npc} (0x{Handle:X8}).", effectSpellId, link.EffectSpellId, victim.Name, victim.Handle);

@@ -128,26 +128,6 @@ namespace Faolan.GameServer
 			return _combat.ApplyNpcDotTick(client, npcHandle, casterHandle, delta, spellId);
 		}
 
-		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.AuraAreasFor(uint spellId)
-		{
-			return _spellAreas.AuraAreas(spellId);
-		}
-
-		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.RepeatingChainsFor(uint spellId)
-		{
-			return _spellAreas.RepeatingChains(spellId);
-		}
-
-		Task<uint> IWorldOutbound.StackingLineOf(uint spellId)
-		{
-			return _spellAreas.StackingLineOf(spellId);
-		}
-
-		Task<IReadOnlyList<SpellAreaEffect>> IWorldOutbound.ChainedSpellsFor(uint spellId)
-		{
-			return _spellAreas.ChainedSpells(spellId);
-		}
-
 		// IEnvironmentOutbound (#495/#504). The StatDamageIIR ENVIRONMENTAL form - no caster, no spell, and NO paired
 		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
 		Task IEnvironmentOutbound.SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)

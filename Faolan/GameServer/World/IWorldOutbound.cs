@@ -205,23 +205,9 @@ namespace Faolan.GameServer.World
 		// started can land the killing blow. `delta` is the DISPLAY-scale per-tick change and is negative for harm.
 		Task ApplyNpcDotTick(INetworkClient client, uint npcHandle, uint casterHandle, int delta, uint spellId);
 
-		// The AURA definitions for a spell, if any - `SpellAreaEffect` rows with a non-zero period. Reached through
-		// the port rather than giving the simulation its own database handle, same as every other lookup it needs.
-		Task<IReadOnlyList<SpellAreaEffect>> AuraAreasFor(uint spellId);
-
-		// #784: the CHAIN edges of a spell - its `CastNano` rows, "when this lands, also run X" on the SAME subject.
-		// The twin of `AuraAreasFor` off the same table, split by the row's kind rather than by its period, because a
-		// chain edge is not an area at all (`SpellAreaCatalog`).
-		Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId);
-
-		// #813: the stacking LINE a spell belongs to (0 = none). The chain walk claims it per edge, because a line is
-		// a mutual-exclusion group and a walk applying two of its members has produced something the client cannot
-		// show - see SpellChainWalk.TryEnter.
-		Task<uint> StackingLineOf(uint spellId);
-
-		// The chain edges that re-run on a CADENCE while the carrier's buff is up (#786) - `Repeats == -1` plus a
-		// non-zero interval. Separate from `ChainedSpellsFor` because the cast path wants every edge exactly once and
-		// the tick wants only the repeating ones.
-		Task<IReadOnlyList<SpellAreaEffect>> RepeatingChainsFor(uint spellId);
+		// (The four spell-area / chain-edge LOOKUPS that used to live here - AuraAreasFor, ChainedSpellsFor,
+		// StackingLineOf, RepeatingChainsFor - are gone. They were pure reads off `SpellAreaCatalog`, which is a leaf
+		// over the database, so the simulation now holds the catalog itself. A lookup is not an outbound message, and
+		// routing one through the wire port made this interface wider and the tick look more coupled than it is.)
 	}
 }

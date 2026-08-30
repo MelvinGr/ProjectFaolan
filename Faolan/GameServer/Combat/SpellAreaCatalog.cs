@@ -26,7 +26,10 @@ namespace Faolan.GameServer.Combat
 	//   * 0  - applied ONCE, by the cast (`Life Leech`: 220980 to 12 targets within 5 m, and that is all of it);
 	//   * >0 - an AURA, re-applied by the tick every period while the buff that owns it is up (`Gangrenous Stench`:
 	//          221069 to 12 targets within 7 m, every 4 s, for the 25 s the self-buff lasts).
-	public sealed class SpellAreaCatalog
+	// Not sealed, and the four lookups the world TICK uses are virtual: the simulation reads this catalog directly
+	// (they used to be four members of IWorldOutbound), so a tick test that wants to drive a specific chain shape
+	// subclasses this rather than stubbing a wire port - see Faolan.Tests RecordingSpellAreaCatalog.
+	public class SpellAreaCatalog
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
@@ -53,14 +56,14 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// The areas re-applied on a period while `spellId`'s buff is up.
-		public async Task<IReadOnlyList<SpellAreaEffect>> AuraAreas(uint spellId)
+		public virtual async Task<IReadOnlyList<SpellAreaEffect>> AuraAreas(uint spellId)
 		{
 			return (await ForSpell(spellId)).Where(a => IsArea(a) && a.PeriodCentiseconds > 0).ToList();
 		}
 
 		// The spells `spellId` also RUNS - its `CastNano` chain edges (#783). Not an area: these land on whatever the
 		// carrier landed on, which is why they are a separate accessor rather than a radius-0 member of the two above.
-		public async Task<IReadOnlyList<SpellAreaEffect>> ChainedSpells(uint spellId)
+		public virtual async Task<IReadOnlyList<SpellAreaEffect>> ChainedSpells(uint spellId)
 		{
 			return (await ForSpell(spellId)).Where(a => !IsArea(a)).ToList();
 		}
@@ -83,7 +86,7 @@ namespace Faolan.GameServer.Combat
 		///         wired.
 		///     </para>
 		/// </remarks>
-		public async Task<IReadOnlyList<SpellAreaEffect>> RepeatingChains(uint spellId)
+		public virtual async Task<IReadOnlyList<SpellAreaEffect>> RepeatingChains(uint spellId)
 		{
 			return (await ForSpell(spellId)).Where(a => !IsArea(a) && a.PeriodCentiseconds > 0 && a.Repeats == UnboundedRepeats).ToList();
 		}
@@ -107,7 +110,7 @@ namespace Faolan.GameServer.Combat
 		///     walk that applies two members of one line has applied something the client cannot represent. The
 		///     Furious Inspiration case put all ten ranks of line 44235 on the bar at once.
 		/// </remarks>
-		public async Task<uint> StackingLineOf(uint spellId)
+		public virtual async Task<uint> StackingLineOf(uint spellId)
 		{
 			if (_lineOf == null)
 			{

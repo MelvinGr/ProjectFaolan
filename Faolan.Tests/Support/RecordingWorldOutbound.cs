@@ -25,8 +25,6 @@ namespace Faolan.Tests.Support
 		// What ApplySpellArea answers with, and what a spell's aura areas / #784 chain edges are - set by the test that
 		// needs them.
 		public IReadOnlyList<uint> AreaVictims { get; set; } = [];
-		public Dictionary<uint, IReadOnlyList<SpellAreaEffect>> Auras { get; } = [];
-		public Dictionary<uint, IReadOnlyList<SpellAreaEffect>> Chains { get; } = [];
 
 		public Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
@@ -50,36 +48,6 @@ namespace Faolan.Tests.Support
 		{
 			Areas.Add((sourceHandle, effectSpellId, radius, maxTargets));
 			return Task.FromResult(AreaVictims);
-		}
-
-		public Task<IReadOnlyList<SpellAreaEffect>> AuraAreasFor(uint spellId)
-		{
-			return Task.FromResult(Auras.TryGetValue(spellId, out var areas)
-				? areas
-				: []);
-		}
-
-		// #813: no stacking line in the fake - these tests drive the chain by id, and a real line map would need the
-		// spell catalog behind it. A 0 means "in no line", which is the non-interfering answer.
-		public Task<uint> StackingLineOf(uint spellId)
-		{
-			return Task.FromResult(0u);
-		}
-
-		public Task<IReadOnlyList<SpellAreaEffect>> ChainedSpellsFor(uint spellId)
-		{
-			return Task.FromResult(Chains.TryGetValue(spellId, out var links)
-				? links
-				: []);
-		}
-
-		// The cadence half of the same map (#786) - filtered here rather than held in a second dictionary, so a test
-		// that seeds `Chains` cannot disagree with itself about which of them repeat.
-		public Task<IReadOnlyList<SpellAreaEffect>> RepeatingChainsFor(uint spellId)
-		{
-			return Task.FromResult(Chains.TryGetValue(spellId, out var links)
-				? (IReadOnlyList<SpellAreaEffect>)links.Where(l => l.PeriodCentiseconds > 0 && l.Repeats == -1).ToList()
-				: []);
 		}
 
 		public Task ResolveInterest(INetworkClient client)

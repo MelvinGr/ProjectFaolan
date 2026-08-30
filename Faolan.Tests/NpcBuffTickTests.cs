@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ADotOnAMob_BleedsItOnTheTick_AttributedToTheCaster()
 		{
-			var (sim, output, _, mob) = Harness();
+			var (sim, output, areas, _, mob) = Harness();
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-5), 30f, dotDelta: -7, dotIntervalMs: 1000));
 
 			await sim.TickNpcBuffs();
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ADotOnAMob_DoesNotBleedTwiceInsideItsInterval()
 		{
-			var (sim, output, _, mob) = Harness();
+			var (sim, output, areas, _, mob) = Harness();
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 2000) with { LastDotTick = DateTimeOffset.UtcNow });
 
 			await sim.TickNpcBuffs();
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnExpiredEffect_SendsTheEndTwinAndLeavesTheRegistry()
 		{
-			var (sim, output, _, mob) = Harness();
+			var (sim, output, areas, _, mob) = Harness();
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow.AddSeconds(-20), 9.5f));
 
 			await sim.TickNpcBuffs();
@@ -78,8 +78,8 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnInfectedMob_EmitsTheEffectsOwnArea_CentredOnItself()
 		{
-			var (sim, output, _, mob) = Harness();
-			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+			var (sim, output, areas, _, mob) = Harness();
+			areas.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
 
 			await sim.TickNpcBuffs();
@@ -94,8 +94,8 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnInfectedMob_DoesNotReEmitInsideThePeriod()
 		{
-			var (sim, output, _, mob) = Harness();
-			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+			var (sim, output, areas, _, mob) = Harness();
+			areas.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 9.5f));
 
 			await sim.TickNpcBuffs();
@@ -110,8 +110,8 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task TwoMobsCarryingTheSameEffect_BothEmit()
 		{
-			var (sim, output, client, mob) = Harness();
-			output.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
+			var (sim, output, areas, client, mob) = Harness();
+			areas.Auras[EffectSpell] = [Area(221068, radius: 4, periodCentiseconds: 300)];
 
 			var second = new WorldEntity(MobHandle + 1, MapId, false, "Rotted Corpse", null!);
 			sim.World.Place(second, MapId, Vector3.Zero, Quaternion.Identity);
@@ -132,7 +132,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnEffectWhoseCasterIsGone_IsDroppedWithoutTicking()
 		{
-			var (sim, output, client, mob) = Harness();
+			var (sim, output, areas, client, mob) = Harness();
 			sim.Players.TryRemove(client, out _);
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
 
@@ -148,7 +148,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ADeadMob_LeavesTheRegistryWithoutTicking()
 		{
-			var (sim, output, _, mob) = Harness();
+			var (sim, output, areas, _, mob) = Harness();
 			mob.Vitals = EntityVitals.FromMax(100, 0, 0);
 			mob.Vitals.ApplyHealthDelta(-1000);
 			Track(sim, mob, Buff(DateTimeOffset.UtcNow, 30f, dotDelta: -7, dotIntervalMs: 1000));
@@ -189,10 +189,11 @@ namespace Faolan.Tests
 			sim.TrackBuffedEntity(mob);
 		}
 
-		private static (WorldSimulation Sim, RecordingWorldOutbound Output, RecordingNetworkClient Client, WorldEntity Mob) Harness()
+		private static (WorldSimulation Sim, RecordingWorldOutbound Output, RecordingSpellAreaCatalog Areas, RecordingNetworkClient Client, WorldEntity Mob) Harness()
 		{
 			var output = new RecordingWorldOutbound();
-			var sim = new WorldSimulation(output, null!, null!, NullLogger.Instance);
+			var areas = new RecordingSpellAreaCatalog();
+			var sim = new WorldSimulation(output, null!, null!, NullLogger.Instance, areas);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
 			var player = new WorldEntity(PlayerHandle, MapId, true, "Caster", client);
@@ -202,7 +203,7 @@ namespace Faolan.Tests
 			var mob = new WorldEntity(MobHandle, MapId, false, "Rotted Corpse", null!);
 			sim.World.Place(mob, MapId, Vector3.Zero, Quaternion.Identity);
 
-			return (sim, output, client, mob);
+			return (sim, output, areas, client, mob);
 		}
 	}
 }
