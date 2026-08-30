@@ -39,9 +39,7 @@ namespace Faolan.GameServer
 {
 	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
 	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
-	public partial class GameServerListener : RpcServer, ISpellEffectOutbound,
-		ISpellweaveOutbound, ITravelOutbound,
-		IGameServerProvider
+	public partial class GameServerListener : RpcServer, ISpellEffectOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -370,8 +368,8 @@ namespace Faolan.GameServer
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
 			_energy = new EnergyService(_buffs, logger);
 			_pets = new PetService(database, _simulation, _broadcaster, logger);
-			_spellweave = new SpellweaveService(logger, this);
-			_travel = new TravelService(database, this, logger);
+			_spellweave = new SpellweaveService(logger, new SpellweaveOutbound(_simulation, _energy, _buffs, agentServerDispatcher));
+			_travel = new TravelService(database, new TravelOutbound(agentServerDispatcher, _economyOutbound, _teleport, _simulation), logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
 			_questShare = new QuestShareOutbound(Connections, _simulation);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);

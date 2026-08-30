@@ -655,7 +655,7 @@ namespace Faolan.GameServer
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
-		private static Task SendWorldChat(INetworkClient client, string xml)
+		internal static Task SendWorldChat(INetworkClient client, string xml)
 		{
 			// As SendFeedback: the [u32 len] is the sender's (#530 rule 2), written by WorldIir.Send.
 			return WorldIir.Send(client, ChatTextCodec.Build(client.Session.Character.Id, Encoding.Latin1.GetBytes(xml)));

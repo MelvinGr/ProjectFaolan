@@ -58,42 +58,5 @@ namespace Faolan.GameServer
 			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddSpecialAbility,
 				AddSpecialAbilityCodec.Build(ability, announce)));
 		}
-
-		// --- ISpellweaveOutbound: the spellweaving FSM's wire + world-state surface. Explicit forwards to the
-		// methods that already existed, which is all the seven Func<> seams ever were - see ISpellweaveOutbound.
-		bool ISpellweaveOutbound.IsMounted(INetworkClient client)
-		{
-			return _simulation.PlayerWorldEntity(client)?.IsMounted == true;
-		}
-
-		void ISpellweaveOutbound.EnsureEnergyLoop(INetworkClient client)
-		{
-			_energy.EnsureEnergyLoop(client);
-		}
-
-		Task ISpellweaveOutbound.ApplyBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)
-		{
-			return _buffs.ApplyBuffById(client, applyTo, applyFrom, wireSpellId);
-		}
-
-		Task ISpellweaveOutbound.RemoveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)
-		{
-			return _buffs.SendBuffRemoval(client, applyTo, applyFrom, wireSpellId);
-		}
-
-		Task ISpellweaveOutbound.SendFeedback(INetworkClient client, string message)
-		{
-			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, message);
-		}
-
-		Task ISpellweaveOutbound.SendMountedRefusal(INetworkClient client)
-		{
-			return SendWorldChat(client, ChatTextXml.MustNotHaveMountRunning);
-		}
-
-		Task ISpellweaveOutbound.SendSprintBar(INetworkClient client, uint energy)
-		{
-			return EnergyService.SendSprintBar(client, energy);
-		}
 	}
 }

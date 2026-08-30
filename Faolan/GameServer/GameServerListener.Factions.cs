@@ -24,7 +24,7 @@ namespace Faolan.GameServer
 		// Points first, then rank: a rank is a threshold ON the points, so the client has the number the title is
 		// about before it is told the title. Nothing captured says the order matters; this is the one that cannot
 		// read as a title arriving for a standing the client has not seen.
-		private async Task SendFactionStanding(INetworkClient client, uint factionId, int points, uint rank)
+		private static async Task SendFactionStanding(INetworkClient client, uint factionId, int points, uint rank)
 		{
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchApplyFactionPoints, ApplyFactionPointsCodec.Build(factionId, points)));

@@ -10,26 +10,42 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.World;
+using Faolan.GameServer.Economy;
 
-namespace Faolan.GameServer
+namespace Faolan.GameServer.World
 {
 	// The wire side of local travel (#506) - ITravelOutbound. The decisions live in World/TravelService.cs.
-	public partial class GameServerListener
+	//
+	// Every op here is either a send or a forward to a service that owns the act (the changemap handoff, the
+	// same-map relocate, the wallet push), which is why it is its own class rather than a facade on the listener.
+	public sealed class TravelOutbound : ITravelOutbound
 	{
-		Task ITravelOutbound.SendTravelRefusal(INetworkClient client, string reason)
+		private readonly IChatServerDispatcher _chat;
+		private readonly IEconomyOutbound _economy;
+		private readonly WorldSimulation _simulation;
+		private readonly TeleportService _teleport;
+
+		public TravelOutbound(IChatServerDispatcher chat, IEconomyOutbound economy, TeleportService teleport, WorldSimulation simulation)
 		{
-			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Color("red", reason));
+			_chat = chat;
+			_economy = economy;
+			_teleport = teleport;
+			_simulation = simulation;
 		}
 
-		Task ITravelOutbound.SendTravelFeeCharged(INetworkClient client, ulong balanceTin)
+		public Task SendTravelRefusal(INetworkClient client, string reason)
 		{
-			return _economyOutbound.SendUpdateCash(client, balanceTin, UpdateCashReason.Spend);
+			return _chat.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Color("red", reason));
+		}
+
+		public Task SendTravelFeeCharged(INetworkClient client, ulong balanceTin)
+		{
+			return _economy.SendUpdateCash(client, balanceTin, UpdateCashReason.Spend);
 		}
 
 		// A cross-map trip is the ordinary changemap handoff - the same path GM .teleport and the recalls take, so
 		// travel gets the persisted transform, the loading screen and the re-entry latch for free.
-		Task ITravelOutbound.TravelToMap(uint characterId, uint destinationMapId, Vector3? arrival)
+		public Task TravelToMap(uint characterId, uint destinationMapId, Vector3? arrival)
 		{
 			return _teleport.DoTeleport(characterId, destinationMapId, arrival);
 		}
@@ -38,7 +54,7 @@ namespace Faolan.GameServer
 		// the revive already uses (IntendedTeleport on the live playfield token, then n3Teleport carrying the
 		// destination), which is exactly what the captured wagoner trip sends at t=781.5, so it is reused rather than
 		// running a changemap the client would answer with a full reload.
-		Task ITravelOutbound.RelocateOnSameMap(INetworkClient client, Vector3 arrival)
+		public Task RelocateOnSameMap(INetworkClient client, Vector3 arrival)
 		{
 			return _simulation.RelocateSameMap(client, arrival);
 		}
@@ -54,7 +70,7 @@ namespace Faolan.GameServer
 		// in-client verified - so this is fidelity: the client is told a trip is happening rather than being silently
 		// relocated. It stayed unsent until the element's `field` was decoded, which read as a per-trip value derived
 		// from nothing we hold; it is retail's own `GameActionData::s_nInstance` counter, so we allocate our own.
-		async Task ITravelOutbound.SendTripDeparture(INetworkClient client, uint destinationMapId, Vector3 arrival, bool sameMap)
+		public async Task SendTripDeparture(INetworkClient client, uint destinationMapId, Vector3 arrival, bool sameMap)
 		{
 			var self = client.Session.Character.Id;
 			var trip = sameMap
@@ -73,18 +89,18 @@ namespace Faolan.GameServer
 			await SendWorldRecord(client, racer);
 		}
 
-		private static Task SendWorldRecord(INetworkClient client, byte[] record)
-		{
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(record)));
-		}
-
 		// #635: a `{teleportplayer}` directive may state only X and Z, so the arrival height comes off the baked
 		// terrain. Null when none is loaded for that map (TerrainDir unset, or the map has no baked file) - the
 		// service then falls back to the destination's default spawn rather than guessing a height.
-		float? ITravelOutbound.GroundHeight(uint mapId, float x, float z)
+		public float? GroundHeight(uint mapId, float x, float z)
 		{
 			return _simulation.Terrain?.GroundHeight(mapId, x, z);
+		}
+
+		private static Task SendWorldRecord(INetworkClient client, byte[] record)
+		{
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(record)));
 		}
 	}
 }
