@@ -71,13 +71,11 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
 ## Claude channel (MCP bridge) — added 2026-06-12
 
 A server-defined channel **"Claude"** (`04/0x00C1A0DE/flag 0x8044`, id far outside the retail range) is
-appended to the login subscription list. The whole bridge is gated on the `Mcp:Enabled` key in `faolan.json`
-(default true): disabled = no MCP host, no channel subscription, no log capture. Player posts on it broadcast normally AND are recorded in the
-in-memory `ClaudeChannel` log (`Faolan.Core.Network/Server/ChatServer/ClaudeChannel.cs`, ring of 500, monotonic
-sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`) and
-`send_claude_channel_message` bridge it to Claude; Claude's replies broadcast in-game as the synthetic
-sender `0xC1A0DE05`/"Claude" via the standard `0x0014`+`0x0041` relay pair. Log is not persisted across
-restarts. In-client render of the channel is not yet verified (needs a live client).
+appended to the login subscription list, gated on `Mcp:Enabled` (disabled = no MCP host, so no subscription —
+nothing could speak on it). It is **OUTBOUND ONLY**: the MCP tools `send_claude_channel_message` and
+`send_claude_whisper` broadcast/whisper as the synthetic sender `0xC1A0DE05`/"Claude" through the standard
+`0x0014`+`0x0041` relay pair. A player's own post on the channel relays and persists like any other channel's
+and reaches Claude nowhere. In-client render of the channel is not yet verified (needs a live client).
 
 ## Local "say" flow + proximity
 
@@ -120,33 +118,30 @@ client has never seen chat may involve a name-lookup exchange that is NOT in thi
 ## The in-game Claude channel
 
 Every client is subscribed to the server-defined **"Claude" chat channel** (04/0x00C1A0DE) on ChatServer
-login, and gets Claude as an always-online **virtual friend** entry (`SendClaudeFriendEntry`) so `/tell Claude`
-has a front door. Player posts on the channel, and tells addressed to the synthetic sender id, land in the
-in-memory `ClaudeChannel` log (500 messages, not persisted across restarts).
+login. It exists so Claude has a VOICE in the game, and that is all it is:
 
-Three MCP tools on the in-process server (`Faolan.Mcp/Tools/ClaudeChannelTools.cs`) are the whole bridge:
-
-| tool | direction |
+| tool (`Faolan.Mcp/Tools/ClaudeChannelTools.cs`) | direction |
 | --- | --- |
-| `read_claude_channel` | reads the log, cursor by `Sequence` (pass the highest you have seen) |
 | `send_claude_channel_message` | broadcasts in-game as "Claude" to every connected client |
 | `send_claude_whisper` | private tell to one connected character |
 
-All three are gated on `Mcp:Enabled`: with it off the channel is not offered at login
-(`ChatChannels.StandingAtLogin`), nothing is appended to the log, and the virtual friend is not sent — because
-without the MCP host nothing can read the log or answer.
+Both are gated on `Mcp:Enabled`: with it off the channel is not offered at login
+(`ChatChannels.StandingAtLogin`), because without the MCP host nothing can speak on it.
 
-**Delivery is PULL.** Claude reads the log when it wants to; nothing wakes it. A stdio Claude Code *channel*
-(`Faolan.Mcp.ChannelBridge`, `.mcp.json` server `faolan-chat`) used to push each new post into a running
-session as a `notifications/claude/channel` event, and was removed on 2026-08-30 — it made the assembly an
-executable and carried its own `ChatBridge:*` config for a push that shipped disabled (`Enabled` defaulted to
-false). The channel, the log and the three tools are unaffected.
+**There is no inbound path (2026-08-30).** A player's post on the channel, or a `/tell` to the synthetic
+sender id, is relayed to other players and written to the `ChatMessage` history like any other chat, and
+reaches Claude nowhere. Removed in the same change: the in-memory `ClaudeChannel` message log, the
+`read_claude_channel` tool over it, and the always-online **virtual friend** entry — that entry existed only
+to give `/tell Claude` a front door, so keeping it would have advertised a friend whose tells answer
+"Player is not online". `ClaudeChannel` is now four constants (the channel/sender ids and names).
 
-**Reply in the addressed mode (#97):** each message carries the inbound MODE structurally —
-`ClaudeChannelMessage.ViaWhisper` is set at ingestion (true for a `/tell Claude`, false for a channel post;
-`ChatServerListener`'s `Whisper` vs channel-chat cases), *not* encoded as a `"(whisper) "` text prefix. So a
-reader can answer in kind — `send_claude_whisper` for a whisper, `send_claude_channel_message` for a channel
-post — and a private tell stays private. Covered by `ClaudeChannelTests`.
+This followed the removal of the stdio Claude Code *channel* bridge (`Faolan.Mcp.ChannelBridge`, `.mcp.json`
+server `faolan-chat`), which polled the log and pushed each new post into a running Claude Code session as a
+`notifications/claude/channel` event. With the push gone, ingestion had no consumer that could act on it.
+
+⚠️ So Claude cannot answer in-game chat: nothing tells it a player spoke, and nothing records what was said
+for it to read. Talking to players is now something a Claude session is told to do, not something it is
+prompted into. Restoring the round trip means restoring the bridge (`git revert a7cfe9d5`) and this change.
 
 ## Ambient NPC barks — the catalog is HARVESTABLE (#331)
 

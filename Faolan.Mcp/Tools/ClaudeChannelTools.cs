@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Server.ChatServer;
 using ModelContextProtocol.Server;
@@ -7,37 +6,22 @@ using ModelContextProtocol.Server;
 namespace Faolan.Mcp.Tools
 {
 	/// <summary>
-	///     The Claude chat channel bridge: every client is subscribed to the in-game "Claude" channel on login;
-	///     player posts on it land in the <see cref="ClaudeChannel" /> log, and these tools let Claude read that
-	///     log and reply in-game (broadcast via <see cref="IChatServerDispatcher" /> under the Claude identity).
+	///     Claude's voice in the game: every client is subscribed to the in-game "Claude" channel on login, and these
+	///     tools broadcast or whisper onto it under the Claude identity (via <see cref="IChatServerDispatcher" />).
+	///     <para>
+	///         OUTBOUND ONLY - there is no read tool, because nothing ingests player chat for Claude any more (the
+	///         channel log and the stdio bridge over it were removed on 2026-08-30). A player's post on the channel
+	///         is relayed and persisted to the chat history like any other channel's, and reaches Claude nowhere.
+	///     </para>
 	/// </summary>
 	[McpServerToolType]
 	public sealed class ClaudeChannelTools
 	{
-		private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
-		{
-			WriteIndented = true
-		};
-
-		private readonly ClaudeChannel _channel;
 		private readonly IChatServerDispatcher _dispatcher;
 
-		public ClaudeChannelTools(ClaudeChannel channel, IChatServerDispatcher dispatcher)
+		public ClaudeChannelTools(IChatServerDispatcher dispatcher)
 		{
-			_channel = channel;
 			_dispatcher = dispatcher;
-		}
-
-		[McpServerTool(Name = "read_claude_channel"),
-		 Description("Read the in-game Claude chat channel log (player posts + Claude's replies), oldest first. Pass afterSequence from a previous read to only get new messages. Read-only.")]
-		public string ReadClaudeChannel(
-			[Description("Only return messages with Sequence greater than this (0 = all retained messages). Use the highest Sequence you have seen to poll for new posts.")] ulong afterSequence = 0)
-		{
-			var messages = _channel.ReadSince(afterSequence);
-			if (messages.Count == 0)
-				return $"No messages after sequence {afterSequence} (latest sequence: {_channel.LatestSequence}).";
-
-			return JsonSerializer.Serialize(messages, JsonOptions);
 		}
 
 		[McpServerTool(Name = "send_claude_channel_message"),
@@ -49,13 +33,13 @@ namespace Faolan.Mcp.Tools
 
 			var delivered = await _dispatcher.SendClaudeChannelMessage(message);
 			return delivered == 0
-				? "No clients are currently connected to the ChatServer; the message was logged on the channel but reached nobody."
+				? "No clients are currently connected to the ChatServer; nothing was sent."
 				: $"Posted to the Claude channel; delivered to {delivered} connected client(s).";
 		}
 
 		[McpServerTool(Name = "send_claude_whisper"),
 		 Description(
-			 "Whisper (private tell) a single connected character as \"Claude\" - only they see it, unlike the channel broadcast. Use the sender's character id from the channel log / channel event meta.")]
+			 "Whisper (private tell) a single connected character as \"Claude\" - only they see it, unlike the channel broadcast. Takes the target's character id (e.g. from list_sessions).")]
 		public async Task<string> SendClaudeWhisper([Description("Character id of the connected player to whisper.")] uint characterId, [Description("The whisper text.")] string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))

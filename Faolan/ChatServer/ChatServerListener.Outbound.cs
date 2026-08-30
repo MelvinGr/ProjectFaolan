@@ -62,14 +62,11 @@ namespace Faolan.ChatServer
 				delivered++;
 			}
 
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message.Value, true);
-
 			return delivered;
 		}
 
 		// Whispers a single character as the synthetic Claude identity: the 0x0014 sender info + the 0x001E tell
-		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests). Logged on the
-		// Claude channel log so the bridge conversation history stays complete.
+		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests).
 		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message)
 		{
 			var target = ClientForCharacter(targetCharacterId);
@@ -80,7 +77,6 @@ namespace Faolan.ChatServer
 
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message.Value));
 
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message.Value}", true, true);
 			return true;
 		}
 

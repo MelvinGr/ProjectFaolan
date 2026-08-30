@@ -172,7 +172,6 @@ namespace Faolan
 				builder.Services.AddHostedService<CsPlayerAgentListener>();
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
-				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
 				builder.Services.AddHostedService<ChatServerListener>();
 
 				// Live seam into the GameServer listener: aggregates world sessions and routes
