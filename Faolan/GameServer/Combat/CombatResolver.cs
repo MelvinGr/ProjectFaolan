@@ -123,13 +123,22 @@ namespace Faolan.GameServer.Combat
 		// retail's own tweak-table coefficients) is the real path.
 		public const uint ArmorHalfMitigation = 2000;
 
-		// What retail puts in `StatDamageIIR.SpellBaseId`: nothing. Measured over the corpus - **3,059 of 3,061 records
-		// carry 0**, and it is total for every stat id we send (all 50 with statId 10, all 2,892 with statId 0, all 119
-		// with statId 5); the two exceptions name an id absent from the whole spell catalog.
+		// What retail puts in `StatDamageIIR.SpellBaseId` **for the stat ids 0, 5 and 10**: nothing. Measured over the
+		// corpus - 3,059 of 3,061 such records carry 0 (all 50 with statId 10, all 2,892 with statId 0, all 119 with
+		// statId 5); the two exceptions name an id absent from the whole spell catalog.
 		//
-		// Both emitters go through this one constant (the spell-cast hit, #767, and the DoT tick, #770) so they cannot
-		// drift apart again - the DoT path was left passing `buff.BuffId >> 8` when the cast path was fixed, precisely
-		// because that IS a real spell id and so produced no client error to notice.
+		// ⛔ THAT POPULATION DOES NOT INCLUDE HEALTH, and health is the one that moves the bar. Re-measured over
+		// statId 0x1B (27) on the player's OWN handle - 434 records across the corpus - retail names a REAL spell in
+		// 391 of them. The only combination it ever pairs with 0 is school 12, the WORLD as the damage source (all 43,
+		// and 43 is exactly the school-12 count): a fall or a hazard, which genuinely has no spell behind it.
+		//
+		// ⚠️ Sending 0 on a health record is not merely inaccurate, it VOIDS THE RECORD. The client logs
+		// `ERROR: GameCode.Magic - SpellTemplate_t::GetMagicSpell failed to load spell with id 0` and abandons it, so
+		// the health never reaches `CMsg_StatChange` and the bar does not move. #767 (2026-08-09) and #770
+		// (2026-08-10) applied the 0/5/10 finding to the health emitters and that is what broke player damage
+		// on screen - #770's own note even records that the real id "produced no client error to notice".
+		//
+		// So: use this for a stat the measurement covers, and the real base id for a health record.
 		public const uint RetailSpellBaseId = 0;
 
 		// TWK_ArmorAbilityModifier / TWK_TargetPerLevelArmor from the client's own tweak table (RDB 1000516,

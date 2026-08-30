@@ -622,6 +622,14 @@ namespace Faolan.GameServer.World
 		// Whether a given swing actually carries it is a per-swing roll - see NpcWeapon.MeleeComboShare.
 		public uint MeleeComboId { get; set; }
 
+		// The creature's own ATTACK ABILITY, as a spell BASE id (`NpcSpells.SpellId >> 8`), 0 when it has none - and
+		// most do not: 35 of 1,227 templates carry a row at all. It is what a health `StatDamageIIR` has to name, and
+		// the reason the field exists: retail's physical hits on the player name exactly these (`Ripper Volley`,
+		// `Rend`, `Butcher`), and a record naming anything the client's spell catalog lacks - 0, or a combo template -
+		// is voided by it, taking the health with it. Not the same thing as MeleeComboId, which is a combo template
+		// the client does NOT hold as a spell.
+		public uint AttackSpellBaseId { get; set; }
+
 		// #675: the CLASS-family rows this NPC may swing INSTEAD of its generic one, already level-gated at load.
 		// Empty for every NPC whose archetype the weapon does not answer, which is most of them - see
 		// `NpcWeapon.ClassComboFamily`. A swing that carries a combo at all then picks between this and MeleeComboId

@@ -465,7 +465,7 @@ namespace Faolan.GameServer.World
 					// which is why it survived the #767 fix to the cast path: that IS a real id, so the client loads it
 					// without complaint and nothing ever looked wrong. It is simply not what retail states.
 					await _output.SendStatDamage(client, entity.Handle, vitals.Health, buff.DotDelta, buff.DotType, buff.CasterHandle,
-						CombatResolver.RetailSpellBaseId);
+						buff.BuffId >> 8); // a HEALTH record names its real spell - see CombatResolver.RetailSpellBaseId
 					await _output.PushVitals(client, vitals);
 
 					if (vitals.IsDead)

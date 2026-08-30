@@ -116,8 +116,7 @@ namespace Faolan.GameServer
 			await GrantCharacterAbilities(client);
 
 			// The CharInPlayIIR echo (retail fr324: [u32 len][864cfef8][C350][instance][00]).
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
+			await SendCharInPlay(client);
 
 			// RegenIIR - retail's fr325 sits here, and a RegenIIR is a DELTA the client ADDS to its own current
 			// vitals (RegenCodec). So the value is that character's deficit at that moment, not a constant: replaying
@@ -165,6 +164,18 @@ namespace Faolan.GameServer
 			// is discarded by the client's identity reconstruction.
 			await GrantCharacterAbilities(client);
 			await GrantCharacterCombos(client);
+
+			// ⭐ IN-PLAY. Without this the client CONSTRUCTS the character and then ignores every runtime stat we send
+			// it: `GameCode.Inplay - Setting inplay from 0 to 0`, and from then on a `StatUpdateIIR` is received and
+			// parsed (`got new stats: 27=200`) but never reaches `CMsg_StatChange`. The visible symptom is a health
+			// bar frozen at whatever the world-entry snapshot seeded, while damage lands, the character dies, and only
+			// the RegenIIR deltas - which are not gated on it - still move the number (in-client 2026-08-30).
+			//
+			// The create-world burst has always sent it and login never has, which is why this only ever bit an
+			// EXISTING character: a freshly made one worked. Retail sends it here, in this order - frame 124 of
+			// PriestofMitra-login is ValidResurrectionSpots, seven AddSpecialAbility, then CharInPlay - and it is
+			// s2c 241 times across the corpus, 218 of them on the player's own handle.
+			await SendCharInPlay(client);
 			// NB the buff re-asserts that used to live here - the persisted mount (#342), the persisted self-buffs (#274)
 			// and Shield of the Risen (#221) - have ALL moved into the shared world-entry flush, where retail sends them
 			// (see RestoreEntryBuffs). Sent from here they arrived after the client had left the loading screen, which
@@ -299,6 +310,16 @@ namespace Faolan.GameServer
 		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
 		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
 		// grant - no capture exercises it; see TODO #3.)
+		// Tells the client its own character is IN PLAY. Until it arrives the client keeps the entity at inplay=0 and
+		// DROPS every runtime stat update for it - see the note at the login call site for the symptom and the
+		// captured ordering. Both ready bursts send it; retail puts it right after the ability grants.
+		private static Task SendCharInPlay(INetworkClient client)
+		{
+			var instance = client.Session.Character.Id;
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(RpcInterfaces.GameInterfaceType, instance), GameInterfaceMethods.DispatchPassBlob,
+				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
+		}
+
 		private async Task GrantCharacterAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;

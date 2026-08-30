@@ -114,14 +114,19 @@ namespace Faolan.GameServer.World
 			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
-			// ⭐ The pool MOVE on the player's own handle. Retail states a vitals change on your own character with a
-			// StatDamageIIR carrying BOTH the resulting value and the delta (measured: 15 own-handle records in
-			// Hoxxling_..._gameplay2, e.g. `stat=0x01FA value=32020 delta=2100`), and our DoT tick has always sent
-			// exactly this - the melee swing never did, in the whole visible history of this method. It only pushed
-			// the absolute 0x96B8DC59 block below, which the client does not appear to apply to its own bar: damage
-			// landed, the character died, and the bar never moved (in-client 2026-08-30). The port's own note already
-			// said this packet is "paired with PushVitals for the bar move"; the pairing was missing here.
-			await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, CombatResolver.RetailSpellBaseId);
+			// ⚠️ A health record must name a REAL spell or the client VOIDS it - `GetMagicSpell failed to load spell
+			// with id <n>`, and the health never reaches CMsg_StatChange. Retail never sends one without a spell: of
+			// 656 own-handle health records the only zeroes are school 12, the world (a fall, a hazard). Its physical
+			// hits name the creature's own ability - `Ripper Volley` (3239371), `Rend` (3236937), `Butcher` - which are
+			// exactly the rows our own `NpcSpells` carries.
+			//
+			// ⛔ So a swing with NO ability sends NO health record, because retail has none to send. Passing the combo
+			// id instead was measured and is wrong: `combo_npc_generic_1hb` IS in our Spells table but not in the
+			// client's catalog, so it fails to load exactly like the 0 did. Only 35 of 1,227 NPC templates carry an
+			// ability at all, so this is the common case, and how retail moves the bar for it is still open.
+			if (npc.AttackSpellBaseId != 0)
+				await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, npc.AttackSpellBaseId);
+
 			await _output.PushVitals(client!, vitals);
 			await ThrowFromMountIfBattered(target, damage);
 
@@ -213,7 +218,9 @@ namespace Faolan.GameServer.World
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			// The same pool MOVE the melee swing sends - see the note there. A cast lands on the player's own handle
 			// too, so it needs the StatDamageIIR just as much.
-			await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, CombatResolver.RetailSpellBaseId);
+			// The CAST's own spell - a health record must name a real one or the client voids it (see
+			// CombatResolver.RetailSpellBaseId).
+			await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, spell.SpellId >> 8);
 			await _output.PushVitals(client!, vitals);
 			await ThrowFromMountIfBattered(target, damage);
 

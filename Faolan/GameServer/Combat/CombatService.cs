@@ -955,7 +955,7 @@ namespace Faolan.GameServer.Combat
 			// is worse than none.
 			return vitals == null
 				? Task.CompletedTask
-				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, CombatResolver.RetailSpellBaseId);
+				: SendStatDamage(client, npcHandle, vitals.Health, -damage, SpellDamageStatId, casterHandle, spellId); // already a BASE id - see the note above
 		}
 
 		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR

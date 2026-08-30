@@ -7,8 +7,20 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #767/#770: retail puts NOTHING in `StatDamageIIR.SpellBaseId` - 3,059 of the corpus' 3,061 records carry 0, and
-	// the two that do not name an id absent from the spell catalog.
+	// ⛔ #767/#770 got this BACKWARDS and it cost the player's health bar for three weeks. They measured
+	// `StatDamageIIR.SpellBaseId` over the stat ids 0, 5 and 10 - where 3,059 of 3,061 records really do carry 0 - and
+	// applied the finding to the HEALTH emitters too. Re-measured over statId 0x1B (27), retail names a REAL spell in
+	// 478 of 656 own-handle records and 1,698 of 1,724 on other handles; the zeroes are school 12, the world.
+	//
+	// A health record naming spell 0 is not merely inaccurate, it VOIDS THE RECORD: the client logs
+	// `SpellTemplate_t::GetMagicSpell failed to load spell with id 0` and abandons it, so the health never reaches
+	// `CMsg_StatChange` and the bar does not move (in-client 2026-08-30).
+	//
+	// ⚠️ #767's own diagnosis was right and only its fix was wrong. The original defect was a DOUBLE SHIFT - a value
+	// that was already a base id shifted again into `14321` - and the client said exactly the same thing about that
+	// (`failed to load spell with id 14321`). Removing the id turned a wrong spell into no spell and kept the error.
+	// The rule is "state the real base id", and the shift is what varies: `buff.BuffId` is a WIRE id and needs `>> 8`,
+	// a cast trailer's `spellId` is already a base and must not be shifted.
 	//
 	// This is a source scan rather than a wire assertion, and that is deliberate: the failure it exists to catch is not
 	// a wrong byte, it is a SECOND emitter drifting away from the first. #767 fixed the spell-cast path and left the DoT
@@ -18,7 +30,7 @@ namespace Faolan.Tests
 	public class StatDamageSpellIdTests
 	{
 		[Fact]
-		public void EverySendStatDamage_PassesTheMeasuredRetailSpellBaseId()
+		public void NoSendStatDamage_ZeroesTheSpellIdOnAHealthRecord()
 		{
 			var offenders = new List<string>();
 			var checkedCount = 0;
@@ -33,7 +45,9 @@ namespace Faolan.Tests
 						continue;
 
 					checkedCount++;
-					if (call.Contains(nameof(CombatResolver.RetailSpellBaseId), StringComparison.Ordinal))
+					// Every SendStatDamage in the tree is a HEALTH record (it reports `vitals.Health`), so none of them
+					// may state the zero the 0/5/10 measurement licensed.
+					if (!call.Contains(nameof(CombatResolver.RetailSpellBaseId), StringComparison.Ordinal))
 						continue;
 
 					offenders.Add($"{name}: {Collapse(call)}");
@@ -41,10 +55,12 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(offenders.Count == 0,
-				$"Every StatDamageIIR must state retail's own {nameof(CombatResolver.RetailSpellBaseId)} (0), not a spell id the client will happily load:\n  "
+				$"A StatDamageIIR carrying HEALTH must name a real spell base id. {nameof(CombatResolver.RetailSpellBaseId)} (0) is measured for the stat "
+				+ "ids 0/5/10 only; on a health record the client fails to load spell 0 and drops the whole record, so the bar stops moving:\n  "
 				+ string.Join("\n  ", offenders));
-			// Both emitters: the spell-cast hit and the DoT tick. A scan that found neither would pass vacuously.
-			Assert.True(checkedCount >= 2, $"only {checkedCount} SendStatDamage call site(s) found - the scan is probably broken");
+			// The four emitters: the spell-cast hit, the DoT tick, and the NPC's swing and cast. A scan that found
+			// none would pass vacuously.
+			Assert.True(checkedCount >= 4, $"only {checkedCount} SendStatDamage call site(s) found - the scan is probably broken");
 		}
 
 		// The argument list of each `<marker>` call, depth-counted so a nested call's parens do not end it early.
