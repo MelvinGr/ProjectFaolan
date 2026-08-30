@@ -39,8 +39,8 @@ namespace Faolan.GameServer
 {
 	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
 	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
-	public partial class GameServerListener : RpcServer, IEnvironmentOutbound, ISpellEffectOutbound,
-		ISpellweaveOutbound, ITravelOutbound, IApprenticeOutbound, ILevelUpOutbound,
+	public partial class GameServerListener : RpcServer, ISpellEffectOutbound,
+		ISpellweaveOutbound, ITravelOutbound,
 		IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
@@ -168,6 +168,9 @@ namespace Faolan.GameServer
 
 		// #826: the wallet / item-grant wire, and the trade wire on top of it. The five economy services and
 		// TradeService take THESE now, not the listener.
+		private readonly ApprenticeOutbound _apprenticeOutbound;
+		private readonly EnvironmentOutbound _environmentOutbound;
+		private readonly LevelUpOutbound _levelUpOutbound;
 		private readonly EconomyOutbound _economyOutbound;
 		private readonly TradeOutbound _tradeOutbound;
 
@@ -348,17 +351,18 @@ namespace Faolan.GameServer
 				await SendWorldHandoff(client);
 			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
-			_trade = new TradeService(database, logger, _tradeOutbound);
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
 			// #820: built BEFORE the quest rewards, which now pay experience through it. A quest award is a second
 			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
-			_levelUp = new LevelUpService(database, _simulation, this, logger);
+			_levelUpOutbound = new LevelUpOutbound();
+			_levelUp = new LevelUpService(database, _simulation, _levelUpOutbound, logger);
 			// Built BEFORE the quest services, which take it as IEconomyOutbound. The one thing it needs BACK from them
 			// - the post-grant collect-goal tick - is bound below, because that pair is a genuine cycle.
 			_economyOutbound = new EconomyOutbound(Connections, database, logger);
 			_tradeOutbound = new TradeOutbound(Connections, _economyOutbound);
+			_trade = new TradeService(database, logger, _tradeOutbound);
 			_questRewards = new QuestRewardService(database, _broadcaster, _economyOutbound, _levelUp.ApplyXp, logger);
 			_dailyChallenges = new DailyChallengeService(database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
@@ -370,6 +374,7 @@ namespace Faolan.GameServer
 			_poolEffects = new SpellPoolEffects(database, logger);
 			_factions = new FactionService(database, logger, SendFactionStanding);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, _broadcaster, csPlayerAgentDispatcher, configuration.ContentKillStreaks);
+			_levelUpOutbound.BindReseed(_combat.ReseedFromMaxStats);
 			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
 			_spellweave = new SpellweaveService(logger, this);
@@ -377,7 +382,8 @@ namespace Faolan.GameServer
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
 			_questShare = new QuestShareOutbound(Connections, _simulation);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
-			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
+			_apprenticeOutbound = new ApprenticeOutbound(Connections, agentServerDispatcher);
+			_apprentice = new ApprenticeService(_apprenticeOutbound, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, _broadcaster.Bags, _economyOutbound, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
@@ -391,7 +397,8 @@ namespace Faolan.GameServer
 			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
-			_environment = new EnvironmentService(database, this, logger);
+			_environmentOutbound = new EnvironmentOutbound(_buffs, SendDismount);
+			_environment = new EnvironmentService(database, _environmentOutbound, logger);
 			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
 
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the

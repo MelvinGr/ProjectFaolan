@@ -231,7 +231,7 @@ namespace Faolan.GameServer
 		// tools/capture/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
 		// toast itself. (The sibling DispatchForgetSpell 0x200B / RemoveSpecialAbility 0x2053 / UntrainSingleFeat
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
-		private Task SendLearnSpell(INetworkClient client, uint spellId)
+		internal static Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchLearnSpell,
 				LearnSpellCodec.Build(spellId)));

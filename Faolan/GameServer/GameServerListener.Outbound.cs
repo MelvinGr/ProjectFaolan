@@ -663,64 +663,6 @@ namespace Faolan.GameServer
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
 
-		// ---- APPRENTICESHIP (#144) ----
-		//
-		// ⚠️ Un-gated, for the same reason quest sharing's are: no capture performs an apprenticeship, so the ENDPOINT
-		// pair is taken from the neighbouring GameCharInterfaceProject dispatches that ARE observed (SyncCanSprint /
-		// UpdateSprintBar) rather than from an observation of these. The BODIES are the client's own signatures. [V0]
-		async Task<bool> IApprenticeOutbound.SendApprenticeRequest(uint studentId, uint teacherId)
-		{
-			if (ClientForCharacter(studentId) is not { } client)
-				return false;
-
-			await SendApprenticeRpc(client, GameCharInterfaceProjectMethods.DispatchRequestApprentice, RequestApprenticeCodec.Build(teacherId));
-			return true;
-		}
-
-		Task IApprenticeOutbound.SendApprenticeEntry(uint recipientId, uint teacherId, uint studentId, bool added)
-		{
-			return ClientForCharacter(recipientId) is { } client
-				? SendApprenticeRpc(client, added
-					? GameCharInterfaceProjectMethods.DispatchAddApprenticeEntry
-					: GameCharInterfaceProjectMethods.DispatchRemoveApprenticeEntry, ApprenticeEntryCodec.Build(teacherId, studentId))
-				: Task.CompletedTask;
-		}
-
-		Task IApprenticeOutbound.SendApprenticeMode(uint recipientId, bool on)
-		{
-			// The mode flag is on GameCharInterface, not GameCharInterfaceProject - a different interface, so a
-			// different endpoint pair, which is exactly the distinction `WireOpcode` cannot express.
-			return ClientForCharacter(recipientId) is { } client
-				? client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
-					GameCharInterfaceMethods.DispatchApprenticeModeOnOff, ApprenticeModeCodec.Build(on)))
-				: Task.CompletedTask;
-		}
-
-		async Task IApprenticeOutbound.SendApprenticeLevel(uint characterId, uint apprenticeLevel)
-		{
-			if (ClientForCharacter(characterId) is not { } client)
-				return;
-
-			// ApprenticeLevel ALONE - not `SetLevel`, which deliberately writes Level too so the nameplate tracks a GM
-			// `.level` (#472). Here the real level is unchanged and only the mitigation term moves.
-			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ApprenticeLevel, apprenticeLevel), characterId);
-		}
-
-		Task IApprenticeOutbound.SendApprenticeFeedback(uint characterId, string message)
-		{
-			return _agentServerDispatcher.SendSystemMessage(characterId, message);
-		}
-
-		uint? IApprenticeOutbound.LevelOf(uint characterId)
-		{
-			return ClientForCharacter(characterId)?.Session.Character.Level;
-		}
-
-		string? IApprenticeOutbound.NameOf(uint characterId)
-		{
-			return ClientForCharacter(characterId)?.Session.Character.Name;
-		}
-
 		// The level-scaled rating QUAD (#685) - AttackRating / DefenseRating / MagicRating / MagicalResist, four
 		// player-addressed StatIIRs carrying one number, in the wire order the corpus sends them.
 		//
@@ -737,34 +679,12 @@ namespace Faolan.GameServer
 		//
 		// ⚠️ Those are two occasions, not THE rule: bursts arrive every ~10 s in a live capture and most of them
 		// follow neither. [V0: what makes retail re-send the quad] stands - what is settled is the VALUE.
-		private static async Task SendCombatRatings(INetworkClient client)
+		internal static async Task SendCombatRatings(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			var rating = CombatRatingCurve.For(character.Level);
 			foreach (var stat in CombatRatingCurve.Stats)
 				await WorldIir.Send(client, StatCodec.Build(StatIirs.ForCharacter(character.Id, (uint)stat, rating)));
-		}
-
-		// --- ILevelUpOutbound: the wire side of a ding. Explicit forwards to the ops that already existed here, which
-		// is what keeps LevelUpService off the listener itself - see Progression/ILevelUpOutbound.cs.
-		Task<EntityVitals> ILevelUpOutbound.ReseedVitals(INetworkClient client)
-		{
-			return _combat.ReseedFromMaxStats(client);
-		}
-
-		Task ILevelUpOutbound.SendCombatRatings(INetworkClient client)
-		{
-			return SendCombatRatings(client);
-		}
-
-		Task ILevelUpOutbound.AnnounceAbility(INetworkClient client, Ability ability)
-		{
-			return SendAddSpecialAbility(client, ability);
-		}
-
-		Task ILevelUpOutbound.LearnSpell(INetworkClient client, uint spellId)
-		{
-			return SendLearnSpell(client, spellId);
 		}
 
 		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed
@@ -875,9 +795,5 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Rest: '{Name}' began resting for {Ms} ms.", character.Name, RestingChannelMs);
 		}
 
-		private static Task SendApprenticeRpc(INetworkClient client, GameCharInterfaceProjectMethods method, byte[] body)
-		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x54), client.Endpoint(RpcInterfaces.GameCharInterfaceProjectType), method, body));
-		}
 	}
 }
