@@ -27,11 +27,13 @@ namespace Faolan.Core.Network
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
 
-		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
+		// The live connections and the lookups over them (#826). Kept as a field the subclass can hand to a wire
+		// collaborator, so "send to this character" no longer has to be a listener method - see ConnectionRegistry.
+		protected readonly ConnectionRegistry Connections = new ConnectionRegistry();
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
-		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
+		protected IEnumerable<INetworkClient> NetworkClients => Connections.Clients;
 
 		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
 		{
@@ -82,7 +84,7 @@ namespace Faolan.Core.Network
 
 					var networkClient = CreateClient(socket);
 
-					_clients.TryAdd(networkClient, 0);
+					Connections.Add(networkClient);
 					await ClientConnected(networkClient);
 
 					networkClient.Start();
@@ -104,7 +106,7 @@ namespace Faolan.Core.Network
 
 		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
-			return NetworkClients.Select(nc => nc.Session);
+			return Connections.Sessions;
 		}
 
 		protected virtual Task ClientConnected(INetworkClient client)
@@ -129,12 +131,12 @@ namespace Faolan.Core.Network
 
 		protected INetworkClient? ClientForAccount(uint accountId)
 		{
-			return NetworkClients.FirstOrDefault(nc => nc.Session.Account?.Id == accountId);
+			return Connections.ForAccount(accountId);
 		}
 
 		protected INetworkClient? ClientForCharacter(uint characterId)
 		{
-			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
+			return Connections.ForCharacter(characterId);
 		}
 
 		// Build the protocol-specific client for the accepted socket, wired with the shared lifecycle callbacks
@@ -166,7 +168,7 @@ namespace Faolan.Core.Network
 		{
 			try
 			{
-				_clients.TryRemove(client, out _);
+				Connections.Remove(client);
 				await ClientDisconnected(client);
 			}
 			catch (Exception ex)

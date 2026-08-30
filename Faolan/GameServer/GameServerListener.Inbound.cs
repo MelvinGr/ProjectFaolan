@@ -27,6 +27,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Quest;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -1173,7 +1174,7 @@ namespace Faolan.GameServer
 				// so that is always our answer too - replayed byte-exact rather than left silent.
 				case GameCharAgentMethods.RequestTeamQuestList:
 				{
-					await SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchCancelTeamQuestList,
+					await QuestShareOutbound.SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchCancelTeamQuestList,
 						CancelTeamQuestListCodec.Build(CancelTeamQuestListCodec.RetailNoList));
 
 					break;

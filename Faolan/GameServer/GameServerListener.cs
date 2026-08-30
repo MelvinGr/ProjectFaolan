@@ -40,7 +40,7 @@ namespace Faolan.GameServer
 	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
 	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
 	public partial class GameServerListener : RpcServer, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
-		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, ILevelUpOutbound,
+		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IApprenticeOutbound, ILevelUpOutbound,
 		IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
@@ -161,6 +161,10 @@ namespace Faolan.GameServer
 
 		// #826: everything the world tick sends or triggers. Was 42 explicit IWorldOutbound members on this class.
 		private readonly WorldOutbound _worldOutbound;
+
+		// #826: the quest-share wire, off this class and onto the ConnectionRegistry seam. Also the single owner of
+		// the live-character view - GetCharacterLiveState below forwards here.
+		private readonly QuestShareOutbound _questShare;
 
 		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
 		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
@@ -361,7 +365,8 @@ namespace Faolan.GameServer
 			_spellweave = new SpellweaveService(logger, this);
 			_travel = new TravelService(database, this, logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
-			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
+			_questShare = new QuestShareOutbound(Connections, _simulation);
+			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, _broadcaster.Bags, this, database, _questProgression, agentServerDispatcher, logger);
@@ -405,18 +410,11 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		// IGameServerProvider (the MCP session tool). One implementation, on QuestShareOutbound - this used to be a
+		// second copy of the same world-model walk.
 		public CharacterLiveState? GetCharacterLiveState(uint characterId)
 		{
-			var client = ClientForCharacter(characterId);
-			var entity = client == null
-				? null
-				: _simulation.PlayerWorldEntity(client);
-			if (entity == null)
-				return null;
-
-			var buffs = entity.ActiveBuffs.Keys.OrderBy(id => id).Select(id => $"0x{id:X8}").ToArray();
-			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, _simulation.World.ZoneForEntity(entity).PlayfieldToken, entity.Position.X,
-				entity.Position.Y, entity.Position.Z, entity.Vitals?.Health, entity.Vitals?.MaxHealth, buffs);
+			return _questShare.LiveStateOf(characterId);
 		}
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)

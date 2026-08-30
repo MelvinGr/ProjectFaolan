@@ -329,50 +329,6 @@ namespace Faolan.GameServer
 				: null;
 		}
 
-		// --- IQuestShareOutbound: the wire + world side of a quest share (#101). Same shape as the trade port, and for
-		// the same reason - a share always spans two connections, so every op is addressed by character id. -----------
-		async Task<bool> IQuestShareOutbound.SendQuestShareRequest(uint recipientId, uint sharerId, uint questId, string questName)
-		{
-			if (ClientForCharacter(recipientId) is not { } client)
-				return false;
-
-			await SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchQuestShareRequest, QuestShareRequestCodec.Build(sharerId, questId, questName));
-			return true;
-		}
-
-		Task IQuestShareOutbound.SendQuestShareGlobalFeedback(uint recipientId, QuestShareFeedback type, uint value)
-		{
-			return ClientForCharacter(recipientId) is { } client
-				? SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchQuestShareGlobalFeedback, QuestShareGlobalFeedbackCodec.Build(type, value))
-				: Task.CompletedTask;
-		}
-
-		Task IQuestShareOutbound.SendQuestShareIndividualFeedback(uint recipientId, QuestShareFeedback type, string playerName)
-		{
-			return ClientForCharacter(recipientId) is { } client
-				? SendQuestShareRpc(client, GameCharInterfaceMethods.DispatchQuestShareIndividualFeedback, QuestShareIndividualFeedbackCodec.Build(type, playerName))
-				: Task.CompletedTask;
-		}
-
-		INetworkClient? IQuestShareOutbound.ClientFor(uint characterId)
-		{
-			return ClientForCharacter(characterId);
-		}
-
-		CharacterLiveState? IQuestShareOutbound.LiveStateOf(uint characterId)
-		{
-			return GetCharacterLiveState(characterId);
-		}
-
-		// The share dispatches ride the same GameCharAgent -> GameCharInterface pair the trade ones do, from the same
-		// sender instance. ⚠️ Un-gated: no capture performs a share, so the endpoint is the trade set's by analogy, not
-		// by observation - and a wrong sender is exactly the failure that cost the team invite window (#101's team
-		// third), which looks like a wrong body and is not one. [V0]
-		private static Task SendQuestShareRpc(INetworkClient client, GameCharInterfaceMethods method, byte[] body)
-		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType), method, body));
-		}
-
 		// One place the trade replies are addressed from, so the endpoints cannot drift between them. Silently no-ops for
 		// a character who is not connected here - a partner who vanished mid-trade is TradeService's problem, not the
 		// wire's.
