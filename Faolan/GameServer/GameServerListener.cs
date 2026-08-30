@@ -303,10 +303,21 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts = null!;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
-			: base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
+		// The port and the log category both come off the injected `HostRealm` (#324), which is what lets this be a
+		// plain AddHostedService<T>() rather than a factory lambda in Program.cs.
+		//
+		// ⚠️ It takes an ILoggerFactory rather than an ILogger because the category is REALM-TAGGED
+		// ("...GameServerListener-<realmId>") - every one of the ~48 composed services below is handed this same
+		// logger, so a multi-realm deployment can tell two realms' lines apart in one log. The alternative,
+		// registering a bare `ILogger` singleton in the container, would silently hand that realm-tagged category to
+		// any OTHER type that ever asks for a non-generic ILogger.
+		public GameServerListener(ILoggerFactory loggerFactory, IConfiguration configuration, IDatabaseRepository database, HostRealm realm,
+			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
+			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)))
 		{
+			// The base ctor has run, so `Logger` is the realm-tagged logger built above; every `logger` below is it.
+			var logger = Logger;
+
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
@@ -360,6 +371,14 @@ namespace Faolan.GameServer
 			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
 
 			InitGmCommands();
+		}
+
+		// The realm-tagged log category, resolved twice in the base initializer above (once for the listener, once for
+		// its packet tracer) - which costs nothing, because ILoggerFactory caches by category name and both calls
+		// therefore return the same ILogger instance.
+		private static ILogger RealmLogger(ILoggerFactory loggerFactory, HostRealm realm)
+		{
+			return loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}");
 		}
 
 		public bool DisconnectCharacter(uint characterId)

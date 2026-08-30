@@ -21,11 +21,11 @@ namespace Faolan
 		private readonly IRealmRepository _database;
 		private readonly uint _realmId;
 
-		public RealmStatusService(IRealmRepository database, ILogger<RealmStatusService> logger, uint realmId)
+		public RealmStatusService(IRealmRepository database, ILogger<RealmStatusService> logger, HostRealm realm)
 		{
 			_database = database;
 			_logger = logger;
-			_realmId = realmId;
+			_realmId = realm.Id;
 		}
 
 		public async Task StartAsync(CancellationToken cancellationToken)

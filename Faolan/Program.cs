@@ -8,7 +8,6 @@ using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
-using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Helpers;
 using Faolan.Core.Network.Logging;
@@ -156,20 +155,25 @@ namespace Faolan
 
 			if (runRealm)
 			{
-				// The realm-local listeners bind THIS realm's ports straight from its Realm row (single source of truth,
-				// #324) - factory-registered so the port is injected, not read from global config.
+				// The realm THIS process hosts, as an immutable snapshot of the Realm row resolved above (single source
+				// of truth for the realm-local service ports, #324). Registering it is what lets every realm-tier
+				// service below be a plain AddHostedService<T>(): the port arrives by INJECTION rather than through a
+				// factory lambda that reaches into the closed-over `hostRealm`.
+				builder.Services.AddSingleton(new HostRealm(hostRealm!.Id, hostRealm.Name, hostRealm.Port, hostRealm.ChatServerPort, hostRealm.CsPlayerAgentPort));
+
+				// ⚠️ Registration ORDER is load-bearing and the four AddHostedService lines below must keep it:
+				// HostOptions.ServicesStartConcurrently is false, so StartAsync is awaited in registration order. That
+				// is what starts RealmStatusService last (Online = the host is up) and, since hosted services stop in
+				// REVERSE order, flips the realm Offline first as shutdown begins (#324).
+
 				// Seam into the CS listener: it owns the team roster, and LeaveTeam/KickFromTeam arrive on the world
 				// connection, so the world listener routes them through here (as it does chat and world actions).
 				builder.Services.AddSingleton<ICsPlayerAgentDispatcher, CsPlayerAgentDispatcher>();
-				builder.Services.AddHostedService(provider => new CsPlayerAgentListener(hostRealm!.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
-					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>(),
-					provider.GetRequiredService<ICsPlayerAgentDispatcher>(), provider.GetRequiredService<IChatServerDispatcher>()));
+				builder.Services.AddHostedService<CsPlayerAgentListener>();
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
-				builder.Services.AddHostedService(provider => new ChatServerListener(hostRealm!.ChatServerPort, provider.GetRequiredService<ILogger<ChatServerListener>>(),
-					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IChatServerDispatcher>(),
-					provider.GetRequiredService<IGameServerDispatcher>(), provider.GetRequiredService<ClaudeChannel>()));
+				builder.Services.AddHostedService<ChatServerListener>();
 
 				// Live seam into the GameServer listener: aggregates world sessions and routes
 				// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
@@ -182,22 +186,13 @@ namespace Faolan
 				if (runMcp)
 					builder.Services.AddFaolanMcp();
 
-				builder.Services.AddHostedService(provider =>
-				{
-					var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-					var configuration = provider.GetRequiredService<IConfiguration>();
-					var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
-					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
-					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
-
-					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm!.Id}"), configuration, dataRepository, hostRealm!,
-						agentServerDispatcher, gameServerDispatcher, provider.GetRequiredService<ICsPlayerAgentDispatcher>());
-				});
+				// Its realm-tagged log category ("...GameServerListener-<realmId>") is built inside the listener from the
+				// injected HostRealm - see its ctor for why that is an ILoggerFactory rather than an ILogger.
+				builder.Services.AddHostedService<GameServerListener>();
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
 				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).
-				builder.Services.AddHostedService(provider =>
-					new RealmStatusService(provider.GetRequiredService<IRealmRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm!.Id));
+				builder.Services.AddHostedService<RealmStatusService>();
 			}
 
 			// One host. When MCP runs, the builder is a WebApplication - map the endpoint onto its Kestrel and run it;

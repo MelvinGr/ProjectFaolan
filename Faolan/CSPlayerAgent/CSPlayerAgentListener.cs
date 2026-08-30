@@ -57,10 +57,11 @@ namespace Faolan.CSPlayerAgent
 		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
-		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
-		// realm-local service ports, #324), passed in at registration rather than read from global config.
-		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
-			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher chatServerDispatcher) : base(port, logger, configuration, database,
+		// The port is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
+		// realm-local service ports, #324), taken by INJECTION rather than read from global config: `HostRealm` is a
+		// singleton the pre-host bootstrap registers, which is what lets this be a plain AddHostedService<T>().
+		public CsPlayerAgentListener(HostRealm realm, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher chatServerDispatcher) : base(realm.CsPlayerAgentPort, logger, configuration, database,
 			new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;

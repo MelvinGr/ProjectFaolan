@@ -31,10 +31,11 @@ namespace Faolan.ChatServer
 		private readonly IChatServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// `port` is the hosting realm's ChatServerPort (from its Realm row - the single source of truth for the
-		// realm-local service ports, #324), passed in at registration rather than read from global config.
-		public ChatServerListener(ushort port, ILogger<ChatServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IChatServerDispatcher dispatcher,
-			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(port, logger, configuration, database, new ChatPacketTracer(logger))
+		// The port is the hosting realm's ChatServerPort (from its Realm row - the single source of truth for the
+		// realm-local service ports, #324), taken by INJECTION rather than read from global config: `HostRealm` is a
+		// singleton the pre-host bootstrap registers, which is what lets this be a plain AddHostedService<T>().
+		public ChatServerListener(HostRealm realm, ILogger<ChatServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IChatServerDispatcher dispatcher,
+			IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(realm.ChatServerPort, logger, configuration, database, new ChatPacketTracer(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
