@@ -64,7 +64,7 @@ Consequences worth knowing:
   +100 Knockback Resistance, `Phoenix Cloak`'s +40/+50 Damage Deflection, and the −20 Chance of Being Staggered
   every horse's `Mounted` buff carries, which the client draws in its own buff tooltip while the number went
   nowhere. All three are honored now. Knockback Resistance is the one with a live consumer
-  (`WorldBroadcaster.Knock` reads it off `BuffedStats`), so a resisting BUFF now resists where only a resisting ITEM
+  (`KnockbackService.Knock` reads it off `BuffedStats`), so a resisting BUFF now resists where only a resisting ITEM
   did before; the other two are sheet-only, because nothing server-side reads them — there is no stagger
   mechanic at all (Gitea #699).
 

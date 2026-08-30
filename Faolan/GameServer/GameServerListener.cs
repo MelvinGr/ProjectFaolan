@@ -268,6 +268,10 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// Knockback: resolve the shove, apply retail's immunity buff, put the displacement on the wire.
+		// See Combat/KnockbackService.cs.
+		private readonly KnockbackService _knockback;
+
 		// The loot LIFECYCLE's wire side - a corpse's drop, the bag's open/close/fade - and what is IN each bag.
 		// See World/LootBroadcaster.cs.
 		private readonly LootBroadcaster _lootBroadcaster;
@@ -417,9 +421,9 @@ namespace Faolan.GameServer
 			_buffs = new BuffService(database, _simulation, _broadcaster, _spellAreas, _poolEffects, _buffStats, logger);
 			_pets = new PetService(database, _simulation, _npcs, logger);
 			_spellEffectOutbound = new SpellEffectOutbound(_buffs, _pets);
-			// The knockback-immunity self-buff the broadcaster applies: bound rather than a ctor arg, because the
-			// broadcaster is built far above (half the graph takes it) and the port that answers it is built here.
-			_broadcaster.BindApplySelfBuff((c, id) => _spellEffectOutbound.ApplySelfBuff(c, id));
+			// The knockback used to reach this port through a BOUND seam on the broadcaster, because the broadcaster is
+			// built far above it. Its own class is built HERE, after the port, so it is an ordinary ctor argument.
+			_knockback = new KnockbackService(_simulation, _spellEffectOutbound, logger);
 			_spellEffects = new SpellEffectService(database, _spellEffectOutbound, logger);
 			_fatality = new FatalityService(logger, _spellEffectOutbound, _spellEffects);
 			_factions = new FactionService(database, logger, SendFactionStanding);
@@ -449,7 +453,7 @@ namespace Faolan.GameServer
 			_skillPoints = new SkillPointService(database, logger);
 			_environmentOutbound = new EnvironmentOutbound(_buffs, SendDismount);
 			_environment = new EnvironmentService(database, _environmentOutbound, logger);
-			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
+			_comboFinisher = new ComboFinisher(_simulation, _knockback, _combat, _buffs, _combos, _spellModifiers, logger);
 
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
 			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the

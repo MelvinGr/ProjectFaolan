@@ -172,8 +172,13 @@ listener-scoped need was `ClientForCharacter`, which `ConnectionRegistry` alread
 single call (`GetOrAddPlayerVitals`), closing `SpellEffectOutbound → BuffService → CombatService →
 FatalityService → SpellEffectOutbound`. That call reads nothing but the world model, so it moved to
 `WorldSimulation` and the cycle went with it. A cycle that survives *is* resolved by a single-op **bound** seam
-(`WorldBroadcaster.BindApplySelfBuff`, `EconomyOutbound.BindCollectGoals`, `LevelUpOutbound.BindReseed`,
-`WorldSimulation.Start(token, output)`) — never a lazy `Func<>` closing over a not-yet-assigned field.
+(`EconomyOutbound.BindCollectGoals`, `LevelUpOutbound.BindReseed`, `WorldSimulation.Start(token, output)`) —
+never a lazy `Func<>` closing over a not-yet-assigned field.
+
+⭐ **But look for the move first: the cycle is usually between the CLASS the op sits in and its answer, not
+between the op and its answer.** `WorldBroadcaster.BindApplySelfBuff` existed only because the knockback lived on
+the broadcaster, which is built far above `SpellEffectOutbound`. Moving the knockback to its own class built
+*after* the port turned the seam into an ordinary ctor argument and deleted the cycle outright.
 
 ⚠️ Two shapes to know when moving a port, because **the compiler and the test suite catch neither**:
 - `((IFoo)this)` still COMPILES after `IFoo` leaves a non-sealed class, and throws `InvalidCastException` at

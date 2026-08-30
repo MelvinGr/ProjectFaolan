@@ -1047,7 +1047,7 @@ namespace Faolan.GameServer
 				source = entity.Position - facing;
 			}
 
-			if (await _broadcaster.Knock(entity, source, distance))
+			if (await _knockback.Knock(entity, source, distance))
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"Knocked back {distance:F2} units.");
 			else
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", "Not displaced (no direction to push along, or fully resisted)."));

@@ -88,15 +88,6 @@ namespace Faolan.GameServer.World
 		// (IWorldOutbound / IQuestOutbound), so the signature has to stay on us even though the work does not.
 		private readonly EncounterService _encounters;
 
-		// The ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) - one
-		// shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
-		// knockback uses it (retail applies "Knockback immunity" in the same batch as the displacement).
-		//
-		// BOUND rather than injected, because it is a genuine cycle: what answers it is SpellEffectOutbound, which
-		// reaches BuffService, which takes THIS class. Null until bound - and null-safe, which is also what lets a
-		// test construct the broadcaster without it.
-		private Func<INetworkClient, uint, Task>? _applySelfBuff;
-
 		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, TortageIntroService tortageIntro, ComboService combos,
 			QuestMarkerResolver questMarkers, QuestBroadcaster quests, RuntimeHandleAllocator handles, AmbientPoolService ambient)
 		{
@@ -111,15 +102,6 @@ namespace Faolan.GameServer.World
 			_quests = quests;
 			_zones = new ZonePopulationLoader(sim, database, combos, _ambient, logger);
 			_encounters = new EncounterService(sim, database, _handles, combos, BroadcastEntityDespawn, logger);
-		}
-
-		/// <summary>
-		///     Binds the self-buff op (see <see cref="_applySelfBuff" />). Called once, from the GameServer ctor, as
-		///     soon as the port that answers it exists.
-		/// </summary>
-		public void BindApplySelfBuff(Func<INetworkClient, uint, Task> applySelfBuff)
-		{
-			_applySelfBuff = applySelfBuff;
 		}
 
 		// #261: re-evaluate quest-gated NPC visibility for one player after their quest state changed (accept / advance /
@@ -408,110 +390,6 @@ namespace Faolan.GameServer.World
 			}
 
 			await DispatchInterest(events, moveBody, client, entity);
-		}
-
-		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
-		// other player who can already see the caster, so the effect renders on their clients too. This is the EFFECT
-		// analogue of BroadcastBehaviorToViewers, which relays only the cast GESTURE (the BCC animation): retail streams
-		// BOTH to nearby observers. `body` is the same ApplySpell carrier the caster's own client receives - it already
-		// carries the acting player's handle as applyFrom (and, for a self-buff, applyTo); retail relays that exact body
-		// to nearby players, only the frame receiver differs. Ground truth: the other-players-visible capture
-		// (Hoxxling ...other_playersvisible) shows s2c ApplySpell (0x6B87E316) for other-player handles 0x1316xxx framed
-		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
-		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
-		// client hasn't built). No-op solo / when the caster is unseen.
-		// Knockback (#496): shove a PLAYER from where they stand to `to`, and make everyone who can see them watch it.
-		//
-		// KNOCKBACK (#496): the server shoving an entity along a segment it did not walk. Decides WHERE the victim
-		// lands, then hands the pair of records below the job of saying so.
-		//
-		// The wire form is decoded and byte-exact; the GAMEPLAY around it is not, and the split is worth keeping in
-		// mind: the whole corpus has exactly ONE knockback, so distance, direction and how KnockbackResistance scales
-		// it are a single measurement plus a reasonable shape (see Knockback). Nothing here should be quoted as
-		// retail-confirmed except the packets it sends.
-		//
-		// ⚠️ Until #139's combo finisher wired it, nothing TRIGGERED this - a GM command was its only caller. The
-		// captured knockback came from an NPC ability, but the ApplySpell in that batch is the "Knockback immunity"
-		// guard rather than the knocking ability, so the corpus still does not say WHICH NPC abilities knock back;
-		// guessing would put a shove on attacks that never had one.
-		//
-		// Returns false when the geometry is degenerate (source and victim on the same spot) or the victim resists it
-		// outright.
-		public async Task<bool> Knock(WorldEntity victim, Vector3 source, float distance = Knockback.DefaultDistance)
-		{
-			// Read the victim's own resistance rather than assuming none - the stat exists (0x040D) and this is the
-			// one place that consults it. It is normally absent, in which case ResistanceScale returns 1.
-			var resistance = victim.BuffedStats.GetValueOrDefault(CharacterStatId.KnockbackResistance,
-				(uint)victim.GearBonuses.GetValueOrDefault(CharacterStatId.KnockbackResistance));
-
-			var to = Knockback.Resolve(source, victim.Position, distance, resistance);
-			if (to == victim.Position)
-			{
-				_logger.LogInformation("Knockback: {Victim} not displaced (resistance {Resistance}, source {Source} vs position {Pos}).", victim.Name, resistance, source, victim.Position);
-				return false;
-			}
-
-			// Ground-snap so the shove follows the terrain instead of leaving the victim at their old altitude - the
-			// difference between being pushed down a slope and being pushed into the air above it. Degrades to the
-			// unsnapped point when no terrain is loaded for the map, which is the documented no-terrain behaviour
-			// rather than a silent failure.
-			var ground = _sim.Terrain?.GroundHeight(victim.MapId, to.X, to.Z);
-			if (ground is { } y)
-				to = to with { Y = y };
-			else if (_sim.Terrain is { Available: true })
-				_logger.LogDebug("Knockback: no ground height at ({X:F1}, {Z:F1}) on map {Map}; leaving the destination unsnapped.", to.X, to.Z, victim.MapId);
-
-			// Retail applies "Knockback immunity" to the victim in the same batch as the displacement. Sent before the
-			// move so a client that acts on it has it in hand when the shove lands.
-			if (victim.Client != null && _applySelfBuff != null)
-				await _applySelfBuff(victim.Client, Knockback.ImmunitySpellId << 8);
-
-			await BroadcastKnockback(victim, to);
-			return true;
-		}
-
-		// Two records, in retail's own order (the annotated dungeon capture, 18:49:54.284 -> 18:49:56.020):
-		//   1. the forced-move MoveTask (mode 0x05) carrying from -> to, which is what the client ANIMATES;
-		//   2. a SetPos pinning the destination ~1.7 s later, which is what makes it authoritative.
-		//
-		// Both go to the victim AND to nearby viewers - the victim's client plays the shove, and a viewer who only got
-		// the SetPos would see the other player teleport. The model position is advanced first so interest, aggro and
-		// the next move all agree with where the player now is; skipping that is how a displaced player ends up
-		// invisible to the NPCs still chasing their old position.
-		//
-		// ⚠️ The caller is expected to have ground-snapped `to`. This does NOT clamp it: a knockback is allowed to put
-		// a player somewhere they could not have walked (off a ledge - which then costs them fall damage, #495), and
-		// clamping here would quietly cancel that.
-		public async Task BroadcastKnockback(WorldEntity victim, Vector3 to)
-		{
-			var from = victim.Position;
-			var move = MoveTaskCodec.Build(new MoveTaskIIR(victim.Handle, from, MoveTaskNodes.ForcedMove(to, from)));
-			var pin = SetPosCodec.Build(victim.Handle, to, default, 0x01);
-
-			victim.Position = to;
-
-			if (victim.Client != null)
-			{
-				await WorldIir.Send(victim.Client, move);
-				await WorldIir.Send(victim.Client, pin);
-			}
-
-			var zone = _sim.World.ZoneForEntity(victim);
-			if (zone == null)
-				return;
-
-			foreach (var viewer in zone.Entities)
-			{
-				if (!viewer.IsPlayer || viewer.Handle == victim.Handle || viewer.Client == null)
-					continue;
-				if (!viewer.Known.Contains(victim.Handle))
-					continue; // only players whose client already holds the victim's handle
-
-				await WorldIir.Send(viewer.Client, move);
-				await WorldIir.Send(viewer.Client, pin);
-			}
-
-			_logger.LogInformation("Knockback: {Victim} shoved {Distance:F2} units from {From} to {To}.", victim.Name, Vector3.Distance(from, to), from, to);
 		}
 
 		public async Task BroadcastSpellToViewers(INetworkClient caster, byte[] body)

@@ -328,7 +328,7 @@ claim entirely:
 | `129` | **Spell Critical Damage** | `SpellCriticalModifier` |
 
 ⭐ **`1037` is the case that settles which source wins.** `CharacterStatId.KnockbackResistance` is live code —
-`WorldBroadcaster.Knock` reads it and `BuffStatEffects` honours it — and 615 names it *Knockback Resistance* in all
+`KnockbackService.Knock` reads it and `BuffStatEffects` honours it — and 615 names it *Knockback Resistance* in all
 seven languages while this table says `Weight`. Renaming toward the internal name would have been a regression,
 and `147` (*Spell Critical Chance* vs `MaxSneak`) shows the internal list can be flatly wrong about a field's
 identity rather than merely terser.
