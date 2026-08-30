@@ -25,13 +25,22 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Turns world-model events into wire packets: spawns/moves/despawns for interest management, NPC respawn/loot/mount
-	// renders, loot-window and quest-journal packets (Gitea #404). Extracted out of the
-	// GameServer listener so packet CONSTRUCTION for world events is its own collaborator; it reads the world model via
-	// the WorldSimulation, loads templates from the DB, and frames every packet on the world conversation (WorldSenderEndpoint:
-	// sender = world-system 0x58, receiver = the recipient's GameInterfaceType endpoint). The FA015807 body carries the
-	// SUBJECT's handle (unchanged), so the recipient renders the subject as a separate entity. NEEDS IN-CLIENT
-	// VERIFICATION with two connected players. Single-player is a no-op (no interest events).
+	// WHO CAN SEE WHAT, and the wire that follows from it (#826). The interest pass decides which entities and world
+	// objects each player currently holds; this class is what turns that decision into packets - the spawn, the
+	// despawn, the move relay, the entry bursts - plus the "relay this record to everyone watching X" family that
+	// every other broadcaster is built on.
+	//
+	// It reads the world model through `WorldSimulation`, loads templates from the DB, and frames every packet on the
+	// world conversation (`GameServerListener.WorldSenderEndpoint`: sender = world-system 0x58, receiver = the
+	// recipient's GameInterfaceType endpoint). The FA015807 body carries the SUBJECT's handle unchanged, so the
+	// recipient renders the subject as a separate entity.
+	//
+	// ⚠️ It used to be all of the world's wire at once - 2523 lines, 81 members. What it is NOT any more, and must not
+	// grow back into: what an NPC does (`NpcBroadcaster`), the loot lifecycle (`LootBroadcaster`), interacting with a
+	// world object (`WorldObjectService`), the quest journal and its markers (`QuestBroadcaster`), and the knockback
+	// (`Combat/KnockbackService`). Each was cut on the same rule - a different QUESTION, and a ONE-WAY dependency:
+	// they call in here for a spawn or a despawn, nothing here calls out to them. The one exception is deliberate and
+	// is `QuestBroadcaster.SendQuestMarkerIfGiver`, which a streamed-in NPC needs.
 	public sealed class WorldBroadcaster
 	{
 
@@ -39,9 +48,6 @@ namespace Faolan.GameServer.World
 		// to time the re-issue cadence AND advance the model, and having two copies is how they drifted - the comment
 		// here still claimed "NpcMoveSpeed (12) is the RUN speed" long after NpcMoveSpeed became 7. It is also no longer
 		// an estimate: it is measured off retail's own patrollers, see #714.)
-
-		// How far a seated player must move from their seat before they stand up. While seated the client keeps
-		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
 
 		// Dev visualization (#363): when true, an NPC that resolves to an RDB spawn AREA has that area's label pushed as
 		// its overhead nameplate (via SetNameIIR after spawn) so a manual creature-labeling pass sees which area it's in.
@@ -52,7 +58,6 @@ namespace Faolan.GameServer.World
 		// GM's debug nameplates following the other realm's players around. Nothing outside this class touches it.
 		private bool _debugAreaLabels;
 
-		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
