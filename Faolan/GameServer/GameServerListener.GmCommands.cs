@@ -456,7 +456,7 @@ namespace Faolan.GameServer
 
 			if (targetHandle == selfHandle)
 			{
-				var vitals = _combat.GetOrAddPlayerVitals(client);
+				var vitals = _simulation.GetOrAddPlayerVitals(client);
 				vitals.Health = 0; // the world tick detects the death and respawns at the nearest resurrection point
 				await SendStatUpdate(client, vitals.ToVitalsBlock(), selfHandle);
 				await _agentServerDispatcher.SendSystemMessage(characterId, "You kill yourself.");
@@ -485,7 +485,7 @@ namespace Faolan.GameServer
 			// Only ever LOWER a pool. This used to SET each one to `percent` of max, which topped UP anything already
 			// below that - .hurt 50 on a character sitting at 0/74 mana handed it 37 mana. Min() keeps it a damage
 			// command whatever state the pools are in.
-			var vitals = _combat.GetOrAddPlayerVitals(client);
+			var vitals = _simulation.GetOrAddPlayerVitals(client);
 			vitals.Health = Math.Max(1, Math.Min(vitals.Health, vitals.MaxHealth * percent / 100));
 			vitals.Mana = Math.Min(vitals.Mana, vitals.MaxMana * percent / 100);
 			vitals.Stamina = Math.Min(vitals.Stamina, vitals.MaxStamina * percent / 100);

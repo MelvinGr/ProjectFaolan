@@ -48,7 +48,6 @@ namespace Faolan.GameServer.Combat
 
 		// The player's live vitals, for the INSTANT pool move a landing spell carries (#702). The world model owns
 		// them; CombatService is their accessor.
-		private readonly CombatService _combat;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
@@ -59,13 +58,12 @@ namespace Faolan.GameServer.Combat
 		private readonly SpellAreaCatalog _spellAreas;
 		private readonly WorldSimulation _sim;
 
-		public BuffService(IDatabaseRepository database, WorldSimulation sim, WorldBroadcaster broadcaster, CombatService combat,
+		public BuffService(IDatabaseRepository database, WorldSimulation sim, WorldBroadcaster broadcaster,
 			SpellAreaCatalog spellAreas, SpellPoolEffects poolEffects, BuffStatEffects buffStats, ILogger logger)
 		{
 			_database = database;
 			_sim = sim;
 			_broadcaster = broadcaster;
-			_combat = combat;
 			_spellAreas = spellAreas;
 			_poolEffects = poolEffects;
 			_buffStats = buffStats;
@@ -207,7 +205,7 @@ namespace Faolan.GameServer.Combat
 			if (effects.Count == 0)
 				return;
 
-			var vitals = _combat.GetOrAddPlayerVitals(client);
+			var vitals = _sim.GetOrAddPlayerVitals(client);
 			var moved = false;
 			foreach (var effect in effects)
 			{

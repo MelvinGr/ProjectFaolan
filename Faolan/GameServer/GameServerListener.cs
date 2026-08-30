@@ -37,9 +37,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
-	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
-	public partial class GameServerListener : RpcServer, ISpellEffectOutbound, IGameServerProvider
+	// NOTE: this class implements NO outbound port any more (#826). Every one of them was a facade over the composed
+	// services - WorldOutbound, EconomyOutbound, TradeOutbound, QuestShareOutbound, ApprenticeOutbound, LevelUpOutbound,
+	// EnvironmentOutbound, TravelOutbound, SpellweaveOutbound and SpellEffectOutbound are all their own classes, built
+	// in the ctor below and handed to the services that need them. It takes no `this` pass either.
+	public partial class GameServerListener : RpcServer, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -271,6 +273,10 @@ namespace Faolan.GameServer
 		// arrives on a NEW connection. See World/TeleportService.cs.
 		private readonly TeleportService _teleport;
 
+		// The three wire ops a SpellEffect row needs (#439), one forward each to the buff registry and the pet
+		// lifecycle. See Combat/SpellEffectOutbound.cs.
+		private readonly SpellEffectOutbound _spellEffectOutbound;
+
 		// A player's summoned PET (#307): summon, the timed variant's extend-or-summon, and the pet bar's dismiss.
 		// Reached from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler. See
 		// Combat/PetService.cs.
@@ -334,7 +340,7 @@ namespace Faolan.GameServer
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos);
 			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
 			// which reaches the same enter-world handoff pair through it.
 			_teleport = new TeleportService(Connections, database, _broadcaster, agentServerDispatcher, logger);
@@ -356,18 +362,27 @@ namespace Faolan.GameServer
 			_dailyChallenges = new DailyChallengeService(database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
 			_economyOutbound.BindCollectGoals(_questProgression.AdvanceCollectGoals);
-			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellModifiers = new SpellModifierService(database);
-			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_poolEffects = new SpellPoolEffects(database, logger);
+			// The buffs / pets / spell-effect trio, ABOVE combat now. That is the ordering change #826's last port
+			// bought: BuffService used to take CombatService for one call (GetOrAddPlayerVitals, which reads nothing
+			// but the world model and has moved to WorldSimulation), and that single edge closed the cycle
+			// SpellEffectOutbound -> BuffService -> CombatService -> FatalityService -> SpellEffectOutbound which is
+			// why the listener implemented ISpellEffectOutbound at all.
+			_buffs = new BuffService(database, _simulation, _broadcaster, _spellAreas, _poolEffects, _buffStats, logger);
+			_pets = new PetService(database, _simulation, _broadcaster, logger);
+			_spellEffectOutbound = new SpellEffectOutbound(_buffs, _pets);
+			// The knockback-immunity self-buff the broadcaster applies: bound rather than a ctor arg, because the
+			// broadcaster is built far above (half the graph takes it) and the port that answers it is built here.
+			_broadcaster.BindApplySelfBuff((c, id) => _spellEffectOutbound.ApplySelfBuff(c, id));
+			_spellEffects = new SpellEffectService(database, _spellEffectOutbound, logger);
+			_fatality = new FatalityService(logger, _spellEffectOutbound, _spellEffects);
 			_factions = new FactionService(database, logger, SendFactionStanding);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, _broadcaster, csPlayerAgentDispatcher, configuration.ContentKillStreaks);
 			_levelUpOutbound.BindReseed(_combat.ReseedFromMaxStats);
-			_buffs = new BuffService(database, _simulation, _broadcaster, _combat, _spellAreas, _poolEffects, _buffStats, logger);
 			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
 			_energy = new EnergyService(_buffs, logger);
-			_pets = new PetService(database, _simulation, _broadcaster, logger);
 			_spellweave = new SpellweaveService(logger, new SpellweaveOutbound(_simulation, _energy, _buffs, agentServerDispatcher));
 			_travel = new TravelService(database, new TravelOutbound(agentServerDispatcher, _economyOutbound, _teleport, _simulation), logger);
 			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);

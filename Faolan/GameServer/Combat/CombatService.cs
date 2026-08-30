@@ -141,19 +141,6 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
-		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
-		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
-		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
-		// regen happens then, so this is just defensive).
-		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
-		{
-			var entity = _sim.PlayerWorldEntity(client);
-			if (entity == null)
-				return EntityVitals.FromCharacter(client.Session.Character);
-
-			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
-		}
-
 		/// <summary>
 		///     Reseeds the LIVE entity's three pools (max and current) for a character whose max has just changed, and
 		///     hands the vitals back so the caller can push them.
@@ -179,7 +166,7 @@ namespace Faolan.GameServer.Combat
 			var statBonuses = await CharacterStatBonuses.For(_database, character);
 			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
 			var seeded = EntityVitals.FromCharacter(character, statBonuses, classBase);
-			var vitals = GetOrAddPlayerVitals(client);
+			var vitals = _sim.GetOrAddPlayerVitals(client);
 
 			vitals.ReseedMaxFrom(seeded);
 			return vitals;
@@ -364,7 +351,7 @@ namespace Faolan.GameServer.Combat
 			await ApplyMeleeCleave(client, instance, targetHandle, damage);
 
 			// 3) EnergyIIR - the player's stamina after the swing.
-			var player = GetOrAddPlayerVitals(client);
+			var player = _sim.GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, EnergyCodec.Build(instance, player.Stamina));
 
 			return true;
@@ -408,7 +395,7 @@ namespace Faolan.GameServer.Combat
 		// of the pool (#629). No-op if the player has no mana pool, or if the spell costs nothing.
 		public async Task SpendCasterMana(INetworkClient client, uint spellId, SpellModifiers? modifiers = null)
 		{
-			var player = GetOrAddPlayerVitals(client);
+			var player = _sim.GetOrAddPlayerVitals(client);
 			if (player.MaxMana == 0)
 				return;
 
@@ -437,7 +424,7 @@ namespace Faolan.GameServer.Combat
 			if (cost == 0)
 				return;
 
-			var player = GetOrAddPlayerVitals(client);
+			var player = _sim.GetOrAddPlayerVitals(client);
 			if (player.MaxStamina == 0)
 				return;
 
@@ -982,7 +969,7 @@ namespace Faolan.GameServer.Combat
 			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
 			await ApplyMeleeCleave(client, instance, targetHandle, damage);
 
-			var player = GetOrAddPlayerVitals(client);
+			var player = _sim.GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, EnergyCodec.Build(instance, player.Stamina));
 		}
 

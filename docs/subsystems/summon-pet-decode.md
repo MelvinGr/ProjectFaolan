@@ -22,15 +22,17 @@ pet spawn is the SAME `FA015807` creature spawn we already build; the owner bind
 473-byte spawn (no `pet_owner` varint) — it is established by the BCC summon action / a follow-up, still to pin.
 Player→pet commands reuse the 16-byte target RPC `[C350][player][C350][target]`.
 
-## MVP shipped this session — `.pet <npc name>`
+## MVP — a minion built on existing infra
 
-A minion **works now** via a GM trigger, built on existing infra:
+A minion works on two pieces that already existed:
 - `WorldBroadcaster.SpawnNpcForPlayer` — mid-session spawn that renders a creature next to the player
   (the #23 mid-session-spawn path).
 - `WorldBroadcaster.SetNpcFollow` — companion-follow (#262).
 
-`.pet <name>` spawns a creature (the SAME `FA015807` spawn retail uses for the pet) and makes it follow → a
-rendered, following minion. This is structurally the retail flow minus the class-summon trigger + owner binding.
+Together they spawn a creature (the SAME `FA015807` spawn retail uses for the pet) and make it follow → a
+rendered, following minion. That was structurally the retail flow minus the class-summon trigger + owner
+binding, both of which the sections below add. (It was first driven by a `.pet <name>` GM command, which has
+since been removed — the summon SPELL is the trigger now.)
 
 ## FULL pet protocol — from the chat-annotated capture (2026-07-05)
 
@@ -130,8 +132,9 @@ pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift)
 - `NpcSpawnBuilder.TryBuildFromType(Npc, handle, pos, rot)`: builds the `FA015807` from the type + a
   caller transform — no `NpcSpawn` instance.
 - `WorldBroadcaster.SpawnPetForPlayer` + `IDatabaseRepository.GetNpcByName`: the spawn-from-type path.
-- `SummonPetForPlayer` (shared by `.pet` + the CastSpell hook) resolves the creature TYPE; only falls back
-  to the placement path for the `.pet` GM test.
+- `PetService.SummonPetForPlayer` (`Faolan/GameServer/Combat/PetService.cs`, reached from the CastSpell hook
+  through `ISpellEffectOutbound`) resolves the creature TYPE; only falls back to the placement path for a
+  world-placed creature whose stat core has not been lifted to its type yet.
 - `PetCodec` (0x1F4CB0F7) owner-assign/remove + inbound `QueuePetCommand` (0x205B) dismiss.
 - `CapturePetImporter` + `PetsModule` (`--only pets`): lifts each pet's captured `FA015807` onto its `NpcTemplate`
   type. Seeded from the necro capture: **Arcanist** (tpl 11733) + **Magus** (tpl 11732) — the two combat
@@ -208,8 +211,8 @@ ones, so over the three cost classes the corpus holds it reads as a coarse tier 
 cost. A cost-3 pet would decide it; the corpus has none. A social pet carries 1 there too, which fits the tier
 reading.
 
-⚠️ A pet with no spell behind it — the `.pet` GM command — summons at **0**, which is the value retail's own
-social pets carry rather than an invented one.
+⚠️ A pet with no spell behind it summons at **0**, which is the value retail's own social pets carry rather
+than an invented one.
 
 `petBuff` is still lifted onto `Spell` and read by nothing.
 
@@ -255,7 +258,7 @@ Three things follow:
 ## Follow-up (#307) to make it retail-accurate
 
 Items 1-3 landed with the MVP above: the summon SPELL fires the spawn (`SpellEffects` rows of kind `SummonPet`
-keyed by the summon spell id, shared with `.pet` through `SummonPetForPlayer`), the pet builds from the creature
+keyed by the summon spell id, dispatched through `SpellEffectOutbound` into `PetService`), the pet builds from the creature
 TYPE, and owner binding is `PetIIR` mode-0. What is left:
 
 - **Pet-side combat AI.** This is the one real blocker on the command bar. `Dismiss` acts; the four stance

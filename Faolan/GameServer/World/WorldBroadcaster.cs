@@ -126,26 +126,36 @@ namespace Faolan.GameServer.World
 		// (IWorldOutbound / IQuestOutbound), so the signature has to stay on us even though the work does not.
 		private readonly EncounterService _encounters;
 
-		// The listener's ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) -
-		// one shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
+		// The ApplySpell op, as the single-op delegate seam the composition pattern prescribes (CLAUDE.md) - one
+		// shared operation does not warrant its own named port. Takes the WIRE id ((base << 8) | rank). Only the
 		// knockback uses it (retail applies "Knockback immunity" in the same batch as the displacement).
-		// Null-safe for tests that construct the broadcaster without it.
-		private readonly Func<INetworkClient, uint, Task>? _applySelfBuff;
+		//
+		// BOUND rather than injected, because it is a genuine cycle: what answers it is SpellEffectOutbound, which
+		// reaches BuffService, which takes THIS class. Null until bound - and null-safe, which is also what lets a
+		// test construct the broadcaster without it.
+		private Func<INetworkClient, uint, Task>? _applySelfBuff;
 
-		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, TortageIntroService tortageIntro, ComboService combos,
-			Func<INetworkClient, uint, Task>? applySelfBuff = null)
+		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger, TortageIntroService tortageIntro, ComboService combos)
 		{
 			_sim = sim;
 			_database = database;
 			_logger = logger;
 			_tortageIntro = tortageIntro;
 			_combos = combos;
-			_applySelfBuff = applySelfBuff;
 			_ambient = new AmbientPoolService(sim, database, _handles, combos, logger);
 			_questMarkers = new QuestMarkerResolver(database, logger);
 			_zones = new ZonePopulationLoader(sim, database, combos, _ambient, logger);
 			Bags = new LootBagContents(sim, database, logger);
 			_encounters = new EncounterService(sim, database, _handles, combos, BroadcastEntityDespawn, logger);
+		}
+
+		/// <summary>
+		///     Binds the self-buff op (see <see cref="_applySelfBuff" />). Called once, from the GameServer ctor, as
+		///     soon as the port that answers it exists.
+		/// </summary>
+		public void BindApplySelfBuff(Func<INetworkClient, uint, Task> applySelfBuff)
+		{
+			_applySelfBuff = applySelfBuff;
 		}
 
 		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId

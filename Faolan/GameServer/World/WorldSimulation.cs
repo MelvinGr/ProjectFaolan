@@ -217,6 +217,23 @@ namespace Faolan.GameServer.World
 				: null;
 		}
 
+		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
+		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
+		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
+		// regen happens then, so this is just defensive).
+		//
+		// It lives here rather than on CombatService (its historical home) because it reads nothing but this class:
+		// keeping it there made BuffService depend on CombatService for one call, which closed the construction cycle
+		// SpellEffectOutbound -> BuffService -> CombatService -> FatalityService -> SpellEffectOutbound.
+		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
+		{
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+				return EntityVitals.FromCharacter(client.Session.Character);
+
+			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
+		}
+
 		// Registers (or relocates) the player in the live world after world entry, SEEDING the authoritative WorldEntity
 		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the

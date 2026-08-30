@@ -573,12 +573,13 @@ All four weaving classes have a profile; the wire is byte-exact against the one 
 
 - `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the weave FSM + the trance-meter /
   energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
-  `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through one narrow port the listener
-  implements, `ISpellweaveOutbound`: `ApplyBuff` (the trance buff and each component's own buff, via the shared
+  `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through one narrow port,
+  `ISpellweaveOutbound`: `ApplyBuff` (the trance buff and each component's own buff, via the shared
   `ApplySpell` path since #274), `RemoveBuff` (rank-1 end-twins, relayed to viewers so the pose ends on their
   screens too), `SendFeedback`, `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `IsMounted` — the trance roots
   the caster and plays a kneeling pose, so opening one from the saddle is refused with an on-screen line rather
-  than pinning a rider mid-gallop.
+  than pinning a rider mid-gallop. The port is `SpellweaveOutbound`
+  (`Faolan/GameServer/Combat/SpellweaveOutbound.cs`), one forward per member.
 - `CombatReactiveCodec` (`Faolan.Core.Network/Codecs/Combat/CombatReactiveCodec.cs`) — reactive-list, stat-gauge
   and buff-data builders.
 - `BehaviorAnimations` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimations.cs`) — the trance /
@@ -587,10 +588,11 @@ All four weaving classes have a profile; the wire is byte-exact against the one 
   rows (elements, stack ladder, trance buff, damage step, the class's own two backlash outcomes), the shared
   backlash partition (`RollBacklash`) and `EnergyMaxForClass`. Its `FireStages` / `CapturedFireRating` are
   **gone** — see the rating-quad note above.
-- `GameServerListener.Buffs.cs` — `SendSprintBar` (`0x200E`) + the persistent energy loop (`RunEnergyMirror`:
-  drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain itself is client-side, the server
-  mirrors it). The loop also pushes `CharacterStatId.Energy` on the retail cadence and owns the sprint-path
-  `Exhausted` apply/remove — see the four-stat table above.
+- `EnergyService` (`Faolan/GameServer/Combat/EnergyService.cs`) — `SendSprintBar` (`0x200E`) + the persistent
+  energy loop (`RunEnergyMirror`: drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain
+  itself is client-side, the server mirrors it). The loop also pushes `CharacterStatId.Energy` on the retail
+  cadence and owns the sprint-path `Exhausted` apply/remove — see the four-stat table above. Every value it
+  touches is on the session, which is why it is a plain collaborator rather than listener state.
 - `GameServerListener.Inbound.cs` — the `CombatReactiveIIR` add case + the `PerformSpecialAction` (`0x205A`) handler.
 
 ## Implementation (melee combos)

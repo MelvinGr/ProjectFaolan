@@ -653,6 +653,30 @@ namespace Faolan.GameServer
 				GameCharInterfaceMethods.DispatchRemoveWayPoint, RemoveWayPointCodec.Build(id, playfieldId)));
 		}
 
+		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
+		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
+		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
+		// tools/capture/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
+		// toast itself. (The sibling DispatchForgetSpell 0x200B / RemoveSpecialAbility 0x2053 / UntrainSingleFeat
+		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
+		internal static Task SendLearnSpell(INetworkClient client, uint spellId)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchLearnSpell,
+				LearnSpellCodec.Build(spellId)));
+		}
+
+		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
+		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
+		// level-up), false for the silent per-login re-grant.
+		// `sender` defaults to the login/world grant sender (GameCharAgent 0x58); the create-editor world-prep grant
+		// rides its own conversation (GameCharAgent 0x0C), so it passes that in - the only thing that differs between
+		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
+		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, ProtoEndpoint? sender = null)
+		{
+			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddSpecialAbility,
+				AddSpecialAbilityCodec.Build(ability, announce)));
+		}
+
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
 		internal static Task SendWorldChat(INetworkClient client, string xml)

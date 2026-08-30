@@ -65,7 +65,7 @@ namespace Faolan.GameServer.Combat
 			// able to afford it - so spending it here keeps the two ends agreeing rather than letting a player
 			// chain combos for free.
 			await _combat.SpendComboStamina(client, await _combos.StaminaCost(
-				client.Session.Character.Class, client.Session.Character.Level, _combat.GetOrAddPlayerVitals(client).MaxStamina, swing));
+				client.Session.Character.Class, client.Session.Character.Level, _sim.GetOrAddPlayerVitals(client).MaxStamina, swing));
 
 			// No target: the finisher still played, but there is nothing to land it on (retail's air swing).
 			if (targetHandle == 0 || targetHandle == casterHandle)

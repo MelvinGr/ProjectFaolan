@@ -751,7 +751,7 @@ namespace Faolan.GameServer
 			var (entryNpcRecords, entryBurstNpcs) = await _broadcaster.BuildEntryNpcBurst(client);
 			toSend.AddRange(entryNpcRecords);
 
-			toSend.Add(BuildVitals(client, _combat.GetOrAddPlayerVitals(client)));
+			toSend.Add(BuildVitals(client, _simulation.GetOrAddPlayerVitals(client)));
 			toSend.Add(BuildGameTime(client));
 
 			foreach (var rpc in toSend)
