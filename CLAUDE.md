@@ -182,7 +182,18 @@ FatalityService → SpellEffectOutbound`. That call reads nothing but the world 
   this way. Audit the ctor for a `_field` read that is assigned later.
 Both are recorded in agent memory (`interface_removal_casts`, `ctor_use_before_assign`).
 
-(#200 closed with the listener extraction done; #826 carries the remaining `WorldBroadcaster` split and the
+**`WorldBroadcaster` splits by SUBJECT, not by state-vs-wire** (#826). Its state half already left
+(`AmbientPoolService`, `QuestMarkerResolver`, `ZonePopulationLoader`, `LootBagContents`, `EncounterService`), so
+what remained was one class doing several domains' wire work. The test that decides a cut is *what is this member
+addressed to*: `WorldBroadcaster` is about a `WorldEntity` — spawn, despawn, move, interest — so
+`WorldObjectService` (World/, subject `LiveWorldObject`: doors, benches, harvest nodes, dynel visuals) and
+`QuestBroadcaster` (Quest/, subject the player's journal: quest packets + the '!' / '?' markers) came off it.
+⚠️ Each cut must leave the dependency ONE-WAY. That is what keeps world-object *streaming* on the broadcaster
+(`DispatchInterest` drives it) while the interaction left, and what keeps `RefreshQuestVisibility` /
+`ScheduleQuestAmbush` / `SetNpcFollowByTemplate` there while the rest of `IQuestOutbound` left — the port is
+reassembled by `QuestOutbound`, the same way `WorldOutbound` forwards to four owners.
+
+(#200 closed with the listener extraction done; #826 carries the rest of the `WorldBroadcaster` split and the
 event-producing tick.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
