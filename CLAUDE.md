@@ -219,8 +219,19 @@ Three rules came out of it, and they generalise to any god class here:
 - ⭐ **Subject is the first approximation; the QUESTION is the test.** `NpcBroadcaster` has the same subject as
   the broadcaster (a `WorldEntity`) and is still the right cut.
 
-(#200 closed with the listener extraction done; #826's titled work is done and it carries only `needs-testing`;
-the event-producing tick is **#898**.)
+**`WorldSimulation` split the same way** (#900): it answers *what is in the world and what is it doing this
+tick*, and `PlayerDeathService` (the killing blow to standing up again), `BuffTickService` (what an applied buff
+does over time — expiry, DoTs, aura areas) and `NpcCombatService` (what an aggroed creature does to its target)
+came off it — 1846 → 855 lines. ⚠️ The trick that made the dependency one-way there is worth reusing: all three
+clusters read `Players` and `World`, which lived ON the simulation, so the naive cut gives `sim → service → sim`.
+**Inject the STATE, not its owner** — `WorldState` is container-registered in its own right and the
+connection→entity map became `PlayerRegistry` (deriving from `ConcurrentDictionary` purely so the container can
+name it, which keeps ~30 call sites unchanged). Each service binds `IWorldOutbound` at `Start`, as the
+simulation does.
+
+(#200 closed with the listener extraction done; #826's titled work is done and it carries only `needs-testing`.
+#898, the event-producing tick, was measured and closed as decided-against — it re-encodes `IWorldOutbound`
+rather than decoupling from it, and deferring a send of mutable `EntityVitals` changes what goes on the wire.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IChatServerDispatcher` for

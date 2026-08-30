@@ -10,7 +10,9 @@ using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Faction;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
@@ -761,6 +763,18 @@ namespace Faolan.GameServer
 			{
 				return false;
 			}
+		}
+
+		// Points first, then rank: a rank is a threshold ON the points, so the client has the number the title is
+		// about before it is told the title. Nothing captured says the order matters; this is the one that cannot
+		// read as a title arriving for a standing the client has not seen.
+		internal static async Task SendFactionStanding(INetworkClient client, uint factionId, int points, uint rank)
+		{
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchApplyFactionPoints, ApplyFactionPointsCodec.Build(factionId, points)));
+
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType),
+				GameCharInterfaceMethods.DispatchApplyFactionRank, ApplyFactionRankCodec.Build(factionId, rank)));
 		}
 	}
 }
