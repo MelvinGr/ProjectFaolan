@@ -187,19 +187,27 @@ the broadcaster, which is built far above `SpellEffectOutbound`. Moving the knoc
   this way. Audit the ctor for a `_field` read that is assigned later.
 Both are recorded in agent memory (`interface_removal_casts`, `ctor_use_before_assign`).
 
-**`WorldBroadcaster` splits by SUBJECT, not by state-vs-wire** (#826). Its state half already left
-(`AmbientPoolService`, `QuestMarkerResolver`, `ZonePopulationLoader`, `LootBagContents`, `EncounterService`), so
-what remained was one class doing several domains' wire work. The test that decides a cut is *what is this member
-addressed to*: `WorldBroadcaster` is about a `WorldEntity` — spawn, despawn, move, interest — so
-`WorldObjectService` (World/, subject `LiveWorldObject`: doors, benches, harvest nodes, dynel visuals) and
-`QuestBroadcaster` (Quest/, subject the player's journal: quest packets + the '!' / '?' markers) came off it.
-⚠️ Each cut must leave the dependency ONE-WAY. That is what keeps world-object *streaming* on the broadcaster
-(`DispatchInterest` drives it) while the interaction left, and what keeps `RefreshQuestVisibility` /
-`ScheduleQuestAmbush` / `SetNpcFollowByTemplate` there while the rest of `IQuestOutbound` left — the port is
-reassembled by `QuestOutbound`, the same way `WorldOutbound` forwards to four owners.
+**`WorldBroadcaster` split by the QUESTION a member answers, not by state-vs-wire** (#826, 2523 → 921 lines,
+81 → 27 members). Its state half had already left (`AmbientPoolService`, `QuestMarkerResolver`,
+`ZonePopulationLoader`, `LootBagContents`, `EncounterService`), so what remained was one class answering several
+questions at once. It now answers ONE — *who can see what*, and the spawn / despawn / move / entry-burst wire
+that follows. What came off it, each a different question: `WorldObjectService` (World/ — interacting with a
+world object), `NpcBroadcaster` (World/ — what an NPC does), `LootBroadcaster` (World/ — what dropped and what
+happens when you take it), `QuestBroadcaster` + `QuestOutbound` (Quest/ — what the client is told about quests),
+`KnockbackService` (Combat/ — the shove).
 
-(#200 closed with the listener extraction done; #826 carries the rest of the `WorldBroadcaster` split and the
-event-producing tick.)
+Three rules came out of it, and they generalise to any god class here:
+- ⚠️ **Every cut must leave the dependency ONE-WAY.** That is what decides where a line falls — world-object
+  *streaming* stayed on the broadcaster (`DispatchInterest` drives it) while the interaction left, and three
+  `IQuestOutbound` members stayed while the other nine left, with `QuestOutbound` reassembling the port so its
+  callers keep taking one interface (the shape `WorldOutbound` already had, forwarding to four owners).
+- ⭐ **Prefer the cut that lets a CALLER drop the big class entirely** — worth more than its line count. Four
+  did: `TradeskillService`, `PetService`, `LootService`, `ComboFinisher`.
+- ⭐ **Subject is the first approximation; the QUESTION is the test.** `NpcBroadcaster` has the same subject as
+  the broadcaster (a `WorldEntity`) and is still the right cut.
+
+(#200 closed with the listener extraction done; #826's titled work is done and it carries only `needs-testing`;
+the event-producing tick is **#898**.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IChatServerDispatcher` for
