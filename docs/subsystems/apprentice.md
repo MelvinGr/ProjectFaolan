@@ -80,6 +80,9 @@ level boost with nobody on the other end of it.
 
 - `Faolan.Core.Network/Codecs/Apprentice/` — the four message bodies.
 - `Faolan/GameServer/Apprentice/ApprenticeService.cs` — the rules and the live pairing state.
-- `Faolan/GameServer/Apprentice/IApprenticeOutbound.cs` — the narrow port the listener implements.
+- `Faolan/GameServer/Apprentice/IApprenticeOutbound.cs` — the narrow port the wire side implements.
+- `Faolan/GameServer/Apprentice/ApprenticeOutbound.cs` — that wire side. It was on `GameServerListener` until
+  #826 moved it off; every op is addressed by CHARACTER ID (mentoring spans two connections), which is why it
+  needed `ConnectionRegistry` before it could move.
 - `Faolan/GameServer/GameServerListener.Inbound.cs` — the four c2s cases.
 - `Faolan.Tests/ApprenticeTests.cs` — the bodies against the signatures, the rules against the strings.

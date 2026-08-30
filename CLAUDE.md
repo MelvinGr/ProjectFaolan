@@ -126,7 +126,7 @@ the compressed GameServer downloads; the Wireshark plugin + `tools/capture/tshar
 behavior. `GameServerListener`'s partials are flat `GameServerListener.*.cs` files named by role:
 `.Inbound` (opcode handlers, `Handle*`), `.Outbound` (packet builders/senders, **behavior-named** e.g.
 `SendVitals`/`SendAddItem` — never opcode-named), plus
-`.WorldEntry`/`.World`/`.Combat`/`.Buffs`/`.ItemUse`/`.Factions`/`.Travel`/`.Vista`; GM commands are the
+`.WorldEntry`/`.Combat`/`.Buffs`/`.ItemUse`/`.Factions`/`.Travel`/`.Vista`; GM commands are the
 `.GmCommands` partial. `ChatServerListener` follows the same `<Listener>.<Role>.cs` naming (`.Outbound`).
 Domain logic proper lives in composed service folders beside it (`Apprentice/`,
 `Combat/`, `CreateFlow/`, `Dialogue/`, `Economy/`, `Feats/`, `Inventory/`, `Progression/`, `Quest/`, `Scripting/`,
@@ -142,14 +142,37 @@ folder-namespaced service classes that take their deps by ctor and the client pe
 `ShopService`/`BankService`/`TradepostService` (Economy/ — the last one owns the AH + mailbox transactions and
 reaches the wire through the same `IEconomyOutbound` port). The
 listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
-OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
-subsystems), reach it through a **narrow port the listener implements** rather than passing the whole
-listener — keeps the service free of the god-class while making its dependency surface explicit. A single
-shared op can be a `Func<…>` delegate seam (e.g. `ClientForCharacter` into `GuildService`); once several
-services share the same cluster of ops, collapse them into one named interface the listener implements
-(`IEconomyOutbound` = wallet + item-grant for Shop/Bank/Tradepost; `IWorldOutbound` = the simulation tick's
-wire side). Do NOT pass the listener itself — that re-introduces the circular dependency the extraction
-removed. (#200 closed with the listener extraction done; the remaining one is Gitea #826, `WorldBroadcaster`.)
+OUTBOUND op, reach it through a **narrow port** rather than passing the whole listener — keeps the service
+free of the god-class while making its dependency surface explicit. A single shared op can be a `Func<…>`
+delegate seam (e.g. `ClientForCharacter` into `GuildService`); once several services share the same cluster
+of ops, collapse them into one named interface. **Do NOT pass the listener itself.**
+
+⚠️ **The ports are no longer IMPLEMENTED BY the listener** (#826, 2026-08-30). They were, and that is what made
+`GameServerListener` the façade for 100+ members it did not own — `GameServerListener.World.cs` was 135 lines of
+`return _broadcaster.X(...)`. Each port now has its own class, built in the listener ctor and passed to the
+services that need it: `WorldOutbound` (World/, the tick's whole wire side), `EconomyOutbound` + `TradeOutbound`
+(Economy/), `QuestShareOutbound` (Quest/), `ApprenticeOutbound` (Apprentice/), `LevelUpOutbound` (Progression/),
+`EnvironmentOutbound` (World/). The listener implements four interfaces now, down from eleven.
+
+What unlocked that was **`ConnectionRegistry`** (`Faolan.Core.Network`): 50 of 57 members on those ports are real
+wire code whose only listener-scoped need was "give me the client for this character id". `ServerBase` owns a
+registry and delegates `NetworkClients`/`ClientForCharacter` to it, so a wire class can be handed the registry
+instead of the listener.
+
+⚠️ Two shapes to know when moving a port, because **the compiler and the test suite catch neither**:
+- `((IFoo)this)` still COMPILES after `IFoo` leaves a non-sealed class, and throws `InvalidCastException` at
+  runtime. Grep every self-cast against the class's actual interface list.
+- A field read in the ctor before its own assignment line is silently **null**, captured forever. Two shipped
+  this way. Audit the ctor for a `_field` read that is assigned later.
+Both are recorded in agent memory (`interface_removal_casts`, `ctor_use_before_assign`).
+
+⚠️ `ISpellEffectOutbound` / `ISpellweaveOutbound` / `ITravelOutbound` deliberately STAY on the listener — the
+5 remaining `this` passes. Their members need `DoTeleport`, `EnsureEnergyLoop` (which owns listener-level energy
+state) and `SummonPetForPlayer`: listener **ops**, not wire. Extracting them would turn one port into three
+`Func` seams, which is the "port that re-exports" shape this rule already rejects.
+
+(#200 closed with the listener extraction done; #826 carries the remaining `WorldBroadcaster` split and the
+event-producing tick.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core.Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IChatServerDispatcher` for
