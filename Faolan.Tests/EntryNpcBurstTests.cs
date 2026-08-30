@@ -76,7 +76,7 @@ namespace Faolan.Tests
 			_databases.Add(path);
 
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, new DatabaseRepository(new Factory(options)), NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim, new DatabaseRepository(new Factory(options)));
 
 			var client = new RecordingNetworkClient(PlayerHandle);
 			var player = new WorldEntity(PlayerHandle, MapId, true, "Entering", client);

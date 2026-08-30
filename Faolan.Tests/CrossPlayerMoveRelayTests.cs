@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			Assert.True(((MoveFlag)parsed.Flag1).HasFlag(MoveFlag.Airborne)); // this capture IS a jump
 
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var jumper = Place(sim, JumperHandle, parsed.Position);
 			var viewer = Place(sim, 0x01317CF8, parsed.Position); // the second client, standing next to them
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4));
 
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var jumper = Place(sim, JumperHandle, parsed.Position);
 			var bystander = Place(sim, 0x01317CF8, parsed.Position + new Vector3(10_000f, 0f, 0f));

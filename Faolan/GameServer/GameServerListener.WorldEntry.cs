@@ -243,7 +243,7 @@ namespace Faolan.GameServer
 			// #262: apply any after-quest world-object effects up-front (e.g. a relog after freeing Casilda drops the
 			// beach chain-wall collision, so the returning player isn't re-blocked by the world-entry burst's chain
 			// dynel), and clear the escortee's captive pose if she's already freed. Both data-driven / no-op when N/A.
-			await _broadcaster.ApplyQuestWorldEffects(client);
+			await _questBroadcaster.ApplyQuestWorldEffects(client);
 			await _tortageIntro.ClearCasildaCaptivePose(client); // it IS in the intro service now; the gating is Gitea's, not a TODO here
 
 			// Bind the character on entry if it has never bound. Every recall targets BindRespawnPointId - the Totem of
@@ -799,8 +799,8 @@ namespace Faolan.GameServer
 				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
 				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId)
 					?? throw new InvalidOperationException($"The beach starter quest {BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
-				await _broadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
-				await _broadcaster.SendQuestFullUpdate(client, beachDef);
+				await _questBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
+				await _questBroadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
 			}
 		}
@@ -846,7 +846,7 @@ namespace Faolan.GameServer
 			// EVERY poll and overrode the state-driven marker (so it never cleared after accept). Non-giver /
 			// not-in-view -> 0x00 (still confirms the spawn). Capture-matched: poll reply was 0x02 before accept,
 			// 0x00 after (Ranochar frames 125 -> 698).
-			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
+			var status = await _questBroadcaster.QuestMarkerStateForHandle(client, handle);
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));

@@ -60,6 +60,7 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly QuestBroadcaster _questBroadcaster;
 
 		// The live world model - the approach trigger asks it who is standing near the player.
 		private readonly WorldSimulation _sim;
@@ -69,13 +70,14 @@ namespace Faolan.GameServer.Dialogue
 		// does. Reached directly rather than through the progression service, which would only be forwarding.
 		private readonly QuestRewardService _rewards;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, WorldSimulation sim,
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestBroadcaster questBroadcaster, WorldSimulation sim,
 			QuestProgressionService questProgression, TravelService travel, IChatServerDispatcher agents, QuestRewardService rewards)
 		{
 			_database = database;
 			_agents = agents;
 			_logger = logger;
 			_broadcaster = broadcaster;
+			_questBroadcaster = questBroadcaster;
 			_sim = sim;
 			_questProgression = questProgression;
 			_travel = travel;
@@ -506,7 +508,7 @@ namespace Faolan.GameServer.Dialogue
 			// NPC re-streams. The clicked NPC IS the giver and is in view.
 			if (grantDef != null)
 			{
-				await _broadcaster.RefreshQuestGiverMarker(client, clickedNpcHandle);
+				await _questBroadcaster.RefreshQuestGiverMarker(client, clickedNpcHandle);
 				// #261: accepting a quest may reveal quest-gated NPCs (e.g. Scavenger Tuut once you hold Casilda's kill
 				// quest) - re-run interest so they stream in immediately, not only after the player next moves.
 				await _broadcaster.RefreshQuestVisibility(client);
@@ -672,8 +674,8 @@ namespace Faolan.GameServer.Dialogue
 					continue;
 
 				await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
-				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
-				await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
+				await _questBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
+				await _questBroadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
 
 				// #820: THIS is where a turn-in quest completes, so this is where it pays. The guard above only lets a
 				// quest through while it is still Active, so the flip - and the payment - happen exactly once.

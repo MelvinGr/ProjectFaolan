@@ -34,7 +34,7 @@ namespace Faolan.Tests
 		public async Task Fade_ReachesEveryViewerInRange_WithTheConsumedVisual()
 		{
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var position = new Vector3(100f, 0f, 100f);
 			var looter = Place(sim, 0x01317CF8, position);
@@ -62,7 +62,7 @@ namespace Faolan.Tests
 		public async Task TheConsumedVisual_FollowsTheFade()
 		{
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var position = new Vector3(0f, 0f, 0f);
 			var viewer = Place(sim, 0x01317CF8, position);

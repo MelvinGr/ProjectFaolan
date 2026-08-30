@@ -437,7 +437,7 @@ namespace Faolan.GameServer
 					// deletes show c2s -> s2c with an identical body (frames 3937/3938 and 3975/3976). So the drop is
 					// confirmed by the echo, not by a bespoke reply. Send it BEFORE the delete so the client is answered
 					// even if persistence throws.
-					await _broadcaster.SendQuestIir(client, questId, state);
+					await _questBroadcaster.SendQuestIir(client, questId, state);
 					await Database.RemoveCharacterQuest(client.Session.Character.Id, questId);
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);

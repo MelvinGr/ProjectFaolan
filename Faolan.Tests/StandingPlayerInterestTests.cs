@@ -192,7 +192,7 @@ namespace Faolan.Tests
 		private (WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc) Harness()
 		{
 			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
-			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
+			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
 			// The sweep only runs for a client whose world entry has FLUSHED its packets; a player standing still is

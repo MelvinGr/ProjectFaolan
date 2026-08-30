@@ -268,6 +268,13 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// The quest WIRE (journal packets + the overhead '!' / '?' markers) and the marker DECISION behind it. Both
+		// are shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the
+		// IQuestOutbound port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
+		private readonly QuestBroadcaster _questBroadcaster;
+		private readonly QuestMarkerResolver _questMarkers;
+		private readonly QuestOutbound _questOutbound;
+
 		// INTERACTING with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
 		// sequences, the GM delete. Its subject is LiveWorldObject, which is what separates it from the broadcaster's
 		// WorldEntity. See World/WorldObjectService.cs.
@@ -345,7 +352,15 @@ namespace Faolan.GameServer
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos);
+			// Built BEFORE the broadcaster and injected into it: the resolver caches the quest-giver / goal-target
+			// tables, so a second instance would duplicate them, and the broadcaster calls into the quest WIRE on
+			// every streamed-in NPC. The dependency runs one way - QuestBroadcaster holds nothing of the world's.
+			_questMarkers = new QuestMarkerResolver(database, logger);
+			_questBroadcaster = new QuestBroadcaster(_simulation, database, _questMarkers, logger);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, _questMarkers, _questBroadcaster);
+			// The IQuestOutbound port itself: nine wire members off the quest broadcaster, three world members off
+			// the world one. See Quest/QuestOutbound.cs for why the interface is not split instead.
+			_questOutbound = new QuestOutbound(_questBroadcaster, _broadcaster);
 			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
 			// which reaches the same enter-world handoff pair through it.
 			_worldObjects = new WorldObjectService(_simulation, database, _broadcaster, logger);
@@ -364,9 +379,9 @@ namespace Faolan.GameServer
 			_economyOutbound = new EconomyOutbound(Connections, database, logger);
 			_tradeOutbound = new TradeOutbound(Connections, _economyOutbound);
 			_trade = new TradeService(database, logger, _tradeOutbound);
-			_questRewards = new QuestRewardService(database, _broadcaster, _economyOutbound, _levelUp.ApplyXp, logger);
+			_questRewards = new QuestRewardService(database, _questOutbound, _economyOutbound, _levelUp.ApplyXp, logger);
 			_dailyChallenges = new DailyChallengeService(database, logger);
-			_questProgression = new QuestProgressionService(database, _broadcaster, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
+			_questProgression = new QuestProgressionService(database, _questOutbound, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
 			_economyOutbound.BindCollectGoals(_questProgression.AdvanceCollectGoals);
 			_spellModifiers = new SpellModifierService(database);
 			_buffStats = new BuffStatEffects(database, logger);
@@ -391,7 +406,7 @@ namespace Faolan.GameServer
 			_energy = new EnergyService(_buffs, logger);
 			_spellweave = new SpellweaveService(logger, new SpellweaveOutbound(_simulation, _energy, _buffs, agentServerDispatcher));
 			_travel = new TravelService(database, new TravelOutbound(agentServerDispatcher, _economyOutbound, _teleport, _simulation), logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
+			_conversation = new ConversationService(database, logger, _broadcaster, _questBroadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
 			_questShare = new QuestShareOutbound(Connections, _simulation);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
 			_apprenticeOutbound = new ApprenticeOutbound(Connections, agentServerDispatcher);
