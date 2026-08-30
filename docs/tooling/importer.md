@@ -795,6 +795,14 @@ pair the rest were built on:
     carry keys for records we cannot currently read, and coverage was not exhausted. The 4% of held keys it does
     not recover are the carriers with no byte anchor — the `itemref://` text links and the quest-reward lists
     inside `Quest_c`.
+  - ⭐ **`exhaustive:apply` writes the validated keys into `Items`.** ⚠️ Writing from a SCAN is the exception, not
+    the shortcut. Most carriers name the item - an inventory entry, a shop ware, a spawn's worn gear, an auction
+    row and a socketed gem all carry `(template, key)` together - and those belong in `ItemHashHarvester`, where
+    they keep paying on every future capture. The equip/unequip `BehaviorControlCenter` ack does NOT: its tail
+    carries the moved item's key quad twice with **no template id anywhere** (`BehaviorAcks.EquipMoveAck` writes
+    exactly that), so there is nothing to attribute the key by and trial decryption is the only mechanism that can
+    identify the record at all. Keys written this way have already survived the full decrypt + inflate + `[type]
+    [id]` check and go through `CaptureItemImporter.UpsertAsync`, so the never-downgrade rules apply as usual.
   - ⭐ **And it names the carrier, which is the actionable half** — a key we do not hold, in a shape we can name,
     says which harvester is missing rather than merely that one is:
 
@@ -808,6 +816,13 @@ pair the rest were built on:
     ⚠️ The tradepost one is why the report names a message by opcode **and receiver class**: `0x2005` alone is the
     lossy wire rendering, and it is shared with the 12-byte wallet update (`DispatchUpdateCash`) — reading it as
     that would have been a clean, wrong answer.
+
+    ⭐⭐ **Three of those four turned out to be the same omission, not four separate ones: SOCKETS.** A gem lives in
+    `slot_map` / `gem_slots` inside the item it is set into and never appears as a top-level entry again, so every
+    harvest source is blind to it until told otherwise — and only the snapshot path had been told. The spawn,
+    bank, loot-bag, mail and add-item sources now walk sockets through one shared `RecordSockets`, and a tradepost
+    source was added outright. Of the 45 records the hunt named, **41 came in structurally**; the 4 left are the
+    BCC acks, which carry no template id and so can only be applied from the scan.
   - ⭐⭐ **Every run plants two known-keyed records as a CONTROL and refuses to report a negative unless they come
     back.** This report's only possible answer is a negative, and a tool whose only answer is "nothing" can be
     completely broken while looking exactly like a true negative — there is no failing case to notice. This one

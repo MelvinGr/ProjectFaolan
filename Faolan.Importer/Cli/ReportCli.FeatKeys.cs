@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Captures;
+using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
@@ -102,7 +103,7 @@ namespace Faolan.Importer.Cli
 			// about a draw from it (#897).
 			if (mode.StartsWith("exhaustive", StringComparison.OrdinalIgnoreCase))
 			{
-				await Exhaustive(capturesDir, reader, encrypted, encryptedBlocks, keyed);
+				await Exhaustive(capturesDir, reader, encrypted, encryptedBlocks, keyed, mode.EndsWith(":apply", StringComparison.OrdinalIgnoreCase), db);
 				return;
 			}
 
@@ -165,7 +166,8 @@ namespace Faolan.Importer.Cli
 		// Every encrypted record, against every candidate quad the corpus carries. The control is implicit and much
 		// stronger here: the records we ALREADY hold keys for are in the target set, so the run reports how many of
 		// them it recovers - if that number is low the instrument is broken and nothing else in the output counts.
-		private static async Task Exhaustive(string capturesDir, RdbReader reader, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed)
+		private static async Task Exhaustive(string capturesDir, RdbReader reader, List<uint> encrypted, Dictionary<uint, byte[]> encryptedBlocks, HashSet<uint> keyed,
+			bool apply, Faolan.Core.Database.DatabaseContext db)
 		{
 			var files = Directory.GetFiles(capturesDir, "*.tshark.json").OrderBy(f => f).ToList();
 			Console.WriteLine($"  EXHAUSTIVE: harvesting candidate quads from {files.Count} dump(s)...");
@@ -236,7 +238,31 @@ namespace Faolan.Importer.Cli
 			foreach (var g in good.Select(id => byId[id].WordOrder).GroupBy(m => m).OrderByDescending(g => g.Count()))
 				Console.WriteLine($"    {g.Count(),4}  {g.Key}");
 
-			await Task.CompletedTask;
+			if (!apply)
+			{
+				Console.WriteLine();
+				Console.WriteLine("  (read-only. `--report-arg exhaustive:apply` writes these keys into Items.)");
+				return;
+			}
+
+			// ⚠️ Writing from a SCAN is the exception, not the shortcut, and it is only right where the wire gives no
+			// other option. Most carriers name the item: an inventory entry, a shop ware, a spawn's worn gear, an
+			// auction row and a socketed gem all carry `(template, key)` together, and those belong in
+			// `ItemHashHarvester` where they keep paying on every future capture - which is where they now are.
+			//
+			// The equip/unequip BehaviorControlCenter ack does NOT: its tail carries the moved item's key quad twice
+			// with **no template id anywhere** (`BehaviorAcks.EquipMoveAck` writes exactly that). There is nothing to
+			// attribute the key BY, so trial decryption against the catalog is not a lazy substitute for a parser -
+			// it is the only mechanism that can identify the record at all.
+			//
+			// Every key written here has already survived a full decrypt + inflate + [type][id] check above, and it
+			// goes through `CaptureItemImporter.UpsertAsync` so the never-downgrade rules apply exactly as they do to
+			// a harvested one.
+			var harvested = good.ToDictionary(id => id, id => new ItemHashHarvester.CapturedItem(byId[id].Key[0], byId[id].Key[1], byId[id].Key[2], byId[id].Key[3], 0));
+			var (total, inserted) = await CaptureItemImporter.UpsertAsync(db, harvested);
+			await db.SaveChangesAsync();
+			Console.WriteLine();
+			Console.WriteLine($"  APPLIED: {inserted} new Items row(s) of {total} validated key(s) written.");
 		}
 
 		// The target set for each mode. Kept apart from the scan so the selection is readable on its own - it is the

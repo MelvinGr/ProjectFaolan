@@ -79,6 +79,20 @@ namespace Faolan.Importer.Extractors
 				// not a parseable loot-bag packet
 			}
 
+			// ⭐ Auction-house SEARCH RESULTS (DispatchTradepostSearchResults). Its breadth is the same kind the
+			// `itemref://` chat links have and no other harvest source does: a listing describes whatever a STRANGER
+			// is selling, so it reaches items nobody in the corpus ever owned - and each row carries the full
+			// ProtoInventoryGameEntry, key quad and sockets included. Found by an exhaustive key hunt (#897), which
+			// turned up 20 keys riding this shape and none of them held.
+			try
+			{
+				ExtractFromTradepostSearch(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable search-results packet
+			}
+
 			// Fifth source: live DispatchAddItem (0x2020) - its inventoryID container type IS the item's kind (0x68 Bag /
 			// 0x71 Quest), so a quest key delivered to the quest tab is TYPED Quest from data (no domain-knowledge guess).
 			// This is the only source that types an item the snapshot never showed in its quest container (the key only
@@ -190,6 +204,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			Record(into, acg.Template1, CapturedItem.From(acg));
+			RecordSockets(into, add.Entry);
 
 			// Only record the specific kinds (Quest/Resource); Normal items are left to the DB default so this never
 			// downgrades an item another source already classified.
@@ -234,6 +249,8 @@ namespace Faolan.Importer.Extractors
 				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
 					Record(into, template.Value, CapturedItem.From(entry.Item!.ItemData!));
+
+				RecordSockets(into, entry.Item);
 			}
 		}
 
@@ -295,6 +312,8 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var listEntry in contents.Inventory.Items)
 			{
+				RecordSockets(into, listEntry.Item);
+
 				var acg = listEntry.Item?.ItemData;
 				if (acg?.Key1 == null || acg.Template1 == 0)
 					continue;
@@ -317,10 +336,32 @@ namespace Faolan.Importer.Extractors
 			foreach (var a in mail.Attachments)
 			{
 				// The attachment's identity is on its wire entry - the per-template key, the template id and the hash.
+				RecordSockets(into, a.Entry);
+
 				var item = a.Entry.ItemData;
 				var key = item?.Key1;
 				if (item is { Template1: not 0 } && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
 					Record(into, item.Template1, CapturedItem.From(item));
+			}
+		}
+
+		// ⭐ The GEMS socketed into an entry, as items in their own right (#897).
+		//
+		// A socket lives in `ProtoInventoryGameEntry.slot_map` (field 4, `{ slot, item }`), and a gem that has been
+		// slotted NEVER appears as a top-level entry again - it exists only inside the piece it is set into. Every
+		// source here walks top-level entries, so each one is blind to sockets until told otherwise, and that is a
+		// per-source omission rather than a shared one: the snapshot path was taught to walk them in #870 and the
+		// other four were left behind. This is that walk, once, so the next source added gets it for free.
+		//
+		// `Record` rather than a direct assignment, because a gem can ALSO be seen loose in a bag before it is
+		// slotted, and the two sightings must merge on the never-downgrade rule instead of racing.
+		private static void RecordSockets(IDictionary<uint, CapturedItem> into, ProtoInventoryGameEntry? entry)
+		{
+			foreach (var socket in entry?.SlotMaps ?? [])
+			{
+				var gem = socket.Item;
+				if (gem?.Key1 != null && gem.Template1 != 0)
+					Record(into, gem.Template1, CapturedItem.From(gem));
 			}
 		}
 
@@ -387,6 +428,49 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)
 				Record(into, e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash, e.TailLevel));
+		}
+
+		// Recovers (template -> CapturedItem) from an auction-house search result.
+		//
+		// ⚠️ `DispatchTradepostSearchResults` and `GameCharInterface.DispatchUpdateCash` are BOTH method index 5, so
+		// they render as the same `0x2005` on the wire and cannot be told apart by opcode - the 12-byte wallet
+		// update and a 1.2 KB grid of listings. The discriminator is the TradepostInterface class id in the header
+		// region, which a wallet update never names. (`CaptureListingImporter` carries the same guard for the same
+		// reason; this is the second reader of the shape and it must not be the one that gets it wrong.)
+		private static void ExtractFromTradepostSearch(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			if (packetBytes.Length < 16)
+				return;
+
+			var packet = Rpc.Parse(packetBytes);
+			if (packet.Method != (uint)TradepostInterfaceMethods.DispatchTradepostSearchResults)
+				return;
+
+			var headerLen = (int)packetBytes.ReadU32Be(8);
+			var bodyStart = 12 + headerLen;
+			if (headerLen <= 0 || bodyStart >= packetBytes.Length)
+				return;
+			if (!ContainsSequence(packetBytes.AsSpan(12, headerLen), TradepostInterfaceLe))
+				return;
+
+			foreach (var row in TradepostListingCodec.Parse(packetBytes[bodyStart..]).Rows)
+			{
+				// ⚠️ A listing's ProtoAcgItem carries NO hash (it is 0 on the wire), which is fine and is why the
+				// hash is not gated on here: the key is the payoff, and an AH item renders through the live add.
+				var acg = row.Entry?.ItemData;
+				if (acg?.Key1 != null && acg.Template1 != 0)
+					Record(into, acg.Template1, CapturedItem.From(acg));
+
+				RecordSockets(into, row.Entry);
+			}
+		}
+
+		// TradepostInterface class id in little-endian wire order - see ExtractFromTradepostSearch.
+		private static readonly byte[] TradepostInterfaceLe = [0xB5, 0xD5, 0xC2, 0xF2]; // 0xF2C2D5B5
+
+		private static bool ContainsSequence(ReadOnlySpan<byte> haystack, ReadOnlySpan<byte> needle)
+		{
+			return haystack.IndexOf(needle) >= 0;
 		}
 
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
