@@ -132,13 +132,15 @@ namespace Faolan.GameServer.Combat
 		// 391 of them. The only combination it ever pairs with 0 is school 12, the WORLD as the damage source (all 43,
 		// and 43 is exactly the school-12 count): a fall or a hazard, which genuinely has no spell behind it.
 		//
-		// ⚠️ Sending 0 on a health record is not merely inaccurate, it VOIDS THE RECORD. The client logs
-		// `ERROR: GameCode.Magic - SpellTemplate_t::GetMagicSpell failed to load spell with id 0` and abandons it, so
-		// the health never reaches `CMsg_StatChange` and the bar does not move. #767 (2026-08-09) and #770
-		// (2026-08-10) applied the 0/5/10 finding to the health emitters and that is what broke player damage
-		// on screen - #770's own note even records that the real id "produced no client error to notice".
+		// ⛔ It does NOT void the record - that was #902's reading, and the client refutes it. The apply
+		// (`StatDamageIIR_t` slot 2, `FUN_008d5960`) touches `spellBaseId` in one place, `if (deathReason == 10)`,
+		// and the health write above it runs unconditionally; the `GetMagicSpell failed to load spell with id 0` in
+		// the client log is one of ~80 other callers. What actually froze the bar was the delta's SCALE
+		// (`CombatService.SendStatDamage`), not this field. #767/#770 are still wrong to have zeroed it - they
+		// applied a 0/5/10 measurement to a population it never covered - but they did not cause the symptom.
 		//
-		// So: use this for a stat the measurement covers, and the real base id for a health record.
+		// So: use this for a stat the measurement covers, and the real base id for a health record - because that is
+		// what retail states, which is reason enough.
 		public const uint RetailSpellBaseId = 0;
 
 		// TWK_ArmorAbilityModifier / TWK_TargetPerLevelArmor from the client's own tweak table (RDB 1000516,

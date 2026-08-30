@@ -7,14 +7,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// ⛔ #767/#770 got this BACKWARDS and it cost the player's health bar for three weeks. They measured
-	// `StatDamageIIR.SpellBaseId` over the stat ids 0, 5 and 10 - where 3,059 of 3,061 records really do carry 0 - and
-	// applied the finding to the HEALTH emitters too. Re-measured over statId 0x1B (27), retail names a REAL spell in
-	// 478 of 656 own-handle records and 1,698 of 1,724 on other handles; the zeroes are school 12, the world.
+	// ⛔ #767/#770 got this BACKWARDS. They measured `StatDamageIIR.SpellBaseId` over the stat ids 0, 5 and 10 - where
+	// 3,059 of 3,061 records really do carry 0 - and applied the finding to the HEALTH emitters too. Re-measured over
+	// statId 0x1B (27), retail names a REAL spell in 478 of 656 own-handle records and 1,698 of 1,724 on other
+	// handles; the zeroes are school 12, the world. So a health record states a spell, because retail states one.
 	//
-	// A health record naming spell 0 is not merely inaccurate, it VOIDS THE RECORD: the client logs
-	// `SpellTemplate_t::GetMagicSpell failed to load spell with id 0` and abandons it, so the health never reaches
-	// `CMsg_StatChange` and the bar does not move (in-client 2026-08-30).
+	// ⚠️ It is NOT because a zero would void the record. #902 read it that way from a client log and the disassembly
+	// refutes it: the apply (`StatDamageIIR_t` slot 2, `FUN_008d5960`) reads `spellBaseId` only inside
+	// `if (deathReason == 10)`, and the `SetStat(statId, GetStat(statId) + delta)` above it is unconditional. The
+	// frozen health bar was the DELTA'S SCALE, fixed in `CombatService.SendStatDamage`. Keep the two apart: this gate
+	// is about matching retail, not about a client that would otherwise reject us.
 	//
 	// ⚠️ #767's own diagnosis was right and only its fix was wrong. The original defect was a DOUBLE SHIFT - a value
 	// that was already a base id shifted again into `14321` - and the client said exactly the same thing about that
@@ -56,7 +58,7 @@ namespace Faolan.Tests
 
 			Assert.True(offenders.Count == 0,
 				$"A StatDamageIIR carrying HEALTH must name a real spell base id. {nameof(CombatResolver.RetailSpellBaseId)} (0) is measured for the stat "
-				+ "ids 0/5/10 only; on a health record the client fails to load spell 0 and drops the whole record, so the bar stops moving:\n  "
+				+ "ids 0/5/10 only; a health record states the creature's or the caster's real ability, as retail does:\n  "
 				+ string.Join("\n  ", offenders));
 			// The four emitters: the spell-cast hit, the DoT tick, and the NPC's swing and cast. A scan that found
 			// none would pass vacuously.

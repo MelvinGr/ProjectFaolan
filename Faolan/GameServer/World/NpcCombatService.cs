@@ -114,16 +114,21 @@ namespace Faolan.GameServer.World
 			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
-			// ⚠️ A health record must name a REAL spell or the client VOIDS it - `GetMagicSpell failed to load spell
-			// with id <n>`, and the health never reaches CMsg_StatChange. Retail never sends one without a spell: of
-			// 656 own-handle health records the only zeroes are school 12, the world (a fall, a hazard). Its physical
-			// hits name the creature's own ability - `Ripper Volley` (3239371), `Rend` (3236937), `Butcher` - which are
-			// exactly the rows our own `NpcSpells` carries.
+			// Retail never sends an entity-caused health record without a spell: of 656 own-handle health records the
+			// only zeroes are school 12, the world (a fall, a hazard). Its physical hits name the creature's own
+			// ability - `Ripper Volley` (3239371), `Rend` (3236937), `Butcher` - which are exactly the rows our own
+			// `NpcSpells` carries. So a swing with NO ability sends NO health record, because retail has none to send.
 			//
-			// ⛔ So a swing with NO ability sends NO health record, because retail has none to send. Passing the combo
-			// id instead was measured and is wrong: `combo_npc_generic_1hb` IS in our Spells table but not in the
-			// client's catalog, so it fails to load exactly like the 0 did. Only 35 of 1,227 NPC templates carry an
-			// ability at all, so this is the common case, and how retail moves the bar for it is still open.
+			// ⛔ NOT because the client would reject one. That was #902's reading and it is wrong: the client's apply
+			// (`StatDamageIIR_t` slot 2, `FUN_008d5960`) reads `spellBaseId` in ONE place, `if (word3 == 10)`, and
+			// nothing downstream depends on it - the health write is unconditional. The
+			// `GetMagicSpell failed to load spell with id 0` in the client log comes from one of the ~80 OTHER callers,
+			// not from here. A probe naming `Rend` on a pirate's swing was staged to test that theory in-client; the
+			// disassembly answers it without the client, so it was dropped rather than run.
+			//
+			// ⚠️ Which leaves the gap where it actually is: only 35 of 1,227 NPC templates carry an ability, so most
+			// swings still move no bar. That is a DATA gap (Gitea #903), and filling it is the fix - not zeroing a
+			// field retail always fills.
 			if (npc.AttackSpellBaseId != 0)
 				await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, npc.AttackSpellBaseId);
 

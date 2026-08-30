@@ -1515,6 +1515,43 @@ too hard — and harder than the melee bug did, because melee is a per-level CUR
 while a DoT is a flat constant that ignores both level and pool: `Rend` at −54/1.5s emptied a level-1 player's
 88-point pool in three ticks, and the corpus reaches −258,352 (`Chill (Rank 5)`) (#693).
 
+⭐ **What that delta does at the other end: it is the ONLY field that moves a health bar.** The client's apply is
+`StatDamageIIR_t` vtable slot 2, `FUN_008d5960`, and its whole stat write is one line —
+
+```
+SetStat(statId, GetStat(statId) + record.delta)      // 008d5b2d..008d5b5d
+```
+
+— run unconditionally once the carrier resolves to a `CoreCharacter` (the `0xC879` branch does the same
+subtraction on a `Destructible`, which is a harvest node chipping down). Three consequences, each of which was
+guessed the other way at some point:
+
+* **`statValue` is never read.** The client recomputes from what it already holds. It is still stated because
+  retail states it — and because it is the only thing that pins the delta's scale.
+* **`spellBaseId` is read in exactly one place**, `if (deathReason == 10)`, and nothing downstream depends on it.
+  ⛔ A record naming spell 0 is **not** voided; the `GetMagicSpell failed to load spell with id 0` seen in a client
+  log beside one comes from one of the ~80 other callers of that function. A health record still names the real
+  ability, because retail does — see `StatDamageSpellIdTests` — but that is fidelity, not a client requirement.
+* **The delta is on the ×100 vitals scale**, like the stat it lands in. The corpus pins the two fields to each
+  other rather than to an absolute: `statValue` equals the same handle's `StatUpdateIIR` stat 27 **exactly** (diff
+  0 across twelve handles, up to 92 records each) and moves by exactly `delta` across 1,015 consecutive pairs.
+
+⛔ **That last one is #902.** A display-scale delta against a wire-scale pool moved a bar by a hundredth of the
+damage: a 12-damage hit took a 20,200-wire bar (202 HP) to 20,188, redrawn as 202. Damage landed, the character
+died, and the bar never moved. `RegenIIR` had the ×100 right, so the only correction the client ever received was
+upward and the bar climbed **past its own max** — the second symptom, and the same root cause. Scaled once in
+`CombatService.SendStatDamage`, beside the health it has to agree with; gated by `StatDamageWireScaleTests`.
+
+⚠️ `StatUpdateIIR`'s own apply (`FUN_007a00e0`) is a plain `SetStat` loop over every `(statId, value)` pair, with
+**no vitals filter and no own-handle special case** — worth stating because the opposite was assumed from a client
+log that showed our stat 27 arriving and no `CMsg_StatChange` following it. `CMsg_StatChange` is a higher layer;
+the absence of a line there is not evidence that the setter was skipped.
+
+`deathReason` — the word after the two zeros, at `+0x40` — turns out not to be padding either: the client writes it
+straight to stat `0x152` (`CharacterStatId.DeathReason`), and it also drives a virtual call on the target when
+non-zero. The corpus carries 0 (×2,201), 5 (×127) and 10 (×52) on health records, so the codec's earlier "0 in
+every captured record" was measured on a population that excluded health.
+
 **A DoT's cadence is measured, not read.** The record carries no period, so consecutive ticks of one spell on
 one target are one tick train and the gap between them *is* that spell's interval — harvested by the
 `dot-effects` importer module into `Spell.DotIntervalMs`. 55 of the 84 DoT spells in the corpus have one;

@@ -1107,26 +1107,36 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
-		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
-		/// <param name="displayHealth">
-		///     The target's health AFTER the hit, in DISPLAY units - the ÷100 scale every live <see cref="EntityVitals" />
-		///     is in. It is scaled to the wire here.
-		///     <para>
-		///         ⚠️ This field is what actually MOVES the bar, and it is the whole packet's point. Retail fills it with
-		///         the wire ×100 value (`Hoxxling_..._gameplay` frames 4286/4326/4340: `stat=0x001B value=12714`, then
-		///         12595, then 12395, with NO `StatUpdateIIR` anywhere near them). We were passing the display number
-		///         straight through, so a 137 HP player was announced at 1.37 and the client left the bar where it was:
-		///         damage landed, the character died, and the bar never moved (found in-client 2026-08-30).
-		///     </para>
-		///     <para>
-		///         `delta` is NOT scaled - retail's is display-sized too (-11 against that same 119-wire drop), so it
-		///         reads as the damage NUMBER rather than as the pool movement.
-		///     </para>
-		/// </param>
-		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint displayHealth, int delta, uint type, uint casterHandle, uint spellBaseId)
+		// the capture. #274
+		//
+		// ⭐ THE DELTA IS THE WHOLE PACKET. The client's apply is `StatDamageIIR_t` vtable slot 2, `FUN_008d5960`,
+		// and its health write is one line:
+		//
+		//     SetStat(statId, GetStat(statId) + record.delta)      // 008d5b2d..008d5b5d
+		//
+		// So `statValue` is NOT read at all - the client recomputes from what it already holds - and the delta is the
+		// only field that moves a bar. Both are stated here anyway because retail states both, and the corpus pins
+		// their scale to each other: `statValue` equals the same handle's `StatUpdateIIR` stat 27 EXACTLY (diff 0 on
+		// twelve handles, up to 92 records each), and `statValue` moves by exactly `delta` across 1,015 consecutive
+		// pairs. Stat 27 is a ×100 vitals stat (`StatDisplayScale`, and in-client: wire 428500 draws as 4285 HP), so
+		// BOTH fields are ×100 and neither may carry a display number.
+		//
+		// ⛔ That is what #902 was: `delta` went out in display units against a wire-scale pool, so a 12-damage hit
+		// moved a 20,200-wire bar to 20,188 - it redrew at 201.88 of 202 and looked frozen. `RegenIIR` had the ×100
+		// right, so the only correction the client ever received was upward and the bar climbed past its own max
+		// (the `688 / 202` symptom). Scaled HERE, beside the health it has to agree with, so no caller can restate it.
+		/// <param name="displayHealth">The target's health AFTER the hit, in the DISPLAY units every live <see cref="EntityVitals" /> is in.</param>
+		/// <param name="displayDelta">The signed change, in those same display units. Negative for damage.</param>
+		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint displayHealth, int displayDelta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			return SendWorldPacket(client, StatDamageCodec.Build(StatDamages.Combat(targetHandle, displayHealth * 100, delta, (DamageSchool)type, casterHandle, 1, spellBaseId)));
+			return SendWorldPacket(client,
+				StatDamageCodec.Build(StatDamages.Combat(targetHandle, displayHealth * VitalsWireScale, displayDelta * (int)VitalsWireScale, (DamageSchool)type, casterHandle, 1, spellBaseId)));
 		}
+
+		// The ×100 the client keeps its vitals in. It divides only when it DRAWS, so every vitals number on the wire
+		// is pre-multiplied - see CharacterStatId.GetScale / StatDisplayScale, which recovers the same factor from the
+		// client's own tooltip divisor.
+		private const uint VitalsWireScale = 100;
 
 		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
 		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)

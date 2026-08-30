@@ -12,9 +12,32 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The carrier, then seventeen big-endian words - or ELEVEN, and the carrier's own entity CLASS is what says which.
 	//
 	//   [subop][class][handle][u8 env]
-	//   [statValue][0][0][0][statId][count]      <- these six ONLY when class != 0xC879
+	//   [statValue][0][0][deathReason][statId][count]   <- these six ONLY when class != 0xC879
 	//   [i32 delta][school]
 	//   [casterClass][caster][idx][0][spellBaseId][magnitude][0][0][0]
+	//
+	// ⭐ WHAT THE CLIENT DOES WITH IT (`StatDamageIIR_t` vtable slot 2, `FUN_008d5960`, #902). Reading the apply is
+	// what settles which of these seventeen words matter, and the answer is not the one the field names suggest:
+	//
+	//   * `delta` (@0x30) is the ONLY thing that moves a stat: `SetStat(statId, GetStat(statId) + delta)`, run
+	//     unconditionally once the carrier resolves to a `CoreCharacter` (or, on the 0xC879 branch, a `Destructible`,
+	//     where it SUBTRACTS - that is the harvest node chipping down).
+	//   * `statValue` (@0x2c) is **never read**. The client recomputes from what it already holds. It is still stated
+	//     because retail states it, and because it is the only field that pins the delta's SCALE: it equals the same
+	//     handle's `StatUpdateIIR` stat 27 exactly (diff 0 on twelve handles, up to 92 records each) and moves by
+	//     exactly `delta` across 1,015 consecutive pairs. Stat 27 is ×100, so both are ×100.
+	//   * `spellBaseId` (@0x54) is read in ONE place - `if (deathReason == 10) FUN_007e95a0(spellBaseId)` - and
+	//     nothing downstream depends on it. ⛔ A record naming spell 0 is NOT voided; #902 assumed it was, and the
+	//     `GetMagicSpell failed to load spell with id 0` in the client log comes from one of ~80 other callers.
+	//   * `deathReason` (@0x40) is not filler. It goes out as `SetStat(0x152, deathReason)` - stat 0x152 is
+	//     `CharacterStatId.DeathReason` - it gates that spell lookup at 10, and when non-zero it drives a virtual call
+	//     on the target (`vtable +0x278`). The corpus carries 0 (×2,201), 5 (×127) and 10 (×52) on health records.
+	//   * `idx` (@0x50) non-zero selects the richer combat-log/floating-number path over the plain one, and `count`
+	//     (@0x74) tweaks its verb at 5 and 6. Neither touches the stat.
+	//
+	// ⚠️ The reader SCATTERS the seven-word tail rather than storing it in order (`FUN_00897b60`): wire positions
+	// 1..7 land at +0x50, +0x58, +0x54, +0x5c, +0x70, +0x60, +0x64 - which is why `spellBaseId` is the THIRD tail
+	// word on the wire and `Idx` the first. Getting that backwards puts the spell id in a word nothing reads.
 	//
 	// ⚠️ The class word was asserted to be 0xC350 Character until #811, which refused all 13 records carrying 0xC879
 	// (`EntityClass.Destructible`) - the player chipping at a harvest node or a breakable. The client says the branch
@@ -79,7 +102,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var statValue = describesAStat ? r.ReadU32Be() : 0;
 			var word1 = describesAStat ? r.ReadU32Be() : 0;
 			var word2 = describesAStat ? r.ReadU32Be() : 0;
-			var word3 = describesAStat ? r.ReadU32Be() : 0;
+			var deathReason = describesAStat ? r.ReadU32Be() : 0;
 			var statId = describesAStat ? r.ReadU32Be() : 0;
 			var count = describesAStat ? r.ReadU32Be() : 0;
 			var delta = r.ReadI32Be();
@@ -91,7 +114,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var spellBaseId = r.ReadU32Be();
 			var magnitude = r.ReadU32Be();
 
-			return new StatDamageIIR(handle, env, statValue, statId, count, delta, school, casterClass, caster, idx, spellBaseId, magnitude, word1, word2, word3, word11, r.ReadU32Be(),
+			return new StatDamageIIR(handle, env, statValue, statId, count, delta, school, casterClass, caster, idx, spellBaseId, magnitude, word1, word2, deathReason, word11, r.ReadU32Be(),
 				r.ReadU32Be(), r.ReadU32Be(), entityClass);
 		}
 
@@ -108,7 +131,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 					.WriteUInt32(v.StatValue)
 					.WriteUInt32(v.Word1)
 					.WriteUInt32(v.Word2)
-					.WriteUInt32(v.Word3)
+					.WriteUInt32(v.DeathReason)
 					.WriteUInt32(v.StatId)
 					.WriteUInt32(v.Count);
 
@@ -127,9 +150,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// StatDamageIIR (0xE9F24184). The seventeen words in wire order, with the six that are 0 in every captured record
-	// carried as `Word*` fields rather than asserted - a record with something in them round-trips instead of being
-	// rejected, which is what an undecoded-but-constant word deserves.
+	// StatDamageIIR (0xE9F24184). The seventeen words in wire order, with the ones still undecoded carried as `Word*`
+	// fields rather than asserted - a record with something in them round-trips instead of being rejected, which is
+	// what an undecoded word deserves.
+	//
+	// ⚠️ "0 in every captured record" is what this used to say of all six, and it was never measured on the HEALTH
+	// population: `DeathReason` carries 5 and 10 in 179 of 2,380 health records and `Word1` carries 12/5/1 in 294 of
+	// them (#902). Which is exactly why they are carried rather than asserted - but it also meant a word the client
+	// acts on was filed as padding.
 	public sealed record StatDamageIIR(
 		uint Handle,
 		byte Env,
@@ -154,7 +182,11 @@ namespace Faolan.Core.Network.Codecs.Combat
 		uint Magnitude,
 		uint Word1 = 0,
 		uint Word2 = 0,
-		uint Word3 = 0,
+
+		// The client writes this straight to stat 0x152 - `CharacterStatId.DeathReason` - so it is the CAUSE word, not
+		// a filler: what killed you, stated on every hit that might. It also gates the record's only spell lookup
+		// (`== 10`) and, when non-zero, a virtual call on the target. Corpus values on a health record: 0, 5, 10.
+		uint DeathReason = 0,
 		uint Word11 = 0,
 		uint Word14 = 0,
 		uint Word15 = 0,

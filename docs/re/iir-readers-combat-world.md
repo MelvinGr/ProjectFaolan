@@ -55,6 +55,53 @@ The discriminator `target_type != 0xC879` is read from the linked entity, **not*
 not self-describing — but **all 898 captured instances are the long form** (17 u32 = 68 B, total
 85 B), so the long layout is the one in practice.
 
+⚠️ The 7-word tail reader **scatters** rather than storing in order. `FUN_00897b60` is called with
+`EDI = record + 0x50` and lands wire positions 1..7 at `+0x50, +0x58, +0x54, +0x5c, +0x70, +0x60,
++0x64` — the last one via `MOVSS`, so that word is a **float**. So `spellBaseId` (`+0x54`) is the
+THIRD tail word on the wire while `idx` (`+0x50`) is the first; reading them in offset order puts
+the spell id in a word nothing reads.
+
+#### Its apply — `FUN_008d5960` (vtable slot 2)
+
+The reader gives the shape; the apply gives the meaning, and here it overturns three readings that
+had been made from a client log instead (#902).
+
+```c
+target = dynamic_cast<CoreCharacter*>(record->carrier);        // else the 0xC879 Destructible branch
+caster = (record->casterClass == 0xC350) ? resolve(record->caster) : 0;
+... combat-log / floating-number render (FUN_006a5180 / FUN_006a5ac0) ...
+if (record->deathReason == 10 && caster) FUN_007e95a0(record->spellBaseId);   // the ONLY spellBaseId read
+target->stats.SetStat(0x152, record->deathReason);                            // 0x152 = DeathReason
+target->stats.SetStat(record->statId,
+                      target->stats.GetStat(record->statId) + record->delta); // UNCONDITIONAL
+if (record->deathReason) target->vtable[0x278](record->deathReason);
+```
+
+| field | offset | what the apply does with it |
+|---|---|---|
+| `statValue` | `+0x2c` | **nothing** — never read; the client recomputes from what it holds |
+| `delta` | `+0x30` | the only field that moves a stat, added to the current value |
+| `school` | `+0x34` | combat-log argument |
+| `deathReason` | `+0x40` | `SetStat(0x152)`, gates the spell lookup at 10, and a target virtual at `+0x278` when non-zero |
+| `casterClass` / `caster` | `+0x44` / `+0x48` | resolved to the attacker; `0xC350` required |
+| `statId` | `+0x4c` | which stat the delta moves |
+| `idx` | `+0x50` | non-zero picks the richer combat-log path |
+| `spellBaseId` | `+0x54` | read only inside `if (deathReason == 10)`; gates nothing |
+| `count` | `+0x74` | tweaks the combat-log verb at 5 and 6 |
+
+⛔ **A record naming spell 0 is not voided.** The health write sits below the spell lookup and does
+not depend on it. `SpellTemplate_t::GetMagicSpell` (`FUN_0099bef0`) has ~80 callers, so its error
+line appearing next to a `StatDamageIIR` in a log is coincidence, not causation.
+
+⭐ **The delta is on the ×100 vitals scale**, and the corpus proves it without needing an absolute:
+`statValue` equals the same handle's `StatUpdateIIR` stat 27 **exactly** (diff 0 on twelve handles,
+up to 92 records each) and moves by exactly `delta` across 1,015 consecutive pairs.
+
+`StatUpdateIIR_c`'s apply (`FUN_007a00e0`) is the contrast worth having beside it: a plain loop
+calling the same `[entity+0x10c] +0xc` setter for every `(statId, value)` pair, with **no vitals
+filter and no own-handle special case**. `RegenIIR` (`FUN_0079dd10`) reaches that setter too, via
+`+8` then `+0xc` with `current + delta`. One setter, three callers.
+
 ### CombatReactiveIIR_c (`0x54C02089`, reader `FUN_0082c720`)
 
 Self-describing mode word — wire-derivable, byte-exact:
