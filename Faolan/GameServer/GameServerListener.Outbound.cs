@@ -47,53 +47,6 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, int? preferredSlot, string? creatorName)
-		{
-			return GrantItemToBackpack(client, itemTemplateId, count, preferredSlot, creatorName);
-		}
-
-		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
-		{
-			return SendAddItem(client, containerType, itemPos, entry, feedback);
-		}
-
-		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
-		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
-		Task IEconomyOutbound.SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
-		{
-			return SendUpdateCash(client, balanceTin, reason);
-		}
-
-		Task IEconomyOutbound.SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
-		{
-			return SendGemSocketed(client, container, targetSlot, socket, gemSlot);
-		}
-
-		Task IEconomyOutbound.SendTradeskillComplete(INetworkClient client, uint recipeId)
-		{
-			return SendTradeskillComplete(client, recipeId);
-		}
-
-		Task IEconomyOutbound.SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
-		{
-			return SendGuildBankData(client, vault);
-		}
-
-		Task IEconomyOutbound.SendGuildBankMove(INetworkClient client, GuildBankMove move)
-		{
-			return SendGuildBankMove(client, move);
-		}
-
-		Task<int?> IEconomyOutbound.TransferItemToCharacter(uint characterId, ItemInstance instance)
-		{
-			return ((ITradeOutbound)this).TransferItemToCharacter(characterId, instance);
-		}
-
-		Task<uint> IEconomyOutbound.TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
-		{
-			return TakeItemsFromInventory(client, itemTemplateId, count);
-		}
-
 		// IGameServerProvider seam: the PAY-OUT half of a guild-bank withdrawal (#132). The CS tier decides it (it owns
 		// Guild.Cash and the rank ladder) and this tier pays it, because the wallet lives on the live session and the
 		// client only learns of a change through this tier's UpdateCash.
@@ -109,7 +62,7 @@ namespace Faolan.GameServer
 
 			character.Money += amountTin;
 			await Database.SetCharacterMoney(character.Id, character.Money);
-			await SendUpdateCash(client!, character.Money, UpdateCashReason.Gain);
+			await _economyOutbound.SendUpdateCash(client!, character.Money, UpdateCashReason.Gain);
 			Logger.LogInformation("CreditCharacterCash: {Character} received {Amount} tin (wallet {Balance}).", character.Name, amountTin, character.Money);
 			return true;
 		}
@@ -150,7 +103,7 @@ namespace Faolan.GameServer
 
 			character.Money -= request.AmountTin;
 			await Database.SetCharacterMoney(character.Id, character.Money);
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
+			await _economyOutbound.SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 
 			if (await _csPlayerAgentDispatcher.DepositToGuildBank(character.Id, request.AmountTin))
 				return;
@@ -158,7 +111,7 @@ namespace Faolan.GameServer
 			// Nobody could take it - put it back rather than leave it nowhere (the withdrawal's refund, mirrored).
 			character.Money += request.AmountTin;
 			await Database.SetCharacterMoney(character.Id, character.Money);
-			await SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
+			await _economyOutbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 			Logger.LogWarning("GuildTransferMoney rolled back: {Character}'s guild is not on this realm's CS tier.", character.Name);
 		}
 
@@ -219,303 +172,14 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// --- ITradeOutbound: the wire side of a player trade. TradeService owns the state machine and reaches the wire
-		// only through this port, addressed by character id because a trade always spans two connections. ---------------
-		Task ITradeOutbound.SendTradeRequest(uint targetId, uint requesterId)
-		{
-			return SendTradeRpc(targetId, GameCharInterfaceMethods.DispatchRequestTrade, EntityIdCodec.Build(EntityIds.Character(requesterId)));
-		}
-
-		Task ITradeOutbound.SendTradeStarted(uint recipientId, uint partnerId)
-		{
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchStartTrade, EntityIdCodec.Build(EntityIds.Character(partnerId)));
-		}
-
-		Task ITradeOutbound.SendPartnerCash(uint recipientId, ulong tin)
-		{
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchPartnerUpdatedCash, TradeCashCodec.Build(new TradeCash(tin)));
-		}
-
-		// The same body either way; only the opcode says whose side of the table the item is on.
-		// The token was a bare 0 here. No capture pins that (the trade path was recovered from the client's method
-		// table, not a trace) and it contradicts the measured rule: every captured message describing a real item
-		// INSTANCE carries one - 165/165 DispatchAddItem entries, 8,479/8,479 snapshot entries, 2,734/2,734 shop
-		// wares - while only the template ADVERTS (AH listings, mail attachments, claim lists) carry 0. A trade
-		// offer names an instance, so it carries the token (#723).
-		// `windowSlot` is the TRADE WINDOW position, not an inventory cell - it addresses the offer on both players'
-		// screens. The offered INSTANCE is passed in rather than looked up, because neither of the two things this
-		// method knows can find it: `recipientId` is whoever is being TOLD (the partner, for the `mine: false` half),
-		// and `windowSlot` is not a bag slot. Resolving it from those two was wrong in both directions.
-		async Task ITradeOutbound.SendTradeItem(uint recipientId, ItemInstance offered, uint windowSlot, uint count, bool mine)
-		{
-			var item = offered.Template;
-			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(offered.Id), item, AcgHash.ForWire(item.Id, item.Hash),
-			[
-				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, windowSlot)),
-				new SnapshotItems.ItemStat(26, count)
-			], sockets: offered.Sockets);
-
-			await SendTradeRpc(recipientId, mine
-				? GameCharInterfaceMethods.DispatchTradeAddedItem
-				: GameCharInterfaceMethods.DispatchTradePartnerAddedItem, TradeAddedItemCodec.Build(new TradeAddedItem(entry, count)));
-		}
-
-		// The remove twin of SendTradeItem: the same one-body/two-opcodes shape, so only the opcode says whose side of
-		// the table the item left. Recovered from the client's method table rather than a capture - see
-		// TradeRemovedItemCodec for why that is sound here (#427).
-		Task ITradeOutbound.SendTradeItemRemoved(uint recipientId, uint slot, bool mine)
-		{
-			return SendTradeRpc(recipientId, mine
-				? GameCharInterfaceMethods.DispatchTradeRemovedItem
-				: GameCharInterfaceMethods.DispatchTradePartnerRemovedItem, TradeRemovedItemCodec.Build(slot));
-		}
-
-		Task ITradeOutbound.SendAcceptAck(uint recipientId)
-		{
-			// #792 named it: its handler is byte for byte DispatchPartnerAcceptedTrade's, on the LOCAL holder instead
-			// of the one the ID32 names - so it is the argument-less YOU half. Which is exactly what the capture
-			// already said: it lands on the accepter's own connection, empty, right after their AcceptTrade.
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchClientAcceptedTrade, []);
-		}
-
-		Task ITradeOutbound.SendPartnerAccepted(uint recipientId, uint partnerId)
-		{
-			return SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchPartnerAcceptedTrade, EntityIdCodec.Build(EntityIds.Character(partnerId)));
-		}
-
-		// The 0x6D trade-completed method then the toast - retail sends both, in that order, to each party.
-		async Task ITradeOutbound.SendTradeCompleted(uint recipientId)
-		{
-			// #792 named it too: the client's handler is CoreTradeHolder's own reset - the in-trade flag cleared, the
-			// accepted byte and both cash slots zeroed, both item lists freed - and it fires the trade-ended signal
-			// with 1 where TradeAbort (0x6A) sends 0. The capture agrees: it lands on BOTH connections, empty, as the
-			// trade commits.
-			await SendTradeRpc(recipientId, GameCharInterfaceMethods.DispatchCompleteTrade, []);
-			if (ClientForCharacter(recipientId) is { } client)
-				await SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
-		}
-
-		Task ITradeOutbound.SendWalletUpdate(uint characterId, ulong balanceTin)
-		{
-			return ClientForCharacter(characterId) is { } client
-				? SendUpdateCash(client, balanceTin, UpdateCashReason.Spend) // a sync, not a celebrated gain - either side may be down money
-				
-				: Task.CompletedTask;
-		}
-
-		Task ITradeOutbound.SendItemRemoved(uint characterId, uint slot)
-		{
-			return ClientForCharacter(characterId) is { } client
-				? SendRemoveItem(client, ContainerKind.Bag, slot)
-				: Task.CompletedTask;
-		}
-
-		async Task<int?> ITradeOutbound.GrantItemToCharacter(uint characterId, uint itemTemplateId, uint count)
-		{
-			// Resolving the connection here is the whole point of the character-id form: the trade path holds only
-			// the receiver's id, and everything past this line is the shared grant - persistence, the live add, the
-			// quest-container routing and AdvanceCollectGoals (#726).
-			return ClientForCharacter(characterId) is { } client
-				? await GrantItemToBackpack(client, itemTemplateId, count)
-				: null;
-		}
-
-		// The HAND-OVER form: the same delivery, except `transferring` MOVES instead of a new instance being minted, so
-		// the item keeps its identity, its crafter and its gems (#750).
-		async Task<int?> ITradeOutbound.TransferItemToCharacter(uint characterId, ItemInstance instance)
-		{
-			return ClientForCharacter(characterId) is { } client
-				? await GrantItemToBackpack(client, instance.TemplateId, instance.Count, transferring: instance)
-				: null;
-		}
-
-		// One place the trade replies are addressed from, so the endpoints cannot drift between them. Silently no-ops for
-		// a character who is not connected here - a partner who vanished mid-trade is TradeService's problem, not the
-		// wire's.
-		private Task SendTradeRpc(uint characterId, GameCharInterfaceMethods opcode, byte[] body)
-		{
-			return ClientForCharacter(characterId) is { } client
-				? client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x10), client.Endpoint(RpcInterfaces.GameCharInterfaceType), opcode, body))
-				: Task.CompletedTask;
-		}
-
-		private async Task<int> BackpackCapacity(uint characterId)
-		{
-			var bag = await Database.GetCharacterItemSlot(characterId, ContainerKind.Equipped, (int)CharacterEquipmentSlot.Bag);
-			return (int)(BaseBackpackSlots + (bag?.Template.BagExtraSlots ?? 0));
-		}
-
 		// The first free backpack cell, skipping occupied ones. The backpack size is 24 base + the equipped bag's extra
 		// slots (#12), so a grown bag can be filled. Null = full. Read-only DB helper (mirrors
 		// AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
 		private async Task<int?> FindFreeBagSlot(uint characterId)
 		{
 			var taken = (await Database.GetCharacterItems(characterId, ContainerKind.Bag)).Select(i => i.Slot).ToHashSet();
-			var capacity = await BackpackCapacity(characterId);
+			var capacity = await _economyOutbound.BackpackCapacity(characterId);
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
-		// The first free cell (0..capacity-1) in `container`, skipping persisted rows.
-		// `preferred` is the slot the player DROPPED the item on (the loot window's drag target, #462).
-		//
-		// An OCCUPIED preferred slot falls through to the first free one, and that is a game rule rather than a
-		// fallback: the player really did drop it there, the bag has already handed the item over, and neither losing
-		// the item nor overwriting what is in the slot is a defensible answer.
-		//
-		// An OUT-OF-RANGE one is a different thing entirely - the client cannot drop an item outside the backpack, so
-		// it means we misread the wire - and it THROWS. Quietly treating it as "first free" would make a
-		// mis-parsed body look like a working loot.
-		private async Task<int?> FindFreeContainerSlot(uint characterId, ContainerKind container, int capacity, int? preferred = null)
-		{
-			if (preferred is { } slot && (slot < 0 || slot >= capacity))
-				throw new ArgumentOutOfRangeException(nameof(preferred), slot, $"a requested {container} slot outside 0..{capacity - 1} cannot come from the client - the body was misread.");
-
-			var taken = (await Database.GetCharacterItems(characterId, container)).Select(i => i.Slot).ToHashSet();
-			if (preferred is { } wanted && !taken.Contains(wanted))
-				return wanted;
-
-			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
-		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
-		// survives relog via the world-entry snapshot) AND pushes the live DispatchAddItem so it appears
-		// immediately. The entry is the proven snapshot entry (SnapshotItems.ListEntry().Item - the
-		// 3-stat form that renders in-client), and itemId/recordId use FullCharacterRoots's deterministic
-		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
-		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
-		// The live add is UNCONDITIONAL, loot included. This used to carry a `pushLiveAdd` flag that loot passed false,
-		// on the claim that "retail sends NO inventory-add for normal loot - the client moves it from the bag locally".
-		// The captures say the opposite: both a loot-all (Hoxxling gameplay, c2s 0x2043 at fr1487) and a single drag
-		// (loot-drag-1538, c2s 0x2046 at fr619) are answered with three 0x201c DispatchSetItemStat and a 0x2020
-		// DispatchAddItem. Our own client agrees - persist-only left the items un-takeable (see LootService). The flag
-		// went dead when loot moved onto the IEconomyOutbound port, which has no such parameter; removing it here makes
-		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
-		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
-		// slot index means nothing.
-		//
-		// `transferring` turns this from a MINT into a HAND-OVER: the delivery, the slot search, the live add, the
-		// quest-container routing and AdvanceCollectGoals are all identical, but the named instance MOVES into the found
-		// cell instead of a new one being created. That is what a player trade is, and re-minting there silently
-		// destroyed the item's crafter and its socketed gems. It is a parameter rather than a second method precisely so
-		// the choke point stays ONE path - InventoryGrantChokePointTests exists to stop a delivery growing its own.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, int? preferredSlot = null, string? creatorName = null,
-			ItemInstance? transferring = null)
-		{
-			// ⚠️ Every refusal below says WHY. This method used to return a bare `null` from three different places -
-			// no template, no free slot, the delivery itself failing - and the caller could not tell them apart, so a
-			// grant that silently did nothing looked identical to a grant that had never been asked for. #824 is what
-			// that costs: harvesting a `Spool of Thread` played the whole node animation and put nothing in the bag,
-			// and the reason (its template is not in `Items`) appeared in no log anywhere.
-			var item = await Database.GetItem(itemTemplateId);
-			if (item == null)
-			{
-				// A DATA gap rather than a player condition, so it is a warning: something in the world - a quest
-				// goal, a loot table, a harvest node - is pointing at a template we do not hold. Almost always an
-				// item no capture ever showed, whose TEA key is therefore unrecoverable (#203), which is why the row
-				// cannot simply be added.
-				Logger.LogWarning("Grant refused for {Char}: item template {Template} is not in Items, so there is nothing to hand over.",
-					client.Session.Character.Name, itemTemplateId);
-				return null;
-			}
-
-			var characterId = client.Session.Character.Id;
-
-			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
-			// land in the player's quest-items tab (#261).
-			//
-			// There is no longer a hash gate here. A normal bag item used to REQUIRE a harvested hash (#719): the
-			// world-entry snapshot renders `Hash != 0` only, so persisting a hash-less row left the item invisible
-			// after a relog, and `RedeliverNonSnapshotBagItems` papered over that by re-pushing it as a live add on
-			// every world entry - re-announcing "You received [X]" on every MAP CHANGE. #723 removed the premise:
-			// every item now HAS a token, harvested or minted (AcgHash.ForWire), so the snapshot renders it and the
-			// grant no longer has to refuse the 232 templates no capture ever showed entering an inventory.
-			var isQuestItem = item.Type == ItemType.Quest;
-
-			var kind = isQuestItem
-				? ContainerKind.Quest
-				: ContainerKind.Bag;
-			var capacity = isQuestItem
-				? 48 // quest tab holds 48 (NewContainer(QuestKind, 48))
-				: await BackpackCapacity(characterId); // backpack = 24 base + the equipped bag's extra slots
-			var slot = await FindFreeContainerSlot(characterId, kind, capacity, isQuestItem
-				? null
-				: preferredSlot);
-			if (slot == null)
-			{
-				// An ordinary PLAYER condition, not a defect - a full bag is a thing that happens - so it is
-				// informational. It is still stated, because "nothing arrived" reads the same to the player either
-				// way and the two need different answers from whoever reads the log.
-				Logger.LogInformation("Grant refused for {Char}: no free {Kind} slot for item {Template} ({Name}).",
-					client.Session.Character.Name, kind, itemTemplateId, item.Name);
-				return null;
-			}
-
-			// The instance the client is about to be told about, and the id the live add and the next login's snapshot
-			// both name it by (#750). The two used to agree via a formula over (instance, kind, slot); they agree by
-			// identity now. A GRANT mints it here; a HAND-OVER moves the existing one, keeping everything hanging off it.
-			var delivered = transferring != null
-				? await Database.TransferCharacterItem(transferring.Id, characterId, kind, slot.Value)
-				: await Database.SetCharacterItemSlot(characterId, kind, slot.Value, itemTemplateId, count, creatorName);
-			if (delivered == null)
-			{
-				// A free slot was found and the write still did not produce a row - so this one is neither a data gap
-				// nor a full bag, and it is the only one of the three that should never happen.
-				Logger.LogWarning("Grant failed for {Char}: {Kind}[{Slot}] was free and item {Template} ({Name}) still did not persist.",
-					client.Session.Character.Name, kind, slot.Value, itemTemplateId, item.Name);
-				return null;
-			}
-
-			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
-			var containerType = isQuestItem
-				? ContainerKind.Quest
-				: ContainerKind.Bag;
-			// The LIVE-ADD stat list, not the snapshot's - retail's two shapes differ (#722).
-			// The INSTANCE overload: a hand-over can carry an item that has already BOUND to its previous owner, and
-			// only the row knows that. Spreading it back into loose scalars is how the crafter and the sockets got
-			// lost before #750, and the bound bit would have been the next one.
-			var entry = SnapshotItems.LiveAddEntry(delivered, FullCharacterRoots.ItemId(delivered.Id),
-				FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value));
-			await SendAddItem(client, containerType, (uint)slot.Value, entry);
-
-			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got
-			// here (quest-pickup node, corpse bag, vendor, harvest, claim, .additem). This is the one choke point every
-			// grant passes through, which is why the hook lives here rather than in each caller.
-			await _questProgression.AdvanceCollectGoals(client, itemTemplateId, count);
-			return slot;
-		}
-
-		// Pushes the s2c UpdateInventoryIIR (0xA74D2814) for the player's OWN Equipped(101) and Bag(104) containers,
-		// in full - retail's "here is your inventory again" after the SERVER changes it behind the player's back (#380).
-		//
-		// Decoded from Hoxxling_mage-heraldofxotli_login_gameplay2, where the Slave Manacles come off:
-		//   f5109 c2s ScryScriptIIR "ShacklesOff"
-		//   f5115 s2c DispatchRemoveItem   [container 101][char][pos 0x12][amount 0]
-		//   f5118 s2c UpdateInventoryIIR   kind=101 Equipped cap=1028   (522 B)
-		//   f5118 s2c UpdateInventoryIIR   kind=104 Bag      cap=24     (1141 B)
-		// i.e. a server-initiated removal followed by BOTH containers whole, in the same frame. Note it is NOT the
-		// answer to the c2s probe of the same opcode - retail answers those never (34 requests, 0 replies).
-		//
-		// The payload is plain ProtoInventoryGame, the same schema the login snapshot carries, so it is built by the
-		// SAME BuildContainers call rather than a second inventory serialiser - capacities included (Equipped 1028,
-		// Bag 24 + the equipped bag's extra slots), which is what the capture shows.
-		private async Task SendUpdateInventory(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			var containers = FullCharacterRoots.Containers(characterId, await Database.GetCharacterItems(characterId));
-
-			// containers[0] = Equipped(101), [1] = Bag(104) - the two retail pushes. The Resource and Quest containers
-			// it also builds are NOT pushed: the capture carries exactly these two.
-			foreach (var container in containers.Take(2))
-			{
-				using var ms = new MemoryStream();
-				Serializer.Serialize(ms, container);
-				var payload = ms.ToArray();
-
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
-					s => s.WriteArrayUInt32Length(UpdateInventoryCodec.Build(new UpdateInventoryIIR(characterId, 0x00, payload)))));
-			}
-
-			Logger.LogDebug("Pushed UpdateInventoryIIR for {Character}: Equipped + Bag (#380).", client.Session.Character.Name);
 		}
 
 		// Removes an item from the player's backpack: deletes the persisted bag item (so it stays gone across relog) AND
@@ -528,56 +192,13 @@ namespace Faolan.GameServer
 				return false;
 
 			await Database.SetCharacterItemSlot(characterId, ContainerKind.Bag, slot, null);
-			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
+			await EconomyOutbound.SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
 
 			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
 			// case - the server took something out of the bag, the player did not move it - which is the shape the
 			// ShacklesOff capture shows. A player-initiated move is NOT followed by one: the client already knows.
-			await SendUpdateInventory(client);
+			await _economyOutbound.SendUpdateInventory(client);
 			return true;
-		}
-
-		// Takes `count` of an item template OUT of the player's inventory and returns how many were actually removed
-		// (IEconomyOutbound). The inverse of GrantItemToBackpack, used by a quest HAND-IN: delivering three stone bricks
-		// to Turach takes the three bricks.
-		//
-		// Deliberately NOT backpack-only, unlike RemoveItemFromBackpack. A quest item lives in the Quest container
-		// (0x71), so a bag-only walk would report success while removing nothing - and the delivery check that gates
-		// this sums the same way, across every container.
-		//
-		// Removes EXACTLY `count`: a slot holding more than is still wanted is DECREMENTED, never cleared, so handing
-		// in 3 of 5 bricks leaves 2. Slots are taken in order and a partial take is reported rather than silently
-		// tolerated - the caller has already verified the player holds enough, so a short result means the inventory
-		// changed underneath us and is worth a log line, not a shrug.
-		private async Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
-		{
-			if (count == 0)
-				return 0;
-
-			var characterId = client.Session.Character.Id;
-			var steps = InventoryTake.Plan(await Database.GetCharacterItems(characterId), itemTemplateId, count);
-
-			foreach (var step in steps)
-			{
-				// A partial take DECREMENTS the item in place - the crafter and any socketed gems stay on it because the
-				// row is not re-minted (#750).
-				if (step.Remaining == 0)
-					await Database.SetCharacterItemSlot(characterId, step.Container, step.Slot, null);
-				else
-					await Database.SetCharacterItemCount(characterId, step.Container, step.Slot, step.Remaining);
-
-				await SendRemoveItem(client, step.Container, (uint)step.Slot, step.Taken);
-			}
-
-			var removed = InventoryTake.Total(steps);
-			if (removed > 0)
-			{
-				// Same follow-up as RemoveItemFromBackpack, and for the same reason: this is a SERVER-initiated removal,
-				// which retail follows with both containers in full (#380).
-				await SendUpdateInventory(client);
-			}
-
-			return removed;
 		}
 
 		// #792: the CloseShop ACK. Retail answers `CloseShop` with `DispatchAbortTrade` (GameCharInterface `0x6A`,
@@ -607,19 +228,6 @@ namespace Faolan.GameServer
 		internal static Task SendTeleportPending(INetworkClient client)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTeleportStarted, _ => { }));
-		}
-
-		// Closes a craft: retail's last word on the transaction, after the product add and the ingredient removals.
-		// The body is the RECIPE ID and nothing else - the capture's `0000000F` is recipe 15, whose own rows are Plain
-		// Hilt Piece x1 + Copper x4 + Silver x4 -> Bloodsilver Khopesh, matching the removals that precede it.
-		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_5 fr17402]
-		//
-		// Sent ONLY on success. Retail has no failure form here, and a completion over a craft that did not happen
-		// would tell the client to close its window on an item it never got.
-		private static Task SendTradeskillComplete(INetworkClient client, uint recipeId)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTradeskillComplete,
-				b => b.WriteUInt32(recipeId)));
 		}
 
 		// Awards a TAG (#748): `DispatchAddTag`, body = the tag id and nothing else, 4 bytes. That covers two
@@ -691,16 +299,6 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. matches.Select(ChatMarkup (m) => $"{m.Id}: {m.Name}")]));
-		}
-
-		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
-		// record stream (the retail money updates ride that conversation).
-		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
-		{
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchUpdateCash,
-				UpdateCashCodec.Build(new UpdateCash(balanceTin, reason))));
-
-			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
 		}
 
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
@@ -852,16 +450,6 @@ namespace Faolan.GameServer
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(RpcInterfaces.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob, bodyWithLenPrefix.ToArray());
 		}
 
-		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
-		// updates (0x2005) ride.
-		private static async Task SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
-		{
-			var charId = client.Session.Character.Id;
-
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchAddItem,
-				AddItemCodec.Build(new AddItem(containerType, charId, itemPos, entry, feedback))));
-		}
-
 		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
 		// [u32 itemId][u32 itemId][u32 0][u32 count] followed by the two 24-byte identity halves the capture repeats,
 		// which we send as zero: the client renders the item from the id, and the halves it echoes are the same value
@@ -900,47 +488,9 @@ namespace Faolan.GameServer
 		//
 		// The carrier's [u32 len] is the SENDER's (#530 rule 2), which is what WorldIir.Send writes - the codec emits
 		// the record alone.
-		private static Task SendFeedback(INetworkClient client, FeedbackPayload payload)
+		internal static Task SendFeedback(INetworkClient client, FeedbackPayload payload)
 		{
 			return WorldIir.Send(client, FormatFeedbackCodec.Build(client.Session.Character.Id, payload));
-		}
-
-		// A gem went into a socket (#754). Retail's answer to the socketing request is exactly two messages:
-		// DispatchAddToItemSlot for the cell that RECEIVED the gem, then DispatchRemoveItem for the cell the gem
-		// left. The socketed item's own container entry is NOT re-sent - the client updates it in place from the
-		// first message, which is why nothing here rebuilds the inventory.
-		// [V2: NecroL80_mage-necromancer_login_gameplay_annotated_8.tshark.json fr8248 - both in the same frame]
-		private async Task SendGemSocketed(INetworkClient client, ContainerKind container, uint targetSlot, ItemInstanceSocket socket, uint gemSlot)
-		{
-			var charId = client.Session.Character.Id;
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), AddToItemSlotCodec.Method,
-				AddToItemSlotCodec.Build(container, charId, targetSlot, socket)));
-
-			await SendRemoveItem(client, container, gemSlot);
-		}
-
-		// The GUILD BANK vault (#654), pushed as part of the banker open. The same container builder the personal
-		// bank uses, with the guild id where a character id would go.
-		private static Task SendGuildBankData(INetworkClient client, ProtoInventoryGame vault)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankCodec.Method,
-				GuildBankCodec.Build(vault)));
-		}
-
-		// The echo acknowledging a guild-bank item move - the request's own six values, raw.
-		private static Task SendGuildBankMove(INetworkClient client, GuildBankMove move)
-		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GuildBankMoveCodec.Method,
-				GuildBankMoveCodec.Build(move)));
-		}
-
-		// Pushes a live item removal to the client (the inverse of SendAddItem).
-		private static async Task SendRemoveItem(INetworkClient client, ContainerKind containerType, uint itemPos, uint amountToRemove = 0)
-		{
-			var charId = client.Session.Character.Id;
-
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchRemoveItem,
-				RemoveItemCodec.Build(new RemoveItem(containerType, charId, itemPos, amountToRemove))));
 		}
 
 		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the

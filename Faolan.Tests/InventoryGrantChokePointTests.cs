@@ -31,9 +31,14 @@ namespace Faolan.Tests
 		// file -> (expected call count, why those calls are not a bypass)
 		private static readonly Dictionary<string, (int Calls, string Why)> Writers = new()
 		{
+			["Faolan/GameServer/Economy/EconomyOutbound.cs"] =
+				(2, "THE choke point itself (GrantItemToBackpack) + TakeItemsFromInventory's per-step clear. The only file "
+				    + "allowed to write a GRANT. It was GameServerListener.Outbound.cs until #826 moved the economy wire "
+				    + "off the listener; the choke point moved with it, the rule did not."),
+
 			["Faolan/GameServer/GameServerListener.Outbound.cs"] =
-				(3, "THE choke point itself (GrantItemToBackpack) + two removals: the bag clear and TakeItemsFromInventory's "
-				    + "per-step clear. The only file allowed to write a GRANT."),
+				(1, "a removal - RemoveItemFromBackpack's bag clear. It kept this one when the grant left for "
+				    + "EconomyOutbound, and a clear cannot introduce an item, so it cannot newly tick a collect goal."),
 
 			["Faolan/GameServer/Inventory/EquipmentService.cs"] =
 				(2, "a drop (clearing the dropped cell) and the new half of a stack SPLIT. Splitting is the one inventory "

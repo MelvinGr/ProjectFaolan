@@ -369,7 +369,7 @@ namespace Faolan.GameServer
 					// implicit client-side removal, so without this the dropped item stays visible until next login.
 					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
 					if (drop?.ContainerId?.Type == (uint)ContainerKind.Bag)
-						await SendRemoveItem(client, (ContainerKind)drop.ContainerId.Type, (uint)drop.ItemPos);
+						await EconomyOutbound.SendRemoveItem(client, (ContainerKind)drop.ContainerId.Type, (uint)drop.ItemPos);
 
 					break;
 				}
@@ -2415,7 +2415,7 @@ namespace Faolan.GameServer
 							// is precisely how #824 presented. Both reasons a grant can fail want the node LEFT
 							// STANDING: a full backpack means try again after making room, and a template we do not
 							// hold means this node can never pay out and should not pretend to.
-							if (await GrantItemToBackpack(client, pickedItem) != null)
+							if (await _economyOutbound.GrantItemToBackpack(client, pickedItem) != null)
 								await _broadcaster.MarkPickupHarvested(client, target);
 							else
 								await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "You cannot carry that.");

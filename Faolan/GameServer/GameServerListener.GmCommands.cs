@@ -57,7 +57,7 @@ namespace Faolan.GameServer
 
 			// Persist + deliver live via DispatchAddItem (0x2020) - it appears without a relog now that the live
 			// add path exists (the old "no live add packet exists" caveat is gone).
-			var slot = await GrantItemToBackpack(client, itemId, count);
+			var slot = await _economyOutbound.GrantItemToBackpack(client, itemId, count);
 			if (slot == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Bag is full (24 cells).");

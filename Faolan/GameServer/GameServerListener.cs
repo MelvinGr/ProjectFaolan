@@ -39,8 +39,8 @@ namespace Faolan.GameServer
 {
 	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
 	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
-	public partial class GameServerListener : RpcServer, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
-		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IApprenticeOutbound, ILevelUpOutbound,
+	public partial class GameServerListener : RpcServer, IEnvironmentOutbound, ISpellEffectOutbound,
+		ISpellweaveOutbound, ITravelOutbound, IApprenticeOutbound, ILevelUpOutbound,
 		IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
@@ -165,6 +165,11 @@ namespace Faolan.GameServer
 		// #826: the quest-share wire, off this class and onto the ConnectionRegistry seam. Also the single owner of
 		// the live-character view - GetCharacterLiveState below forwards here.
 		private readonly QuestShareOutbound _questShare;
+
+		// #826: the wallet / item-grant wire, and the trade wire on top of it. The five economy services and
+		// TradeService take THESE now, not the listener.
+		private readonly EconomyOutbound _economyOutbound;
+		private readonly TradeOutbound _tradeOutbound;
 
 		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
 		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
@@ -343,16 +348,21 @@ namespace Faolan.GameServer
 				await SendWorldHandoff(client);
 			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
-			_trade = new TradeService(database, logger, this);
+			_trade = new TradeService(database, logger, _tradeOutbound);
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
 			// #820: built BEFORE the quest rewards, which now pay experience through it. A quest award is a second
 			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
 			_levelUp = new LevelUpService(database, _simulation, this, logger);
-			_questRewards = new QuestRewardService(database, _broadcaster, this, _levelUp.ApplyXp, logger);
+			// Built BEFORE the quest services, which take it as IEconomyOutbound. The one thing it needs BACK from them
+			// - the post-grant collect-goal tick - is bound below, because that pair is a genuine cycle.
+			_economyOutbound = new EconomyOutbound(Connections, database, logger);
+			_tradeOutbound = new TradeOutbound(Connections, _economyOutbound);
+			_questRewards = new QuestRewardService(database, _broadcaster, _economyOutbound, _levelUp.ApplyXp, logger);
 			_dailyChallenges = new DailyChallengeService(database, logger);
-			_questProgression = new QuestProgressionService(database, _broadcaster, this, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
+			_questProgression = new QuestProgressionService(database, _broadcaster, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
+			_economyOutbound.BindCollectGoals(_questProgression.AdvanceCollectGoals);
 			_spellEffects = new SpellEffectService(database, this, logger);
 			_spellModifiers = new SpellModifierService(database);
 			_fatality = new FatalityService(logger, this, _spellEffects);
@@ -369,16 +379,16 @@ namespace Faolan.GameServer
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
-			_loot = new LootService(_broadcaster, _broadcaster.Bags, this, database, _questProgression, agentServerDispatcher, logger);
+			_loot = new LootService(_broadcaster, _broadcaster.Bags, _economyOutbound, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);
-			_shop = new ShopService(database, logger, this);
-			_bank = new BankService(database, logger, this);
-			_tradepost = new TradepostService(database, logger, this, csPlayerAgentDispatcher);
-			_guildBank = new GuildBankService(database, this, logger);
-			_tradeskill = new TradeskillService(database, this, _broadcaster, agentServerDispatcher, logger);
-			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
+			_shop = new ShopService(database, logger, _economyOutbound);
+			_bank = new BankService(database, logger, _economyOutbound);
+			_tradepost = new TradepostService(database, logger, _economyOutbound, csPlayerAgentDispatcher);
+			_guildBank = new GuildBankService(database, _economyOutbound, logger);
+			_tradeskill = new TradeskillService(database, _economyOutbound, _broadcaster, agentServerDispatcher, logger);
+			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
 			_environment = new EnvironmentService(database, this, logger);

@@ -24,7 +24,7 @@ namespace Faolan.GameServer
 
 		Task ITravelOutbound.SendTravelFeeCharged(INetworkClient client, ulong balanceTin)
 		{
-			return SendUpdateCash(client, balanceTin, UpdateCashReason.Spend);
+			return _economyOutbound.SendUpdateCash(client, balanceTin, UpdateCashReason.Spend);
 		}
 
 		// A cross-map trip is the ordinary changemap handoff - the same path GM .teleport and the recalls take, so
