@@ -477,12 +477,16 @@ suite reads. It has two halves, and the difference decides which one a new gate 
   moment captures are added and the gate fails on data that is MORE correct than the evidence it demands. That is
   what the `*-check` reports are — each one a shipped-data gate moved out of a test and run against the real dumps,
   where there is no second population: **`npc-pose-check`** (from `NpcStatCoreColumnsTests`),
-  **`item-level-check`** (from `ItemLevelTests`, now deleted) and **`buff-duration-check`** (from
-  `MagicBuffCorpusTests`). The test is the right home only for a property of the CODE (a round-trip, a field
+  **`item-level-check`** (from `ItemLevelTests`, now deleted), **`buff-duration-check`** (from
+  `MagicBuffCorpusTests`) and **`acg-token-check`** (from `AcgHashTests`). The test is the right home only for a property of the CODE (a round-trip, a field
   sweep), never for one of the DATA. ⚠️ And a moved check PRINTS its populations instead of pinning them: a count
   that moves when captures are added is a fact about the data, so only the direction that can only be a defect
   stays asserted (`buff-duration-check` returns non-zero on an apply that outlasts a row stating a real duration,
-  and merely reports the rows still at the empty placeholder).
+  and merely reports the rows still at the empty placeholder). ⭐ `acg-token-check` is the clearest case of the
+  rule: its assertion is a BIRTHDAY PROBLEM in the item population (~1.5 expected collisions per `AcgHash.Salt`,
+  so any salt is clean ~22% of the time), it gets likelier to fire with every capture harvested, and its only fix
+  — re-roll the salt — is a coin flip. As a test that is a gate whose failure means the data grew; as a report it
+  prints the count, the expectation to compare it against, and the next clean salt.
 
 ```zsh
 dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures

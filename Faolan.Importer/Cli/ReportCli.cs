@@ -36,6 +36,9 @@ namespace Faolan.Importer.Cli
 			var arg = options.ReportArg;
 
 			// The DB-only reports never touch the corpus, so they run before the captures check below.
+			if (report == "acg-token-check")
+				return await AcgTokenCheck();
+
 			if (report == "sql-seed")
 				return await SqlSeed(arg);
 

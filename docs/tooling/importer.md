@@ -298,6 +298,14 @@ test it had to read the input through `fixtures.bin`'s frozen corpus half, and t
 captures are added — on 2026-08-08 the extract called the Knight's shipped `anim_idle_id` an outlier at 12:2 from a
 sample of fourteen while the shipped value came from a run over captures the extract had never seen. Exit code 1 when
 something is flagged, so it can gate a re-import) ·
+`acg-token-check` (#729's rule applied to the ACGHash token space: `Items.Hash` is the HARVESTED token — 0 when no
+capture ever showed that template entering an inventory — and `AcgHash.Mint` supplies the rest, so a minted token
+must not land on a harvested one or on another minted one, which is the one-token-per-template property retail
+keeps. ⭐ It is a report and not a test because the assertion is a BIRTHDAY PROBLEM in the item population, not a
+property of the code: with 4,615 harvested and 529 minted tokens in a 36^4 space the expectation is 1.54
+collisions per salt, so any given salt is clean about 22% of the time — measured, 90 of 400 consecutive salts —
+and every capture harvested makes it likelier. It prints the count, the expectation to read it against, and the
+next clean `AcgHash.Salt`; exit code 1 only when a collision actually exists) ·
 `quest-rewards` (#464: the four reward lists inside every captured `Quest_c` journal record - what the codec
 carried as *"16 raw u32s, unvalidated"* until the whole corpus was swept, because the beach starter is the one
 record that carries NONE of them. Each 16-word element is one reward ITEM: `[instance][questId]` then the ACG

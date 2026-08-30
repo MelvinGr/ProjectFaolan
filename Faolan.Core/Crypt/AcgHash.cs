@@ -29,17 +29,32 @@ namespace Faolan.Core.Crypt
 	public static class AcgHash
 	{
 		// The token alphabet, in base-36 digit order. The client's reader also accepts '_', but no retail item
-		// token uses one (0 of 3,993), so minting stays inside the proven set rather than relying on an untested
-		// byte.
+		// token uses one (0 of 4,615), so minting stays inside the proven set rather than relying on an untested
+		// byte. That unused byte is also the structural fix for salt collisions - see Salt.
 		private const string Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 		// 36^4 = 1,679,616 distinct tokens.
 		public const uint Space = 36u * 36u * 36u * 36u;
 
-		// Bump this if AcgHashTests.MintedTokens_NeverCollideWithAHarvestedOne ever fails: it re-rolls every
-		// minted token. A collision is not a correctness bug (the client resolves nothing through the token) but
-		// two templates sharing an identity is a property retail maintains, so we maintain it too.
-		private const uint Salt = 0x14D6F0A9;
+		// Re-rolls every minted token. A collision is not a correctness bug (the client resolves nothing through the
+		// token) but two templates sharing an identity is a property retail maintains, so we maintain it too -
+		// `--report acg-token-check` scores the shipped data and names the next clean salt.
+		//
+		// ⚠️ A bump is a LOTTERY, not a fix, and the numbers say so. With today's population (5,144 items: 4,615
+		// harvested, 529 minted) the expected number of collisions per salt is
+		//     529x4615/36^4 (minted vs harvested) + 529^2/(2x36^4) (minted vs minted) = 1.45 + 0.08 = 1.54,
+		// so a given salt is clean with probability e^-1.54 ~ 22% - measured, not estimated: 90 of 400 consecutive
+		// salts are clean. It WILL fire again, and the dominant term grows every time captures are harvested.
+		//
+		// The structural fix, when someone wants one: the client's reader accepts '_' and **zero of the 4,615
+		// harvested tokens contain one**, so minting into the '_'-bearing part of the space is disjoint from every
+		// harvested token BY CONSTRUCTION and kills the 1.45. It is not done here because '_' is the one byte the
+		// in-client check never exercised ('ZZZZ' and 'ZZZY' were), and shipping it unverified would risk 529
+		// currently-working items rendering as nothing. Gitea #899 carries it, gated on that check.
+		private const uint Salt = 0x14D6F0B6;
+
+		/// <summary>The salt in force, so `--report acg-token-check` can sweep forward from it for a clean one.</summary>
+		public const uint CurrentSalt = Salt;
 
 		// The token to put on the wire for a template: the HARVESTED one when a capture ever showed this template
 		// entering an inventory, otherwise a minted one.
@@ -59,10 +74,20 @@ namespace Faolan.Core.Crypt
 		// processes and sessions, so the live add and the next login's snapshot agree without storing anything.
 		public static uint Mint(uint templateId)
 		{
+			return MintWith(templateId, Salt);
+		}
+
+		/// <summary>
+		///     <see cref="Mint" /> with an explicit salt, for the report that sweeps for a clean one. Production always
+		///     goes through <see cref="Mint" />: a settable salt would let two processes mint different tokens for the
+		///     same template, which is the one property minting has to keep.
+		/// </summary>
+		public static uint MintWith(uint templateId, uint salt)
+		{
 			// FNV-1a over the template id, reduced into the token space. The choice of mixer is arbitrary - the
 			// retail value is uniformly random, so any good mixer is as faithful as another; what matters is that
 			// it is deterministic and lands in-charset.
-			var h = 0x811C9DC5u ^ Salt;
+			var h = 0x811C9DC5u ^ salt;
 			for (var i = 0; i < 4; i++)
 			{
 				h ^= (templateId >> (8 * i)) & 0xFF;

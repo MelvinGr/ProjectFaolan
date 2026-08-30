@@ -13,13 +13,6 @@ namespace Faolan.Tests
 	// opaquely: it validates the four characters and resolves nothing through them.
 	public class AcgHashTests
 	{
-		private readonly ITestOutputHelper _o;
-
-		public AcgHashTests(ITestOutputHelper o)
-		{
-			_o = o;
-		}
-
 		// The property that makes minting safe in the first place: the client's reader accepts [0-9A-Z_] and
 		// rejects everything else, so a token built any other way would be refused for its BYTES rather than for
 		// its identity - which is the false negative that nearly killed this investigation.
@@ -56,31 +49,24 @@ namespace Faolan.Tests
 			Assert.Equal("60GP", AcgHash.Token(909133648)); // the harvested Feywater token, as text
 		}
 
-		// Retail keeps one token per template: 3,993 harvested values, 3,993 distinct, and 0 templates carrying two
-		// across 107,929 sightings in the capture dumps. A minted token that duplicated a harvested one would break
-		// that property, so the gate holds it - bump AcgHash.Salt if it ever fires.
+		// ⛔ The "no minted token collides with a harvested one" gate USED to live here and is now
+		// `--report acg-token-check` (#729's rule). It scored SHIPPED DATA and failed as that data GREW rather than
+		// as the code broke: the collision count is a birthday problem in the item population, ~1.5 expected per
+		// salt today, so any salt is clean about 22% of the time and every capture harvested makes it worse. Its
+		// only sanctioned fix - re-roll AcgHash.Salt - is a coin flip, which is exactly the "weaken the gate"
+		// pressure #729 describes. The report prints the count, the expectation it should be compared against, and
+		// the next clean salt.
+		//
+		// What stays here is what is a property of the CODE, plus the one data check whose failure can only ever be
+		// a defect rather than growth: a malformed Items.Hash is a bad import, not evidence the gate outgrew.
+
+		// The salted form the `acg-token-check` sweep uses must agree with production at the salt in force - otherwise
+		// the salt it recommends is for a different mixer than the one that will run.
 		[Fact]
-		public async Task MintedTokens_NeverCollideWithAHarvestedOne()
+		public void MintWith_TheCurrentSalt_IsExactlyMint()
 		{
-			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
-			var items = await db.Items.AsNoTracking().Select(i => new { i.Id, i.Hash, i.Name }).ToListAsync(TestContext.Current.CancellationToken);
-
-			var harvested = items.Where(i => i.Hash != 0).ToDictionary(i => i.Hash, i => i.Name);
-			var hashless = items.Where(i => i.Hash == 0).ToList();
-			_o.WriteLine($"{items.Count} items: {harvested.Count} harvested, {hashless.Count} minted");
-
-			var minted = new Dictionary<uint, string>();
-			var clashes = new List<string>();
-			foreach (var item in hashless)
-			{
-				var token = AcgHash.Mint(item.Id);
-				if (harvested.TryGetValue(token, out var owner))
-					clashes.Add($"  '{item.Name}' ({item.Id}) minted {AcgHash.Token(token)}, already harvested for '{owner}'");
-				else if (!minted.TryAdd(token, item.Name))
-					clashes.Add($"  '{item.Name}' ({item.Id}) minted {AcgHash.Token(token)}, already minted for '{minted[token]}'");
-			}
-
-			Assert.True(clashes.Count == 0, $"{clashes.Count} minted token(s) collide - bump AcgHash.Salt:\n" + string.Join("\n", clashes));
+			for (var id = 0u; id < 5000; id++)
+				Assert.Equal(AcgHash.Mint(id), AcgHash.MintWith(id, AcgHash.CurrentSalt));
 		}
 
 		// Every shipped token is one the client would accept. This covers the HARVESTED half too, so a bad import
