@@ -2447,7 +2447,7 @@ namespace Faolan.GameServer
 						break;
 					if (await _worldObjects.OpenWorldObject(client, target))
 						break;
-					if (await _broadcaster.OpenLootBag(client, target))
+					if (await _lootBroadcaster.OpenLootBag(client, target))
 						break;
 
 					// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an

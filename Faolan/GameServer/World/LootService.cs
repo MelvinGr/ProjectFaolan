@@ -17,11 +17,12 @@ namespace Faolan.GameServer.World
 	//   UL 0x2044 CloseLootBag [typetag][bag handle]                          -> drop the window without taking
 	//   UL 0x2045 TryLootCash  [typetag][bag handle]                          -> credit the bag's coins to the wallet
 	//   UL 0x2046 TryLootItem  [typetag][bag handle][display index]           -> grant the one dragged item
-	// Three collaborators, one per question (#826): the bag's CONTENTS are `LootBagContents`, the fade/close/window
-	// WIRE side is `WorldBroadcaster` (loot bags are world entities), and this service is the orchestration the
-	// dispatch switch used to carry inline - it pulls items off the bag via `LootBagContents` and grants them through
-	// the IEconomyOutbound port (the listener implements the latter). Extracted out of
-	// GameServerListener as a composed collaborator, mirroring ShopService (#200): the switch cases are now thin
+	// Two collaborators, one per question (#826): `LootBroadcaster` owns the loot LIFECYCLE - the corpse drop, the
+	// bag's fade/close, and (as its `Bags`) what is in each bag - while this service is the orchestration the
+	// dispatch switch used to carry inline: it pulls items off the bag and grants them through the IEconomyOutbound
+	// port. (It used to take the whole `WorldBroadcaster` plus its `Bags` property, on the reasoning that a loot bag
+	// is a world entity. It is - but that is the visibility system SERVING loot, not the two being one job.)
+	// Extracted out of GameServerListener as a composed collaborator, mirroring ShopService (#200): the switch cases are now thin
 	// one-liners delegating here, like the shop cases. Our client does NOT local-add from the bag (verified -
 	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
 	public sealed class LootService
@@ -31,14 +32,12 @@ namespace Faolan.GameServer.World
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
-		private readonly WorldBroadcaster _broadcaster;
-		private readonly LootBagContents _bags;
+		private readonly LootBroadcaster _loot;
 
-		public LootService(WorldBroadcaster broadcaster, LootBagContents bags, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression,
+		public LootService(LootBroadcaster loot, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression,
 			IChatServerDispatcher chat, ILogger logger)
 		{
-			_broadcaster = broadcaster;
-			_bags = bags;
+			_loot = loot;
 			_outbound = outbound;
 			_database = database;
 			_questProgression = questProgression;
@@ -54,7 +53,7 @@ namespace Faolan.GameServer.World
 			if (await _outbound.GrantItemToBackpack(client, itemTemplateId, preferredSlot: preferredSlot) != null)
 				return true;
 
-			_bags.ReturnBagItem(client, bagHandle, itemTemplateId, position);
+			_loot.Bags.ReturnBagItem(client, bagHandle, itemTemplateId, position);
 			if (client.Session.Character is { } character)
 				await _chat.SendSystemMessage(character.Id, "You have no room for that - free a slot and loot it again.");
 
@@ -66,7 +65,7 @@ namespace Faolan.GameServer.World
 		{
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
-			await _broadcaster.CloseLootBag(client, bagHandle);
+			await _loot.CloseLootBag(client, bagHandle);
 		}
 
 		// 0x2043 TryLootAll: the loot-all click. Grant every item the bag carries into the backpack (persist + live
@@ -77,9 +76,9 @@ namespace Faolan.GameServer.World
 			var bagHandle = body.ReadUInt32();
 
 			// Capture the bag's source NPC BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
-			var source = _bags.BagSource(client, bagHandle);
+			var source = _loot.Bags.BagSource(client, bagHandle);
 
-			var items = _bags.TakeBagItems(client, bagHandle);
+			var items = _loot.Bags.TakeBagItems(client, bagHandle);
 			var granted = 0;
 			foreach (var itemTemplateId in items)
 			{
@@ -105,7 +104,7 @@ namespace Faolan.GameServer.World
 			// Confirm the take + (since loot-all empties it) consume/fade the bag. A loot-all removes EVERY item slot
 			// the bag handed over, and retail says so in one message listing them all - the contiguous run [0..n-1]
 			// (#453). Passing nothing here sent a one-element [0] and left the client showing every slot but the first.
-			await _broadcaster.AfterLootTake(client, bagHandle, [.. Enumerable.Range(0, items.Count).Select(i => (uint)i)]);
+			await _loot.AfterLootTake(client, bagHandle, [.. Enumerable.Range(0, items.Count).Select(i => (uint)i)]);
 		}
 
 		// 0x2045 TryLootCash: credit the bag's coins. Coins AUTO-LOOT when the window opens - this is the client's very
@@ -120,14 +119,14 @@ namespace Faolan.GameServer.World
 			var bagHandle = body.ReadUInt32();
 
 			var character = client.Session.Character;
-			var cash = _bags.TakeLootCash(client, bagHandle);
+			var cash = _loot.Bags.TakeLootCash(client, bagHandle);
 			if (cash > 0 && character != null)
 			{
 				character.Money += cash;
 				await _database.SetCharacterMoney(character.Id, character.Money);
 				await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 				// Retail follows the balance update with the bag-window removal of the money row (#809).
-				await _broadcaster.AfterLootCash(client, bagHandle, cash);
+				await _loot.AfterLootCash(client, bagHandle, cash);
 				_logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 			}
 			else
@@ -154,14 +153,14 @@ namespace Faolan.GameServer.World
 
 			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} desired slot {Slot}.", bagHandle, itemIndex, looterHandle, desiredPosition);
 
-			var source = _bags.BagSource(client, bagHandle);
-			var item = _bags.TakeBagItem(client, bagHandle, (int)itemIndex);
+			var source = _loot.Bags.BagSource(client, bagHandle);
+			var item = _loot.Bags.TakeBagItem(client, bagHandle, (int)itemIndex);
 			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex, (int)desiredPosition))
 				await _questProgression.AdvanceLootGoals(client, source.Name!, item.Value, source.TemplateId); // #261: the goal wants THIS item
 
 			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
 			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.
-			await _broadcaster.AfterLootTake(client, bagHandle, itemIndex);
+			await _loot.AfterLootTake(client, bagHandle, itemIndex);
 		}
 	}
 }

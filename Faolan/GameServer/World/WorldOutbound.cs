@@ -35,6 +35,7 @@ namespace Faolan.GameServer.World
 	internal sealed class WorldOutbound : IWorldOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly LootBroadcaster _loot;
 		private readonly NpcBroadcaster _npcs;
 		private readonly WorldObjectService _worldObjects;
 		private readonly BuffService _buffs;
@@ -46,10 +47,11 @@ namespace Faolan.GameServer.World
 		// codebase already sanctions for exactly this case.
 		private readonly Func<INetworkClient, Task> _sendDismount;
 
-		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
+		public WorldOutbound(WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster loot, WorldObjectService worldObjects, BuffService buffs, CombatService combat, TradeskillService tradeskill, Func<INetworkClient, Task> sendDismount)
 		{
 			_broadcaster = broadcaster;
 			_npcs = npcs;
+			_loot = loot;
 			_worldObjects = worldObjects;
 			_buffs = buffs;
 			_combat = combat;
@@ -78,7 +80,7 @@ namespace Faolan.GameServer.World
 
 		public Task BroadcastCorpseFade(WorldEntity npc)
 		{
-			return _broadcaster.BroadcastCorpseFade(npc);
+			return _loot.BroadcastCorpseFade(npc);
 		}
 
 		public Task BroadcastEntityDespawn(WorldEntity entity)
@@ -145,7 +147,7 @@ namespace Faolan.GameServer.World
 
 		public Task DropCorpseLoot(WorldEntity npc)
 		{
-			return _broadcaster.DropCorpseLoot(npc);
+			return _loot.DropCorpseLoot(npc);
 		}
 
 		public Task MaintainAmbientPools()

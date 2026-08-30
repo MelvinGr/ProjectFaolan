@@ -64,7 +64,7 @@ and the body lies **beside** it for another half-minute.
 interest-managed — walk away from a body and it quits, walk back and it re-spawns — so the first quit is often
 that one. Reading it that way leaves the median at 33.18 s but drops the minimum to 6.96 s, which is the tell.
 
-1. **loot drop** (`NpcCorpseLootDropped` → `WorldBroadcaster.DropCorpseLoot`) rolls the drop and spawns a
+1. **loot drop** (`NpcCorpseLootDropped` → `LootBroadcaster.DropCorpseLoot`) rolls the drop and spawns a
    **SEPARATE** loot bag (its own handle, via `SpawnLootBagAt` — the standalone-bag path, decoupled in #246). The
    bag lives/loots/expires independently (a `ForLoot` entity, tick-expired) and SURVIVES the NPC's respawn. (Old
    `MakeCorpseLootable` reused the NPC handle in place — removed; it pinned the respawn to the death spot, #246.)

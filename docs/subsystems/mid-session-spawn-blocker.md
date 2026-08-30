@@ -100,7 +100,7 @@ mid-session world-conversation sender as unknown / "0").
   server-chosen and the client addresses us with an empty instance, so a consistent value should suffice.)
 - **Handle range** — REAL bug, fixed but insufficient. Retail mid-session handles are tiny (`0x000286xx`); the
   burst is `0x000818xx`; the char-id/player is `~0x0802xxxx`. Our allocator was `0x40000000` → out of range; fixed
-  `0x40000000`→`0x0F000000`→**`0x00090000`** (`WorldBroadcaster._nextLootHandle`). All three failed to render —
+  `0x40000000`→`0x0F000000`→**`0x00090000`** (`RuntimeHandleAllocator`). All three failed to render —
   small is necessary/correct but not sufficient.
 - **Body byte-correctness** — proven builders (`NpcSpawnBuilder`, `WorldObjectCodec`); the captured loot bag
   carried the correct beach playfield token `0x01EA985C`.

@@ -40,12 +40,12 @@ and `RuntimeHandleAllocator`):
 |---|---|
 | mid-session dynels (mount, interest NPCs) | `0x000286xx` |
 | world-burst NPCs | `0x000818xx` |
-| our loot / summon allocator (`_nextLootHandle`) | starts `0x00090000` — just above the burst NPCs, below the char-id range |
+| our loot / summon allocator (`RuntimeHandleAllocator`) | starts `0x00090000` — just above the burst NPCs, below the char-id range |
 | player / char-id | `~0x0131xxxx` … `0x0802xxxx` (`0x02000000+`) |
 
 **The failure mode:** the client only polls/tracks handles inside this band. A handle far above it — the old
 `0x40000000`, or even `0x0F000000` — is never polled (`client → 0x2020`), so the server never reaches
-`SpawnCheck 0x2008`, and the entity **never renders**. That is exactly why `_nextLootHandle` starts at
+`SpawnCheck 0x2008`, and the entity **never renders**. That is exactly why `RuntimeHandleAllocator` starts at
 `0x00090000` and not an arbitrary large number.
 
 **Necessary but not sufficient.** Being in-range only makes a mid-session spawn *eligible*. Our pushed

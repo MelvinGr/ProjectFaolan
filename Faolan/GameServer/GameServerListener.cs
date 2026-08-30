@@ -268,6 +268,10 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// The loot LIFECYCLE's wire side - a corpse's drop, the bag's open/close/fade - and what is IN each bag.
+		// See World/LootBroadcaster.cs.
+		private readonly LootBroadcaster _lootBroadcaster;
+
 		// What an NPC DOES, told to everyone who can see it - aggro, combat mode, movement, patrol, follow, respawn,
 		// scripted exit - plus putting a runtime NPC or pet in the world. The broadcaster answers the other half of
 		// the question, who can see what. See World/NpcBroadcaster.cs.
@@ -375,6 +379,8 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, _questMarkers, _questBroadcaster, _handles, _ambientPools);
 			// What an NPC DOES, as against who can see it. One-way: nothing in the broadcaster calls in here.
 			_npcs = new NpcBroadcaster(_simulation, database, _broadcaster, _ambientPools, _combos, _handles, logger);
+			// The loot LIFECYCLE (corpse drop -> bag -> take -> fade), and what is IN each bag. One-way like the two above.
+			_lootBroadcaster = new LootBroadcaster(_simulation, database, _broadcaster, _questMarkers, _handles, logger);
 			// The IQuestOutbound port itself: nine wire members off the quest broadcaster, three world members off
 			// the world one. See Quest/QuestOutbound.cs for why the interface is not split instead.
 			_questOutbound = new QuestOutbound(_questBroadcaster, _broadcaster, _npcs);
@@ -429,7 +435,7 @@ namespace Faolan.GameServer
 			_apprenticeOutbound = new ApprenticeOutbound(Connections, agentServerDispatcher);
 			_apprentice = new ApprenticeService(_apprenticeOutbound, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
-			_loot = new LootService(_broadcaster, _broadcaster.Bags, _economyOutbound, database, _questProgression, agentServerDispatcher, logger);
+			_loot = new LootService(_lootBroadcaster, _economyOutbound, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);
@@ -448,7 +454,7 @@ namespace Faolan.GameServer
 			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
 			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
 			// thing that makes the graph acyclic.
-			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
+			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _lootBroadcaster, _worldObjects, _buffs, _combat, _tradeskill, SendDismount);
 
 			InitGmCommands();
 		}
