@@ -489,7 +489,12 @@ namespace Faolan.GameServer
 			vitals.Health = Math.Max(1, Math.Min(vitals.Health, vitals.MaxHealth * percent / 100));
 			vitals.Mana = Math.Min(vitals.Mana, vitals.MaxMana * percent / 100);
 			vitals.Stamina = Math.Min(vitals.Stamina, vitals.MaxStamina * percent / 100);
-			await SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
+			// ⚠️ EXPERIMENT (2026-08-30, in-client): the player's own bar does not move for ANY vitals push we send.
+			// `--report vitals-shape` says retail's own-handle health change is a SINGLE-stat block - {HealthCurrent}
+			// alone, 211 captured - while the six-record current+max form is a SEED (93, at entry/stream-in) and the
+			// three-current form is what it sends about OTHER entities (4,676) and never about you. We have only ever
+			// sent the latter two. This sends retail's shape; if the bar moves, the shape is the whole bug.
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, vitals.Health), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Hurt to {percent}%: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}.");
 		}

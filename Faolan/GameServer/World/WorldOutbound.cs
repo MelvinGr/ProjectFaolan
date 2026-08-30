@@ -285,9 +285,9 @@ namespace Faolan.GameServer.World
 			return _buffs.SendMagicBuffIir(client, applyTo, applyFrom, wireSpellId, MagicBuffDatas.ApplyNow(wireSpellId >> 8, durationCentiseconds, BuffService.CasterLevel(client), _buffs.CasterIsPlayer(client, applyFrom)));
 		}
 
-		public Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
+		public Task SendStatDamage(INetworkClient client, uint targetHandle, uint displayHealth, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			return CombatService.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
+			return CombatService.SendStatDamage(client, targetHandle, displayHealth, delta, type, casterHandle, spellBaseId);
 		}
 
 		public Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)

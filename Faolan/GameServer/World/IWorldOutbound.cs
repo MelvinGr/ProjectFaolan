@@ -180,10 +180,11 @@ namespace Faolan.GameServer.World
 		// client recognizes the same playfield and just repositions (#214).
 		Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken);
 
-		// A DoT tick's StatDamageIIR (0xE9F24184): the health effect on the player from an active bleed/HoT debuff -
-		// statValue = the player's resulting HealthCurrent, delta the per-tick change, type the damage-school flag,
+		// A StatDamageIIR (0xE9F24184): a pool MOVE on the target - a DoT tick, an NPC's swing, a hostile cast.
+		// ⚠️ `displayHealth` is the resulting HealthCurrent in DISPLAY units (scaled to the wire by the sender); it is
+		// the field that moves the bar. `delta` is the damage NUMBER and is not scaled. type = the damage-school flag,
 		// caster the NPC, spellBaseId the wire id >> 8. Paired with PushVitals for the bar move. #274.
-		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
+		Task SendStatDamage(INetworkClient client, uint targetHandle, uint displayHealth, int delta, uint type, uint casterHandle, uint spellBaseId);
 
 		// #772: apply a spell's AREA - "spell `effectSpellId` to up to `maxTargets` entities within `radius` metres of
 		// `sourceHandle`" - and answer WHICH entities it reached. The tick's half of the aura: a buff whose spell

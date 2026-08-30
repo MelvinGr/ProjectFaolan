@@ -114,6 +114,14 @@ namespace Faolan.GameServer.World
 			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
+			// ⭐ The pool MOVE on the player's own handle. Retail states a vitals change on your own character with a
+			// StatDamageIIR carrying BOTH the resulting value and the delta (measured: 15 own-handle records in
+			// Hoxxling_..._gameplay2, e.g. `stat=0x01FA value=32020 delta=2100`), and our DoT tick has always sent
+			// exactly this - the melee swing never did, in the whole visible history of this method. It only pushed
+			// the absolute 0x96B8DC59 block below, which the client does not appear to apply to its own bar: damage
+			// landed, the character died, and the bar never moved (in-client 2026-08-30). The port's own note already
+			// said this packet is "paired with PushVitals for the bar move"; the pairing was missing here.
+			await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, CombatResolver.RetailSpellBaseId);
 			await _output.PushVitals(client!, vitals);
 			await ThrowFromMountIfBattered(target, damage);
 
@@ -203,6 +211,9 @@ namespace Faolan.GameServer.World
 			target.LastCombatAt = DateTimeOffset.UtcNow; // taking damage -> in combat (halts HP/mana regen)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.SendDamageNumber(client!, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
+			// The same pool MOVE the melee swing sends - see the note there. A cast lands on the player's own handle
+			// too, so it needs the StatDamageIIR just as much.
+			await _output.SendStatDamage(client!, target.Handle, vitals.Health, -damage, (uint)DamageSchool.Generic, npc.Handle, CombatResolver.RetailSpellBaseId);
 			await _output.PushVitals(client!, vitals);
 			await ThrowFromMountIfBattered(target, damage);
 

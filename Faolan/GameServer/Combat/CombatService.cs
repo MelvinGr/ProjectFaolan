@@ -1108,9 +1108,24 @@ namespace Faolan.GameServer.Combat
 
 		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
 		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
-		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
+		/// <param name="displayHealth">
+		///     The target's health AFTER the hit, in DISPLAY units - the ÷100 scale every live <see cref="EntityVitals" />
+		///     is in. It is scaled to the wire here.
+		///     <para>
+		///         ⚠️ This field is what actually MOVES the bar, and it is the whole packet's point. Retail fills it with
+		///         the wire ×100 value (`Hoxxling_..._gameplay` frames 4286/4326/4340: `stat=0x001B value=12714`, then
+		///         12595, then 12395, with NO `StatUpdateIIR` anywhere near them). We were passing the display number
+		///         straight through, so a 137 HP player was announced at 1.37 and the client left the bar where it was:
+		///         damage landed, the character died, and the bar never moved (found in-client 2026-08-30).
+		///     </para>
+		///     <para>
+		///         `delta` is NOT scaled - retail's is display-sized too (-11 against that same 119-wire drop), so it
+		///         reads as the damage NUMBER rather than as the pool movement.
+		///     </para>
+		/// </param>
+		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint displayHealth, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			return SendWorldPacket(client, StatDamageCodec.Build(StatDamages.Combat(targetHandle, statValue, delta, (DamageSchool)type, casterHandle, 1, spellBaseId)));
+			return SendWorldPacket(client, StatDamageCodec.Build(StatDamages.Combat(targetHandle, displayHealth * 100, delta, (DamageSchool)type, casterHandle, 1, spellBaseId)));
 		}
 
 		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
