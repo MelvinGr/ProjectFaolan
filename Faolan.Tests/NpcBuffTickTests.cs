@@ -193,7 +193,8 @@ namespace Faolan.Tests
 		{
 			var output = new RecordingWorldOutbound();
 			var areas = new RecordingSpellAreaCatalog();
-			var sim = new WorldSimulation(output, null!, null!, NullLogger.Instance, areas);
+			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, areas);
+			sim.BindOutbound(output);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
 			var player = new WorldEntity(PlayerHandle, MapId, true, "Caster", client);

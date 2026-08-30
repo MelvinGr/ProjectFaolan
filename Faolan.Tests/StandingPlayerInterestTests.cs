@@ -191,7 +191,7 @@ namespace Faolan.Tests
 
 		private (WorldBroadcaster Broadcaster, RecordingNetworkClient Client, WorldEntity Player, WorldEntity Npc) Harness()
 		{
-			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance, null!);
+			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
 			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!, null!);
 
 			var client = new RecordingNetworkClient(PlayerHandle);

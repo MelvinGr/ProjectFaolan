@@ -148,7 +148,12 @@ namespace Faolan.GameServer.World
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
-		private readonly IWorldOutbound _output;
+		// BOUND AT Start, NOT AT CONSTRUCTION (#826). Everything this port reaches - WorldBroadcaster above all - is
+		// built ON the simulation, so demanding it in the ctor is what made GameServerListener the façade for 41
+		// members it does not implement: a genuine WorldSimulation <-> WorldBroadcaster construction cycle that no
+		// container can build. Binding it at Start breaks that: the simulation now constructs with no outbound
+		// dependency at all, and the tick - the only thing that uses it - does not run until Start.
+		private IWorldOutbound _output = null!;
 
 		// #813/#784/#786: the spell-area + chain-edge CATALOG, read directly rather than through IWorldOutbound.
 		// It is a pure read over the DB (SpellAreaCatalog takes nothing else), so routing four table lookups through
@@ -193,10 +198,8 @@ namespace Faolan.GameServer.World
 		// the client's dev "Server Framerate" overlay, and by the slow-tick warning below. See TickMetrics.
 		public TickMetrics Metrics { get; } = new TickMetrics(1.0 / BaseTickSeconds);
 
-		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas,
-			TerrainService? terrain = null)
+		public WorldSimulation(IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, SpellAreaCatalog spellAreas, TerrainService? terrain = null)
 		{
-			_output = output;
 			_spellAreas = spellAreas;
 			_database = database;
 			_agents = agents;
@@ -463,9 +466,19 @@ namespace Faolan.GameServer.World
 
 		// Starts the simulation tick on the given lifetime token (owned by the listener so startup/shutdown stay in one
 		// place). The task is held so StopAsync can await a clean exit.
-		public void Start(CancellationToken cancellationToken)
+		// `output` arrives here rather than in the ctor - see the _output field for why. Start is called from the
+		// listener's StartAsync, long after every collaborator exists, and nothing touches the port before it.
+		public void Start(CancellationToken cancellationToken, IWorldOutbound output)
 		{
+			BindOutbound(output);
 			_tickTask = RunTickLoop(cancellationToken);
+		}
+
+		// The binding on its own, for tests that drive tick methods directly instead of running the loop
+		// (InternalsVisibleTo Faolan.Tests is global). Production goes through Start.
+		internal void BindOutbound(IWorldOutbound output)
+		{
+			_output = output;
 		}
 
 		// Awaits the tick loop's (cancelled) exit. The loop swallows its own OperationCanceledException, so this

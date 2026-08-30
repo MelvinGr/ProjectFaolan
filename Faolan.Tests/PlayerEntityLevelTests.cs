@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void RegisterPlayerInWorld_SeedsTheEntitysLevelFromTheCharacter()
 		{
-			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance, null!);
+			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
 			var client = new RecordingNetworkClient(0x0802E5D4);
 			client.Session.Character = new Character
 			{
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void RecomputingAfterAnAttributeChange_DoesNotThrow_ForARegisteredPlayer()
 		{
-			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance, null!);
+			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
 			var client = new RecordingNetworkClient(0x0802E5D4);
 			client.Session.Character = new Character
 			{

@@ -23,7 +23,8 @@ namespace Faolan.Tests
 
 		private static (WorldSimulation Sim, RecordingNetworkClient Client, WorldEntity Entity) Alive()
 		{
-			var sim = new WorldSimulation(new RecordingWorldOutbound(), null!, null!, NullLogger.Instance, null!);
+			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
+			sim.BindOutbound(new RecordingWorldOutbound());
 			var client = new RecordingNetworkClient(Player);
 			var entity = new WorldEntity(Player, MapId, true, "NecroL80", client)
 			{

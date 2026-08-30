@@ -327,7 +327,7 @@ namespace Faolan.GameServer
 			// to go out through IWorldOutbound and come straight back to this field). It is a leaf - nothing but the
 			// database - so it can sit this high with no ordering cost.
 			_spellAreas = new SpellAreaCatalog(database);
-			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, _spellAreas, terrain);
+			_simulation = new WorldSimulation(database, agentServerDispatcher, logger, _spellAreas, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
 			{
 				await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
@@ -458,7 +458,7 @@ namespace Faolan.GameServer
 			// connection. Tasks are stored so they can be awaited on shutdown.
 			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			_persistence.Start(_loopCts.Token); // periodic crash-safety flush of the live world state
-			_simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
+			_simulation.Start(_loopCts.Token, this); // the simulation tick (regen, NPC AI, death/respawn, discovery)
 			return base.StartAsync(cancellationToken);
 		}
 
