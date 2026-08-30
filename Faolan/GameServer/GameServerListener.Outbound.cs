@@ -648,7 +648,7 @@ namespace Faolan.GameServer
 		// ⚠️ The client does NOTHING with it: `GamecodeClient_t`'s override of the vtable slot it dispatches to
 		// (+0x70) is an empty function. So this is sent for fidelity with retail's byte stream and for nothing else -
 		// do not hang behaviour off it, and do not go looking for what it "should" do.
-		private static Task SendTeleportPending(INetworkClient client)
+		internal static Task SendTeleportPending(INetworkClient client)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(RpcInterfaces.GameCharInterfaceType), GameCharInterfaceMethods.DispatchTeleportStarted, _ => { }));
 		}
@@ -933,7 +933,7 @@ namespace Faolan.GameServer
 		//
 		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
 		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
-		private static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		internal static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
 			return SendFeedback(client, new AreaNameBanner(areaNameId));
 		}
@@ -990,7 +990,7 @@ namespace Faolan.GameServer
 		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
 		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
 		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
-		private static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		internal static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
 			return SendFeedback(client, new RespawnPointDiscovered(pointId, nameKey));
 		}
@@ -998,7 +998,7 @@ namespace Faolan.GameServer
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
 		// remoteformat template lands.
 
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
+		internal static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
 		}
@@ -1090,7 +1090,7 @@ namespace Faolan.GameServer
 				ResurrectRequestCodec.Method, ResurrectRequestCodec.Build(characterId, resurrectSpell)));
 		}
 
-		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
+		internal static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(RpcInterfaces.GameCharAgentType, 0x59), client.Endpoint(RpcInterfaces.GameCharInterfaceType),
 				GameCharInterfaceMethods.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, spots))));

@@ -37,7 +37,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
+	// NOTE: no longer IWorldOutbound (#826). Those 42 members were a facade over the broadcaster / buffs / combat /
+	// tradeskill services and now live on WorldOutbound, which is built below and handed to the simulation at Start.
+	public partial class GameServerListener : RpcServer, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound,
 		ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, ILevelUpOutbound,
 		IGameServerProvider
 	{
@@ -137,7 +139,7 @@ namespace Faolan.GameServer
 		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59);
+		internal static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x59);
 
 		// The instance-selection reply (#309) comes from GameCharAgent at instance 0x57, NOT the 0x58 nearly every other
 		// GameCharAgent reply uses - taken from the one captured exchange (chat-annotated-4, the c2s 0x207B at frame
@@ -156,6 +158,9 @@ namespace Faolan.GameServer
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;
+
+		// #826: everything the world tick sends or triggers. Was 42 explicit IWorldOutbound members on this class.
+		private readonly WorldOutbound _worldOutbound;
 
 		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
 		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
@@ -374,6 +379,11 @@ namespace Faolan.GameServer
 			_environment = new EnvironmentService(database, this, logger);
 			_comboFinisher = new ComboFinisher(_simulation, _broadcaster, _combat, _buffs, _combos, _spellModifiers, logger);
 
+			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
+			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
+			// thing that makes the graph acyclic.
+			_worldOutbound = new WorldOutbound(_broadcaster, _buffs, _combat, _tradeskill, SendDismount);
+
 			InitGmCommands();
 		}
 
@@ -458,7 +468,7 @@ namespace Faolan.GameServer
 			// connection. Tasks are stored so they can be awaited on shutdown.
 			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			_persistence.Start(_loopCts.Token); // periodic crash-safety flush of the live world state
-			_simulation.Start(_loopCts.Token, this); // the simulation tick (regen, NPC AI, death/respawn, discovery)
+			_simulation.Start(_loopCts.Token, _worldOutbound); // the simulation tick (regen, NPC AI, death/respawn, discovery)
 			return base.StartAsync(cancellationToken);
 		}
 

@@ -42,14 +42,6 @@ namespace Faolan.GameServer
 			return SummonTimedPetForPlayer(client, template, duration, cap, pointCost);
 		}
 
-		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
-		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
-		// share one builder.
-		Task IWorldOutbound.SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
-		{
-			return _buffs.SendBuffRemoval(client, applyTo, applyFrom, appliedSpellId);
-		}
-
 		// Inits the energy pool + starts the single persistent energy loop (idempotent). Called on sprint and on weave
 		// start, so energy is tracked + regenerates regardless of which happens first.
 		internal void EnsureEnergyLoop(INetworkClient client)
