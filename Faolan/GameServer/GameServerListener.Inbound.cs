@@ -1421,7 +1421,7 @@ namespace Faolan.GameServer
 						? body.ReadUInt32()
 						: 0;
 
-					if (await _simulation.ResurrectFromOffer(client, resurrectSpell))
+					if (await _playerDeaths.ResurrectFromOffer(client, resurrectSpell))
 						Logger.LogInformation("ResurrectMe (spell {Spell}): self-resurrection taken.", resurrectSpell);
 					else
 						// Not an error: a resurrect offered by another PLAYER arrives the same way and we make none,
@@ -1441,7 +1441,7 @@ namespace Faolan.GameServer
 						? body.ReadUInt32()
 						: 0;
 
-					if (_simulation.CancelSelfResurrection(client.Session.Character.Id, declinedSpell))
+					if (_playerDeaths.CancelSelfResurrection(client.Session.Character.Id, declinedSpell))
 						Logger.LogInformation("CancelResurrectionRequest: {Character} declined the resurrection from {Requester:X8} (spell {Spell}).", client.Session.Character.Name, requester.Id,
 							declinedSpell);
 					else
@@ -1459,7 +1459,7 @@ namespace Faolan.GameServer
 					// Retail respawn is click-driven (vitals restore + tombstone + teleport + re-render at the
 					// resurrection point); our simulation already implements that flow on a fallback timer - the
 					// click just triggers it immediately.
-					if (await _simulation.TryRespawnNow(client))
+					if (await _playerDeaths.TryRespawnNow(client))
 						Logger.LogInformation("RespawnMe (token 0x{Token:X8}): player released; respawned.", token);
 					else
 						Logger.LogWarning("RespawnMe (token 0x{Token:X8}) from a player that is not dead; ignored.", token);

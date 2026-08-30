@@ -21,9 +21,10 @@ namespace Faolan.Tests
 		private const uint PotionSpell = 4840951; // "Self Resurrection", what the Potion's own effect names
 		private const uint Percent = 100;
 
-		private static (WorldSimulation Sim, RecordingNetworkClient Client, WorldEntity Entity) Alive()
+		private static (WorldSimulation Sim, PlayerDeathService Deaths, RecordingNetworkClient Client, WorldEntity Entity) Alive()
 		{
-			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
+			var parts = TestWorld.Build();
+			var sim = parts.Sim;
 			sim.BindOutbound(new RecordingWorldOutbound());
 			var client = new RecordingNetworkClient(Player);
 			var entity = new WorldEntity(Player, MapId, true, "NecroL80", client)
@@ -42,7 +43,7 @@ namespace Faolan.Tests
 			sim.Players[client] = entity;
 			sim.World.Place(entity, MapId, new Vector3(100f, 0f, 100f), Quaternion.Identity);
 
-			return (sim, client, entity);
+			return (sim, parts.Deaths, client, entity);
 		}
 
 		private static void Kill(WorldEntity entity)
@@ -55,11 +56,11 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnArmedOffer_RevivesTheDeadPlayerAtTheOffersPercentage()
 		{
-			var (sim, client, entity) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, client, entity) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
-			Assert.True(await sim.ResurrectFromOffer(client, PotionSpell));
+			Assert.True(await deaths.ResurrectFromOffer(client, PotionSpell));
 
 			Assert.False(entity.Vitals!.IsDead);
 			Assert.Equal(1000u, entity.Vitals.Health);
@@ -75,11 +76,11 @@ namespace Faolan.Tests
 		[InlineData(75u, 750u)]
 		public async Task ThePercentageIsTheOffers(uint percent, uint expectedHealth)
 		{
-			var (sim, client, entity) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, percent);
+			var (sim, deaths, client, entity) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, percent);
 			Kill(entity);
 
-			Assert.True(await sim.ResurrectFromOffer(client, percent == 0 ? 0 : PotionSpell));
+			Assert.True(await deaths.ResurrectFromOffer(client, percent == 0 ? 0 : PotionSpell));
 			Assert.Equal(expectedHealth, entity.Vitals!.Health);
 		}
 
@@ -88,12 +89,12 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ItRevivesWhereThePlayerFell()
 		{
-			var (sim, client, entity) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, client, entity) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 			var deathPosition = entity.Position;
 
-			Assert.True(await sim.ResurrectFromOffer(client, PotionSpell));
+			Assert.True(await deaths.ResurrectFromOffer(client, PotionSpell));
 
 			Assert.Equal(deathPosition, entity.Position);
 		}
@@ -102,15 +103,15 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnOfferIsConsumedByTheResurrection()
 		{
-			var (sim, client, entity) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, client, entity) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
-			Assert.True(await sim.ResurrectFromOffer(client, PotionSpell));
-			Assert.False(sim.HasSelfResurrection(Player, PotionSpell));
+			Assert.True(await deaths.ResurrectFromOffer(client, PotionSpell));
+			Assert.False(deaths.HasSelfResurrection(Player, PotionSpell));
 
 			Kill(entity);
-			Assert.False(await sim.ResurrectFromOffer(client, PotionSpell)); // a second death is not covered
+			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell)); // a second death is not covered
 		}
 
 		// The spell id is the TOKEN we sent, echoed back: an answer naming a different one is not an answer to this
@@ -118,33 +119,33 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnAnswerNamingAnotherSpell_IsNotThisOffer()
 		{
-			var (sim, client, entity) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, client, entity) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 			Kill(entity);
 
-			Assert.False(await sim.ResurrectFromOffer(client, 4332780));
+			Assert.False(await deaths.ResurrectFromOffer(client, 4332780));
 			Assert.True(entity.Vitals!.IsDead);
-			Assert.True(sim.HasSelfResurrection(Player, PotionSpell)); // still armed
+			Assert.True(deaths.HasSelfResurrection(Player, PotionSpell)); // still armed
 		}
 
 		// The offer only answers a DEATH. Taking it while alive would consume the item's whole point for nothing.
 		[Fact]
 		public async Task ALivePlayerCannotTakeTheOffer()
 		{
-			var (sim, client, _) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, client, _) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 
-			Assert.False(await sim.ResurrectFromOffer(client, PotionSpell));
-			Assert.True(sim.HasSelfResurrection(Player, PotionSpell));
+			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell));
+			Assert.True(deaths.HasSelfResurrection(Player, PotionSpell));
 		}
 
 		[Fact]
 		public async Task WithNoOffer_NothingHappens()
 		{
-			var (sim, client, entity) = Alive();
+			var (sim, deaths, client, entity) = Alive();
 			Kill(entity);
 
-			Assert.False(await sim.ResurrectFromOffer(client, PotionSpell));
+			Assert.False(await deaths.ResurrectFromOffer(client, PotionSpell));
 			Assert.True(entity.Vitals!.IsDead);
 		}
 
@@ -152,14 +153,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void DecliningDropsTheOffer()
 		{
-			var (sim, _, _) = Alive();
-			sim.ArmSelfResurrection(Player, PotionSpell, Percent);
+			var (sim, deaths, _, _) = Alive();
+			deaths.ArmSelfResurrection(Player, PotionSpell, Percent);
 
-			Assert.False(sim.CancelSelfResurrection(Player, 4332780)); // another offer's id
-			Assert.True(sim.HasSelfResurrection(Player, PotionSpell));
+			Assert.False(deaths.CancelSelfResurrection(Player, 4332780)); // another offer's id
+			Assert.True(deaths.HasSelfResurrection(Player, PotionSpell));
 
-			Assert.True(sim.CancelSelfResurrection(Player, PotionSpell));
-			Assert.False(sim.HasSelfResurrection(Player, PotionSpell));
+			Assert.True(deaths.CancelSelfResurrection(Player, PotionSpell));
+			Assert.False(deaths.HasSelfResurrection(Player, PotionSpell));
 		}
 	}
 }

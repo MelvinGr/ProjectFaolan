@@ -71,6 +71,12 @@ namespace Faolan.GameServer
 			// TerrainService takes a configured DIRECTORY, so it is a factory rather than a plain registration.
 			services.AddSingleton(sp => new TerrainService(sp.GetRequiredService<IConfiguration>().ContentTerrainDir, sp.GetRequiredService<ILogger>()));
 			services.AddSingleton<SpellAreaCatalog>();
+			// The world MODEL and the player registry are registered in their own right (#900) because two
+			// collaborators share them: WorldSimulation, and PlayerDeathService - which must not hold the simulation,
+			// so what it is handed is the state, not a reference back to its owner.
+			services.AddSingleton(sp => new WorldState(sp.GetService<TerrainService>()));
+			services.AddSingleton<PlayerRegistry>();
+			services.AddSingleton<PlayerDeathService>();
 			services.AddSingleton<WorldSimulation>();
 			services.AddSingleton<PlayerPersistenceService>();
 			services.AddSingleton<TortageIntroService>();

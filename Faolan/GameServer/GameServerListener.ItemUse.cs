@@ -51,7 +51,7 @@ namespace Faolan.GameServer
 			if (spell.SelfResurrectionSpell is { } resurrectSpell && resurrectSpell != 0)
 			{
 				await SendResurrectRequest(client, self, resurrectSpell);
-				_simulation.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
+				_playerDeaths.ArmSelfResurrection(self, resurrectSpell, spell.SelfResurrectionPercent ?? 100);
 			}
 
 			// #702: and the pool the consumable actually MOVES. A health potion's whole point is the instant heal -

@@ -171,7 +171,7 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
 - **Player death** (#214) uses `SimpleCharKilledByUpdateIIR_t` (**0xB066AFC2**) — the "you were killed by X"
   record that drives the local release/resurrect UI, ABSENT from NPC kills. Record:
   `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `SimpleCharKilledByUpdateCodec`
-  (byte-exact golden). `WorldSimulation.SendDeathScreen` sends it (along with the death-pose + death-Bcc) for the
+  (byte-exact golden). `PlayerDeathService.SendDeathScreen` sends it (along with the death-pose + death-Bcc) for the
   player BEFORE `DispatchValidResurrectionSpots`.
 
 **Player death/resurrect — COMPLETE + verified in-client, #214 CLOSED 2026-06-20.** Full flow: release window
@@ -256,7 +256,7 @@ things in the same frame [V2: Hoxxling_mage-heraldofxotli_login_gameplay.tshark.
 2. the **spots re-send** above, with the new point now in the list, so the release screen has it next death.
 
 The banner is sent with the **live** position to a **living** player and does not open the release screen (that is
-`SimpleCharKilledByUpdateIIR`'s job). `WorldSimulation.DiscoverNearbyRespawnPoints` drives both.
+`SimpleCharKilledByUpdateIIR`'s job). `PlayerDeathService.DiscoverNearbyRespawnPoints` drives both.
 
 The banner XML identifies its string by **`id=`**, not the `token=` every other feedback message uses:
 

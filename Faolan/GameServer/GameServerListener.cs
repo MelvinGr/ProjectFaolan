@@ -250,6 +250,10 @@ namespace Faolan.GameServer
 		// involuntary path shares. See World/MountService.cs.
 		private readonly MountService _mounts;
 
+		// A player dying, releasing and coming back: the death screen, the release timer, the self-resurrection a
+		// spell can arm, and the respawn. See World/PlayerDeathService.cs.
+		private readonly PlayerDeathService _playerDeaths;
+
 		// Knockback: resolve the shove, apply retail's immunity buff, put the displacement on the wire.
 		// See Combat/KnockbackService.cs.
 		private readonly KnockbackService _knockback;
@@ -328,7 +332,7 @@ namespace Faolan.GameServer
 		public GameServerListener(ILoggerFactory loggerFactory, IConfiguration configuration, IDatabaseRepository database, HostRealm realm,
 			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher,
 			ConnectionRegistry connections,
-			WorldSimulation simulation, PlayerPersistenceService persistence, TortageIntroService tortageIntro, ComboService combos,
+			WorldSimulation simulation, PlayerDeathService playerDeaths, PlayerPersistenceService persistence, TortageIntroService tortageIntro, ComboService combos,
 			QuestBroadcaster questBroadcaster, WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster lootBroadcaster,
 			QuestOutbound questOutbound, WorldObjectService worldObjects, TeleportService teleport, CreateFlowService createFlow,
 			LevelUpService levelUp, EconomyOutbound economyOutbound, TradeService trade, QuestRewardService questRewards,
@@ -347,6 +351,7 @@ namespace Faolan.GameServer
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 
 			_simulation = simulation;
+			_playerDeaths = playerDeaths;
 			_persistence = persistence;
 			_tortageIntro = tortageIntro;
 			_combos = combos;

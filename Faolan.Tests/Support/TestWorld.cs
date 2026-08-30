@@ -1,5 +1,7 @@
 using Faolan.Core.Database.Repositories;
 using Faolan.GameServer.Quest;
+using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -16,6 +18,31 @@ namespace Faolan.Tests.Support
 	// and so are constructed here too; nothing in these tests spawns a runtime entity, but the ctor requires them.
 	public static class TestWorld
 	{
+		// A WorldSimulation with the world model, the player registry and the death service it now takes by
+		// injection (#900) already built. The tests that construct it directly care about the tick and the world
+		// model, not about which of those three a given field came from, so the helper keeps that off their
+		// arrange blocks - and, like Broadcaster below, wires the real collaborators rather than a null.
+		public static WorldSimulation Simulation(IDatabaseRepository? database = null, IChatServerDispatcher? agents = null,
+			SpellAreaCatalog? spellAreas = null, ILogger? logger = null, TerrainService? terrain = null)
+		{
+			return Build(database, agents, spellAreas, logger, terrain).Sim;
+		}
+
+		// The same, when the test drives the DEATH service as well - it is a sibling of the simulation now, not a
+		// member of it, so a test that exercises both needs both handed back.
+		public static WorldParts Build(IDatabaseRepository? database = null, IChatServerDispatcher? agents = null,
+			SpellAreaCatalog? spellAreas = null, ILogger? logger = null, TerrainService? terrain = null)
+		{
+			var log = logger ?? NullLogger.Instance;
+			var world = new WorldState(terrain);
+			var players = new PlayerRegistry();
+			var deaths = new PlayerDeathService(world, players, database!, log);
+
+			return new WorldParts(new WorldSimulation(database!, agents!, log, spellAreas!, world, players, deaths, terrain), deaths, world, players);
+		}
+
+		public sealed record WorldParts(WorldSimulation Sim, PlayerDeathService Deaths, WorldState World, PlayerRegistry Players);
+
 		public static WorldBroadcaster Broadcaster(WorldSimulation sim, IDatabaseRepository? database = null, ILogger? logger = null)
 		{
 			var log = logger ?? NullLogger.Instance;

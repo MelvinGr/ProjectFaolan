@@ -141,7 +141,7 @@ namespace Faolan.Tests
 		{
 			var output = new RecordingWorldOutbound();
 			var areas = new RecordingSpellAreaCatalog();
-			var sim = new WorldSimulation(new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase))), null!, NullLogger.Instance, areas);
+			var sim = TestWorld.Simulation(new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase))), spellAreas: areas);
 			sim.BindOutbound(output);
 
 			var client = new RecordingNetworkClient(PlayerHandle);

@@ -85,7 +85,7 @@ from the session** — not just a verbatim replay.
   area-name points at string 3474586) and the plain-token lines (`AttributeChanged`, ...) are token-driven, so
   server-authored custom text has no path here. Open work tracked in Gitea #664.
 - ✅ **Resurrection-point discovered banner** (#372, verified in-client): byte-exact
-  `RespawnPointDiscoveredCodec` + goldens, sent by `WorldSimulation.DiscoverNearbyRespawnPoints`
+  `RespawnPointDiscoveredCodec` + goldens, sent by `PlayerDeathService.DiscoverNearbyRespawnPoints`
   alongside the spots re-send. Replaces a chat-routed `"Resurrection point discovered: X"` `SendSystemMessage` that
   was never capture-derived (and printed the RDB dev label, "ResurrectionAIPoint2"). Its `<parameter>` is a nested
   `<localized>` naming the point by its own id under category 270 — the client resolves the text, so no name crosses

@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4)); // the carrier's [u32 len] is the sender's (#530 rule 2)
 			Assert.True(((MoveFlag)parsed.Flag1).HasFlag(MoveFlag.Airborne)); // this capture IS a jump
 
-			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
+			var sim = TestWorld.Simulation();
 			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var jumper = Place(sim, JumperHandle, parsed.Position);
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			var record = Convert.FromHexString(CapturedJumpC2S);
 			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4));
 
-			var sim = new WorldSimulation(null!, null!, NullLogger.Instance, null!);
+			var sim = TestWorld.Simulation();
 			var broadcaster = TestWorld.Broadcaster(sim);
 
 			var jumper = Place(sim, JumperHandle, parsed.Position);
