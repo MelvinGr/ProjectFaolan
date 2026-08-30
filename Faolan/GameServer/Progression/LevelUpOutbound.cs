@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Progression
 	///     "you gained this" messages. The senders themselves stay in the listener's .Outbound partial and are reached
 	///     statically - they hold no state - so this owns the level-up SHAPE without owning the wire builders.
 	/// </summary>
-	internal sealed class LevelUpOutbound : ILevelUpOutbound
+	public sealed class LevelUpOutbound : ILevelUpOutbound
 	{
 		// ⚠️ BOUND, not injected, and this is a real CYCLE rather than a preference: CombatService takes
 		// LevelUpService, which takes this. Passing `_combat` in the ctor captured a field that is not assigned until

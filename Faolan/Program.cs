@@ -159,7 +159,8 @@ namespace Faolan
 				// of truth for the realm-local service ports, #324). Registering it is what lets every realm-tier
 				// service below be a plain AddHostedService<T>(): the port arrives by INJECTION rather than through a
 				// factory lambda that reaches into the closed-over `hostRealm`.
-				builder.Services.AddSingleton(new HostRealm(hostRealm!.Id, hostRealm.Name, hostRealm.Port, hostRealm.ChatServerPort, hostRealm.CsPlayerAgentPort));
+				var realm = new HostRealm(hostRealm!.Id, hostRealm.Name, hostRealm.Port, hostRealm.ChatServerPort, hostRealm.CsPlayerAgentPort);
+				builder.Services.AddSingleton(realm);
 
 				// ⚠️ Registration ORDER is load-bearing and the four AddHostedService lines below must keep it:
 				// HostOptions.ServicesStartConcurrently is false, so StartAsync is awaited in registration order. That
@@ -184,6 +185,12 @@ namespace Faolan
 				// When disabled the ChatServer also skips the Claude chat-channel subscription (nothing reads the log).
 				if (runMcp)
 					builder.Services.AddFaolanMcp();
+
+				// The realm's ~60 world services (#826). They used to be hand-`new`ed in the GameServer listener's
+				// ctor; the registration lists them in dependency order, which is documentation rather than a
+				// requirement - MS.DI resolves by type. It also registers the bare realm-tagged `ILogger` every one
+				// of them takes, which is why it is scoped to a process that actually hosts a realm.
+				builder.Services.AddRealmGameServer(realm);
 
 				// Its realm-tagged log category ("...GameServerListener-<realmId>") is built inside the listener from the
 				// injected HostRealm - see its ctor for why that is an ILoggerFactory rather than an ILogger.

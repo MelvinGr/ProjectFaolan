@@ -163,7 +163,7 @@ namespace Faolan.Tests
 
 		private static CreateFlowService Service(Action onHandoff)
 		{
-			return new CreateFlowService(NullLogger.Instance, null!, null!, null!, _ =>
+			return new CreateFlowService(NullLogger.Instance, null!, null!, _ =>
 			{
 				onHandoff();
 				return Task.CompletedTask;

@@ -18,7 +18,7 @@ namespace Faolan.GameServer.Dialogue
 	// interactive ConversationService: the client fires PlayStockphraseAsSubtitle (0x205E) per line and blocks up
 	// to 60s for a ReceivedStockPhraseText (0x205D) reply. The remoteformat payloads are DB-sourced (StockPhrases,
 	// harvested from captures by the importer's stock-phrases module) - keyed by the {stock_N} token.
-	internal sealed class StockConversationService
+	public sealed class StockConversationService
 	{
 		private readonly ICatalogRepository _database;
 		private readonly ILogger _logger;

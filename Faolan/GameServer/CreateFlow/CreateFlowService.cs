@@ -107,7 +107,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
 		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
-		private readonly Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry;
+		private Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry = null!;
 
 		// The listener-owned "wash the new character ashore and hand it to the world server" op (change-map prep +
 		// the 0x2002 redirect). A narrow Func seam like _sendBurstlessWorldEntry rather than a back-reference to the
@@ -125,14 +125,26 @@ namespace Faolan.GameServer.CreateFlow
 		// cutscene actor-binding (LiveNpcHandle) to re-address the destiny cinematic to OUR live Kalanthes.
 		private readonly WorldSimulation _simulation;
 
-		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, Func<INetworkClient, uint, Task> sendBurstlessWorldEntry,
-			Func<INetworkClient, Task> sendEnterWorldHandoff)
+		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, Func<INetworkClient, Task> sendEnterWorldHandoff)
 		{
 			_logger = logger;
 			_database = database;
 			_simulation = simulation;
-			_sendBurstlessWorldEntry = sendBurstlessWorldEntry;
 			_sendEnterWorldHandoff = sendEnterWorldHandoff;
+		}
+
+		/// <summary>
+		///     Binds the burst-less WORLD ENTRY - the one op this service needs that belongs to the listener rather
+		///     than to any service. Called once, from the GameServer ctor.
+		/// </summary>
+		/// <remarks>
+		///     A bound seam rather than a constructor argument because it is a genuine cycle: the entry is a
+		///     GameServerListener method and the listener holds this service. It is the LAST edge of that shape in
+		///     the graph - everything else the flow needs is an injected collaborator.
+		/// </remarks>
+		public void BindWorldEntry(Func<INetworkClient, uint, Task> sendBurstlessWorldEntry)
+		{
+			_sendBurstlessWorldEntry = sendBurstlessWorldEntry;
 		}
 
 		// Handles the client->server 0xA36D3B74 character-creation script callbacks.

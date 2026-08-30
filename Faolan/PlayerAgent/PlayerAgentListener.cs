@@ -19,7 +19,7 @@ namespace Faolan.PlayerAgent
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.ServerPlayerAgentPort, logger, configuration,
 			// The TX naming fall-back is the METHOD catalog: this tier has no opcodes (#613), and the four login
 			// handoffs address the ServiceConnection, which no receiver-keyed map covers.
-			database, new ConanPacketTracer(logger, "PlayerAgent", typeof(PlayerInterfaceMethods)))
+			database, new ConanPacketTracer(logger, "PlayerAgent", typeof(PlayerInterfaceMethods)), new ConnectionRegistry())
 		{
 			//
 		}

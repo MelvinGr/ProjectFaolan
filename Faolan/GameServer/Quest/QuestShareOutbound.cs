@@ -21,7 +21,7 @@ namespace Faolan.GameServer.Quest
 	///     registry injectable that need is satisfiable without the listener, so the code can live where it belongs
 	///     instead of behind a pile of Func seams.
 	/// </remarks>
-	internal sealed class QuestShareOutbound : IQuestShareOutbound
+	public sealed class QuestShareOutbound : IQuestShareOutbound
 	{
 		private readonly ConnectionRegistry _connections;
 		private readonly WorldSimulation _simulation;

@@ -139,27 +139,13 @@ namespace Faolan.GameServer
 		// the live-character view - GetCharacterLiveState below forwards here.
 		private readonly QuestShareOutbound _questShare;
 
-		// #826: the wallet / item-grant wire, and the trade wire on top of it. The five economy services and
-		// TradeService take THESE now, not the listener.
-		private readonly ApprenticeOutbound _apprenticeOutbound;
-		private readonly EnvironmentOutbound _environmentOutbound;
-		private readonly LevelUpOutbound _levelUpOutbound;
 		private readonly EconomyOutbound _economyOutbound;
-		private readonly TradeOutbound _tradeOutbound;
-
 		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
 		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
 		private readonly BuffStatEffects _buffStats;
 
-		// The INSTANT half of a spell's effect - the pools it moves the moment it lands, where _buffStats owns the
-		// lasting stat deltas (#702).
-		private readonly SpellPoolEffects _poolEffects;
 		private readonly ClaimService _claims;
 		private readonly QuestRewardService _questRewards;
-
-		// #509: the daily-challenge counters. Composed here because the quest engine is the one subsystem with a
-		// MEASURED trigger into it (a quest line ending); the other four categories have no modelled trigger yet.
-		private readonly DailyChallengeService _dailyChallenges;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
@@ -173,16 +159,8 @@ namespace Faolan.GameServer
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
 
-		private readonly FatalityService _fatality;
-
 		// #310: Khitai reputation - awards standing on a kill and restores it at world entry.
 		private readonly FactionService _factions;
-
-		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect
-		// table. See Combat/SpellEffectService.cs.
-		private readonly SpellEffectService _spellEffects;
-		private readonly SpellAreaCatalog _spellAreas;
-		private readonly SpellModifierService _spellModifiers;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
@@ -285,15 +263,10 @@ namespace Faolan.GameServer
 		// the question, who can see what. See World/NpcBroadcaster.cs.
 		private readonly NpcBroadcaster _npcs;
 
-		// Shared between the two broadcasters (see the ctor for why neither can own them).
-		private readonly AmbientPoolService _ambientPools;
-		private readonly RuntimeHandleAllocator _handles;
-
 		// The quest WIRE (journal packets + the overhead '!' / '?' markers) and the marker DECISION behind it. Both
 		// are shared: the broadcaster calls into the wire on every streamed-in NPC, and _questOutbound is the
 		// IQuestOutbound port over this plus the broadcaster's three world-side members. See Quest/QuestBroadcaster.cs.
 		private readonly QuestBroadcaster _questBroadcaster;
-		private readonly QuestMarkerResolver _questMarkers;
 		private readonly QuestOutbound _questOutbound;
 
 		// INTERACTING with a world object - doors, containers, benches, harvest nodes, quest pickups, dynel visual
@@ -305,10 +278,6 @@ namespace Faolan.GameServer
 		// two latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
 		// arrives on a NEW connection. See World/TeleportService.cs.
 		private readonly TeleportService _teleport;
-
-		// The three wire ops a SpellEffect row needs (#439), one forward each to the buff registry and the pet
-		// lifecycle. See Combat/SpellEffectOutbound.cs.
-		private readonly SpellEffectOutbound _spellEffectOutbound;
 
 		// A player's summoned PET (#307): summon, the timed variant's extend-or-summon, and the pet bar's dismiss.
 		// Reached from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler. See
@@ -337,7 +306,7 @@ namespace Faolan.GameServer
 
 		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
 		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
-		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
+		// IWorldOutbound port is handed to it at Start, not at construction. See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
 
 		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
@@ -345,125 +314,91 @@ namespace Faolan.GameServer
 		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts = null!;
 
-		// The port and the log category both come off the injected `HostRealm` (#324), which is what lets this be a
-		// plain AddHostedService<T>() rather than a factory lambda in Program.cs.
+		// Everything below arrives by INJECTION (#826): the ~61 services this ctor used to hand-`new` are registered
+		// in GameServerRealmServices.AddRealmGameServer, and the fourteen that were held only in order to build
+		// something else are not fields here at all any more.
 		//
 		// ⚠️ It takes an ILoggerFactory rather than an ILogger because the category is REALM-TAGGED
-		// ("...GameServerListener-<realmId>") - every one of the ~48 composed services below is handed this same
-		// logger, so a multi-realm deployment can tell two realms' lines apart in one log. The alternative,
-		// registering a bare `ILogger` singleton in the container, would silently hand that realm-tagged category to
-		// any OTHER type that ever asks for a non-generic ILogger.
+		// ("...GameServerListener-<realmId>"), and the base initializer has to build it before `Logger` exists. Every
+		// composed service gets the same category through the bare `ILogger` the realm registration provides.
+		//
+		// ⚠️ The parameter count is the honest size of this class's collaborator surface, not an artifact of DI - it
+		// is what the partials below actually call. Shrinking it means moving handlers out, which is #826's remaining
+		// direction of travel, not hiding them behind a parameter object.
 		public GameServerListener(ILoggerFactory loggerFactory, IConfiguration configuration, IDatabaseRepository database, HostRealm realm,
-			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
-			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)))
+			IChatServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher,
+			ConnectionRegistry connections,
+			WorldSimulation simulation, PlayerPersistenceService persistence, TortageIntroService tortageIntro, ComboService combos,
+			QuestBroadcaster questBroadcaster, WorldBroadcaster broadcaster, NpcBroadcaster npcs, LootBroadcaster lootBroadcaster,
+			QuestOutbound questOutbound, WorldObjectService worldObjects, TeleportService teleport, CreateFlowService createFlow,
+			LevelUpService levelUp, EconomyOutbound economyOutbound, TradeService trade, QuestRewardService questRewards,
+			QuestProgressionService questProgression, BuffStatEffects buffStats, BuffService buffs, PetService pets,
+			KnockbackService knockback, FactionService factions, CombatService combat, CastService cast, EnergyService energy,
+			SpellweaveService spellweave, TravelService travel, ConversationService conversation, QuestShareOutbound questShare,
+			QuestSharingService questSharing, ApprenticeService apprentice, StockConversationService stockConversation, LootService loot,
+			KeepAliveService keepAlive, ShortcutBarService shortcutBar, EquipmentService equipment, ShopService shop, BankService bank,
+			TradepostService tradepost, GuildBankService guildBank, TradeskillService tradeskill, ClaimService claims, FeatService feats,
+			SkillPointService skillPoints, MountService mounts, EnvironmentService environment, ComboFinisher comboFinisher,
+			WorldOutbound worldOutbound)
+			: base(realm.Port, RealmLogger(loggerFactory, realm), configuration, database, new GameServerPacketTracer(RealmLogger(loggerFactory, realm)), connections)
 		{
-			// The base ctor has run, so `Logger` is the realm-tagged logger built above; every `logger` below is it.
-			var logger = Logger;
-
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
-			var terrain = new TerrainService(configuration.ContentTerrainDir, logger);
 
-			// Built BEFORE the simulation because the TICK reads it directly (the spell-area / chain-edge lookups used
-			// to go out through IWorldOutbound and come straight back to this field). It is a leaf - nothing but the
-			// database - so it can sit this high with no ordering cost.
-			_spellAreas = new SpellAreaCatalog(database);
-			_simulation = new WorldSimulation(database, agentServerDispatcher, logger, _spellAreas, terrain);
-			_persistence = new PlayerPersistenceService(database, logger, _simulation);
-			_tortageIntro = new TortageIntroService(database, _simulation, logger);
-			_combos = new ComboService(database, logger);
-			// Built BEFORE the broadcaster and injected into it: the resolver caches the quest-giver / goal-target
-			// tables, so a second instance would duplicate them, and the broadcaster calls into the quest WIRE on
-			// every streamed-in NPC. The dependency runs one way - QuestBroadcaster holds nothing of the world's.
-			_questMarkers = new QuestMarkerResolver(database, logger);
-			_questBroadcaster = new QuestBroadcaster(_simulation, database, _questMarkers, logger);
-			// Both SHARED with NpcBroadcaster below, so built here rather than inside the broadcaster: the handle
-			// allocator because a second counter would hand out colliding entity handles (loot bags are minted on one
-			// side, NPCs / pets / ambient members on the other), and the ambient pools because one side seeds a zone
-			// while the other streams what it stands up.
-			_handles = new RuntimeHandleAllocator();
-			_ambientPools = new AmbientPoolService(_simulation, database, _handles, _combos, logger);
-			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, _questMarkers, _questBroadcaster, _handles, _ambientPools);
-			// What an NPC DOES, as against who can see it. One-way: nothing in the broadcaster calls in here.
-			_npcs = new NpcBroadcaster(_simulation, database, _broadcaster, _ambientPools, _combos, _handles, logger);
-			// The loot LIFECYCLE (corpse drop -> bag -> take -> fade), and what is IN each bag. One-way like the two above.
-			_lootBroadcaster = new LootBroadcaster(_simulation, database, _broadcaster, _questMarkers, _handles, logger);
-			// The IQuestOutbound port itself: nine wire members off the quest broadcaster, three world members off
-			// the world one. See Quest/QuestOutbound.cs for why the interface is not split instead.
-			_questOutbound = new QuestOutbound(_questBroadcaster, _broadcaster, _npcs);
-			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
-			// which reaches the same enter-world handoff pair through it.
-			_worldObjects = new WorldObjectService(_simulation, database, _broadcaster, logger);
-			_teleport = new TeleportService(Connections, database, _broadcaster, agentServerDispatcher, logger);
-			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
-			{
-				await _teleport.SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
-				await _teleport.SendWorldHandoff(client);
-			});
-			// #820: built BEFORE the quest rewards, which now pay experience through it. A quest award is a second
-			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
-			_levelUpOutbound = new LevelUpOutbound();
-			_levelUp = new LevelUpService(database, _simulation, _levelUpOutbound, logger);
-			// Built BEFORE the quest services, which take it as IEconomyOutbound. The one thing it needs BACK from them
-			// - the post-grant collect-goal tick - is bound below, because that pair is a genuine cycle.
-			_economyOutbound = new EconomyOutbound(Connections, database, logger);
-			_tradeOutbound = new TradeOutbound(Connections, _economyOutbound);
-			_trade = new TradeService(database, logger, _tradeOutbound);
-			_questRewards = new QuestRewardService(database, _questOutbound, _economyOutbound, _levelUp.ApplyXp, logger);
-			_dailyChallenges = new DailyChallengeService(database, logger);
-			_questProgression = new QuestProgressionService(database, _questOutbound, _economyOutbound, _tortageIntro, agentServerDispatcher, _questRewards, _dailyChallenges, logger);
-			_economyOutbound.BindCollectGoals(_questProgression.AdvanceCollectGoals);
-			_spellModifiers = new SpellModifierService(database);
-			_buffStats = new BuffStatEffects(database, logger);
-			_poolEffects = new SpellPoolEffects(database, logger);
-			// The buffs / pets / spell-effect trio, ABOVE combat now. That is the ordering change #826's last port
-			// bought: BuffService used to take CombatService for one call (GetOrAddPlayerVitals, which reads nothing
-			// but the world model and has moved to WorldSimulation), and that single edge closed the cycle
-			// SpellEffectOutbound -> BuffService -> CombatService -> FatalityService -> SpellEffectOutbound which is
-			// why the listener implemented ISpellEffectOutbound at all.
-			_buffs = new BuffService(database, _simulation, _broadcaster, _spellAreas, _poolEffects, _buffStats, logger);
-			_pets = new PetService(database, _simulation, _npcs, logger);
-			_spellEffectOutbound = new SpellEffectOutbound(_buffs, _pets);
-			// The knockback used to reach this port through a BOUND seam on the broadcaster, because the broadcaster is
-			// built far above it. Its own class is built HERE, after the port, so it is an ordinary ctor argument.
-			_knockback = new KnockbackService(_simulation, _spellEffectOutbound, logger);
-			_spellEffects = new SpellEffectService(database, _spellEffectOutbound, logger);
-			_fatality = new FatalityService(logger, _spellEffectOutbound, _spellEffects);
-			_factions = new FactionService(database, logger, SendFactionStanding);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, _levelUp, _fatality, _factions, _broadcaster, csPlayerAgentDispatcher, configuration.ContentKillStreaks);
-			_levelUpOutbound.BindReseed(_combat.ReseedFromMaxStats);
-			_cast = new CastService(database, _simulation, _combat, _buffs, _spellEffects, _spellModifiers, _spellAreas, logger, _broadcaster);
-			_energy = new EnergyService(_buffs, logger);
-			_spellweave = new SpellweaveService(logger, new SpellweaveOutbound(_simulation, _energy, _buffs, agentServerDispatcher));
-			_travel = new TravelService(database, new TravelOutbound(agentServerDispatcher, _economyOutbound, _teleport, _simulation), logger);
-			_conversation = new ConversationService(database, logger, _broadcaster, _npcs, _questBroadcaster, _simulation, _questProgression, _travel, agentServerDispatcher, _questRewards);
-			_questShare = new QuestShareOutbound(Connections, _simulation);
-			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, _questShare, _questProgression, logger);
-			_apprenticeOutbound = new ApprenticeOutbound(Connections, agentServerDispatcher);
-			_apprentice = new ApprenticeService(_apprenticeOutbound, csPlayerAgentDispatcher, logger);
-			_stockConversation = new StockConversationService(logger, database);
-			_loot = new LootService(_lootBroadcaster, _economyOutbound, database, _questProgression, agentServerDispatcher, logger);
-			_keepAlive = new KeepAliveService(_simulation.Metrics);
-			_shortcutBar = new ShortcutBarService(database, logger);
-			_equipment = new EquipmentService(database, logger);
-			_shop = new ShopService(database, logger, _economyOutbound);
-			_bank = new BankService(database, logger, _economyOutbound);
-			_tradepost = new TradepostService(database, logger, _economyOutbound, csPlayerAgentDispatcher);
-			_guildBank = new GuildBankService(database, _economyOutbound, logger);
-			_tradeskill = new TradeskillService(database, _economyOutbound, _worldObjects, agentServerDispatcher, logger);
-			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
-			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => _teleport.DoTeleport(id, map, pos), SendLearnSpell);
-			_skillPoints = new SkillPointService(database, logger);
-			_mounts = new MountService(_simulation, database, _buffs, _broadcaster, logger);
-			_environmentOutbound = new EnvironmentOutbound(_buffs, _mounts.Dismount);
-			_environment = new EnvironmentService(database, _environmentOutbound, logger);
-			_comboFinisher = new ComboFinisher(_simulation, _knockback, _combat, _buffs, _combos, _spellModifiers, logger);
+			_simulation = simulation;
+			_persistence = persistence;
+			_tortageIntro = tortageIntro;
+			_combos = combos;
+			_questBroadcaster = questBroadcaster;
+			_broadcaster = broadcaster;
+			_npcs = npcs;
+			_lootBroadcaster = lootBroadcaster;
+			_questOutbound = questOutbound;
+			_worldObjects = worldObjects;
+			_teleport = teleport;
+			_createFlow = createFlow;
+			_levelUp = levelUp;
+			_economyOutbound = economyOutbound;
+			_trade = trade;
+			_questRewards = questRewards;
+			_questProgression = questProgression;
+			_buffStats = buffStats;
+			_buffs = buffs;
+			_pets = pets;
+			_knockback = knockback;
+			_factions = factions;
+			_combat = combat;
+			_cast = cast;
+			_energy = energy;
+			_spellweave = spellweave;
+			_travel = travel;
+			_conversation = conversation;
+			_questShare = questShare;
+			_questSharing = questSharing;
+			_apprentice = apprentice;
+			_stockConversation = stockConversation;
+			_loot = loot;
+			_keepAlive = keepAlive;
+			_shortcutBar = shortcutBar;
+			_equipment = equipment;
+			_shop = shop;
+			_bank = bank;
+			_tradepost = tradepost;
+			_guildBank = guildBank;
+			_tradeskill = tradeskill;
+			_claims = claims;
+			_feats = feats;
+			_skillPoints = skillPoints;
+			_mounts = mounts;
+			_environment = environment;
+			_comboFinisher = comboFinisher;
+			_worldOutbound = worldOutbound;
 
-			// The world tick's whole outbound surface, composed once everything it reaches exists. It is handed to the
-			// simulation at Start rather than construction - see WorldSimulation._output for why that ordering is the
-			// thing that makes the graph acyclic.
-			_worldOutbound = new WorldOutbound(_broadcaster, _npcs, _lootBroadcaster, _worldObjects, _buffs, _combat, _tradeskill, _mounts.Dismount);
+			// The ONE op the create flow needs that is genuinely ours: the burst-less world entry. It is a bound seam
+			// rather than a ctor argument because the flow is a service and the entry is a listener method - the last
+			// remaining edge of that shape, and the reason CreateFlowService cannot simply take us.
+			_createFlow.BindWorldEntry(SendBurstlessWorldEntry);
 
 			InitGmCommands();
 		}

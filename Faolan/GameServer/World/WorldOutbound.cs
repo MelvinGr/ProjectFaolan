@@ -32,7 +32,7 @@ namespace Faolan.GameServer.World
 	///         <c>.Outbound</c> extraction rather than this change.
 	///     </para>
 	/// </remarks>
-	internal sealed class WorldOutbound : IWorldOutbound
+	public sealed class WorldOutbound : IWorldOutbound
 	{
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly LootBroadcaster _loot;

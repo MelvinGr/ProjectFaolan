@@ -62,7 +62,7 @@ namespace Faolan.CSPlayerAgent
 		// singleton the pre-host bootstrap registers, which is what lets this be a plain AddHostedService<T>().
 		public CsPlayerAgentListener(HostRealm realm, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
 			ICsPlayerAgentDispatcher csPlayerAgentDispatcher, IChatServerDispatcher chatServerDispatcher) : base(realm.CsPlayerAgentPort, logger, configuration, database,
-			new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)))
+			new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)), new ConnectionRegistry())
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;

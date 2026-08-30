@@ -27,16 +27,22 @@ namespace Faolan.Core.Network
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
 
-		// The live connections and the lookups over them (#826). Kept as a field the subclass can hand to a wire
-		// collaborator, so "send to this character" no longer has to be a listener method - see ConnectionRegistry.
-		protected readonly ConnectionRegistry Connections = new ConnectionRegistry();
+		// The live connections and the lookups over them (#826), so "send to this character" no longer has to be a
+		// listener method - see ConnectionRegistry.
+		//
+		// ⚠️ INJECTED, not owned. Each listener needs its OWN registry (a chat connection is not a world connection),
+		// so most subclasses simply pass `new ConnectionRegistry()` at their base call. The GameServer takes it from
+		// the container instead, because its wire collaborators are container-resolved and would otherwise have to
+		// reach back into the listener for this one field - the last cycle standing between them and injection.
+		protected readonly ConnectionRegistry Connections;
 		private readonly TcpListener _tcpListener;
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
 		protected IEnumerable<INetworkClient> NetworkClients => Connections.Clients;
 
-		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
+		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConnectionRegistry connections)
 		{
+			Connections = connections;
 			Logger = logger;
 			Configuration = configuration;
 			Database = database;
@@ -188,7 +194,8 @@ namespace Faolan.Core.Network
 		// SENDS are traced through the same object, with the same channel label (Gitea #406 phase 6).
 		private readonly ChatPacketTracer _tracer;
 
-		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer) : base(port, logger, configuration, database)
+		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer)
+			: base(port, logger, configuration, database, new ConnectionRegistry())
 		{
 			_tracer = tracer;
 		}
@@ -236,7 +243,8 @@ namespace Faolan.Core.Network
 		// This channel's packet trace - both directions through one object (see ChatServerBase._tracer).
 		private readonly ConanPacketTracer _tracer;
 
-		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer) : base(port, logger, configuration, database)
+		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer, ConnectionRegistry connections)
+			: base(port, logger, configuration, database, connections)
 		{
 			_tracer = tracer;
 		}

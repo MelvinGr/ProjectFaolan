@@ -35,7 +35,7 @@ namespace Faolan.GameServer.Economy
 	///         name - so collapsing the two would change what the senders can express.
 	///     </para>
 	/// </remarks>
-	internal sealed class EconomyOutbound : IEconomyOutbound
+	public sealed class EconomyOutbound : IEconomyOutbound
 	{
 		private readonly ConnectionRegistry _connections;
 		private readonly IDatabaseRepository _database;
