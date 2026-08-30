@@ -36,11 +36,11 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AnEffectLandingOnAMob_AlsoLandsTheSpellItsChainEdgeNames()
 		{
-			var (sim, output, areas, client, mob) = await Harness();
+			var (sim, buffTicks, output, areas, client, mob) = await Harness();
 			areas.Chains[Stench] = await ShippedChainEdges(Stench);
 			output.AreaVictims = [MobHandle];
 
-			await sim.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
+			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
 
 			Assert.Equal([Stench << 8, Wrack << 8], output.Applications.Select(a => a.WireSpellId));
 			Assert.All(output.Applications, a =>
@@ -61,12 +61,12 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task AVictimAlreadyCarryingTheEffect_DoesNotReRunTheChain()
 		{
-			var (sim, output, areas, client, mob) = await Harness();
+			var (sim, buffTicks, output, areas, client, mob) = await Harness();
 			areas.Chains[Stench] = await ShippedChainEdges(Stench);
 			output.AreaVictims = [MobHandle];
 
-			await sim.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
-			await sim.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
+			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
+			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
 
 			Assert.Equal(2, output.Applications.Count); // the carrier and its chained debuff, ONCE each
 			Assert.Equal([Stench << 8, Wrack << 8], mob.ActiveBuffs.Keys.Order());
@@ -77,12 +77,12 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task ACycleInTheChain_TerminatesWithEachSpellAppliedOnce()
 		{
-			var (sim, output, areas, client, mob) = await Harness();
+			var (sim, buffTicks, output, areas, client, mob) = await Harness();
 			areas.Chains[Stench] = [Link(Stench, Wrack)];
 			areas.Chains[Wrack] = [Link(Wrack, Stench)]; // ...and back again
 			output.AreaVictims = [MobHandle];
 
-			await sim.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
+			await buffTicks.ApplyAreaEffect(client, PlayerHandle, PlayerHandle, Area(Stench));
 
 			Assert.Equal([Stench << 8, Wrack << 8], output.Applications.Select(a => a.WireSpellId));
 			Assert.Equal(2, mob.ActiveBuffs.Count);
@@ -137,11 +137,12 @@ namespace Faolan.Tests
 			return new SpellAreaEffect { SpellId = 221070, Sequence = 0, Kind = 53088, EffectSpellId = effectSpellId, RadiusMetres = 7, MaxTargets = 12 };
 		}
 
-		private static async Task<(WorldSimulation Sim, RecordingWorldOutbound Output, RecordingSpellAreaCatalog Areas, RecordingNetworkClient Client, WorldEntity Mob)> Harness()
+		private static async Task<(WorldSimulation Sim, BuffTickService BuffTicks, RecordingWorldOutbound Output, RecordingSpellAreaCatalog Areas, RecordingNetworkClient Client, WorldEntity Mob)> Harness()
 		{
 			var output = new RecordingWorldOutbound();
 			var areas = new RecordingSpellAreaCatalog();
-			var sim = TestWorld.Simulation(new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase))), spellAreas: areas);
+			var parts = TestWorld.Build(new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase))), spellAreas: areas);
+			var sim = parts.Sim;
 			sim.BindOutbound(output);
 
 			var client = new RecordingNetworkClient(PlayerHandle);
@@ -152,7 +153,7 @@ namespace Faolan.Tests
 			var mob = new WorldEntity(MobHandle, MapId, false, "Rotted Corpse", null!);
 			sim.World.Place(mob, MapId, Vector3.Zero, Quaternion.Identity);
 
-			return await Task.FromResult((sim, output, areas, client, mob));
+			return await Task.FromResult((sim, parts.BuffTicks, output, areas, client, mob));
 		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>

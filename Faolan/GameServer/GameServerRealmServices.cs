@@ -77,6 +77,7 @@ namespace Faolan.GameServer
 			services.AddSingleton(sp => new WorldState(sp.GetService<TerrainService>()));
 			services.AddSingleton<PlayerRegistry>();
 			services.AddSingleton<PlayerDeathService>();
+			services.AddSingleton<BuffTickService>();
 			services.AddSingleton<WorldSimulation>();
 			services.AddSingleton<PlayerPersistenceService>();
 			services.AddSingleton<TortageIntroService>();

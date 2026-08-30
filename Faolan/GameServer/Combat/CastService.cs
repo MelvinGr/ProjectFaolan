@@ -46,6 +46,9 @@ namespace Faolan.GameServer.Combat
 		private readonly ILogger _logger;
 		private readonly WorldSimulation _sim;
 
+		// A ground AoE's tick applies through the same path the world tick uses for an aura area.
+		private readonly BuffTickService _buffTicks;
+
 		// #772: the spell's INSTANT self-centred areas, and the #784 chain edges the buff engine walks.
 		private readonly SpellAreaCatalog _spellAreas;
 
@@ -55,11 +58,12 @@ namespace Faolan.GameServer.Combat
 		// #710: the per-cast overrides a caster's trained feats and live buffs put on this spell.
 		private readonly SpellModifierService _spellModifiers;
 
-		public CastService(IDatabaseRepository database, WorldSimulation sim, CombatService combat, BuffService buffs,
+		public CastService(IDatabaseRepository database, WorldSimulation sim, BuffTickService buffTicks, CombatService combat, BuffService buffs,
 			SpellEffectService spellEffects, SpellModifierService spellModifiers, SpellAreaCatalog spellAreas, ILogger logger, WorldBroadcaster broadcaster)
 		{
 			_database = database;
 			_sim = sim;
+			_buffTicks = buffTicks;
 			_combat = combat;
 			_buffs = buffs;
 			_spellEffects = spellEffects;
@@ -309,7 +313,7 @@ namespace Faolan.GameServer.Combat
 				// belongs to the world model.
 				foreach (var area in await _spellAreas.InstantAreas(spellId))
 				{
-					var hit = await _sim.ApplyAreaEffect(client, casterHandle, casterHandle, area);
+					var hit = await _buffTicks.ApplyAreaEffect(client, casterHandle, casterHandle, area);
 					_logger.LogInformation("Cast {Spell} applied area effect {Effect} to {Hit} target(s) within {Radius}m.", spellId, area.EffectSpellId, hit, area.RadiusMetres);
 				}
 

@@ -2056,7 +2056,7 @@ spell's damage to everyone in range and stopped there, so the effect record neve
 - none of its stat effects (`Modify 840 = -5%` damage, the three `TempChangeSkill` invulnerabilities);
 - and the chain stopped dead, because nothing was holding `221069` for its own 4 m / 3 s area to fire from.
 
-So `WorldSimulation.ApplyAreaEffect` owns the whole operation: `ApplySpellArea` answers WHICH entities were
+So `BuffTickService.ApplyAreaEffect` owns the whole operation: `ApplySpellArea` answers WHICH entities were
 hit, and each of them then gets the effect itself — the `ApplySpell` carrier so the client draws the icon on
 the mob, plus a tracked `ActiveBuff` carrying its duration and DoT.
 
