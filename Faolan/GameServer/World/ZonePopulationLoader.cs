@@ -350,6 +350,19 @@ namespace Faolan.GameServer.World
 				{
 					foreach (var s in typeSpells)
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8)));
+
+					// ⛔ `AttackSpellBaseId` was DECLARED and READ and never once ASSIGNED (#902, 2026-08-30) - the whole
+					// tree had exactly three mentions of it: the property, the `!= 0` guard in `NpcCombatService`, and
+					// the call that guard protects. So it was 0 for every creature that has ever existed here, the guard
+					// was never true, and a melee swing has NEVER put a health `StatDamageIIR` on the wire. The gap read
+					// as a DATA gap ("only 35 of 1,227 templates carry an ability") when it was a wiring one: not even
+					// those 35 reached the entity.
+					//
+					// The property documents its own source - `NpcSpells.SpellId >> 8` - and this is where that row is
+					// already in hand, so it is where the shift belongs. First row wins: a creature's rows are its
+					// abilities and retail names one of them per physical hit (`Ripper Volley`, `Rend`, `Butcher`), so
+					// which one is a fidelity question, while having none at all is why the record is absent entirely.
+					entity.AttackSpellBaseId = typeSpells.First().SpellId >> 8;
 				}
 
 				// Bark lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent). The entity

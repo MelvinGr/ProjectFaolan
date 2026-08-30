@@ -163,8 +163,16 @@ namespace Faolan.GameServer.World
 		public Task PushVitals(INetworkClient client, EntityVitals vitals)
 		{
 			// #586: every caller of this - the regen tick, fall damage, lava, drowning - moves a CURRENT and nothing
-			// else, which is the case retail answers with the three-record currents-only block.
-			return GameServerListener.SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
+			// else. #902: and only the ones that MOVED go on the wire, which is both what #586's title said and the
+			// own-handle shape retail actually uses (single-stat blocks x1,503 against x12 for the three-current form,
+			// which is what it says about OTHER entities). An empty block means nothing moved and there is nothing to
+			// announce - sending one would restate a health that did not change, which is what the regen tick did on
+			// every second of every fight because stamina kept it alive.
+			var moved = vitals.ToChangedCurrentsBlock();
+
+			return moved.Records.Count == 0
+				? Task.CompletedTask
+				: GameServerListener.SendStatUpdate(client, moved, client.Session.Character.Id);
 		}
 
 		public Task ResolveInterest(INetworkClient client)

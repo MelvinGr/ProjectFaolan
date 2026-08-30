@@ -272,6 +272,11 @@ namespace Faolan.GameServer.World
 				// spell boosts are - a swing must not turn into a query.
 				ComboBonuses = comboBonuses ?? new Dictionary<uint, ComboFeatBonus>()
 			});
+			// The CLIENT's copy of the vitals is reseeded from the world-entry snapshot, not from a push - so what we
+			// last pushed says nothing about what it now holds, and a current that happens to match would never be
+			// restated. Forget it here so the first push after entry states all three (#902).
+			entity.Vitals?.ForgetPushedCurrents();
+
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
 			if (client.Session.Account is { } account)
@@ -422,7 +427,7 @@ namespace Faolan.GameServer.World
 					wisdom = entity.AttributeScore(CharacterStatId.Wisdom);
 				var changed = vitals.Regenerate(inCombat
 						? 0u
-						: RegenRates.Gain(RegenRates.HealthPerSecond(constitution, strength), elapsedSeconds),
+						: RegenRates.Gain(RegenRates.HealthPerSecond(constitution, strength, vitals.MaxHealth), elapsedSeconds),
 					RegenRates.Gain(RegenRates.StaminaPerSecond(constitution, strength, dexterity), elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
 						? 0u
 						: RegenRates.Gain(RegenRates.ManaPerSecond(intelligence, wisdom, entity.NonCombatManaRegenBase), elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));

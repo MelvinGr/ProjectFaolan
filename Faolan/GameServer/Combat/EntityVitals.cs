@@ -301,6 +301,49 @@ namespace Faolan.GameServer.Combat
 				.Set(CharacterStatId.ManaCurrent, Mana);
 		}
 
+		// What the last own-handle push actually stated, so the next one can carry only what MOVED. uint.MaxValue is
+		// "never pushed", which no pool can equal, so the first push after world entry always states all three.
+		private uint _pushedHealth = uint.MaxValue, _pushedStamina = uint.MaxValue, _pushedMana = uint.MaxValue;
+
+		/// <summary>
+		///     The currents that have CHANGED since the last call, and nothing else - an empty block when none have.
+		///     Stamps what it returns, so it is a state transition and must be called once per push.
+		/// </summary>
+		/// <remarks>
+		///     ⭐ This is what #586's title said ("a vitals push carries what MOVED") and what its code did not do: it
+		///     sent all three currents on every push regardless. On the player's OWN handle that is not retail's shape -
+		///     the corpus splits the own-handle blocks as `[0x01FA]` x1171, `[0x001B]` x211 and `[0x01F8]` x121 against
+		///     only x12 for the three-current form, while that same three-current form is what retail says about OTHER
+		///     entities (x4,676). So a single-stat block IS the own-handle idiom and we were using the other one.
+		///
+		///     ⛔ The concrete cost was a health record on every tick of a fight. HP regen is halted in combat, but
+		///     STAMINA's is not, so the regen tick still fired every second and restated `HealthCurrent` with it -
+		///     announcing a health "change" that had not happened, once a second, for the whole fight (#902).
+		/// </remarks>
+		public CharacterStatBlock ToChangedCurrentsBlock()
+		{
+			var block = new CharacterStatBlock();
+			if (Health != _pushedHealth)
+				block.Set(CharacterStatId.HealthCurrent, Health);
+			if (Stamina != _pushedStamina)
+				block.Set(CharacterStatId.StaminaCurrent, Stamina);
+			if (Mana != _pushedMana)
+				block.Set(CharacterStatId.ManaCurrent, Mana);
+
+			(_pushedHealth, _pushedStamina, _pushedMana) = (Health, Stamina, Mana);
+			return block;
+		}
+
+		/// <summary>
+		///     Forgets what was last pushed, so the next <see cref="ToChangedCurrentsBlock" /> restates every current.
+		///     Called wherever the CLIENT's copy is reseeded from something other than a push - world entry, a
+		///     resurrection - because after that our record of what it holds is no longer about the same client state.
+		/// </summary>
+		public void ForgetPushedCurrents()
+		{
+			_pushedHealth = _pushedStamina = _pushedMana = uint.MaxValue;
+		}
+
 		/// <summary>
 		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none),
 		///     PLUS the equipped-gear vital bonuses (#3) so worn +HP/+Stamina/+Mana raises the max and the regen bar can

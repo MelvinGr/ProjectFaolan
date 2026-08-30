@@ -89,10 +89,34 @@ namespace Faolan.GameServer.Combat
 		// `WorldEntity.NonCombatManaRegenBase` is the sum, and the simulation passes it here.
 		public const double ManaFlatRate = 0.0;
 
+		// ⭐ The CEILING the attribute+flat sum is held under, as a share of the character's MAX health per second.
+		//
+		// Measured off the corpus (#902): retail's own-handle `RegenIIR` ticks at a median 1.01s and carries a median
+		// 3.90% of the character's max health per second - p25 3.07%, p75 4.63%. That share is the rule rather than a
+		// coincidence of one pool size: the captured pools span **17.2x** (13,800 to 237,100 wire) and the
+		// share-of-pool reading is the TIGHTER of the two (CV 0.49 against 0.75 for a flat HP/s), which is the
+		// comparison that makes it identifiable at all.
+		//
+		// ⚠️ It is a CAP, not a replacement, because the formula below is already right where retail was captured. Every
+		// capture is a level 23-80 character, and there the attribute term dominates: a level-80 Necromancer computes
+		// 106 HP/s against the 92 HP/s the corpus measures, i.e. 4.5% of its 2,371 pool - just under this ceiling, so
+		// nothing about #442's verified shape changes.
+		//
+		// ⛔ What it bites is the LOW-LEVEL band, which no capture covers. `HealthFlatRate` is a flat 20 HP/s read off
+		// the client's own stat 278, and a flat term does not scale down: on a level-4's 202-point pool it alone is
+		// 10% of the bar PER SECOND (a full bar in 9s), against the 3.9% that holds across every captured character.
+		// Capping at the observed p75 leaves the verified band untouched and pulls the unverified one into the measured
+		// range, which is the conservative direction when the evidence stops before the level you are standing on.
+		public const double HealthRegenMaxFractionPerSecond = 0.0463;
+
 		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).
-		public static double HealthPerSecond(uint constitution, uint strength)
+		public static double HealthPerSecond(uint constitution, uint strength, uint maxHealth = 0)
 		{
-			return OutOfCombatAttributeModifier * (constitution + strength) + HealthFlatRate;
+			var rate = OutOfCombatAttributeModifier * (constitution + strength) + HealthFlatRate;
+
+			return maxHealth == 0
+				? rate // no pool stated: the historical rate, unchanged
+				: Math.Min(rate, maxHealth * HealthRegenMaxFractionPerSecond);
 		}
 
 		// Stamina: Constitution + Strength + Dexterity. Keeps ticking in combat - it is the action resource, and the
