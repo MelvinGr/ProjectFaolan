@@ -27,15 +27,6 @@
 		"Store": "./cdn-store"
 	},
 
-	"ChatBridge": {
-		// How far back a channel's history still counts as backlog rather than new traffic, in milliseconds.
-		"BacklogGraceMs": 120000,
-		// Push in-game "Claude" channel chat into the Claude Code session. Requires Mcp:Enabled; off still leaves the reply tool working.
-		"Enabled": false,
-		// How often the chat bridge looks for new messages, in milliseconds.
-		"PollMs": 1500
-	},
-
 	"Content": {
 		// The client build the protocol was decoded against. Another build is WARNED about, never refused.
 		"ClientVersion": "v5.01.0@602248",

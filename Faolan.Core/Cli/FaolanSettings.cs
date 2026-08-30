@@ -35,9 +35,6 @@ namespace Faolan.Core.Cli
 			Setting<ushort>(Keys.CdnListenPort, "The port the CDN mirror BINDS, on Cdn:ListenAddress. Not a port to dial - that is Cdn:PublicAddress.", 7081),
 			Setting(Keys.CdnPublicAddress, "The full URL every mirror CLIENT dials, scheme and port included. http ONLY - the game client's libcurl has no SSL.", "http://127.0.0.1:7081"),
 			Setting(Keys.CdnStore, "Where the CDN mirror keeps the blobs it has fetched.", "./cdn-store"),
-			Setting(Keys.ChatBridgeBacklogGraceMs, "How far back a channel's history still counts as backlog rather than new traffic, in milliseconds.", 120_000),
-			Setting(Keys.ChatBridgeEnabled, "Push in-game \"Claude\" channel chat into the Claude Code session. Requires Mcp:Enabled; off still leaves the reply tool working.", false),
-			Setting(Keys.ChatBridgePollMs, "How often the chat bridge looks for new messages, in milliseconds.", 1500),
 			Setting(Keys.ContentClientVersion, "The client build the protocol was decoded against. Another build is WARNED about, never refused.", "v5.01.0@602248"),
 			Setting(Keys.ContentKillStreaks, "Announce a player's kill STREAK - the running count of kills strung together inside nine seconds. Off, no chain is tracked and the client is told nothing.", true),
 			Optional<string>(Keys.ContentRdbDir, "The client's RDB folder, part of the game INSTALL. Read by the importer, the RDB tools and Faolan.Web's model viewer - the server itself never needs it."),
@@ -68,10 +65,8 @@ namespace Faolan.Core.Cli
 		// const beside it is named. So a key and its accessor are one grep, and an accessor cannot drift into naming a
 		// section it does not belong to (`UniverseAgentPort`, `WelcomeString`, `RdbDir` all read as global).
 		//
-		// Two kinds of member are legitimately not a key: a DERIVED value (`McpUrl`, `ServerUniverseAddress`), which
-		// sits directly under the setting it is derived from, and a UNIT CONVERSION (`ChatBridgeBacklogGrace`,
-		// `ChatBridgePoll`) - the key carries the Ms suffix because it holds a number, the accessor drops it because it
-		// hands back a TimeSpan, and keeping the suffix there would be the lie.
+		// One kind of member is legitimately not a key: a DERIVED value (`McpUrl`, `ServerUniverseAddress`), which sits
+		// directly under the setting it is derived from.
 		extension(IConfiguration config)
 		{
 			public uint AccountFreeCharSlots => Value<uint>(config, Keys.AccountFreeCharSlots);
@@ -82,10 +77,6 @@ namespace Faolan.Core.Cli
 			public ushort CdnListenPort => Value<ushort>(config, Keys.CdnListenPort);
 			public string? CdnPublicAddress => config[Keys.CdnPublicAddress];
 			public string CdnStore => config[Keys.CdnStore]!;
-
-			public TimeSpan ChatBridgeBacklogGrace => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgeBacklogGraceMs));
-			public bool ChatBridgeEnabled => config.McpEnabled && Value<bool>(config, Keys.ChatBridgeEnabled);
-			public TimeSpan ChatBridgePoll => TimeSpan.FromMilliseconds(Value<int>(config, Keys.ChatBridgePollMs));
 
 			public string ContentClientVersion => config[Keys.ContentClientVersion]!;
 			public bool ContentKillStreaks => Value<bool>(config, Keys.ContentKillStreaks);
@@ -203,9 +194,6 @@ namespace Faolan.Core.Cli
 			public const string CdnListenPort = "Cdn:ListenPort";
 			public const string CdnPublicAddress = "Cdn:PublicAddress";
 			public const string CdnStore = "Cdn:Store";
-			public const string ChatBridgeBacklogGraceMs = "ChatBridge:BacklogGraceMs";
-			public const string ChatBridgeEnabled = "ChatBridge:Enabled";
-			public const string ChatBridgePollMs = "ChatBridge:PollMs";
 			public const string ContentClientVersion = "Content:ClientVersion";
 			public const string ContentKillStreaks = "Content:KillStreaks";
 			public const string ContentRdbDir = "Content:RdbDir";

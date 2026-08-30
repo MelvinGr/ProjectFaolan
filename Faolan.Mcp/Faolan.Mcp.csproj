@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <!-- Dual-role assembly: a LIBRARY hosted in-process by the game server (FaolanMcpHostedService), and an
-             EXECUTABLE whose entry point is the Claude Code channel bridge (ChannelBridge.Main - spawned by
-             Claude Code over stdio via .mcp.json "faolan-chat"). Exe-to-exe project references are fine. -->
-        <OutputType>Exe</OutputType>
-        <StartupObject>Faolan.Mcp.ChannelBridge</StartupObject>
+        <!-- A LIBRARY, hosted in-process by the game server (AddFaolanMcp / MapFaolanMcp onto its Kestrel). It was
+             ALSO an executable until the Claude Code stdio channel bridge (ChannelBridge.Main) was removed; nothing
+             in here has an entry point any more.
+             AllowMissingPrunePackageData is required by the FrameworkReference below, not by the output kind -
+             dropping it fails the build with NETSDK1226 "Prune Package data not found .NETCoreApp 10.0
+             Microsoft.AspNetCore.App", and only on a fresh restore, so a cached incremental build will not show it. -->
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
 

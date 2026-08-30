@@ -117,32 +117,36 @@ client has never seen chat may involve a name-lookup exchange that is NOT in thi
   `.syschat` bootstrap replays the captured line). The local-say `0x0022` path covers player say.
 - Tune `SayRangeUnits` if the in-client range feels off.
 
-## The in-game Claude channel and the Claude Code channel bridge
+## The in-game Claude channel
 
 Every client is subscribed to the server-defined **"Claude" chat channel** (04/0x00C1A0DE) on ChatServer
-login. Player posts on it land in the in-memory `ClaudeChannel` log; the MCP tools `read_claude_channel`
-(cursor by sequence) and `send_claude_channel_message` (broadcast in-game as "Claude") bridge it to Claude.
+login, and gets Claude as an always-online **virtual friend** entry (`SendClaudeFriendEntry`) so `/tell Claude`
+has a front door. Player posts on the channel, and tells addressed to the synthetic sender id, land in the
+in-memory `ClaudeChannel` log (500 messages, not persisted across restarts).
 
-**Push delivery (2026-06-12):** `Faolan.Mcp.ChannelBridge` (the assembly's exe entry point) is a Claude Code
-*channel* (research preview, code.claude.com/docs/en/channels-reference): Claude Code spawns it over stdio
-(`.mcp.json` server `faolan-chat`), it polls the game server's MCP endpoint every ~1.5 s, and pushes each new
-player post into the running Claude Code session as a `notifications/claude/channel` event - so Claude reacts
-to in-game chat without polling. Replies go back through its `reply` tool. Enable per session:
+Three MCP tools on the in-process server (`Faolan.Mcp/Tools/ClaudeChannelTools.cs`) are the whole bridge:
 
-```bash
-claude --dangerously-load-development-channels server:faolan-chat
-```
+| tool | direction |
+| --- | --- |
+| `read_claude_channel` | reads the log, cursor by `Sequence` (pass the highest you have seen) |
+| `send_claude_channel_message` | broadcasts in-game as "Claude" to every connected client |
+| `send_claude_whisper` | private tell to one connected character |
 
-(Custom channels are not on the research-preview allowlist, hence the development flag. The bridge tolerates
-game-server restarts and skips the pre-launch backlog. SDK note: the experimental capability value must be a
-JsonElement - a boxed Dictionary breaks the SDK's source-generated initialize serialization.)
+All three are gated on `Mcp:Enabled`: with it off the channel is not offered at login
+(`ChatChannels.StandingAtLogin`), nothing is appended to the log, and the virtual friend is not sent — because
+without the MCP host nothing can read the log or answer.
 
-**Reply in the addressed mode (#97):** each message carries the inbound MODE structurally — `ClaudeChannelMessage.ViaWhisper`
-is set at ingestion (true for a `/tell Claude`, false for a channel post; `ChatServerListener` `Whisper` vs channel-chat
-cases), *not* encoded as a `"(whisper) "` text prefix. The bridge surfaces it on the channel event as
-`mode="whisper|channel"`, and the server instructions tell Claude to answer in kind: whisper back (`whisper_to` =
-`sender_id`) for a whisper, broadcast (omit `whisper_to`) for a channel post. So a private tell stays private and a
-public post stays public, automatically. Covered by `ClaudeChannelTests`.
+**Delivery is PULL.** Claude reads the log when it wants to; nothing wakes it. A stdio Claude Code *channel*
+(`Faolan.Mcp.ChannelBridge`, `.mcp.json` server `faolan-chat`) used to push each new post into a running
+session as a `notifications/claude/channel` event, and was removed on 2026-08-30 — it made the assembly an
+executable and carried its own `ChatBridge:*` config for a push that shipped disabled (`Enabled` defaulted to
+false). The channel, the log and the three tools are unaffected.
+
+**Reply in the addressed mode (#97):** each message carries the inbound MODE structurally —
+`ClaudeChannelMessage.ViaWhisper` is set at ingestion (true for a `/tell Claude`, false for a channel post;
+`ChatServerListener`'s `Whisper` vs channel-chat cases), *not* encoded as a `"(whisper) "` text prefix. So a
+reader can answer in kind — `send_claude_whisper` for a whisper, `send_claude_channel_message` for a channel
+post — and a private tell stays private. Covered by `ClaudeChannelTests`.
 
 ## Ambient NPC barks — the catalog is HARVESTABLE (#331)
 

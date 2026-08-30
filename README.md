@@ -440,7 +440,6 @@ catalog's — `--help` on any of the executables lists the same values for the s
 | `Login` `{ PrivateKey, PublicKey }` | the login DH keypair. Unset (the default) means no password is ever checked and every client is accepted on its account name; setting `PrivateKey` requires every client to be patched (`Faolan.ClientLauncher --patch-login`), since a client the server cannot decrypt has proved only that name |
 | `Mcp` `{ Enabled, Port }` | the in-process MCP endpoint the game server hosts |
 | `Cdn` `{ Store, ListenAddress, ListenPort, PublicAddress }` | the `Faolan.Web.Content` mirror's store dir + the interface it binds; `PublicAddress` is the address written into the patch config it serves back — **required by the mirror**, which will not start without it, since it is not the bind address and cannot be derived — **and the address every mirror CLIENT dials** — the importer's on-demand RDB fetches and `Faolan.Web`'s viewer, so a mirror on another box is this one key |
-| `ChatBridge` `{ Enabled, PollMs, BacklogGraceMs }` | the Claude chat-bridge: whether it pushes in-game chat into the Claude session (default: yes), and its poll-loop tuning. It always dials the local `Mcp:Port` — that endpoint binds loopback, so its URL is derived rather than configured |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
 

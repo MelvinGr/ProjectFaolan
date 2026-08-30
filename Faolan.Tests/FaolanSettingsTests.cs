@@ -18,8 +18,8 @@ namespace Faolan.Tests
 	//
 	// The bug this pins is the one that shape removes. A setting used to be spelled out twice, in a `*Command.cs`
 	// (name + description) and again in `IConfigurationExtensions` (name + `?? "faolan.log"`), with nothing tying
-	// them together: `--help` could describe a default the code did not use, and ClientVersion / ChatBridge:PollMs /
-	// ChatBridge:BacklogGraceMs had a fallback and NO declaration at all, so no --help in the tree mentioned them.
+	// them together: `--help` could describe a default the code did not use, and Content:ClientVersion had a fallback
+	// and NO declaration at all, so no --help in the tree mentioned it.
 	//
 	// So the gate is: every accessor must resolve against the catalog ALONE. An accessor reading a key nobody
 	// catalogued now throws, and it throws HERE rather than at whatever startup first needs the value.
@@ -50,9 +50,6 @@ namespace Faolan.Tests
 			Assert.False(config.McpEnabled);
 			Assert.Equal(7099, config.McpPort);
 			Assert.Equal("http://127.0.0.1:7099/mcp", config.McpUrl); // ...derived from that port, not a second literal
-			Assert.False(config.ChatBridgeEnabled); // ...its own default is off, and it ALSO requires Mcp:Enabled
-			Assert.Equal(120_000, config.ChatBridgeBacklogGrace.TotalMilliseconds);
-			Assert.Equal(1500, config.ChatBridgePoll.TotalMilliseconds);
 			Assert.Equal("./cdn-store", config.CdnStore);
 			Assert.Equal("0.0.0.0", config.CdnListenAddress.ToString()); // the interface the mirror BINDS, not an address to dial
 			Assert.Equal(7081, config.CdnListenPort);
@@ -66,10 +63,10 @@ namespace Faolan.Tests
 		}
 
 		// The MCP endpoint's URL is DERIVED from Mcp:Port and is not a setting, so moving the port moves every reader
-		// of it (the chat bridge, Faolan.Web's live-session probe) with it. It used to be one - `Mcp:Url`, then
-		// `ChatBridge:Url` - holding a second copy of the port: `Mcp:Port 7098` left its readers dialling 7099, which
-		// is a bridge that connects to nothing with the port written correctly in the config that broke it. There is
-		// no override, because the endpoint binds loopback: an address a port cannot express is one nothing can reach.
+		// of it (Faolan.Web's live-session probe) with it. It used to be one - `Mcp:Url`, then `ChatBridge:Url` -
+		// holding a second copy of the port: `Mcp:Port 7098` left its readers dialling 7099, which is a client that
+		// connects to nothing with the port written correctly in the config that broke it. There is no override,
+		// because the endpoint binds loopback: an address a port cannot express is one nothing can reach.
 		[Theory]
 		[InlineData(null, "http://127.0.0.1:7099/mcp")]
 		[InlineData("7098", "http://127.0.0.1:7098/mcp")]
@@ -134,7 +131,6 @@ namespace Faolan.Tests
 		[InlineData(Keys.AccountPremiumCharSlots, "ten")]
 		[InlineData(Keys.McpPort, "not-a-port")]
 		[InlineData(Keys.LogPacketBytes, "yes")]
-		[InlineData(Keys.ChatBridgePollMs, "soon")]
 		[InlineData(Keys.DatabaseProvider, "mysql")]
 		public void AMalformedValue_ThrowsNamingTheKey(string key, string value)
 		{
@@ -349,7 +345,6 @@ namespace Faolan.Tests
 				Keys.AccountPremiumCharSlots => config.AccountPremiumCharSlots,
 				Keys.McpPort => config.McpPort,
 				Keys.LogPacketBytes => config.LogPacketBytes,
-				Keys.ChatBridgePollMs => config.ChatBridgePoll,
 				Keys.DatabaseProvider => config.DatabaseProvider,
 				_ => throw new ArgumentException($"No accessor wired for '{key}' in this test.", nameof(key))
 			};

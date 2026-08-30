@@ -3,12 +3,6 @@
     "faolan": {
       "type": "http",
       "url": "http://127.0.0.1:7099/mcp"
-    },
-    "faolan-chat": {
-      "command": "dotnet",
-      "args": [
-        "Faolan.Mcp/bin/Debug/Faolan.Mcp.dll"
-      ]
     }
   }
 }
