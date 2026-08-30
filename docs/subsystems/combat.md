@@ -509,7 +509,7 @@ The player's guards therefore do work in PvE, matching the live game's "in gener
 you can leave them alone for PvE" — and the default `111` spread is the table's neutral entry, so leaving them
 alone costs exactly nothing.
 
-Applied on the melee path only (`WorldSimulation.ApplyNpcAttack`, after armour), through the same table as a
+Applied on the melee path only (`NpcCombatService.ApplyNpcAttack`, after armour), through the same table as a
 player's directed swing. An NPC **cast** takes no arc, for the same reason a player's spell does not: the rose
 guards swings.
 
@@ -630,7 +630,7 @@ world-tick `StatUpdate` (the ack's damage is just the floating number, so the tw
 
 Decode: `CombatDamageCodecTests` (98/98 frames of the strickenbla capture). Builder
 `BehaviorAnimations.NpcAttackAck`, byte-exact against frame 6472 in
-`EnergyCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
+`EnergyCodecTests`. Wired into `NpcCombatService.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
 semantically decoded - capture-typical defaults for the live send.
 

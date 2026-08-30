@@ -39,7 +39,8 @@ namespace Faolan.Tests.Support
 			var deaths = new PlayerDeathService(world, players, database!, log);
 			var buffTicks = new BuffTickService(world, players, database!, spellAreas!, log);
 
-			return new WorldParts(new WorldSimulation(database!, agents!, log, spellAreas!, world, players, deaths, buffTicks, terrain), deaths, buffTicks, world, players);
+			return new WorldParts(new WorldSimulation(database!, agents!, log, spellAreas!, world, players, deaths, buffTicks, new NpcCombatService(buffTicks, log), terrain),
+				deaths, buffTicks, world, players);
 		}
 
 		public sealed record WorldParts(WorldSimulation Sim, PlayerDeathService Deaths, BuffTickService BuffTicks, WorldState World, PlayerRegistry Players);

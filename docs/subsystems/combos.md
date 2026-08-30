@@ -735,7 +735,7 @@ which is why it is consulted there and nowhere else. Slot 6/8 are the weapon slo
 weapon-class item appears in any other slot (slot 7 is the belt).
 
 **Not every swing combos.** 427 of the 1,504 captured s2c `Combat:Melee` acks whose actor is a named NPC carry a
-combo — 28.4% — so `WorldSimulation.ApplyNpcAttack` rolls per swing (`NpcWeapon.MeleeComboShare`) rather than
+combo — 28.4% — so `NpcCombatService.ApplyNpcAttack` rolls per swing (`NpcWeapon.MeleeComboShare`) rather than
 combo-ing every time. `Combat:Unarmed` is **0 of 769**, which needs no rule of its own: an animal has no weapon, so
 the lookup returns nothing. The id is resolved once per NPC at zone load (`WorldEntity.MeleeComboId`), beside
 `RangedAttacker` and for the same reason — that is where the equipment rows are already `Include`d.
