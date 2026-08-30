@@ -23,8 +23,8 @@ namespace Faolan.Core.Enums
 		// handoff, recognised by PendingCreateWorldEntry). Gets the intro/cutscene world entry.
 		CreateWorld,
 
-		// An existing character reconnecting after a changemap/teleport handoff (recognised by
-		// PendingTeleportReentry). Behaves like Login for the world burst, but the reconnect carries NO client
+		// An existing character reconnecting after a changemap/teleport handoff (recognised by the re-entry mark
+		// TeleportService arms). Behaves like Login for the world burst, but the reconnect carries NO client
 		// 0x205F, so the post-0x205F follow-up is armed at auth and flushed on the CharInPlayIIR / next 0x2020.
 		TeleportReentry
 	}

@@ -99,20 +99,6 @@ namespace Faolan.GameServer
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameAgentType, 0x58);
 
-		// Characters whose armed teleport chose the EPIC difficulty (#309): set in DoTeleport beside the reentry
-		// mark below, consumed by the reconnect's world entry - the difficulty must survive the handoff because the
-		// entry happens on a NEW connection. Absent = normal, so nothing is stored for the common case.
-		internal static readonly ConcurrentDictionary<uint, byte> PendingEpicEntry = new ConcurrentDictionary<uint, byte>();
-
-		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
-		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
-		// retail changemap capture confirms it - the flag is normally armed by the client's 0x205F at full login), so
-		// we arm HasPendingPost205FFollowUp ourselves here. Without it the world burst lands but 0x2024 ReadyForPlay-
-		// Screen never fires and the client sits on the loading screen forever (the totem-recall hang, Gitea #28).
-		// Static for the same reason as PendingCreateWorldEntry: the old + reconnect connections are different sessions
-		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
-		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
-
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict = null!;
 
 		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(RpcInterfaces.GameCharAgentProjectType, 0x58);
@@ -200,7 +186,7 @@ namespace Faolan.GameServer
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
-		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
+		// burst-less world entry it needs is injected as a Func seam, and the handoff pair comes off _teleport.
 		private readonly CreateFlowService _createFlow;
 
 		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
@@ -282,6 +268,11 @@ namespace Faolan.GameServer
 		private readonly GuildBankService _guildBank;
 		private readonly TradeskillService _tradeskill;
 
+		// The CHANGEMAP handoff (GM .teleport, the recalls, the travel box, a zone line, a cross-map trip) plus the
+		// two latches that have to survive it - the re-entry mark and the epic-difficulty pick - because the re-entry
+		// arrives on a NEW connection. See World/TeleportService.cs.
+		private readonly TeleportService _teleport;
+
 		// A player's summoned PET (#307): summon, the timed variant's extend-or-summon, and the pet bar's dismiss.
 		// Reached from the cast path through ISpellEffectOutbound and from the QueuePetCommand handler. See
 		// Combat/PetService.cs.
@@ -342,15 +333,18 @@ namespace Faolan.GameServer
 			// database - so it can sit this high with no ordering cost.
 			_spellAreas = new SpellAreaCatalog(database);
 			_simulation = new WorldSimulation(database, agentServerDispatcher, logger, _spellAreas, terrain);
-			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
-			{
-				await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
-				await SendWorldHandoff(client);
-			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_tortageIntro = new TortageIntroService(database, _simulation, logger);
 			_combos = new ComboService(database, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _tortageIntro, _combos, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id));
+			// After the broadcaster (it sources the destination playfield token from it) and BEFORE the create flow,
+			// which reaches the same enter-world handoff pair through it.
+			_teleport = new TeleportService(Connections, database, _broadcaster, agentServerDispatcher, logger);
+			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
+			{
+				await _teleport.SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
+				await _teleport.SendWorldHandoff(client);
+			});
 			// #820: built BEFORE the quest rewards, which now pay experience through it. A quest award is a second
 			// SOURCE of XP rather than a second copy of the ding burst - see LevelUpService's own header.
 			_levelUpOutbound = new LevelUpOutbound();
@@ -394,7 +388,7 @@ namespace Faolan.GameServer
 			_guildBank = new GuildBankService(database, _economyOutbound, logger);
 			_tradeskill = new TradeskillService(database, _economyOutbound, _broadcaster, agentServerDispatcher, logger);
 			_claims = new ClaimService(database, logger, _economyOutbound, agentServerDispatcher);
-			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos), SendLearnSpell);
+			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => _teleport.DoTeleport(id, map, pos), SendLearnSpell);
 			_skillPoints = new SkillPointService(database, logger);
 			_environmentOutbound = new EnvironmentOutbound(_buffs, SendDismount);
 			_environment = new EnvironmentService(database, _environmentOutbound, logger);
@@ -457,7 +451,7 @@ namespace Faolan.GameServer
 			if (ClientForCharacter(characterId) == null)
 				return false;
 
-			await DoTeleport(characterId, mapId, position);
+			await _teleport.DoTeleport(characterId, mapId, position);
 			return true;
 		}
 

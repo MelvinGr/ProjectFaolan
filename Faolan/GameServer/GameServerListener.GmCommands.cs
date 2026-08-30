@@ -176,80 +176,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
-		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
-		// `epic` is the difficulty the player picked at the travel box (#309): it rides PendingEpicEntry across the
-		// handoff (the reconnect's world entry is a new connection) and selects the destination's class word on the
-		// prep packets below.
-		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null, bool epic = false)
-		{
-			var client = ClientForCharacter(characterId);
-			if (client?.Session.Character == null)
-				return;
-
-			var map = await Database.GetMap(mapId);
-			if (map == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"Unknown map id: {mapId}"));
-				return;
-			}
-
-			// Destination: an explicit point (bind/recall/coords) or the map's default spawn (the AlwaysKnown starter, 			// else any respawn point - GetDefaultSpawn). A map with no points defined can't resolve a spawn, so refuse
-			// rather than dump the player at the origin. Persist BEFORE the handoff so the reconnect's world entry
-			// (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands at the right spot.
-			Vector3 position;
-			Quaternion rotation;
-			if (toPosition.HasValue)
-			{
-				position = toPosition.Value;
-				rotation = Quaternion.Identity;
-			}
-			else
-			{
-				var spawn = await Database.GetDefaultSpawn(map.Id);
-				if (spawn == null)
-				{
-					await _agentServerDispatcher.SendSystemMessage(characterId,
-						ChatMarkup.Color("red", $"No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport <x> <y> <z>."));
-					return;
-				}
-
-				position = spawn.Position;
-				rotation = spawn.Rotation;
-			}
-
-			client.Session.Character.MapId = map.Id;
-			client.Session.Character.Position = position;
-			client.Session.Character.Rotation = rotation;
-			await Database.SaveCharacterTransform(client.Session.Character.Id, position, rotation, map.Id);
-
-			var mapLabel = string.IsNullOrEmpty(map.Name)
-				? map.Id.ToString()
-				: $"{map.Name} ({map.Id})";
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleporting to {mapLabel}...");
-
-			// Reproduce the retail change-map sequence (decoded from both changemap captures, consistent):
-			// on the live connection, announce the destination - 0x10D27BC0 ("begin teleport to map N") then
-			// 0x5A32F0D7 (destination map + spawn position) - THEN the 0x2002 handoff advert, after which the
-			// client reconnects and does a fresh world entry on the new map. All three ride the handoff
-			// conversation (0xb171ce13 -> 0x6c67c147 = SendWorldHandoff's sender/receiver).
-			// Mark this client as a teleport re-entry so the reconnect Hello arms the post-0x205F follow-up (the
-			// changemap reconnect carries no 0x205F, so 0x2024 ReadyForPlayScreen would otherwise never fire and the
-			// loading screen would hang - #28). Consumed in the GameServer Hello existing-character branch.
-			PendingTeleportReentry.TryAdd(client.Session.Character.Id, 0);
-			if (epic)
-				PendingEpicEntry.TryAdd(client.Session.Character.Id, 0);
-			else
-				PendingEpicEntry.TryRemove(client.Session.Character.Id, out _);
-
-			// We've just persisted the destination position above; stop THIS (old) connection's imminent disconnect
-			// from saving its stale pre-teleport live position back over it (ClientDisconnected does a fire-and-forget
-			// SavePlayerState that would otherwise clobber the bind/destination - #28).
-			client.Session.IsTeleportingOut = true;
-
-			await SendChangeMapPrep(client, map.Id, position, epic: epic);
-			await SendWorldHandoff(client);
-		}
-
 		private async Task MatchStartCommand(INetworkClient client)
 		{
 			var outcome = await _csPlayerAgentDispatcher.ForcePvpMatchStart();
@@ -694,7 +620,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await DoTeleport(character.Id, point.MapId, point.Position);
+			await _teleport.DoTeleport(character.Id, point.MapId, point.Position);
 		}
 
 		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
@@ -786,7 +712,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await DoTeleport(character.Id, point.MapId, point.Position);
+			await _teleport.DoTeleport(character.Id, point.MapId, point.Position);
 		}
 
 		// .removeitem <slot>  - the inverse of .additem: clear the calling character's bag cell `slot` (persisted
@@ -1205,7 +1131,7 @@ namespace Faolan.GameServer
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
 			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
-				await DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
+				await _teleport.DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
 				return;
 			}
 
@@ -1223,13 +1149,13 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				await DoTeleport(characterId, resolved.Id, new Vector3(mpx, mpy, mpz));
+				await _teleport.DoTeleport(characterId, resolved.Id, new Vector3(mpx, mpy, mpz));
 				return;
 			}
 
 			if (uint.TryParse(arg, out var mapId))
 			{
-				await DoTeleport(characterId, mapId);
+				await _teleport.DoTeleport(characterId, mapId);
 				return;
 			}
 
@@ -1240,7 +1166,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await DoTeleport(characterId, match.Id);
+			await _teleport.DoTeleport(characterId, match.Id);
 		}
 
 		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage.

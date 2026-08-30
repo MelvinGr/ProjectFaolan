@@ -31,7 +31,7 @@ namespace Faolan.GameServer
 		// travel gets the persisted transform, the loading screen and the re-entry latch for free.
 		Task ITravelOutbound.TravelToMap(uint characterId, uint destinationMapId, Vector3? arrival)
 		{
-			return DoTeleport(characterId, destinationMapId, arrival);
+			return _teleport.DoTeleport(characterId, destinationMapId, arrival);
 		}
 
 		// A SAME-MAP trip: relocate in place with no loading screen - retail's `Local=1` trip. The wire pair is the one

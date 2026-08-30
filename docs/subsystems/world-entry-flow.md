@@ -31,12 +31,13 @@ of character creation; the login ready burst fired into the intro cutscene; and 
 | `Login` | none of the below (existing named character) | `SendWorldEntry` (burst-less, from the DB) | client `0x205F` arms, `0x2020` poll flushes |
 | `CreateEditor` | `Character.Name == null` (brand-new, unnamed) | none yet — shows the character creator | `CharInPlayIIR` launches the editor burst |
 | `CreateWorld` | char id in `PendingCreateWorldEntry` (2nd connection, post-naming) | `SendCreateWorldWithCutscene` (intro) | its own `0x2024` in the create burst; `0x2020` polls answered |
-| `TeleportReentry` | char id in `PendingTeleportReentry` (changemap reconnect) | `SendWorldEntry` (same as `Login`) | **no client `0x205F`** — armed at Hello, flushed on `CharInPlayIIR` **or** `0x2020` |
+| `TeleportReentry` | `TeleportService.IsReentryPending` (changemap reconnect) | `SendWorldEntry` (same as `Login`) | **no client `0x205F`** — armed at Hello, flushed on `CharInPlayIIR` **or** `0x2020` |
 
 `PendingCreateWorldEntry` is added when the name is committed (`CreateFlowService`, on the editor connection) and
-consumed on the following world connection. `PendingTeleportReentry` is added by the teleport/changemap path
-(`GameServerListener.GmCommands.cs` and the door path) and consumed in the existing-login branch of
-`Authenticate2`, where it also flips the mode to `TeleportReentry` and arms the follow-up.
+consumed on the following world connection. The teleport re-entry mark is armed by `TeleportService.DoTeleport`
+(every teleport in the server goes through it — GM `.teleport`, the recalls, the travel box, the door path) and
+consumed in the existing-login branch of `Authenticate2` via `TeleportService.ConsumeReentry`, where it also
+flips the mode to `TeleportReentry` and arms the follow-up.
 
 ## Role-at-auth vs name-now — the subtlety that made this fragile
 

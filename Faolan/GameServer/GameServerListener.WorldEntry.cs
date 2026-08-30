@@ -601,9 +601,9 @@ namespace Faolan.GameServer
 			var comboBonuses = await Database.GetCharacterComboBonuses(character.Id);
 
 			// #309: whether the armed teleport picked the EPIC difficulty - consumed here (the reconnect is a new
-			// connection, so the flag rode PendingEpicEntry) and threaded into BOTH the instance selection (an epic
+			// connection, so the flag rode TeleportService) and threaded into BOTH the instance selection (an epic
 			// copy never shares a zone with a normal one) and the MapChange's class word below.
-			var epicEntry = PendingEpicEntry.TryRemove(character.Id, out _);
+			var epicEntry = _teleport.ConsumeEpicEntry(character.Id);
 			// #512: a GROUP map is one copy per TEAM, so the entry needs the team's id - which the CS tier owns, and
 			// which this listener reaches through the same seam LeaveTeam/KickFromTeam already use.
 			// #146: and a STARTED custom PvP match owns one copy of its minigame map - both sides land in it - so the
@@ -805,23 +805,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
-		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u, bool epic = false)
-		{
-			var instance = client.Session.Character.Id;
-			// Source the destination playfield token from the destination map's burst so the announce matches the token
-			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
-			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-			// #792: the zero-length 0x1B first - retail precedes EVERY IntendedTeleport with it, 102 of 102 across the
-			// corpus. The client discards it (its handler is an empty override); we send it because retail does.
-			await SendTeleportPending(client);
-			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId, epic), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor, epic) })
-			{
-				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
-			}
-		}
-
 		private async Task SendReadyForPlayScreen(INetworkClient client)
 		{
 			var sender = client.Session.IsUnnamedCreatePhase
@@ -899,17 +882,6 @@ namespace Faolan.GameServer
 			// for the factions the character has a row for: a faction at neutral has no row and needs no message,
 			// since zero is what the client shows for one it has never been told about.
 			await _factions.SendAll(client);
-		}
-
-		private async Task SendWorldHandoff(INetworkClient client)
-		{
-			var realm = await Database.GetRealm(client.Session.Character.RealmId);
-			var address = $"{realm!.IpAddress}:{realm.Port}";
-
-			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceMethods.DispatchRedirectToServer,
-				b => b.WriteByte(0x00).WriteStringByteLength(address)));
-
-			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
 
 		// The complete burst-less player FA015807 spawn packet. Entry is a pure READ of the scaffold: the rows are seeded

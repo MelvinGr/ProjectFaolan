@@ -700,8 +700,8 @@ namespace Faolan.GameServer
 					// The two legitimate re-connections are NOT duplicates and must pass: the post-creation world
 					// handoff and a changemap/teleport re-entry both open a fresh connection for a character whose old
 					// one may not have been reaped yet. Both are recognised by their pending set - CreateWorld was
-					// consumed just above, and PendingTeleportReentry is peeked here (the login branch consumes it).
-					var reconnectHandoff = isCreateWorldEntry || PendingTeleportReentry.ContainsKey(clientInstance);
+					// consumed just above, and the teleport re-entry mark is peeked here (the login branch consumes it).
+					var reconnectHandoff = isCreateWorldEntry || _teleport.IsReentryPending(clientInstance);
 					if (!reconnectHandoff && ClientForCharacter(client.Session.Character.Id) is { } existingClient && !ReferenceEquals(existingClient, client))
 					{
 						Logger.LogWarning("Duplicate login for character {CharacterId:X8} '{Name}' (account {AccountId:X8}): already in the world on another connection - dropping the new one.",
@@ -713,7 +713,7 @@ namespace Faolan.GameServer
 					// The connection's world-entry role, decided ONCE here and the single source of truth for routing
 					// every later handshake signal (docs/subsystems/world-entry-flow.md). CreateWorld/CreateEditor are
 					// known now; the Login-vs-TeleportReentry split is finalised in the existing-login branch below (it
-					// consumes PendingTeleportReentry there, next to the follow-up arming that depends on it).
+					// consumes the teleport re-entry mark there, next to the follow-up arming that depends on it).
 					client.Session.EntryMode = isCreateWorldEntry
 						? WorldEntryMode.CreateWorld
 						: isNewCharacter
@@ -800,7 +800,7 @@ namespace Faolan.GameServer
 						// Teleport/changemap re-entry: a full login arms the post-0x205F follow-up off the client's 0x205F, 						// but a direct GameServer->GameServer changemap reconnect sends no 0x205F (retail confirms). Arm it
 						// here so the next 0x2020 poll flushes 0x2024 ReadyForPlayScreen (+ abilities) and the loading screen
 						// dismisses; otherwise the burst lands but the client loads forever (#28 / totem recall).
-						if (PendingTeleportReentry.TryRemove(clientInstance, out _))
+						if (_teleport.ConsumeReentry(clientInstance))
 						{
 							client.Session.EntryMode = WorldEntryMode.TeleportReentry;
 							client.Session.HasPendingPost205FFollowUp = true;
@@ -1081,7 +1081,7 @@ namespace Faolan.GameServer
 					}
 
 					Logger.LogInformation("Character {CharacterId} accepted the instance bind for map {MapId}.", client.Session.Character.Id, request.MapId);
-					await DoTeleport(client.Session.Character.Id, offered.DestinationMapId, offered.ArrivalPosition);
+					await _teleport.DoTeleport(client.Session.Character.Id, offered.DestinationMapId, offered.ArrivalPosition);
 
 					break;
 				}
@@ -1121,7 +1121,7 @@ namespace Faolan.GameServer
 						Logger.LogInformation("ScryMessageBoxAnswer chose option {Answer} for the trip to map {MapId}{Epic}.", reply.Answer,
 							pending.DestinationMapId, epic ? " - the EPIC difficulty" : " - we offer one option, so it travels as normal");
 
-					await DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition, epic);
+					await _teleport.DoTeleport(client.Session.Character.Id, pending.DestinationMapId, pending.ArrivalPosition, epic);
 
 					break;
 				}
@@ -2390,7 +2390,7 @@ namespace Faolan.GameServer
 						// trip resumes in HandleScryMessageBoxAnswer when the player confirms; a decline drops it.
 						await SendTravelConfirmation(client, confirming, dest.ArrivalPosition);
 					else
-						await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition); // TODO: Move DoTeleport into _simulation like RelocateSameMap
+						await _teleport.DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition);
 
 					break;
 				}

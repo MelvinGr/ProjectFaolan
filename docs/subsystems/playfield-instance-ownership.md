@@ -212,7 +212,7 @@ Closing that gap needs the leave-side message box, which is not sent yet.
 interim.** The client renders the normal/epic buttons itself (the two captured Spider Caverns shows are
 byte-identical in shape to every plain travel box), so the server's whole job is honouring the answer INDEX:
 option `2` arms an EPIC teleport (`ScryMessageBoxAnswerCodec.ConfirmSecondOption`), the choice rides
-`PendingEpicEntry` across the handoff (the reconnect's world entry is a new connection), and it lands in three
+`TeleportService`'s epic latch across the handoff (the reconnect's world entry is a new connection), and it lands in three
 places — the prep packets' class word (`TeleportCodec.Build(..., epic: true)` reproduces the captured epic begin
 byte-for-byte), the entry `MapChange`'s class word, and the instance selection. An epic copy never shares a zone
 with a normal one: `Zone.IsEpic` is stamped at entry, the stay-in rule refuses a difficulty mismatch (retail's
