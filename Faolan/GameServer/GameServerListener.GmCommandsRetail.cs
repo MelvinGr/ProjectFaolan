@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Crypt;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.World;
@@ -1244,6 +1245,75 @@ namespace Faolan.GameServer
 
 				default:
 					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inventory delete <slot> | deleteall   (retail also has equipall/unequipall; not backed here)");
+					return;
+			}
+		}
+
+		// /gethash <templateid>  - "Does a lookup in the CategoryTree to try and match the templateid and a HASH. It
+		// prints the HASH if it's found."
+		//
+		// ⭐ Ours does not need a CategoryTree walk: the relationship retail looks up is the one AcgHash MINTS, so the
+		// answer is computed rather than searched (#899). The item's name comes along when the template is one we
+		// have, which is what makes the output checkable instead of a bare number.
+		private async Task GetHashCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (!uint.TryParse(arg, out var templateId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .gethash <templateid>");
+				return;
+			}
+
+			var minted = AcgHash.Mint(templateId);
+			var item = await Database.GetItem(templateId);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Template {templateId}{(item == null ? " (not in our catalogue)" : $" '{item.Name}'")} -> HASH {minted} (0x{minted:X8}).");
+		}
+
+		// /quest ...  - retail's quest debug, which addresses goals and tasks by HASH:
+		//   clearlog | solvegoal <hash> | failgoal <hash> | solvetask <hash> | failtask <hash> | nextphase <hash>
+		//   | increasecount <hash> | clearallcooldowns
+		//
+		// ⚠️ Only `solvegoal` has a server path here (#559). The rest name real machinery - failing a goal, solving a
+		// whole task, advancing a phase, bumping a repeat count - that our quest progression does not expose, and
+		// each says so by name rather than the whole verb reporting itself absent. That distinction matters: the
+		// command IS partly usable.
+		private async Task QuestDebugCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			var verb = tokens.Length > 0 ? tokens[0].ToLowerInvariant() : "";
+
+			switch (verb)
+			{
+				case "solvegoal":
+				{
+					if (tokens.Length < 2 || !uint.TryParse(tokens[1], out var goalId))
+					{
+						await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest solvegoal <goal hash>");
+						return;
+					}
+
+					await _questProgression.SolveGoal(client, goalId);
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Solved goal {goalId} (if it was in your current phase).");
+					return;
+				}
+
+				case "failgoal":
+				case "solvetask":
+				case "failtask":
+				case "nextphase":
+				case "increasecount":
+				case "clearlog":
+				case "clearallcooldowns":
+					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
+						$".quest {verb} is not backed: quest progression exposes solving a GOAL and nothing else - no fail path, no task-level or phase-level advance, no journal wipe (#559)."));
+					return;
+
+				default:
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						"Usage: .quest solvegoal <goal hash>   (retail also has clearlog/failgoal/solvetask/failtask/nextphase/increasecount/clearallcooldowns; only solvegoal is backed)");
 					return;
 			}
 		}

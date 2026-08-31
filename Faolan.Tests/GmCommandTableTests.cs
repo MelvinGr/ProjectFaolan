@@ -37,7 +37,9 @@ namespace Faolan.Tests
 			// #914 batch C1 (`.feat` was the manipulator under the reader's name; it is now `feats`)
 			"feats", "char", "kickban",
 			// #914 batch C2 (`.removeitem` retired into `inventory delete`)
-			"getfaction", "setfaction", "magic", "inventory"
+			"getfaction", "setfaction", "magic", "inventory",
+			// #914 batch C3
+			"gethash", "quest"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

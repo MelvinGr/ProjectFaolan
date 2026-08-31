@@ -337,6 +337,8 @@ namespace Faolan.GameServer
 				["setfaction"] = SetFactionCommand,
 				["magic"] = MagicCommand,
 				["inventory"] = InventoryCommand,
+				["gethash"] = GetHashCommand,
+				["quest"] = QuestDebugCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["delete"] = DeleteCommand,
 				["kill"] = KillCommand,
@@ -471,6 +473,8 @@ namespace Faolan.GameServer
 			["setfaction"] = GmPrivileges.Developer,
 			["magic"] = GmPrivileges.SetStats,
 			["inventory"] = GmPrivileges.AcgSpawn,
+			["gethash"] = GmPrivileges.GetStats,
+			["quest"] = GmPrivileges.Developer,
 			["level"] = GmPrivileges.SetStats,
 			["kill"] = GmPrivileges.NpcCommands,
 
@@ -560,6 +564,24 @@ namespace Faolan.GameServer
 			var selfHandle = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
 
+			// RETAIL GRAMMAR (#914): `[all | radius r]`. Retail's own caveat - "the kill all and kill radius only works
+			// on ..." - is truncated in the recovered description, so we apply the one restriction that is obviously
+			// right and is what the parameter help says twice: both forms kill CHARACTER DYNELS, i.e. NPCs, never
+			// players. A GM sweeping a playfield must not take the other GMs with it.
+			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length > 0 && tokens[0].Equals("all", StringComparison.OrdinalIgnoreCase))
+			{
+				await KillArea(client, radius: null);
+				return;
+			}
+
+			if (tokens.Length == 2 && tokens[0].Equals("radius", StringComparison.OrdinalIgnoreCase) &&
+			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var killRadius) && killRadius > 0f)
+			{
+				await KillArea(client, killRadius);
+				return;
+			}
+
 			uint? resolved;
 			if (arg.Length == 0)
 				resolved = client.Session.SelectedTargetHandle;
@@ -569,7 +591,7 @@ namespace Faolan.GameServer
 				resolved = parsedHandle;
 			else
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [<handle> | self]  (no arg = your selected target)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [all | radius <r> | <handle> | self]  (no arg = your selected target)");
 				return;
 			}
 
@@ -590,6 +612,41 @@ namespace Faolan.GameServer
 
 			await _combat.KillNpc(client, targetHandle);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
+		}
+
+		// `.kill all` and `.kill radius <r>` - a null radius is the whole playfield.
+		//
+		// ⚠️ Players are never swept. Retail's parameter help says "character dynels" for both forms, and a GM
+		// clearing a zone taking every other player with it would be a spectacular way to learn that.
+		private async Task KillArea(INetworkClient client, float? radius)
+		{
+			var characterId = client.Session.Character.Id;
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var zone = _simulation.World.ZoneForEntity(player);
+			if (zone == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You have no live zone.");
+				return;
+			}
+
+			// Snapshot first: killing runs the whole lifecycle (corpse, loot, respawn arming), which mutates the zone.
+			var doomed = (radius is { } r
+					? zone.EntitiesInRange(player.Position, r, player.Handle)
+					: zone.Entities.Where(e => e.Handle != player.Handle))
+				.Where(e => !e.IsPlayer && e.Vitals is { IsDead: false })
+				.ToArray();
+
+			foreach (var victim in doomed)
+				await _combat.KillNpc(client, victim.Handle);
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Killed {doomed.Length} NPC(s){(radius is { } shown ? $" within {shown:0.#}u" : " on this playfield")}. Players were not touched.");
 		}
 
 		// .hurt [<percent>]  - drop the caller's three pools to `percent` of their max (default 50) and push the
