@@ -1219,13 +1219,55 @@ namespace Faolan.GameServer
 			if (arg.Length == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					"Usage: .teleport <mapId | name>  or  .teleport <x> <y> <z>  (current map)  or  .teleport <mapId | name> <x> <y> <z>  (see .maps)");
+					"Usage: .teleport <mapId | name>  or  .teleport <x> <y> <z>  (current map)  or  .teleport <mapId | name> <x> <y> <z>  (see .maps)"
+					+ "  -  retail's own form is /teleport <x> <z> [y <y>] [playfield], which is what the client's map sends");
 				return;
 			}
 
-			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change).
-			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
+			// Invariant culture throughout so a comma-decimal locale doesn't reject the dotted coordinates.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+			// RETAIL GRAMMAR (#913). The client's own hidden GM affordance - right-click the map -> "teleport to
+			// location" - emits `/teleportself <posx> <posz>`: TWO coordinates and no Y, on the current playfield.
+			// Recovered from FanaticTeleportCommand_c's parameter descriptor (docs/re/gm-command-args.tsv), which
+			// declares the family as
+			//     posx posz [[y posy][playfield]] [proxy model type group subgroup running]
+			// so Y is optional and arrives behind a literal `y` token, with the playfield after it. We used to parse
+			// the whole argument as a map name and answer "No map matching '534 657'", which is what made every one
+			// of those clicks fail. The forms below are RETAIL's; ours (`<x> <y> <z>`, `<map>`) are unchanged and
+			// handled after them - a 3-token form is unambiguously ours, since retail's third token is the literal `y`.
+			if (tokens.Length is 2 or 4 or 5 &&
+			    float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var retailX) &&
+			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var retailZ) &&
+			    (tokens.Length == 2 || tokens[2].Equals("y", StringComparison.OrdinalIgnoreCase)))
+			{
+				var entity = _simulation.PlayerWorldEntity(client);
+				var retailMapId = entity?.MapId ?? client.Session.Character.MapId;
+
+				// `[playfield]` only ever follows the y-group, so it cannot appear on the 2-token form.
+				if (tokens.Length == 5 && uint.TryParse(tokens[4], out var statedMapId))
+					retailMapId = statedMapId;
+
+				float retailY;
+				if (tokens.Length >= 4 && float.TryParse(tokens[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var statedY))
+					retailY = statedY;
+				else if (_simulation.Terrain?.GroundHeight(retailMapId, retailX, retailZ) is { } ground)
+					retailY = ground;
+				else
+				{
+					// No baked terrain for this map, so there is no height to snap to. Keeping the caller's current Y
+					// lands them at the right X/Z at the wrong altitude, which is recoverable and honest - say so
+					// rather than silently teleporting them under the world.
+					retailY = entity?.Position.Y ?? 0f;
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						ChatMarkup.Color("orange", $"No terrain loaded for map {retailMapId} - keeping your current height ({retailY:0.#})."));
+				}
+
+				await _teleport.DoTeleport(characterId, retailMapId, new Vector3(retailX, retailY, retailZ));
+				return;
+			}
+
+			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change). Ours.
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
 			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{

@@ -131,6 +131,61 @@ are our own verbs, so their bit is a family CHOICE, commented as such in the tab
 `tools/ghidra/DumpCommandRegistry.java`; re-run it to regenerate this table. The raw dump, with each command's
 implementing class and its registration address, is [`docs/re/gm-command-registry.tsv`](../re/gm-command-registry.tsv).
 
+### The argument grammar
+
+The registry gives verb, class, vftable and mask — and nothing about what each verb PARSES. That gap is what made
+`/teleportself` refuse the client's own map UI: right-click a map → *teleport to location* emits
+`/teleportself <X> <Z>`, and we answered `No map matching '534 657'` because we read the argument as a map name.
+
+Every command class declares its parameters in one vtable slot, as a run of string appends —
+`open literal, close literal, help text, parameter name`, **four per parameter**, after a two-append preamble that
+wraps the command's own description. So the ordered append sequence IS the grammar, and the usage line rebuilds as
+the concatenation of `open + name + close`. That reconstruction self-validates: a correctly read class comes out
+with balanced brackets. `tools/ghidra/DumpCommandArgs.java` walks the same registry function as
+`DumpCommandRegistry.java`, then walks each class's vtable, and writes
+[`docs/re/gm-command-args.tsv`](../re/gm-command-args.tsv) — verb, mask, class, vftable, status, usage, short and
+long description, and the parameter list.
+
+All 133 verbs come out with something usable:
+
+| status | verbs | meaning |
+|---|---:|---|
+| `ok` | 89 | every parameter read, brackets balance |
+| `noargs` | 26 | the preamble and nothing else — the verb declares no parameters |
+| `partial:n` | 6 | every complete parameter read, `n` trailing appends left over (the last parameter's name arrives through a different string helper) |
+| `ok+unbalanced` | 4 | every parameter read, but retail put the closing `]` inside the HELP text (`"Clears 1 death effect]"`) — a data quirk, not a misread |
+| `partial:n+unbalanced` | 2 | both of the above |
+| `no-appends` | 6 | the class declares its usage some other way; retail's own long description documents these |
+
+⚠️ **A `noargs` row means the verb declares no parameters, not that it accepts none** — `/lua` and
+`/setlookspackage` plainly take an argument each and parse it ad hoc. The declaration is what is recovered.
+
+The teleport family — one class, `FanaticTeleportCommand_c`, serving all four verbs:
+
+```
+/teleport posx posz [[y posy][playfield]] [proxy model type group subgroup running]
+```
+
+| parameter | type | help |
+|---|---|---|
+| `posx` | Integer | X position to teleport to |
+| `posz` | Integer | Z position to teleport to |
+| `y` | Integer | Spesifies a y coordinate as well *(sic)* |
+| `posy` | Integer | Y position to teleport to |
+| `playfield` | Integer | PlayfieldID to teleport to |
+| `proxy` | Literal | Does a proxy teleport |
+| `model` `type` `group` `subgroup` `running` | Integer | (no help text) |
+
+So **X and Z are the mandatory pair and Y is optional**, supplied behind a literal `y` token, with the playfield
+after it — which is exactly why the map UI sends two numbers and no height. Its long description adds: *"Teleports
+self or another dynel. If playfield ID is greater than 65535 you have to use teleport proxy."*
+
+Our `.teleport` accepts retail's forms (`<x> <z>`, `<x> <z> y <y>`, `<x> <z> y <y> <playfield>`) alongside our own
+(`<map>`, `<x> <y> <z>`, `<map> <x> <y> <z>`); a three-token form is unambiguously ours, since retail's third token
+is the literal `y`. On the two-token form the missing Y is ground-snapped from the baked terrain, and when a map has
+no terrain loaded the caller's current height is kept and the reply says so. `GmCommandArgumentGrammarTests` pins
+the recovered facts the parser is built on, as `GmCommandTableTests` pins the masks.
+
 | privilege | bit | commands |
 |---|---|---|
 | `(unrestricted)` | `0x00000000` | `/system` |
