@@ -28,29 +28,30 @@ namespace Faolan.Core.Crypt
 	// "the client validates the hash, minting is impossible". Mint through Mint() and nothing else.
 	public static class AcgHash
 	{
-		// The token alphabet, in base-36 digit order. The client's reader also accepts '_', but no retail item
-		// token uses one (0 of 4,615), so minting stays inside the proven set rather than relying on an untested
-		// byte. That unused byte is also the structural fix for salt collisions - see Salt.
+		// The token alphabet, in base-36 digit order. The client's reader accepts these AND '_'; no retail item token
+		// uses an underscore (0 of 4,615), which is what makes it the minting space - see Mint.
 		private const string Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 		// 36^4 = 1,679,616 distinct tokens.
 		public const uint Space = 36u * 36u * 36u * 36u;
 
+		// The MINTING space: one of the four positions holds the '_', the other three are base-36 digits.
+		// 4 x 36^3 = 186,624 tokens, every one of them disjoint from every harvested token by construction.
+		public const uint MintSpace = 4u * 36u * 36u * 36u;
+
 		// Re-rolls every minted token. A collision is not a correctness bug (the client resolves nothing through the
 		// token) but two templates sharing an identity is a property retail maintains, so we maintain it too -
 		// `--report acg-token-check` scores the shipped data and names the next clean salt.
 		//
-		// ⚠️ A bump is a LOTTERY, not a fix, and the numbers say so. With today's population (5,144 items: 4,615
-		// harvested, 529 minted) the expected number of collisions per salt is
+		// ⚠️ A bump used to be a LOTTERY rather than a fix. With a minting space that overlapped the harvested one,
+		// the expected number of collisions per salt was
 		//     529x4615/36^4 (minted vs harvested) + 529^2/(2x36^4) (minted vs minted) = 1.45 + 0.08 = 1.54,
-		// so a given salt is clean with probability e^-1.54 ~ 22% - measured, not estimated: 90 of 400 consecutive
-		// salts are clean. It WILL fire again, and the dominant term grows every time captures are harvested.
+		// so a salt was clean with probability e^-1.54 ~ 22% - measured, not estimated: 90 of 400 consecutive salts
+		// were clean. It fired repeatedly, and the DOMINANT term grew every time captures were harvested.
 		//
-		// The structural fix, when someone wants one: the client's reader accepts '_' and **zero of the 4,615
-		// harvested tokens contain one**, so minting into the '_'-bearing part of the space is disjoint from every
-		// harvested token BY CONSTRUCTION and kills the 1.45. It is not done here because '_' is the one byte the
-		// in-client check never exercised ('ZZZZ' and 'ZZZY' were), and shipping it unverified would risk 529
-		// currently-working items rendering as nothing. Gitea #899 carries it, gated on that check.
+		// Since #899 the 1.45 is gone by construction (see Mint): minted tokens all carry a '_' and no harvested one
+		// does, so the two populations cannot collide at all. What is left is 529^2/(2 x 186,624) = 0.75 - a term
+		// that SHRINKS as harvests cover more items, because every newly harvested template stops being minted for.
 		private const uint Salt = 0x14D6F0B6;
 
 		/// <summary>The salt in force, so `--report acg-token-check` can sweep forward from it for a clean one.</summary>
@@ -72,9 +73,44 @@ namespace Faolan.Core.Crypt
 
 		// A deterministic, well-formed token for a template we have never harvested one for. Stable across
 		// processes and sessions, so the live add and the next login's snapshot agree without storing anything.
+		//
+		// ⭐ Every minted token carries an UNDERSCORE, which is what makes minting disjoint from harvesting by
+		// construction (#899). Zero of the 4,615 harvested tokens contain one, so a minted token can never collide
+		// with a retail one - it is not a smaller chance, it is impossible.
+		//
+		// ⚠️ '_' is the byte the 2026-08-08 in-client check did NOT exercise ('ZZZZ' and 'ZZZY' are both in
+		// [0-9A-Z]), and this used to stay inside that proven set for exactly that reason. What replaces the check is
+		// the client's own validator, read out of the binary: `FUN_005d7190` stores the four bytes as a u32 and then
+		// walks indices 0..3 with ONE predicate applied identically at every index -
+		//
+		//     ('/' < c && c < ':')  ||  ('@' < c && c < '[')  ||  c == '_'      // 0-9, A-Z, _
+		//
+		// - falling out of the loop into `Read invalid hash "..." from stream.`. There is no per-position branch, so
+		// '_' is accepted in ANY of the four, first included. And `ACGHash` appears in that one function and nowhere
+		// else in the image: the token is never decoded into digits, only stored and compared as an opaque word, so
+		// no consumer can treat '_' arithmetically differently from any other byte.
+		//
+		// ⭐ A side benefit worth having: a minted token is now IDENTIFIABLE (`IsMinted`). Before this, nothing could
+		// tell a synthesized token from a harvested one after the fact.
 		public static uint Mint(uint templateId)
 		{
 			return MintWith(templateId, Salt);
+		}
+
+		/// <summary>Whether a token was MINTED by us rather than harvested - i.e. whether it carries an underscore.</summary>
+		/// <remarks>
+		///     Sound in both directions only because no harvested token contains one (0 of 4,615) - it is a property of
+		///     the shipped data, gated by <c>--report acg-token-check</c>, not of the format.
+		/// </remarks>
+		public static bool IsMinted(uint hash)
+		{
+			for (var i = 0; i < 4; i++)
+			{
+				if ((char)((hash >> (8 * i)) & 0xFF) == '_')
+					return true;
+			}
+
+			return false;
 		}
 
 		/// <summary>
@@ -94,7 +130,28 @@ namespace Faolan.Core.Crypt
 				h *= 0x01000193u;
 			}
 
-			return Encode(h % Space);
+			// Which of the four positions carries the '_', and the base-36 value filling the other three. Splitting the
+			// mixed word rather than reducing it once keeps both choices deterministic from the same hash.
+			return EncodeMinted(h / 4u % (MintSpace / 4u), (int)(h % 4u));
+		}
+
+		// Packs a base-36 value < 36^3 into three of the four ASCII bytes, with '_' in `underscoreAt`.
+		public static uint EncodeMinted(uint n, int underscoreAt)
+		{
+			var value = 0u;
+			for (var i = 0; i < 4; i++)
+			{
+				if (i == underscoreAt)
+				{
+					value |= (uint)'_' << (8 * i);
+					continue;
+				}
+
+				value |= (uint)Alphabet[(int)(n % 36)] << (8 * i);
+				n /= 36;
+			}
+
+			return value;
 		}
 
 		// Packs a base-36 value < 36^4 into the four ASCII bytes the wire carries, most significant digit first.

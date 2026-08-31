@@ -93,8 +93,37 @@ Two findings closed it:
   invented in-charset token renders correctly, live **and** after a relog.
 
 So `AcgHash.ForWire` mints a token when none was harvested, and `Items.Hash = 0` now means "not harvested"
-rather than "cannot be held". ⚠️ A minted token must be four `[0-9A-Z]` characters — a random u32 fails the
+rather than "cannot be held". ⚠️ A minted token must be four `[0-9A-Z_]` characters — a random u32 fails the
 client's charset check, which tests the validator rather than the identity.
+
+#### ⭐ Minting is DISJOINT from harvesting by construction (#899)
+
+Every minted token carries an **underscore**, and **zero of the 4,615 harvested tokens contain one**. So a
+minted token cannot collide with a retail one — not unlikely, impossible.
+
+That replaced a lottery. While minting shared the `[0-9A-Z]` space the expected collisions per salt were
+`529×4615/36⁴ + 529²/(2×36⁴)` = **1.45 + 0.08 = 1.54**, so a salt was clean ~22% of the time (measured: 90 of
+400 consecutive salts) — and the dominant term *grew with every harvest*. What is left is the minted-vs-minted
+term alone in the 186,624-token `_`-bearing space: **0.75**, ~47% clean, and it **shrinks** as harvests cover
+more templates, because each newly harvested one stops being minted for. `--report acg-token-check` prints
+exactly that arithmetic.
+
+⚠️ **`_` is the byte the in-client check never exercised** — the 2026-08-08 run used `ZZZZ`/`ZZZY`, both inside
+`[0-9A-Z]` — so this was gated on a fresh one. What replaced that check is the client's own validator, read out
+of the binary. `FUN_005d7190` stores the four bytes as a `u32` and walks indices 0..3 applying **one predicate
+identically at every index**:
+
+```c
+('/' < c && c < ':') || ('@' < c && c < '[') || c == '_'      // 0-9, A-Z, _
+```
+
+falling out of the loop into `Read invalid hash "…" from stream.`. **There is no per-position branch**, so `_`
+is legal in any of the four including the first — which is the specific risk the gate existed for. And the
+string `ACGHash` appears in that one function and nowhere else in the image: the token is never decoded into
+digits, only stored and compared as an opaque word, so no consumer can treat `_` arithmetically at all.
+
+⭐ Side benefit: a minted token is now **identifiable** (`AcgHash.IsMinted`). Nothing could previously tell a
+synthesized token from a harvested one after the fact.
 
 ### The 0x0009 "new claims" glow
 

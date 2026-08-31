@@ -82,5 +82,53 @@ namespace Faolan.Tests
 				"Items.Hash must be a 4-character [0-9A-Z_] ACGHash the client's reader accepts:\n  "
 				+ string.Join("\n  ", offenders.Select(o => $"item {o.Id} '{o.Name}' Hash 0x{o.Hash:X8}")));
 		}
-	}
+	
+		[Fact]
+		// ⭐ #899's structural guarantee, and the whole point of the change: every minted token carries an underscore,
+		// so it CANNOT equal a harvested one - zero of the 4,615 harvested tokens contain one. This is not a smaller
+		// collision chance, it is a disjoint space, and it is what removed the term that grew with every harvest.
+		public void EveryMintedToken_CarriesAnUnderscore()
+		{
+			for (var templateId = 1u; templateId < 5000u; templateId++)
+				Assert.True(AcgHash.IsMinted(AcgHash.Mint(templateId)), $"template {templateId} minted {AcgHash.Token(AcgHash.Mint(templateId))}");
+		}
+
+		[Fact]
+		// ...and it is still a token the client accepts. Its validator (`FUN_005d7190`) walks indices 0..3 applying ONE
+		// predicate at every index - 0-9, A-Z or '_' - with no per-position branch, so an underscore is legal in any of
+		// the four including the first.
+		public void EveryMintedToken_IsStillWellFormed()
+		{
+			for (var templateId = 1u; templateId < 5000u; templateId++)
+				Assert.True(AcgHash.IsWellFormed(AcgHash.Mint(templateId)));
+		}
+
+		[Fact]
+		// The minting space is used, not collapsed onto one position: all four slots carry the underscore across the
+		// population. A mixer that always picked slot 0 would quarter the space and quadruple the residual collisions.
+		public void TheUnderscore_LandsInAllFourPositions()
+		{
+			var slots = new HashSet<int>();
+			for (var templateId = 1u; templateId < 5000u; templateId++)
+			{
+				var token = AcgHash.Mint(templateId);
+				for (var i = 0; i < 4; i++)
+				{
+					if ((char)((token >> (8 * i)) & 0xFF) == '_')
+						slots.Add(i);
+				}
+			}
+
+			Assert.Equal([0, 1, 2, 3], slots.Order());
+		}
+
+		[Fact]
+		// A HARVESTED token is never treated as minted - the predicate is only sound because the shipped data has no
+		// underscore in it, so this pins the direction that would silently break `IsMinted`.
+		public void AHarvestedStyleToken_IsNotReportedAsMinted()
+		{
+			Assert.False(AcgHash.IsMinted(AcgHash.Encode(0)));
+			Assert.False(AcgHash.IsMinted(AcgHash.Encode(AcgHash.Space - 1)));
+		}
+}
 }
