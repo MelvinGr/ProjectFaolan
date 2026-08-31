@@ -29,7 +29,9 @@ namespace Faolan.Tests
 			// #914 Wave B1
 			"summon", "unsummon", "assist", "falldamage", "cash",
 			// #914 Wave B2
-			"inflict", "areaknockback", "resurrect"
+			"inflict", "areaknockback", "resurrect",
+			// #914 Wave B3 - the stat family (`setstat` retired into `setlocal`)
+			"get", "set", "setlocal", "getskill", "teleporttarget"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

@@ -368,8 +368,15 @@ namespace Faolan.GameServer
 				["inflict"] = InflictCommand,
 				["areaknockback"] = AreaKnockbackCommand,
 				["resurrect"] = ResurrectCommand,
+				// Wave B3 - the stat family. ⚠️ `setstat` is GONE (#914 rule 1): it pushed a raw stat to the CLIENT
+				// without touching server state, which is precisely retail's `/setlocal`, not its `/set`. The two verbs
+				// are one class in the client, separated by the registry record's mode byte, so they are one method here.
+				["get"] = GetStatCommand,
+				["set"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: false),
+				["setlocal"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: true),
+				["getskill"] = GetSkillCommand,
+				["teleporttarget"] = TeleportTargetCommand,
 				["tradeskill"] = TradeskillCommand,
-				["setstat"] = SetStatCommand,
 				["waypoint"] = WayPointCommand,
 				["resist"] = ResistCommand,
 				// #146: force-form a PvP match from the minigame queue as it stands, however few are queued (down
@@ -420,6 +427,13 @@ namespace Faolan.GameServer
 			["inflict"] = GmPrivileges.PlayerDamage,
 			["areaknockback"] = GmPrivileges.PlayerDamage,
 			["resurrect"] = GmPrivileges.AcgSpawn,
+			// Wave B3: /get /getskill = GetStats 0x20, /set /setlocal = SetStats 0x40, /teleporttarget =
+			// TeleportDynels 0x8 (NOT TeleportSelf - retail masks moving somebody else higher than moving yourself).
+			["get"] = GmPrivileges.GetStats,
+			["getskill"] = GmPrivileges.GetStats,
+			["set"] = GmPrivileges.SetStats,
+			["setlocal"] = GmPrivileges.SetStats,
+			["teleporttarget"] = GmPrivileges.TeleportDynels,
 			["tradeskill"] = GmPrivileges.Developer,
 			["teleport"] = GmPrivileges.TeleportSelf,
 			["teleportself"] = GmPrivileges.TeleportSelf,
@@ -456,7 +470,6 @@ namespace Faolan.GameServer
 			["togglenpcgroup"] = GmPrivileges.NpcCommands,
 			["graduatenpcgroup"] = GmPrivileges.NpcCommands,
 			["weaponset"] = GmPrivileges.Developer,
-			["setstat"] = GmPrivileges.SetStats,
 			["waypoint"] = GmPrivileges.Developer,
 			["resist"] = GmPrivileges.SetStats,
 			["matchstart"] = GmPrivileges.Developer,
@@ -478,47 +491,6 @@ namespace Faolan.GameServer
 		}
 
 
-		// .time [<hh:mm> | reset]  - report or set the world time of day, then resend the clock so the change shows
-		// without a relog. The clock runs live off the wall clock at 5 game seconds per real second (#351), so a game day
-		// is 4.8 real hours; this shifts its PHASE rather than stopping it. Verified in-client 2026-07-25: the sky follows
-		// the time sent, so game-midnight is 0 and the client's own 06:00-18:00 day window (GameTime_t holds 21600.0 /
-		// 64800.0) lines up with it. No argument reports the current time.
-		// .setstat <statId> <rawValue> [<statId> <rawValue> ...]  - push arbitrary stats at their RAW WIRE value, with
-		// no scaling applied by us. The measuring instrument for CharacterStatIdExtensions.GetScale: the client keeps
-		// its stat table in wire units and divides only when it DRAWS, so a scale cannot be read off the wire or the
-		// debug log - it needs a rendered number. Send a known raw value, read what the character sheet shows, and
-		// `raw / displayed` IS the scale. Ids are decimal or 0x-hex, and several pairs ride one block so a whole sheet
-		// tab can be probed in one shot.
-		//
-		// ⚠️ Deliberately NOT persisted and NOT reflected into the world model - this writes to the client's view
-		// only, so a relog or the next vitals push undoes it. That keeps a probe from corrupting a character.
-		private async Task SetStatCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length == 0 || parts.Length % 2 != 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .setstat <statId> <rawValue> [<statId> <rawValue> ...]   (ids decimal or 0x-hex; value is the RAW wire value)");
-				return;
-			}
-
-			var block = new CharacterStatBlock();
-			var applied = new List<string>();
-			for (var i = 0; i < parts.Length; i += 2)
-			{
-				if (!TryParseStatId(parts[i], out var statId) || !uint.TryParse(parts[i + 1], out var raw))
-				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Not a stat id / raw value: '{parts[i]}' '{parts[i + 1]}'.");
-					return;
-				}
-
-				block.SetRaw(statId, raw);
-				applied.Add($"{(uint)statId} (0x{(uint)statId:X}) = {raw} raw");
-			}
-
-			await SendStatUpdate(client, block, characterId);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Pushed {applied.Count} stat(s): {string.Join(", ", applied)}. Read the sheet - raw/displayed is the scale.");
-		}
 
 		private static bool TryParseStatId(string text, out CharacterStatId statId)
 		{

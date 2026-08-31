@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.World;
@@ -621,6 +622,213 @@ namespace Faolan.GameServer
 				$"Armed a {strength}% resurrection for '{subject.Name}' - they accept it from the death screen.");
 			if (subjectId != characterId)
 				await _agentServerDispatcher.SendSystemMessage(subjectId, $"A resurrection ({strength}%) has been offered to you.");
+		}
+
+		// A stat named either as a number (decimal or 0x-hex) or by its CLIENT name - retail's whole stat family takes
+		// `statid | statname`, and the enum carries all 1,515 names, so the name form costs nothing to support.
+		private static bool TryResolveStat(string text, out CharacterStatId stat)
+		{
+			if (TryParseStatId(text, out stat) && Enum.IsDefined(stat))
+				return true;
+
+			return Enum.TryParse(text, ignoreCase: true, out stat) && Enum.IsDefined(stat);
+		}
+
+		// The three views retail's /get offers, which happen to be exactly the three sources our stat model keeps
+		// separate: `base` is the class/level base before anything is added, `item` is the gear bonus, and `full` is
+		// the fully buffed live value.
+		private static (int Base, int Item, int Full) StatViews(WorldEntity entity, CharacterStatId stat)
+		{
+			// ⚠️ ClassBase is the RAW WIRE value while the gear bonus is already divided by the stat's scale, so the
+			// base has to be converted before the two are comparable - the same trap AttributeScore documents.
+			var scaled = entity.ClassBase.GetValueOrDefault(stat) / (int)stat.GetScale();
+			var item = entity.GearBonuses.GetValueOrDefault(stat);
+			var full = entity.BuffedStats.TryGetValue(stat, out var buffed) ? (int)buffed : scaled + item;
+			return (scaled, item, full);
+		}
+
+		// /get <statname | statnr> [base | full | item] [server | client]
+		//   "Gets a stat or stat range from the target dynel. It will default to you if you do not have a target."
+		private async Task GetStatCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length == 0 || !TryResolveStat(tokens[0], out var stat))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .get <statname | statnr> [base | full | item] [server | client]");
+				return;
+			}
+
+			// Retail's own fallback, stated in its long description: the target if there is one, else you.
+			var subject = TryResolveTarget(client, out var target, out _) ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var wants = tokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
+			if (wants.Contains("client"))
+			{
+				// ⚠️ Said plainly rather than answered with the server's number wearing a "client" label: the client's
+				// own copy of a stat is not readable from here - we only ever WRITE it. `/setlocal` is what pushes one.
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					ChatMarkup.Color("orange", "The CLIENT's copy of a stat cannot be read from the server - only written (.setlocal). Showing nothing rather than the server value mislabelled."));
+				return;
+			}
+
+			var (baseValue, item, full) = StatViews(subject, stat);
+			var asked = wants.FirstOrDefault(w => w is "base" or "full" or "item");
+			var body = asked switch
+			{
+				"base" => $"base {baseValue}",
+				"item" => $"item {item}",
+				"full" => $"full {full}",
+				_ => $"base {baseValue}, item {item}, full {full}"
+			};
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"'{subject.Name}' {stat} ({(uint)stat}, 0x{(uint)stat:X}, scale {stat.GetScale()}): {body}.");
+		}
+
+		// /set and /setlocal: `statid | statname [+ | - | t | c | s]value`
+		//
+		// ⭐ The two are ONE class in the client, told apart by the registry record's mode byte (0 = /set, 1 =
+		// /setlocal) - see docs/re/gm-command-args.tsv. So they are one implementation with a flag here too.
+		//
+		// ⭐⭐ `t`, `c` and `s` are BIT operations - toggle, clear and set a flag on the stat. That is worth noticing
+		// on its own: retail's stat setter assumes stats are routinely BITFIELDS, not just scalars, which is the same
+		// shape the GM privilege mask and the vanity mask already have.
+		private async Task SetStatValueCommand(INetworkClient client, string arguments, bool localOnly)
+		{
+			var characterId = client.Session.Character.Id;
+			var verb = localOnly ? ".setlocal" : ".set";
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length != 2 || !TryResolveStat(tokens[0], out var stat))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"Usage: {verb} <statid | statname> [+|-|t|c|s]<value>   (+ add, - subtract, t toggle bit, c clear bit, s set bit, bare = assign)");
+				return;
+			}
+
+			var spec = tokens[1];
+			var op = spec.Length > 0 && "+-tcs".Contains(spec[0]) ? spec[0] : '=';
+			if (!uint.TryParse(op == '=' ? spec : spec[1..], out var operand))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Not a value: '{spec}'. {verb} takes [+|-|t|c|s]<number>.");
+				return;
+			}
+
+			var subject = TryResolveTarget(client, out var target, out _) ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var (_, _, current) = StatViews(subject, stat);
+			// ⚠️ The bit operators take the operand as a BIT INDEX, not a mask - "toggles a flag on the stat" is one
+			// flag, and a mask would make `t1` and `t2` the same edit for adjacent bits.
+			var bit = operand < 32 ? 1u << (int)operand : 0u;
+			var updated = op switch
+			{
+				'+' => current + (int)operand,
+				'-' => current - (int)operand,
+				't' => (int)((uint)current ^ bit),
+				'c' => (int)((uint)current & ~bit),
+				's' => (int)((uint)current | bit),
+				_ => (int)operand
+			};
+
+			updated = Math.Max(0, updated);
+			if (!localOnly)
+				subject.BuffedStats[stat] = (uint)updated;
+
+			await SendStatUpdate(client, new CharacterStatBlock().SetRaw(stat, (uint)updated), characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"'{subject.Name}' {stat} ({(uint)stat}): {current} -> {updated}{(localOnly ? " (CLIENT only - server state unchanged)" : "")}.");
+		}
+
+		// /getskill <statid | statname>  - "Prints the skillvalue buffed and base, max skill value and the float, rank
+		// and level."
+		//
+		// ⚠️ Retail prints six things and we hold four. The float and the rank are not modelled (#507), so they are
+		// named as missing rather than printed as zero - a zero rank would read as a real answer.
+		private async Task GetSkillCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0 || !TryResolveStat(arg, out var stat))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .getskill <statid | statname>");
+				return;
+			}
+
+			var subject = TryResolveTarget(client, out var target, out _) ? target : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var (baseValue, item, full) = StatViews(subject, stat);
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([
+				$"'{subject.Name}' skill {stat} ({(uint)stat}, 0x{(uint)stat:X}):",
+				$"  base {baseValue}, item {item}, buffed {full} (scale {stat.GetScale()})",
+				$"  level {subject.Level}",
+				"  float and rank: not modelled (#507)"
+			]));
+		}
+
+		// /teleporttarget <posx> <posz> [y <posy>] [<playfield>]  - the same grammar as the rest of the family, on the
+		// TARGET instead of yourself. ⭐ It is the mode byte in the registry record that says so: /teleporttarget is
+		// mode 0 while /teleport, /teleportself and /tp are all mode 1.
+		private async Task TeleportTargetCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (!TryResolveTarget(client, out var target, out var failure))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, failure);
+				return;
+			}
+
+			if (!target.IsPlayer)
+			{
+				// Honest gap rather than a silent no-op: DoTeleport moves a CHARACTER (it re-runs world entry), and an
+				// NPC has no character to move. Relocating a live NPC entity is a different mechanism we have not built.
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - only player targets can be teleported (moving a live NPC entity is a separate mechanism we do not have yet)."));
+				return;
+			}
+
+			if (tokens.Length is not (2 or 4 or 5) ||
+			    !float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ||
+			    !float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var z) ||
+			    (tokens.Length > 2 && !tokens[2].Equals("y", StringComparison.OrdinalIgnoreCase)))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleporttarget <x> <z> [y <y>] [<playfield>]");
+				return;
+			}
+
+			var mapId = target.MapId;
+			if (tokens.Length == 5 && uint.TryParse(tokens[4], out var statedMap))
+				mapId = statedMap;
+
+			float y;
+			if (tokens.Length >= 4 && float.TryParse(tokens[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var statedY))
+				y = statedY;
+			else if (_simulation.Terrain?.GroundHeight(mapId, x, z) is { } ground)
+				y = ground;
+			else
+			{
+				y = target.Position.Y;
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					ChatMarkup.Color("orange", $"No terrain loaded for map {mapId} - keeping their current height ({y:0.#})."));
+			}
+
+			await _teleport.DoTeleport(target.Client.Session.Character.Id, mapId, new Vector3(x, y, z));
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported '{target.Name}' to {x:0.#}, {y:0.#}, {z:0.#} on map {mapId}.");
 		}
 	}
 }

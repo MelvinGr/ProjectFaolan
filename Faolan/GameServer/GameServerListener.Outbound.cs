@@ -581,7 +581,7 @@ namespace Faolan.GameServer
 		// {HealthCurrent, StaminaCurrent, ManaCurrent}).
 		//
 		// `EntityVitals.ToVitalsBlock` - current AND max - is for a push where a MAX moved: a level-up, a gear or buff
-		// change to a pool, a GM `.setstat`. Use CombatService.ReseedFromMaxStats(client).ToVitalsBlock() there.
+		// change to a pool, a GM `.set`. Use CombatService.ReseedFromMaxStats(client).ToVitalsBlock() there.
 		//
 		// ⚠️ The rule is "what moved", NOT "always send everything", and it is not "always send currents" either.
 		// There used to be a blanket `SendVitals` pair emitting the three currents alone, justified as "matches the

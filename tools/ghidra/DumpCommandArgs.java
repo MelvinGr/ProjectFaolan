@@ -53,8 +53,9 @@ public class DumpCommandArgs extends GhidraScript {
         // Pass 1: the registry, verb -> vftable. Same walk as DumpCommandRegistry, kept here rather than shared so
         // this script runs standalone; the two agree because they read the same instruction stream.
         List<String[]> rows = new ArrayList<>(); // verb, mask, class, vftable
-        Long f8 = null;
+        Long f4 = null, f8 = null;
         String cls = null, vft = null;
+        long word4 = 0, mode = 0;
         long mask = 0;
         InstructionIterator it = currentProgram.getListing().getInstructions(f.getBody(), true);
         while (it.hasNext()) {
@@ -64,7 +65,7 @@ public class DumpCommandArgs extends GhidraScript {
                 if (pushed != null && cls != null) {
                     String verb = describe(toAddr(pushed));
                     if (verb.startsWith("/")) {
-                        rows.add(new String[] { verb, "0x" + Long.toHexString(mask), cls, vft });
+                        rows.add(new String[] { verb, "0x" + Long.toHexString(mask), cls, vft, "" + mode });
                         cls = null;
                     }
                 }
@@ -76,18 +77,28 @@ public class DumpCommandArgs extends GhidraScript {
 
             String dst = insn.getDefaultOperandRepresentation(0);
             Long imm = immediateOf(insn, 1);
-            if (dst.contains("[EAX + 0x8]"))
+            // ⭐ The record is SIXTEEN bytes, not twelve: `PUSH 0x10` allocates it, and past the mask at [8] sits a
+            // MODE BYTE at [0xC]. That byte is what distinguishes verbs sharing one class - /set writes BL (0) and
+            // /setlocal writes 1, so 0 is the server form and 1 the local one. Without it a shared class looks like
+            // one command wearing several names.
+            if (dst.contains("byte ptr [EAX + 0xc]"))
+                mode = imm == null ? 0L : imm; // a register operand is BL, and EBX is zeroed throughout
+            else if (dst.contains("[EAX + 0x4]"))
+                f4 = imm == null ? 0L : imm;
+            else if (dst.contains("[EAX + 0x8]"))
                 f8 = imm == null ? 0L : imm;
             else if (dst.equals("dword ptr [EAX]") && imm != null && f8 != null) {
                 cls = nameAt(toAddr(imm)).replace("::vftable", "");
                 vft = "0x" + Long.toHexString(imm);
                 mask = f8;
-                f8 = null;
+                word4 = f4 == null ? 0L : f4;
+                mode = 0; // reset per record; the byte is written just after the vftable
+                f4 = f8 = null;
             } else if (dst.equals("EAX") && imm != null && cls != null) {
                 String verb = describe(toAddr(imm));
                 if (!verb.startsWith("/"))
                     continue;
-                rows.add(new String[] { verb, "0x" + Long.toHexString(mask), cls, vft });
+                rows.add(new String[] { verb, "0x" + Long.toHexString(mask), cls, vft, "" + mode });
                 cls = null;
             }
         }
@@ -96,7 +107,7 @@ public class DumpCommandArgs extends GhidraScript {
         // family alone is four verbs on one class and re-walking a vtable per verb would be pure waste.
         Map<String, String[]> byVftable = new HashMap<>(); // vftable -> {short, long, usage, params, ok}
         PrintWriter out = new PrintWriter(OUT + "command_args.tsv");
-        out.println("verb\tmask\tclass\tvftable\tok\tusage\tshortdesc\tlongdesc\tparams");
+        out.println("verb\tmask\tclass\tvftable\tmode\tok\tusage\tshortdesc\tlongdesc\tparams");
         int good = 0;
         for (String[] r : rows) {
             String[] g = byVftable.get(r[3]);
@@ -106,7 +117,7 @@ public class DumpCommandArgs extends GhidraScript {
             }
             if (g[4].equals("ok"))
                 good++;
-            out.println(r[0] + "\t" + r[1] + "\t" + r[2] + "\t" + r[3] + "\t" + g[4] + "\t" + g[2] + "\t" + g[0] + "\t" + g[1] + "\t" + g[3]);
+            out.println(r[0] + "\t" + r[1] + "\t" + r[2] + "\t" + r[3] + "\t" + r[4] + "\t" + g[4] + "\t" + g[2] + "\t" + g[0] + "\t" + g[1] + "\t" + g[3]);
         }
 
         out.flush();

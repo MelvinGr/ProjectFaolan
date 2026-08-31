@@ -18,14 +18,14 @@ namespace Faolan.Tests
 	// Source: docs/re/gm-command-args.tsv, produced by tools/ghidra/DumpCommandArgs.java.
 	public class GmCommandArgumentGrammarTests
 	{
-		private sealed record CommandArgs(string Verb, uint Mask, string Class, string Status, string Usage, string Params);
+		private sealed record CommandArgs(string Verb, uint Mask, string Class, uint Mode, string Status, string Usage, string Params);
 
 		private static List<CommandArgs> ArgTable()
 		{
 			return File.ReadAllLines(TestPaths.Repo("docs", "re", "gm-command-args.tsv"))
 				.Skip(1)
 				.Select(l => l.Split('\t'))
-				.Select(f => new CommandArgs(f[0].TrimStart('/'), Convert.ToUInt32(f[1], 16), f[2], f[4], f[5], f[8]))
+				.Select(f => new CommandArgs(f[0].TrimStart('/'), Convert.ToUInt32(f[1], 16), f[2], uint.Parse(f[4]), f[5], f[6], f[9]))
 				.ToList();
 		}
 
@@ -59,6 +59,43 @@ namespace Faolan.Tests
 				// Y is present but bracketed - never among the leading positional pair.
 				Assert.Contains("posy", names);
 				Assert.DoesNotContain("posy", names.Take(2));
+			}
+		}
+
+		// ⭐ The registry record is SIXTEEN bytes and its last one is a MODE byte, which is the only thing telling
+		// verbs apart that share a class - and five classes do. Read across the families the byte is a variant
+		// selector: 0 is the target/server form and 1 the self/local one. This is what says `/teleporttarget` acts on
+		// the target while its three siblings act on you, and what separates `/set` from `/setlocal`; get it wrong and
+		// four teleport verbs look like one command wearing four names.
+		[Fact]
+		public void VerbsSharingAClass_AreSeparatedByTheModeByte()
+		{
+			var expected = new Dictionary<string, uint>
+			{
+				["teleporttarget"] = 0, ["teleport"] = 1, ["teleportself"] = 1, ["tp"] = 1,
+				["set"] = 0, ["setlocal"] = 1,
+				["setname"] = 0, ["setnick"] = 1,
+				["reload"] = 0, ["lazyreload"] = 1
+			};
+
+			var table = ArgTable().ToDictionary(c => c.Verb, c => c, StringComparer.OrdinalIgnoreCase);
+			foreach (var (verb, mode) in expected)
+			{
+				Assert.True(table.TryGetValue(verb, out var cmd), $"'{verb}' is not in the arg table.");
+				Assert.Equal(mode, cmd.Mode);
+			}
+
+			// Every verb sharing a class with another must be distinguishable from it. ⚠️ The broadcast trio is the
+			// one family the byte does NOT separate - /broadcast, /servcast and /sitecast are all mode 0 and are told
+			// apart inside the class by the verb text - so it is named here rather than silently failing the rule.
+			var byClass = ArgTable().GroupBy(c => c.Class).Where(g => g.Count() > 1);
+			foreach (var family in byClass)
+			{
+				if (family.Key == "FanaticBroadcastCommand_c")
+					continue;
+
+				Assert.True(family.Select(c => c.Mode).Distinct().Count() > 1,
+					$"'{family.Key}' serves {family.Count()} verbs that the mode byte does not separate.");
 			}
 		}
 

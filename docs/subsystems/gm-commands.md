@@ -224,6 +224,11 @@ slows the deltatimer system on server and client". The time-of-day setter is `/s
 `.time` actually was, so it was renamed; `reset` moved to `/gametime`, where retail puts it. We do not implement
 retail's `/time`. Check the recovered long description before assuming two same-named verbs agree.
 
+⚠️ **`.setstat` is now `/setlocal`.** It pushed a raw stat to the CLIENT without changing server state, which is
+exactly what retail's `/setlocal` does — retail's `/set` is the one that changes the stat on the target. Older
+notes in `docs/re/` that say a value was "measured with `.setstat`" are accurate history and are left alone; the
+command to type today is `.setlocal`.
+
 `/gametime * <factor> | / <factor> | reset` rides a real wire field: `GameTimeIIR`'s trailing f32 `rate` feeds the
 client clock's own multiplier (`GameTime_t` +0xD4), so the client speeds its day/night cycle to match instead of
 drifting against the server's.

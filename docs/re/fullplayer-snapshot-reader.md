@@ -161,7 +161,7 @@ across **29 distinct archetype characters** (L1 fresh through L80, every class) 
     tracks her `ExpCurrentLevelBase` across captures). A level-scaled rating quad; left `Unknown` (needs probing).
 
 The remaining per-character unknowns cannot be named from captures (the values track level/class but map to no
-independently-observable quantity). Naming them needs **in-client `.setstat <id> <value>` probing** — the method
+independently-observable quantity). Naming them needs **in-client `.setlocal <id> <value>` probing** — the method
 that pinned HP/mana/stamina current-vs-max (see `CharacterStatId`). That is the open tail of #393; the bytes
 already round-trip, so it is labelling, not decoding.
 
