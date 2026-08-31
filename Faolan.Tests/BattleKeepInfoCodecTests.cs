@@ -51,6 +51,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void EmptyReply_IsTheBareListFrame()
+		{
+			// The reply CSPlayerAgentListener sends to a keep query while no siege layer exists: zero entries, i.e.
+			// the ListFrame(0) word alone. Uncaptured as such (every retail reply carried an owned keep), but it is
+			// the same honest-empty shape as the zero-guild Massive-PvP board (#147).
+			Assert.Equal("000003f1", Convert.ToHexStringLower(BattleKeepInfoCodec.Build(BattleKeepInfo.Empty)));
+
+			var parsed = BattleKeepInfoCodec.Parse(Convert.FromHexString("000003f1"));
+			Assert.Empty(parsed.Keeps);
+		}
+
+		[Fact]
 		public void TheOwnerIsAGuildId32_SoAnotherClassWordIsRefused()
 		{
 			// The word after keepId is the owning guild's ID32 CLASS (EntityClass.Guild), which the client's keep

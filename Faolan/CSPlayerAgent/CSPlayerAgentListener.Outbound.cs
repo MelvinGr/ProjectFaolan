@@ -139,6 +139,21 @@ namespace Faolan.CSPlayerAgent
 				MassivePvpInfoCodec.Build(MassivePvpInfo.Empty)));
 		}
 
+		// 0x20AA DispatchBattleKeepInfoRequestReturnPhase3And4: the per-battlekeep status reply (answer to 0x2042
+		// RequestBattleKeepInformation, the Border Kingdoms siege panel). The grammar lives in BattleKeepInfoCodec,
+		// byte-exact against the four captured replies; every captured entry names an OWNING guild, and with no siege
+		// layer no keep here has one - an unowned keep's encoding is uncaptured (#147) - so the honest answer is the
+		// empty list, the same shape as SendMassivePvpInfo's zero-guild board. Build real entries when a city/siege
+		// layer exists.
+		private Task SendBattleKeepInfo(INetworkClient client, Rpc packet, List<uint> requestedKeepIds)
+		{
+			Logger.LogDebug("BattleKeepInfo: keep(s) [{KeepIds}] queried; no siege layer, sending the empty list.",
+				string.Join(", ", requestedKeepIds));
+
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, BattleKeepInfoCodec.Method,
+				BattleKeepInfoCodec.Build(BattleKeepInfo.Empty)));
+		}
+
 		// NB the 0x2092 DispatchPvPMatchMakingInfoRequestReturn sender that used to live here is GONE (#882). It
 		// wrote the constant `[0x3F1][u32 0]` on the strength of the login captures, and the matchmaking capture
 		// shows that body is the EMPTY BOARD rather than the message's shape: the real one is a three-level map that

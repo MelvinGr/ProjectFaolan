@@ -46,9 +46,12 @@ namespace Faolan.Tests
 			["RankingCountdownCodec"] = "PvP ranking is not calculated, so there is no countdown to report (#146)",
 			["RequestGetEffectCodec"] = "all eight captured frames ask for effect 0, so what to ask FOR is unknown (#874)",
 			["UpdateNameCodec"] = "nothing renames a live entity; the nameplate work is #363",
-			["UpdateTokenAmountCodec"] = "we model no token pool at all - the 29 pools the client names (TokenPool, RDB 1000520) are all unimplemented content, and the AA three are #150 (#870)",
-			["BattleKeepInfoCodec"] = "the battlekeep-info reply is captured and byte-exact, but we run no siege layer to answer a keep query with (#147)"
+			["UpdateTokenAmountCodec"] = "we model no token pool at all - the 29 pools the client names (TokenPool, RDB 1000520) are all unimplemented content, and the AA three are #150 (#870)"
 		};
+
+		// BattleKeepInfoCodec came OFF the list with #147: CSPlayerAgentListener now answers 0x2042
+		// RequestBattleKeepInformation with the honest empty keep list (BattleKeepInfo.Empty) - the same shape as the
+		// zero-guild Massive-PvP board - instead of dropping the query as an unknown packet.
 
 		// DungeonPlayfieldCodec came OFF the list with #882. Its entry said "needs a playfield to be classified as a
 		// dungeon", and the group-finder capture IS that classification: both captured `01` frames land on a playfield

@@ -910,6 +910,17 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// 0x2042 RequestBattleKeepInformation(const InstanceVec_t&): the Border Kingdoms siege panel queries
+				// keep status (retail answers each with a 0x20AA DispatchBattleKeepInfoRequestReturnPhase3And4 -
+				// NecroL80_mage-necromancer_login_gameplay_annotated_9, four pairs). Captured vectors carry ONE keep id each.
+				case CSPlayerAgentMethods.RequestBattleKeepInformation:
+				{
+					var keepIds = ReadListFrameOfUInt32(body, "RequestBattleKeepInformation");
+					await SendBattleKeepInfo(client, packet, keepIds);
+
+					break;
+				}
+
 				default:
 				{
 					LogUnknownPacket(packet);

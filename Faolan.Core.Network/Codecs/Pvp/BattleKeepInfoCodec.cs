@@ -104,7 +104,12 @@ namespace Faolan.Core.Network.Codecs.Pvp
 		}
 	}
 
-	public sealed record BattleKeepInfo(IReadOnlyList<BattleKeepInfoEntry> Keeps);
+	public sealed record BattleKeepInfo(IReadOnlyList<BattleKeepInfoEntry> Keeps)
+	{
+		// The reply a server with no siege layer sends: every captured entry names an OWNING guild and an unowned
+		// keep's encoding is uncaptured, so zero entries is the only honest body (#147).
+		public static readonly BattleKeepInfo Empty = new BattleKeepInfo([]);
+	}
 
 	// One keep's status. AttackingGuildClass/AttackingGuildId are the attacker's ID32 as two raw words: [0][0] is the
 	// client's null ID32 (no war declared - every captured keep), a real attacker carries [EntityClass.Guild][id].
