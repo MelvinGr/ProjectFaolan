@@ -154,6 +154,7 @@ namespace Faolan.Tests
 				{
 					AcgHash = 0x52524C33
 				},
+				0,
 				[],
 				QuestJournalCurrent.None);
 

@@ -127,7 +127,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The area's ACGHash token - see the codec note. Carried per area rather than written as a literal.
 		public uint AcgHash { get; init; }
 
-		// The word between the hash and the entry count. 0 on all 38 captured journals; carried rather than asserted.
+		// The word between the hash and the entry count. 0 on ALL 49 captured journal area blocks (every area id:
+		// 241/386/1054/1772/1834), so the corpus can never vary it. Client-side (#464, 2026-08-31): it lands at
+		// area+0x6c, and a MergeType-1 journal STAMPS the incoming value onto every held area
+		// (JournalHolder_c::UpdateQuestEntryList copies it before the area-id match) - but no reader exists in the
+		// journal GUI band (the only +0x6c hits there are widget rect floats and vector copies), so like
+		// MainQuestUpdate's TableField3 it is stored and propagated without a found consumer. Carried, not asserted.
 		public uint Unknown { get; init; }
 	}
 

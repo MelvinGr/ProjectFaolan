@@ -32,7 +32,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				AcgHash = first.IndexMagic
 			};
 
-			return new QuestJournalIIR(playerHandle, area, [], current ?? QuestJournalCurrent.None);
+			// MergeType 0 = append: what retail's own one-quest journal carries, and the right op for a client that
+			// holds nothing yet (we always send the whole journal fresh).
+			return new QuestJournalIIR(playerHandle, area, 0, [], current ?? QuestJournalCurrent.None);
 		}
 	}
 }
