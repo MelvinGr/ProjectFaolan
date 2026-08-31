@@ -60,6 +60,14 @@ namespace Faolan.Importer.Cli
 	// ⚠️ A death here is any NPC death the client was told about, which is NOT the same as a kill the player made.
 	// The report prints both, because the difference is what a per-kill counter would resolve - and note the
 	// player-damage column reads 0 for a NECROMANCER, whose pets deal the damage.
+	//
+	// ⭐⭐ And the CAPS are answered too (#887 closed, 2026-08-31): they are the daily challenges' COMPLETION
+	// targets, not counter clamps. In four independent sessions, the instant 1000069 reaches 5 (and 1000070
+	// reaches 20) the server fires the challenge-completion burst - DailyDailyCounter/DailyWeeklyCounter/
+	// DailyMonthlyCounter + CounterDailyChallenges in one frame, plus level-scaled cash and a
+	// DispatchDisplayItemLootChatMessage granting one of item 5063859 - player-annotated "daily challenge
+	// compelted" in NecroL80_..._chat-annotated-3. 1000069 keeps counting past its target (13 observed) while
+	// 1000070 saturates at its own; that residual asymmetry is recorded in docs/subsystems/daily-challenges.md.
 	public static partial class ReportCli
 	{
 		// Shared with --report corpse-timing / death-timing: the BCC pair a death arrives as.

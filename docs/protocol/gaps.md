@@ -682,52 +682,16 @@ a stock client cannot send a mismatched pair and the gap only matters against a 
 more harvested fields, not a decode: `--report gem-slots` already prints them (a 4-slot weapon declares
 `[12,13,14,15]`, a 3-slot item `[7,8,9,0]`).
 
-### The two daily kill counters: 1000070 counts every kill, 1000069 counts the FATALITIES (#887)
-[V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count] The client's
-stat-name table pairs `1000069` with `DailyPvEKills` and `1000070` with `DailyPvPKills`, and the corpus is
-entirely PvE — beach, Tortage, Ymir's Pass. Yet it is the **PvP-named** one that moves 118 times against the
-PvE-named one's 39 (`--report stat-series --report-arg 106,1000069,1000070`).
-
-⛔ **The pairing is NOT off by one, and it is no longer inferred from the name table.** The client's stat
-REGISTRATION (`FUN_01df7df0`) writes the id into its record and then names it: `0xF4285` (= 1000069) →
-`DailyPvEKills`, `0xF4286` (= 1000070) → `DailyPvPKills`. Each id is registered again under sub-indices 1, 2, 5
-and 8, which carry no name at all — so a stat id owns a small family of slots and only slot 0 is named.
-
-⭐ **The old sharpened question — "why does 1000069 run to 13 against its own cap of 5" — is answered: that cap
-clamps nothing.** Two measurements, both from `xxx_..._play1_beach-to-enter-tortage_city`, time-ordered rather
-than aggregated:
-
-* `1000070` reaches **20** at frame 6039 and never moves again, while the capture runs on to frame 11692 and
-  `1000069` keeps counting (11 at f7148, 12 at f8009, 13 at f10642). The session did not end and kills did not
-  stop, so 20 is a genuine clamp — and since nothing in the client reads either cap, it is the SERVER's.
-* `1000069` passes **5** at frame 3936 and carries on to 13 with no stall of any kind.
-
-⛔ **Nothing in the client consumes either cap.** There is no comparison, no clamp, no "x of y" read. So a cap
-named for a counter is not evidence that it bounds it, and the one-to-one table in
-[`client-tweak-table.md`](../rdb/client-tweak-table.md) is a NAME pairing.
-
-⚠️ It is not quite "exactly one function" though, and the difference is the interesting part: besides the
-tweak-DEFAULTS registry `FUN_010CB540`, the client builds a **global tweak accessor for `DailyPvPKillsCap`** — a
-`SignalTarget` at `0x02D243D8`, constructed at `0x01DF61A0` inside the PvP-XP economy run of static initializers
-— and builds **none** for `DailyPvEKillsCap`. Nothing READS that global except its own ctor and its atexit, so it
-is not a consumer and the address route ends there; what it establishes is that the two caps are not
-interchangeable in the client, which is the shape the clamp asymmetry has.
-
-⭐ **And `1000070` is now identified**, by counting each capture's INCREMENTS against its NPC deaths
-(`--report daily-kills`): where a capture's deaths stay under 20 the increments EQUAL the death count exactly
-(9=9, 10=10, 11=11, … on 7 of 15), and four captures running **29 / 34 / 37 / 39** deaths all stop dead on
-**20**. So it advances once per NPC death the client is told about, under a PvP name. `1000069` advances
-**0.16–0.36** of the deaths per capture — about a third — which is the residue this gap now names.
-
-⭐⭐ **And the subset is named (2026-08-25): `1000069` moves once per FATALITY.** `--report daily-kills` pairs
-each of its bumps directly with the two Fatality self-buffs the server applies to the killer (5070797 + 791221,
-`FatalityService.FatalityBuffA/B`): **49 of 49** bumps arrive within twelve packets after a fatality apply on the
-player, and **49 of 49** applies are followed by a bump — a bijection over every capture — with the lifetime
-`1379 PvEFatalities` pushed in the same burst. That is why it read as "about a third" (the client's fatality
-chance is level-tiered 5%..30%) and why the same mob was counted one time and not the next. So both counters
-wear a misleading name: `DailyPvPKills` counts every witnessed kill, `DailyPvEKills` the fatalities among them.
-What `DailyPvEKillsCap` = 5 caps is the residue: nothing in the client reads it, and 13 fatalities in one session
-passed it without a stall — a reward cap rather than a counter clamp is the reading its siblings suggest.
+### ~~The two daily kill counters~~ RESOLVED (#887, 2026-08-31): the caps are daily-challenge completion TARGETS
+The old [V0] here asked what `DailyPvEKillsCap` = 5 caps, `1000069` having been identified as the daily fatality
+count (and `1000070` as every witnessed kill, clamped at 20 — `--report daily-kills` has both identifications).
+The corpus answers it directly: **crossing the cap fires the daily-challenge COMPLETION burst** — the instant
+`DailyPvEKills` reaches 5, and the instant `DailyPvPKills` reaches 20, the server pushes
+`DailyDailyCounter`/`DailyWeeklyCounter`/`DailyMonthlyCounter` + lifetime `CounterDailyChallenges` together with
+level-scaled cash and a `DispatchDisplayItemLootChatMessage` announce. Observed at exactly the cap crossing in
+four independent sessions (three PvE completions, four PvP) and annotated by the player in one ("daily challenge
+compelted"). Full measurement in [daily-challenges.md](../subsystems/daily-challenges.md); the residual clamp
+asymmetry (`DailyPvPKills` alone saturates at its target) stays with the #509 entry below.
 
 ## The daily-challenge reset timestamps are never on the wire
 

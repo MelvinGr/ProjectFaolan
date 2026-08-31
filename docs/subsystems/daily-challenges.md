@@ -119,13 +119,23 @@ depends on, and this is the one case where minting is right.
 
 ## Gaps
 
-* ⚠️ **Four of the five categories have no trigger.** `DailyPvEKills`, `DailyPvPKills`, `DailyMinigameWins` and
-  `DailyUnchainedDungeonsCompleted` are declared (the client declares them, and the reset must clear them) but
-  nothing increments them. Which kill counts toward which is unresolved — `DailyPvPKills` moves 118 times in a
-  corpus with **no PvP in it at all**, so either the name↔id pairing is off by one or it counts all kills (#656's
-  `[V0]`). Guessing would put a wrong number in front of the player.
-* ⚠️ **The reward side is not built.** No capture shows a Cache being granted, so what a completed tier actually
-  hands over is unknown; the three item ids are recorded above and nothing grants them.
+* ⚠️ **Four of the five categories have no trigger built.** What counts toward each IS now resolved for the two
+  kill counters (#887, `--report daily-kills`): `DailyPvPKills` advances once per witnessed NPC death (its PvP
+  name is retail's own misnomer) and saturates at its cap of 20; `DailyPvEKills` advances once per FATALITY kill
+  and runs past its cap of 5 (13 in one session). Our sim increments neither yet, and `DailyMinigameWins` /
+  `DailyUnchainedDungeonsCompleted` have no trigger and no corpus evidence.
+* **The completion burst is CAPTURED, at exactly the cap crossing** (#887, 2026-08-31). In four independent
+  sessions, the instant a counter reaches its cap the server sends, in one frame: the four challenge counters
+  (`DailyDailyCounter`/`DailyWeeklyCounter`/`DailyMonthlyCounter` + `CounterDailyChallenges`), an `UpdateCash`
+  with a level-scaled award, and a `DispatchDisplayItemLootChatMessage` granting ONE of item **5063859** (an
+  uncatalogued Cache-family id; the message carries the item id twice, a u64 count of 1 and the ACG token
+  `LM7Q`). Player-annotated in one session ("daily challenge compelted").
+  [V2: xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city.tshark.json t=614.2 / t=758.9]
+  [V2: NecroL80_mage-necromancer_login_gameplay_chat-annotated-3.tshark.json t=1048.9]
+* ⚠️ **The reward VALUES are only partly pinned.** Cash: +2,629 copper at ~L5 (three completions, two
+  characters, both challenge types), +3,893 a level or two later, +100,000 (1 gold) at 80 — level-scaled, not
+  per-type; the scale curve between those points is unobserved. Item 5063859's identity (the three tier Caches
+  above are 5063646–48) is unresolved, and nothing grants any of it in our sim.
 * ⚠️ **The three reset timestamps are never sent in the corpus** — 0 occurrences of 1000066/67/68 across all 134
   captures, where the nine counters appear in 46–72 each. Their unit and epoch are therefore ours (unix seconds
   of the last boundary applied). Nothing observable depends on the choice, since the client is never shown them.

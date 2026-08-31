@@ -244,7 +244,9 @@ check this sheet before deciding a number is missing from the client:
   it does establish is that the two caps are not interchangeable in the client, which is the shape the clamp
   asymmetry has.
 
-  `[V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count]`
+  RESOLVED (#887, 2026-08-31): `DailyPvEKillsCap` = 5 is the daily fatality challenge's COMPLETION target —
+  crossing it fires the challenge-completion burst; see
+  [daily-challenges.md](../subsystems/daily-challenges.md).
 
   …plus `CounterDailyChallenges` (1000077) and the three RESET stamps the run opens with — `DailyResetTimestamp`
   (1000066), `WeeklyResetTimestamp` (1000067), `MonthlyResetTimestamp` (1000068). So "does it reset daily" is

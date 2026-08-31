@@ -134,7 +134,9 @@ evidence, not as a citation, until the id is used.
   ⭐⭐ `1000069` is the daily FATALITY count: `--report daily-kills` pairs 49 of 49 of its bumps with the Fatality
   self-buffs landing on the player (and 49 of 49 applies with a bump), the lifetime `1379 PvEFatalities` riding
   the same burst. "About a third" was the fatality roll. It passes its stated cap of 5 without stalling,
-  reaching 13, so [V0: what DailyPvEKillsCap = 5 caps, now that 1000069 is the daily fatality count]
+  reaching 13 — RESOLVED (#887, 2026-08-31): the cap is the daily fatality challenge's COMPLETION target, not a
+  counter clamp; crossing 5 fires the challenge-completion burst (see
+  [daily-challenges.md](../subsystems/daily-challenges.md)).
 
   ⛔ The *"name↔id pairing is off"* half is dead twice over: the client's stat REGISTRATION (`FUN_01df7df0`)
   writes `0xF4285` before naming `DailyPvEKills` and `0xF4286` before `DailyPvPKills`, so the pairing is the
