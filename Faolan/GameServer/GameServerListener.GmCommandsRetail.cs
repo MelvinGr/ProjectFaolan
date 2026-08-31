@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.World;
@@ -327,6 +328,185 @@ namespace Faolan.GameServer
 			await client.SendAsync(BuildGameTime(client));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Game time rate {_gameTimeRate:0.###}x - a game day now takes {GameClock.GameDayRealSeconds / 3600.0 / _gameTimeRate:0.##} real hours (offset {_gameTimeOffset}s).");
+		}
+
+		// Finds a live player by character id or by NAME. ⭐ Retail's own help for /summon and /assist warns that
+		// "only a small cache of names is kept, so summon on name may fail if the name is no longer cached" - so
+		// resolution by id is the reliable form there and by name is best-effort. Ours has no such cache (the world
+		// model holds every online player), so the by-name form is exact; the id form is still accepted because that
+		// is what the client's own UI is most likely to send.
+		private WorldEntity? FindOnlinePlayer(string idOrName)
+		{
+			if (uint.TryParse(idOrName, out var id))
+			{
+				var byId = _simulation.Players.Values.FirstOrDefault(p => p.IsPlayer && p.Client.Session.Character.Id == id);
+				if (byId != null)
+					return byId;
+			}
+
+			return _simulation.Players.Values.FirstOrDefault(p => p.IsPlayer && p.Name.Equals(idOrName, StringComparison.OrdinalIgnoreCase));
+		}
+
+		// /summon <id | name>  - "Summons a character to your position by id or name."
+		private async Task SummonCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .summon <id | name>");
+				return;
+			}
+
+			var me = _simulation.PlayerWorldEntity(client);
+			if (me == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			var subject = FindOnlinePlayer(arg);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No ONLINE character matching '{arg}'. (Summon moves a live character; an offline one has nothing to move.)"));
+				return;
+			}
+
+			if (subject.Handle == me.Handle)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You are already where you are.");
+				return;
+			}
+
+			await _teleport.DoTeleport(subject.Client.Session.Character.Id, me.MapId, me.Position);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Summoned '{subject.Name}' to your position on map {me.MapId}.");
+			await _agentServerDispatcher.SendSystemMessage(subject.Client.Session.Character.Id, $"You have been summoned by '{me.Name}'.");
+		}
+
+		// /unsummon <name>  - "Dismisses a character to the last saved location". ⭐ Note what retail means by that:
+		// not "send them home" and not "remove them", but back to the position PERSISTED for them - i.e. undo the
+		// summon by returning them to wherever they were last saved. That is a DB read, not a bind point.
+		private async Task UnsummonCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .unsummon <name>");
+				return;
+			}
+
+			var subject = FindOnlinePlayer(arg);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No ONLINE character matching '{arg}'."));
+				return;
+			}
+
+			var stored = await Database.GetCharacter(subject.Client.Session.Character.Id);
+			if (stored == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"'{subject.Name}' has no saved location to return to."));
+				return;
+			}
+
+			await _teleport.DoTeleport(stored.Id, stored.MapId, new Vector3(stored.PositionX, stored.PositionY, stored.PositionZ));
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Dismissed '{subject.Name}' to their last saved location (map {stored.MapId} at {stored.PositionX:0.#}, {stored.PositionY:0.#}, {stored.PositionZ:0.#}).");
+		}
+
+		// /assist <id | name>  - "Assists a player by teleporting to his/her position." The mirror of /summon: it
+		// moves YOU, not them.
+		private async Task AssistCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .assist <id | name>");
+				return;
+			}
+
+			var subject = FindOnlinePlayer(arg);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No ONLINE character matching '{arg}'."));
+				return;
+			}
+
+			await _teleport.DoTeleport(characterId, subject.MapId, subject.Position);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported to '{subject.Name}' on map {subject.MapId}.");
+		}
+
+		// /falldamage on | off  - retail's help states the default: "Enables falldamage (it is default on all players)".
+		private async Task FallDamageCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			if (arg.Equals("on", StringComparison.OrdinalIgnoreCase))
+				entity.FallDamageEnabled = true;
+			else if (arg.Equals("off", StringComparison.OrdinalIgnoreCase))
+				entity.FallDamageEnabled = false;
+			else if (arg.Length > 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .falldamage on | off  (no argument reports the current setting)");
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity.FallDamageEnabled
+				? ChatMarkup.Raw($"Fall damage {ChatMarkup.Color("lime", "ON")} (retail's default for every player).")
+				: ChatMarkup.Raw($"Fall damage {ChatMarkup.Color("red", "OFF")} - falls are still detected, they just do not hurt."));
+		}
+
+		// /cash [ [+|-]amount ]  - "Without arguments it gets the current cash value, with an absolute value it sets
+		// the cash, with + in front of the value it adds to the cash". ⚠️ The recovered parameter help for `+` and `-`
+		// is retail's own COPY-PASTE slip - it reads "Lists all the known tradeskill recipes" / "Learn a recipe",
+		// lifted from the tradeskill command. The long description above is the accurate one.
+		private async Task CashCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			var character = await Database.GetCharacter(characterId);
+			if (character == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Your character row could not be loaded.");
+				return;
+			}
+
+			if (arg.Length > 0)
+			{
+				var signed = arg[0] is '+' or '-';
+				if (!ulong.TryParse(signed ? arg[1..] : arg, out var amount))
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .cash [ [+|-]<amount> ]  (no argument reports the balance; bare value SETS it)");
+					return;
+				}
+
+				// Clamped at zero rather than wrapping: Money is unsigned, so subtracting past empty would hand the
+				// player about eighteen quintillion tin.
+				var updated = arg[0] switch
+				{
+					'+' => character.Money + amount,
+					'-' => amount >= character.Money ? 0UL : character.Money - amount,
+					_ => amount
+				};
+
+				// ⚠️ The reason word is decided against the PREVIOUS balance, so it has to be read before the
+				// assignment overwrites it - comparing `updated` to an already-updated field is always "gain".
+				var reason = updated >= character.Money ? UpdateCashReason.Gain : UpdateCashReason.Spend;
+				character.Money = updated;
+				await Database.SetCharacterMoney(characterId, updated);
+				await _economyOutbound.SendUpdateCash(client, updated, reason);
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Cash: {character.Money} tin.");
 		}
 	}
 }

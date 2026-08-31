@@ -135,6 +135,12 @@ namespace Faolan.GameServer.World
 			if (vitals == null || vitals.IsDead)
 				return;
 
+			// /falldamage off (#914). Deliberately AFTER the free-fall test and before the damage is resolved, so a
+			// disabled fall is still a detected fall - the airborne state is cleared either way and the toggle only
+			// suppresses the consequence.
+			if (!entity.FallDamageEnabled)
+				return;
+
 			var damage = useSpeed
 				? FallDamage.Resolve(speed, vitals.MaxHealth)
 				: FallDamage.ResolveFromDistance(fall, vitals.MaxHealth);

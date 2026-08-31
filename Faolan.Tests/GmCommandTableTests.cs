@@ -25,7 +25,9 @@ namespace Faolan.Tests
 		[
 			"save", "tradeskill", "teleport", "teleportself", "tp", "knockback", "feat", "level", "kill",
 			// #914 Wave A
-			"settime", "gametime", "distance", "whereis", "playfieldinfo", "playfieldinstancelock", "ghost", "system", "hatedbylist"
+			"settime", "gametime", "distance", "whereis", "playfieldinfo", "playfieldinstancelock", "ghost", "system", "hatedbylist",
+			// #914 Wave B1
+			"summon", "unsummon", "assist", "falldamage", "cash"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

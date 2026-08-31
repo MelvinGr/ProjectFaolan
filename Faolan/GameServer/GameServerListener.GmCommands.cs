@@ -358,6 +358,12 @@ namespace Faolan.GameServer
 				["ghost"] = GhostCommand,
 				["system"] = (client, _) => SystemInfoCommand(client),
 				["hatedbylist"] = (client, _) => HatedByListCommand(client),
+				// Wave B1 - character administration and the environment/economy levers.
+				["summon"] = SummonCommand,
+				["unsummon"] = UnsummonCommand,
+				["assist"] = AssistCommand,
+				["falldamage"] = FallDamageCommand,
+				["cash"] = CashCommand,
 				["tradeskill"] = TradeskillCommand,
 				["setstat"] = SetStatCommand,
 				["waypoint"] = WayPointCommand,
@@ -399,6 +405,13 @@ namespace Faolan.GameServer
 			// ⚠️ Retail registers /system at mask 0x0 - UNRESTRICTED - and we match retail rather than inventing a bit.
 			// It is the only verb besides our own `.help` that is unmasked.
 			["system"] = GmPrivileges.None,
+			// Wave B1, again retail's own masks: /summon /assist = AssistSummon 0x2000, /unsummon = TeleportDynels
+			// 0x8, /falldamage = PlayerDamage 0x10, /cash = SetStats 0x40.
+			["summon"] = GmPrivileges.AssistSummon,
+			["assist"] = GmPrivileges.AssistSummon,
+			["unsummon"] = GmPrivileges.TeleportDynels,
+			["falldamage"] = GmPrivileges.PlayerDamage,
+			["cash"] = GmPrivileges.SetStats,
 			["tradeskill"] = GmPrivileges.Developer,
 			["teleport"] = GmPrivileges.TeleportSelf,
 			["teleportself"] = GmPrivileges.TeleportSelf,

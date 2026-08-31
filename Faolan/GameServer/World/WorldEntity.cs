@@ -760,6 +760,11 @@ namespace Faolan.GameServer.World
 		// owns the position (every client sees the same spot; a chase begins from where it actually is, not its spawn).
 		public bool Patrols => PatrolWaypoints.Count > 0;
 
+		// /falldamage on|off (#914). Retail's help states the default explicitly - "it is default on all players" - and
+		// it is a PER-CHARACTER toggle there, not a server switch, so it lives on the entity and resets with the world
+		// entry like any other live state.
+		public bool FallDamageEnabled { get; set; } = true;
+
 		// True while a leashed NPC is walking back to its spawn point - it ignores re-aggro until home (so a player
 		// camping the leash edge can't ping-pong it).
 		public bool Returning { get; set; }
