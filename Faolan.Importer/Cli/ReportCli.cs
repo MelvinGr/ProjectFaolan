@@ -1065,7 +1065,7 @@ namespace Faolan.Importer.Cli
 
 				case "bcc-trees":
 				{
-					BccTrees(RdbDir());
+					BccTrees(RdbDir(), arg);
 					return 0;
 				}
 

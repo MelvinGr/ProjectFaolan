@@ -35,12 +35,31 @@ namespace Faolan.Core.Enums
 		HealthCurrent = 0x001B,
 		HealthMax = 0x0001,
 
-		// Combat-mode / weapon-stance flag: pushed in a 0x96B8DC59 update the tick an entity enters combat, telling
-		// the client to DRAW the entity's weapon (out of combat the weapon is sheathed). Decoded from the strickenbla
-		// combat capture (#218): every beach melee mob gets `CombatMode = 4` the moment before its first swing, and the
-		// player gets `CombatMode = 1` when it enters combat - so without it an NPC swings EMPTY-HANDED (the swing plays
-		// but no weapon is drawn). The value is a stance/mode code not fully decoded (melee mobs = 4, player = 1); idle
-		// entities carry no record at all, so 0 = sheathed.
+		// ⭐ The entity's BEHAVIOUR-TREE STATE - the client calls this slot "BCC State" and it is right; our name is
+		// the narrow one, kept only because every caller so far uses it for the weapon stance. Pushed in a 0x96B8DC59
+		// update; `4` the tick before a mob's first swing is what DRAWS its weapon, and without it an NPC swings
+		// empty-handed (#218).
+		//
+		// ⭐ **The values are STATE ids out of the client's own behaviour trees** (RDB 1010203, plain-text XML -
+		// `--report bcc-trees --report-arg <ids>`), which decodes every value the corpus carries (#905):
+		//
+		//    1  Idle          28 trees      9  Sitting       16 trees      39  Spellweaving   Character
+		//    2  Movement      11 trees     29  Limbo         24 trees      41  Drunk          Character
+		//    4  Fighting      22 trees     69  Evade          3 trees      72  Talking_idle   Character
+		//
+		// - `1` is **Idle**, NOT "the player is in combat" as this comment used to say. The player's captured 1 is the
+		//   client sitting in its idle state.
+		// - `29` is **Limbo**, which is the client's own name for death (protocol_death_resurrect).
+		// - `9` is **Sitting** (#355's `/sit`), `39` **Spellweaving** - the state `combos.md` already keys the
+		//   `Spellweaving Remover` criterion off (`!= 39`) without knowing what the number was.
+		//
+		// ⚠️ **`0` is not a state.** No shipped tree declares id 0, so pushing 0 to sheathe a weapon - which this
+		// comment used to prescribe, inferred from "idle entities carry no record at all" - was sending a value retail
+		// has no meaning for. The sheathe value is `1` (Idle).
+		//
+		// ⚠️ State ids COLLIDE across trees (11 is `LoopingEmote` in Animal/Character and `SneakHiding` in seven
+		// others), so a value only resolves against the tree the entity actually runs. The table above lists the ids
+		// whose reading is unambiguous or whose tree is named.
 		CombatMode = 0x0014,
 		PvpExp = 0x0033,
 		Exp = 0x0034,

@@ -976,19 +976,58 @@ NPC into **combat stance** - entities sheathe their weapon out of combat and DRA
 never sent the draw. There is **no dedicated weapon-draw IIR**: the trigger is a **stat** in the ordinary
 `0x96B8DC59` vitals update - **stat `0x14` (CombatMode) = 4**. In the strickenbla capture every beach melee mob
 gets `CombatMode = 4` the tick BEFORE its first swing (handle 0x2C56 frame 6424 → swings 6472; 0x2C59 7341→7424;
-0x2CCE 9441→9462; 0x2C47 11118→11138; 0x2C48 12141→12187 - perfect correlation), and the player gets
-`CombatMode = 1` when it enters combat. The value is a stance/mode code (melee mobs = 4, player = 1, one
-non-swinging entity = 1) not fully decoded, but **4 is what every actual melee swinger sends**; idle entities
-carry no stat-20 record at all, so **0 = sheathed**.
+0x2CCE 9441→9462; 0x2C47 11118→11138; 0x2C48 12141→12187 - perfect correlation).
+
+### ⭐ The values are BCC STATE ids, and all of them decode (#905)
+
+The client calls stat `0x14` **"BCC State"**, and it means it literally: the values are **state ids out of the
+client's own behaviour trees** (RDB 1010203, plain-text XML —
+`--report bcc-trees --report-arg <ids>`). Every value the corpus carries now has a name:
+
+| id | name | trees | id | name | trees |
+|---:|---|---:|---:|---|---:|
+| 1 | `Idle` | 28 | 29 | `Limbo` | 24 |
+| 2 | `Movement` | 11 | 39 | `Spellweaving` | Character |
+| 4 | `Fighting` | 22 | 41 | `Drunk` | Character |
+| 9 | `Sitting` | 16 | 69 | `Evade` | 3 |
+| | | | 72 | `Talking_idle` | Character |
+
+Three corrections fall straight out:
+
+- ⚠️ **`1` is `Idle`, not "the player is in combat"** — which this page and the enum both used to say. The
+  player's captured 1 is the client sitting in its idle state.
+- ⚠️ **`0` is not a state at all.** No shipped tree declares id 0, so pushing 0 to sheathe — inferred from "idle
+  entities carry no stat-20 record" — was sending a value retail has no meaning for. The sheathe is **`1` (Idle)**.
+- `29` is `Limbo`, the client's own name for death; `9` is `Sitting` (#355's `/sit`); and `39` is `Spellweaving`,
+  the state [`combos.md`](combos.md) already keys the `Spellweaving Remover` criterion off (`!= 39`) without
+  knowing what the number was.
+
+⚠️ State ids **collide across trees** — 11 is `LoopingEmote` in Animal/Character and `SneakHiding` in seven
+others — so a value only resolves against the tree the entity actually runs. That is why the lookup names the
+tree and why there is no flat published id→name dump for states (there is one for *substates*, which do not
+collide).
 
 Implemented as a world-sim state transition: `WorldEntity.InCombat` flips in `WorldState.Tick` when a hostile NPC
 acquires/loses a target (emitting `NpcEnterCombat`/`NpcExitCombat` effects), and `NpcBroadcaster.BroadcastNpcCombatMode`
-pushes the stat (4 on enter, 0 on exit) to every viewer in range that already sees the NPC (mirrors `BroadcastNpcMove`).
+pushes the stat (4 `Fighting` on enter, 1 `Idle` on exit) to every viewer in range that already sees the NPC (mirrors `BroadcastNpcMove`).
 Reset on death/respawn so a respawned mob re-draws cleanly. Builder `VitalsPacket.BuildStatBlockBody`, byte-exact
 against frame 6424 (`CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame`); transition
-logic covered by `WorldStateTests.Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects`. The exit value (0) is an
-inference (the capture's mobs died rather than leashing, so a sheathe was never captured). **VERIFIED in-client
-— the NPC swings with its weapon drawn (#218 CLOSED).**
+logic covered by `WorldStateTests.Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects`. The exit value is now
+`1` (`Idle`) rather than the inferred `0`, which no shipped tree declares — see the state table above.
+**VERIFIED in-client — the NPC swings with its weapon drawn (#218 CLOSED).**
+
+⭐ **But the send was a ONE-SHOT, and retail's is not (#905).** `BroadcastNpcCombatMode` fires on the engage
+transition and reaches only viewers who already `Known` the handle, so a mob that aggroed before the player could
+see it never drew its weapon *for that player* — and there was no retry for the rest of the fight. Measured over
+one five-pirate fight: the server sent 1,315 `StatUpdateIIR` frames and **exactly one** went to an NPC — handle
+0x65, the single pirate the player had selected, which transitioned later via the retaliation path when its
+handle was already known. The other four aggroed by proximity on the tick the player arrived, and are exactly the
+four that rendered sheathed. One-to-one with what was on screen.
+
+Retail restates it: over all 138 dumps (10,373 well-formed `StatUpdateIIR` frames) there are **593 stat-20
+records across 43 captures**, and per (capture, handle) **25% are sent more than once — one of them 28 times**.
+So an already-fighting NPC now re-asserts its state to a viewer at the moment that viewer confirms it has built
+the dynel (`HandleWorldEntrySpawnPoll`, the same structural gate the #225 idle assert uses).
 
 ## Level-up feedback (#209)
 On a ding (XP-driven or the GM `.level` set) retail sends, in order: a burst of **`AttributeChanged`/`Increased`**

@@ -421,7 +421,16 @@ namespace Faolan.GameServer
 			// this replaces sent one per NPC per second, which is where #716's 119.6 BCC/s came from. Sending it here
 			// rather than from the tick is also what makes the Confirmed gate structural instead of a check.
 			if (viewer != null && _simulation.World.ZoneForEntity(viewer).TryGet(requestId, out var confirmed) && !confirmed.IsPlayer && !confirmed.IsLoot)
+			{
 				await _npcs.SendNpcIdleAssert(client, confirmed);
+
+				// #905: a mob that was ALREADY fighting when this viewer built its dynel never got the combat-mode
+				// stat - `BroadcastNpcCombatMode` fires on the engage transition and only reaches viewers who already
+				// know the handle - so it swung empty-handed for that player for the rest of the fight. This is the
+				// moment the viewer can render it, and it is the same structural gate the idle assert uses.
+				if (confirmed.InCombat)
+					await _npcs.SendNpcCombatMode(client, confirmed);
+			}
 
 			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
 			Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}", ack0, requestId, ack1,

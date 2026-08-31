@@ -41,7 +41,7 @@ namespace Faolan.Importer.Cli
 
 		private sealed record BctNodeRow(uint TreeId, string Tree, string Kind, int Id, string Name, int? Priority);
 
-		private static void BccTrees(string rdbDir)
+		private static void BccTrees(string rdbDir, string? lookup = null)
 		{
 			using var rdb = OpenRdb(rdbDir);
 
@@ -89,6 +89,34 @@ namespace Faolan.Importer.Cli
 					                  ? "NONE"
 					                  : string.Join(", ", clashes.Select(g => $"{g.Key}={string.Join('/', g.Select(r => r.Name).Distinct())}")))
 				                  + $"   priority disagreements: {(priorityClashes.Count == 0 ? "NONE" : priorityClashes.Count.ToString())}");
+			}
+
+			// ⭐ STATE id -> name, per tree, for the ids the caller asks about (#905). Stat 0x14 is the client's own
+			// "BCC State", so a stat-20 value IS a state id from this table - which is what makes the four unnamed
+			// values the corpus carries (69, 41, 9, 72) answerable at all. It is a LOOKUP rather than a dump because
+			// state ids genuinely collide across trees (11 is `LoopingEmote` in one and `SneakHiding` in another), so
+			// the only honest answer names the tree alongside the name.
+			if (!string.IsNullOrWhiteSpace(lookup))
+			{
+				var wanted = lookup.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+					.Select(t => int.TryParse(t, out var v) ? v : -1)
+					.Where(v => v >= 0)
+					.ToHashSet();
+
+				Console.WriteLine();
+				Console.WriteLine($"STATE id lookup for {string.Join(", ", wanted.Order())} - the space `CharacterStatId.CombatMode` (stat 0x14, the client's \"BCC State\") draws from:");
+				foreach (var id in wanted.Order())
+				{
+					var hits = states.Where(r => r.Id == id).ToList();
+					if (hits.Count == 0)
+					{
+						Console.WriteLine($"  {id,4} -- declared by NO shipped tree");
+						continue;
+					}
+
+					foreach (var g in hits.GroupBy(r => r.Name).OrderByDescending(g => g.Count()))
+						Console.WriteLine($"  {id,4} {g.Key,-26} in {g.Count()} tree(s): {string.Join(", ", g.Select(r => r.Tree).Distinct().Order())}");
+				}
 			}
 
 			Console.WriteLine();

@@ -41,7 +41,13 @@ namespace Faolan.GameServer.World
 		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
 		// and one non-swinging entity used 1 - the field is a stance/mode code that isn't fully decoded, but 4 is the
 		// value every actual melee swinger sends.)
+		// BCC STATE ids from the client's own behaviour trees (RDB 1010203; see CharacterStatId.CombatMode). 4 is
+		// `Fighting` - what draws the weapon - and 1 is `Idle`, which sheathes it.
+		//
+		// ⚠️ The sheathe used to be 0, inferred from "an idle spawn carries no stat-20 record at all". It is wrong:
+		// **no shipped tree declares state 0** (#905), so that was a value retail has no meaning for. `Idle` is 1.
 		private const uint NpcCombatModeValue = 4;
+		private const uint NpcIdleStateValue = 1;
 
 		// A scripted exit's two beats, from the farewell window closing - see ScheduleScriptedExit for the frames.
 		private const int ScriptedExitMoveDelayMs = 4000;
@@ -205,16 +211,40 @@ namespace Faolan.GameServer.World
 		// get it (mirrors BroadcastNpcMove).
 		public async Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
 		{
-			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
-				? NpcCombatModeValue
-				: 0u);
-			var body = StatUpdateCodec.Build(npc.Handle, stats);
+			var body = CombatModeBody(npc, inCombat);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 					await WorldIir.Send(viewer.Client, body);
 			}
+		}
+
+		// ⭐ Re-assert an already-fighting NPC's combat mode to ONE viewer, when that viewer has just built its dynel
+		// (#905). The broadcast above fires on the engage TRANSITION and only reaches viewers who already know the
+		// handle, so a mob that aggroed before the player could see it never draws its weapon for that player - it
+		// swings empty-handed for the rest of the fight, with no retry.
+		//
+		// Measured, and it is a one-to-one match with what was on screen: over one five-pirate fight the server sent
+		// 1,315 StatUpdateIIR frames and EXACTLY ONE went to an NPC - handle 0x65, the one pirate the player had
+		// selected, which transitioned later via the retaliation path when its handle was already known. The other
+		// four aggroed by proximity on the tick the player arrived and are exactly the four rendering sheathed.
+		//
+		// ⭐ Retail does not treat this as a one-shot either. Over all 138 dumps (10,373 well-formed StatUpdateIIR
+		// frames) there are 593 stat-20 records across 43 captures, and per (capture, handle) **25% are sent more
+		// than once, one of them 28 times**. So a re-assert is retail's own shape, not a patch over ours.
+		public Task SendNpcCombatMode(INetworkClient client, WorldEntity npc)
+		{
+			return WorldIir.Send(client, CombatModeBody(npc, true));
+		}
+
+		private static byte[] CombatModeBody(WorldEntity npc, bool inCombat)
+		{
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
+				? NpcCombatModeValue
+				: NpcIdleStateValue);
+
+			return StatUpdateCodec.Build(npc.Handle, stats);
 		}
 
 		// The "this entity is alive and idling" assert (#225): a short-form BehaviorControlCenterIIR (BehaviorId.BccAction)
