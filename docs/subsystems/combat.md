@@ -866,6 +866,55 @@ Losing the target out in the field also sends it home, but only after `NpcChaseD
 its ground (`WorldEntity.TargetLostAt`), so stepping out of aggro range and straight back in is one engagement.
 WORKS in-client (it moves + leashes + stops on de-aggro).
 
+### ⭐ Each attacker chases its own SLOT, and the ring is retail's (#908)
+
+Reported in-client: five `Tortage Pirate`s on one player settled **0.03u-0.46u apart** — every one of the ten
+pairs inside half a unit. The chase walked all of them to `NpcContactRange` of the target's *exact* position with
+no per-attacker offset, so N attackers solved for one sphere and stacked inside it.
+
+The geometry is **measured, not designed** — `--report melee-crowd`, 25,638 NPC-NPC pairs across 75 captures. The
+method matters and is worth reusing:
+
+- ⚠️ It does **not** go through attack records. Its sibling `ranged-standoff` established that a mob's `Combat:*`
+  BCC carries an empty target list, so "who is attacking whom" is not recoverable that way. It does not need to
+  be — the question is about positions, and those are streamed.
+- ⚠️ **`CharDCMove` is the PLAYER's movement and only the player's** — measured, not assumed: 30,769 records over
+  the corpus, **not one** naming an NPC handle. An NPC moves by `MoveTask`, so a report that tracks NPC positions
+  from `CharDCMove` is silently reading each mob's *spawn* position — where it stood when it streamed in, not
+  where it fought. (`ranged-standoff` has that defect; noted there.)
+- ⚠️ Proximity is not aggro, so the crowd is cut to mobs that have moved recently — a chase is mobs walking, a
+  city square is mobs standing.
+
+**Is it a ring, or do they just pack in?** On a circle of radius R with N evenly-spaced occupants neighbours sit
+`2·R·sin(π/N)` apart, so dividing the observed closest pair by that factor recovers the radius each crowd size
+implies. Packing would show the implied radius falling away with N; a ring holds it flat. It is flat:
+
+| crowd | closest walking pair (median) | implied R |
+|---:|---:|---:|
+| 4 | 1.49u | 1.05 |
+| 5 | 1.21u | 1.03 |
+| 6 | 1.06u | 1.06 |
+| 7 | 0.83u | 0.96 |
+| 8 | 0.83u | 1.08 |
+
+So attackers take a **slot on a ring around the target**. `AttackerSlotRadius` is `NpcContactRange` (1.5u),
+bracketed between the corpus's two estimates that lean opposite ways — the implied R above *under*-estimates
+(even spacing is assumed, real spacing is not) while the measured distance from a crowd member to the player
+(median 2.95u, p10 1.57u) *over*-estimates (bystanders). What confirms the pick is that it reproduces retail's
+spacing at this radius: **2.03u for three attackers against retail's 2.11, 1.33 for five against 1.21, 0.84 for
+seven against 0.83**.
+
+⭐ **The angle is a golden-angle sequence, not a hash.** Handles are allocated sequentially, so a wave of spawns
+gets consecutive handles — the input an ordinary scrambling hash handles *worst*. One was tried first and put two
+of five consecutive attackers 0.42u apart, inside the stack this was meant to fix. `handle * (2³²/φ)` read as a
+fraction of a turn keeps any prefix of the sequence as evenly spread as it can be. The target's handle is added
+as a **rotation of the whole ring**, so a creature does not take the same angle against everything it ever
+fights while the attackers' relative spacing is untouched.
+
+⚠️ The walk aims at the slot; the **range check still measures the target**. They differ by up to the ring
+radius, so reusing the slot distance would let a mob swing from out of range on one side and refuse a legitimate
+swing on the other. Gated by `AttackerSlotTests`, which compares each crowd size against the retail median above.
+
 ⭐ **Three AI clocks, and all but one are retail's own** (#804, from the client's tuning sheet RDB 1000516 —
 `docs/rdb/client-tweak-table.md`): `AIDefaults_MaximumChaseRadius` 45 → `NpcLeashRange`,
 `AIDefaults_IrritationForgetPeriod` 4 → `NpcIrritationForgetSeconds`, `AIDefaults_ChaseDeaggroDelayTime` 5 →

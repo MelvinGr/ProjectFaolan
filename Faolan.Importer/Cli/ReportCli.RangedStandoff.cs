@@ -23,6 +23,14 @@ namespace Faolan.Importer.Cli
 	// names, both tracked live from the spawn record and every subsequent `CharDCMove`, and print the distance
 	// distribution. Melee is the CONTROL: whatever the measurement says about archers only means something if the same
 	// pipeline puts melee mobs at contact range.
+	//
+	// ⚠️ **The NPC half of that position tracking does not work, and this report's own negative result hides it.**
+	// `CharDCMove` is the PLAYER's movement and only the player's - measured while writing `melee-crowd` (#908): over
+	// the whole corpus it carries 30,769 records and NOT ONE names an NPC handle. An NPC moves by `MoveTask`. So an
+	// attacker's position here is whatever its SPAWN record streamed in with - where it stood when it came into view,
+	// not where it shot from. It happens not to matter today because the attack records carry no target at all, so
+	// zero pairs are produced either way; it would matter the moment a capture with populated targets arrives. Take
+	// the `MoveTask` branch from `melee-crowd` before trusting a number out of this.
 	public static partial class ReportCli
 	{
 		private static void RangedStandoff(IReadOnlyList<NamedCapture> captures)

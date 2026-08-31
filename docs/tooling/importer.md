@@ -562,6 +562,14 @@ the client's own per-page language record (`LdbLanguageIndex`), never a sniff of
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`melee-crowd` (#908: when several retail mobs are on one player at once, how are they arranged? Its finding is that
+they take slots on a RING of about 1-1.5u around the target, established by dividing each crowd's closest walking
+pair by the ring factor `2*R*sin(pi/N)` - the implied radius is FLAT across crowd sizes (1.05, 1.03, 1.06, 0.96,
+1.08 for four to eight mobs), where opportunistic packing would show it falling away with N.
+⚠️ Two method notes worth stealing: it does NOT go through attack records (a mob's `Combat:*` BCC carries an empty
+target list, as `ranged-standoff` found), and it tracks NPC positions from **`MoveTask`** - `CharDCMove` is the
+PLAYER's movement and only the player's, 30,769 records over the corpus and not one naming an NPC handle, so a
+report reading NPC positions from it is silently using each mob's spawn position),
 `bcc-relay` (#912: for each `BehaviorId`, does retail send a client a record for somebody ELSE'S actor handle?
 ⭐ It needs no multi-client capture, which is what made the question look blocked: it needs the recipient's own
 handle, and every capture states that — the client sends its own actions, so the modal actor over the c2s records

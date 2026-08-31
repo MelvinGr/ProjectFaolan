@@ -102,6 +102,22 @@ namespace Faolan.GameServer.World
 		// it perpetually a step away and never swinging). Must be < NpcMeleeRange.
 		public const float NpcContactRange = 1.5f;
 
+		// The radius of the ring attackers take their slots on, around the target (#908). Measured off retail rather
+		// than picked, and BRACKETED rather than read off one number, because the corpus gives two estimates that lean
+		// opposite ways (`--report melee-crowd`):
+		//
+		//   - the radius implied by each crowd's CLOSEST walking pair is a flat 0.96-1.08 over crowds of four to
+		//     eight. That is an UNDER-estimate: the arithmetic assumes evenly spaced occupants and real ones are not,
+		//     so the closest pair is tighter than even spacing would give.
+		//   - the MEASURED distance from a walking crowd member to the player is a median 2.95u, p10 1.57u. That is an
+		//     OVER-estimate: proximity is not aggro, so bystanders inside the sample radius pull it up.
+		//
+		// 1.5 sits between them, and it is `NpcContactRange` - the distance a chaser already stops at - so the slot
+		// ring coincides with the stop ring instead of introducing a second number. What confirms the pick is that it
+		// REPRODUCES retail's neighbour spacing: 2.03u for three attackers against retail's measured 2.11, 1.33 for
+		// five against 1.21, 0.84 for seven against 0.83.
+		internal const float AttackerSlotRadius = NpcContactRange;
+
 		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
 		//
@@ -712,9 +728,27 @@ namespace Faolan.GameServer.World
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
 					// is broadcast in retail-sized segments (StepAndStream throttle, #272) so the client interpolates the
 					// run up to the player smoothly; it swings once it arrives in melee range.
-					var dx = target.Position.X - entity.Position.X;
-					var dz = target.Position.Z - entity.Position.Z;
+					// ⭐ Each attacker chases its OWN SLOT on a ring around the target, not the target's exact point
+					// (#908). Without the offset every attacker solved for the same sphere and they settled inside one
+					// body's worth of space - five Tortage Pirates measured 0.03u-0.46u apart in-client, i.e. all ten
+					// pairs inside a distance retail produces in 0.9% of cases.
+					//
+					// The geometry is retail's, measured rather than designed (`--report melee-crowd`, 25,638 NPC-NPC
+					// pairs over 75 captures). Take each crowd's CLOSEST walking pair and divide it by the ring factor
+					// `2*R*sin(pi/N)`, and the radius it implies is the SAME for every crowd size - 1.05, 1.03, 1.06,
+					// 0.96, 1.08 for crowds of four to eight. That constancy is the finding: mobs packing in
+					// opportunistically would imply a radius that falls away with N, and a ring is what holds it flat.
+					var (slotX, slotZ) = AttackerSlotOffset(entity, target);
+					var dx = target.Position.X + slotX - entity.Position.X;
+					var dz = target.Position.Z + slotZ - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
+
+					// ⚠️ The WALK aims at the slot; the RANGE CHECK must still measure the target. They differ by up to
+					// the ring radius, so reusing the slot distance would let a mob swing from out of range on one side
+					// of the ring and refuse a legitimate swing on the other.
+					var toTargetX = target.Position.X - entity.Position.X;
+					var toTargetZ = target.Position.Z - entity.Position.Z;
+					var targetDistance = MathF.Sqrt(toTargetX * toTargetX + toTargetZ * toTargetZ);
 
 					// How close this creature needs to be to attack, and how close it therefore walks (#838). A melee mob
 					// keeps the measured pair it always had: swing range 3u, walk into CONTACT at 1.5u so it visibly
@@ -739,7 +773,7 @@ namespace Faolan.GameServer.World
 						// the swing/combat-mode draw plants it).
 						EndMove(entity, false, WorldTickEffectType.NpcMove);
 
-					if (horizontal > attackRange)
+					if (targetDistance > attackRange)
 					{
 						entity.ArmAttackCooldown(NpcAttackInterval); // still out of range: wind up for arrival
 						continue;
@@ -1029,6 +1063,43 @@ namespace Faolan.GameServer.World
 
 			return nearest;
 		}
+
+		// A deterministic per-attacker slot offset (X, Z) on the contact ring around the TARGET, so several mobs on one
+		// player fan out instead of converging on its exact point (#908). The combat twin of `FollowFormationOffset`.
+		//
+		// Deterministic from the handle PAIR, and that is the design decision worth stating. A slot indexed by the
+		// attacker's rank among the target's current attackers would spread more evenly, but the rank CHANGES as mobs
+		// join and die, so every attacker would re-solve for a new angle mid-fight - the jitter `FollowFormationOffset`
+		// exists to avoid. Mixing the target's handle in as well is what keeps a creature from taking the same angle
+		// against every target it ever fights, which a handle-only hash would.
+		//
+		// ⚠️ The offset is a RING POSITION, not a displacement to add to the stop distance: the mob still walks until
+		// it is `NpcContactRange` from the slot point, so its distance to the target stays inside melee range. Retail's
+		// own crowd sits at a median 2.95u from the player (p10 1.57u), which brackets this.
+		//
+		// ⚠️ Two attackers CAN hash to nearby angles - a deterministic hash makes no spacing promise. That is accepted:
+		// it degrades to the old behaviour for that pair only, where the bug had every attacker collide by
+		// construction. Retail overlaps sometimes too (0.9% of its walking pairs are inside 0.5u), so an occasional
+		// close pair is not itself wrong.
+		internal static (float X, float Z) AttackerSlotOffset(WorldEntity attacker, WorldEntity target)
+		{
+			// ⭐ A GOLDEN-ANGLE sequence, not a hash. `GoldenStep` is 2^32/φ, so reading `handle * GoldenStep` as a
+			// fraction of a turn walks the circle in golden-ratio steps - the arrangement that keeps any PREFIX of the
+			// sequence as evenly spread as it can be. That is the property this needs, because handles are allocated
+			// SEQUENTIALLY: a wave of spawns gets consecutive handles, which is exactly the input an ordinary
+			// scrambling hash handles worst. One was tried first and put two of five consecutive attackers 0.42u
+			// apart - inside the stack this ticket is about.
+			//
+			// The target's handle is added as a ROTATION of the whole ring rather than mixed in per attacker: that
+			// stops a creature taking the same angle against every target it ever fights, while leaving the attackers'
+			// spacing relative to each other untouched.
+			var angle = (attacker.Handle * GoldenStep + target.Handle * GoldenStep) / (float)uint.MaxValue * MathF.Tau;
+
+			return (AttackerSlotRadius * MathF.Cos(angle), AttackerSlotRadius * MathF.Sin(angle));
+		}
+
+		// 2^32 / φ - the multiplier that turns a sequential id into a golden-angle position on the circle.
+		private const uint GoldenStep = 2654435769;
 
 		// A deterministic per-pet formation slot offset (X, Z) on a small ring around the leader, so multiple pets
 		// following one player fan out instead of piling on the same spot (#307). Derived from the entity handle so
