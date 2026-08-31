@@ -282,6 +282,32 @@ namespace Faolan.Core.Database.Tables
 		// Veteran's Bag 35 (->59). NULL = not a bag. Extracted by RdbItemImporter; see FullCharacterRoots.
 		public uint? BagExtraSlots { get; set; }
 
+		// ⭐ WHERE the item can be WORN, from the client's own item-template property table (#916). Three fields, all
+		// three named by the client's stat-name table (docs/re/aoc-client-stat-names.tsv), all three present on every
+		// one of the 5,071 decrypted templates:
+		//
+		//   `Placement`   (field 298, stat 0x12A) - a BITMASK of `CharacterEquipmentSlot` ids the item may go into.
+		//                 **0 means not equippable** (1,049 of 5,071: keys, notes, pelts, crates).
+		//   `DefaultPos`  (field  88, stat 0x58)  - the PREFERRED slot when the mask offers several.
+		//   `OccupySlots` (field 148, stat 0x94)  - every slot the item consumes once worn. Bits BEYOND the chosen
+		//                 slot are additionally blocked, which is the two-hander rule.
+		//
+		// Validated against every worn item the corpus records (72 template/slot pairs, `ItemInstances` container 101):
+		// a ring is `Placement` = 1536 = bits 9|10 (either ring), a one-hander 320 = bits 6|8 (either hand), a
+		// two-hander 64 = bit 6 alone with `OccupySlots` = 256 = bit 8 (the off hand goes too - 280 templates, every
+		// one in a documented two-handed weapon class: 30012/30014/30016/30044/30019). `DefaultPos` is NOT derivable
+		// from `Placement`: 45 off-hand focus items (category 30009 - tomes, folios, trinkets) carry the one-hander
+		// mask 320 but default to 8.
+		//
+		// ⚠️ Bits 6 and 8 mean "a MAIN hand" and "an OFF hand", not slots 6 and 8 specifically. Slots 20/21 are weapon
+		// SET 2 and are set-neutral (#400) - either set holds any weapons - so which set a hand bit resolves to is the
+		// wearer's choice, not a property of the item. `EquipSlotResolver` owns that decision.
+		public uint Placement { get; set; }
+
+		public uint DefaultPos { get; set; }
+
+		public uint OccupySlots { get; set; }
+
 		// The self-buff spell this item applies when USED (right-clicked) - a consumable's on-use effect (Health/Mana
 		// potion, food, drink, Double XP potion, ...). The BASE spell id (Spells.Id); the wire ApplySpell id is
 		// base<<8. NULL = not a use-a-spell consumable. Harvested from captures (CaptureItemUseImporter pairs the item's

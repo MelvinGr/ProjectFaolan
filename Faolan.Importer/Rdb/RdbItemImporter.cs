@@ -34,6 +34,14 @@ namespace Faolan.Importer.Rdb
 
 		// `NumGemSlots` - how many gems the item can take (#754).
 		private const uint GemSlotsPropertyField = 114;
+
+		// Where the item may be WORN (#916). All three are the client's own stat ids (aoc-client-stat-names.tsv) and
+		// all three are present on every decrypted template: `Placement` is the slot BITMASK (0 = not equippable),
+		// `DefaultPos` the preferred slot when the mask offers several, `OccupySlots` everything the item consumes
+		// once worn (bits beyond the chosen slot = the two-hander rule). See `Item.Placement`.
+		private const uint PlacementPropertyField = 298;
+		private const uint DefaultPosPropertyField = 88;
+		private const uint OccupySlotsPropertyField = 148;
 		private const uint MarkerItem = 1000000;
 
 		// Bag capacity = property field 104 (= the Bag container kind, 0x68) for the normal backpack bag, or field 1331
@@ -273,6 +281,7 @@ namespace Faolan.Importer.Rdb
 				flagsAdded = 0,
 				bindFieldsAdded = 0,
 				gemSlotsAdded = 0,
+				placementAdded = 0,
 				weaponDamageAdded = 0,
 				attackRangeAdded = 0,
 				onUseAdded = 0,
@@ -394,6 +403,19 @@ namespace Faolan.Importer.Rdb
 				{
 					item.GemSlots = gemSlots;
 					gemSlotsAdded++;
+				}
+
+				// Where the item can be worn (#916). Absent reads as 0, which for `Placement` IS the answer for the
+				// 1,049 templates that are not equippable at all.
+				var placement = properties.Fields.GetValueOrDefault(PlacementPropertyField);
+				var defaultPos = properties.Fields.GetValueOrDefault(DefaultPosPropertyField);
+				var occupySlots = properties.Fields.GetValueOrDefault(OccupySlotsPropertyField);
+				if (placement != item.Placement || defaultPos != item.DefaultPos || occupySlots != item.OccupySlots)
+				{
+					item.Placement = placement;
+					item.DefaultPos = defaultPos;
+					item.OccupySlots = occupySlots;
+					placementAdded++;
 				}
 
 				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
@@ -612,6 +634,9 @@ namespace Faolan.Importer.Rdb
 
 			if (gemSlotsAdded > 0)
 				Console.WriteLine($"  NumGemSlots (field 114) set on {gemSlotsAdded} item(s); {items.Count(i => i.GemSlots > 0)} are socketable (#754).");
+
+			if (placementAdded > 0)
+				Console.WriteLine($"  Placement/DefaultPos/OccupySlots (fields 298/88/148) set on {placementAdded} item(s); {items.Count(i => i.Placement > 0)} are equippable (#916).");
 
 			if (flagsAdded > 0 || bindFieldsAdded > 0)
 			{

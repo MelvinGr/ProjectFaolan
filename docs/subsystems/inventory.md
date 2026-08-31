@@ -133,6 +133,53 @@ Capture: `Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed` (2026-06-12
 Slot ids (equipped container `pos` = `CharacterEquipmentSlot` = the worn instance's `Slot`): chest 5, main hand
 6, ring 9, legs 16, wrist 18, second weapon/sheath 0x14 - verified against the captured container.
 
+### ⭐ WHICH slot an item goes into - the client says (#916)
+
+Three item-template property fields answer it, all three named by the client's own stat-name table
+(`docs/re/aoc-client-stat-names.tsv`) and all three carried by **every one of the 5,071 decrypted templates**.
+Imported by `RdbItemImporter` onto `Item`, read by `EquipSlotResolver`:
+
+| field | stat | column | meaning |
+|---:|---:|---|---|
+| 298 | `0x12A` `Placement` | `Item.Placement` | BITMASK of `CharacterEquipmentSlot` ids the item may occupy. **0 = not equippable** |
+| 88 | `0x58` `DefaultPos` | `Item.DefaultPos` | the PREFERRED slot when the mask offers several |
+| 148 | `0x94` `OccupySlots` | `Item.OccupySlots` | every slot the item consumes once worn |
+
+**Validated against every worn item the corpus records** — 72 template/slot pairs from `ItemInstances` container
+101, with no contradiction:
+
+- a ring is `1536` = bits 9|10 (either finger), and the corpus has one template worn at 9 on one character and
+  10 on another;
+- a one-hander is `320` = bits 6|8 (either hand);
+- a two-hander is `64` = bit 6 alone **plus** `OccupySlots` `256` = bit 8, i.e. the off hand goes too. 280
+  templates have that shape and every one is in a documented two-handed weapon class (30012 2h edge/blunt,
+  30014 2h blunt, 30016 polearm, 30044, 30019 thrown);
+- `DefaultPos` is **not** derivable from `Placement`: 45 off-hand focus items (category 30009 — tomes, folios,
+  trinkets) carry the one-hander mask `320` and default to `8`.
+
+⚠️ **Bits 6 and 8 mean "a MAIN hand" and "an OFF hand", not slots 6 and 8.** Slots 20/21 are weapon SET 2 and are
+set-NEUTRAL (#400) — either set holds any weapons — so which set a hand bit lands in is the wearer's choice, not
+a property of the item. That single decision is the only thing `EquipSlotResolver` adds to the template data; it
+fills set 1 first and falls through to set 2.
+
+4,022 of the 5,071 templates are equippable. `Placement` `0` on the other 1,049 is a statement, not a gap: they
+are keys, notes, pelts and crates.
+
+**Slot 23 = `Carried`, named here for the first time.** Six templates place there (`Placement` = `1<<23`,
+`DefaultPos` = 23) and they are exactly the things a character visibly carries: *Bundle of Wood*, *Baracha Basket
+of Fruit*, *Battle Plan Fragment I*, *Letter to Hakon Wolftamer*, and two whose own asset names end in
+`_carryable`. No capture shows one worn — the corpus runs no carry quest — so it is named from the client's data,
+the way slot 26 (`ResourceBag`) was before a live equip confirmed it. Independent corroboration of the whole
+reading: `Placement` bit 26 appears on exactly the two resource bags, and 26 was recovered separately, off the
+wire.
+
+Bulk moves ride this: `EquipmentService.EquipAll` walks the backpack filling FREE slots (it does not judge which
+of two swords is better — the template data does not answer that), `UnequipAll` walks the worn set into the
+backpack and stops cleanly when the bag fills. Both persist and return what moved; the caller sends a
+`DispatchRemoveItem` + `DispatchAddItem` pair per move, which is what a server-driven inventory change looks
+like on the wire (a client-driven equip needs neither — the client is the one that moved it). GM verbs:
+`.inventory equipall` / `.inventory unequipall`.
+
 ## Sockets (gems)
 
 A socket lives on the wire in two forms, and **neither carries a stat value** — the socket names the GEM by

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -165,5 +167,87 @@ namespace Faolan.GameServer.Inventory
 			_logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Template.Name, current.TemplateId, fromSlot,
 				targetBagSlot, character.Id);
 		}
+
+		// ⭐ BULK unequip (#916): every worn item into the backpack, in slot order, stopping when the bag runs out.
+		// The easy half of the pair - each item's source slot is already known, so no resolver is involved.
+		//
+		// Returns what actually moved, in the order it moved, so the caller can send the wire for each. Same contract
+		// as `PersistEquip`: this class persists, the caller announces.
+		public async Task<IReadOnlyList<EquipmentMove>> UnequipAll(INetworkClient client, int backpackCapacity)
+		{
+			var characterId = client.Session.Character.Id;
+			var worn = await _database.GetCharacterItems(characterId, ContainerKind.Equipped);
+			var free = await FreeBagSlots(characterId, backpackCapacity);
+
+			var moves = new List<EquipmentMove>();
+			foreach (var item in worn.OrderBy(i => i.Slot))
+			{
+				if (free.Count == 0)
+					break;
+
+				var target = free[0];
+				if (!await _database.MoveCharacterItem(characterId, ContainerKind.Equipped, item.Slot, ContainerKind.Bag, target))
+					continue;
+
+				free.RemoveAt(0);
+				moves.Add(new EquipmentMove(item.TemplateId, item.Template?.Name, ContainerKind.Equipped, item.Slot, ContainerKind.Bag, target));
+			}
+
+			_logger.LogInformation("Bulk UNEQUIP for character {CharacterId}: {Moved} of {Worn} worn item(s) moved to the backpack.", characterId, moves.Count, worn.Length);
+			return moves;
+		}
+
+		// ⭐ BULK equip (#916): walk the backpack and wear whatever fits, using the client's own template fields to
+		// pick the slot (`EquipSlotResolver`). An item that is not equippable, or whose every candidate slot is
+		// already taken, is left in the bag - this fills the EMPTY slots rather than deciding which of two swords is
+		// better, which is not a question the template data answers.
+		//
+		// Bag order is the tie-break, so the outcome is reproducible: the first shirt in the bag is the one worn.
+		public async Task<IReadOnlyList<EquipmentMove>> EquipAll(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var occupied = (await _database.GetCharacterItems(characterId, ContainerKind.Equipped))
+				.Select(i => (CharacterEquipmentSlot)i.Slot)
+				.ToHashSet();
+
+			var moves = new List<EquipmentMove>();
+			foreach (var item in (await _database.GetCharacterItems(characterId, ContainerKind.Bag)).OrderBy(i => i.Slot))
+			{
+				if (item.Template == null)
+					continue;
+
+				var slot = EquipSlotResolver.ResolveFreeSlot(item.Template, occupied);
+				if (slot == null)
+					continue;
+
+				if (!await _database.MoveCharacterItem(characterId, ContainerKind.Bag, item.Slot, ContainerKind.Equipped, (int)slot.Value))
+					continue;
+
+				// The chosen slot AND everything wearing it consumes - a two-hander blocks the off hand of the same
+				// weapon set, so nothing else may land there.
+				occupied.Add(slot.Value);
+				foreach (var also in EquipSlotResolver.Occupies(item.Template, slot.Value))
+					occupied.Add(also);
+
+				moves.Add(new EquipmentMove(item.TemplateId, item.Template.Name, ContainerKind.Bag, item.Slot, ContainerKind.Equipped, (int)slot.Value));
+			}
+
+			_logger.LogInformation("Bulk EQUIP for character {CharacterId}: {Moved} item(s) worn from the backpack.", characterId, moves.Count);
+			return moves;
+		}
+
+		// The backpack cells with nothing in them, ascending. The capacity is the caller's to supply - it is the
+		// equipped bag's business (24 base + `Item.BagExtraSlots`) and `EconomyOutbound` already answers it.
+		private async Task<List<int>> FreeBagSlots(uint characterId, int capacity)
+		{
+			var taken = (await _database.GetCharacterItems(characterId, ContainerKind.Bag)).Select(i => i.Slot).ToHashSet();
+			return Enumerable.Range(0, capacity).Where(slot => !taken.Contains(slot)).ToList();
+		}
 	}
+
+	/// <summary>
+	///     One item that a bulk equip / unequip actually moved. The caller sends the wire for each (a
+	///     <c>DispatchRemoveItem</c> on the source cell and a <c>DispatchAddItem</c> on the destination).
+	/// </summary>
+	public sealed record EquipmentMove(uint TemplateId, string? Name, ContainerKind From, int FromSlot, ContainerKind To, int ToSlot);
 }

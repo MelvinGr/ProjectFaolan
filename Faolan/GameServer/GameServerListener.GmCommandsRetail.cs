@@ -13,6 +13,8 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Crypt;
 using Faolan.Core.Progression;
+using Faolan.GameServer.Economy;
+using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Progression;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -1225,7 +1227,8 @@ namespace Faolan.GameServer
 		// /inventory delete <slot> [bag name] | deleteall [bag name] | equipall | unequipall
 		//
 		// ⚠️ This REPLACES our `.removeitem <bagSlot>` (#914 rule 1) - same job, and retail's form carries the
-		// deleteall and equip-all verbs ours never had. `equipall`/`unequipall` are not backed and say so (#916).
+		// deleteall and equip-all verbs ours never had. All four are backed since #916, which recovered the slot
+		// resolver from the client's own item-template fields (`EquipSlotResolver`).
 		private async Task InventoryCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1265,14 +1268,49 @@ namespace Faolan.GameServer
 				}
 
 				case "equipall":
-				case "unequipall":
-					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
-						$".inventory {verb} is not backed: it needs a bulk equip path that picks a slot per item, which the equipment service does not expose (#916)."));
+				{
+					var moves = await _equipment.EquipAll(client);
+					await AnnounceEquipmentMoves(client, moves);
+					await _agentServerDispatcher.SendSystemMessage(characterId, moves.Count == 0
+						? "Nothing in the backpack fits a free equipment slot."
+						: $"Equipped {moves.Count} item(s): {string.Join(", ", moves.Select(m => $"{m.Name ?? m.TemplateId.ToString()} -> {(CharacterEquipmentSlot)m.ToSlot}"))}.");
 					return;
+				}
+
+				case "unequipall":
+				{
+					var moves = await _equipment.UnequipAll(client, await _economyOutbound.BackpackCapacity(characterId));
+					await AnnounceEquipmentMoves(client, moves);
+					var stillWorn = (await Database.GetCharacterItems(characterId, ContainerKind.Equipped)).Length;
+					await _agentServerDispatcher.SendSystemMessage(characterId, moves.Count == 0
+						? stillWorn == 0 ? "Nothing is equipped." : "The backpack is full - nothing could be taken off."
+						: $"Unequipped {moves.Count} item(s){(stillWorn > 0 ? $"; {stillWorn} left on (backpack full)" : "")}.");
+					return;
+				}
 
 				default:
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inventory delete <slot> | deleteall   (retail also has equipall/unequipall; not backed here)");
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inventory delete <slot> | deleteall | equipall | unequipall");
 					return;
+			}
+		}
+
+		// Tells the client about a bulk equip/unequip: each moved item leaves its old cell (`DispatchRemoveItem`) and
+		// arrives in the new one (`DispatchAddItem`). Both are retail messages we already send for a server-driven
+		// inventory change; there is no single "the server moved your item" packet - a client-driven equip needs none
+		// at all, because the client is the one that moved it.
+		private async Task AnnounceEquipmentMoves(INetworkClient client, IReadOnlyList<EquipmentMove> moves)
+		{
+			var characterId = client.Session.Character.Id;
+			foreach (var move in moves)
+			{
+				await EconomyOutbound.SendRemoveItem(client, move.From, (uint)move.FromSlot);
+
+				var landed = await Database.GetCharacterItemSlot(characterId, move.To, move.ToSlot);
+				if (landed == null)
+					continue;
+
+				await EconomyOutbound.SendAddItem(client, move.To, (uint)move.ToSlot,
+					SnapshotItems.LiveAddEntry(landed, FullCharacterRoots.ItemId(landed.Id), FullCharacterRoots.RecordId(characterId, move.To, (ulong)move.ToSlot)));
 			}
 		}
 

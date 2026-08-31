@@ -1741,6 +1741,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Can")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("DefaultPos")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
@@ -1774,6 +1777,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<uint>("OccupySlots")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("OnUseLockSeconds")
                         .HasColumnType("INTEGER");
 
@@ -1781,6 +1787,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<uint?>("OnUseSpell")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Placement")
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("Quality")

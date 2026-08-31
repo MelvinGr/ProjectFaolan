@@ -27,6 +27,16 @@ namespace Faolan.Core.Enums
 		Wrist = 18,
 		RangedWeapon = 20, // main_hand_right (bow/crossbow/thrown)
 		Ammo = 21, // off_hand_right (quiver/bolts)
+		// ⭐ The CARRIED-object slot, recovered from the client's item templates (#916). Six templates place here -
+		// `Placement` = 1<<23 with `DefaultPos` = 23 - and they are exactly the things a character visibly carries:
+		// "Bundle of Wood", "Baracha Basket of Fruit", "Battle Plan Fragment I", "Letter to Hakon Wolftamer" and two
+		// whose own asset names end in `_carryable` ("Global rolledup blankets carryable", "Global decor crate
+		// carryable"). No capture shows one worn - none of the corpus's sessions runs a carry quest - so the slot is
+		// named from the client's data rather than from the wire, the same way slot 26 was found before a live equip
+		// confirmed it.
+		// [V1: Items.Placement, imported from RDB item-template field 298]
+		Carried = 23,
+
 		ResourceBag = 26, // the equipped RESOURCE bag - sizes the resource container (kind 112), the sibling of Bag (3)
 		// for the backpack. Live-confirmed: equipping a Max Resource Bag sent InventoryToEquipped
 		// target 26. Its extra slots come from Item.ResourceBagExtraSlots (RDB field 1331), added on
