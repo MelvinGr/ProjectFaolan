@@ -589,7 +589,7 @@ namespace Faolan.GameServer
 		// the force ("How far targets will be knocked back"), and the sibling /knockback uses the identical parameter
 		// purely as force. We follow the parameter help - one value, the FORCE, matching /knockback - and take the
 		// area from the same aggro radius the rest of the simulation uses, because a command whose single number
-		// silently meant something different from its singular twin would be the worse surprise.
+		// silently meant something different from its singular twin would be the worse surprise. #919 settles it.
 		private async Task AreaKnockbackCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -831,9 +831,9 @@ namespace Faolan.GameServer
 			if (!target.IsPlayer)
 			{
 				// Honest gap rather than a silent no-op: DoTeleport moves a CHARACTER (it re-runs world entry), and an
-				// NPC has no character to move. Relocating a live NPC entity is a different mechanism we have not built.
+				// NPC has no character to move. Relocating a live NPC entity is a different mechanism we have not built (#917).
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - only player targets can be teleported (moving a live NPC entity is a separate mechanism we do not have yet)."));
+					ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - only player targets can be teleported (moving a live NPC entity is a separate mechanism we do not have yet - #917)."));
 				return;
 			}
 
@@ -877,7 +877,7 @@ namespace Faolan.GameServer
 		// signal we do have is the mask: /broadcast and /servcast share Broadcast (0x400) while /sitecast sits alone
 		// on Sitecast (0x800). So the first two reach this realm and /sitecast is the wider form - which, with one
 		// realm per process, is the same audience here. The reply states the scope it actually reached rather than
-		// implying a fanout we do not have.
+		// implying a fanout we do not have. #919 decompiles the class to recover what actually separates the three.
 		private async Task BroadcastCommand(INetworkClient client, string arguments, string verb)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1016,7 +1016,8 @@ namespace Faolan.GameServer
 		// ⚠️ NOT a duplicate of our `.ban`, so that one stays: `.ban` is indefinite and account-wide until someone
 		// runs `.unban`, while this is a TIMED kick that lifts itself.
 		// ⚠️ The lift is in-process and NOT persisted, so a server restart inside the window leaves the account
-		// banned - the reply says so rather than letting a GM assume it expires regardless.
+		// banned - the reply says so rather than letting a GM assume it expires regardless. #918 makes it a DB
+		// property (a BanExpiresAt column) so the lift survives a restart in both directions.
 		private async Task KickBanCommand(INetworkClient client, string arguments)
 		{
 			var gmId = client.Session.Character.Id;
@@ -1099,7 +1100,7 @@ namespace Faolan.GameServer
 
 			await _agentServerDispatcher.SendSystemMessage(gmId,
 				$"Kickbanned '{name}' (account '{userName}') for {minutes} minute(s){(kicked > 0 ? $", {kicked} live session(s) dropped" : "")}."
-				+ " The lift is in-process only - a restart inside the window leaves it banned, so use .unban then.");
+				+ " The lift is in-process only - a restart inside the window leaves it banned, so use .unban then (#918).");
 		}
 
 		// /getfaction <faction id>  - "Get the faction points for the player with the specified faction id."
@@ -1146,7 +1147,7 @@ namespace Faolan.GameServer
 		// ⚠️ Retail's full grammar also carries `npccast` and three token-state-counter verbs; those name machinery we
 		// do not have, and they say so rather than failing silently. `forget` and `forgetall` are the interesting
 		// absence: the repository can ADD a known spell but has no path to remove one, so un-learning is a genuine
-		// gap and is reported as one instead of pretending the spellbook shrank.
+		// gap and is reported as one instead of pretending the spellbook shrank (#915).
 		private async Task MagicCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1185,7 +1186,7 @@ namespace Faolan.GameServer
 				case "forget":
 				case "forgetall":
 					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
-						$".magic {verb} is not backed: the repository can add a known spell but has no path to remove one, so the spellbook cannot shrink yet."));
+						$".magic {verb} is not backed: the repository can add a known spell but has no path to remove one, so the spellbook cannot shrink yet (#915)."));
 					return;
 
 				default:
@@ -1198,7 +1199,7 @@ namespace Faolan.GameServer
 		// /inventory delete <slot> [bag name] | deleteall [bag name] | equipall | unequipall
 		//
 		// ⚠️ This REPLACES our `.removeitem <bagSlot>` (#914 rule 1) - same job, and retail's form carries the
-		// deleteall and equip-all verbs ours never had. `equipall`/`unequipall` are not backed and say so.
+		// deleteall and equip-all verbs ours never had. `equipall`/`unequipall` are not backed and say so (#916).
 		private async Task InventoryCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1240,7 +1241,7 @@ namespace Faolan.GameServer
 				case "equipall":
 				case "unequipall":
 					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
-						$".inventory {verb} is not backed: it needs a bulk equip path that picks a slot per item, which the equipment service does not expose."));
+						$".inventory {verb} is not backed: it needs a bulk equip path that picks a slot per item, which the equipment service does not expose (#916)."));
 					return;
 
 				default:

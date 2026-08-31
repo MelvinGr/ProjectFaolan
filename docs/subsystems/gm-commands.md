@@ -126,8 +126,10 @@ are our own verbs, so their bit is a family CHOICE, commented as such in the tab
 
 ## The command catalog
 
-133 commands, all registered by one function (`FUN_0064e2d0`) as 12-byte records — `[0] vftable, [4] 0,
-[8] requiredMask` — pushed into the interpreter's list. Recovered with
+133 commands, all registered by one function (`FUN_0064e2d0`) as **16-byte** records — `[0] vftable, [4] 0,
+[8] requiredMask, [0xC] mode` — pushed into the interpreter's list. ⚠️ The record was long documented as 12
+bytes, which is what the allocation (`PUSH 0x10`) refutes: the trailing byte at `[0xC]` is a **variant selector**
+and is the only thing telling apart verbs that share a class (see [the argument grammar](#the-argument-grammar)). Recovered with
 `tools/ghidra/DumpCommandRegistry.java`; re-run it to regenerate this table. The raw dump, with each command's
 implementing class and its registration address, is [`docs/re/gm-command-registry.tsv`](../re/gm-command-registry.tsv).
 
@@ -159,6 +161,21 @@ All 133 verbs come out with something usable:
 
 ⚠️ **A `noargs` row means the verb declares no parameters, not that it accepts none** — `/lua` and
 `/setlookspackage` plainly take an argument each and parse it ad hoc. The declaration is what is recovered.
+
+**Five classes serve more than one verb**, and the record's mode byte at `[0xC]` is what separates them —
+`0` is the target/server form and `1` the self/local one:
+
+| class | mode 0 | mode 1 |
+|---|---|---|
+| `FanaticTeleportCommand_c` | `/teleporttarget` | `/teleport` `/teleportself` `/tp` |
+| `FanaticSetCommand_c` | `/set` | `/setlocal` |
+| `FanaticSetnameCommand_c` | `/setname` | `/setnick` |
+| `FanaticReloadCommand_c` | `/reload` | `/lazyreload` |
+| `FanaticBroadcastCommand_c` | `/broadcast` `/servcast` `/sitecast` | — |
+
+⚠️ The broadcast trio is the one family the byte does **not** separate — all three are mode 0 and the class reads
+the verb text itself, so their relative SCOPE is not recovered. `GmCommandArgumentGrammarTests` names it as the
+known exception rather than letting it fail the rule silently.
 
 The teleport family — one class, `FanaticTeleportCommand_c`, serving all four verbs:
 

@@ -1,5 +1,8 @@
-// The client's chat-command REGISTRY: one function constructs every command as a 12-byte record
-//     [0] <Command>::vftable   [4] u32   [8] u32 permission mask
+// The client's chat-command REGISTRY: one function constructs every command as a 16-byte record
+//     [0] <Command>::vftable   [4] u32   [8] u32 permission mask   [0xC] u8 mode
+// ⚠️ It was long read as TWELVE bytes; `PUSH 0x10` allocates it, and the trailing byte is a variant selector that
+// is the only thing separating verbs which share a class (0 = the target/server form, 1 = self/local). This script
+// does not emit it - DumpCommandArgs.java does, alongside the argument grammar.
 // and pushes it into the interpreter's list. This walks that function's instructions and emits one line per record -
 // the class name behind the vtable pointer, both u32s, and whatever symbol/string the record's registration call was
 // handed - so the whole catalog and its gating come out as data rather than 3,400 lines of decompiled C.
