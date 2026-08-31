@@ -73,6 +73,25 @@ the server's own `.godmode` toggle, instead of from the account TYPE.
 set — so *failing to send* stat 215 grants every privilege including this one. A missing GM level is not a
 neutral default.
 
+### Which bits do anything BEYOND gating `/help`
+
+Naming a bit is not knowing what it does. Every site that reads the mask was scanned (`PUSH 0xd7` ahead of the
+getter, then the bit it tests — both `TEST reg,imm` and `AND reg,imm` spellings):
+
+| bit | privilege | sites | what it does there |
+|---|---|---|---|
+| `0x00000200` | `GodMode` | 5 | **3 decrease gates in the local player's stat setter** `FUN_010fd220` — health `@010fde41`, stamina `@010fe513`, mana `@010fe544`, each `TEST 0x200` then `CMP new,old; JL return`; plus 2 in `FUN_008d4820`, the damage-number path (it checks stat `0x1b` and a negative delta) |
+| `0x02000000` | `NoCriteriaCheck` | 2 | `FUN_006dd970` |
+| `0x00010000` | `ShowGmTag` | 2 | `FUN_01104080` |
+| `0x00000001` | `Developer` | 4 | |
+
+Every other read has no immediate bit test: that is the `/help` filter `FUN_006c86b0`, which reads the mask once
+and ANDs it against each registered command's own required mask (the 133-command registry, already decoded).
+
+⭐ **None of the seven unnamed bits appears in a hard-coded test anywhere** — they are role membership only, with no
+special client behaviour. That is a useful negative: the unnamed bits can be carried verbatim in the role masks
+without worrying what they switch on.
+
 ## The roles the client ships
 
 Registered beside the bits, so `/gm support2` names one. Verbatim values — each set is Funcom's own policy, which is
