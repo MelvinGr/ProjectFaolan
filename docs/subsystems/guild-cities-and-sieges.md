@@ -22,7 +22,7 @@ LDB is where the *ruleset* lives, and it is the source those sweeps had not read
 The client opens the Border Kingdoms siege panel and queries one keep at a time. Byte-exact against all four
 captured replies (`BattleKeepInfoCodec`, `BattleKeepInfoCodecTests`). Our server answers the query: with no
 siege layer every keep is unowned, and an unowned keep's encoding is uncaptured (every retail entry names an
-owning guild), so `CSPlayerAgentListener` sends the honest EMPTY list (`BattleKeepInfo.Empty`) — the same shape
+owning guild), so `CsPlayerAgentListener` sends the honest EMPTY list (`BattleKeepInfo.Empty`) — the same shape
 as the zero-guild Massive-PvP board:
 
 ```
