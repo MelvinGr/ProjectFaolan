@@ -25,8 +25,8 @@ namespace Faolan.Core.Rdb.Assets
 
 			// Header.
 			ms.Write(Encoding.ASCII.GetBytes("FCTX"));
-			WriteU32(ms, 2); // version
-			WriteU32(ms, 1); // unknown (matches observed FCTX entries)
+			WriteU32(ms, 2); // Version - the client's loader dispatch (FUN_00de0f00: 1 legacy / 2 current, #464)
+			WriteU32(ms, 1); // MapsMask - bit 0 = the base image alone (the single-image encoding this writes)
 			WriteU16(ms, (ushort)width);
 			WriteU16(ms, (ushort)height);
 			ms.WriteByte((byte)mipCount);

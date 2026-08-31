@@ -13,6 +13,14 @@ namespace Faolan.Importer.Cli
 	// on that census whose evidence is not the capture corpus at all, and which therefore has no reason to be stuck.
 	// This is that census.
 	//
+	// ⭐ RESOLVED (2026-08-31), and the census was the right instrument but could only characterise: the NAMES came
+	// from the client's loader. `FUN_00de0f00` reads "FCTX" then dispatches on the word at +4 - 1 legacy loader /
+	// 2 current - so it is the container VERSION; and the v2 loader (`FUN_00de0bd0`) popcounts bits 0x1|0x2|0x4 of
+	// the word at +8 for the number of map chains to read, so it is a MAPS-PRESENT BITMASK (1 = base image alone;
+	// MIXD's 6 = two extra maps, its rare 2 = one - the 1.36x payload/px split a 6-vs-2 COUNT could never make).
+	// The header's bytes +16/+17 are m_nNumMips / m_nNumMipsInFile (asserted equal), +18 u16 read-and-discarded.
+	// FctxConverter carries the renamed fields; this report stays as the measuring instrument.
+	//
 	// ⚠️ The whole point is to read the two words AGAINST the header fields around them, not on their own. A value
 	// census would report "0x18 on most textures" and leave it there; what settles a header word is whether it
 	// PREDICTS something the rest of the header already states (the payload's length, its block size, its mip

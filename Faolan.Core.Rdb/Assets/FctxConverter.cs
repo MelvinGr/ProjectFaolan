@@ -31,35 +31,24 @@ namespace Faolan.Core.Rdb.Assets
 			if (payload.Length < 24)
 				return Result.Fail("FCTX payload shorter than its 24-byte header");
 
-			// FCTX header: magic[4], unknown1 u32, unknown2 u32, width u16, height u16, mip1 u8, mip2 u8, unk3 u16, fourcc[4].
+			// FCTX header: magic[4], version u32, mapsMask u32, width u16, height u16, numMips u8, numMipsInFile u8,
+			// pad u16, fourcc[4] - 24 bytes. NAMED FROM THE CLIENT'S OWN LOADER (#464, 2026-08-31), not from the
+			// census that first characterised the two words:
 			//
-			// ⭐ The two words are CENSUSED, not unknown-shaped (#464, `--report fctx-header` over 2,808 textures):
-			// neither is per-texture data and neither predicts any size, dimension or mip count.
-			//
-			//   unknown1  2 on every fourcc-tagged texture (DXT1 2,475 / DXT5 115 / MIXD 218), 1 on the 7 whose
-			//             fourcc slot holds no readable tag - so it separates "carries a fourcc" from "does not".
-			//   unknown2  1 on every single-image format, and 6 on MIXD - the one CONTAINER format, which this
-			//             converter already has to special-case as several concatenated maps.
-			//
-			// ⭐ RESOLVED at a larger sample (#464, 4,397 textures): the MIXD outlier is NINE textures, not one, and
-			// unknown2 is NOT a sub-map COUNT - the reading the smaller sample suggested. The two groups separate by
-			// PAYLOAD PER PIXEL with no overlap at all, and the bands are 1.36x apart where a 6-vs-2 count would have
-			// to be 3x:
-			//
-			//   MIXD u2=6   x706   payload/px 2.500-2.576
-			//   MIXD u2=2   x9     payload/px 1.834-1.848
-			//
-			// ⚠️ It is a real CONTENT split rather than a size artefact: the two groups OVERLAP on dimensions and mip
-			// count (both carry 512x512, both carry mips 6/8/9), so nothing about the image size explains it. So
-			// unknown2 selects between two MIXD channel LAYOUTS - which sub-textures the container holds - and the
-			// number itself is a layout id, not a count. Naming the two layouts needs the client's MIXDTextureLoader.
-			//
-			// ⚠️ The superseded reading, recorded because the smaller sample genuinely supported it and someone will
-			// re-derive it otherwise: "a value that varies WITHIN a format is a count, not a label, so unknown2 is
-			// the number of sub-maps". It is the right INSTINCT and the wrong answer, and only a payload measurement
-			// separates the two - a distribution never could.
-			var unknown1 = payload.ReadU32Le(4);
-			var unknown2 = payload.ReadU32Le(8);
+			//   * `FUN_00de0f00` reads the magic ("FCTX" = 0x58544346 LE) and then SWITCHES ON THE NEXT u32 -
+			//     1 -> the legacy loader `FUN_00de08c0`, 2 -> the current one `FUN_00de0bd0`, anything else
+			//     unsupported. So the word at +4 is the container VERSION, which is exactly the census's split
+			//     (2 on 2,801 textures, 1 on the 7 legacy ones whose fourcc slot holds no readable tag).
+			//   * The v2 loader POPCOUNTS bits 0x1|0x2|0x4 of the word at +8 and reads that many map chains - so it
+			//     is a bitmask of WHICH MAPS the container carries, not a layout id and not a plain count.
+			//     1 (bit 0) = the base image alone, every single-image format; MIXD's 6 (bits 1+2) = two additional
+			//     maps and its rare 2 (bit 1) = one - which is the 1.36x payload/px split the census measured and
+			//     could not explain as a 6-vs-2 count (that would have to be 3x).
+			//   * Bytes +16/+17 are `m_nNumMips` / `m_nNumMipsInFile` - the loader ASSERTS them equal ("Cheetah",
+			//     "The m_nNumMips field, and the m_nNumMipsInFile should be the same") - and the u16 at +18 is read
+			//     and discarded.
+			var version = payload.ReadU32Le(4);
+			var mapsMask = payload.ReadU32Le(8);
 			int width = payload.ReadU16Le(12);
 			int height = payload.ReadU16Le(14);
 			int mip = payload[16];
@@ -67,7 +56,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (mip < 1)
 				mip = 1;
 
-			var header = new FctxHeader(fourCc, width, height, mip, unknown1, unknown2);
+			var header = new FctxHeader(fourCc, width, height, mip, version, mapsMask);
 			var pixels = payload[24..];
 
 			// MIXD is a CONTAINER of several concatenated maps (see DecodeMixdDetail); the usable single-channel body
@@ -297,9 +286,10 @@ namespace Faolan.Core.Rdb.Assets
 			return ms.ToArray();
 		}
 
-		// `Unknown1`/`Unknown2` keep their names deliberately: the census above says what they CORRELATE with and
-		// not what they mean, and a name like `SubMapCount` would be a claim the measurement does not support.
-		public readonly record struct FctxHeader(string FourCc, int Width, int Height, int MipCount, uint Unknown1, uint Unknown2);
+		// Version and MapsMask are the client's own semantics - see the header comment in Convert: the loader
+		// dispatches on Version (1 legacy / 2 current) and popcounts MapsMask's bits 0x1|0x2|0x4 for the number of
+		// map chains to read.
+		public readonly record struct FctxHeader(string FourCc, int Width, int Height, int MipCount, uint Version, uint MapsMask);
 
 		public readonly record struct Result(bool Ok, byte[] Dds, FctxHeader Header, string? Warning)
 		{

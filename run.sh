@@ -60,7 +60,8 @@ case "$command" in
 
     --claude)
         shift
-        claude --dangerously-load-development-channels server:faolan-chat \
+        #claude --dangerously-load-development-channels server:faolan-chat \
+	claude \
             "$@"
         ;;
 
