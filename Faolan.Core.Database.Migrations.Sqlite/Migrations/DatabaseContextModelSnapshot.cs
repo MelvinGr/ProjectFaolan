@@ -65,6 +65,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("GmInvisible")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("GmPrivileges")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTimeOffset?>("LastConnection")
                         .HasColumnType("TEXT");
 

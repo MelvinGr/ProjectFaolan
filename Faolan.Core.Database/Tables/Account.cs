@@ -35,6 +35,35 @@ namespace Faolan.Core.Database.Tables
 		public bool GmGodMode { get; set; }
 		public bool GmInvisible { get; set; }
 
+		// The client GM privilege MASK (stat 0xD7 / 215) this account gets, overriding the role its TYPE would map
+		// to. NULL - the default - means "use the role", which is what every account had before the admin UI could
+		// set bits individually; a value here is an explicit per-account mask.
+		//
+		// ⚠️ `GmPrivileges.GodMode` is NOT stored here even when the mask is explicit - it is taken from GmGodMode
+		// above, so the client's invulnerability and the server's `.godmode` can never disagree. That split is #902:
+		// with the bit set the client DISCARDS every server-driven health decrease (three gates in its stat setter,
+		// one per vital), so an account carrying it while the server did not think it was in god mode took damage,
+		// died, and watched a full health bar the whole time. `ClientGmLevel()` is the one place that assembles both.
+		public uint? GmPrivileges { get; set; }
+
+		/// <summary>
+		///     The GM privilege mask to put on the wire: the explicit <see cref="GmPrivileges" /> when set, otherwise
+		///     the role this account's <see cref="Type" /> maps to - and in both cases the
+		///     <see cref="Enums.GmPrivileges.GodMode" /> bit strictly follows <see cref="GmGodMode" />.
+		/// </summary>
+		public uint ClientGmLevel()
+		{
+			var mask = GmPrivileges ?? Type.ToClientGmLevel();
+
+			// A normal account must stay at zero: ANY non-zero value flips the retail client into GM mode.
+			if (Type < AccountType.GameMaster)
+				return 0;
+
+			return GmGodMode
+				? mask | (uint)Enums.GmPrivileges.GodMode
+				: mask & ~(uint)Enums.GmPrivileges.GodMode;
+		}
+
 		[MaxLength(128)]
 		public string Password { get; set; } = null!;
 

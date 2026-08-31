@@ -84,6 +84,97 @@
 				</div>
 			</div>
 
+			<div class="card gm">
+				<h2>
+					GM privileges
+					<span class="mask">@($"0x{_account.EffectiveGmLevel:X8}")</span>
+				</h2>
+
+				@if (_account.Type < AccountType.GameMaster)
+				{
+					<p class="muted">
+						A <strong>@_account.Type</strong> account carries no privileges at all - any non-zero value flips the
+						retail client into GM mode. Raise the account type to edit these.
+					</p>
+				}
+				else
+				{
+					<p class="muted">
+						<code>gm_level</code> (character stat <code>0x0D7</code>) is a <strong>bitmask, not a level</strong>: the
+						client offers a command when <code>(gm_level &amp; required) != 0</code>.
+						@if (_account.GmPrivileges == null)
+						{
+							<text>This account inherits the <strong>@RoleName</strong> role from its type.</text>
+						}
+						else
+						{
+							<text>This account has an <strong>explicit</strong> mask.</text>
+						}
+					</p>
+
+					<div class="presets">
+						<span class="k">Preset</span>
+						@foreach (var (name, mask) in Roles)
+						{
+							<button class="abtn preset" @onclick="() => ApplyPreset(mask)">@name</button>
+						}
+						<button class="abtn preset inherit" disabled="@(_account.GmPrivileges == null)"
+						        @onclick="ResetToRole">
+							Inherit from type
+						</button>
+					</div>
+
+					<ul class="flags">
+						@foreach (var bit in NamedBits)
+						{
+							<li>
+								<label class="@(bit == GmPrivileges.GodMode ? "godmode" : null)">
+									<input type="checkbox" checked="@Has(bit)" @onchange="e => ToggleBit(bit, e)"/>
+									<span class="n">@bit</span>
+									<span class="b">@($"0x{(uint)bit:X8}")</span>
+								</label>
+								@if (bit == GmPrivileges.GodMode)
+								{
+									<p class="warn">
+										Not a UI permission - <strong>client-side invulnerability</strong>. With it set the client
+										discards every server-driven health decrease (one gate per vital), so damage lands and the
+										character dies while the bar never moves (#902). Stored as the account's
+										<code>.godmode</code> toggle so the client and the simulation cannot disagree.
+									</p>
+								}
+							</li>
+						}
+					</ul>
+
+					<h3>Unnamed bits</h3>
+					<p class="muted">
+						Used by the shipped roles but never named by the client, and never tested anywhere in it - role
+						membership only.
+					</p>
+					<ul class="flags unnamed">
+						@foreach (var bit in UnnamedBits)
+						{
+							<li>
+								<label>
+									<input type="checkbox" checked="@HasRaw(bit)" @onchange="e => ToggleRaw(bit, e)"/>
+									<span class="b">@($"0x{bit:X8}")</span>
+								</label>
+							</li>
+						}
+					</ul>
+
+					<div class="row">
+						<span class="k">Invisible to monsters</span>
+						<span class="v">
+							<label class="toggle">
+								<input type="checkbox" checked="@_account.GmInvisible" @onchange="ToggleInvisible"/>
+								<span class="muted">server-side only, not a client privilege bit</span>
+							</label>
+						</span>
+					</div>
+				}
+			</div>
+
 			<div class="card">
 				<h2>Characters (@_account.Characters.Count)</h2>
 				@if (_account.Characters.Count == 0)

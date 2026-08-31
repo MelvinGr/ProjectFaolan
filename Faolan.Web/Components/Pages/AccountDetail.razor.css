@@ -179,3 +179,101 @@
 @media (max-width: 720px) {
 	.cards { grid-template-columns: 1fr; }
 }
+
+/* --- GM privileges ------------------------------------------------------ */
+
+.card.gm h2 {
+	display: flex;
+	align-items: baseline;
+	gap: .6rem;
+	justify-content: space-between;
+}
+
+.card.gm .mask {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: .8rem;
+	font-weight: 400;
+	opacity: .75;
+}
+
+.card.gm .presets {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .35rem;
+	margin: .6rem 0 .9rem;
+}
+
+.card.gm .presets .k {
+	margin-right: .2rem;
+	opacity: .7;
+}
+
+.abtn.preset {
+	padding: .15rem .5rem;
+	font-size: .78rem;
+}
+
+.abtn.preset.inherit {
+	margin-left: auto;
+}
+
+.card.gm ul.flags {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	gap: .1rem .8rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.card.gm ul.flags label {
+	display: flex;
+	align-items: center;
+	gap: .45rem;
+	padding: .18rem 0;
+	cursor: pointer;
+}
+
+.card.gm ul.flags .n {
+	flex: 1;
+}
+
+.card.gm ul.flags .b {
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: .72rem;
+	opacity: .55;
+}
+
+.card.gm ul.flags label.godmode .n {
+	font-weight: 600;
+}
+
+.card.gm .warn {
+	grid-column: 1 / -1;
+	margin: .1rem 0 .5rem 1.6rem;
+	font-size: .78rem;
+	line-height: 1.35;
+	opacity: .85;
+	border-left: 2px solid currentColor;
+	padding-left: .55rem;
+}
+
+.card.gm h3 {
+	margin: 1.1rem 0 .2rem;
+	font-size: .85rem;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	opacity: .7;
+}
+
+.card.gm ul.flags.unnamed {
+	grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+
+.card.gm .toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: .45rem;
+	cursor: pointer;
+}
