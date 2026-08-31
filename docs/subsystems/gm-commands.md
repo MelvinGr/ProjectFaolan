@@ -46,6 +46,33 @@ Seven bits are used by the shipped roles below but never named by the client —
 `0x00800000`, `0x08000000`, `0x20000000`, `0x40000000`, `0x80000000`. They are deliberately absent from the enum
 rather than guessed at.
 
+### ⛔ `GodMode` (`0x00000200`) is not a UI permission — it is client-side invulnerability
+
+Every other bit gates which commands `/help` offers. This one changes what the client does with the WIRE. Its
+`HealthCurrent` handler opens by testing it, and refuses any decrease while it is set:
+
+```
+FUN_010fd220 @010fde3a          the LOCAL PLAYER's stat setter (vtable 0x0203ec38 slot 3)
+    GetStat(0xD7)               215 = GM Level, the privilege mask
+    TEST EAX,0x200              GodMode
+    JZ   normal
+    CMP  EDI,[ESP+0x24]         new vs old
+    JL   return                 new < old  ->  DISCARD
+```
+
+So a character carrying it takes damage server-side and **dies**, while its health bar never moves — the bar
+keeps whatever the world-entry snapshot seeded. That was #902, and it cost three sessions of packet analysis
+because nothing on the wire is wrong: the packets are byte-identical to retail, the handle and the ×100 scale
+are right, and the client simply drops the value.
+
+⚠️ It is in BOTH roles an account type can map to — `all` (`0xFFFFFFFF`) and `support2` (`0x0951FFEE`) — so every
+GM had it. `AccountTypeExtensions.ToClientGmLevel` therefore masks it out and takes it from `Account.GmGodMode`,
+the server's own `.godmode` toggle, instead of from the account TYPE.
+
+⭐ Worth knowing generally: **`GetStat` returns `-1` for a stat the client does not hold**, and `-1` has every bit
+set — so *failing to send* stat 215 grants every privilege including this one. A missing GM level is not a
+neutral default.
+
 ## The roles the client ships
 
 Registered beside the bits, so `/gm support2` names one. Verbatim values — each set is Funcom's own policy, which is
