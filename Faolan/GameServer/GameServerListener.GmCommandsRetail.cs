@@ -820,6 +820,11 @@ namespace Faolan.GameServer
 		// /teleporttarget <posx> <posz> [y <posy>] [<playfield>]  - the same grammar as the rest of the family, on the
 		// TARGET instead of yourself. ⭐ It is the mode byte in the registry record that says so: /teleporttarget is
 		// mode 0 while /teleport, /teleportself and /tp are all mode 1.
+		//
+		// Retail's own description says the family teleports "self or another DYNEL", so the target may be an NPC.
+		// The two halves are different mechanisms (#917): a player teleport is a changemap handoff that re-runs world
+		// entry on a new connection; an NPC has neither character nor connection and is moved in the world model,
+		// with every viewer in the zone re-resolved around it.
 		private async Task TeleportTargetCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -827,15 +832,6 @@ namespace Faolan.GameServer
 			if (!TryResolveTarget(client, out var target, out var failure))
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, failure);
-				return;
-			}
-
-			if (!target.IsPlayer)
-			{
-				// Honest gap rather than a silent no-op: DoTeleport moves a CHARACTER (it re-runs world entry), and an
-				// NPC has no character to move. Relocating a live NPC entity is a different mechanism we have not built (#917).
-				await _agentServerDispatcher.SendSystemMessage(characterId,
-					ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - only player targets can be teleported (moving a live NPC entity is a separate mechanism we do not have yet - #917)."));
 				return;
 			}
 
@@ -864,7 +860,31 @@ namespace Faolan.GameServer
 					ChatMarkup.Color("orange", $"No terrain loaded for map {mapId} - keeping their current height ({y:0.#})."));
 			}
 
-			await _teleport.DoTeleport(target.Client.Session.Character.Id, mapId, new Vector3(x, y, z));
+			var destination = new Vector3(x, y, z);
+
+			// ⭐ Retail describes the whole family as teleporting "self or another DYNEL", and a dynel is any world
+			// entity - so an NPC target is in scope (#917). The two halves are genuinely different mechanisms, not one
+			// with a branch: a PLAYER teleport is a changemap handoff that re-runs world entry on a new connection,
+			// while an NPC has no character and no connection - it is moved in the world model and the viewers are
+			// re-resolved around it.
+			if (!target.IsPlayer)
+			{
+				if (mapId != target.MapId)
+				{
+					// Cross-map for a non-player would mean taking the handle out of one Zone and into another while
+					// every viewer of the old one still holds it. Refused by name rather than half-done.
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						ChatMarkup.Color("orange", $"'{target.Name}' is an NPC - it can only be moved within its own playfield (map {target.MapId}), not to map {mapId} (#917)."));
+					return;
+				}
+
+				var resolved = await _simulation.RelocateEntity(target, destination);
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"Moved '{target.Name}' to {x:0.#}, {y:0.#}, {z:0.#} on map {mapId} ({resolved} player view(s) re-resolved). Live only - it respawns at its placed spot.");
+				return;
+			}
+
+			await _teleport.DoTeleport(target.Client.Session.Character.Id, mapId, destination);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported '{target.Name}' to {x:0.#}, {y:0.#}, {z:0.#} on map {mapId}.");
 		}
 

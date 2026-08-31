@@ -20,6 +20,7 @@ namespace Faolan.Tests.Support
 		public List<(uint NpcHandle, uint CasterHandle, int Delta, uint SpellId)> DotTicks { get; } = [];
 		public List<(uint SourceHandle, uint EffectSpellId, float Radius, uint MaxTargets)> Areas { get; } = [];
 		public List<uint> InterestResolves { get; } = [];
+		public List<(uint Handle, Vector3 Position)> Snaps { get; } = [];
 		public List<(uint Handle, CorpseStage Stage)> CorpseEvents { get; } = [];
 
 		// What ApplySpellArea answers with, and what a spell's aura areas / #784 chain edges are - set by the test that
@@ -93,6 +94,12 @@ namespace Faolan.Tests.Support
 
 		public Task BroadcastNpcMove(WorldEntity npc)
 		{
+			return Task.CompletedTask;
+		}
+
+		public Task BroadcastEntitySnap(WorldEntity entity)
+		{
+			Snaps.Add((entity.Handle, entity.Position));
 			return Task.CompletedTask;
 		}
 

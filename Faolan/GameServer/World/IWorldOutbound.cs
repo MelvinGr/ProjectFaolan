@@ -68,6 +68,9 @@ namespace Faolan.GameServer.World
 		// and the plain despawn used wherever an entity should simply stop existing for a viewer.
 		Task BroadcastEntityDespawn(WorldEntity entity);
 
+		// #917: an entity was RELOCATED rather than walked - the mode-02 snap, for the viewers who keep it in sight.
+		Task BroadcastEntitySnap(WorldEntity entity);
+
 		// #778: re-run one player's interest pass with nothing having changed on their side, so entities that moved
 		// THEMSELVES are streamed in and out for a player standing still. See WorldBroadcaster.ResolveInterest.
 		Task ResolveInterest(INetworkClient client);

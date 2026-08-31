@@ -323,6 +323,60 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("World: {Player} same-map relocated to {Dest} on map {Map} (token 0x{Token:X}).", character.Name, destination, character.MapId, liveToken);
 		}
 
+		// ⭐ Relocate a live NON-PLAYER entity within its own zone (#917). The player twin is `RelocateSameMap` above;
+		// this is the one for anything the world model holds that is not a character - an NPC, a corpse, a loot bag.
+		//
+		// **The ticket's open question, answered: a large jump is not "a move OR a despawn/respawn pair", it is BOTH,
+		// and which one a client gets is a property of the VIEWER, not of the jump.** Three populations:
+		//
+		//   - a viewer who keeps the entity in sight gets the mode-02 snap (`BroadcastEntitySnap`);
+		//   - a viewer who loses it gets a despawn;
+		//   - a player standing near the DESTINATION, who has never seen it, gets a spawn.
+		//
+		// The last two are exactly what an interest pass produces, so this does not re-implement them: it re-runs
+		// `ResolveInterest` for every player in the zone. That is the #778 sweep, whose whole subject is "an entity
+		// moved ITSELF and the player did not" - a teleport is that, at maximum step size. Sweeping the zone rather
+		// than the two radii is deliberate: the union of "was in range of the origin" and "is in range of the
+		// destination" is what has to be re-resolved, and the pass is a cheap set-difference against `Known` that
+		// sends nothing to a player whose view did not change.
+		//
+		// `MoveFrom` is reset with `Position` on purpose. It is the FROM point of the segment the tick's broadcaster
+		// sends, so leaving it at the old spot would make the next ordinary step render as a walk all the way back
+		// across the map.
+		//
+		// ⚠️ This is LIVE ONLY - it does not touch `NpcSpawn`, which is the placement the entity respawns at. Move a
+		// creature and kill it, and it comes back where it was placed. That is the right default for repositioning a
+		// stuck mob or staging a scene, and it means this is not a world-editing primitive.
+		//
+		// ⚠️ Same zone only. Crossing to another map means leaving one `Zone` and entering another, with a handle that
+		// every viewer of the old zone still holds; nothing here does that.
+		//
+		// Returns the number of players whose interest was re-resolved.
+		public async Task<int> RelocateEntity(WorldEntity entity, Vector3 destination)
+		{
+			ArgumentNullException.ThrowIfNull(entity);
+
+			var zone = World.ZoneForEntity(entity);
+			entity.Position = destination;
+			entity.MoveFrom = destination;
+
+			await _output.BroadcastEntitySnap(entity);
+
+			var resolved = 0;
+			foreach (var player in zone.Entities)
+			{
+				if (!player.IsPlayer || player.Client == null)
+					continue;
+
+				await _output.ResolveInterest(player.Client);
+				resolved++;
+			}
+
+			_logger.LogInformation("World: {Entity} (handle {Handle}) relocated to {Dest} on map {Map}; {Resolved} player interest pass(es).", entity.Name, entity.Handle, destination,
+				entity.MapId, resolved);
+			return resolved;
+		}
+
 		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
 		// leaver is still in the zone so its viewers resolve), then calls this. Returns false if the player wasn't in
 		// the world.

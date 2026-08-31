@@ -304,6 +304,27 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// ⭐ An entity JUMPED - it is at a new position and did not walk there (#917). The mode-02 RotateMoveTask is
+		// retail's own form for that: `MoveTaskNodes.Rotate` with from != to is "a step the client SNAPS to", which is
+		// exactly why `BroadcastNpcMove` deliberately does NOT use it for the per-tick chase (a snap reads wrong for
+		// walking). Here the snap is the point.
+		//
+		// ⚠️ This only reaches viewers who ALREADY hold the handle and are still in range of the DESTINATION. A jump
+		// large enough to leave someone's interest radius is not a move for them at all - it is a despawn, and for a
+		// player near the destination it is a spawn. `WorldSimulation.RelocateEntity` runs the interest pass that
+		// settles both; this call is only the third case, the viewer who watches it go.
+		public async Task BroadcastEntitySnap(WorldEntity entity)
+		{
+			ArgumentNullException.ThrowIfNull(entity);
+			var body = MoveTaskCodec.Build(new MoveTaskIIR(entity.Handle, entity.Position, MoveTaskNodes.Rotate(entity.Position, entity.Rotation)));
+
+			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(entity.Handle))
+					await WorldIir.Send(viewer.Client, body);
+			}
+		}
+
 		// #266: (re-)issue a patrolling NPC's captured route to every in-range viewer that already sees it, so it keeps
 		// walking its loop (the tick fires this on each patrol cycle; retail re-paths idle patrols). Only known handles.
 		public async Task BroadcastNpcPatrol(WorldEntity npc)

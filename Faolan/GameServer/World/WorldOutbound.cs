@@ -118,6 +118,11 @@ namespace Faolan.GameServer.World
 			return _npcs.BroadcastNpcMove(npc);
 		}
 
+		public Task BroadcastEntitySnap(WorldEntity entity)
+		{
+			return _npcs.BroadcastEntitySnap(entity);
+		}
+
 		public Task BroadcastNpcPatrol(WorldEntity npc)
 		{
 			return _npcs.BroadcastNpcPatrol(npc);

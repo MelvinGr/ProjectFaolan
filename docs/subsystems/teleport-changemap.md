@@ -34,6 +34,48 @@ carries NO redirect** — only a genuine change does, so the redirect is the tra
 before the move. The capture tooling learns the port another way (a SYN-ACK sweep, commit `8aec82e5`), so
 nothing is broken; but the advert is there and is decodable.
 
+## ⭐ Moving a NON-PLAYER: a different mechanism, and a jump is not one packet (#917)
+
+Retail describes its teleport family as moving *"self or another **dynel**"*, a dynel being any world entity —
+NPCs included. Ours has two mechanisms rather than one with a branch, because the two subjects have nothing in
+common:
+
+| subject | mechanism | code |
+|---|---|---|
+| a player, cross-map | changemap handoff — persist, announce, redirect, re-run world entry on a NEW connection | `TeleportService.DoTeleport` |
+| a player, same map | relocate in place, no loading screen | `WorldSimulation.RelocateSameMap` |
+| **anything else** (NPC, corpse, loot bag) | move the world model, re-resolve the viewers | `WorldSimulation.RelocateEntity` |
+
+An NPC has neither character nor connection, so nothing of the handoff applies.
+
+**A large jump is not "a move OR a despawn/respawn pair" — it is both, and which one a client gets is a property
+of the VIEWER, not of the jump.** Three populations, and each needs a different message:
+
+- a viewer who keeps the entity in sight → the **mode-02 `RotateMoveTask` snap** (`MoveTaskNodes.Rotate` with
+  `from != to`, which is retail's own "a step the client SNAPS to" — and exactly why `BroadcastNpcMove`
+  deliberately does *not* use it for the per-tick chase, where a snap reads wrong);
+- a viewer who loses it → a **despawn**;
+- a player near the DESTINATION who never saw it → a **spawn**.
+
+The last two are what an interest pass already produces, so `RelocateEntity` snaps and then re-runs
+`ResolveInterest` for every player in the zone. That is the #778 sweep, whose whole subject is "an entity moved
+ITSELF and the player did not" — a teleport is that, at maximum step size. Sweeping the **zone** rather than the
+two interest radii is deliberate: the union of *was in range of the origin* and *is in range of the destination*
+is what has to be re-resolved, and the pass is a cheap set-difference against each viewer's `Known` set that
+sends nothing to a player whose view did not change.
+
+Two limits, both refused by name rather than half-done:
+
+- ⚠️ **Live only.** It does not touch `NpcSpawn`, the placement the entity respawns at — move a creature and kill
+  it and it returns to where it was placed. Right for repositioning a stuck mob or staging a scene, and it means
+  this is not a world-editing primitive.
+- ⚠️ **Same zone only.** Crossing to another map means taking a handle out of one `Zone` and into another while
+  every viewer of the old one still holds it. `/teleporttarget` says so when a playfield is named for an NPC
+  target.
+
+`MoveFrom` travels with `Position`: it is the FROM point of the segment the tick's broadcaster sends, so leaving
+it at the old spot would render the entity's next ordinary step as a walk all the way back across the map.
+
 ## IntendedTeleportIIR_c (0x10D27BC0) — "begin teleport to map N"
 
 Reader `FUN_005bfce0` = the PlayfieldProxy + a trailing bool.
