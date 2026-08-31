@@ -224,6 +224,10 @@ slows the deltatimer system on server and client". The time-of-day setter is `/s
 `.time` actually was, so it was renamed; `reset` moved to `/gametime`, where retail puts it. We do not implement
 retail's `/time`. Check the recovered long description before assuming two same-named verbs agree.
 
+⚠️ **`.invisible` is now `/mobs on | off [id | name]`** — the same `InvisibleToMonsters` flag with the same
+account persistence, but explicit rather than a toggle and aimable at another character. (Retail's note that it
+"only works on debugservers" describes *their* deployment, not a limit here.)
+
 ⚠️ **`.setstat` is now `/setlocal`.** It pushed a raw stat to the CLIENT without changing server state, which is
 exactly what retail's `/setlocal` does — retail's `/set` is the one that changes the stat on the target. Older
 notes in `docs/re/` that say a value was "measured with `.setstat`" are accurate history and are left alone; the

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -11,6 +12,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.World;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
@@ -27,6 +29,18 @@ namespace Faolan.GameServer
 	// manipulates FRAME times; the time-of-day setter is `/settime`).
 	public partial class GameServerListener
 	{
+		// Where a character stood before /summon moved them, so /unsummon can put them back.
+		//
+		// ⚠️ This is REQUIRED, not a convenience: DoTeleport persists the destination (SaveCharacterTransform), so by
+		// the time /unsummon runs, the character's "last saved location" IS the summoned position - and dismissing
+		// them would return them to exactly where they already stand. Retail's wording ("dismisses a character to the
+		// last saved location") works there because their summon presumably does not save; ours does, so the return
+		// point has to be captured at summon time or it is gone.
+		//
+		// Not persisted, so it does not survive a server restart - the fallback below (the stored position) then
+		// applies, which is the same answer a character we never summoned gets.
+		private readonly ConcurrentDictionary<uint, (uint MapId, Vector3 Position)> _summonReturns = new();
+
 		// The spell id a GM /resurrect offer is filed under. Self-resurrection offers are keyed by (character, spell)
 		// so that declining one potion's offer cannot drop another's; a GM offer needs an id of its own for the same
 		// reason, and 0 is the one value no real resurrection spell uses.
@@ -384,9 +398,14 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await _teleport.DoTeleport(subject.Client.Session.Character.Id, me.MapId, me.Position);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Summoned '{subject.Name}' to your position on map {me.MapId}.");
-			await _agentServerDispatcher.SendSystemMessage(subject.Client.Session.Character.Id, $"You have been summoned by '{me.Name}'.");
+			// Captured BEFORE the teleport, which overwrites the persisted position.
+			var subjectId = subject.Client.Session.Character.Id;
+			_summonReturns[subjectId] = (subject.MapId, subject.Position);
+
+			await _teleport.DoTeleport(subjectId, me.MapId, me.Position);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Summoned '{subject.Name}' to your position on map {me.MapId}. (.unsummon {subject.Name} returns them to map {subject.MapId}.)");
+			await _agentServerDispatcher.SendSystemMessage(subjectId, $"You have been summoned by '{me.Name}'.");
 		}
 
 		// /unsummon <name>  - "Dismisses a character to the last saved location". ⭐ Note what retail means by that:
@@ -409,7 +428,19 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var stored = await Database.GetCharacter(subject.Client.Session.Character.Id);
+			var subjectId = subject.Client.Session.Character.Id;
+
+			// The summon's own return point wins. Only when there is none - they were never summoned by us, or the
+			// server restarted since - does the persisted position apply, which is what retail's wording describes.
+			if (_summonReturns.TryRemove(subjectId, out var mark))
+			{
+				await _teleport.DoTeleport(subjectId, mark.MapId, mark.Position);
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"Dismissed '{subject.Name}' to where they were summoned from (map {mark.MapId} at {mark.Position.X:0.#}, {mark.Position.Y:0.#}, {mark.Position.Z:0.#}).");
+				return;
+			}
+
+			var stored = await Database.GetCharacter(subjectId);
 			if (stored == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"'{subject.Name}' has no saved location to return to."));
@@ -418,7 +449,8 @@ namespace Faolan.GameServer
 
 			await _teleport.DoTeleport(stored.Id, stored.MapId, new Vector3(stored.PositionX, stored.PositionY, stored.PositionZ));
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Dismissed '{subject.Name}' to their last saved location (map {stored.MapId} at {stored.PositionX:0.#}, {stored.PositionY:0.#}, {stored.PositionZ:0.#}).");
+				$"Dismissed '{subject.Name}' to their last saved location (map {stored.MapId} at {stored.PositionX:0.#}, {stored.PositionY:0.#}, {stored.PositionZ:0.#})."
+				+ " No summon of ours to undo, so this is the persisted position.");
 		}
 
 		// /assist <id | name>  - "Assists a player by teleporting to his/her position." The mirror of /summon: it
@@ -829,6 +861,118 @@ namespace Faolan.GameServer
 
 			await _teleport.DoTeleport(target.Client.Session.Character.Id, mapId, new Vector3(x, y, z));
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported '{target.Name}' to {x:0.#}, {y:0.#}, {z:0.#} on map {mapId}.");
+		}
+
+		// The most repeats a `[duration pause]` broadcast will ever schedule. Retail states no bound; this one exists
+		// so a fat-fingered `.broadcast 100000 1 hi` cannot pin a background loop to the process for a day.
+		private const int MaxBroadcastRepeats = 60;
+
+		// /broadcast, /servcast and /sitecast: `[duration pause] message`
+		//
+		// ⚠️ All three are ONE class at mode 0, so - unlike /set vs /setlocal - the recovered record does NOT tell
+		// them apart; the class reads the verb text itself. Their SCOPE is therefore not recovered, and the one
+		// signal we do have is the mask: /broadcast and /servcast share Broadcast (0x400) while /sitecast sits alone
+		// on Sitecast (0x800). So the first two reach this realm and /sitecast is the wider form - which, with one
+		// realm per process, is the same audience here. The reply states the scope it actually reached rather than
+		// implying a fanout we do not have.
+		private async Task BroadcastCommand(INetworkClient client, string arguments, string verb)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Usage: .{verb} [<duration> <pause>] <message>   (duration and pause in seconds)");
+				return;
+			}
+
+			// `[duration pause]` is optional and positional, so it is present only when the line STARTS with two
+			// integers. A message beginning with a number is therefore ambiguous in retail's own grammar too; two
+			// leading integers win, which is what the declaration order says.
+			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			var duration = 0;
+			var pause = 0;
+			var message = arg;
+			if (tokens.Length >= 3 && int.TryParse(tokens[0], out duration) && int.TryParse(tokens[1], out pause) && duration > 0 && pause > 0)
+				message = string.Join(' ', tokens.Skip(2));
+			else
+				duration = pause = 0;
+
+			var repeats = pause > 0 ? Math.Min(MaxBroadcastRepeats, duration / pause) : 0;
+			var announcement = ChatMarkup.Color("yellow", message);
+
+			var reached = await FanOutBroadcast(announcement);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$".{verb} -> {reached} player(s) on this realm{(repeats > 0 ? $", repeating every {pause}s for {duration}s ({repeats} more)" : "")}.");
+
+			if (repeats <= 0)
+				return;
+
+			// Fire-and-forget on purpose: the GM gets their prompt back immediately and the repeats run behind it.
+			// Failures are logged rather than thrown into nothing, and the loop is bounded above.
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					for (var i = 0; i < repeats; i++)
+					{
+						await Task.Delay(TimeSpan.FromSeconds(pause));
+						await FanOutBroadcast(announcement);
+					}
+				}
+				catch (Exception e)
+				{
+					Logger.LogWarning(e, "GM .{Verb} repeat loop stopped early.", verb);
+				}
+			});
+		}
+
+		private async Task<int> FanOutBroadcast(ChatMarkup announcement)
+		{
+			var recipients = _simulation.Players.Values.Where(p => p.IsPlayer).ToArray();
+			foreach (var player in recipients)
+				await _agentServerDispatcher.SendSystemMessage(player.Client.Session.Character.Id, announcement);
+
+			return recipients.Length;
+		}
+
+		// /mobs off | on [id | name]  - "Enables/disables InvisibleToMonsters".
+		//
+		// ⚠️ This REPLACES our `.invisible` (#914 rule 1): same flag, same persistence, and retail's form is strictly
+		// richer - it is explicit on/off rather than a toggle, and it can be aimed at another character.
+		// ⚠️ Retail's own note "only works on debugservers" is about THEIR deployment, not a limit here.
+		private async Task MobsCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length == 0 || !(tokens[0].Equals("on", StringComparison.OrdinalIgnoreCase) || tokens[0].Equals("off", StringComparison.OrdinalIgnoreCase)))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .mobs on | off [<id> | <name>]   (no id/name = yourself)");
+				return;
+			}
+
+			var wanted = tokens[0].Equals("on", StringComparison.OrdinalIgnoreCase);
+			var subject = tokens.Length > 1 ? FindOnlinePlayer(string.Join(' ', tokens.Skip(1))) : _simulation.PlayerWorldEntity(client);
+			if (subject == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", tokens.Length > 1
+					? $"No ONLINE character matching '{string.Join(' ', tokens.Skip(1))}'."
+					: "You're not in the world yet."));
+				return;
+			}
+
+			subject.Invisible = wanted;
+
+			// Persisted on the ACCOUNT, as the toggle it replaces was, so it survives relog and map changes (#279).
+			var account = subject.Client.Session.Account;
+			if (account != null)
+			{
+				account.SetGmPrivilege(GmPrivileges.InvisibleToMonsters, wanted);
+				await Database.SaveAccount(account);
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw(wanted
+				? $"'{subject.Name}' is now {ChatMarkup.Color("lime", "INVISIBLE")} to monsters - NPCs won't aggro."
+				: $"'{subject.Name}' is {ChatMarkup.Color("red", "VISIBLE")} to monsters again."));
 		}
 	}
 }

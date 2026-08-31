@@ -31,7 +31,9 @@ namespace Faolan.Tests
 			// #914 Wave B2
 			"inflict", "areaknockback", "resurrect",
 			// #914 Wave B3 - the stat family (`setstat` retired into `setlocal`)
-			"get", "set", "setlocal", "getskill", "teleporttarget"
+			"get", "set", "setlocal", "getskill", "teleporttarget",
+			// #914 Wave B4 - broadcast family and monster visibility (`invisible` retired into `mobs`)
+			"broadcast", "servcast", "sitecast", "mobs"
 		];
 
 		private static Dictionary<string, uint> RegistryMasks()

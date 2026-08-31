@@ -326,7 +326,6 @@ namespace Faolan.GameServer
 				["level"] = SetLevelCommand,
 				["feat"] = _feats.FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
-				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
 				["delete"] = DeleteCommand,
 				["kill"] = KillCommand,
 				["hurt"] = HurtCommand,
@@ -376,6 +375,13 @@ namespace Faolan.GameServer
 				["setlocal"] = (client, arguments) => SetStatValueCommand(client, arguments, localOnly: true),
 				["getskill"] = GetSkillCommand,
 				["teleporttarget"] = TeleportTargetCommand,
+				// Wave B4 - the broadcast family and the monster-visibility flag. ⚠️ `invisible` is GONE (#914 rule 1):
+				// `/mobs` is the same InvisibleToMonsters flag with the same account persistence, and retail's form is
+				// strictly richer - explicit on/off instead of a toggle, and it can be aimed at another character.
+				["broadcast"] = (client, arguments) => BroadcastCommand(client, arguments, "broadcast"),
+				["servcast"] = (client, arguments) => BroadcastCommand(client, arguments, "servcast"),
+				["sitecast"] = (client, arguments) => BroadcastCommand(client, arguments, "sitecast"),
+				["mobs"] = MobsCommand,
 				["tradeskill"] = TradeskillCommand,
 				["waypoint"] = WayPointCommand,
 				["resist"] = ResistCommand,
@@ -434,6 +440,12 @@ namespace Faolan.GameServer
 			["set"] = GmPrivileges.SetStats,
 			["setlocal"] = GmPrivileges.SetStats,
 			["teleporttarget"] = GmPrivileges.TeleportDynels,
+			// Wave B4: /broadcast /servcast = Broadcast 0x400, /sitecast = Sitecast 0x800 (its own bit - the wider
+			// reach), /mobs = Developer 0x1.
+			["broadcast"] = GmPrivileges.Broadcast,
+			["servcast"] = GmPrivileges.Broadcast,
+			["sitecast"] = GmPrivileges.Sitecast,
+			["mobs"] = GmPrivileges.Developer,
 			["tradeskill"] = GmPrivileges.Developer,
 			["teleport"] = GmPrivileges.TeleportSelf,
 			["teleportself"] = GmPrivileges.TeleportSelf,
@@ -453,7 +465,6 @@ namespace Faolan.GameServer
 			["criminal"] = GmPrivileges.SetStats,
 			["heroicmode"] = GmPrivileges.Developer,
 			["godmode"] = GmPrivileges.SetStats,
-			["invisible"] = GmPrivileges.SetStats,
 			["delete"] = GmPrivileges.NpcCommands,
 			["hurt"] = GmPrivileges.PlayerDamage,
 			["additem"] = GmPrivileges.AcgSpawn,
@@ -1321,26 +1332,6 @@ namespace Faolan.GameServer
 				: ChatMarkup.Raw($"God mode {ChatMarkup.Color("red", "OFF")}."));
 		}
 
-		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the
-		// sim's NearestPlayerInRange). Persisted on the account (#279) and re-applied on each world entry, so it
-		// survives relog and map changes. Self-target only.
-		private async Task ToggleInvisibleCommand(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			var entity = _simulation.PlayerWorldEntity(client);
-			if (entity == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
-				return;
-			}
-
-			entity.Invisible = !entity.Invisible;
-			client.Session.Account.SetGmPrivilege(GmPrivileges.InvisibleToMonsters, entity.Invisible);
-			await Database.SaveAccount(client.Session.Account);
-			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
-				? ChatMarkup.Raw($"Invisible {ChatMarkup.Color("lime", "ON")} - NPCs won't aggro you.")
-				: ChatMarkup.Raw($"Invisible {ChatMarkup.Color("red", "OFF")}."));
-		}
 
 		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that
 		// resolves to an RDB spawn AREA shows that area's "group | tier xN" over its head (pushed via SetNameIIR, since
