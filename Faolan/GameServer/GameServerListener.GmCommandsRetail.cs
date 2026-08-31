@@ -1145,9 +1145,9 @@ namespace Faolan.GameServer
 		// /magic list | learn <spellid> | forget <spellid> | forgetall | ...  - "Spellbook/magic handling".
 		//
 		// ⚠️ Retail's full grammar also carries `npccast` and three token-state-counter verbs; those name machinery we
-		// do not have, and they say so rather than failing silently. `forget` and `forgetall` are the interesting
-		// absence: the repository can ADD a known spell but has no path to remove one, so un-learning is a genuine
-		// gap and is reported as one instead of pretending the spellbook shrank (#915).
+		// do not have, and they say so rather than failing silently. `forget`/`forgetall` ARE backed since #915: the
+		// repository can now shrink the spellbook, and the client is told with `DispatchForgetSpell` (0x200B), whose
+		// body the client's own dispatch reader settles (see SpellBookChangeCodec).
 		private async Task MagicCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -1184,14 +1184,40 @@ namespace Faolan.GameServer
 				}
 
 				case "forget":
-				case "forgetall":
-					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
-						$".magic {verb} is not backed: the repository can add a known spell but has no path to remove one, so the spellbook cannot shrink yet (#915)."));
+				{
+					if (tokens.Length < 2 || !uint.TryParse(tokens[1], out var spellId))
+					{
+						await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .magic forget <spellid>");
+						return;
+					}
+
+					var removed = await Database.RemoveCharacterSpell(characterId, spellId);
+					if (removed)
+						await SendForgetSpell(client, spellId);
+
+					await _agentServerDispatcher.SendSystemMessage(characterId, removed
+						? $"Forgot spell {spellId}."
+						: $"Spell {spellId} was not known.");
 					return;
+				}
+
+				case "forgetall":
+				{
+					// Read the set BEFORE the delete: the client is told per spell, so the ids have to survive the wipe.
+					var known = await Database.GetCharacterSpells(characterId);
+					var removed = await Database.ClearCharacterSpells(characterId);
+					foreach (var spell in known)
+						await SendForgetSpell(client, spell.SpellId);
+
+					await _agentServerDispatcher.SendSystemMessage(characterId, removed == 0
+						? "No known spells to forget."
+						: $"Forgot {removed} spell(s).");
+					return;
+				}
 
 				default:
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"Usage: .magic list | learn <spellid>   (retail also has forget/forgetall/npccast and the token-state-counter verbs; none are backed here)");
+						$"Usage: .magic list | learn <spellid> | forget <spellid> | forgetall   (retail also has npccast and the token-state-counter verbs; those are not backed here)");
 					return;
 			}
 		}

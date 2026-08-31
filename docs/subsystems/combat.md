@@ -973,9 +973,17 @@ byte-exact:
   granted has a name and nothing else. `Ability.IsGrantable` is the test; `CharacterLoadout.ResolveAbilities` logs and skips a
   key-less row rather than putting a null key on the wire. Recovering the rest needs a capture that grants them —
   the same key blocker as the item catalog (Gitea #415). Pinned by `AbilityCatalogTests`.
-- **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
-  invariant across all 68 captured packets. `SendLearnSpell`/`LearnSpellCodec` (decode
-  `CaptureSpellImporterTests`, golden `LearnSpellTests`).
+- **`0x200A DispatchLearnSpell` / `0x200B DispatchForgetSpell`** — one spell entering or leaving the spellbook.
+  Body = a bare big-endian `u32` spell id (`i_nSpellID`), invariant across all 68 captured grants.
+  `SendLearnSpell`/`SendForgetSpell`, one `SpellBookChangeCodec` for both (decode `CaptureSpellImporterTests`,
+  golden `SpellBookChangeTests`).
+
+  ⭐ **The FORGET half is client-recovered, not capture-derived (#915).** No capture carries one — retail only
+  sends a forget when something un-teaches a spell, which no captured session does — but the body needs no
+  capture: the client's two dispatch readers are the same function twice, `FUN_004bf2b0` (learn) and
+  `FUN_004bf3a0` (forget), each making a single call to `FUN_0048f900` (a 4-byte stream read byte-swapped to host
+  order = one big-endian `u32`) before handing the value to adjacent vtable slots `+0x2c` / `+0x30`. Both
+  "stream bad after `'i_nSpellID'`" diagnostics name the same single field. [V1: docs/re/aoc-client-rpc-methods.json]
 
 (The GM test commands `.grantability`/`.abilitylist`/`.learnspell` were removed in the "remove 25 GM test commands"
 cleanup — 2026-07-05; the underlying wire builders above are still live.)

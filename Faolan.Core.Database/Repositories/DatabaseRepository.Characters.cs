@@ -16,6 +16,15 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds);
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
+
+		/// <summary>
+		///     Un-learns one spell. False when the character did not know it. The caller is responsible for the
+		///     client half (<c>DispatchForgetSpell</c>) - this only touches the row.
+		/// </summary>
+		Task<bool> RemoveCharacterSpell(uint characterId, uint spellId);
+
+		/// <summary>Un-learns every spell the character knows; returns how many rows went.</summary>
+		Task<int> ClearCharacterSpells(uint characterId);
 		Task<bool> AddFriend(uint characterId, uint friendCharacterId);
 		Task<Character[]> GetFriends(uint characterId);
 		Task<uint[]> GetFriendWatchers(uint characterId);
@@ -407,6 +416,21 @@ namespace Faolan.Core.Database.Repositories
 			});
 			await ctx.SaveChangesAsync();
 			return true;
+		}
+
+		// #915: the spellbook could only ever GROW - `AddCharacterSpell` had no counterpart, so a learned spell was
+		// permanent for the life of the character row. Retail has both halves (`GameCharAgent.MagicForgetSpell` c2s,
+		// `GameCharInterface.DispatchForgetSpell` s2c), so a shrink is a real operation, not an invention.
+		public async Task<bool> RemoveCharacterSpell(uint characterId, uint spellId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId && s.SpellId == spellId).ExecuteDeleteAsync() > 0;
+		}
+
+		public async Task<int> ClearCharacterSpells(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId).ExecuteDeleteAsync();
 		}
 
 		// #748: returns FALSE when the character already held the tag. It used to return nothing, which was fine while

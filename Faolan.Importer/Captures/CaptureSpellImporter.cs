@@ -48,7 +48,7 @@ namespace Faolan.Importer.Captures
 		// body = [u32 spellId] (#73). A method is a per-interface INDEX, so the class pair is what disambiguates it
 		// from the methods that share index 0x0A on other conversations (CharacterSearch etc.); the
 		// receiver-instance == character-id is the s2c-direction filter.
-		private const uint LearnSpell = LearnSpellCodec.Method;
+		private const uint LearnSpell = (uint)GameCharInterfaceMethods.DispatchLearnSpell;
 
 		public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
