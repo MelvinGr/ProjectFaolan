@@ -54,7 +54,7 @@
 					<td>
 						<select value="@a.Type" disabled="@isSelf"
 						        @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
-							@foreach (var t in Enum.GetValues<AccountType>())
+							@foreach (var t in Enum.GetValues<WebAccountType>())
 							{
 								<option value="@t" selected="@(t == a.Type)">@t</option>
 							}

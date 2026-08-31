@@ -66,8 +66,9 @@ because nothing on the wire is wrong: the packets are byte-identical to retail, 
 are right, and the client simply drops the value.
 
 ⚠️ It is in BOTH roles an account type can map to — `all` (`0xFFFFFFFF`) and `support2` (`0x0951FFEE`) — so every
-GM had it. `AccountTypeExtensions.ToClientGmLevel` therefore masks it out and takes it from `Account.GmGodMode`,
-the server's own `.godmode` toggle, instead of from the account TYPE.
+GM had it, because the mask used to be DERIVED from the account type. It is now stored: `Account.GmLevel` is the
+whole GM state - the mask, or NULL for an account that is not a GM - so `GodMode` is simply the bit it always was
+and the client's invulnerability cannot disagree with the server's `.godmode`. There is no second copy to drift.
 
 ⭐ Worth knowing generally: **`GetStat` returns `-1` for a stat the client does not hold**, and `-1` has every bit
 set — so *failing to send* stat 215 grants every privilege including this one. A missing GM level is not a
@@ -108,7 +109,8 @@ why they are recorded as roles rather than rebuilt from flags. `GmRoles` in the 
 | `support2` | `0x0951FFEE` | registered as `support1 \| 0x00100C48` |
 | `operations` | `0x09410C20` | |
 
-`AccountTypeExtensions.ToClientGmLevel` maps Administrator → `all` and GameMaster → `support2` — the widest of the
+`Account.GmLevel` stores one of these verbatim, or any custom mask (the admin UI edits it a bit at a time). The
+roles below are offered as presets — `support2` is the widest of the
 shipped non-developer roles, carrying the moderation set without the `Developer` bit that gates the ~85 debug
 commands.
 

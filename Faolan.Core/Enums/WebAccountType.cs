@@ -1,6 +1,6 @@
 namespace Faolan.Core.Enums
 {
-	public enum AccountType : byte
+	public enum WebAccountType : byte
 	{
 		Trial = 0,
 		Normal = 1,

@@ -59,13 +59,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset>("CreationDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("GmGodMode")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("GmInvisible")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("GmPrivileges")
+                    b.Property<uint?>("GmLevel")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("LastConnection")

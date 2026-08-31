@@ -21,7 +21,7 @@ namespace Faolan.Web.Components.Pages
 		{
 			if (id == SelfId)
 				return; // don't change your own privileges
-			if (!Enum.TryParse<AccountType>(value, out var type))
+			if (!Enum.TryParse<WebAccountType>(value, out var type))
 				return;
 
 			var set = await AdminSvc.SetTypeAsync(id, type);

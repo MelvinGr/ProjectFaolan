@@ -29,7 +29,7 @@ namespace Faolan.Core.Database
 			{
 				UserName = "faolan",
 				Password = PasswordHashing.Hash(PasswordHashing.DefaultSeedPassword),
-				Type = AccountType.Administrator,
+				Type = WebAccountType.Administrator,
 				State = AccountState.Active,
 				LastIpAddress = ""
 			});

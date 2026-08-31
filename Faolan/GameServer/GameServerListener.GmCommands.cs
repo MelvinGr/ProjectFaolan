@@ -1187,7 +1187,7 @@ namespace Faolan.GameServer
 			}
 
 			entity.GodMode = !entity.GodMode;
-			client.Session.Account.GmGodMode = entity.GodMode;
+			client.Session.Account.SetGmPrivilege(GmPrivileges.GodMode, entity.GodMode);
 			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
 				? ChatMarkup.Raw($"God mode {ChatMarkup.Color("lime", "ON")} - you take no damage.")
@@ -1208,7 +1208,7 @@ namespace Faolan.GameServer
 			}
 
 			entity.Invisible = !entity.Invisible;
-			client.Session.Account.GmInvisible = entity.Invisible;
+			client.Session.Account.SetGmPrivilege(GmPrivileges.InvisibleToMonsters, entity.Invisible);
 			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
 				? ChatMarkup.Raw($"Invisible {ChatMarkup.Color("lime", "ON")} - NPCs won't aggro you.")

@@ -26,7 +26,7 @@ namespace Faolan.Web.Components.Pages
 		{
 			if (_isSelf)
 				return;
-			if (!Enum.TryParse<AccountType>(e.Value?.ToString(), out var type))
+			if (!Enum.TryParse<WebAccountType>(e.Value?.ToString(), out var type))
 				return;
 
 			var set = await AdminSvc.SetTypeAsync((uint)Id, type);
@@ -52,46 +52,25 @@ namespace Faolan.Web.Components.Pages
 		[
 			("all", GmRoles.All), ("support2", GmRoles.Support2), ("support1", GmRoles.Support1),
 			("operations", GmRoles.Operations), ("dev", GmRoles.Dev), ("internal", GmRoles.Internal),
-			("volunteers1", GmRoles.Volunteers1), ("none", 0)
+			("volunteers1", GmRoles.Volunteers1)
 		];
 
-		// What the account is being edited AGAINST: its explicit mask, or the role its type maps to when it has none.
-		private uint CurrentMask => _account?.GmPrivileges ?? _account?.Type.ToClientGmLevel() ?? 0;
+		private uint Mask => _account?.GmLevel ?? 0;
 
-		// Matched against the RAW role, not the one ToClientGmLevel() hands the wire - that one has GodMode stripped,
-		// so comparing against it would never match a role and every account would read "custom".
-		private string RoleName => Roles.FirstOrDefault(r => r.Mask == (_account?.Type.ToClientGmLevel(godMode: true) ?? 0)).Name ?? "custom";
+		private bool IsGm => _account?.GmLevel is not null;
 
-		// ⚠️ GodMode is the one bit NOT read from the mask: it lives on the account's `.godmode` toggle so the client
-		// and the simulation cannot disagree about it (#902).
-		private bool Has(GmPrivileges bit)
+		private string RoleName => Roles.FirstOrDefault(r => r.Mask == Mask).Name ?? "custom";
+
+		private bool Has(uint bit)
 		{
-			return bit == GmPrivileges.GodMode
-				? _account?.GmGodMode ?? false
-				: (CurrentMask & (uint)bit) != 0;
+			return (Mask & bit) != 0;
 		}
 
-		private bool HasRaw(uint bit)
-		{
-			return (CurrentMask & bit) != 0;
-		}
-
-		private Task ToggleBit(GmPrivileges bit, ChangeEventArgs e)
-		{
-			var on = e.Value is true;
-
-			return bit == GmPrivileges.GodMode
-				? SetGodMode(on)
-				: SetMask(on
-					? CurrentMask | (uint)bit
-					: CurrentMask & ~(uint)bit);
-		}
-
-		private Task ToggleRaw(uint bit, ChangeEventArgs e)
+		private Task ToggleBit(uint bit, ChangeEventArgs e)
 		{
 			return SetMask(e.Value is true
-				? CurrentMask | bit
-				: CurrentMask & ~bit);
+				? Mask | bit
+				: Mask & ~bit);
 		}
 
 		private Task ApplyPreset(uint mask)
@@ -99,39 +78,23 @@ namespace Faolan.Web.Components.Pages
 			return SetMask(mask);
 		}
 
-		private Task ResetToRole()
+		// Clearing every bit and "not a GM" are the same state - see AccountAdminService.SetGmLevelAsync.
+		private Task RevokeGm()
 		{
 			return SetMask(null);
 		}
 
+		private Task GrantGm()
+		{
+			return SetMask(GmRoles.Support2);
+		}
+
 		private async Task SetMask(uint? mask)
 		{
-			var effective = await AdminSvc.SetGmPrivilegesAsync((uint)Id, mask);
-			_notice = effective == null
-				? "Account not found."
-				: mask == null
-					? "GM privileges now inherit the account type's role."
-					: $"GM privileges set - gm_level is now 0x{effective:X8}.";
-			await Reload();
-		}
-
-		private async Task SetGodMode(bool on)
-		{
-			var effective = await AdminSvc.SetGodModeAsync((uint)Id, on);
-			_notice = effective == null
-				? "Account not found."
-				: on
-					? $"God mode ON - the client will ignore health decreases. gm_level is now 0x{effective:X8}."
-					: $"God mode off. gm_level is now 0x{effective:X8}.";
-			await Reload();
-		}
-
-		private async Task ToggleInvisible(ChangeEventArgs e)
-		{
-			var set = await AdminSvc.SetInvisibleAsync((uint)Id, e.Value is true);
-			_notice = set == null
-				? "Account not found."
-				: $"Invisible to monsters: {(set.Value ? "on" : "off")}.";
+			var stored = await AdminSvc.SetGmLevelAsync((uint)Id, mask);
+			_notice = stored == null
+				? "Account is no longer a GM."
+				: $"gm_level is now 0x{stored:X8}.";
 			await Reload();
 		}
 

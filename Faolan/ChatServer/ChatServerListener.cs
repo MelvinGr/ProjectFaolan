@@ -385,7 +385,7 @@ namespace Faolan.ChatServer
 			if (text.Length <= 2 || text[0] != '.' || text[1] == '.')
 				return false;
 
-			if (client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
+			if (client.Session.Account is not { } account || !account.IsGm)
 				return false;
 
 			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);

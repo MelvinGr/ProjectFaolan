@@ -21,13 +21,13 @@ namespace Faolan.Tests
 			return [.. SubClassStatBlock.FreshSheet().Select(p => ((CharacterStatId)p.Id, 0xDEADu))];
 		}
 
-		private static Character Char80(AccountType type = AccountType.Normal)
+		private static Character Char80(uint? gmLevel = null)
 		{
 			return new Character
 			{
 				Level = 80,
 				Experience = 4242,
-				Account = new Account { Type = type }
+				Account = new Account { GmLevel = gmLevel }
 			};
 		}
 
@@ -38,13 +38,12 @@ namespace Faolan.Tests
 		[MemberData(nameof(Provenance))]
 		public void EveryOverride_Lands_WhateverTheProvenance(bool imported)
 		{
-			var sheet = SnapshotStatSheet.For(Char80(AccountType.Administrator), 0x0802ABCD, imported ? Captured() : null);
+			var sheet = SnapshotStatSheet.For(Char80(GmRoles.All), 0x0802ABCD, imported ? Captured() : null);
 
 			Assert.Equal(0x0802ABCDu, Value(sheet, CharacterStatId.PlayfieldToken));
-			// ⛔ WITHOUT the GodMode bit: an Administrator gets every privilege the client names EXCEPT client-side
-			// invulnerability, which follows `Account.GmGodMode` rather than the account type (#902 - with it set the
-			// client discards every server-driven health decrease and the bar never moves). See GmPrivilegeTests.
-			Assert.Equal(GmRoles.All & ~(uint)GmPrivileges.GodMode, Value(sheet, CharacterStatId.GmLevel));
+			// The account's stored mask, verbatim - `Account.GmLevel` IS the wire value now, with nothing derived
+			// from the web account type and no separate god-mode flag to reconcile. See AccountGmPrivilegeMaskTests.
+			Assert.Equal(GmRoles.All, Value(sheet, CharacterStatId.GmLevel));
 			Assert.Equal(80u, Value(sheet, CharacterStatId.Level));
 			// The XP triple is retail's CUMULATIVE form (#297): the row's 4242 is within-level progress and rides on
 			// level 80's own threshold, which is also the base the client subtracts to fill the bar.

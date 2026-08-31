@@ -281,8 +281,8 @@ namespace Faolan.GameServer.World
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
 			if (client.Session.Account is { } account)
 			{
-				entity.GodMode = account.GmGodMode;
-				entity.Invisible = account.GmInvisible;
+				entity.GodMode = account.HasGmPrivilege(GmPrivileges.GodMode);
+				entity.Invisible = account.HasGmPrivilege(GmPrivileges.InvisibleToMonsters);
 			}
 
 			// #512: `teamId` is what makes a GROUP map route to the party's copy rather than to a private one. It is

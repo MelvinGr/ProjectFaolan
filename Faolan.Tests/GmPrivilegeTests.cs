@@ -45,21 +45,6 @@ namespace Faolan.Tests
 		}
 
 		// A GM must be able to moderate (kick, cloak, GM chat and tag) without the Developer bit, which is what gates
-		// the ~85 client debug commands; an Administrator gets everything.
-		[Fact]
-		public void AccountTypes_MapToRolesWithTheRightReach()
-		{
-			var gm = AccountType.GameMaster.ToClientGmLevel();
-			foreach (var needed in new[] { GmPrivileges.CanKick, GmPrivileges.CanCloak, GmPrivileges.GmChat, GmPrivileges.ShowGmTag })
-				Assert.NotEqual(0u, gm & (uint)needed);
-
-			Assert.Equal(0u, gm & (uint)GmPrivileges.Developer);
-			Assert.Equal(GmRoles.All & ~(uint)GmPrivileges.GodMode, AccountType.Administrator.ToClientGmLevel());
-
-			// A normal account carries no bit at all - any non-zero value flips the client into GM mode.
-			Assert.Equal(0u, AccountType.Normal.ToClientGmLevel());
-			Assert.Equal(0u, AccountType.Trial.ToClientGmLevel());
-		}
 
 		// ⛔ THE ONE BIT THAT IS NOT A UI PERMISSION. `GodMode` (0x200) is CLIENT-SIDE INVULNERABILITY: the client's
 		// HealthCurrent handler opens with `GetStat(0xD7); if (gmLevel & 0x200) { if (new < old) return; }`
@@ -70,19 +55,5 @@ namespace Faolan.Tests
 		// So the bit follows `Account.GmGodMode`, the authoritative flag the simulation already honours, and never the
 		// account TYPE. Proven in-client with Frida on the local player's stat setter: with the bit set the write
 		// arrives carrying our value and the stored health does not move; cleared, the next decrease applies
-		// (`CMsg_StatChange()..(27 9999 old:25000)`) and a live fight walks the bar down to 0.
-		[Fact]
-		public void GodModeRidesTheServerToggle_NotTheAccountType()
-		{
-			foreach (var type in new[] { AccountType.GameMaster, AccountType.Administrator })
-			{
-				Assert.Equal(0u, type.ToClientGmLevel() & (uint)GmPrivileges.GodMode);
-				Assert.Equal(0u, type.ToClientGmLevel(godMode: false) & (uint)GmPrivileges.GodMode);
-				Assert.NotEqual(0u, type.ToClientGmLevel(godMode: true) & (uint)GmPrivileges.GodMode);
-			}
-
-			// Turning god mode on must not hand a normal account the client's GM mode - any non-zero value does that.
-			Assert.Equal(0u, AccountType.Normal.ToClientGmLevel(godMode: true));
-		}
 	}
 }

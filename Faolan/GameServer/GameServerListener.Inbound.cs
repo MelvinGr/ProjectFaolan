@@ -589,7 +589,8 @@ namespace Faolan.GameServer
 					//
 					// Still gated server-side on the account: the client only OFFERS these when gm_level is non-zero,
 					// but that is a value we send it, so it cannot be the authority on who may run them.
-					if (client.Session.Account!.Type < AccountType.GameMaster)
+					// ⚠️ The account's GM state, NOT its WebAccountType - that governs the admin site and nothing here.
+					if (!client.Session.Account!.IsGm)
 					{
 						Logger.LogWarning("FanaticCommandIIR '{Text}' from non-GM account {Account} ignored.", f.Text, client.Session.Account.Id);
 						break;
@@ -857,7 +858,7 @@ namespace Faolan.GameServer
 
 					Logger.LogDebug("ChatVicinity from ID32 {{{SenderClass:X}, {SenderHandle:X8}}}, mode {Mode}, {Length} message bytes.", senderClass, senderHandle, mode, messageLength);
 
-					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
+					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.IsGm)
 						await HandleGmCommand(client, text);
 					else
 						// "say" is proximity chat - only same-map players within range hear it (the sender always does).

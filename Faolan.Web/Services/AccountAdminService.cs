@@ -9,26 +9,21 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Web.Services
 {
 	// One account row for the admin table.
-	public sealed record AccountRow(uint Id, string UserName, AccountType Type, AccountState State, DateTimeOffset? LastConnection, int Characters);
+	public sealed record AccountRow(uint Id, string UserName, WebAccountType Type, AccountState State, DateTimeOffset? LastConnection, int Characters);
 
 	// Full account detail for the per-account admin page.
 	public sealed record AccountDetail(
 		uint Id,
 		string UserName,
-		AccountType Type,
+		WebAccountType Type,
 		AccountState State,
 		DateTimeOffset CreationDate,
 		DateTimeOffset? LastConnection,
 		string? LastIp,
 		List<AccountChar> Characters,
 
-		// The account's own client GM privilege mask, or null when it inherits the role its Type maps to.
-		uint? GmPrivileges,
-		bool GmGodMode,
-		bool GmInvisible,
-
-		// What ClientGmLevel() will actually put on the wire, mask + the GodMode bit from GmGodMode.
-		uint EffectiveGmLevel);
+		// The account's GM privilege mask, or null when it is not a GM at all. This IS what goes on the wire.
+		uint? GmLevel);
 
 	public sealed record AccountChar(uint Id, string Name, ushort Level, string Class, string Race, ulong Money, DateTimeOffset? LastConnection);
 
@@ -59,7 +54,7 @@ namespace Faolan.Web.Services
 
 			return new AccountDetail(a.Id, a.UserName, a.Type, a.State, a.CreationDate, a.LastConnection, string.IsNullOrEmpty(a.LastIpAddress)
 				? null
-				: a.LastIpAddress, chars, a.GmPrivileges, a.GmGodMode, a.GmInvisible, a.ClientGmLevel());
+				: a.LastIpAddress, chars, a.GmLevel);
 		}
 
 		public async Task<List<AccountRow>> ListAccountsAsync()
@@ -86,7 +81,7 @@ namespace Faolan.Web.Services
 			return account.State;
 		}
 
-		public async Task<AccountType?> SetTypeAsync(uint accountId, AccountType type)
+		public async Task<WebAccountType?> SetTypeAsync(uint accountId, WebAccountType type)
 		{
 			await using var db = await _dbFactory.CreateDbContextAsync();
 			var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
@@ -99,54 +94,27 @@ namespace Faolan.Web.Services
 		}
 
 		/// <summary>
-		///     Sets the account's explicit client GM privilege mask, or clears it (<paramref name="mask" /> null) so the
-		///     account falls back to the role its type maps to. Returns the EFFECTIVE mask that will go on the wire.
+		///     Sets the account's GM privilege mask, or clears it (<paramref name="mask" /> null) so the account stops
+		///     being a GM. Returns the stored value.
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ <see cref="GmPrivileges.GodMode" /> is stripped here and carried by <see cref="SetGodModeAsync" />
-		///     instead: it is the one bit that is not a UI permission but client-side invulnerability, and the server's
-		///     own `.godmode` has to agree with it or damage stops showing (#902). Storing it in two places is exactly
-		///     how they would drift.
+		///     ⚠️ An all-zero mask is normalised to null. On the wire the two are the same thing - ANY non-zero value
+		///     flips the retail client into GM mode, so "a GM with no privileges" cannot be expressed - and keeping a
+		///     0 around would be a second way to say "not a GM" that `IsGm` would disagree with.
 		/// </remarks>
-		public async Task<uint?> SetGmPrivilegesAsync(uint accountId, uint? mask)
+		public async Task<uint?> SetGmLevelAsync(uint accountId, uint? mask)
 		{
 			await using var db = await _dbFactory.CreateDbContextAsync();
 			var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
 			if (account == null)
 				return null;
 
-			account.GmPrivileges = mask & ~(uint)Core.Enums.GmPrivileges.GodMode;
-			if (mask == null)
-				account.GmPrivileges = null;
-
+			account.GmLevel = mask is null or 0
+				? null
+				: mask;
 			await db.SaveChangesAsync();
-			return account.ClientGmLevel();
+			return account.GmLevel;
 		}
 
-		/// <summary>Sets the persisted god-mode toggle, which is also the client's GodMode privilege bit.</summary>
-		public async Task<uint?> SetGodModeAsync(uint accountId, bool on)
-		{
-			await using var db = await _dbFactory.CreateDbContextAsync();
-			var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
-			if (account == null)
-				return null;
-
-			account.GmGodMode = on;
-			await db.SaveChangesAsync();
-			return account.ClientGmLevel();
-		}
-
-		/// <summary>Sets the persisted invisible-to-monsters toggle (server-side; not a client privilege bit).</summary>
-		public async Task<bool?> SetInvisibleAsync(uint accountId, bool on)
-		{
-			await using var db = await _dbFactory.CreateDbContextAsync();
-			var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
-			if (account == null)
-				return null;
-
-			account.GmInvisible = on;
-			await db.SaveChangesAsync();
-			return account.GmInvisible;
-		}
 	}
 }

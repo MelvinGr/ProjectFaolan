@@ -129,7 +129,7 @@ namespace Faolan.Web
 					var account = new Account
 					{
 						UserName = username,
-						Type = AccountType.Normal,
+						Type = WebAccountType.Normal,
 						State = AccountState.Active,
 						CreationDate = DateTimeOffset.UtcNow,
 						LastIpAddress = ""
@@ -382,7 +382,7 @@ namespace Faolan.Web
 				new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
 				new Claim(ClaimTypes.Name, account.UserName)
 			};
-			if (account.Type >= AccountType.GameMaster)
+			if (account.Type >= WebAccountType.GameMaster)
 				claims.Add(new Claim(ClaimTypes.Role, "Admin"));
 
 			var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

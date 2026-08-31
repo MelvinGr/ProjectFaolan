@@ -80,8 +80,7 @@ namespace Faolan.Core.Database.Repositories
 				.ExecuteUpdateAsync(s => s
 					.SetProperty(a => a.AuthStatus, account.AuthStatus)
 					.SetProperty(a => a.ClientInstance, account.ClientInstance)
-					.SetProperty(a => a.GmGodMode, account.GmGodMode)
-					.SetProperty(a => a.GmInvisible, account.GmInvisible));
+					.SetProperty(a => a.GmLevel, account.GmLevel));
 		}
 
 		// The account-wide client settings archive (#611). Its own method rather than a field on SaveAccount: that one

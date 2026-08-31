@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260831063449_AccountGmPrivilegesMask")]
-    partial class AccountGmPrivilegesMask
+    [Migration("20260831075034_AccountGmLevel")]
+    partial class AccountGmLevel
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -62,13 +62,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset>("CreationDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("GmGodMode")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("GmInvisible")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint?>("GmPrivileges")
+                    b.Property<uint?>("GmLevel")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("LastConnection")

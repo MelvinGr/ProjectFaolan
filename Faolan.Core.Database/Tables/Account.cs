@@ -18,7 +18,7 @@ namespace Faolan.Core.Database.Tables
 		public AccountState State { get; set; }
 
 		[ConstrainToEnumValues]
-		public AccountType Type { get; set; }
+		public WebAccountType Type { get; set; }
 
 		public DateTimeOffset CreationDate { get; set; } = DateTimeOffset.UtcNow;
 		public DateTimeOffset? LastConnection { get; set; }
@@ -28,40 +28,57 @@ namespace Faolan.Core.Database.Tables
 		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.
 		public bool ClaimsAvailable { get; set; }
 
-		// Persisted GM toggles (#279). Unlike the live WorldEntity flags (which clear on relog AND on every map
-		// change, since a playfield change is a fresh world connection), these survive on the account and are
-		// re-applied to the player's entity on each world entry. Only ever set true by the GM .godmode/.invisible
-		// commands (gated to AccountType >= GameMaster), so a normal account never carries them.
-		public bool GmGodMode { get; set; }
-		public bool GmInvisible { get; set; }
-
-		// The client GM privilege MASK (stat 0xD7 / 215) this account gets, overriding the role its TYPE would map
-		// to. NULL - the default - means "use the role", which is what every account had before the admin UI could
-		// set bits individually; a value here is an explicit per-account mask.
+		// ⭐ THE ACCOUNT'S GM PRIVILEGES, and the only place they live: the retail client's `gm_level` MASK (character
+		// stat 0x0D7 / 215, `GmPrivileges`), or NULL for an account that is not a GM at all.
 		//
-		// ⚠️ `GmPrivileges.GodMode` is NOT stored here even when the mask is explicit - it is taken from GmGodMode
-		// above, so the client's invulnerability and the server's `.godmode` can never disagree. That split is #902:
-		// with the bit set the client DISCARDS every server-driven health decrease (three gates in its stat setter,
-		// one per vital), so an account carrying it while the server did not think it was in god mode took damage,
-		// died, and watched a full health bar the whole time. `ClientGmLevel()` is the one place that assembles both.
-		public uint? GmPrivileges { get; set; }
+		// One nullable column rather than the four things this used to be - an `WebAccountType`-derived role, an
+		// explicit override mask, and separate `GmGodMode`/`GmInvisible` booleans - because three of those were the
+		// SAME data written twice: `GodMode` is bit 0x200 and `InvisibleToMonsters` is bit 0x80, both already in the
+		// mask retail puts on the wire. Two stores of one fact is how they drift, and #902 is what that costs.
+		//
+		// ⚠️ NULL and 0 are the same thing on the wire and deliberately not distinguished: ANY non-zero value flips the
+		// retail client into GM mode, so "a GM with no privileges" is not representable - an account with every bit
+		// cleared simply is not a GM. `IsGm` is therefore `GmLevel is not null`, not a second column that could disagree.
+		//
+		// ⚠️ This is NOT `WebAccountType`. That is the web ADMIN site's role and says nothing about the game; an account
+		// can administer the site without being a GM in-world, and vice versa.
+		public uint? GmLevel { get; set; }
+
+		/// <summary>Whether this account is a GM in game at all - i.e. carries any privileges.</summary>
+		public bool IsGm => GmLevel is not null;
+
+		/// <summary>Whether this account holds one privilege. False for a non-GM whatever the bit.</summary>
+		/// <remarks>
+		///     ⚠️ Pattern-matched rather than written `(GmLevel &amp; bit) != 0`: on a NULL level that lifts to
+		///     `null != 0`, which is TRUE, so a non-GM would hold every privilege. Same shape as the client's own
+		///     `GetStat` returning -1 for a stat it does not have (#902) - an absent value is not a zero.
+		/// </remarks>
+		public bool HasGmPrivilege(GmPrivileges privilege)
+		{
+			return GmLevel is { } level && (level & (uint)privilege) != 0;
+		}
 
 		/// <summary>
-		///     The GM privilege mask to put on the wire: the explicit <see cref="GmPrivileges" /> when set, otherwise
-		///     the role this account's <see cref="Type" /> maps to - and in both cases the
-		///     <see cref="Enums.GmPrivileges.GodMode" /> bit strictly follows <see cref="GmGodMode" />.
+		///     Turns one privilege on or off. A no-op on a non-GM: flipping a bit must never PROMOTE an account, or
+		///     `.godmode` on someone who is not a GM would quietly make them one.
+		/// </summary>
+		public void SetGmPrivilege(GmPrivileges privilege, bool on)
+		{
+			if (GmLevel is not { } level)
+				return;
+
+			GmLevel = on
+				? level | (uint)privilege
+				: level & ~(uint)privilege;
+		}
+
+		/// <summary>
+		///     The value to put in character stat <c>0x0D7</c>. Zero for a non-GM, which is what stops the client
+		///     entering GM mode at all.
 		/// </summary>
 		public uint ClientGmLevel()
 		{
-			var mask = GmPrivileges ?? Type.ToClientGmLevel();
-
-			// A normal account must stay at zero: ANY non-zero value flips the retail client into GM mode.
-			if (Type < AccountType.GameMaster)
-				return 0;
-
-			return GmGodMode
-				? mask | (uint)Enums.GmPrivileges.GodMode
-				: mask & ~(uint)Enums.GmPrivileges.GodMode;
+			return GmLevel ?? 0;
 		}
 
 		[MaxLength(128)]

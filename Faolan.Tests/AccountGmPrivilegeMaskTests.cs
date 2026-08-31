@@ -4,72 +4,80 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// `Account.ClientGmLevel()` is the ONE place the GM privilege mask on the wire is assembled, now that the admin UI
-	// can set bits individually. Two rules it has to keep, and both are load-bearing:
+	// `Account.GmLevel` is the account's WHOLE GM state: the retail client's `gm_level` mask, or null for an account
+	// that is not a GM. It replaced four things that were partly the same data - a `WebAccountType`-derived role, an
+	// override mask, and `GmGodMode`/`GmInvisible` booleans - because `GodMode` (0x200) and `InvisibleToMonsters`
+	// (0x80) are already bits IN that mask. Two stores of one fact is how they drift, and #902 is the bill for it:
+	// the client discards every server-driven health decrease while `GodMode` is set, so an account carrying the bit
+	// while the server thought otherwise took damage, died, and watched a full health bar the whole time.
 	//
-	//  * a per-account mask OVERRIDES the role the account type maps to, and clearing it falls back to that role;
-	//  * ⛔ `GodMode` is never taken from the mask. It rides `Account.GmGodMode`, the same flag the simulation reads,
-	//    because it is not a UI permission but CLIENT-SIDE INVULNERABILITY: with it set the client discards every
-	//    server-driven health decrease (one gate per vital in its stat setter), so an account carrying it while the
-	//    server did not think it was in god mode took damage, died, and watched a full health bar (#902). Storing it
-	//    in two places is exactly how the two would drift apart again.
+	// ⚠️ It is independent of `WebAccountType`, which governs the admin SITE and says nothing about the game.
 	public class AccountGmPrivilegeMaskTests
 	{
-		private static Account Acc(AccountType type, uint? mask = null, bool godMode = false)
+		private static Account Gm(uint mask)
 		{
-			return new Account { Type = type, GmPrivileges = mask, GmGodMode = godMode };
+			return new Account { GmLevel = mask };
 		}
 
 		[Fact]
-		public void NoMask_FallsBackToTheRoleTheTypeMapsTo()
+		public void NoLevel_IsNotAGm_AndPutsZeroOnTheWire()
 		{
-			Assert.Equal(GmRoles.All & ~(uint)GmPrivileges.GodMode, Acc(AccountType.Administrator).ClientGmLevel());
-			Assert.Equal(GmRoles.Support2 & ~(uint)GmPrivileges.GodMode, Acc(AccountType.GameMaster).ClientGmLevel());
+			var account = new Account();
+
+			Assert.False(account.IsGm);
+			Assert.Equal(0u, account.ClientGmLevel());
+			Assert.False(account.HasGmPrivilege(GmPrivileges.CanKick));
 		}
 
 		[Fact]
-		public void AnExplicitMask_OverridesTheRole()
+		public void TheStoredMaskIsWhatGoesOnTheWire()
 		{
-			var only = (uint)(GmPrivileges.CanKick | GmPrivileges.GmChat);
-
-			Assert.Equal(only, Acc(AccountType.GameMaster, only).ClientGmLevel());
+			Assert.Equal(GmRoles.Support2, Gm(GmRoles.Support2).ClientGmLevel());
+			Assert.True(Gm(GmRoles.Support2).IsGm);
+			Assert.True(Gm(GmRoles.Support2).HasGmPrivilege(GmPrivileges.CanKick));
+			Assert.False(Gm(GmRoles.Support2).HasGmPrivilege(GmPrivileges.Developer));
 		}
 
-		// ⛔ The #902 invariant. Whatever the mask says, the bit is the server's toggle and nothing else.
+		// ⛔ The #902 invariant, and it is now structural rather than enforced: god mode is a BIT, so the client's
+		// invulnerability and the server's `.godmode` are the same fact and cannot disagree.
+		[Fact]
+		public void GodModeIsJustABit_SoTheClientAndTheServerCannotDisagree()
+		{
+			var account = Gm((uint)GmPrivileges.CanKick);
+			Assert.False(account.HasGmPrivilege(GmPrivileges.GodMode));
+
+			account.SetGmPrivilege(GmPrivileges.GodMode, true);
+			Assert.True(account.HasGmPrivilege(GmPrivileges.GodMode));
+			Assert.NotEqual(0u, account.ClientGmLevel() & (uint)GmPrivileges.GodMode);
+			Assert.True(account.HasGmPrivilege(GmPrivileges.CanKick)); // the rest of the mask survives
+
+			account.SetGmPrivilege(GmPrivileges.GodMode, false);
+			Assert.Equal(0u, account.ClientGmLevel() & (uint)GmPrivileges.GodMode);
+		}
+
+		// Flipping a bit must never PROMOTE: `.godmode` on someone who is not a GM would otherwise quietly make them
+		// one, and any non-zero gm_level puts the retail client into GM mode.
+		[Fact]
+		public void SettingAPrivilegeOnANonGm_DoesNothing()
+		{
+			var account = new Account();
+
+			account.SetGmPrivilege(GmPrivileges.GodMode, true);
+
+			Assert.False(account.IsGm);
+			Assert.Equal(0u, account.ClientGmLevel());
+		}
+
+		// The web account type is the admin SITE's role. It must not leak into the game either way round.
 		[Theory]
-		[InlineData(AccountType.GameMaster)]
-		[InlineData(AccountType.Administrator)]
-		public void GodMode_ComesFromTheServerToggle_NeverFromTheMask(AccountType type)
+		[InlineData(WebAccountType.Trial)]
+		[InlineData(WebAccountType.Normal)]
+		[InlineData(WebAccountType.GameMaster)]
+		[InlineData(WebAccountType.Administrator)]
+		public void TheWebAccountType_DoesNotDecideGmPrivileges(WebAccountType type)
 		{
-			var withBit = (uint)(GmPrivileges.CanKick | GmPrivileges.GodMode);
-
-			// asked for in the mask but god mode off -> stripped
-			Assert.Equal(0u, Acc(type, withBit).ClientGmLevel() & (uint)GmPrivileges.GodMode);
-			// absent from the mask but god mode on -> present
-			Assert.NotEqual(0u, Acc(type, (uint)GmPrivileges.CanKick, godMode: true).ClientGmLevel() & (uint)GmPrivileges.GodMode);
-			// and the rest of the mask is untouched either way
-			Assert.NotEqual(0u, Acc(type, withBit, godMode: true).ClientGmLevel() & (uint)GmPrivileges.CanKick);
-		}
-
-		// Any non-zero value flips the retail client into GM mode, so a normal account must never carry one - not via a
-		// mask left behind by a demotion, and not via the god-mode toggle.
-		[Theory]
-		[InlineData(AccountType.Normal)]
-		[InlineData(AccountType.Trial)]
-		public void ANonGmAccount_CarriesNothing_WhateverIsStored(AccountType type)
-		{
-			Assert.Equal(0u, Acc(type).ClientGmLevel());
-			Assert.Equal(0u, Acc(type, GmRoles.All).ClientGmLevel());
-			Assert.Equal(0u, Acc(type, GmRoles.All, godMode: true).ClientGmLevel());
-		}
-
-		// A mask of 0 is a real setting ("this GM has no privileges"), not the same as "no mask" - the null case has to
-		// stay distinguishable or clearing every box would silently restore the role instead.
-		[Fact]
-		public void AnExplicitZeroMask_IsNotTheSameAsNoMask()
-		{
-			Assert.Equal(0u, Acc(AccountType.GameMaster, 0u).ClientGmLevel());
-			Assert.NotEqual(0u, Acc(AccountType.GameMaster).ClientGmLevel());
+			Assert.Equal(0u, new Account { Type = type }.ClientGmLevel());
+			Assert.Equal(GmRoles.Dev, new Account { Type = type, GmLevel = GmRoles.Dev }.ClientGmLevel());
 		}
 	}
 }
