@@ -331,12 +331,17 @@ namespace Faolan.GameServer
 				["feats"] = _feats.FeatCommand,
 				["char"] = (client, _) => CharLogCommand(client),
 				["kickban"] = KickBanCommand,
+				// Batch C2. ⚠️ `removeitem` is GONE (#914 rule 1): `/inventory delete <slot>` is the same job, and
+				// retail's form also carries deleteall and the equip-all verbs ours never had.
+				["getfaction"] = GetFactionCommand,
+				["setfaction"] = SetFactionCommand,
+				["magic"] = MagicCommand,
+				["inventory"] = InventoryCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["delete"] = DeleteCommand,
 				["kill"] = KillCommand,
 				["hurt"] = HurtCommand,
 				["additem"] = AddItemCommand,
-				["removeitem"] = RemoveItemCommand,
 				["tag"] = TagCommand,
 				["claim"] = _claims.ClaimCommand,
 				["syschat"] = (client, _) => SysChatCommand(client),
@@ -461,6 +466,11 @@ namespace Faolan.GameServer
 			["feats"] = GmPrivileges.SetStats,
 			["char"] = GmPrivileges.Developer,
 			["kickban"] = GmPrivileges.CanKick,
+			// Batch C2: /getfaction /setfaction = Developer 0x1, /magic = SetStats 0x40, /inventory = AcgSpawn 0x1000.
+			["getfaction"] = GmPrivileges.Developer,
+			["setfaction"] = GmPrivileges.Developer,
+			["magic"] = GmPrivileges.SetStats,
+			["inventory"] = GmPrivileges.AcgSpawn,
 			["level"] = GmPrivileges.SetStats,
 			["kill"] = GmPrivileges.NpcCommands,
 
@@ -477,7 +487,6 @@ namespace Faolan.GameServer
 			["delete"] = GmPrivileges.NpcCommands,
 			["hurt"] = GmPrivileges.PlayerDamage,
 			["additem"] = GmPrivileges.AcgSpawn,
-			["removeitem"] = GmPrivileges.AcgSpawn,
 			["tag"] = GmPrivileges.Developer,
 			["claim"] = GmPrivileges.Developer,
 			["syschat"] = GmPrivileges.Broadcast,
@@ -896,21 +905,6 @@ namespace Faolan.GameServer
 				: $"Already held tag {tagId}: {name}");
 		}
 
-		private async Task RemoveItemCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length != 1 || !int.TryParse(parts[0], out var slot) || slot < 0)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .removeitem <bagSlot>");
-				return;
-			}
-
-			var removed = await RemoveItemFromBackpack(client, slot);
-			await _agentServerDispatcher.SendSystemMessage(characterId, removed
-				? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
-				: $"No item in bag slot {slot}.");
-		}
 
 		// Bootstrap the AH window at accessPosition (must be within the 15-unit client proximity check). Shared by the
 		// `.ah` GM command and the real trigger - talking to the "Trader" auctioneer NPC (GameServerListener.Inbound

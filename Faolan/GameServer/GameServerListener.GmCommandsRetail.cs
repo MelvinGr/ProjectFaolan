@@ -11,6 +11,8 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Progression;
+using Faolan.GameServer.Progression;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -1097,6 +1099,153 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(gmId,
 				$"Kickbanned '{name}' (account '{userName}') for {minutes} minute(s){(kicked > 0 ? $", {kicked} live session(s) dropped" : "")}."
 				+ " The lift is in-process only - a restart inside the window leaves it banned, so use .unban then.");
+		}
+
+		// /getfaction <faction id>  - "Get the faction points for the player with the specified faction id."
+		//
+		// ⭐ The pair of these says something structural about factions: retail's getter takes a faction id and its
+		// setter takes id + POINTS, with no rank argument anywhere. So standing is a flat `faction id -> points` map
+		// and the rank is DERIVED from the point total, not stored (#310) - which is exactly how FactionLadder works.
+		private async Task GetFactionCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (!uint.TryParse(arg, out var factionId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .getfaction <faction id>");
+				return;
+			}
+
+			var standings = await Database.GetCharacterFactionStandings(characterId);
+			var points = standings.TryGetValue(factionId, out var stored) ? stored : 0;
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Faction {factionId}: {points} points, rank {FactionLadder.RankFor(points)}{(standings.ContainsKey(factionId) ? "" : " (no standing row - reported as zero)")}.");
+		}
+
+		// /setfaction <faction id> <faction points>
+		private async Task SetFactionCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length != 2 || !uint.TryParse(tokens[0], out var factionId) ||
+			    !int.TryParse(tokens[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var points))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .setfaction <faction id> <faction points>");
+				return;
+			}
+
+			await Database.SetCharacterFactionStanding(characterId, factionId, points);
+			var rank = (uint)FactionLadder.RankFor(points);
+			await _factions.SendAll(client);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Faction {factionId} set to {points} points (rank {rank}).");
+		}
+
+		// /magic list | learn <spellid> | forget <spellid> | forgetall | ...  - "Spellbook/magic handling".
+		//
+		// ⚠️ Retail's full grammar also carries `npccast` and three token-state-counter verbs; those name machinery we
+		// do not have, and they say so rather than failing silently. `forget` and `forgetall` are the interesting
+		// absence: the repository can ADD a known spell but has no path to remove one, so un-learning is a genuine
+		// gap and is reported as one instead of pretending the spellbook shrank.
+		private async Task MagicCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			var verb = tokens.Length > 0 ? tokens[0].ToLowerInvariant() : "list";
+
+			switch (verb)
+			{
+				case "list":
+				{
+					var known = await Database.GetCharacterSpells(characterId);
+					await _agentServerDispatcher.SendSystemMessage(characterId, known.Length == 0
+						? "No known spells."
+						: $"{known.Length} known spell(s): {string.Join(", ", known.Select(k => k.SpellId).Order())}");
+					return;
+				}
+
+				case "learn":
+				{
+					if (tokens.Length < 2 || !uint.TryParse(tokens[1], out var spellId))
+					{
+						await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .magic learn <spellid>");
+						return;
+					}
+
+					var added = await Database.AddCharacterSpell(characterId, spellId);
+					if (added)
+						await SendLearnSpell(client, spellId);
+
+					await _agentServerDispatcher.SendSystemMessage(characterId, added
+						? $"Learned spell {spellId}."
+						: $"Spell {spellId} was already known.");
+					return;
+				}
+
+				case "forget":
+				case "forgetall":
+					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
+						$".magic {verb} is not backed: the repository can add a known spell but has no path to remove one, so the spellbook cannot shrink yet."));
+					return;
+
+				default:
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"Usage: .magic list | learn <spellid>   (retail also has forget/forgetall/npccast and the token-state-counter verbs; none are backed here)");
+					return;
+			}
+		}
+
+		// /inventory delete <slot> [bag name] | deleteall [bag name] | equipall | unequipall
+		//
+		// ⚠️ This REPLACES our `.removeitem <bagSlot>` (#914 rule 1) - same job, and retail's form carries the
+		// deleteall and equip-all verbs ours never had. `equipall`/`unequipall` are not backed and say so.
+		private async Task InventoryCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var tokens = (arguments ?? "").Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			var verb = tokens.Length > 0 ? tokens[0].ToLowerInvariant() : "";
+
+			switch (verb)
+			{
+				case "delete":
+				{
+					if (tokens.Length < 2 || !int.TryParse(tokens[1], out var slot) || slot < 0)
+					{
+						await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inventory delete <slot>");
+						return;
+					}
+
+					var removed = await RemoveItemFromBackpack(client, slot);
+					await _agentServerDispatcher.SendSystemMessage(characterId, removed
+						? $"Deleted the item in bag slot {slot}."
+						: $"No item in bag slot {slot}.");
+					return;
+				}
+
+				case "deleteall":
+				{
+					// Walks the backpack rather than issuing a bulk delete, so every removal takes the same live
+					// DispatchRemoveItem path a single one does and the client's bags stay in step.
+					var deleted = 0;
+					for (var slot = 0; slot < (int)BaseBackpackSlots; slot++)
+					{
+						if (await RemoveItemFromBackpack(client, slot))
+							deleted++;
+					}
+
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {deleted} item(s) from the backpack.");
+					return;
+				}
+
+				case "equipall":
+				case "unequipall":
+					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("orange",
+						$".inventory {verb} is not backed: it needs a bulk equip path that picks a slot per item, which the equipment service does not expose."));
+					return;
+
+				default:
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .inventory delete <slot> | deleteall   (retail also has equipall/unequipall; not backed here)");
+					return;
+			}
 		}
 	}
 }
